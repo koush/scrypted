@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/objectdetector",
-   "version": "0.0.71",
+   "version": "0.0.72",
    "description": "Scrypted Video Analysis Plugin. Installed alongside a detection service like OpenCV or TensorFlow.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -45,6 +45,7 @@
       "jpeg-js": "^0.4.3",
       "lodash": "^4.17.21",
       "node-moving-things-tracker": "file:./node-moving-things-tracker",
+      "point-inside-polygon": "^1.0.3",
       "polygon-overlap": "^1.0.5"
    },
    "devDependencies": {

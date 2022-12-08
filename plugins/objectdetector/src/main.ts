@@ -6,6 +6,7 @@ import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } fro
 import { safeParseJson } from './util';
 
 const polygonOverlap = require('polygon-overlap');
+const insidePolygon = require('point-inside-polygon');
 
 const { mediaManager, systemManager, log } = sdk;
 
@@ -326,11 +327,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         y = y * 100 / detection.inputDimensions[1];
         x2 = x2 * 100 / detection.inputDimensions[0];
         y2 = y2 * 100 / detection.inputDimensions[1];
-        const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
 
         let excluded = false;
         for (const [zone, zoneValue] of Object.entries(this.exclusionZones)) {
-          if (polygonOverlap(box, zoneValue)) {
+          if (insidePolygon([x, y], zoneValue) &&
+            insidePolygon([x, y2], zoneValue) &&
+            insidePolygon([x2, y], zoneValue) &&
+            insidePolygon([x2, y2], zoneValue)) {
             excluded = true;
             copy = copy.filter(c => c !== o);
             break;
@@ -340,6 +343,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         if (excluded)
           continue;
 
+        const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
         for (const [zone, zoneValue] of Object.entries(this.zones)) {
           if (polygonOverlap(box, zoneValue)) {
             // this.console.log(o.className, 'inside', zone);
@@ -620,6 +624,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       key: 'zones',
       title: 'Inclusion Zones',
       type: 'string',
+      description: 'Enter the name of a new zone, or delete existing ones.',
       multiple: true,
       value: Object.keys(this.zones),
       choices: Object.keys(this.zones),
@@ -629,6 +634,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     settings.push({
       key: 'exclusionZones',
       title: 'Exclusion Zones',
+      description: 'Enter the name of a new zone, or delete existing ones.',
       type: 'string',
       multiple: true,
       value: Object.keys(this.exclusionZones),
