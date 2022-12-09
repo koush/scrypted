@@ -624,7 +624,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       key: 'zones',
       title: 'Inclusion Zones',
       type: 'string',
-      description: 'Enter the name of a new zone, or delete existing ones.',
+      description: 'Inclusion zones report limit detections that those within one of these zones. Enter the name of a new zone or delete an existing zone.',
       multiple: true,
       value: Object.keys(this.zones),
       choices: Object.keys(this.zones),
@@ -634,7 +634,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     settings.push({
       key: 'exclusionZones',
       title: 'Exclusion Zones',
-      description: 'Enter the name of a new zone, or delete existing ones.',
+      description: 'Exclusion zones report prevent detections that are fully contained within one of these zones. Enter the name of a new zone or delete an existing zone.',
       type: 'string',
       multiple: true,
       value: Object.keys(this.exclusionZones),
@@ -704,11 +704,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
     if (key.startsWith('zone-')) {
       const zoneName = key.substring(5);
-      if (this.zones[zoneName])
+      if (this.zones[zoneName]) {
         this.zones[zoneName] = JSON.parse(vs);
-      if (this.exclusionZones[zoneName])
+        this.storage.setItem('zones', JSON.stringify(this.zones));
+      }
+      if (this.exclusionZones[zoneName]) {
         this.exclusionZones[zoneName] = JSON.parse(vs);
-      this.storage.setItem('zones', JSON.stringify(this.zones));
+        this.storage.setItem('exclusionZones', JSON.stringify(this.exclusionZones));
+      }
       return;
     }
 
