@@ -144,9 +144,15 @@ export function redirectScryptedLogin(options?: {
 }) {
     let { baseUrl, redirect } = options || {};
     redirect = redirect || `/endpoint/@scrypted/core/public/`
-    if (baseUrl)
-        redirect = new URL(redirect, baseUrl).toString();
-    const redirect_uri = `${redirect}?redirect_uri=${encodeURIComponent(window.location.href)}`;
+    if (baseUrl) {
+        const url = new URL(redirect, baseUrl);
+        url.searchParams.set('redirect_uri', window.location.href);
+        redirect = url.toString();
+    }
+    else {
+        redirect = `${redirect}?redirect_uri=${encodeURIComponent(window.location.href)}`;
+    }
+    const redirect_uri = redirect;
     console.log('redirect_uri', redirect_uri);
     globalThis.location.href = redirect_uri;
 }
