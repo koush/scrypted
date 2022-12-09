@@ -624,7 +624,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       key: 'zones',
       title: 'Inclusion Zones',
       type: 'string',
-      description: 'Inclusion zones report limit detections that those within one of these zones. Enter the name of a new zone or delete an existing zone.',
+      description: 'Inclusion zones limit detections to those within the included areas. Enter the name of a new zone or delete an existing zone.',
       multiple: true,
       value: Object.keys(this.zones),
       choices: Object.keys(this.zones),
@@ -634,7 +634,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     settings.push({
       key: 'exclusionZones',
       title: 'Exclusion Zones',
-      description: 'Exclusion zones report prevent detections that are fully contained within one of these zones. Enter the name of a new zone or delete an existing zone.',
+      description: 'Exclusion zones prevent detections that are fully contained within excluded areas. Enter the name of a new zone or delete an existing zone.',
       type: 'string',
       multiple: true,
       value: Object.keys(this.exclusionZones),
