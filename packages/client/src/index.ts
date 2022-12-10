@@ -69,7 +69,7 @@ export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
 }
 
 function isRunningStandalone() {
-    return globalThis.matchMedia?.('(display-mode: standalone)').matches;
+    return globalThis.matchMedia?.('(display-mode: standalone)').matches || navigator.userAgent.includes('InstalledApp');
 }
 
 export async function logoutScryptedClient(baseUrl?: string) {
