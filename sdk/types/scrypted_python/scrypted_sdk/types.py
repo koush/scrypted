@@ -411,6 +411,7 @@ class NotifierOptions(TypedDict):
     actions: list[NotificationAction]
     badge: str
     body: str
+    bodyWithSubtitle: str
     data: Any
     dir: NotificationDirection
     lang: str

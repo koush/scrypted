@@ -200,6 +200,7 @@ export interface NotifierOptions {
   subtitle?: string;
   actions?: NotificationAction[];
   badge?: string;
+  bodyWithSubtitle?: string;
   body?: string;
   data?: any;
   dir?: NotificationDirection;
