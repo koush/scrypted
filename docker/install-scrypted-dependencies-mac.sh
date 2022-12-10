@@ -66,6 +66,13 @@ then
     exit 1
 fi
 
+PYTHON_PATH=$(brew --prefix python3)
+PYTHON_BIN_PATH=
+if [ ! -d "$PYTHON_PATH" ]
+then
+    PYTHON_BIN_PATH=$PYTHON_PATH/bin
+fi
+
 BREW_PREFIX=$(brew --prefix)
 if [ -z "$BREW_PREFIX" ]
 then
@@ -122,7 +129,7 @@ cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
     <key>EnvironmentVariables</key>
         <dict>
             <key>PATH</key>
-                <string>$NODE_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+                <string>$NODE_BIN_PATH:$PYTHON_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
                 <string>/Users/$USER</string>
         </dict>
