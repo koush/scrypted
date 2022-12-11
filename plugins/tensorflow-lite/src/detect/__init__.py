@@ -16,6 +16,7 @@ import binascii
 from urllib.parse import urlparse
 import threading
 from pipeline import run_pipeline
+import platform
 
 from gi.repository import Gst
 
@@ -309,7 +310,12 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             videosrc = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0 is-live=false ! rtph264depay ! h264parse' % videosrc
 
         decoder = settings and settings.get('decoder', 'decodebin')
-        decoder = decoder or 'decodebin'
+        decoder = decoder or 'Default'
+        if decoder == 'Default':
+            if platform.system() == 'Darwin':
+                decoder = 'vtdec_hw'
+            else:
+                decoder = 'decodebin'
         videosrc += " ! %s " % decoder
 
         width = optional_chain(j, 'mediaStreamOptions',

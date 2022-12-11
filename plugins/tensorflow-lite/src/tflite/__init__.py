@@ -239,10 +239,11 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             'title': "Decoder",
             'description': "The gstreamer element used to decode the stream",
             'combobox': True,
-            'value': 'decodebin',
-            'placeholder': 'decodebin',
+            'value': 'Default',
+            'placeholder': 'Default',
             'key': 'decoder',
             'choices': [
+                'Default',
                 'decodebin',
                 'vtdec_hw',
                 'nvh264dec',
