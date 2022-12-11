@@ -4,7 +4,7 @@ import asyncio
 import base64
 import gc
 import json
-import mimetypes
+import sys
 import os
 import platform
 import shutil
@@ -274,13 +274,14 @@ class PluginRemote:
         zip = zipfile.ZipFile(zipPath)
 
         plugin_volume = os.environ.get('SCRYPTED_PLUGIN_VOLUME')
-        python_prefix = os.path.join(plugin_volume, 'python-%s-%s' % (platform.system(), platform.machine()))
-        if not os.path.exists(python_prefix):
-            os.makedirs(python_prefix)
 
         python_version = 'python%s' % str(
             sys.version_info[0])+"."+str(sys.version_info[1])
         print('python version:', python_version)
+
+        python_prefix = os.path.join(plugin_volume, 'python%s-%s-%s' % (python_version, platform.system(), platform.machine()))
+        if not os.path.exists(python_prefix):
+            os.makedirs(python_prefix)
 
         if 'requirements.txt' in zip.namelist():
             requirements = zip.open('requirements.txt').read()

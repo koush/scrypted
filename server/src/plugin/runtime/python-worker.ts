@@ -47,7 +47,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             }
         }
 
-        const pythonPath = os.platform() === 'win32' ? 'py.exe' : 'python3';
+        const pythonPath = process.env.SCRYPTED_PYTHON_PATH || (os.platform() === 'win32' ? 'py.exe' : 'python3');
 
         this.worker = child_process.spawn(pythonPath, args, {
             // stdin, stdout, stderr, peer in, peer out
