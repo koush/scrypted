@@ -295,8 +295,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
     def get_interfaces_by_model(self, model_id):
         model_id = model_id.lower()
+        self.logger.debug(f"Checking applicable scrypted interfaces for {model_id}")
 
-        if model_id == "avd1001":
+        if model_id.startswith("avd1001"):
             return [
                 ScryptedInterface.VideoCamera.value,
                 ScryptedInterface.Camera.value,
