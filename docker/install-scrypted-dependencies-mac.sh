@@ -42,10 +42,18 @@ RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-
 RUN_IGNORE brew install gst-python
 # python image library
 RUN_IGNORE brew install pillow
-RUN pip3 install --upgrade pip
-RUN pip3 install aiofiles debugpy typing_extensions typing opencv-python
-# tflite/coral
-RUN_IGNORE pip3 install --extra-index-url https://google-coral.github.io/py-repo/ pycoral~=2.0
+
+RUN_IGNORE brew install python@3.9
+PYTHON_PATH=$(brew --prefix python@3.9)
+PYTHON_BIN_PATH=
+if [ ! -d "$PYTHON_PATH" ]
+then
+    PYTHON_BIN_PATH=$PYTHON_PATH/bin
+    export PATH=$PYTHON_BIN_PATH:$PATH
+fi
+
+RUN python3.9 -m pip install --upgrade pip
+RUN python3.9 -m pip install aiofiles debugpy typing_extensions typing opencv-python
 
 echo "Installing Scrypted Launch Agent..."
 
@@ -64,13 +72,6 @@ then
     echo "Unable to determine node@18 bin path."
     echo "$NODE_BIN_PATH does not exist."
     exit 1
-fi
-
-PYTHON_PATH=$(brew --prefix python3)
-PYTHON_BIN_PATH=
-if [ ! -d "$PYTHON_PATH" ]
-then
-    PYTHON_BIN_PATH=$PYTHON_PATH/bin
 fi
 
 BREW_PREFIX=$(brew --prefix)
