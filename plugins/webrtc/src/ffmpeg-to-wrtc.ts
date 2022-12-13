@@ -62,6 +62,9 @@ export async function createTrackForwarder(options: {
         tool: transcodeBaseline ? 'ffmpeg' : 'scrypted',
     });
 
+    if (!mo)
+        return;
+
     let mediaStreamFeedback: MediaStreamFeedback;
     try {
         mediaStreamFeedback = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.MediaStreamFeedback);
@@ -86,10 +89,10 @@ export async function createTrackForwarder(options: {
 
     if (!maximumCompatibilityMode) {
         let found: RTCRtpCodecParameters;
-        if (mediaStreamOptions.audio?.codec === 'pcm_ulaw') {
+        if (mediaStreamOptions?.audio?.codec === 'pcm_ulaw') {
             found = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU')
         }
-        else if (mediaStreamOptions.audio?.codec === 'pcm_alaw') {
+        else if (mediaStreamOptions?.audio?.codec === 'pcm_alaw') {
             found = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA')
         }
         if (found)
@@ -381,7 +384,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         });
 
         const atrack = new MediaStreamTrack({ kind: "audio" });
-        const console = sdk.deviceManager.getMixinConsole(mediaObject.sourceId);
+        const console = sdk.deviceManager.getMixinConsole(mediaObject?.sourceId || intercomId);
 
         const timeStart = Date.now();
         return {
@@ -444,7 +447,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject, options?.intercomId);
 
         const videoTransceiver = this.pc.addTransceiver(vtrack, {
-            direction: 'sendonly',
+            direction: 'sendonly' ,
         });
 
         videoTransceiver.mid = options?.videoMid;
@@ -466,8 +469,8 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                 return;
             this.console.log('done waiting ice connected');
             const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
-            waitClosed(this.pc).finally(() => f.kill());
-            ret.removed.promise.finally(() => f.kill());
+            waitClosed(this.pc).finally(() => f?.kill());
+            ret.removed.promise.finally(() => f?.kill());
         });
 
         return ret;
