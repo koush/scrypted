@@ -7,6 +7,12 @@ if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
 }
 
+// Node 17 changes the dns resolution order to return the record order.
+// This causes issues with clients that are on "IPv6" networks that are
+// actually busted and fail to connect to npm's IPv6 address.
+// The workaround is to favor IPv4.
+process.env['NODE_OPTIONS'] = '--dns-result-order=ipv4first';
+
 startPeriodicGarbageCollection();
 
 if (process.argv[2] === 'child' || process.argv[2] === 'child-thread') {
