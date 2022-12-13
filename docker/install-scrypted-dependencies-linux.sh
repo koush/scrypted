@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# Node 17 changes the dns resolution order to return the record order.
+# This causes issues with clients that are on "IPv6" networks that are
+# actually busted and fail to connect to npm's IPv6 address.
+# The workaround is to favor IPv4.
+export NODE_OPTIONS=--dns-result-order=ipv4first
+
 if [ "$USER" != "root" ]
 then
     echo "Installation must be run as 'root' (use sudo)."
