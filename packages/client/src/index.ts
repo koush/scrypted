@@ -66,6 +66,7 @@ export interface ScryptedLoginOptions extends ScryptedConnectionOptions {
 export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
     pluginId: string;
     clientName?: string;
+    transports?: string[];
 }
 
 function isRunningStandalone() {
@@ -198,6 +199,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         withCredentials: true,
         extraHeaders,
         rejectUnauthorized: false,
+        transports: options?.transports,
     };
 
     const explicitBaseUrl = baseUrl || `${globalThis.location.protocol}//${globalThis.location.host}`;
@@ -214,6 +216,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             withCredentials: true,
             extraHeaders,
             rejectUnauthorized: false,
+            transports: options?.transports,
         };
 
         let sockets: IOClientSocket[] = [];
@@ -252,6 +255,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                         withCredentials: true,
                         extraHeaders,
                         rejectUnauthorized: false,
+                        transports: options?.transports,
                     };
                     const check = new eio.Socket(explicitBaseUrl, webrtcEioOptions);
                     sockets.push(check);
