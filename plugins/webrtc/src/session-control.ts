@@ -36,6 +36,10 @@ export class ScryptedSessionControl implements RTCSessionControl {
         const url = rtspTcpServer.url.replace('tcp:', 'rtsp:');
         const ffmpegInput: FFmpegInput = {
             url,
+            mediaStreamOptions: {
+                id: undefined,
+                video: null,
+            },
             inputArguments: [
                 '-rtsp_transport', 'udp',
                 '-i', url,

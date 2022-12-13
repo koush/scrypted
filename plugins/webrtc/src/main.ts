@@ -4,7 +4,7 @@ import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import net from 'net';
@@ -36,11 +36,11 @@ mediaManager.addConverter({
 
 const zygote = createZygote<ReturnType<typeof fork>>();
 
-class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
+class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
     storageSettings = new StorageSettings(this, {});
     webrtcIntercom: Promise<Intercom>;
 
-    constructor(public plugin: WebRTCPlugin, options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
+    constructor(public plugin: WebRTCPlugin, options: SettingsMixinDeviceOptions<RTCSignalingClient & RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
         super(options);
     }
 
@@ -51,6 +51,22 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         }
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom))
             return this.mixinDevice.startIntercom(media);
+
+        if (this.mixinDeviceInterfaces.includes(ScryptedInterface.RTCSignalingClient)) {
+            const session = await this.mixinDevice.createRTCSignalingSession();
+
+            const ret = await createRTCPeerConnectionSink(
+                session,
+                this.console,
+                undefined,
+                media,
+                this.plugin.storageSettings.values.maximumCompatibilityMode,
+                this.plugin.getRTCConfiguration(),
+                this.plugin.getWeriftConfiguration(),
+            );
+            return;
+        }
+
         throw new Error("webrtc session not connected.");
     }
 
@@ -246,7 +262,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
         // if this is a webrtc camera, also proxy the signaling channel too
         // for inflexible clients.
-        if (interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
+        if (interfaces.includes(ScryptedInterface.RTCSignalingChannel) || interfaces.includes(ScryptedInterface.RTCSignalingClient)) {
             const ret = [
                 ScryptedInterface.RTCSignalingChannel,
                 ScryptedInterface.Settings,
@@ -262,11 +278,11 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             }
             else if (type === ScryptedDeviceType.Display) {
                 // intercom too?
-                ret.push(ScryptedInterface.Display);
+                ret.push(ScryptedInterface.Intercom, ScryptedInterface.Display);
             }
             else if (type === ScryptedDeviceType.SmartDisplay) {
                 // intercom too?
-                ret.push(ScryptedInterface.Display, ScryptedInterface.VideoCamera);
+                ret.push(ScryptedInterface.Intercom, ScryptedInterface.Microphone, ScryptedInterface.Display, ScryptedInterface.VideoCamera);
             }
             else {
                 return;

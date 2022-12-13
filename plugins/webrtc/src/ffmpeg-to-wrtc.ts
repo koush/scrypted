@@ -227,6 +227,11 @@ export async function createTrackForwarder(options: {
             video: videoRtpTrack,
         }
     }
+    else if (ffmpegInput.mediaStreamOptions?.video === null) {
+        tracks = {
+            audio: audioRtpTrack,
+        }
+    }
     else {
         tracks = {
             video: videoRtpTrack,
@@ -523,6 +528,7 @@ export async function createRTCPeerConnectionSink(
     maximumCompatibilityMode: boolean,
     configuration: RTCConfiguration,
     weriftConfiguration: PeerConfig,
+    clientOffer = true,
 ) {
     const clientOptions = await clientSignalingSession.getOptions();
     console.log('remote options', clientOptions);
@@ -552,7 +558,7 @@ export async function createRTCPeerConnectionSink(
         configuration,
     };
 
-    connection.negotiateRTCSignalingSessionInternal(setup, true);
+    connection.negotiateRTCSignalingSessionInternal(setup, clientOffer);
 
     return track.control;
 }
