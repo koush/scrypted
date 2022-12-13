@@ -83,6 +83,7 @@ Type=simple
 ExecStart=/usr/bin/npx -y scrypted serve
 Restart=on-failure
 RestartSec=3
+Environment="NODE_OPTIONS=$NODE_OPTIONS"
 
 [Install]
 WantedBy=multi-user.target

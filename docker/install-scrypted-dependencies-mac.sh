@@ -135,6 +135,8 @@ cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
         <string>$USER</string>
     <key>EnvironmentVariables</key>
         <dict>
+            <key>NODE_OPTIONS</key>
+                <string>$NODE_OPTIONS</string>
             <key>PATH</key>
                 <string>$NODE_BIN_PATH:$PYTHON_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>

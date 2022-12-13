@@ -517,14 +517,12 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
       ScryptedInterface.StartStop,
       ScryptedInterface.Pause,
       ScryptedInterface.EngineIOHandler,
+      ScryptedInterface.RTCSignalingClient,
     ];
 
     const type = (model && model.indexOf('Google Home') !== -1 && model.indexOf('Hub') == -1)
       ? ScryptedDeviceType.Speaker
       : ScryptedDeviceType.Display;
-
-    if (type === ScryptedDeviceType.Display)
-      interfaces.push(ScryptedInterface.RTCSignalingClient)
 
     const device: Device = {
       nativeId: id,
@@ -541,17 +539,21 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
     this.search.emit(id);
     await deviceManager.onDeviceDiscovered(device);
 
-    const castDevice = this.getDevice(id);
+    const castDevice = await this.getDevice(id);
     castDevice.storage.setItem('host', ip);
   }
 
-  getDevice(nativeId: string) {
+  async getDevice(nativeId: string) {
     let ret = this.devices.get(nativeId);
     if (!ret) {
       ret = new CastDevice(this, nativeId);
       this.devices.set(nativeId, ret);
     }
     return ret;
+  }
+
+  async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+      
   }
 
   async discoverDevices(duration: number) {
