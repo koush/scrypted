@@ -34,7 +34,7 @@ function getDebugModeH264EncoderArgs() {
 
 export async function createTrackForwarder(options: {
     timeStart: number,
-    isPrivate: boolean, destinationId: string,
+    isPrivate: boolean, destinationId: string, ipv4: boolean,
     requestMediaStream: RequestMediaStream,
     videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver,
     sessionSupportsH264High: boolean, maximumCompatibilityMode: boolean, transcodeWidth: number,
@@ -187,7 +187,11 @@ export async function createTrackForwarder(options: {
         },
     };
 
-    const videoPacketSize = 1300;
+    // ipv4 mtu is 1500
+    // so max usable packet size is 1500 - rtp header - tcp header - ip header
+    // 1500 - 12 - 20 - 20 = 1448.
+    // but set to 1440 cause that's what cameras seem to use for some reason.
+    const videoPacketSize = options.ipv4 ? 1440 : 1300;
     let h264Repacketizer: H264Repacketizer;
     let spsPps: ReturnType<typeof getSpsPps>;
 
