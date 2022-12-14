@@ -75,7 +75,7 @@ class Stream:
             key = f"{resource}/{action}"
 
             while key not in self.queues:
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(random.uniform(0, 0.01))
             q = self.queues[key]
 
             while True:
