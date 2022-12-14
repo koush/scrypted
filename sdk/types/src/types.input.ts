@@ -1798,6 +1798,7 @@ export interface RTCConnectionManagement {
     intercomId?: string,
   }): Promise<RTCMediaObjectTrack>;
   close(): Promise<void>;
+  probe(): Promise<void>;
 }
 
 /**
