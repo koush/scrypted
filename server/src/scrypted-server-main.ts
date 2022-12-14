@@ -439,8 +439,6 @@ async function start() {
     }
 
     app.post('/login', async (req, res) => {
-        await checkResetLogin();
-
         const { username, password, change_password, maxAge: maxAgeRequested } = req.body;
         const timestamp = Date.now();
         const maxAge = parseInt(maxAgeRequested) || ONE_DAY_MILLISECONDS;
@@ -531,6 +529,8 @@ async function start() {
 
 
     app.get('/login', async (req, res) => {
+        await checkResetLogin();
+
         scrypted.addAccessControlHeaders(req, res);
         const hostname = os.hostname()?.split('.')?.[0];
 
