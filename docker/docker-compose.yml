@@ -19,6 +19,8 @@ services:
 
         volumes:
             - ~/.scrypted/volume:/server/volume
+            # modify and add the additional volume for Scrypted NVR
+            # - /media/external:/media/external
         # logging is noisy and will unnecessarily wear on flash storage.
         # scrypted has per device in memory logging that is preferred.
         logging:
