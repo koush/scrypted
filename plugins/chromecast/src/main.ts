@@ -14,7 +14,7 @@ const Client = require('castv2-client').Client;
 function ScryptedMediaReceiver() {
   DefaultMediaReceiver.apply(this, arguments);
 }
-ScryptedMediaReceiver.APP_ID = '00F7C5DD';
+ScryptedMediaReceiver.APP_ID = '9D66005A';
 util.inherits(ScryptedMediaReceiver, DefaultMediaReceiver);
 
 class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, EngineIOHandler, RTCSignalingClient {

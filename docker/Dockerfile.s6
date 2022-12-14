@@ -40,6 +40,6 @@ WORKDIR /server
 # this prevents node from preferring ipv6 addresses locally on
 # networks with busted ipv6 setups.
 # https://github.com/nodejs/node/issues/41145#issuecomment-992948130
-ENV NODE_OPTIONS=--dns-result-order=ipv4first
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 
 CMD npm --prefix /server exec scrypted-serve
