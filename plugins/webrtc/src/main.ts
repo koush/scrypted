@@ -4,12 +4,12 @@ import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
-import { createRTCPeerConnectionSink, parseOptions, RTC_BRIDGE_NATIVE_ID, WebRTCBridge, WebRTCConnectionManagement } from "./ffmpeg-to-wrtc";
+import { createRTCPeerConnectionSink, parseOptions, RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement } from "./ffmpeg-to-wrtc";
 import { stunServer, turnServer } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
@@ -489,24 +489,76 @@ export async function fork() {
                 }
             }
 
-            const socket = net.connect(port, '127.0.0.1');
-            cleanup.promise.finally(() => socket.destroy());
-
-            const dc = pc.createDataChannel('rpc');
-            dc.message.subscribe(message => socket.write(message));
-
-            const debouncer = new DataChannelDebouncer({
-                send: u8 => dc.send(Buffer.from(u8)),
-            }, e => {
-                this.console.error('datachannel send error', e);
-                socket.destroy();
-            });
-            socket.on('data', data => debouncer.send(data));
-            socket.on('close', () => cleanup.resolve('socket closed'));
-            socket.on('error', () => cleanup.resolve('socket error'));
+            if (port) {
+                const socket = net.connect(port, '127.0.0.1');
+                cleanup.promise.finally(() => socket.destroy());
+    
+                const dc = pc.createDataChannel('rpc');
+                dc.message.subscribe(message => socket.write(message));
+    
+                const debouncer = new DataChannelDebouncer({
+                    send: u8 => dc.send(Buffer.from(u8)),
+                }, e => {
+                    this.console.error('datachannel send error', e);
+                    socket.destroy();
+                });
+                socket.on('data', data => debouncer.send(data));
+                socket.on('close', () => cleanup.resolve('socket closed'));
+                socket.on('error', () => cleanup.resolve('socket error'));
+            }
+            else {
+                pc.createDataChannel('dummy');
+                const offer = await pc.createOffer();
+                pc.setLocalDescription(offer);
+            }
 
             return connection;
         }
+    }
+}
+
+class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
+    constructor(public plugin: WebRTCPlugin, nativeId: string) {
+        super(nativeId);
+
+        this.fromMimeType = ScryptedMimeTypes.RTCSignalingSession;
+        this.toMimeType = ScryptedMimeTypes.RTCConnectionManagement;
+    }
+
+    async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<any> {
+        const session = data as RTCSignalingSession;
+        const maximumCompatibilityMode = !!this.plugin.storageSettings.values.maximumCompatibilityMode;
+        const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
+
+        const console = sdk.deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
+
+        const result = zygote();
+
+        const cleanup = new Deferred<string>();
+
+        this.plugin.activeConnections++;
+        result.worker.on('exit', () => {
+            this.plugin.activeConnections--;
+            cleanup.resolve('worker exited');
+        });
+        cleanup.promise.finally(() => {
+            result.worker.terminate()
+        });
+
+        const { createConnection } = await result.result;
+        const connection = await createConnection({}, undefined, session,
+            maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
+            configuration: this.plugin.getRTCConfiguration(),
+            weriftConfiguration: this.plugin.getWeriftConfiguration(),
+        });
+        cleanup.promise.finally(() => connection.close().catch(() => { }));
+        connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
+        await connection.negotiateRTCSignalingSession();
+        await connection.waitConnected();
+
+        // await connection.negotiateRTCSignalingSession();
+
+        return connection;
     }
 }
 

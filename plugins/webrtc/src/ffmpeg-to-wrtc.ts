@@ -372,6 +372,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         this.weriftSignalingSession = new WeriftSignalingSession(console, this.pc);
     }
 
+    async probe() {
+    }
+
     async createTracks(mediaObject: MediaObject, intercomId?: string) {
         let requestMediaStream: RequestMediaStream;
 
@@ -452,7 +455,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject, options?.intercomId);
 
         const videoTransceiver = this.pc.addTransceiver(vtrack, {
-            direction: 'sendonly' ,
+            direction: 'sendonly',
         });
 
         videoTransceiver.mid = options?.videoMid;
@@ -492,31 +495,10 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     async waitClosed() {
         await waitClosed(this.pc);
     }
-}
 
-export class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
-    constructor(public plugin: WebRTCPlugin, nativeId: string) {
-        super(nativeId);
-
-        this.fromMimeType = ScryptedMimeTypes.RTCSignalingSession;
-        this.toMimeType = ScryptedMimeTypes.RTCConnectionManagement;
-    }
-
-    async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<any> {
-        const session = data as RTCSignalingSession;
-        const maximumCompatibilityMode = !!this.plugin.storageSettings.values.maximumCompatibilityMode;
-        const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
-
-        const console = sdk.deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
-        const ret = new WebRTCConnectionManagement(console, session, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
-            configuration: this.plugin.getRTCConfiguration(),
-            weriftConfiguration: this.plugin.getWeriftConfiguration(),
-        });
-        // todo: move this into api, provide a client stream.
-        ret.pc.createDataChannel('dummy');
-        const offer = await ret.pc.createOffer();
-        ret.pc.setLocalDescription(offer);
-        return ret;
+    async waitConnected() {
+        await waitIceConnected(this.pc);
+        await waitConnected(this.pc);
     }
 }
 

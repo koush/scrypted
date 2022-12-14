@@ -28,8 +28,8 @@ async function statePromise(e: Event, check: () => boolean): Promise<void> {
 
 function isPeerConnectionClosed(pc: RTCPeerConnection) {
     return (pc.connectionState === 'closed'
-    || pc.connectionState === 'disconnected'
-    || pc.connectionState === 'failed')
+        || pc.connectionState === 'disconnected'
+        || pc.connectionState === 'failed')
 }
 
 export function waitConnected(pc: RTCPeerConnection) {
@@ -42,8 +42,8 @@ export function waitConnected(pc: RTCPeerConnection) {
 
 function isPeerIceConnectionClosed(pc: RTCPeerConnection) {
     return (pc.iceConnectionState === 'disconnected'
-    || pc.iceConnectionState === 'failed'
-    || pc.iceConnectionState === 'closed')
+        || pc.iceConnectionState === 'failed'
+        || pc.iceConnectionState === 'closed')
 }
 
 export function waitIceConnected(pc: RTCPeerConnection) {
