@@ -4,19 +4,29 @@ type CompileFunction = (code: string, params?: ReadonlyArray<string>, options?: 
 export function startPeriodicGarbageCollection() {
     if (!global.gc) {
         console.warn('rpc peer garbage collection not available: global.gc is not exposed.');
-        return;
     }
+    let g: typeof global;
     try {
-        const g = global;
-        if (g.gc) {
-            return setInterval(() => {
-                g.gc!();
-            }, 10000);
-        }
+        g = global;
     }
     catch (e) {
-
     }
+
+    // periodically see if new objects were created or finalized,
+    // and collect gc if so.
+    let lastCollection = 0;
+    return setInterval(() => {
+        const now = Date.now();
+        const sinceLastCollection = now - lastCollection;
+        const remotesCreated = RpcPeer.remotesCreated;
+        RpcPeer.remotesCreated = 0;
+        const remotesCollected = RpcPeer.remotesCollected;
+        RpcPeer.remotesCollected = 0;
+        if (remotesCreated || remotesCollected || sinceLastCollection > 5 * 60 * 1000) {
+            lastCollection = now;
+            g?.gc?.();
+        }
+    }, 10000);
 }
 
 export interface RpcMessage {
@@ -221,6 +231,9 @@ export class RpcPeer {
     killedDeferred: Deferred;
 
     static readonly finalizerIdSymbol = Symbol('rpcFinalizerId');
+    static remotesCollected = 0;
+    static remotesCreated = 0;
+
 
     static isRpcProxy(value: any) {
         return !!value?.[RpcPeer.PROPERTY_PROXY_ID];
@@ -315,6 +328,8 @@ export class RpcPeer {
     }
 
     finalize(entry: LocalProxiedEntry) {
+        RpcPeer.remotesCollected++;
+
         delete this.remoteWeakProxies[entry.id];
         const rpcFinalize: RpcFinalize = {
             __local_proxy_id: entry.id,
@@ -471,6 +486,8 @@ export class RpcPeer {
     }
 
     newProxy(proxyId: string, proxyConstructorName: string, proxyProps: any, proxyOneWayMethods: string[]) {
+        RpcPeer.remotesCreated++;
+
         const localProxiedEntry: LocalProxiedEntry = {
             id: proxyId,
             finalizerId: undefined,
