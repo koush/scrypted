@@ -34,18 +34,6 @@ addSupportedType({
             maxValue: maxSetTemp // default = 38, change to 32C or 90F (32.2222C)
         });
 
-        service.getCharacteristic(Characteristic.CoolingThresholdTemperature).setProps({
-            minStep: minStep, // 0.1
-            minValue: minSetTemp, // default = 10, change to 9C or 50F (10C)
-            maxValue: maxSetTemp // default = 35, change to 32C or 90F (32.2222C)
-        });
-        
-        service.getCharacteristic(Characteristic.HeatingThresholdTemperature).setProps({
-            minStep: minStep, // 0.1
-            minValue: minSetTemp, // default = 0, change to 9C or 50F (10C)
-            maxValue: maxSetTemp // default = 25, change to 32C or 90F (32.2222C)
-        });
-
         function toCurrentMode(mode: ThermostatMode) {
             switch (mode) {
                 case ThermostatMode.Off:
@@ -68,6 +56,8 @@ addSupportedType({
                     return Characteristic.TargetHeatingCoolingState.HEAT;
                 case ThermostatMode.Auto:
                     return Characteristic.TargetHeatingCoolingState.AUTO;
+                case ThermostatMode.HeatCool:
+                    return Characteristic.TargetHeatingCoolingState.AUTO;
             }
             return Characteristic.TargetHeatingCoolingState.AUTO;
         }
@@ -81,7 +71,11 @@ addSupportedType({
                 case Characteristic.TargetHeatingCoolingState.COOL:
                     return ThermostatMode.Cool;
                 case Characteristic.TargetHeatingCoolingState.AUTO:
-                    return ThermostatMode.Auto;
+                    if (device.thermostatAvailableModes.includes(ThermostatMode.HeatCool)) {
+                        return ThermostatMode.HeatCool;
+                    } else {
+                        return ThermostatMode.Auto;
+                    }
             }
         }
 
@@ -97,7 +91,8 @@ addSupportedType({
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetHeatingCoolingState,
             () => toTargetMode(device.thermostatMode));
         
-        if (!device.thermostatAvailableModes.includes(ThermostatMode.Auto)) {
+        if (!device.thermostatAvailableModes.includes(ThermostatMode.Auto) &&
+                !device.thermostatAvailableModes.includes(ThermostatMode.HeatCool)) {
             service.getCharacteristic(Characteristic.TargetHeatingCoolingState).setProps({
                 maxValue: Characteristic.TargetHeatingCoolingState.COOL // Disable 'Auto' mode
             });
@@ -112,23 +107,37 @@ addSupportedType({
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetTemperature,
             () => Math.max(device.thermostatSetpoint || 0, 10));
 
-        service.getCharacteristic(Characteristic.HeatingThresholdTemperature)
-            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                callback();
-                device.setThermostatSetpointLow(value as number);
+        if (device.thermostatAvailableModes.includes(ThermostatMode.HeatCool)) {
+            service.getCharacteristic(Characteristic.CoolingThresholdTemperature).setProps({
+                minStep: minStep, // 0.1
+                minValue: minSetTemp, // default = 10, change to 9C or 50F (10C)
+                maxValue: maxSetTemp // default = 35, change to 32C or 90F (32.2222C)
             });
 
-        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.HeatingThresholdTemperature,
-            () => Math.max(device.thermostatSetpointLow || 0, 10));
-
-        service.getCharacteristic(Characteristic.CoolingThresholdTemperature)
-            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                callback();
-                device.setThermostatSetpointHigh(value as number);
+            service.getCharacteristic(Characteristic.HeatingThresholdTemperature).setProps({
+                minStep: minStep, // 0.1
+                minValue: minSetTemp, // default = 0, change to 9C or 50F (10C)
+                maxValue: maxSetTemp // default = 25, change to 32C or 90F (32.2222C)
             });
 
-        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.CoolingThresholdTemperature,
-            () => Math.max(device.thermostatSetpointHigh || 0, 10));
+            service.getCharacteristic(Characteristic.HeatingThresholdTemperature)
+                .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                    callback();
+                    device.setThermostatSetpointLow(value as number);
+                });
+
+            bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.HeatingThresholdTemperature,
+                () => Math.max(device.thermostatSetpointLow || 0, 10));
+
+            service.getCharacteristic(Characteristic.CoolingThresholdTemperature)
+                .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                    callback();
+                    device.setThermostatSetpointHigh(value as number);
+                });
+
+            bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.CoolingThresholdTemperature,
+                () => Math.max(device.thermostatSetpointHigh || 0, 10));
+        }
 
         bindCharacteristic(device, ScryptedInterface.Thermometer, service, Characteristic.TemperatureDisplayUnits,
             () => device.temperatureUnit === TemperatureUnit.F ? Characteristic.TemperatureDisplayUnits.FAHRENHEIT : Characteristic.TemperatureDisplayUnits.CELSIUS);
