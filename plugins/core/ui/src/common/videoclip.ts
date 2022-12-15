@@ -8,7 +8,7 @@ export async function fetchClipThumbnail(mediaManager: MediaManager, device: Vid
     const url = (await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.LocalUrl)).toString();
     try {
         const u = new URL(url);
-        return u.pathname + '?' + u.search;
+        return u.pathname + u.search;
     }
     catch (e) {
         return url;
@@ -20,7 +20,7 @@ export async function fetchClipUrl(mediaManager: MediaManager, device: VideoClip
     const url = (await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.LocalUrl)).toString();
     try {
         const u = new URL(url);
-        return u.pathname + '?' + u.search;
+        return u.pathname + u.search;
     }
     catch (e) {
         return url;
