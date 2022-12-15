@@ -130,7 +130,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
             ret.push({
                 name: `RTSP ${preview}`,
                 id: preview,
-                url: `rtsp://${this.getRtspAddress()}/${preview}`
+                url: `rtsp://${this.getRtspAddress()}/${preview}`,
+                container: 'rtsp',
+                video: {
+                    codec: preview.substring(0, 4),
+                },
             });
         }
 
