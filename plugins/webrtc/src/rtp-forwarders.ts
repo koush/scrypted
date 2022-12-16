@@ -69,6 +69,7 @@ async function setupRtspClient(console: Console, rtspClient: RtspClient, channel
                 onRtp: (rtspHeader, rtp) => deliver(rtp),
             });
             console.log('rtsp/udp', section.codec, result);
+            return false;
         }
     }
     catch (e) {

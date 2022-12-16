@@ -39,7 +39,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             title: 'Local Stream',
             description: 'The media stream to use when streaming on your local network. This stream should be prebuffered. Recommended resolution: 1920x1080 to 4K.',
             hide: true,
-            prefersPrebuffer: true,
+            prefersPrebuffer: false,
             preferredResolution: 3840 * 2160,
         },
         remoteStream: {
@@ -69,7 +69,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             description: 'The media stream to use when recording to cloud storage such as HomeKit Secure Video clips in iCloud. This stream should be prebuffered. Recommended resolution: 1280x720.',
             hide: true,
             prefersPrebuffer: true,
-            preferredResolution: 1280 * 720,
+            preferredResolution: 2560 * 1440,
         },
     });
 

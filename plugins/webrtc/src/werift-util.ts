@@ -57,8 +57,11 @@ export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection
             console.warn('Turn server is in use. For optimal performance ensure that your router supports source NAT.');
     }
     console.log('Connection is local network:', isPrivate);
+    const destinationId = pc.iceTransports[0]?.connection?.remoteAddr?.[0];
+    const ipv4 = ip.isV4Format(destinationId);
     return {
+        ipv4,
         isPrivate,
-        destinationId: pc.iceTransports[0]?.connection?.remoteAddr?.[0],
+        destinationId,
     };
 }

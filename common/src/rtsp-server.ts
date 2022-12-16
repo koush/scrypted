@@ -782,6 +782,9 @@ export class RtspServer {
         this.session = randomBytes(4).toString('hex');
         if (sdp)
             sdp = sdp.trim();
+
+        if (client instanceof net.Socket)
+            client.setNoDelay(true);
     }
 
     async handleSetup(methods = ['play', 'record', 'teardown']) {
