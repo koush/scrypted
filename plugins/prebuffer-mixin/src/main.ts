@@ -1043,8 +1043,10 @@ class PrebufferSession {
 
     const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
     let sdp = await this.sdp;
-    if (!mediaStreamOptions.video?.h264Info && this.usingScryptedParser)
+    if (!mediaStreamOptions.video?.h264Info && this.usingScryptedParser) {
+      mediaStreamOptions.video ||= {};
       mediaStreamOptions.video.h264Info = this.getLastH264Probe();
+    }
 
     let socketPromise: Promise<Duplex>;
     let url: string;
@@ -1587,8 +1589,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       const session = this.sessions.get(mso.id);
       if (session?.parserSession || enabledStreams.includes(mso))
         mso.prebuffer = prebufferDurationMs;
-      if (session && !mso.video?.h264Info)
+      if (session && !mso.video?.h264Info) {
+        mso.video ||= {};
         mso.video.h264Info = session.getLastH264Probe();
+      }
       if (!mso.destinations) {
         mso.destinations = [];
         for (const [k, v] of map.entries()) {

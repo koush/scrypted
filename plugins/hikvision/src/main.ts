@@ -212,11 +212,14 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                             const [id] = streamingChannel.id;
                             const width = parseInt(streamingChannel?.Video?.[0]?.videoResolutionWidth?.[0]) || undefined;
                             const height = parseInt(streamingChannel?.Video?.[0]?.videoResolutionHeight?.[0]) || undefined;
+                            let codec = streamingChannel?.Video?.[0]?.videoCodecType?.[0] as string;
+                            codec = codec?.toLowerCase()?.replaceAll('.', '');
                             const vso: MediaStreamOptions = {
                                 id,
                                 video: {
                                     width,
                                     height,
+                                    codec,
                                 }
                             }
                             ret.set(id, vso);
