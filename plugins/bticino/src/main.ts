@@ -42,81 +42,56 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         return;
     }
 
-    storageSettings = new StorageSettings(this, {})
+    settingsStorage = new StorageSettings(this, {
+        sipfrom: {
+            title: 'SIP From: URI',
+            type: 'string',
+            value: this.storage.getItem('sipfrom'),
+            description: 'SIP URI From field: Using the IP address of your server you will be calling from. Also the user and IP you added in /etc/flexisip/users/route_ext.conf on the intercom.',
+            placeholder: 'user@192.168.0.111',
+            multiple: false,
+        },
+        sipto: {
+            title: 'SIP To: URI',
+            type: 'string',
+            description: 'SIP URI To field: Must look like c300x@IP;transport=udp;rport and UDP transport is the only one supported right now.',
+            placeholder: 'c300x@192.168.0.2[:5060];transport=udp;rport',
+        },
+        sipdomain: {
+            title: 'SIP domain',
+            type: 'string',
+            description: 'SIP domain: The internal BTicino domain, usually has the following format: 2048362.bs.iotleg.com',
+            placeholder: '2048362.bs.iotleg.com',
+        },
+        sipexpiration: {
+            title: 'SIP UA expiration',
+            type: 'number',
+            range: [60, SIP_EXPIRATION_DEFAULT],
+            description: 'SIP UA expiration: How long the UA should remain active before expiring. Use 3600.',
+            placeholder: '3600',
+        },
+        sipdebug: {
+            title: 'SIP debug logging',
+            type: 'boolean',
+            description: 'Enable SIP debugging',
+            placeholder: 'true or false',
+        },
+    });
 
-    async putSetting(key: string, value: SettingValue) {
-        if (this.storageSettings.settings[key]) {
-            this.storageSettings.putSetting(key, value);
-        }
-        else if (key === 'defaultStream') {
-            const vsos = await this.getVideoStreamOptions();
-            const stream = vsos.find(vso => vso.name === value);
-            this.storage.setItem('defaultStream', stream?.id);
-        }
-        else {
-            this.storage.setItem(key, value.toString());
-        }
-
-        this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+    getSettings(): Promise<Setting[]> {
+        return this.settingsStorage.getSettings();
     }
-
-    async getSettings(): Promise<Setting[]> {
-        return [
-            {
-                key: 'sipfrom',
-                title: 'SIP From: URI',
-                type: 'string',
-                value: this.storage.getItem('sipfrom'),
-                description: 'SIP URI From field: Using the IP address of your server you will be calling from. Also the user and IP you added in /etc/flexisip/users/route_ext.conf on the intercom.',
-                placeholder: 'user@192.168.0.111',
-                multiple: false,
-            },
-            {
-                key: 'sipto',
-                title: 'SIP To: URI',
-                type: 'string',
-                value: this.storage.getItem('sipto'),
-                description: 'SIP URI To field: Must look like c300x@IP;transport=udp;rport and UDP transport is the only one supported right now.',
-                placeholder: 'c300x@192.168.0.2[:5060];transport=udp;rport',
-                multiple: false,
-            },
-            {
-                key: 'sipdomain',
-                title: 'SIP domain',
-                type: 'string',
-                value: this.storage.getItem('sipdomain'),
-                description: 'SIP domain: The internal BTicino domain, usually has the following format: 2048362.bs.iotleg.com',
-                placeholder: '2048362.bs.iotleg.com',
-                multiple: false,
-            }, 
-            {
-                key: 'sipuaexpiration',
-                title: 'SIP UA expiration',
-                type: 'number',
-                range: [0, 3600],
-                value: this.storage.getItem('sipuaexpiration') || SIP_EXPIRATION_DEFAULT,
-                description: 'SIP UA expiration: How long the UA should remain active before expiring.',
-                placeholder: '3600',
-                multiple: false,
-            },             
-            {
-                key: 'sipdebug',
-                title: 'SIP debug logging',
-                type: 'boolean',
-                value: this.storage.getItem('sipdebug') || false,
-                description: 'Enable SIP debugging',
-                placeholder: 'true or false',
-                multiple: false,
-            },                       
-        ];
-    }
+ 
+    putSetting(key: string, value: SettingValue): Promise<void> {
+        return this.settingsStorage.putSetting(key, value);
+    }    
 
     async startIntercom(media: MediaObject): Promise<void> {
-        this.log.d( "startIntercom" + media );
+        this.log.d( "TODO: startIntercom" + media );
     }
 
     async stopIntercom(): Promise<void> {
-        this.log.d( "stopIntercom" );
+        this.log.d( "TODO: stopIntercom" );
     }
 
     resetStreamTimeout() {
@@ -208,12 +183,14 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
 
                 // Call the C300X
                 let remoteRtpDescription = await sip.start();
-                this.log.d('SIP: Received remote SDP:\n' + remoteRtpDescription.sdp)
+                if( sipOptions.debug )
+                    this.log.d('SIP: Received remote SDP:\n' + remoteRtpDescription.sdp)
 
                 let sdp: string = replacePorts( remoteRtpDescription.sdp, 0, 0 );
                 sdp = addTrackControls(sdp);
                 sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n');
-                this.log.d('SIP: Updated SDP:\n' + sdp);
+                if( sipOptions.debug )
+                    this.log.d('SIP: Updated SDP:\n' + sdp);
 
                 let vseq = 0;
                 let vseen = 0;
