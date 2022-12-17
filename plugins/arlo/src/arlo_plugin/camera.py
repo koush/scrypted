@@ -94,6 +94,11 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
 
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)
 
+    async def startRTCSignalingSession(self, session):
+        self.logger.info("Starting RTC signaling")
+        await asyncio.wait_for(self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device), timeout=self.timeout)
+        return None
+
     def _update_device_details(self, arlo_device):
         """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
         """

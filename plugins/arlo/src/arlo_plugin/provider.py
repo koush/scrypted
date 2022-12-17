@@ -138,6 +138,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         except Exception as e:
             self.logger.error(f"Error performing post-login Arlo setup: {type(e)} with message {str(e)}")
 
+    def invalidate_arlo_client(self):
+        if self.arlo is not None:
+            self._arlo.Unsubscribe()
+        self._arlo = None
+        self._arlo_mfa_code = None
+        self._arlo_mfa_complete_auth = None
+        self.storage.setItem("arlo_auth_headers", "")
+        self.storage.setItem("arlo_user_id", "")
+
     def get_current_log_level(self):
         return ArloProvider.plugin_verbosity_choices[self.plugin_verbosity]
 
@@ -172,6 +181,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "description": "Enter the code sent by Arlo to your email or phone number.",
             },
             {
+                "key": "force_reauth",
+                "title": "Force Re-Authentication",
+                "description": "Resets the authentication flow of the plugin. Will also re-do 2FA.",
+                "value": "No",
+                "choices": ["No", "Yes"],
+            },
+            {
                 "key": "arlo_transport",
                 "title": "Underlying Transport Protocol",
                 "description": "Select the underlying transport protocol used to connect to Arlo Cloud.",
@@ -190,6 +206,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     async def putSetting(self, key, value):
         if key == "arlo_mfa_code":
             self._arlo_mfa_code = value
+        elif key == "force_reauth":
+            # force arlo client to be invalidated and reloaded
+            self.invalidate_arlo_client()
         else:
             self.storage.setItem(key, value)
 
@@ -204,13 +223,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                     self._arlo = None
             else:
                 # force arlo client to be invalidated and reloaded
-                if self.arlo is not None:
-                    self._arlo.Unsubscribe()
-                    self._arlo = None
-                    self._arlo_mfa_code = None
-                    self._arlo_mfa_complete_auth = None
-                    self.storage.setItem("arlo_auth_headers", "")
-                    self.storage.setItem("arlo_user_id", "")
+                self.invalidate_arlo_client()
 
         # initialize Arlo client or continue MFA
         _ = self.arlo
@@ -302,11 +315,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 ScryptedInterface.VideoCamera.value,
                 ScryptedInterface.Camera.value,
                 ScryptedInterface.MotionSensor.value,
+                ScryptedInterface.RTCSignalingChannel.value,
             ]
  
         return [
             ScryptedInterface.VideoCamera.value,
             ScryptedInterface.Camera.value,
             ScryptedInterface.MotionSensor.value,
+            ScryptedInterface.RTCSignalingChannel.value,
             ScryptedInterface.Battery.value,
         ]

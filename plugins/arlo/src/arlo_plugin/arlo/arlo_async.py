@@ -178,6 +178,7 @@ class Arlo(object):
                 'Auth-Version': '2',
                 'Authorization': finish_auth_body['data']['token'],
                 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
+                'Content-Type': 'application/json; charset=UTF-8',
             }
             self.request.session.headers.update(headers)
             self.BASE_URL = 'myapi.arlo.com'
@@ -479,11 +480,30 @@ class Arlo(object):
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
         """
-        stream_url_dict = self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/startStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"startUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId":camera.get('xCloudId')})
+        stream_url_dict = self.request.post(
+            f'https://{self.BASE_URL}/hmsweb/users/devices/startStream',
+            {
+                "to": camera.get('parentId'),
+                "from": self.user_id + "_web",
+                "resource": "cameras/" + camera.get('deviceId'),
+                "action": "set",
+                "responseUrl": "",
+                "publishResponse": True,
+                "transId": self.genTransId(),
+                "properties": {
+                    "activityState": "startUserStream",
+                    "cameraId": camera.get('deviceId')
+                }
+            },
+            headers={"xcloudId":camera.get('xCloudId')}
+        )
         return stream_url_dict['url'].replace("rtsp://", "rtsps://")
 
-    def StopStream(self, basestation, camera):
-        return self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/stopStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"stopUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId": camera.get('xCloudId')})
+    async def StartPushToTalk(self, basestation, camera):
+        url = f'https://{self.BASE_URL}/hmsweb/users/devices/{self.user_id}_{camera.get("deviceId")}/pushtotalk'
+        resp = self.request.get(url)
+        import json
+        logger.info(json.dumps(resp, indent=4))
 
     async def TriggerFullFrameSnapshot(self, basestation, camera):
         """
@@ -494,7 +514,21 @@ class Arlo(object):
         resource = f"cameras/{camera.get('deviceId')}"
 
         def trigger(self):
-            self.request.post(f"https://{self.BASE_URL}/hmsweb/users/devices/fullFrameSnapshot", {"to":camera.get("parentId"),"from":self.user_id+"_web","resource":"cameras/"+camera.get("deviceId"),"action":"set","publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"fullFrameSnapshot"}}, headers={"xcloudId":camera.get("xCloudId")})
+            self.request.post(
+                f"https://{self.BASE_URL}/hmsweb/users/devices/fullFrameSnapshot",
+                {
+                    "to": camera.get("parentId"),
+                    "from": self.user_id + "_web",
+                    "resource": "cameras/" + camera.get("deviceId"),
+                    "action": "set",
+                    "publishResponse": True,
+                    "transId": self.genTransId(),
+                    "properties": {
+                        "activityState": "fullFrameSnapshot"
+                    }
+                },
+                headers={"xcloudId":camera.get("xCloudId")}
+            )
 
         def callback(self, event):
             properties = event.get("properties", {})
