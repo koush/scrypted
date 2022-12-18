@@ -236,15 +236,20 @@ export class H264Repacketizer {
         const fnri = first.payload[0] & (0x80 | 0x60);
         const originalNalHeader = Buffer.from([fnri | originalNalType]);
 
-        const originalFragments = this.pendingFuA.map(packet => packet.payload.subarray(FU_A_HEADER_SIZE));
-        originalFragments.unshift(originalNalHeader);
-        const defragmented = Buffer.concat(originalFragments);
+        const getDefragmentedPendingFua = () => {
+            const originalFragments = this.pendingFuA.map(packet => packet.payload.subarray(FU_A_HEADER_SIZE));
+            originalFragments.unshift(originalNalHeader);
+            const defragmented = Buffer.concat(originalFragments);
+            return defragmented;
+        }
 
         // have seen cameras that toss sps/pps/idr into a fua, delimited by start codes?
         // this probably is not compliant...
         // so the fua packet looks like:
         // sps | start code | pps | start code | idr
         if (originalNalType === NAL_TYPE_SPS) {
+            const defragmented = getDefragmentedPendingFua();
+
             const splits = splitBitstream(defragmented);
             while (splits.length) {
                 const split = splits.shift();
@@ -269,6 +274,26 @@ export class H264Repacketizer {
             }
         }
         else {
+            while (this.pendingFuA.length) {
+                const fua = this.pendingFuA[0];
+                if (fua.payload.length > this.maxPacketSize)
+                    break;
+                this.pendingFuA.shift();
+                ret.push(this.createPacket(fua, fua.payload, fua.header.marker));
+            }
+
+            if (!this.pendingFuA.length) {
+                this.pendingFuA = undefined;
+                return;
+            }
+
+            const first = this.pendingFuA[0];
+            const last = this.pendingFuA[this.pendingFuA.length - 1];
+            const hasFuStart = !!(first.payload[1] & 0x80);
+            const hasFuEnd = !!(last.payload[1] & 0x40);
+
+            const defragmented = getDefragmentedPendingFua();
+
             this.fragment(first, ret, {
                 payload: defragmented,
                 noStart: !hasFuStart,
@@ -352,6 +377,10 @@ export class H264Repacketizer {
         }
 
         if (nalType === NAL_TYPE_FU_A) {
+            // ideally send the packets through as is from the upstream source.
+            // refragment only if the incoming fua packet is larger than
+            // the max packet size.
+
             const data = packet.payload;
             const originalNalType = data[1] & 0x1f;
 
@@ -367,7 +396,7 @@ export class H264Repacketizer {
                 if (this.pendingFuA)
                     this.console.error('fua restarted. skipping refragmentation of previous fua.', originalNalType);
 
-                this.pendingFuA = [];
+                this.pendingFuA = undefined;
 
                 // if this is an idr frame, but no sps has been sent via a stapa, dummy one up.
                 // the stream may not contain codec information in stapa or may be sending it
@@ -376,21 +405,32 @@ export class H264Repacketizer {
                     this.maybeSendSpsPps(packet, ret);
             }
             else {
-                // packet was missing earlier in fua packets, so this packet has to be dropped.
-                if (!this.pendingFuA)
-                    return;
-
-                const last = this.pendingFuA[this.pendingFuA.length - 1];
-                if (!isNextSequenceNumber(last.header.sequenceNumber, packet.header.sequenceNumber)) {
-                    this.console.error('fua packet missing. skipping refragmentation.', originalNalType);
-                    this.pendingFuA = undefined;
-                    return;
+                if (this.pendingFuA) {
+                    // check if packet were missing earlier from the previously queued fua packets.
+                    // if so, don't queue the current packet.
+                    // all further fua packets will continue to be dropped until a later fua start
+                    // is received. the fua series up to the point of validity will then be flushed,
+                    // although it will be incomplete, it is valid.
+                    const last = this.pendingFuA[this.pendingFuA.length - 1];
+                    if (!isNextSequenceNumber(last.header.sequenceNumber, packet.header.sequenceNumber)) {
+                        this.console.error('fua packet missing. skipping refragmentation.', originalNalType);
+                        return;
+                    }
                 }
             }
 
+            if (!this.pendingFuA)
+                this.pendingFuA = [];
+
             this.pendingFuA.push(packet);
 
-            if (isFuEnd) {
+            // fua packets over rtsp/tcp may be a full size 64k packet.
+            // when fragmenting those for a udp transport, don't flush
+            // the tiny fragmented packet at the end. prepend it
+            // to the beginning of the next fat packet.
+            const fatPacket = packet.payload.length > this.maxPacketSize * 2;
+
+            if (isFuEnd || !fatPacket) {
                 this.flushPendingFuA(ret);
             }
             else if (this.pendingFuA.reduce((p, c) => p + c.payload.length - FU_A_HEADER_SIZE, NAL_HEADER_SIZE) > this.maxPacketSize) {
@@ -399,6 +439,7 @@ export class H264Repacketizer {
                 const last = this.pendingFuA[this.pendingFuA.length - 1].clone();
                 const partial: RtpPacket[] = [];
                 this.flushPendingFuA(partial);
+                // retain a fua packet to validate subsequent fua packets.
                 const retain = partial.pop();
                 last.payload = retain.payload;
                 this.pendingFuA = [last];

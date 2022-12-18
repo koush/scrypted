@@ -9,6 +9,7 @@ import { AudioStreamingSamplerate } from '../../hap';
 import { ntpTime } from './camera-utils';
 import { H264Repacketizer } from './h264-packetizer';
 import { OpusRepacketizer } from './opus-repacketizer';
+import throttle from 'lodash/throttle';
 
 export function createCameraStreamSender(console: Console, config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number,
     videoOptions?: {
@@ -35,6 +36,17 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     let opusPacketizer: OpusRepacketizer;
     let h264Packetizer: H264Repacketizer;
     let analyzeVideo = true;
+
+    const loggedNaluTypes = new Set<number>();
+    const printNaluTypes = () => {
+        if (!loggedNaluTypes.size)
+            return;
+        console.log('scanning for idr start found:', ...[...loggedNaluTypes]);
+        loggedNaluTypes.clear();
+    };
+    const logIdrCheck = throttle(() => {
+        printNaluTypes();
+    }, 1000);
 
     let audioIntervalScale = 1;
     if (audioOptions) {
@@ -150,8 +162,15 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         for (const packet of packets) {
             if (analyzeVideo) {
                 const naluTypes = getNaluTypesInNalu(packet.payload, true);
-                console.log('scanning for idr start found:', ...[...naluTypes]);
                 analyzeVideo = !naluTypes.has(H264_NAL_TYPE_IDR);
+                if (analyzeVideo) {
+                    naluTypes.forEach(loggedNaluTypes.add, loggedNaluTypes);
+                    logIdrCheck();
+                }
+                else {
+                    printNaluTypes();
+                    console.log('idr start found:', ...[...naluTypes]);
+                }
             }
             sendPacket(packet);
         }
