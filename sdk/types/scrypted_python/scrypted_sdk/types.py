@@ -73,7 +73,6 @@ class ScryptedInterface(Enum):
     AirQualitySensor = "AirQualitySensor"
     AmbientLightSensor = "AmbientLightSensor"
     AudioSensor = "AudioSensor"
-    Authenticator = "Authenticator"
     Battery = "Battery"
     BinarySensor = "BinarySensor"
     Brightness = "Brightness"
@@ -130,9 +129,9 @@ class ScryptedInterface(Enum):
     Scriptable = "Scriptable"
     ScryptedDevice = "ScryptedDevice"
     ScryptedPlugin = "ScryptedPlugin"
+    ScryptedUser = "ScryptedUser"
     SecuritySystem = "SecuritySystem"
     Settings = "Settings"
-    SoftwareUpdate = "SoftwareUpdate"
     StartStop = "StartStop"
     TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
@@ -233,6 +232,12 @@ class ObjectDetectionResult(TypedDict):
 class PictureDimensions(TypedDict):
     height: float
     width: float
+    pass
+
+class ScryptedDeviceAccessControl(TypedDict):
+    id: str
+    methods: list[str]
+    properties: list[str]
     pass
 
 class VideoStreamOptions(TypedDict):
@@ -559,6 +564,10 @@ class ScriptSource(TypedDict):
     script: str
     pass
 
+class ScryptedUserAccessControl(TypedDict):
+    devicesAccessControls: list[ScryptedDeviceAccessControl]
+    pass
+
 class SecuritySystemState(TypedDict):
     mode: SecuritySystemMode
     obstruction: SecuritySystemObstruction
@@ -580,6 +589,18 @@ class Setting(TypedDict):
     title: str
     type: Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
+    pass
+
+class TemperatureCommand(TypedDict):
+    mode: ThermostatMode
+    setpoint: float | tuple[float, float]
+    pass
+
+class TemperatureSettingStatus(TypedDict):
+    activeMode: ThermostatMode
+    availableModes: list[ThermostatMode]
+    mode: ThermostatMode
+    setpoint: float | tuple[float, float]
     pass
 
 class VideoClip(TypedDict):
@@ -614,11 +635,6 @@ class AmbientLightSensor:
 
 class AudioSensor:
     audioDetected: bool
-    pass
-
-class Authenticator:
-    async def checkPassword(self, password: str) -> bool:
-        pass
     pass
 
 class Battery:
@@ -697,7 +713,7 @@ class DeviceProvider:
 class Display:
     async def startDisplay(self, media: MediaObject) -> None:
         pass
-    async def stopDisplay(self, media: MediaObject) -> None:
+    async def stopDisplay(self) -> None:
         pass
     pass
 
@@ -708,7 +724,7 @@ class Dock:
     pass
 
 class EngineIOHandler:
-    async def onConnection(self, request: HttpRequest, webSocketUrl: str) -> None:
+    async def onConnection(self, request: HttpRequest, webScoket: WebSocket) -> None:
         pass
     pass
 
@@ -964,6 +980,11 @@ class ScryptedPlugin:
         pass
     pass
 
+class ScryptedUser:
+    async def getScryptedUserAccessControl(self) -> ScryptedUserAccessControl:
+        pass
+    pass
+
 class SecuritySystem:
     securitySystemState: SecuritySystemState
     async def armSecuritySystem(self, mode: SecuritySystemMode) -> None:
@@ -976,14 +997,6 @@ class Settings:
     async def getSettings(self) -> list[Setting]:
         pass
     async def putSetting(self, key: str, value: SettingValue) -> None:
-        pass
-    pass
-
-class SoftwareUpdate:
-    updateAvailable: bool
-    async def checkForUpdate(self) -> bool:
-        pass
-    async def installUpdate(self) -> None:
         pass
     pass
 
@@ -1000,12 +1013,15 @@ class TamperSensor:
     pass
 
 class TemperatureSetting:
+    temperatureSetting: TemperatureSettingStatus
     thermostatActiveMode: ThermostatMode
     thermostatAvailableModes: list[ThermostatMode]
     thermostatMode: ThermostatMode
     thermostatSetpoint: float
     thermostatSetpointHigh: float
     thermostatSetpointLow: float
+    async def setTemperature(self, command: TemperatureCommand) -> None:
+        pass
     async def setThermostatMode(self, mode: ThermostatMode) -> None:
         pass
     async def setThermostatSetpoint(self, degrees: float) -> None:
@@ -1215,6 +1231,7 @@ class ScryptedInterfaceProperty(Enum):
     running = "running"
     paused = "paused"
     docked = "docked"
+    temperatureSetting = "temperatureSetting"
     thermostatActiveMode = "thermostatActiveMode"
     thermostatAvailableModes = "thermostatAvailableModes"
     thermostatMode = "thermostatMode"
@@ -1229,7 +1246,6 @@ class ScryptedInterfaceProperty(Enum):
     entryOpen = "entryOpen"
     batteryLevel = "batteryLevel"
     online = "online"
-    updateAvailable = "updateAvailable"
     fromMimeType = "fromMimeType"
     toMimeType = "toMimeType"
     binaryState = "binaryState"
@@ -1408,6 +1424,13 @@ class DeviceState:
         self.setScryptedProperty("docked", value)
 
     @property
+    def temperatureSetting(self) -> TemperatureSettingStatus:
+        return self.getScryptedProperty("temperatureSetting")
+    @temperatureSetting.setter
+    def temperatureSetting(self, value: TemperatureSettingStatus):
+        self.setScryptedProperty("temperatureSetting", value)
+
+    @property
     def thermostatActiveMode(self) -> ThermostatMode:
         return self.getScryptedProperty("thermostatActiveMode")
     @thermostatActiveMode.setter
@@ -1504,13 +1527,6 @@ class DeviceState:
     @online.setter
     def online(self, value: bool):
         self.setScryptedProperty("online", value)
-
-    @property
-    def updateAvailable(self) -> bool:
-        return self.getScryptedProperty("updateAvailable")
-    @updateAvailable.setter
-    def updateAvailable(self, value: bool):
-        self.setScryptedProperty("updateAvailable", value)
 
     @property
     def fromMimeType(self) -> str:
@@ -1794,12 +1810,14 @@ ScryptedInterfaceDescriptors = {
   "TemperatureSetting": {
     "name": "TemperatureSetting",
     "methods": [
+      "setTemperature",
       "setThermostatMode",
       "setThermostatSetpoint",
       "setThermostatSetpointHigh",
       "setThermostatSetpointLow"
     ],
     "properties": [
+      "temperatureSetting",
       "thermostatActiveMode",
       "thermostatAvailableModes",
       "thermostatMode",
@@ -1926,13 +1944,6 @@ ScryptedInterfaceDescriptors = {
     ],
     "properties": []
   },
-  "Authenticator": {
-    "name": "Authenticator",
-    "methods": [
-      "checkPassword"
-    ],
-    "properties": []
-  },
   "Scene": {
     "name": "Scene",
     "methods": [
@@ -2011,16 +2022,6 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "online"
-    ]
-  },
-  "SoftwareUpdate": {
-    "name": "SoftwareUpdate",
-    "methods": [
-      "checkForUpdate",
-      "installUpdate"
-    ],
-    "properties": [
-      "updateAvailable"
     ]
   },
   "BufferConverter": {
@@ -2285,6 +2286,13 @@ ScryptedInterfaceDescriptors = {
     "properties": [
       "applicationInfo"
     ]
+  },
+  "ScryptedUser": {
+    "name": "ScryptedUser",
+    "methods": [
+      "getScryptedUserAccessControl"
+    ],
+    "properties": []
   }
 }
 

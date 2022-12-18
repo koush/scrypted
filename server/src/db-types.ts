@@ -28,7 +28,7 @@ export class ScryptedAlert extends ScryptedDocument {
     title: string;
     path: string;
     message: string;
-}``
+}
 
 export class PluginDevice extends ScryptedDocument {
     constructor(id?: string) {

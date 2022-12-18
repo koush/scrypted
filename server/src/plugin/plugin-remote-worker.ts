@@ -336,6 +336,9 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             pluginReader = undefined;
             const script = main.toString();
 
+            scrypted.connect = (socket, options) => {
+                process.send(options, socket);
+            }
 
             const forks = new Set<PluginRemote>();
 

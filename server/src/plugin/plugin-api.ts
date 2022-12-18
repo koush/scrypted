@@ -22,9 +22,6 @@ export interface PluginAPI {
     listen(EventListener: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister>;
     listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister>;
 
-    ioClose(id: string): Promise<void>;
-    ioSend(id: string, message: string): Promise<void>;
-
     deliverPush(endpoint: string, request: HttpRequest): Promise<void>;
 
     getLogger(nativeId: ScryptedNativeId): Promise<PluginLogger>;
@@ -112,12 +109,6 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
     }
     async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
         return this.manageListener(await this.api.listenDevice(id, event, callback));
-    }
-    ioClose(id: string): Promise<void> {
-        return this.api.ioClose(id);
-    }
-    ioSend(id: string, message: string): Promise<void> {
-        return this.api.ioSend(id, message);
     }
     deliverPush(endpoint: string, request: HttpRequest): Promise<void> {
         return this.api.deliverPush(endpoint, request);

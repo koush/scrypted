@@ -62,7 +62,7 @@ export interface WebSocketConnectCallbacks {
 }
 
 export interface WebSocketConnect {
-    (url: string, callbacks: WebSocketConnectCallbacks): void;
+    (connection: WebSocketConnection, callbacks: WebSocketConnectCallbacks): void;
 }
 
 export interface WebSocketMethods {
@@ -76,15 +76,14 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect): any 
         _url: string;
         _protocols: string[];
         readyState: number;
-        _ws: WebSocketMethods;
 
-        constructor(url: string, protocols?: string[]) {
+        constructor(public connection: WebSocketConnection, protocols?: string[]) {
             super();
-            this._url = url;
+            this._url = connection.url;
             this._protocols = protocols;
             this.readyState = 0;
 
-            __websocketConnect(url, {
+            __websocketConnect(connection, {
                 connect: (e, ws) => {
                     // connect
                     if (e != null) {
@@ -95,7 +94,6 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect): any 
                         return;
                     }
 
-                    this._ws = ws;
                     this.readyState = 1;
                     this.dispatchEvent({
                         type: 'open',
@@ -129,7 +127,7 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect): any 
         }
 
         send(message: string | ArrayBufferLike) {
-            this._ws.send(message);
+            this.connection.send(message);
         }
 
         get url() {
@@ -141,7 +139,7 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect): any 
         }
 
         close(reason: string) {
-            this._ws.close(reason);
+            this.connection.close(reason);
         }
     }
 
@@ -153,10 +151,25 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect): any 
     return WebSocket;
 }
 
-export class WebSocketConnection {
+export class WebSocketConnection implements WebSocketMethods {
     [RpcPeer.PROPERTY_PROXY_PROPERTIES]: any;
 
-    constructor(public url: string) {
+    [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = [
+        "send",
+        "close",
+    ];
+
+    constructor(public url: string, public websocketMethods: WebSocketMethods) {
+        this[RpcPeer.PROPERTY_PROXY_PROPERTIES] = {
+            url,
+        }
+    }
+
+    send(message: string | ArrayBufferLike): void {
+        return this.websocketMethods.send(message);
+    }
+    close(message: string): void {
+        return this.websocketMethods.close(message);
     }
 }
 
@@ -164,16 +177,12 @@ export class WebSocketSerializer implements RpcSerializer {
     WebSocket: ReturnType<typeof createWebSocketClass>;
 
     serialize(value: any, serializationContext?: any) {
-        const connection = value as WebSocketConnection;
-        connection[RpcPeer.PROPERTY_PROXY_PROPERTIES] = {
-            url: connection.url,
-        }
-        return connection;
+        throw new Error("WebSocketSerializer should only be used for deserialization.");
     }
 
-    deserialize(serialized: any, serializationContext?: any) {
+    deserialize(serialized: WebSocketConnection, serializationContext?: any) {
         if (!this.WebSocket)
             return undefined;
-        return new this.WebSocket(serialized.url);
+        return new this.WebSocket(serialized);
     }
 }

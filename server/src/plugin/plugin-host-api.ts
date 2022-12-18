@@ -20,8 +20,6 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         'onMixinEvent',
         'onDeviceEvent',
         'setStorage',
-        'ioSend',
-        'ioClose',
         'setDeviceProperty',
         'deliverPush',
         'requestRestart',
@@ -103,18 +101,6 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
             default:
                 throw new Error(`Not allowed to set property ${property}`);
         }
-    }
-
-    async ioClose(id: string) {
-        // @ts-expect-error
-        this.pluginHost.io.clients[id]?.close();
-        this.pluginHost.ws[id]?.close();
-    }
-
-    async ioSend(id: string, message: string) {
-        // @ts-expect-error
-        this.pluginHost.io.clients[id]?.send(message);
-        this.pluginHost.ws[id]?.send(message);
     }
 
     async setState(nativeId: ScryptedNativeId, key: string, value: any) {

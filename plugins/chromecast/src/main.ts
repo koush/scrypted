@@ -240,9 +240,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     reject: any;
   };
 
-  async onConnection(request: HttpRequest, webSocketUrl: string) {
-    const ws = new WebSocket(webSocketUrl);
-
+  async onConnection(request: HttpRequest, ws: WebSocket) {
     ws.onmessage = async (message) => {
       const json = JSON.parse(message.data as string);
       const { token } = json;

@@ -194,9 +194,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         this.throttleSync();
     }
 
-    async onConnection(request: HttpRequest, webSocketUrl: string) {
-        const ws = new WebSocket(webSocketUrl);
-
+    async onConnection(request: HttpRequest, ws: WebSocket) {
         ws.onmessage = async (message) => {
             const json = JSON.parse(message.data as string);
             const { token } = json;

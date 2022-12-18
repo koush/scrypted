@@ -393,6 +393,12 @@ export class RpcPeer {
             if (!proxy)
                 proxy = this.newProxy(__remote_proxy_id, __remote_constructor_name, __remote_proxy_props, __remote_proxy_oneway_methods);
             proxy[RpcPeer.finalizerIdSymbol] = __remote_proxy_finalizer_id;
+
+            const deserializer = this.nameDeserializerMap.get(__remote_constructor_name);
+            if (deserializer) {
+                return deserializer.deserialize(proxy, deserializationContext);
+            }
+
             return proxy;
         }
 

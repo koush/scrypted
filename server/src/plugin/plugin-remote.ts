@@ -429,15 +429,16 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
     const retPromise = new Promise<ScryptedStatic>(resolve => done = resolve);
 
     peer.params.getRemote = async (api: PluginAPI, pluginId: string) => {
-        websocketSerializer.WebSocket = createWebSocketClass((url: string, callbacks: WebSocketConnectCallbacks) => {
+        websocketSerializer.WebSocket = createWebSocketClass((connection, callbacks) => {
+            const {url} = connection;
             if (url.startsWith('io://') || url.startsWith('ws://')) {
                 const id = url.substring('xx://'.length);
 
                 ioSockets[id] = callbacks;
 
                 callbacks.connect(undefined, {
-                    close: () => api.ioClose(id),
-                    send: (message: string) => api.ioSend(id, message),
+                    close: (message) => connection.close(message),
+                    send: (message) => connection.send(message),
                 });
             }
             else {

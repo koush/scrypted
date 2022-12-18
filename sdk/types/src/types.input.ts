@@ -1,4 +1,5 @@
 import type { Worker as NodeWorker } from 'worker_threads';
+import type { Socket as NodeNetSocket } from 'net';
 
 export type ScryptedNativeId = string | undefined;
 
@@ -253,23 +254,77 @@ export interface Dock {
 
   docked?: boolean;
 }
+
+export interface TemperatureCommand {
+  mode?: ThermostatMode;
+  setpoint?: number | [number, number];
+}
+export interface TemperatureSettingStatus {
+  availableModes?: ThermostatMode[];
+  mode?: ThermostatMode;
+  activeMode?: ThermostatMode;
+  setpoint?: number | [number, number];
+}
 /**
  * TemperatureSetting represents a thermostat device.
  */
 export interface TemperatureSetting {
+  temperatureSetting?: TemperatureSettingStatus;
+  setTemperature(command: TemperatureCommand): Promise<void>;
+
+  /**
+   * @deprecated
+   * @param mode
+   */
   setThermostatMode(mode: ThermostatMode): Promise<void>;
 
+  /**
+   * @deprecated
+   * @param mode
+   */
   setThermostatSetpoint(degrees: number): Promise<void>;
 
+  /**
+   * @deprecated
+   * @param mode
+   */
   setThermostatSetpointHigh(high: number): Promise<void>;
 
+  /**
+   * @deprecated
+   * @param mode
+   */
   setThermostatSetpointLow(low: number): Promise<void>;
 
+  /**
+   * @deprecated
+   * @param mode
+   */
   thermostatAvailableModes?: ThermostatMode[];
+  /**
+   * @deprecated
+   * @param mode
+   */
   thermostatMode?: ThermostatMode;
+  /**
+   * @deprecated
+   * @param mode
+   */
   thermostatActiveMode?: ThermostatMode;
+  /**
+   * @deprecated
+   * @param mode
+   */
   thermostatSetpoint?: number;
+  /**
+   * @deprecated
+   * @param mode
+   */
   thermostatSetpointHigh?: number;
+  /**
+   * @deprecated
+   * @param mode
+   */
   thermostatSetpointLow?: number;
 }
 export enum HumidityMode {
@@ -683,7 +738,7 @@ export interface PanTiltZoom {
  */
 export interface Display {
   startDisplay(media: MediaObject): Promise<void>;
-  stopDisplay(media: MediaObject): Promise<void>;
+  stopDisplay(): Promise<void>;
 }
 
 /**
@@ -712,13 +767,7 @@ export interface PasswordStore {
   removePassword(password: string): Promise<void>;
 
 }
-/**
- * Authenticator can be used to require a password before allowing interaction with a security device.
- */
-export interface Authenticator {
-  checkPassword(password: string): Promise<boolean>;
 
-}
 /**
  * Scenes control multiple different devices into a given state.
  */
@@ -946,16 +995,6 @@ export interface Scriptable {
   saveScript(script: ScriptSource): Promise<void>;
   loadScripts(): Promise<{ [filename: string]: ScriptSource }>;
   eval(source: ScriptSource, variables?: { [name: string]: any }): Promise<any>;
-}
-/**
- * SoftwareUpdate provides a way to check for updates and install them. This may be a Scrypted Plugin or device firmware.
- */
-export interface SoftwareUpdate {
-  checkForUpdate(): Promise<boolean>;
-
-  installUpdate(): Promise<void>;
-
-  updateAvailable?: boolean;
 }
 
 export interface BufferConvertorOptions {
@@ -1566,7 +1605,7 @@ export interface HttpResponseOptions {
   headers?: object;
 }
 export interface EngineIOHandler {
-  onConnection(request: HttpRequest, webSocketUrl: string): Promise<void>;
+  onConnection(request: HttpRequest, webScoket: WebSocket): Promise<void>;
 
 }
 /**
@@ -1664,7 +1703,6 @@ export enum ScryptedInterface {
   Intercom = "Intercom",
   Lock = "Lock",
   PasswordStore = "PasswordStore",
-  Authenticator = "Authenticator",
   Scene = "Scene",
   Entry = "Entry",
   EntrySensor = "EntrySensor",
@@ -1675,7 +1713,6 @@ export enum ScryptedInterface {
   Refresh = "Refresh",
   MediaPlayer = "MediaPlayer",
   Online = "Online",
-  SoftwareUpdate = "SoftwareUpdate",
   BufferConverter = "BufferConverter",
   Settings = "Settings",
   BinarySensor = "BinarySensor",
@@ -1711,6 +1748,7 @@ export enum ScryptedInterface {
   RTCSignalingChannel = "RTCSignalingChannel",
   RTCSignalingClient = "RTCSignalingClient",
   LauncherApplication = "LauncherApplication",
+  ScryptedUser = "ScryptedUser",
 }
 
 /**
@@ -1869,6 +1907,62 @@ export interface PluginFork<T> {
   worker: NodeWorker;
 }
 
+export declare interface DeviceState {
+  id?: string;
+  setState?(property: string, value: any): Promise<void>;
+}
+
+export interface ScryptedInterfaceDescriptor {
+  name: string;
+  properties: string[];
+  methods: string[];
+}
+
+/**
+ * ScryptedDeviceAccessControl describes the methods and properties on a device
+ * that will be visible to the user.
+ * If methods is null, the user will be granted full access to all methods.
+ * If properties is null, the user will be granted full access to all properties.
+ */
+export interface ScryptedDeviceAccessControl {
+  id: string;
+  methods?: string[];
+  properties?: string[];
+}
+
+/**
+ * ScryptedUserAccessControl describes the list of devices that
+ * may be accessed by the user.
+ */
+export interface ScryptedUserAccessControl {
+  /**
+   * If devicesAccessControls is null, the user has full access to all devices.
+   */
+  devicesAccessControls: ScryptedDeviceAccessControl[] | null;
+}
+
+/**
+ * ScryptedUser represents a user managed by Scrypted.
+ * This interface can not be implemented, only extended by Mixins.
+ */
+export interface ScryptedUser {
+  /**
+   * Retrieve the ScryptedUserAccessControl for a user. If no access control object is returned
+   * the user has full access to all devices. This differs from an admin user that can also
+   * access admin related system services.
+   */
+  getScryptedUserAccessControl(): Promise<ScryptedUserAccessControl | null>;
+}
+
+export interface APIOptions {
+  username?: string;
+  accessControls?: ScryptedUserAccessControl;
+}
+
+export interface ConnectOptions extends APIOptions {
+  pluginId: string;
+}
+
 export interface ScryptedStatic {
   /**
    * @deprecated
@@ -1883,16 +1977,15 @@ export interface ScryptedStatic {
   pluginHostAPI: any;
   pluginRemoteAPI: any;
 
+  /**
+   * Start a new instance of the plugin, returning an instance of the new process
+   * and the result of the fork method.
+   */
   fork?<T>(): PluginFork<T>;
-}
-
-export declare interface DeviceState {
-  id?: string;
-  setState?(property: string, value: any): Promise<void>;
-}
-
-export interface ScryptedInterfaceDescriptor {
-  name: string;
-  properties: string[];
-  methods: string[];
+  /**
+   * Initiate the Scrypted RPC wire protocol on a socket.
+   * @param socket
+   * @param options
+   */
+  connect?(socket: NodeNetSocket, options?: ConnectOptions): void;
 }

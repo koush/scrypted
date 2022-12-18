@@ -129,6 +129,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.aggregateCore;
     }
 
+    async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+    }
+
     checkEngineIoEndpoint(request: HttpRequest, name: string) {
         const check = `/endpoint/@scrypted/core/engine.io/${name}/`;
         if (!request.url.startsWith(check))
@@ -154,9 +157,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         return true;
     }
 
-    async onConnection(request: HttpRequest, webSocketUrl: string): Promise<void> {
-        const ws = new WebSocket(webSocketUrl);
-
+    async onConnection(request: HttpRequest, ws: WebSocket): Promise<void> {
         if (await this.checkService(request, ws, 'console') || await this.checkService(request, ws, 'repl')) {
             return;
         }

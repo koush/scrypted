@@ -168,7 +168,14 @@ export class PluginHost {
                 });
 
                 // @ts-expect-error
-                await handler.onConnection(endpointRequest, new WebSocketConnection(`io://${id}`));
+                await handler.onConnection(endpointRequest, new WebSocketConnection(`io://${id}`, {
+                    send(message) {
+                        socket.send(message);
+                    },
+                    close(message) {
+                        socket.close();
+                    },
+                }));
             }
             catch (e) {
                 console.error('engine.io plugin error', e);
@@ -304,7 +311,6 @@ export class PluginHost {
         });
 
         this.worker.setupRpcPeer(this.peer);
-        this.peer.addSerializer(WebSocketConnection, WebSocketConnection.name, new WebSocketSerializer());
 
         this.worker.stdout.on('data', data => console.log(data.toString()));
         this.worker.stderr.on('data', data => console.error(data.toString()));
@@ -373,7 +379,6 @@ export class PluginHost {
             }
         });
         serializer.setupRpcPeer(rpcPeer);
-        rpcPeer.addSerializer(WebSocketConnection, WebSocketConnection.name, new WebSocketSerializer());
 
         // wrap the host api with a connection specific api that can be torn down on disconnect
         const createMediaManager = await this.peer.getParam('createMediaManager');
@@ -390,7 +395,6 @@ export class PluginHost {
 
     async createRpcPeer(duplex: Duplex) {
         const rpcPeer = createDuplexRpcPeer(`api/${this.pluginId}`, 'duplex', duplex, duplex);
-        rpcPeer.addSerializer(WebSocketConnection, WebSocketConnection.name, new WebSocketSerializer());
 
         // wrap the host api with a connection specific api that can be torn down on disconnect
         const createMediaManager = await this.peer.getParam('createMediaManager');

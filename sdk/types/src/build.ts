@@ -31,6 +31,7 @@ for (const name of Object.values(ScryptedInterface)) {
 }
 
 const properties = Object.values(ScryptedInterfaceDescriptors).map(d => d.properties).flat();
+const methods = Object.values(ScryptedInterfaceDescriptors).map(d => d.methods).flat();
 
 const deviceStateContents = `
 export interface DeviceState {
@@ -48,11 +49,18 @@ ${properties.map(property => '  ' + property + ' = \"' + property + '",\n').join
 }
 `;
 
+const methodContents = `
+export enum ScryptedInterfaceMethod {
+${methods.map(method => '  ' + method + ' = \"' + method + '",\n').join('')}
+}
+`;
+
 const contents = `
 export const TYPES_VERSION = "${typesVersion}";
 
 ${deviceStateContents}
 ${propertyContents}
+${methodContents}
 
 export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = ${stringifyObject(ScryptedInterfaceDescriptors, { indent: '  ' })}
 

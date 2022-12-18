@@ -345,7 +345,14 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         });
 
         // @ts-expect-error
-        await handler.onConnection(httpRequest, new WebSocketConnection(`ws://${id}`));
+        await handler.onConnection(httpRequest, new WebSocketConnection(`ws://${id}`, {
+            send(message) {
+                ws.send(message);
+            },
+            close(message) {
+                ws.close();
+            },
+        }));
     }
 
     async getComponent(componentId: string): Promise<any> {

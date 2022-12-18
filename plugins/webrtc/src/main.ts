@@ -4,7 +4,7 @@ import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, BufferConvertorOptions, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import net from 'net';
@@ -402,7 +402,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         const message = await new Promise<{
             connectionManagementId: string,
             updateSessionId: string,
-        }>((resolve, reject) => {
+        } & ConnectOptions>((resolve, reject) => {
             const close = () => {
                 const str = 'Connection closed while waiting for message';
                 reject(new Error(str));
@@ -415,6 +415,8 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                 resolve(JSON.parse(message.data));
             }
         });
+
+        message.username = request.username;
 
         const { connectionManagementId, updateSessionId } = message;
         if (connectionManagementId) {
@@ -457,7 +459,12 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
             const cp = await client.clientPromise;
             cp.on('close', () => cleanup.resolve('socket client closed'));
-            process.send(message, cp);
+            // TODO: remove process.send hack
+            // 12/16/2022
+            if (sdk.connect)
+                sdk.connect(cp, message);
+            else
+                process.send(message, cp);
         }
         catch (e) {
             console.error("error negotiating browser RTCC signaling", e);
@@ -492,10 +499,10 @@ export async function fork() {
             if (port) {
                 const socket = net.connect(port, '127.0.0.1');
                 cleanup.promise.finally(() => socket.destroy());
-    
+
                 const dc = pc.createDataChannel('rpc');
                 dc.message.subscribe(message => socket.write(message));
-    
+
                 const debouncer = new DataChannelDebouncer({
                     send: u8 => dc.send(Buffer.from(u8)),
                 }, e => {
