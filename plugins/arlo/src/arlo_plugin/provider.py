@@ -315,13 +315,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 ScryptedInterface.VideoCamera.value,
                 ScryptedInterface.Camera.value,
                 ScryptedInterface.MotionSensor.value,
-                ScryptedInterface.RTCSignalingChannel.value,
+                ScryptedInterface.Intercom.value,
             ]
  
         return [
             ScryptedInterface.VideoCamera.value,
             ScryptedInterface.Camera.value,
             ScryptedInterface.MotionSensor.value,
-            ScryptedInterface.RTCSignalingChannel.value,
+            ScryptedInterface.Intercom.value,
             ScryptedInterface.Battery.value,
         ]

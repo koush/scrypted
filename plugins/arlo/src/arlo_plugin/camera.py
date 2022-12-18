@@ -1,12 +1,17 @@
+from aioice import Candidate
+from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceGatherer, RTCIceServer
+from aiortc.contrib.media import MediaPlayer
+from aiortc.rtcicetransport import candidate_to_aioice, candidate_from_aioice 
 import asyncio
+import json
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
-from scrypted_sdk.types import Camera, VideoCamera, MotionSensor, Battery, ScryptedMimeTypes
+from scrypted_sdk.types import Camera, VideoCamera, Intercom, MotionSensor, Battery, ScryptedMimeTypes
 
 from .logging import ScryptedDeviceLoggerMixin
 
-class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery, ScryptedDeviceLoggerMixin):
+class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor, Battery, ScryptedDeviceLoggerMixin):
     timeout = 30
     nativeId = None
     arlo_device = None
@@ -30,6 +35,8 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
         self.stop_subscriptions = False
         self.start_motion_subscription()
         self.start_battery_subscription()
+
+        self.stop_intercom = True
 
     def __del__(self):
         self.stop_subscriptions = True
@@ -94,10 +101,68 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
 
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)
 
-    async def startRTCSignalingSession(self, session):
-        self.logger.info("Starting RTC signaling")
-        await asyncio.wait_for(self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device), timeout=self.timeout)
-        return None
+    async def startIntercom(self, media):
+        self.logger.info("Starting intercom")
+
+        self.stop_intercom = False
+
+        ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
+        self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
+
+        session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
+        self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
+        
+        ice_servers = [
+            RTCIceServer(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
+            for ice in ice_servers
+        ]
+        ice_gatherer = RTCIceGatherer(ice_servers)
+        await ice_gatherer.gather()
+
+        local_candidates = [
+            f"candidate:{Candidate.to_sdp(candidate_to_aioice(candidate))}"
+            for candidate in ice_gatherer.getLocalCandidates()
+        ]
+
+        self.logger.info(f"Local candidates: {local_candidates}")
+
+        # MediaPlayer/PyAV will block until the intercom stream starts, and it seems that scrypted waits
+        # for startIntercom to exit before sending data. So, let's do the remaining setup in a coroutine
+        # so this function can return early.
+        async def async_setup(self):
+            try:
+                media_player = MediaPlayer(ffmpeg_params["url"], format="rtsp")
+
+                pc = RTCPeerConnection()
+                pc.addTrack(media_player.audio)
+                offer = await pc.createOffer()
+                await pc.setLocalDescription(offer)
+
+                def on_remote_sdp(sdp):
+                    sdp = RTCSessionDescription(sdp=sdp, type="answer")
+                    asyncio.get_event_loop().create_task(pc.setRemoteDescription(sdp))
+                    return self.stop_intercom 
+
+                def on_remote_candidate(candidate):
+                    prefix = "candidate:"
+                    if candidate.startswith(prefix):
+                        candidate = candidate[len(prefix):]
+                    candidate = candidate_from_aioice(Candidate.from_sdp(candidate))
+                    asyncio.get_event_loop().create_task(pc.addIceCandidate(candidate))
+                    return self.stop_intercom
+
+                self.provider.arlo.DoPushToTalkNegotiation(
+                    self.arlo_basestation, self.arlo_device,
+                    session_id, offer.sdp, local_candidates,
+                    on_remote_sdp, on_remote_candidate
+                )
+            except Exception as e:
+                self.logger.error(e, exc_info=True)
+
+        asyncio.get_event_loop().create_task(async_setup(self))
+
+    async def stopIntercom(self):
+        self.logger.info("Stopping intercom")
 
     def _update_device_details(self, arlo_device):
         """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
