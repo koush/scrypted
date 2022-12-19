@@ -9,6 +9,7 @@ import { AutomationCore, AutomationCoreNativeId } from './automations-core';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
 import { ScriptCore, ScriptCoreNativeId } from './script-core';
+import { UsersCore, UsersNativeId } from './user';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
 
@@ -23,7 +24,6 @@ interface RoutedHttpRequest extends HttpRequest {
     params: { [key: string]: string };
 }
 
-
 class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, DeviceProvider, Settings {
     router: any = Router();
     publicRouter: any = Router();
@@ -32,6 +32,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     scriptCore: ScriptCore;
     aggregateCore: AggregateCore;
     automationCore: AutomationCore;
+    users: UsersCore;
     localAddresses: string[];
     storageSettings = new StorageSettings(this, {
         localAddresses: {
@@ -101,6 +102,19 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             );
             this.aggregateCore = new AggregateCore();
         })();
+
+
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Scrypted Users',
+                    nativeId: UsersNativeId,
+                    interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+            this.users = new UsersCore();
+        })();
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -127,9 +141,11 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.automationCore;
         if (nativeId === AggregateCoreNativeId)
             return this.aggregateCore;
+        if (nativeId === UsersNativeId)
+            return this.users;
     }
 
-    async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     checkEngineIoEndpoint(request: HttpRequest, name: string) {
@@ -140,6 +156,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     }
 
     async checkService(request: HttpRequest, ws: WebSocket, name: string): Promise<boolean> {
+        // only allow admin users to access these services.
+        if (request.aclId)
+            return false;
         const check = this.checkEngineIoEndpoint(request, name);
         if (!check)
             return false;

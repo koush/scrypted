@@ -137,4 +137,7 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
         if (nativeId === 'files')
             return this.filesHost;
     }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+    }
 }

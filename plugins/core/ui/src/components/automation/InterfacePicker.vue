@@ -37,7 +37,6 @@ import EventListener from "../../interfaces/EventListener.vue";
 import OnOff from "../../interfaces/OnOff.vue";
 import Lock from "../../interfaces/Lock.vue";
 import Notifier from "../../interfaces/Notifier.vue";
-import SoftwareUpdate from "../../interfaces/SoftwareUpdate.vue";
 import ColorSettingHsv from "../../interfaces/ColorSettingHsv.vue";
 import StartStop from "../../interfaces/StartStop.vue";
 import Dock from "../../interfaces/Dock.vue";
@@ -81,7 +80,6 @@ export default {
     Brightness,
     Lock,
     Notifier,
-    SoftwareUpdate,
     ColorSettingHsv,
     ColorSettingRgb,
     ColorSettingTemperature,

@@ -4,7 +4,7 @@ import PluginUpdate from "./PluginUpdate.vue";
 import PluginPid from "./PluginPid.vue";
 import PluginStats from "./PluginStats.vue";
 import { getDeviceViewPath } from "../helpers";
-import { snapshotCurrentPlugins } from "./plugin";
+import { snapshotCurrentPlugins, getIdForNativeId } from "./plugin";
 
 export default {
   mixins: [BasicComponent],
@@ -16,13 +16,7 @@ export default {
       return `https://www.npmjs.com/package/${device.pluginId}`;
     },
     async openAutoupdater() {
-      const plugins = await this.$scrypted.systemManager.getComponent(
-        "plugins"
-      );
-      const id = await plugins.getIdForNativeId(
-        "@scrypted/core",
-        "automation:update-plugins"
-      );
+      const id = getIdForNativeId(systemManager, '@scrypted/core', 'scriptcore');
       this.$router.push(getDeviceViewPath(id));
     },
     async snapshotCurrentPlugins() {
@@ -84,17 +78,22 @@ export default {
         const ids = Object.keys(this.$store.state.systemState);
 
         const devices = [];
-        const plugins = await this.$scrypted.systemManager.getComponent(
-          "plugins"
-        );
         const promises = ids.map(async (id) => {
           const device = this.$scrypted.systemManager.getDeviceById(id);
           if (device.id !== device.providerId) return;
           const { name, type } = device;
           const pluginId = device.pluginId;
-          const pluginInfo = await plugins.getPluginInfo(pluginId);
-          const { packageJson, pid, stats, rpcObjects, pendingResults } = pluginInfo;
-          const npmPackageVersion = packageJson.version;
+          let pluginInfo;
+          try {
+            const plugins = await this.$scrypted.systemManager.getComponent(
+              "plugins"
+            );
+            pluginInfo = await plugins.getPluginInfo(pluginId);
+          }
+          catch (e) {
+          }
+          const { packageJson, pid, stats, rpcObjects, pendingResults } = pluginInfo || {};
+          const npmPackageVersion = packageJson?.version;
           devices.push({
             id,
             name,

@@ -496,7 +496,7 @@ export default {
         versions: null,
       };
       const device = this.device;
-      pluginData.nativeId = await plugins.getNativeId(this.id);
+      pluginData.nativeId = device.nativeId;
       pluginData.storage = await plugins.getStorage(this.id);
       pluginData.pluginId = this.device.pluginId;
       pluginData.packageJson = await plugins.getPackageJson(this.device.pluginId);
@@ -571,7 +571,7 @@ export default {
       return this.$store.state.scrypted.devices;
     },
     id() {
-      return this.$route.params.id || this.$props.id;
+      return this.$route.params.id || this.$props.deviceId;
     },
     canLoad() {
       return this.devices.includes(this.id);
@@ -583,7 +583,7 @@ export default {
       return this.$scrypted.systemManager.getDeviceById(this.id);
     },
   },
-  props: ['id'],
+  props: ['deviceId'],
 };
 </script>
 <style>

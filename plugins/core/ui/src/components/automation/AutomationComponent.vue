@@ -1,5 +1,5 @@
 <template>
-  <Device v-if="id" :id="id"></Device>
+  <Device v-if="id" :deviceId="id"></Device>
 </template>
 <script>
 import Device from "../Device.vue";

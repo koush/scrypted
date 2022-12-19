@@ -83,4 +83,7 @@ export class AutomationCore extends ScryptedDeviceBase implements DeviceProvider
     async getDevice(nativeId: string) {
         return this.automations.get(nativeId);
     }
+ 
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+    }
 }

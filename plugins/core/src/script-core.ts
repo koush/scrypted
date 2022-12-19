@@ -87,4 +87,7 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
     getDevice(nativeId: string) {
         return this.scripts.get(nativeId);
     }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+    }
 }

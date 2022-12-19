@@ -6,6 +6,7 @@ import { Scriptable } from '@scrypted/types';
 import { SystemManager } from '@scrypted/types';
 import axios, { AxiosResponse } from 'axios';
 import semver from 'semver';
+import { getAllDevices } from '../../common/mixin';
 const pluginSnapshot = require("!!raw-loader!./plugin-snapshot.ts").default.split('\n')
     .filter(line => !line.includes('SCRYPTED_FILTER_EXAMPLE_LINE'))
     .join('\n')
@@ -74,11 +75,15 @@ export function getNpmPath(npmPackage: string) {
     return `https://www.npmjs.com/package/${npmPackage}`;
 }
 
+export function getIdForNativeId(systemManager: SystemManager, pluginId: string, nativeId: string) {
+    const found = getAllDevices(systemManager).find(device => device.pluginId === pluginId && device, nativeId === nativeId);
+    return found?.id;
+}
+
 export async function snapshotCurrentPlugins(scrypted: ScryptedStatic): Promise<string> {
     const { systemManager, deviceManager } = scrypted;
 
-    const plugins = await systemManager.getComponent("plugins");
-    const id = await plugins.getIdForNativeId('@scrypted/core', 'scriptcore');
+    const id = getIdForNativeId(systemManager, '@scrypted/core', 'scriptcore');
     const scriptCore = systemManager.getDeviceById<DeviceCreator & Scriptable>(id);
     const backupId = await scriptCore.createDevice({
     });

@@ -66,4 +66,7 @@ export class AggregateCore extends ScryptedDeviceBase implements DeviceProvider,
     async getDevice(nativeId: string) {
         return this.aggregate.get(nativeId);
     }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+    }
 }

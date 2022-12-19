@@ -12,7 +12,6 @@ export const actionableInterfaces = [
     ScryptedInterface.Notifier,
     ScryptedInterface.Pause,
     ScryptedInterface.Scene,
-    ScryptedInterface.SoftwareUpdate,
     ScryptedInterface.StartStop,
 
     // 'Timer',
