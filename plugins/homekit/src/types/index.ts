@@ -11,4 +11,4 @@ import './sensor';
 import './switch';
 import './thermostat';
 import './vacuum';
-
+import './outlet';
