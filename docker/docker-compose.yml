@@ -1,5 +1,8 @@
 version: "3.5"
 
+# The Scrypted docker-compose.yml file typically resides at:
+# ~/.scrypted/docker-compose.yml
+
 services:
     scrypted:
         environment:
