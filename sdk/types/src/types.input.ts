@@ -888,7 +888,7 @@ export interface DeviceProvider {
   /**
    * Called when a previously returned device from getDevice was deleted from Scrypted.
    */
-  releaseDevice(id: string, nativeId: ScryptedNativeId, device: any): Promise<void>;
+  releaseDevice(id: string, nativeId: ScryptedNativeId): Promise<void>;
 }
 /**
  * DeviceManifest is passed to DeviceManager.onDevicesChanged to sync a full list of devices from the controller/hub (Hue, SmartThings, etc)
@@ -1459,11 +1459,6 @@ export interface EndpointManager {
   getCloudPushEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
-   * Deliver a push notification to a device. Used by push providers.
-   */
-  deliverPush(id: string, request: HttpRequest): Promise<void>;
-
-  /**
    * Set the recommended local addresses used by Scrypted plugins that listen for incoming connections.
    * @param addresses
    */
@@ -1576,6 +1571,7 @@ export interface HttpRequest {
   rootPath?: string;
   url?: string;
   username?: string;
+  aclId?: string;
 }
 /**
  * Response object provided by the HttpRequestHandler.
@@ -1921,13 +1917,15 @@ export interface ScryptedInterfaceDescriptor {
 /**
  * ScryptedDeviceAccessControl describes the methods and properties on a device
  * that will be visible to the user.
- * If methods is null, the user will be granted full access to all methods.
- * If properties is null, the user will be granted full access to all properties.
+ * If methods is nullish, the user will be granted full access to all methods.
+ * If properties is nullish, the user will be granted full access to all properties.
+ * If events is nullish, the user will be granted full access to all events.
  */
 export interface ScryptedDeviceAccessControl {
   id: string;
   methods?: string[];
   properties?: string[];
+  interfaces?: string[];
 }
 
 /**
@@ -1938,7 +1936,7 @@ export interface ScryptedUserAccessControl {
   /**
    * If devicesAccessControls is null, the user has full access to all devices.
    */
-  devicesAccessControls: ScryptedDeviceAccessControl[] | null;
+  devicesAccessControls?: ScryptedDeviceAccessControl[] | null;
 }
 
 /**
@@ -1951,7 +1949,7 @@ export interface ScryptedUser {
    * the user has full access to all devices. This differs from an admin user that can also
    * access admin related system services.
    */
-  getScryptedUserAccessControl(): Promise<ScryptedUserAccessControl | null>;
+  getScryptedUserAccessControl(): Promise<ScryptedUserAccessControl>;
 }
 
 export interface APIOptions {

@@ -236,6 +236,7 @@ class PictureDimensions(TypedDict):
 
 class ScryptedDeviceAccessControl(TypedDict):
     id: str
+    interfaces: list[str]
     methods: list[str]
     properties: list[str]
     pass
@@ -353,6 +354,7 @@ class FanStatus(TypedDict):
     pass
 
 class HttpRequest(TypedDict):
+    aclId: str
     body: str
     headers: Any
     isPublicEndpoint: bool
@@ -706,7 +708,7 @@ class DeviceDiscovery:
 class DeviceProvider:
     async def getDevice(self, nativeId: str) -> Any:
         pass
-    async def releaseDevice(self, id: str, nativeId: str, device: Any) -> None:
+    async def releaseDevice(self, id: str, nativeId: str) -> None:
         pass
     pass
 
@@ -1182,8 +1184,6 @@ class MediaManager:
     pass
 
 class EndpointManager:
-    async def deliverPush(self, id: str, request: HttpRequest) -> None:
-        pass
     async def getAuthenticatedPath(self, nativeId: str = None) -> str:
         pass
     async def getCloudEndpoint(self, nativeId: str = None, options: Any = None) -> str:

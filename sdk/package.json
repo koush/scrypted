@@ -1,10 +1,11 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.2.33",
+  "version": "0.2.39",
   "description": "",
   "main": "dist/src/index.js",
   "exports": {
     ".": "./dist/src/index.js",
+    "./acl": "./dist/src/acl.js",
     "./storage-settings": "./dist/src/storage-settings.js"
   },
   "scripts": {

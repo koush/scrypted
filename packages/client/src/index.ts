@@ -1,4 +1,4 @@
-import { ScryptedStatic, RTCConnectionManagement, RTCSignalingSession } from "@scrypted/types";
+import { RTCConnectionManagement, RTCSignalingSession, ScryptedStatic } from "@scrypted/types";
 import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
@@ -7,10 +7,10 @@ import { timeoutFunction, timeoutPromise } from "../../../common/src/promise-uti
 import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
 import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-debouncer";
 import type { IOSocket } from '../../../server/src/io';
+import type { MediaObjectRemote } from '../../../server/src/plugin/plugin-api';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
-import type { MediaObjectRemote } from '../../../server/src/plugin/plugin-api'
 import packageJson from '../package.json';
 
 type IOClientSocket = eio.Socket & IOSocket;
@@ -495,9 +495,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         const [userStorage, version, rtcConnectionManagement] = await Promise.all([
             rpcPeer.getParam('userStorage'),
             (async () => {
-                const info = await systemManager.getComponent('info');
                 let version = 'unknown';
                 try {
+                    const info = await systemManager.getComponent('info');
                     version = await info.getVersion();
                 }
                 catch (e) {
