@@ -37,6 +37,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         self.start_battery_subscription()
 
         self.stop_intercom = True
+        self.pc = None
 
     def __del__(self):
         self.stop_subscriptions = True
@@ -133,21 +134,40 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
             try:
                 media_player = MediaPlayer(ffmpeg_params["url"], format="rtsp")
 
-                pc = RTCPeerConnection()
+                pc = self.pc = RTCPeerConnection()
                 pc.addTrack(media_player.audio)
                 offer = await pc.createOffer()
                 await pc.setLocalDescription(offer)
 
+                # this class is here so that we can modify an outer scope's
+                # variable from within the callbacks
+                class has_received_sdp:
+                    received = False
+
                 def on_remote_sdp(sdp):
-                    sdp = RTCSessionDescription(sdp=sdp, type="answer")
-                    asyncio.get_event_loop().create_task(pc.setRemoteDescription(sdp))
+                    if not has_received_sdp.received:
+                        if "a=mid:" not in sdp:
+                            # arlo appears to not return a mux id in the response, which
+                            # doesn't play nicely with aiortc. let's add it
+                            sdp += "a=mid:0\r\n"
+
+                        sdp = RTCSessionDescription(sdp=sdp, type="answer")
+                        has_received_sdp.received = True
+
+                        asyncio.get_event_loop().create_task(pc.setRemoteDescription(sdp))
                     return self.stop_intercom 
 
                 def on_remote_candidate(candidate):
-                    prefix = "candidate:"
+                    prefix = "a=candidate:"
                     if candidate.startswith(prefix):
                         candidate = candidate[len(prefix):]
+
                     candidate = candidate_from_aioice(Candidate.from_sdp(candidate))
+                    if candidate.sdpMid is None:
+                        # arlo appears to not return a mux id in the response, which
+                        # doesn't play nicely with aiortc. let's add it
+                        candidate.sdpMid = 0
+
                     asyncio.get_event_loop().create_task(pc.addIceCandidate(candidate))
                     return self.stop_intercom
 
@@ -162,7 +182,14 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         asyncio.get_event_loop().create_task(async_setup(self))
 
     async def stopIntercom(self):
-        self.logger.info("Stopping intercom")
+        try:
+            self.logger.info("Stopping intercom")
+            self.stop_intercom = True
+            if self.pc is not None:
+                asyncio.get_event_loop().create_task(self.pc.close())
+            self.pc = None
+        except Exception as e:
+            self.logger.info(e)
 
     def _update_device_details(self, arlo_device):
         """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.

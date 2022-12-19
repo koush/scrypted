@@ -259,7 +259,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 },
                 "nativeId": camera["deviceId"],
                 "name": camera["deviceName"],
-                "interfaces": self.get_interfaces_by_model(camera['properties']['modelId']),
+                "interfaces": self.get_interfaces(camera),
                 "type": ScryptedDeviceType.Camera.value,
                 "providerNativeId": self.nativeId,
             }
@@ -306,22 +306,19 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         else:
             return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
 
-    def get_interfaces_by_model(self, model_id):
-        model_id = model_id.lower()
+    def get_interfaces(self, camera):
+        model_id = camera['properties']['modelId'].lower()
         self.logger.debug(f"Checking applicable scrypted interfaces for {model_id}")
 
-        if model_id.startswith("avd1001"):
-            return [
-                ScryptedInterface.VideoCamera.value,
-                ScryptedInterface.Camera.value,
-                ScryptedInterface.MotionSensor.value,
-                ScryptedInterface.Intercom.value,
-            ]
- 
-        return [
+        results = [
             ScryptedInterface.VideoCamera.value,
             ScryptedInterface.Camera.value,
             ScryptedInterface.MotionSensor.value,
             ScryptedInterface.Intercom.value,
             ScryptedInterface.Battery.value,
         ]
+
+        if model_id.startswith("avd1001"):
+            results.remove(ScryptedInterface.Battery.value)
+ 
+        return results
