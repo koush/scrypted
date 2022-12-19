@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
+import { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings"
 import qs from 'query-string';
 import { Duplex } from 'stream';
@@ -206,7 +206,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         if (url.startsWith(cm)) {
             const endpoint = url.substring(cm.length + 1);
             request.rootPath = '/';
-            endpointManager.deliverPush(endpoint, request);
+            this.deliverPush(endpoint, request);
         }
     }
 
@@ -238,6 +238,20 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     async getCloudMessagePath() {
         const url = new URL(await endpointManager.getPublicLocalEndpoint());
         return path.join(url.pathname, 'cloudmessage');
+    }
+
+    async deliverPush(endpoint: string, request: HttpRequest) {
+        const handler = systemManager.getDeviceById<PushHandler>(endpoint);
+        if (!handler) {
+            this.console.error('device not found for push event to', endpoint);
+            return;
+        }
+        if (!handler.interfaces.includes(ScryptedInterface.PushHandler)) {
+            this.console.error('deive not a push handler', endpoint);
+            return;
+        }
+
+        return handler.onPush(request);
     }
 
     async getOauthUrl(): Promise<string> {
@@ -335,7 +349,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                         return;
                     const endpoint = payload.rootPath.replace('/push/', '');
                     payload.rootPath = '/';
-                    endpointManager.deliverPush(endpoint, payload)
+                    await this.deliverPush(endpoint, payload);
                 }
                 catch (e) {
                     this.console.error('cloudmessage error', e);
