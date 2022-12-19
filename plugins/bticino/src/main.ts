@@ -9,7 +9,6 @@ import { SipSession } from './sip-session';
 import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from '../../sip/src/rtp-utils';
 import { ChildProcess } from 'child_process';
 import { randomBytes } from 'crypto';
-import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 
 const STREAM_TIMEOUT = 50000;
 const SIP_EXPIRATION_DEFAULT = 3600;
@@ -286,24 +285,11 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
             // this stream is NOT scrypted blessed due to wackiness in the h264 stream.
             // tool: "scrypted",
             container: 'sdp',
-            video: {
-                codec: 'h264',
-                h264Info: {
-                    sei: true,
-                    stapb: true,
-                    mtap16: true,
-                    mtap32: true,
-                    fuab: true,
-                    reserved0: true,
-                    reserved30: true,
-                    reserved31: true,
-                }
-            },
             audio: {
                 // this is a hint to let homekit, et al, know that it's speex audio and needs transcoding.
                 codec: 'speex',
             },
-            source: 'cloud',
+            source: 'local',
             userConfigurable: false,
         };
     }
