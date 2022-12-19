@@ -25,6 +25,7 @@ import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 import os from 'os';
+import { setScryptedUserPassword } from './services/users';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -123,7 +124,8 @@ async function start() {
         realm: 'Scrypted',
     }, async (username, password, callback) => {
         const user = await db.tryGet(ScryptedUser, username);
-        if (!user) {
+        // disallow basic auth for non-admin as it can deploy plugins, etc.
+        if (!user || user.aclId) {
             callback(false);
             return;
         }
@@ -188,7 +190,7 @@ async function start() {
 
         const userToken = getSignedLoginUserToken(req);
         if (userToken) {
-            const { username } = userToken;
+            const { username, aclId } = userToken;
 
             // this database lookup on every web request is not necessary, the cookie
             // itself is the auth, and is signed. furthermore, this is currently
@@ -202,6 +204,7 @@ async function start() {
             // }
 
             res.locals.username = username;
+            res.locals.aclId = aclId;
         }
         else if (req.headers.authorization?.startsWith('Bearer ')) {
             const [checkHash, ...tokenParts] = req.headers.authorization.substring('Bearer '.length).split('#');
@@ -216,6 +219,7 @@ async function start() {
                     const userToken = validateToken(tokenPart);
                     if (userToken)
                         res.locals.username = userToken.username;
+                    res.locals.aclId = userToken.aclId;
                 }
             }
         }
@@ -240,7 +244,7 @@ async function start() {
 
     // verify all plugin related requests have some sort of auth
     app.all('/web/component/*', (req, res, next) => {
-        if (!res.locals.username) {
+        if (!res.locals.username || res.locals.aclId) {
             res.status(401);
             res.send('Not Authorized');
             return;
@@ -466,7 +470,7 @@ async function start() {
                 return;
             }
 
-            const userToken = new UserToken(username, timestamp, maxAge);
+            const userToken = new UserToken(username, user.aclId, timestamp, maxAge);
             const login_user_token = userToken.toString();
             res.cookie(getLoginUserToken(req.secure), login_user_token, {
                 maxAge,
@@ -476,9 +480,7 @@ async function start() {
             });
 
             if (change_password) {
-                user.salt = crypto.randomBytes(64).toString('base64');
-                user.passwordHash = crypto.createHash('sha256').update(user.salt + change_password).digest().toString('hex');
-                user.passwordDate = timestamp;
+                setScryptedUserPassword(user, change_password, timestamp);
                 await db.upsert(user);
             }
 
@@ -502,14 +504,12 @@ async function start() {
 
         const user = new ScryptedUser();
         user._id = username;
-        user.salt = crypto.randomBytes(64).toString('base64');
-        user.passwordHash = crypto.createHash('sha256').update(user.salt + password).digest().toString('hex');
-        user.passwordDate = timestamp;
+        setScryptedUserPassword(user, password, timestamp);
         user.token = crypto.randomBytes(16).toString('hex');
         await db.upsert(user);
         hasLogin = true;
 
-        const userToken = new UserToken(username, timestamp);
+        const userToken = new UserToken(username, user.aclId, timestamp);
         const login_user_token = userToken.toString();
         res.cookie(getLoginUserToken(req.secure), login_user_token, {
             maxAge,

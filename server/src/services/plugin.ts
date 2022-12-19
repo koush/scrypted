@@ -29,12 +29,10 @@ export class PluginComponent {
         await this.reload(pluginDevice.pluginId);
     }
 
-    getNativeId(id: string) {
-        return this.scrypted.findPluginDeviceById(id)?.nativeId;
-    }
     getStorage(id: string) {
         return this.scrypted.findPluginDeviceById(id)?.storage || {};
     }
+
     async setStorage(id: string, storage: { [key: string]: string }) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
         pluginDevice.storage = storage;
@@ -65,17 +63,9 @@ export class PluginComponent {
     async getIdForNativeId(pluginId: string, nativeId: ScryptedNativeId) {
         return this.scrypted.findPluginDevice(pluginId, nativeId)?._id;
     }
-    /**
-     * @deprecated available as device.pluginId now.
-     * Remove at some point after core/ui rolls out 6/20/2022.
-     */
-    async getPluginId(id: string) {
-        const pluginDevice = this.scrypted.findPluginDeviceById(id);
-        return pluginDevice.pluginId;
-    }
     async reload(pluginId: string) {
         const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
-        await this.scrypted.runPlugin(plugin);
+        this.scrypted.runPlugin(plugin);
     }
     async kill(pluginId: string) {
         return this.scrypted.plugins[pluginId]?.kill();

@@ -7,6 +7,7 @@ import { PrimitiveProxyHandler, RpcPeer } from "../rpc";
 import { ScryptedRuntime } from "../runtime";
 import { sleep } from "../sleep";
 import { getState } from "../state";
+import { AccessControls } from "./acl";
 import { allInterfaceProperties, getInterfaceMethods, getPropertyInterfaces } from "./descriptor";
 import { PluginError } from "./plugin-error";
 
@@ -395,6 +396,11 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
 
     async apply(target: any, thisArg: any, argArray?: any): Promise<any> {
         const method = target();
+
+        const { activeRpcPeer } = RpcPeer;
+        const acl: AccessControls = activeRpcPeer?.tags?.acl;
+        if (acl?.shouldRejectMethod(this.id, method))
+            acl.deny();
 
         this.ensureProxy();
         const pluginDevice = this.scrypted.findPluginDeviceById(this.id);

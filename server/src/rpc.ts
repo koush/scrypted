@@ -229,11 +229,12 @@ export class RpcPeer {
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
     killed: Promise<void>;
     killedDeferred: Deferred;
+    tags: any = {};
 
     static readonly finalizerIdSymbol = Symbol('rpcFinalizerId');
     static remotesCollected = 0;
     static remotesCreated = 0;
-
+    static activeRpcPeer: RpcPeer;
 
     static isRpcProxy(value: any) {
         return !!value?.[RpcPeer.PROPERTY_PROXY_ID];
@@ -507,7 +508,17 @@ export class RpcPeer {
         return proxy;
     }
 
-    async handleMessage(message: RpcMessage, deserializationContext?: any) {
+    handleMessage(message: RpcMessage, deserializationContext?: any) {
+        try {
+            RpcPeer.activeRpcPeer = this;
+            this.handleMessageInternal(message, deserializationContext);
+        }
+        finally {
+            RpcPeer.activeRpcPeer = undefined;
+        }
+    }
+
+    private async handleMessageInternal(message: RpcMessage, deserializationContext?: any) {
         if (Object.isFrozen(this.pendingResults))
             return;
 

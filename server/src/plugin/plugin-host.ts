@@ -9,13 +9,14 @@ import path from 'path';
 import rimraf from 'rimraf';
 import { Duplex } from 'stream';
 import WebSocket from 'ws';
-import { Plugin } from '../db-types';
+import { Plugin, ScryptedUser } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
 import { Logger } from '../logger';
 import { RpcPeer } from '../rpc';
 import { createDuplexRpcPeer, createRpcSerializer } from '../rpc-serializer';
 import { ScryptedRuntime } from '../runtime';
 import { sleep } from '../sleep';
+import { AccessControls } from './acl';
 import { MediaManagerHostImpl } from './media';
 import { PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { ConsoleServer, createConsoleServer } from './plugin-console';
@@ -134,6 +135,12 @@ export class PluginHost {
 
         this.io.on('connection', async (socket) => {
             try {
+                const {
+                    accessControls,
+                    endpointRequest,
+                    pluginDevice,
+                } = (socket.request as any).scrypted;
+
                 try {
                     if (socket.request.url.indexOf('/engine.io/api') !== -1) {
                         if (socket.request.url.indexOf('/public') !== -1) {
@@ -141,7 +148,7 @@ export class PluginHost {
                             return;
                         }
 
-                        await this.createRpcIoPeer(socket);
+                        await this.createRpcIoPeer(socket, accessControls);
                         return;
                     }
                 }
@@ -150,10 +157,6 @@ export class PluginHost {
                     return;
                 }
 
-                const {
-                    endpointRequest,
-                    pluginDevice,
-                } = (socket.request as any).scrypted;
 
                 const handler = this.scrypted.getDevice<EngineIOHandler>(pluginDevice._id);
 
@@ -340,7 +343,7 @@ export class PluginHost {
         });
 
         this.worker.on('rpc', (message, sendHandle) => {
-            const socket  = sendHandle as net.Socket;
+            const socket = sendHandle as net.Socket;
             const { pluginId } = message;
             const host = this.scrypted.plugins[pluginId];
             if (!host) {
@@ -355,7 +358,7 @@ export class PluginHost {
         }
     }
 
-    async createRpcIoPeer(socket: IOServerSocket) {
+    async createRpcIoPeer(socket: IOServerSocket, accessControls: AccessControls) {
         const serializer = createRpcSerializer({
             sendMessageBuffer: buffer => socket.send(buffer),
             sendMessageFinish: message => socket.send(JSON.stringify(message)),
@@ -378,11 +381,13 @@ export class PluginHost {
                 reject?.(e);
             }
         });
+        rpcPeer.tags.acl = accessControls;
         serializer.setupRpcPeer(rpcPeer);
 
         // wrap the host api with a connection specific api that can be torn down on disconnect
         const createMediaManager = await this.peer.getParam('createMediaManager');
         const api = new PluginAPIProxy(this.api, await createMediaManager());
+        api.acl = accessControls;
         const kill = () => {
             serializer.onDisconnected();
             api.removeListeners();

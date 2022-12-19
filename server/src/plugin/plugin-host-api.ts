@@ -1,4 +1,4 @@
-import { Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, HttpRequest, MediaManager, ScryptedDevice, ScryptedInterfaceDescriptor, ScryptedInterfaceProperty, ScryptedNativeId } from '@scrypted/types';
+import { Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, MediaManager, ScryptedDevice, ScryptedInterfaceDescriptor, ScryptedInterfaceProperty, ScryptedNativeId } from '@scrypted/types';
 import debounce from 'lodash/debounce';
 import { Plugin } from '../db-types';
 import { Logger } from '../logger';
@@ -21,7 +21,6 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         'onDeviceEvent',
         'setStorage',
         'setDeviceProperty',
-        'deliverPush',
         'requestRestart',
         "setState",
     ];
@@ -74,10 +73,6 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
 
     async getMediaManager(): Promise<MediaManager> {
         return this.mediaManager;
-    }
-
-    async deliverPush(endpoint: string, httpRequest: HttpRequest) {
-        return this.scrypted.deliverPush(endpoint, httpRequest);
     }
 
     async getLogger(nativeId: ScryptedNativeId): Promise<Logger> {

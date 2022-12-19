@@ -1,4 +1,4 @@
-import { Device, DeviceInformation, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, PushHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedNativeId } from '@scrypted/types';
+import { Device, DeviceInformation, DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, ScryptedDevice, ScryptedInterface, ScryptedInterfaceMethod, ScryptedInterfaceProperty, ScryptedNativeId, ScryptedUser as SU } from '@scrypted/types';
 import AdmZip from 'adm-zip';
 import axios from 'axios';
 import * as io from 'engine.io';
@@ -14,13 +14,14 @@ import { PassThrough } from 'stream';
 import tar from 'tar';
 import { URL } from "url";
 import WebSocket, { Server as WebSocketServer } from "ws";
-import { Plugin, PluginDevice, ScryptedAlert } from './db-types';
+import { Plugin, PluginDevice, ScryptedAlert, ScryptedUser } from './db-types';
 import { createResponseInterface } from './http-interfaces';
 import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefault, getProvidedRoomOrDefault, getProvidedTypeOrDefault } from './infer-defaults';
 import { IOServer } from './io';
 import { Level } from './level';
 import { LogEntry, Logger, makeAlertId } from './logger';
 import { hasMixinCycle } from './mixin/mixin-cycle';
+import { AccessControls } from './plugin/acl';
 import { PluginDebug } from './plugin/plugin-debug';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
 import { PluginHost } from './plugin/plugin-host';
@@ -34,6 +35,7 @@ import { CORSControl, CORSServer } from './services/cors';
 import { Info } from './services/info';
 import { PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
+import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
 
 interface DeviceProxyPair {
@@ -76,6 +78,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     alerts = new Alerts(this);
     corsControl = new CORSControl(this);
     addressSettings = new AddressSettings(this);
+    usersService = new UsersService(this);
 
     constructor(datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
         super(app);
@@ -91,6 +94,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         });
 
         app.all('/engine.io/shell', (req, res) => {
+            if (res.locals.aclId) {
+                res.writeHead(401);
+                res.end();
+                return;
+            }
             this.shellHandler(req, res);
         });
 
@@ -251,21 +259,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         };
     }
 
-    async deliverPush(endpoint: string, request: HttpRequest) {
-        const { pluginHost, pluginDevice } = await this.getPluginForEndpoint(endpoint);
-        if (!pluginDevice) {
-            console.error('plugin device missing for', endpoint);
-            return;
-        }
-
-        if (!pluginDevice?.state.interfaces.value.includes(ScryptedInterface.PushHandler)) {
-            return;
-        }
-
-        const handler = this.getDevice<PushHandler>(pluginDevice._id);
-        return handler.onPush(request);
-    }
-
     async shellHandler(req: Request, res: Response) {
         const isUpgrade = isConnectionUpgrade(req.headers);
 
@@ -377,6 +370,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 return this.corsControl;
             case 'addresses':
                 return this.addressSettings;
+            case "users":
+                return this.usersService;
         }
     }
 
@@ -392,8 +387,30 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         return packageJson;
     }
 
-    handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
+    async handleEngineIOEndpoint(req: Request, res: ServerResponse & { locals: any }, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
         const { pluginHost, pluginDevice } = pluginData;
+
+        const { username } = res.locals;
+        let accessControls: AccessControls;
+        if (username) {
+            const user = await this.datastore.tryGet(ScryptedUser, username);
+            if (user.aclId) {
+                const accessControl = this.getDevice<SU>(user.aclId);
+                try {
+                    const acls = await accessControl.getScryptedUserAccessControl();
+                    if (acls) {
+                        accessControls = new AccessControls(acls);
+                        if (accessControls.shouldRejectMethod(pluginDevice._id, ScryptedInterfaceMethod.onConnection))
+                            accessControls.deny();
+                    }
+                }
+                catch (e) {
+                    res.writeHead(401);
+                    res.end();
+                    return;
+                }
+            }
+        }
 
         if (!pluginHost || !pluginDevice) {
             console.error('plugin does not exist or is still starting up.');
@@ -405,6 +422,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         (req as any).scrypted = {
             endpointRequest,
             pluginDevice,
+            accessControls,
         };
         if ((req as any).upgradeHead)
             pluginHost.io.handleUpgrade(req, res.socket, (req as any).upgradeHead)
@@ -635,7 +653,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         this.plugins[pluginId] = pluginHost;
 
         for (const pluginDevice of pluginDevices) {
-            this.getDevice(pluginDevice._id)?.probe().catch(() => {});
+            this.getDevice(pluginDevice._id)?.probe().catch(() => { });
         }
 
         return pluginHost;
@@ -691,6 +709,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 continue;
             await this.removeDevice(provided);
         }
+        const providerId = device.state?.providerId?.value;
         device.state = undefined;
 
         this.invalidatePluginDevice(device._id);
@@ -713,6 +732,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 // notify the plugin that a device was removed.
                 const plugin = this.plugins[device.pluginId];
                 await plugin.remote.setNativeId(device.nativeId, undefined, undefined);
+                const provider = this.getDevice<DeviceProvider>(providerId);
+                await provider?.releaseDevice(device._id, device.nativeId);
             }
             catch (e) {
                 // may throw if the plugin is killed, etc.

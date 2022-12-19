@@ -95,6 +95,7 @@ export abstract class PluginHttp<T> {
             url: req.url,
             isPublicEndpoint,
             username: res.locals.username,
+            aclId: res.locals.aclId,
         };
 
         if (isEngineIOEndpoint && !isUpgrade && isPublicEndpoint) {

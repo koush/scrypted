@@ -1,5 +1,6 @@
-import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointManager, HttpRequest, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
+import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointManager, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
 import { RpcPeer, RPCResultError } from '../rpc';
+import { AccessControls } from './acl';
 import { BufferSerializer } from './buffer-serializer';
 import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketConnection, WebSocketMethods, WebSocketSerializer } from './plugin-remote-websocket';
@@ -121,10 +122,6 @@ class EndpointManagerImpl implements EndpointManager {
         return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.PushEndpoint);
     }
 
-    async deliverPush(id: string, request: HttpRequest) {
-        return this.api.deliverPush(id, request);
-    }
-
     async getPath(nativeId?: string, options?: { public?: boolean; }): Promise<string> {
         return `/endpoint/${this.getEndpoint(nativeId)}/${options?.public ? 'public/' : ''}`
     }
@@ -133,7 +130,7 @@ class EndpointManagerImpl implements EndpointManager {
         const protocol = options?.insecure ? 'http' : 'https';
         const port = await this.api.getComponent(options?.insecure ? 'SCRYPTED_INSECURE_PORT' : 'SCRYPTED_SECURE_PORT');
         const path = await this.getPath(nativeId, options);
-        const url =  `${protocol}://${await this.getUrlSafeIp()}:${port}${path}`;
+        const url = `${protocol}://${await this.getUrlSafeIp()}:${port}${path}`;
         return url;
     }
 
@@ -368,8 +365,48 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
         const getRemote = await peer.getParam('getRemote');
         const remote = await getRemote(api, pluginId) as PluginRemote;
 
-        await remote.setSystemState(getSystemState());
+        const accessControls: AccessControls = peer.tags.acl;
+
+        const getAccessControlDeviceState = (id: string, state?:  { [property: string]: SystemDeviceState } ) => {
+            state = state || getSystemState()[id];
+            if (accessControls && state) {
+                state = Object.assign({}, state);
+                for (const property of Object.keys(state)) {
+                    if (accessControls.shouldRejectProperty(id, property))
+                        delete state[property];
+                }
+                let interfaces: ScryptedInterface[] = state.interfaces?.value;
+                if (interfaces) {
+                    interfaces = interfaces.filter(scryptedInterface => !accessControls.shouldRejectInterface(id, scryptedInterface));
+                    state.interfaces = {
+                        value: interfaces,
+                    }
+                }
+            }
+            return state;
+        }
+
+        const getAccessControlSystemState = () => {
+            let state = getSystemState();
+            if (accessControls) {
+                state = Object.assign({}, state);
+                for (const id of Object.keys(state)) {
+                    if (accessControls.shouldRejectDevice(id)) {
+                        delete state[id];
+                        continue;
+                    }
+                    state[id] = getAccessControlDeviceState(id, state[id]);
+                }
+            }
+
+            return state;
+        }
+
+        await remote.setSystemState(getAccessControlSystemState());
         api.listen((id, eventDetails, eventData) => {
+            if (accessControls?.shouldRejectEvent(eventDetails.property === ScryptedInterfaceProperty.id ? eventData : id, eventDetails))
+                return;
+
             // ScryptedDevice events will be handled specially and repropagated by the remote.
             if (eventDetails.eventInterface === ScryptedInterface.ScryptedDevice) {
                 if (eventDetails.property === ScryptedInterfaceProperty.id) {
@@ -378,7 +415,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
                 }
                 else {
                     // a change on anything else is a descriptor update
-                    remote.updateDeviceState(id, getSystemState()[id]);
+                    remote.updateDeviceState(id, getAccessControlDeviceState(id));
                 }
                 return;
             }
@@ -430,7 +467,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
     peer.params.getRemote = async (api: PluginAPI, pluginId: string) => {
         websocketSerializer.WebSocket = createWebSocketClass((connection, callbacks) => {
-            const {url} = connection;
+            const { url } = connection;
             if (url.startsWith('io://') || url.startsWith('ws://')) {
                 const id = url.substring('xx://'.length);
 
