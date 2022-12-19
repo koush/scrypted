@@ -149,7 +149,7 @@ export function parseFmtp(msection: string[]) {
             const paramLine = fmtpLine.substring(firstSpace + 1);
             const payloadType = parseInt(fmtp.split(':')[1]);
 
-            if (!fmtp || !paramLine || payloadType === NaN) {
+            if (!fmtp || !paramLine || Number.isNaN( payloadType )) {
                 return;
             }
 
