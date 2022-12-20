@@ -70,8 +70,15 @@ jobs:
             koush/scrypted:${{ matrix.BASE }}${{ matrix.SUPERVISOR }}
             ${{ format('koush/scrypted:v{0}-{1}{2}', github.event.inputs.package_version || steps.package-version.outputs.current-version, matrix.BASE, matrix.SUPERVISOR) }}
 
+            ghcr.io/koush/scrypted:${{ matrix.BASE }}${{ matrix.SUPERVISOR }}
+            ${{ format('ghcr.io/koush/scrypted:v{0}-{1}{2}', github.event.inputs.package_version || steps.package-version.outputs.current-version, matrix.BASE, matrix.SUPERVISOR) }}
+
             ${{ matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '.s6' && format('koush/scrypted:{0}', github.event.inputs.docker_tag) }}
             ${{ matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'koush/scrypted:lite' || '' }}
             ${{ matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '' && 'koush/scrypted:thin' || '' }}
+
+            ${{ matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '.s6' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.docker_tag) }}
+            ${{ matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:lite' || '' }}
+            ${{ matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:thin' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
