@@ -195,7 +195,15 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
 
         sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
         sip.onCallEnded.subscribe(cleanup);
-        this.remoteRtpDescription = await sip.start();
+        this.remoteRtpDescription = await sip.call(
+            ( audio ) => {
+                return [
+                    `m=audio ${audio.port} RTP/AVP 0`,
+                    'a=rtpmap:0 PCMU/8000',
+                    'a=sendrecv'
+                ]
+            }
+        );
         this.console.log('SIP: Received remote SDP:\n', this.remoteRtpDescription.sdp)
 
         let [rtpPort, rtcpPort] = await SipSession.reserveRtpRtcpPorts()

@@ -33,7 +33,7 @@ export class SipSession extends Subscribed {
       audioRtcpSplitter = await createBindUdp(audioSplitter.port + 1),
       videoSplitter = await createBindZero(),
       videoRtcpSplitter = await createBindUdp(videoSplitter.port + 1),
-      rtpOptions = {
+      rtpOptions : RtpOptions = {
         audio: {
           port: audioSplitter.port,
           rtcpPort: audioRtcpSplitter.port
@@ -74,7 +74,7 @@ export class SipSession extends Subscribed {
     return this.sipCall
   }
 
-  async start(): Promise<RtpDescription> {
+  async call( audioSection, videoSection? ): Promise<RtpDescription> {
     this.console.log(`SipSession::start()`);
 
     if (this.hasStarted) {
@@ -86,8 +86,11 @@ export class SipSession extends Subscribed {
       throw new Error('SIP Session has already ended')
     }
 
+
     try {
-      const rtpDescription = await this.sipCall.invite(),
+      if( this.sipOptions.shouldRegister )
+        await this.sipCall.register()
+      const rtpDescription = await this.sipCall.invite( audioSection, videoSection ),
         sendStunRequests = () => {
           sendStunBindingRequest({
             rtpSplitter: this.audioSplitter,

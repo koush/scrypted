@@ -1,6 +1,8 @@
 import { noop, Subject } from 'rxjs'
 import { randomInteger, randomString } from './util'
 import { RtpDescription, RtpOptions, RtpStreamDescription } from './rtp-utils'
+import { decodeSrtpOptions } from '@homebridge/camera-utils'
+import { stringify } from 'sip/sip'
 
 const sip = require('sip'),
   sdp = require('sdp')
@@ -8,16 +10,21 @@ const sip = require('sip'),
 export interface SipOptions {
   to: string
   from: string
+  domain?: string
+  expire?: number
   localIp: string
   localPort: number
-  udp: boolean
-  tcp: boolean
+  debugSip?: boolean
+  shouldRegister?: boolean
 }
 
 interface UriOptions {
   name?: string
   uri: string
-  params?: { tag?: string }
+  params?: {
+     tag?: string
+     expires?: number
+  }
 }
 
 interface SipHeaders {
@@ -77,10 +84,12 @@ function getRtpDescription(
     const { port } = sdp.parseMLine(section),
     lines: string[] = sdp.splitLines(section),
     rtcpLine = lines.find((l: string) => l.startsWith('a=rtcp:')),
+    cryptoLine = lines.find((l: string) => l.startsWith('a=crypto'))!,
     rtcpMuxLine = lines.find((l: string) => l.startsWith('a=rtcp-mux')),
     ssrcLine = lines.find((l: string) => l.startsWith('a=ssrc')),
     iceUFragLine = lines.find((l: string) => l.startsWith('a=ice-ufrag')),
-    icePwdLine = lines.find((l: string) => l.startsWith('a=ice-pwd'))
+    icePwdLine = lines.find((l: string) => l.startsWith('a=ice-pwd')),
+    encodedCrypto = cryptoLine?.match(/inline:(\S*)/)![1] || undefined
 
     let rtcpPort: number;
     if (rtcpMuxLine) {
@@ -96,6 +105,7 @@ function getRtpDescription(
       ssrc: (ssrcLine && Number(ssrcLine.match(/ssrc:(\S*)/)?.[1])) || undefined,
       iceUFrag: (iceUFragLine && iceUFragLine.match(/ice-ufrag:(\S*)/)?.[1]) || undefined,
       icePwd: (icePwdLine && icePwdLine.match(/ice-pwd:(\S*)/)?.[1]) || undefined,
+      ...(encodedCrypto? decodeSrtpOptions(encodedCrypto) : {})
     }
   } catch (e) {
     console.error('Failed to parse SDP from remote end')
@@ -129,23 +139,19 @@ export class SipCall {
   private destroyed = false
   private readonly console: any
 
-  public readonly sdp: string
   public readonly audioUfrag = randomString(16)
   public readonly videoUfrag = randomString(16)
 
   constructor(
     console: any,
     private sipOptions: SipOptions,
-    rtpOptions: RtpOptions,
+    private rtpOptions: RtpOptions,
     //tlsPort: number
   ) {
     this.console = console;
 
-    const { audio, video } = rtpOptions,
-      { from } = this.sipOptions,
-      host = this.sipOptions.localIp,
-      port = this.sipOptions.localPort,
-      ssrc = randomInteger();
+    const host = this.sipOptions.localIp,
+    port = this.sipOptions.localPort
 
     this.sipStack = {
       makeResponse: sip.makeResponse,
@@ -153,14 +159,57 @@ export class SipCall {
         host,
         hostname: host,
         port: port,
-        udp: this.sipOptions.udp,
-        tcp: this.sipOptions.tcp,
+        udp: true,
+        tcp: false,
         tls: false,
         // tls_port: tlsPort,
         // tls: {
         //   rejectUnauthorized: false,
         // },
-        ws: false
+        ws: false,
+        logger: {
+          recv:  function(m, remote) {
+            if( sipOptions.debugSip ) {
+              console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+              console.log(stringify( m ));
+              console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")            
+            }
+          },
+          send:  function(m, remote) {
+            /*
+            Some door bells run an embedded SIP server with an unresolvable public domain
+            Due to bugs in the DNS resolution in sip/sip we abuse the 'send' logger to modify some headers
+            just before they get sent to the SIP server.
+            */
+           if( sipOptions.domain && sipOptions.domain.length > 0 ) {
+            // Bticino CX300 specific: runs on an internet 2048362.bs.iotleg.com domain
+            // While underlying UDP socket is bound to the IP, the header is rewritten to match the domain
+            let toWithDomain: string = (sipOptions.to.split('@')[0] + '@' + sipOptions.domain).trim()
+            let fromWithDomain: string = (sipOptions.from.split('@')[0] + '@' + sipOptions.domain).trim()
+            if( m.method == 'REGISTER' || m.method == 'INVITE' ) {
+              if( m.method == 'REGISTER' ) {
+                m.uri = "sip:" + sipOptions.domain
+              } else if( m.method == 'INVITE' ) {
+                m.uri = toWithDomain
+              } else {
+                throw new Error("Error: Method construct for uri not implemented: " + m.method)
+              }
+              
+              m.headers.to.uri = toWithDomain
+              m.headers.from.uri = fromWithDomain
+              if( m.headers.contact[0].uri.split('@')[0].indexOf('-') < 0 ) {
+                m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + this.contactId + "@");
+              }
+           }
+
+            }
+            if( sipOptions.debugSip ) {
+              console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+              console.log(stringify( m ));
+              console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");            
+            }
+          },          
+        },        
       },
         (request: SipRequest) => {
           if (request.method === 'BYE') {
@@ -174,40 +223,6 @@ export class SipCall {
         }
       )
     }
-
-    this.sdp = ([
-      'v=0',
-      `o=${from.split(':')[1].split('@')[0]} 3747 461 IN IP4 ${host}`,
-      's=ScryptedSipPlugin',
-      `c=IN IP4 ${host}`,
-      't=0 0',
-      `m=audio ${audio.port} RTP/AVP 0`,
-      'a=rtpmap:0 PCMU/8000',
-      `a=rtcp:${audio.rtcpPort}`,
-      `a=ssrc:${ssrc}`,
-      'a=sendrecv'
-    ]
-      .filter((l) => l)
-      .join('\r\n')) + '\r\n';
-
-      /* Example SDP for audio and video
-    this.sdp = ([
-      'v=0',
-      `o=${from.split(':')[1].split('@')[0]} 3747 461 IN IP4 ${host}`,
-      's=ScryptedSipPlugin',
-      `c=IN IP4 ${host}`,
-      't=0 0',
-      `m=audio ${audio.port} RTP/AVP 97`,
-      `a=rtpmap:97 speex/8000`,
-      `m=video ${video.port} RTP/AVP 97`,
-      `a=rtpmap:97 H264/90000`,
-      `a=fmtp:97 profile-level-id=42801F`,
-      `a=ssrc:${ssrc}`,
-      'a=recvonly'
-    ]
-      .filter((l) => l)
-      .join('\r\n')) + '\r\n';
-      */
   }
 
   request({
@@ -235,9 +250,9 @@ export class SipCall {
           uri: this.sipOptions.to,
           headers: {
             to: {
-              name: '"Scrypted SIP Plugin Client"',
+              //name: '"Scrypted SIP Plugin Client"',
               uri: this.sipOptions.to,
-              params: this.toParams,
+              params: (method == 'REGISTER' || method == 'INVITE'  ? null : this.toParams),
             },
             from: {
               uri: this.sipOptions.from,
@@ -302,9 +317,11 @@ export class SipCall {
     })
   }
 
-  async invite() {
-
-    const { from } = this.sipOptions,
+  async invite( audioSection, videoSection? ) {
+    let ssrc = randomInteger()
+    let audio = audioSection ? audioSection( this.rtpOptions.audio, ssrc ).concat( ...[`a=ssrc:${ssrc}`, `a=rtcp:${this.rtpOptions.audio.rtcpPort}`] ) : []
+    let video = videoSection ? videoSection( this.rtpOptions.video, ssrc ).concat( ...[`a=ssrc:${ssrc}`, `a=rtcp:${this.rtpOptions.video.rtcpPort}`] ) : []
+    const { from, localIp } = this.sipOptions,
       inviteResponse = await this.request({
         method: 'INVITE',
         headers: {
@@ -314,10 +331,34 @@ export class SipCall {
           'content-type': 'application/sdp',
           contact: [{ uri: from }],
         },
-        content: this.sdp,
+        content: ([
+          'v=0',
+          `o=${from.split(':')[1].split('@')[0]} 3747 461 IN IP4 ${localIp}`,
+          's=ScryptedSipPlugin',
+          `c=IN IP4 ${this.sipOptions.localIp}`,
+          't=0 0',
+          ...audio,
+          ...video
+          ]
+          .filter((l) => l)
+          .join('\r\n')) + '\r\n'
       })
 
     return parseRtpDescription(this.console, inviteResponse)
+  }
+
+  async register() {
+    const { from } = this.sipOptions,
+      inviteResponse = await this.request({
+        method: 'REGISTER',
+        headers: {
+          //supported: 'replaces, outbound',
+          allow:
+            'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
+          'content-type': 'application/sdp',
+          contact: [{ uri: from, params: { expires: this.sipOptions.expire } }],
+        },
+      });
   }
 
   async sendBye() {
