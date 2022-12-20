@@ -10,6 +10,7 @@ import InstallPlugin from "./components/plugin/InstallPlugin.vue";
 import LogComponent from "./components/builtin/LogComponent.vue";
 import SettingsComponent from "./components/builtin/SettingsComponent.vue";
 import ShellComponent from "./components/builtin/ShellComponent.vue";
+import UsersComponent from "./components/UsersComponent.vue";
 
 let router = new VueRouter({
     routes: [
@@ -52,6 +53,10 @@ let router = new VueRouter({
       {
         path: "/component/settings",
         component: SettingsComponent
+      },
+      {
+        path: "/component/users",
+        component: UsersComponent
       },
       {
         path: "/component/log/:path*",

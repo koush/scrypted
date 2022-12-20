@@ -1,36 +1,62 @@
 import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedUser, ScryptedUserAccessControl, Setting, Settings, SettingValue } from "@scrypted/sdk";
 import { addAccessControlsForInterface } from "@scrypted/sdk/acl";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 export const UsersNativeId = 'users';
 
 type DBUser = { username: string, aclId: string };
 
 export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
+    storageSettings = new StorageSettings(this, {
+        devices: {
+            title: 'Devices',
+            description: 'The devices this user can access. Admin users can access all devices. Scrypted NVR users should use NVR Permissions to grant access to the NVR and associated cameras.',
+            type: 'device',
+            multiple: true,
+            defaultValue: [],
+        },
+    })
+
     async getScryptedUserAccessControl(): Promise<ScryptedUserAccessControl> {
         return {
             devicesAccessControls: [
                 addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/core').id,
                     ScryptedInterface.ScryptedDevice,
                     ScryptedInterface.EngineIOHandler),
+                ...this.storageSettings.values.devices.map((id: string) => ({
+                    id,
+                })),
             ]
         };
+    }
+
+    get username() {
+        return this.nativeId.substring('user:'.length);
     }
 
     async getSettings(): Promise<Setting[]> {
         return [
             {
+                key: 'username',
+                title: 'User Name',
+                readonly: true,
+                value: this.username,
+            },
+            {
                 key: 'password',
                 title: 'Password',
+                description: 'Change the password.',
                 type: 'password',
-            }
+            },
+            ...await this.storageSettings.getSettings(),
         ]
     }
 
     async putSetting(key: string, value: SettingValue): Promise<void> {
         if (key !== 'password')
-            return;
+            return this.storageSettings.putSetting(key, value);
         const usersService = await sdk.systemManager.getComponent('users');
         const users: DBUser[] = await usersService.getAllUsers();
-        const user = users.find(user => user.username === this.nativeId.substring('user:'.length));
+        const user = users.find(user => user.username === this.username);
         if (!user)
             return;
         await usersService.addUser(user.username, value.toString(), user.aclId);
@@ -49,7 +75,7 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-        const username = nativeId.substring('user:'.length);
+        const username = ('user:'.length);
         const usersService = await sdk.systemManager.getComponent('users');
         await usersService.removeUser(username);
     }
@@ -61,16 +87,16 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
                 title: 'User name',
             },
             {
+                key: 'password',
+                type: 'password',
+                title: 'Password',
+            },
+            {
                 key: 'admin',
                 type: 'boolean',
                 title: 'Admin',
                 description: 'Grant this user administrator privileges.',
             },
-            {
-                key: 'password',
-                type: 'password',
-                title: 'Password',
-            }
         ]
     }
 
@@ -86,7 +112,7 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
                 ScryptedInterface.ScryptedUser,
                 ScryptedInterface.Settings,
             ],
-            type: ScryptedDeviceType.Builtin,
+            type: ScryptedDeviceType.Person,
         })
 
         await usersService.addUser(username, password, admin ? undefined : aclId);
@@ -110,7 +136,7 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
                     ScryptedInterface.ScryptedUser,
                     ScryptedInterface.Settings,
                 ],
-                type: ScryptedDeviceType.Builtin,
+                type: ScryptedDeviceType.Person,
             })),
         })
     }

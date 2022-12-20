@@ -298,9 +298,11 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 }));
                 const dcDeferred = new Deferred<RTCDataChannel>();
                 const session = new BrowserSignalingSession();
+                const droppedMessages: any[] = [];
                 session.onPeerConnection = async pc => {
                     pc.ondatachannel = e => {
-                        e.channel.onmessage = () => console.log('dropped mesage');
+                        e.channel.onmessage = message => droppedMessages.push(message);
+                        e.channel.binaryType = 'arraybuffer';
                         dcDeferred.resolve(e.channel)
                     };
                 }
@@ -352,6 +354,11 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     const serializer = createRpcDuplexSerializer({
                         write: (data) => debouncer.send(data),
                     });
+
+                    while (droppedMessages.length) {
+                        const message = droppedMessages.shift();
+                        dc.dispatchEvent(message);
+                    }
 
                     const ret = new RpcPeer('webrtc-client', "api", (message, reject, serializationContext) => {
                         try {
