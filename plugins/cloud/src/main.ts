@@ -62,6 +62,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         },
         registrationSecret: {
             hide: true,
+        },
+        cloudMessageToken: {
+            hide: true,
+            persistedDefaultValue: crypto.randomBytes(8).toString('hex'),
         }
     });
 
@@ -199,7 +203,16 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
-        response.send('ok');
+        response.send('', {
+            headers: {
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Origin': request.headers?.origin,
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Length, X-Requested-With'            
+            },
+        });
+
+        if (request.method.toLowerCase() === 'options')
+            return;
 
         const cm = await this.getCloudMessagePath();
         const { url } = request;
@@ -214,7 +227,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         return this.push;
     }
 
-    async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     getHostname() {
@@ -237,7 +250,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async getCloudMessagePath() {
         const url = new URL(await endpointManager.getPublicLocalEndpoint());
-        return path.join(url.pathname, 'cloudmessage');
+        return path.join(url.pathname, this.storageSettings.values.cloudMessageToken);
     }
 
     async deliverPush(endpoint: string, request: HttpRequest) {
@@ -247,7 +260,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             return;
         }
         if (!handler.interfaces.includes(ScryptedInterface.PushHandler)) {
-            this.console.error('deive not a push handler', endpoint);
+            this.console.error('device not a push handler', endpoint);
             return;
         }
 
