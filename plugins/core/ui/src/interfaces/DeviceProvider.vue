@@ -21,7 +21,7 @@
         text
         color="primary"
         @click="openDeviceCreationDialog"
-        >Add Device</v-btn
+        >Add New</v-btn
       >
       <!-- <v-btn
         v-if="device.interfaces.includes('DeviceDiscovery')"

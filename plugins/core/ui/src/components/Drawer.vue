@@ -3,12 +3,8 @@
     <v-list dense nav>
       <v-subheader></v-subheader>
 
-      <v-list-item
-        link
-        href="#/component/settings"
-        v-if="updateAvailable"
-        active-class="deep-purple accent-4 white--text"
-      >
+      <v-list-item link href="#/component/settings" v-if="updateAvailable"
+        active-class="deep-purple accent-4 white--text">
         <v-list-item-icon>
           <v-icon color="red" small>fa-download</v-icon>
         </v-list-item-icon>
@@ -18,14 +14,8 @@
         </v-list-item-content>
       </v-list-item>
 
-      <v-list-item
-        v-for="item in builtinComponents"
-        :key="item.id"
-        link
-        :to="item.path"
-        :active="item.active"
-        active-class="deep-purple accent-4 white--text"
-      >
+      <v-list-item v-for="item in builtinComponents" :key="item.id" link :to="item.path" :active="item.active"
+        active-class="deep-purple accent-4 white--text">
         <v-list-item-icon>
           <v-icon small>{{ item.icon }}</v-icon>
         </v-list-item-icon>
@@ -38,13 +28,8 @@
       <div dense nav v-for="category in categories" :key="category">
         <v-subheader>{{ category }}</v-subheader>
 
-        <v-list-item
-          v-for="item in filterComponents(category)"
-          :key="item.id"
-          link
-          :to="getComponentViewPath(item.id)"
-          active-class="deep-purple accent-4 white--text"
-        >
+        <v-list-item v-for="item in filterComponents(category)" :key="item.id" link :to="getComponentViewPath(item.id)"
+          active-class="deep-purple accent-4 white--text">
           <v-list-item-icon>
             <v-icon small>{{ item.icon }}</v-icon>
           </v-list-item-icon>
@@ -56,11 +41,7 @@
         <v-divider></v-divider>
       </div>
       <v-subheader>Social</v-subheader>
-      <v-list-item
-        link
-        href="https://discord.gg/DcFzmBHYGq"
-        active-class="purple white--text tile"
-      >
+      <v-list-item link href="https://discord.gg/DcFzmBHYGq" active-class="purple white--text tile">
         <v-list-item-icon>
           <v-icon small>fab fa-discord</v-icon>
         </v-list-item-icon>
@@ -69,11 +50,7 @@
           <v-list-item-title>Discord</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
-      <v-list-item
-        link
-        href="https://github.com/koush/scrypted"
-        active-class="purple white--text tile"
-      >
+      <v-list-item link href="https://github.com/koush/scrypted" active-class="purple white--text tile">
         <v-list-item-icon>
           <v-icon small>fab fa-github</v-icon>
         </v-list-item-icon>
@@ -89,9 +66,7 @@
         </v-list-item-icon>
 
         <v-list-item-content>
-          <v-list-item-title
-            >Version {{ scryptedVersion || "Unknown" }}</v-list-item-title
-          >
+          <v-list-item-title>Version {{ scryptedVersion || "Unknown" }}</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
     </v-list>
@@ -128,6 +103,12 @@ export default {
             category: "Components",
           },
           // { id: "log", name: "Live Log", icon: "list", category: "Utilities" },
+          {
+            id: "users",
+            name: "Users",
+            icon: "fa-users",
+            category: "Utilities",
+          },
           {
             id: "shell",
             name: "Terminal",
@@ -183,11 +164,11 @@ export default {
       updateAvailable: null,
       actives: {},
       builtinComponents: [
-              {
-            id: "plugin",
-            name: "Plugins",
-            icon: "fa-puzzle-piece",
-            path: '/component/plugin',
+        {
+          id: "plugin",
+          name: "Plugins",
+          icon: "fa-puzzle-piece",
+          path: '/component/plugin',
         },
         {
           id: "devices",
@@ -203,4 +184,5 @@ export default {
 };
 </script>
 <style scoped>
+
 </style>
