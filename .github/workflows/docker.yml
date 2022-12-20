@@ -54,7 +54,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.SCRYPTED_GHCR_TOKEN }}
 
       - name: Build and push Docker image (scrypted)
         uses: docker/build-push-action@v2
