@@ -406,6 +406,54 @@ class Arlo(object):
 
         asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
+    def SubscribeToSDPAnswers(self, basestation, camera, callback):
+        """
+        Use this method to subscribe to pushToTalk SDP answer events. You must provide a callback function which will get called once per SDP event.
+
+        The callback function should have the following signature:
+        def callback(self, event)
+
+        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
+        that has a big switch statement in it to handle all the various events Arlo produces.
+        """
+
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        def callbackwrapper(self, event):
+            properties = event.get("properties", {})
+            stop = None 
+            if properties.get("type") == "answerSdp":
+                stop = callback(properties.get("data"))
+            if not stop:
+                return None
+            return stop
+
+        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
+
+    def SubscribeToCandidateAnswers(self, basestation, camera, callback):
+        """
+        Use this method to subscribe to pushToTalk ICE candidate answer events. You must provide a callback function which will get called once per candidate event.
+
+        The callback function should have the following signature:
+        def callback(self, event)
+
+        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
+        that has a big switch statement in it to handle all the various events Arlo produces.
+        """
+
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        def callbackwrapper(self, event):
+            properties = event.get("properties", {})
+            stop = None 
+            if properties.get("type") == "answerCandidate":
+                stop = callback(properties.get("data"))
+            if not stop:
+                return None
+            return stop
+
+        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
+
     async def HandleEvents(self, basestation, resource, actions, callback):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
@@ -505,44 +553,30 @@ class Arlo(object):
         resp = self.request.get(url)
         return resp.get("uSessionId"), resp.get("data")
 
-    def DoPushToTalkNegotiation(self, basestation, camera, uSessionId, localSdp, localCandidates, onRemoteSdp, onRemoteCandidates):
+    def StartPushToTalkNegotiation(self, basestation, camera, uSessionId, localSdp, localCandidates):
         resource = f"cameras/{camera.get('deviceId')}"
 
-        def trigger(self):
+        self.Notify(basestation, {
+            "action": "pushToTalk",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "data": localSdp,
+                "type": "offerSdp",
+                "uSessionId": uSessionId
+            }
+        })
+        for candidate in localCandidates:
             self.Notify(basestation, {
                 "action": "pushToTalk",
                 "resource": resource,
-                "publishResponse": True,
+                "publishResponse": False,
                 "properties": {
-                    "data": localSdp,
-                    "type": "offerSdp",
+                    "data": candidate,
+                    "type": "offerCandidate",
                     "uSessionId": uSessionId
                 }
             })
-            for candidate in localCandidates:
-                self.Notify(basestation, {
-                    "action": "pushToTalk",
-                    "resource": resource,
-                    "publishResponse": False,
-                    "properties": {
-                        "data": candidate,
-                        "type": "offerCandidate",
-                        "uSessionId": uSessionId
-                    }
-                })
-
-        def callback(self, event):
-            properties = event.get("properties", {})
-            stop = None 
-            if properties.get("type") == "answerSdp":
-                stop = onRemoteSdp(properties.get("data"))
-            elif properties.get("type") == "answerCandidate":
-                stop = onRemoteCandidates(properties.get("data"))
-            if not stop:
-                return None
-            return stop
-
-        asyncio.get_event_loop().create_task(self.TriggerAndHandleEvent(basestation, resource, ["pushToTalk"], trigger, callback))
 
     async def TriggerFullFrameSnapshot(self, basestation, camera):
         """

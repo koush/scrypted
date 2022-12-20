@@ -1,5 +1,3 @@
 paho-mqtt==1.6.1
 sseclient==0.0.22
-aiortc==1.3.2
 requests
---no-binary=cffi
