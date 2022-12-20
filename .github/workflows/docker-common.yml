@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        NODE_VERSION: ["16", "18"]
+        NODE_VERSION: ["18"]
         BUILDPACK_DEPS_BASE: ["bullseye"]
         FLAVOR: ["full", "lite", "thin"]
     steps:
