@@ -69,7 +69,5 @@ jobs:
           push: true
           tags: |
             ${{ matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '.s6' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.docker_tag) }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:lite' || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:thin' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
