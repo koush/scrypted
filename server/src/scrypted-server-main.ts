@@ -161,13 +161,6 @@ async function start() {
         next();
     })
 
-    app.options('*', (req, res) => {
-        // add more?
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
-        res.send(200);
-    });
-
     const authSalt = crypto.randomBytes(16);
     const createAuthorizationToken = (login_user_token: string) => {
         const salted = login_user_token + authSalt;
