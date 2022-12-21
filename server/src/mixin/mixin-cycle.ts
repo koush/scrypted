@@ -2,7 +2,7 @@ import { ScryptedInterfaceProperty } from "@scrypted/types";
 import { ScryptedRuntime } from "../runtime";
 import { getState } from "../state";
 
-function getMixins(scrypted: ScryptedRuntime, id: string) {
+export function getMixins(scrypted: ScryptedRuntime, id: string) {
     const pluginDevice = scrypted.findPluginDeviceById(id);
     if (!pluginDevice)
         return [];

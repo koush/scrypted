@@ -20,7 +20,7 @@ import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefaul
 import { IOServer } from './io';
 import { Level } from './level';
 import { LogEntry, Logger, makeAlertId } from './logger';
-import { hasMixinCycle } from './mixin/mixin-cycle';
+import { getMixins, hasMixinCycle } from './mixin/mixin-cycle';
 import { AccessControls } from './plugin/acl';
 import { PluginDebug } from './plugin/plugin-debug';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
@@ -652,8 +652,23 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         this.setupPluginHostAutoRestart(pluginHost);
         this.plugins[pluginId] = pluginHost;
 
+        const pluginDeviceSet = new Set<string>();
         for (const pluginDevice of pluginDevices) {
+            if (pluginDeviceSet.has(pluginDevice._id))
+                continue;
+            pluginDeviceSet.add(pluginDevice._id);
             this.getDevice(pluginDevice._id)?.probe().catch(() => { });
+        }
+
+        for (const pluginDevice of Object.values(this.pluginDevices)) {
+            const { _id } = pluginDevice;
+            if (pluginDeviceSet.has(_id))
+                continue;
+            for (const mixinId of getMixins(this, _id)) {
+                if (pluginDeviceSet.has(mixinId)) {
+                    this.getDevice(_id)?.probe().catch(() => { });
+                }
+            }
         }
 
         return pluginHost;
