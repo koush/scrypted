@@ -126,13 +126,11 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         self.logger.info("Starting intercom")
         real_speaker = await self.speaker.real_speaker()
         await real_speaker.startIntercom(media)
-        self.logger.info("STARTED")
 
     async def stopIntercom(self):
         self.logger.info("Stopping intercom")
         real_speaker = await self.speaker.real_speaker()
         await real_speaker.stopIntercom()
-        self.logger.info("STOPPED")
 
     def _update_device_details(self, arlo_device):
         """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
