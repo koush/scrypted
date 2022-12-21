@@ -37,9 +37,9 @@ function once(socket: IOClientSocket, event: 'open' | 'message') {
 export type ScryptedClientConnectionType = 'http' | 'webrtc' | 'http-local';
 
 export interface ScryptedClientStatic extends ScryptedStatic {
+    userId?: string;
     disconnect(): void;
     onClose?: Function;
-    userStorage: Storage,
     version: string;
     connectionType: ScryptedClientConnectionType;
     rtcConnectionManagement?: RTCConnectionManagement;
@@ -189,6 +189,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             throw new ScryptedClientLoginError(loginCheck);
         addresses = loginCheck.addresses;
         scryptedCloud = loginCheck.scryptedCloud;
+        username = loginCheck.username;
         console.log('login checked', Date.now() - start, loginCheck);
     }
 
@@ -499,8 +500,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             });
         }
 
-        const [userStorage, version, rtcConnectionManagement] = await Promise.all([
-            rpcPeer.getParam('userStorage'),
+        const [version, rtcConnectionManagement] = await Promise.all([
             (async () => {
                 let version = 'unknown';
                 try {
@@ -528,7 +528,12 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         console.log('api initialized', Date.now() - start);
         console.log('api queried, version:', version);
 
+        const userDevice = Object.keys(systemManager.getSystemState())
+            .map(id => systemManager.getDeviceById(id))
+            .find(device => device.pluginId === '@scrypted/core' && device.nativeId === `user:${username}`);
+
         const ret: ScryptedClientStatic = {
+            userId: userDevice?.id,
             pluginRemoteAPI: undefined,
             connectionType,
             version,
@@ -536,7 +541,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             deviceManager,
             endpointManager,
             mediaManager,
-            userStorage,
             disconnect() {
                 rpcPeer.kill('disconnect requested');
             },
