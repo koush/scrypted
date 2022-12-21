@@ -90,7 +90,10 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
             forwarder.killPromise.finally(() => pc.close());
 
             const weriftSignalingSession = new WeriftSignalingSession(this.console, pc);
-            this.mixinDevice.startRTCSignalingSession(weriftSignalingSession);
+            const control = await this.mixinDevice.startRTCSignalingSession(weriftSignalingSession);
+
+            forwarder.killPromise.finally(() => control.endSession());
+            return;
         }
 
         throw new Error("webrtc session not connected.");
