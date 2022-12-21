@@ -33,15 +33,7 @@ Vue.use(Vue => {
     Vue.prototype.$connectScrypted = () => {
         const clientPromise = connectScryptedClient({
             pluginId: '@scrypted/core',
-        })
-            .then(async (scrypted) => {
-                // todo: fix this.
-                // since moving the connection out of the @scrypted/core and
-                // directly onto the server, userStorage no longer exists.
-                if (!scrypted.userStorage)
-                    scrypted.userStorage = localStorage;
-                return scrypted;
-            });
+        });
 
         store.commit("setHasLogin", undefined);
         store.commit("setIsLoggedIn", undefined);

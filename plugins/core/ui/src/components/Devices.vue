@@ -40,7 +40,7 @@
 </template>
 <script>
 import colors from "vuetify/es5/util/colors";
-import { typeToIcon, getComponentName, getDeviceViewPath } from "./helpers";
+import { getDeviceViewPath, typeToIcon } from "./helpers";
 
 export default {
   methods: {
@@ -48,13 +48,11 @@ export default {
     getProvider(device) {
       if (device.providerId === device.id)
         return {
-          name: this.$scrypted.systemManager.getDeviceById(device.providerId)
-            .name,
+          name: this.$scrypted.systemManager.getDeviceById(device.providerId)?.name,
           link: `#/device/${device.id}`,
         };
       return {
-        name: this.$scrypted.systemManager.getDeviceById(device.providerId)
-          .name,
+        name: this.$scrypted.systemManager.getDeviceById(device.providerId)?.name,
         link: `#/device/${device.id}`,
       };
     },
