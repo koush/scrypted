@@ -72,9 +72,15 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
         if ((this.type === ScryptedDeviceType.Speaker || this.type === ScryptedDeviceType.SmartSpeaker)
             && this.mixinDeviceInterfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
 
+                this.console.log('starting webrtc speaker intercom');
+
             const pc = new RTCPeerConnection();
             const atrack = new MediaStreamTrack({ kind: 'audio' });
             const audioTransceiver = pc.addTransceiver(atrack);
+            audioTransceiver.mid = '0';
+            const weriftSignalingSession = new WeriftSignalingSession(this.console, pc);
+            const control = await this.mixinDevice.startRTCSignalingSession(weriftSignalingSession);
+            
             const forwarder = await createTrackForwarder({
                 timeStart: Date.now(),
                 videoTransceiver: undefined,
@@ -88,9 +94,6 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
 
             waitClosed(pc).finally(() => forwarder.kill());
             forwarder.killPromise.finally(() => pc.close());
-
-            const weriftSignalingSession = new WeriftSignalingSession(this.console, pc);
-            const control = await this.mixinDevice.startRTCSignalingSession(weriftSignalingSession);
 
             forwarder.killPromise.finally(() => control.endSession());
             return;
