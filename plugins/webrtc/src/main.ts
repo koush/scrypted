@@ -1,4 +1,4 @@
-import { defaultPeerConfig, PeerConfig } from '@koush/werift';
+import { defaultPeerConfig, MediaStreamTrack, PeerConfig, RTCPeerConnection } from '@koush/werift';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
@@ -9,12 +9,13 @@ import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
-import { createRTCPeerConnectionSink, parseOptions, RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement } from "./ffmpeg-to-wrtc";
+import { createRTCPeerConnectionSink, createTrackForwarder, parseOptions, RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement } from "./ffmpeg-to-wrtc";
 import { stunServer, turnServer } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 import { createZygote } from './zygote';
+import { WeriftSignalingSession } from './werift-signaling-session';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -65,6 +66,31 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
                 this.plugin.getWeriftConfiguration(),
             );
             return;
+        }
+
+        // odd code path for arlo that has a webrtc connection only for the speaker
+        if ((this.type === ScryptedDeviceType.Speaker || this.type === ScryptedDeviceType.SmartSpeaker)
+            && this.mixinDeviceInterfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
+
+            const pc = new RTCPeerConnection();
+            const atrack = new MediaStreamTrack({ kind: 'audio' });
+            const audioTransceiver = pc.addTransceiver(atrack);
+            const forwarder = await createTrackForwarder({
+                timeStart: Date.now(),
+                videoTransceiver: undefined,
+                audioTransceiver,
+                isPrivate: undefined, destinationId: undefined, ipv4: undefined,
+                requestMediaStream: async () => media,
+                sessionSupportsH264High: true,
+                maximumCompatibilityMode: false,
+                transcodeWidth: 1280,
+            });
+
+            waitClosed(pc).finally(() => forwarder.kill());
+            forwarder.killPromise.finally(() => pc.close());
+
+            const weriftSignalingSession = new WeriftSignalingSession(this.console, pc);
+            this.mixinDevice.startRTCSignalingSession(weriftSignalingSession);
         }
 
         throw new Error("webrtc session not connected.");
@@ -352,7 +378,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return new WebRTCCamera(this, nativeId);
     }
 
-    async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     getRTCConfiguration(): RTCConfiguration {

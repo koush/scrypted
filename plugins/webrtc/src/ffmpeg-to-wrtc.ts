@@ -226,12 +226,12 @@ export async function createTrackForwarder(options: {
     };
 
     let tracks: RtpTracks;
-    if (ffmpegInput.mediaStreamOptions?.audio === null) {
+    if (ffmpegInput.mediaStreamOptions?.audio === null || !audioTransceiver) {
         tracks = {
             video: videoRtpTrack,
         }
     }
-    else if (ffmpegInput.mediaStreamOptions?.video === null) {
+    else if (ffmpegInput.mediaStreamOptions?.video === null || !videoTransceiver) {
         tracks = {
             audio: audioRtpTrack,
         }
