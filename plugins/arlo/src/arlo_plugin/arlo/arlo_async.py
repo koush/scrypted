@@ -553,7 +553,7 @@ class Arlo(object):
         resp = self.request.get(url)
         return resp.get("uSessionId"), resp.get("data")
 
-    def StartPushToTalkNegotiation(self, basestation, camera, uSessionId, localSdp, localCandidates):
+    def NotifyPushToTalkSDP(self, basestation, camera, uSessionId, localSdp):
         resource = f"cameras/{camera.get('deviceId')}"
 
         self.Notify(basestation, {
@@ -566,17 +566,20 @@ class Arlo(object):
                 "uSessionId": uSessionId
             }
         })
-        for candidate in localCandidates:
-            self.Notify(basestation, {
-                "action": "pushToTalk",
-                "resource": resource,
-                "publishResponse": False,
-                "properties": {
-                    "data": candidate,
-                    "type": "offerCandidate",
-                    "uSessionId": uSessionId
-                }
-            })
+
+    def NotifyPushToTalkCandidate(self, basestation, camera, uSessionId, localCandidate):
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        self.Notify(basestation, {
+            "action": "pushToTalk",
+            "resource": resource,
+            "publishResponse": False,
+            "properties": {
+                "data": localCandidate,
+                "type": "offerCandidate",
+                "uSessionId": uSessionId
+            }
+        })
 
     async def TriggerFullFrameSnapshot(self, basestation, camera):
         """

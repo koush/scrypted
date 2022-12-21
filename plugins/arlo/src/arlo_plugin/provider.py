@@ -316,6 +316,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             ScryptedInterface.MotionSensor.value,
             ScryptedInterface.Intercom.value,
             ScryptedInterface.Battery.value,
+            ScryptedInterface.DeviceProvider.value,
+            ScryptedInterface.DeviceDiscovery.value,
         ]
 
         if model_id.startswith("avd1001"):
