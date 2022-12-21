@@ -17,8 +17,11 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
     })
 
     async getScryptedUserAccessControl(): Promise<ScryptedUserAccessControl> {
-        return {
+        const self = sdk.deviceManager.getDeviceState(this.nativeId);
+
+        const ret: ScryptedUserAccessControl =  {
             devicesAccessControls: [
+                addAccessControlsForInterface(self.id, ScryptedInterface.ScryptedDevice),
                 addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/core').id,
                     ScryptedInterface.ScryptedDevice,
                     ScryptedInterface.EngineIOHandler),
@@ -27,6 +30,13 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
                 })),
             ]
         };
+
+
+        if (self) {
+
+        }
+
+        return ret;
     }
 
     get username() {
