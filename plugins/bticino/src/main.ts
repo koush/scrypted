@@ -1,37 +1,35 @@
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { SipCall, SipOptions } from '../../sip/src/sip-call';
+import { SipMessageHandler, SipCall, SipOptions, SipRequest } from '../../sip/src/sip-call';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import sdk, { BinarySensor, Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
-import dgram from 'dgram';
 import { SipSession } from '../../sip/src/sip-session';
 import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from '../../sip/src/rtp-utils';
-import { ChildProcess } from 'child_process';
 import { randomBytes } from 'crypto';
 
 const STREAM_TIMEOUT = 50000;
 const SIP_EXPIRATION_DEFAULT = 3600;
 const { deviceManager, mediaManager } = sdk;
 
-class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, Settings, BinarySensor {
+export class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, Settings, BinarySensor {
     session: SipSession;
-    audioOutForwarder: dgram.Socket;
-    audioOutProcess: ChildProcess;
-    doorbellAudioActive: boolean;
-    audioInProcess: ChildProcess;
     currentMedia: FFmpegInput | MediaStreamUrl;
     currentMediaMimeType: string;
-    audioSilenceProcess: ChildProcess;
     refreshTimeout: NodeJS.Timeout;
-    pendingPicture: Promise<MediaObject>;
+    messageHandler: SipMessageHandler;
 
     constructor(nativeId: string, public provider: SipCamProvider) {
         super(nativeId);
-        this.binaryState = false;
-        this.doorbellAudioActive = false;
-        this.audioSilenceProcess = null;
-    }
+        let logger = this.log;
+        this.messageHandler = new class extends SipMessageHandler {
+                handle( request: SipRequest ) {
+                    // TODO: implement netatmo.onPresence handling?
+                    // {"jsonrpc":"2.0","method":"netatmo.onPresence","params":[{"persons":[]}]}
+                    logger.d("remote message: " + request.content );
+                }
+            }()
+        }
 
     async takePicture(option?: PictureOptions): Promise<MediaObject> {
         throw new Error("The SIP doorbell camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
@@ -100,8 +98,6 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
     }
 
     stopSession() {
-        this.doorbellAudioActive = false;
-        this.audioInProcess?.kill('SIGKILL');
         if (this.session) {
             this.log.d('ending sip session');
             this.session.stop();
@@ -173,7 +169,8 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
                     localIp,
                     localPort,
                     shouldRegister: true,
-                    debugSip: sipdebug
+                    debugSip: sipdebug,
+                    messageHandler: this.messageHandler
                  };
                 sip = await SipSession.createSipSession(console, "Bticino", sipOptions);
                 

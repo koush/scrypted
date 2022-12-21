@@ -14,7 +14,7 @@ export class SipSession extends Subscribed {
   onCallEnded = this.onCallEndedSubject.asObservable()
 
   constructor(
-    public readonly console: any,
+    public readonly console: Console,
     public readonly sipOptions: SipOptions,
     public readonly rtpOptions: RtpOptions,
     public readonly audioSplitter: dgram.Socket,

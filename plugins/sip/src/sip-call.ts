@@ -15,7 +15,15 @@ export interface SipOptions {
   localIp: string
   localPort: number
   debugSip?: boolean
+  messageHandler?: SipMessageHandler 
   shouldRegister?: boolean
+}
+
+/**
+ * Allows handling of SIP messages
+ */
+export abstract class SipMessageHandler {
+  abstract handle( request: SipRequest )
 }
 
 interface UriOptions {
@@ -137,13 +145,13 @@ export class SipCall {
   private sipStack: SipStack
   public readonly onEndedByRemote = new Subject()
   private destroyed = false
-  private readonly console: any
+  private readonly console: Console
 
   public readonly audioUfrag = randomString(16)
   public readonly videoUfrag = randomString(16)
 
   constructor(
-    console: any,
+    console: Console,
     private sipOptions: SipOptions,
     private rtpOptions: RtpOptions,
     //tlsPort: number
@@ -151,7 +159,8 @@ export class SipCall {
     this.console = console;
 
     const host = this.sipOptions.localIp,
-    port = this.sipOptions.localPort
+    port = this.sipOptions.localPort,
+    contactId = randomInteger()
 
     this.sipStack = {
       makeResponse: sip.makeResponse,
@@ -198,7 +207,7 @@ export class SipCall {
               m.headers.to.uri = toWithDomain
               m.headers.from.uri = fromWithDomain
               if( m.headers.contact[0].uri.split('@')[0].indexOf('-') < 0 ) {
-                m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + this.contactId + "@");
+                m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + contactId + "@");
               }
            }
 
@@ -218,6 +227,13 @@ export class SipCall {
 
             if (this.destroyed) {
               this.onEndedByRemote.next(null)
+            }
+          } else if( request.method === 'MESSAGE' && sipOptions.messageHandler ) {
+            sipOptions.messageHandler.handle( request )
+            this.sipStack.send(this.sipStack.makeResponse(request, 200, 'Ok'))
+          } else {
+            if( sipOptions.debugSip ) {
+              this.console.warn("unimplemented method received from remote: " + request.method)
             }
           }
         }
@@ -317,6 +333,9 @@ export class SipCall {
     })
   }
 
+  /**
+  * Initiate a call by sending a SIP INVITE request
+  */
   async invite( audioSection, videoSection? ) {
     let ssrc = randomInteger()
     let audio = audioSection ? audioSection( this.rtpOptions.audio, ssrc ).concat( ...[`a=ssrc:${ssrc}`, `a=rtcp:${this.rtpOptions.audio.rtcpPort}`] ) : []
@@ -347,6 +366,9 @@ export class SipCall {
     return parseRtpDescription(this.console, inviteResponse)
   }
 
+  /**
+  * Register the user agent with a Registrar
+  */  
   async register() {
     const { from } = this.sipOptions,
       inviteResponse = await this.request({
@@ -360,6 +382,24 @@ export class SipCall {
         },
       });
   }
+
+  /**
+  * Send a message to the current call contact
+  */    
+  async message( content: string ) {
+    const { from } = this.sipOptions,
+      inviteResponse = await this.request({
+        method: 'MESSAGE',
+        headers: {
+          //supported: 'replaces, outbound',
+          allow:
+            'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
+          'content-type': 'application/sdp',
+          contact: [{ uri: from, params: { expires: this.sipOptions.expire } }],
+        },
+        content: content
+      });
+  }  
 
   async sendBye() {
     this.console.log('Sending BYE...')
