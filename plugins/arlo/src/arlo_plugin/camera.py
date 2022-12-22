@@ -131,6 +131,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         self.logger.info("Stopping intercom")
         real_speaker = await self.speaker.real_speaker()
         await real_speaker.stopIntercom()
+        self.speaker.close()
 
     def _update_device_details(self, arlo_device):
         """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
@@ -156,18 +157,24 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
 
         self.rtc_session = None
         self.rtc_setup = None
+        self.rtc_answered = False
 
     def __del__(self):
         self.stop_subscriptions = True
 
     def start_sdp_answer_subscription(self):
         def callback(sdp):
-            if self.rtc_session:
-                self.logger.info(f"Arlo response sdp: {sdp}")
+            if self.rtc_session and not self.rtc_answered:
+                if "a=mid:" not in sdp:
+                    # arlo appears to not return a mux id in the response, which
+                    # doesn't play nicely with our webrtc peers. let's add it
+                    sdp += "a=mid:0av\r\n"
+                self.logger.info(f"Arlo response sdp:\n{sdp}")
                 asyncio.get_event_loop().create_task(self.rtc_session.setRemoteDescription(
                     { "sdp": sdp, "type": "answer" },
                     self.rtc_setup
                 ))
+                self.rtc_answered = True
             return self.stop_subscriptions
 
         self.provider.arlo.SubscribeToSDPAnswers(self.arlo_basestation, self.arlo_device, callback)
@@ -175,12 +182,12 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
     def start_candidate_answer_subscription(self):
         def callback(candidate):
             if self.rtc_session:
-                prefix = "a=candidate:"
-                if candidate.startswith(prefix):
-                    candidate = candidate[len(prefix):]
+                #prefix = "a="
+                #if candidate.startswith(prefix):
+                #    candidate = candidate[len(prefix):]
                 self.logger.info(f"Arlo response candidate: {candidate}")
                 asyncio.get_event_loop().create_task(self.rtc_session.addIceCandidate(
-                    { "candidate": candidate }
+                    { "candidate": candidate, "sdpMid": "0av", "sdpMLineIndex": 0 }
                 ))
             return self.stop_subscriptions
 
@@ -189,39 +196,45 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
     async def startRTCSignalingSession(self, session):
         self.logger.info("Starting RTC signaling")
 
-        self.rtc_session = session
-        session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
+        try:
+            self.rtc_session = session
+            self.rtc_answered = False
+            session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
 
-        self.rtc_setup = {
-            "type": "offer",
-            "audio": {
-                "direction": "sendonly",
-            },
-            "configuration": {
-                "iceServers": [
-                    dict(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
-                    for ice in ice_servers
-                ]
-            },
-        }
+            self.rtc_setup = {
+                "type": "offer",
+                "audio": {
+                    "direction": "sendonly",
+                },
+                "configuration": {
+                    "iceServers": [
+                        dict(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
+                        for ice in ice_servers
+                    ]
+                },
+            }
 
-        async def on_ice_candidate(candidate):
-            self.logger.info(f"Arlo offer candidate: {candidate.candidate}")
-            self.provider.arlo.NotifyPushToTalkCandidate(self.arlo_basestation, self.arlo_device, session_id, candidate.candidate)
+            async def on_ice_candidate(candidate):
+                self.logger.info(f"Arlo offer candidate: {candidate.candidate}")
+                self.provider.arlo.NotifyPushToTalkCandidate(self.arlo_basestation, self.arlo_device, session_id, candidate.candidate)
 
-        offer = await session.createLocalDescription("offer", self.rtc_setup, on_ice_candidate)
-        self.logger.info(f"Arlo offer sdp: {offer.sdp}")
+            offer = await session.createLocalDescription("offer", self.rtc_setup, on_ice_candidate)
+            self.logger.info(f"Arlo offer sdp:\n{offer['sdp']}")
 
-        self.provider.arlo.NotifyPushToTalkSDP(self.arlo_basestation, self.arlo_device, session_id, offer.sdp)
+            self.provider.arlo.NotifyPushToTalkSDP(self.arlo_basestation, self.arlo_device, session_id, offer["sdp"])
 
-        return ArloCameraSpeakerSessionControl(self)
+            return ArloCameraSpeakerSessionControl(self)
+        except Exception as e:
+            self.logger.error(e, exc_info=True)
 
     async def real_speaker(self):
         return await scrypted_sdk.systemManager.api.getDeviceById(self.getScryptedProperty("id"))
 
     def close(self):
+        self.logger.info("Closing speaker session")
         self.rtc_session = None
         self.rtc_setup = None
+        self.rtc_answered = False
 
 class ArloCameraSpeakerSessionControl:
     def __init__(self, speaker):
