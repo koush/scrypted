@@ -25,6 +25,9 @@ export function safeKillFFmpeg(cp: ChildProcess) {
 }
 
 export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forever?: boolean, storage?: Storage) {
+    if (!console)
+        return;
+
     const SCRYPTED_FFMPEG_NOISY = !!process.env.SCRYPTED_FFMPEG_NOISY || !!storage?.getItem('SCRYPTED_FFMPEG_NOISY');
 
     function logger(log: (str: string) => void): (buffer: Buffer) => void {
@@ -55,6 +58,8 @@ export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forev
 }
 
 export function safePrintFFmpegArguments(console: Console, args: string[]) {
+    if (!console)
+        return;
     const ret = [];
     let redactNext = false;
     for (const arg of args) {
