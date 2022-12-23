@@ -77,7 +77,6 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
             const pc = new RTCPeerConnection();
             const atrack = new MediaStreamTrack({ kind: 'audio' });
             const audioTransceiver = pc.addTransceiver(atrack);
-            audioTransceiver.mid = '0';
             const weriftSignalingSession = new WeriftSignalingSession(this.console, pc);
             const control = await this.mixinDevice.startRTCSignalingSession(weriftSignalingSession);
             
