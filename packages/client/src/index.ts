@@ -38,6 +38,7 @@ export type ScryptedClientConnectionType = 'http' | 'webrtc' | 'http-local';
 
 export interface ScryptedClientStatic extends ScryptedStatic {
     userId?: string;
+    username?: string;
     disconnect(): void;
     onClose?: Function;
     version: string;
@@ -534,6 +535,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
         const ret: ScryptedClientStatic = {
             userId: userDevice?.id,
+            username,
             pluginRemoteAPI: undefined,
             connectionType,
             version,
