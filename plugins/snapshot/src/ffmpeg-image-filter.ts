@@ -1,5 +1,5 @@
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
-import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { sleep } from '@scrypted/common/src/sleep';
 import child_process, { ChildProcess } from 'child_process';
 import { once } from 'events';
@@ -7,6 +7,7 @@ import { Writable } from 'stream';
 import { Pipe2Jpeg } from './pipe2jpeg';
 
 export interface FFmpegImageFilterOptions {
+    console?: Console,
     blur?: boolean;
     brightness?: number;
     ffmpegPath?: string;
@@ -103,10 +104,13 @@ export async function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpeg
         ...outputArguments,
     ];
 
+    safePrintFFmpegArguments(options.console, args);
     const cp = child_process.spawn(options.ffmpegPath || 'ffmpeg',
         args, {
         stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
     });
+    ffmpegLogInitialOutput(options.console, cp);
+
     const input = cp.stdio[4] as Writable;
     input.write(inputJpeg);
     input.end();
@@ -145,10 +149,12 @@ export async function ffmpegFilterImage(inputArguments: string[], options: FFmpe
 
     // console.log(args);
 
+    safePrintFFmpegArguments(options.console, args);
     const cp = child_process.spawn(options.ffmpegPath || 'ffmpeg',
         args, {
         stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
     });
+    ffmpegLogInitialOutput(options.console, cp);
 
     if (options.time)
         return ffmpegFilterImageStream(cp, options);
@@ -162,14 +168,14 @@ export async function ffmpegFilterImageInternal(cp: ChildProcess, options: FFmpe
     cp.stdio[3].on('data', data => buffers.push(data));
 
     const to = options.timeout ? setTimeout(() => {
-        console.log('ffmpeg stream to image convesion timed out.');
+        console.log('ffmpeg stream to image conversion timed out.');
         safeKillFFmpeg(cp);
     }, 10000) : undefined;
 
     const [exitCode] = await once(cp, 'exit');
     clearTimeout(to);
     if (exitCode)
-        throw new Error(`ffmpeg stream to image convesion failed with exit code: ${exitCode}`);
+        throw new Error(`ffmpeg stream to image conversion failed with exit code: ${exitCode}`);
 
     return Buffer.concat(buffers);
 }
@@ -177,7 +183,7 @@ export async function ffmpegFilterImageInternal(cp: ChildProcess, options: FFmpe
 export async function ffmpegFilterImageStream(cp: ChildProcess, options: FFmpegImageFilterOptions) {
     const ret = new Promise<Buffer>((resolve, reject) => {
         const to = options.timeout ? setTimeout(() => {
-            reject(new Error('ffmpeg stream to image convesion timed out.'));
+            reject(new Error('ffmpeg stream to image conversion timed out.'));
         }, 10000) : undefined;
 
         const pipe = cp.stdio[3].pipe(new Pipe2Jpeg());
@@ -201,7 +207,7 @@ export async function ffmpegFilterImageStream(cp: ChildProcess, options: FFmpegI
             if (last)
                 resolve(last);
             else
-                reject(new Error(`ffmpeg stream to image convesion failed with exit code: ${exitCode}`));
+                reject(new Error(`ffmpeg stream to image conversion failed with exit code: ${exitCode}`));
         })
     });
 

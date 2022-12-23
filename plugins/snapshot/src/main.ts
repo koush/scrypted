@@ -3,7 +3,7 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { createMapPromiseDebouncer, RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, BufferConvertorOptions, Camera, FFmpegInput, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, BufferConvertorOptions, Camera, FFmpegInput, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import axios, { Axios } from "axios";
 import https from 'https';
 import path from 'path';
@@ -118,8 +118,13 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     static lastGeneratedErrorImageTime = 0;
     lastAvailablePicture: Buffer;
 
-    constructor(options: SettingsMixinDeviceOptions<Camera>) {
+    constructor(public plugin: SnapshotPlugin, options: SettingsMixinDeviceOptions<Camera>) {
         super(options);
+    }
+
+    get debugConsole() {
+        if (this.plugin.debugConsole)
+            return this.console;
     }
 
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
@@ -262,6 +267,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 picture = await this.cropAndScale(picture);
                 if (needSoftwareResize) {
                     picture = await ffmpegFilterImageBuffer(picture, {
+                        console: this.debugConsole,
                         ffmpegPath: await mediaManager.getFFmpegPath(),
                         resize: options?.picture,
                         timeout: 10000,
@@ -329,6 +335,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
         return ffmpegFilterImageBuffer(buffer, {
+            console: this.debugConsole,
             ffmpegPath: await mediaManager.getFFmpegPath(),
             crop: {
                 fractional: true,
@@ -410,6 +417,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return ffmpegFilterImage([
                 '-i', black,
             ], {
+                console: this.debugConsole,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 blur: true,
                 text: {
@@ -421,6 +429,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         }
         else {
             return ffmpegFilterImageBuffer(errorBackground, {
+                console: this.debugConsole,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 blur: true,
                 brightness: -.2,
@@ -471,12 +480,33 @@ export function parseDims<T extends string>(dict: DimDict<T>) {
     return ret;
 }
 
-class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter {
+class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings {
+    storageSettings = new StorageSettings(this, {
+        debugLogging: {
+            title: 'Debug Logging',
+            description: 'Debug logging for all cameras will be shown in the Snapshot Plugin Console.',
+            type: 'boolean',
+        }
+    });
+
     constructor(nativeId?: string) {
         super(nativeId);
 
         this.fromMimeType = ScryptedMimeTypes.FFmpegInput;
         this.toMimeType = 'image/jpeg';
+    }
+
+    getSettings(): Promise<Setting[]> {
+        return this.storageSettings.getSettings();
+    }
+
+    putSetting(key: string, value: SettingValue): Promise<void> {
+        return this.storageSettings.putSetting(key, value);
+    }
+
+    get debugConsole() {
+        if (this.storageSettings.values.debugLogging)
+            return this.console;
     }
 
     async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<any> {
@@ -512,6 +542,7 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
         });
 
         return ffmpegFilterImage(args, {
+            console: this.debugConsole,
             ffmpegPath: await mediaManager.getFFmpegPath(),
             resize: (isNaN(width) && isNaN(height))
                 ? undefined
@@ -540,7 +571,7 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
         return undefined;
     }
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-        return new SnapshotMixin({
+        return new SnapshotMixin(this, {
             mixinDevice,
             mixinDeviceInterfaces,
             mixinDeviceState,

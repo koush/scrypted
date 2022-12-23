@@ -25,6 +25,7 @@
       "name": "Snapshot Plugin",
       "type": "API",
       "interfaces": [
+         "Settings",
          "MixinProvider",
          "BufferConverter"
       ]
