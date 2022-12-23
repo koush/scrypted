@@ -161,7 +161,6 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
 
         self.rtc_session = None
         self.rtc_setup = None
-        self.sdp_sent = False
         self.sdp_answered = False
         self.candidate_answered = set()
 
@@ -240,13 +239,12 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
                 },
             }
 
+            sdp_sent = asyncio.get_event_loop().create_future()
             async def on_ice_candidate(candidate):
                 try:
-                    while not self.sdp_sent:
-                        await asyncio.sleep(0.01)
+                    await sdp_sent
                     self.logger.info(f"Arlo offer candidate: {candidate['candidate']}")
                     self.provider.arlo.NotifyPushToTalkCandidate(self.arlo_basestation, self.arlo_device, session_id, candidate['candidate'])
-                    self.logger.info("Candidate sent")
                 except Exception as e:
                     self.logger.error(e)
 
@@ -254,7 +252,7 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
             self.logger.info(f"Arlo offer sdp:\n{offer['sdp']}")
 
             self.provider.arlo.NotifyPushToTalkSDP(self.arlo_basestation, self.arlo_device, session_id, offer["sdp"])
-            self.sdp_sent = True
+            sdp_sent.set_result(True)
 
             return ArloCameraSpeakerSessionControl(self)
         except Exception as e:
@@ -267,7 +265,6 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
         self.logger.info("Closing speaker session")
         self.rtc_session = None
         self.rtc_setup = None
-        self.sdp_sent = False
         self.sdp_answered = False
         self.candidate_answered = set()
 
