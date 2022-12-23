@@ -13,8 +13,10 @@ from .arlo.logging import logger as arlo_lib_logger
 from .camera import ArloCamera
 from .doorbell import ArloDoorbell
 from .logging import ScryptedDeviceLoggerMixin 
+from .util import BackgroundTaskMixin
 
-class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery, ScryptedDeviceLoggerMixin):
+
+class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     arlo_cameras = None
     arlo_basestations = None
     _arlo_mfa_code = None
@@ -32,7 +34,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
     def __init__(self, nativeId=None):
         super().__init__(nativeId=nativeId)
-        self.logger_name = "ArloProvider"
+        self.logger_name = "provider"
 
         self.arlo_cameras = {}
         self.arlo_basestations = {}
@@ -93,7 +95,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 self.storage.setItem("arlo_auth_headers", json.dumps(dict(self._arlo.request.session.headers.items())))
                 self.storage.setItem("arlo_user_id", self._arlo.user_id)
 
-                asyncio.get_event_loop().create_task(self.do_arlo_setup())
+                self.create_task(self.do_arlo_setup())
 
             return self._arlo
 
@@ -108,7 +110,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 self._arlo.UseExistingAuth(self.arlo_user_id, json.loads(headers))
                 self.logger.info(f"Initialized Arlo client, reusing stored auth headers")
 
-                asyncio.get_event_loop().create_task(self.do_arlo_setup())
+                self.create_task(self.do_arlo_setup())
                 return self._arlo
             else:
                 self._arlo_mfa_complete_auth = self._arlo.LoginMFA()

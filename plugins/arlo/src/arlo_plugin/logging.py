@@ -1,5 +1,6 @@
 import logging
 
+
 class ScryptedDeviceLoggingWrapper(logging.Handler):
     scrypted_device = None
 
@@ -9,6 +10,7 @@ class ScryptedDeviceLoggingWrapper(logging.Handler):
 
     def emit(self, record):
         self.scrypted_device.print(self.format(record))
+
 
 def createScryptedLogger(scrypted_device, name):
     logger = logging.getLogger(name)
@@ -21,13 +23,14 @@ def createScryptedLogger(scrypted_device, name):
     sh = ScryptedDeviceLoggingWrapper(scrypted_device)
 
     # log formatting
-    fmt = logging.Formatter("%(asctime)s %(name)s %(levelname)s: %(message)s")
+    fmt = logging.Formatter("(arlo) %(levelname)s:%(name)s:%(asctime)s.%(msecs)03d %(message)s", "%H:%M:%S")
     sh.setFormatter(fmt)
 
     # configure handler to logger
     logger.addHandler(sh)
 
     return logger
+
 
 class ScryptedDeviceLoggerMixin:
     _logger = None

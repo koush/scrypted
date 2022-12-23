@@ -5,9 +5,10 @@ from scrypted_sdk import ScryptedDeviceBase
 from scrypted_sdk.types import Camera, VideoCamera, Intercom, MotionSensor, Battery, DeviceProvider, ScryptedDevice, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .logging import ScryptedDeviceLoggerMixin
+from .util import BackgroundTaskMixin
 
 
-class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor, Battery, DeviceProvider, ScryptedDeviceLoggerMixin):
+class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor, Battery, DeviceProvider, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     timeout = 30
     nativeId = None
     arlo_device = None
@@ -17,8 +18,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
     def __init__(self, nativeId, arlo_device, arlo_basestation, provider):
         super().__init__(nativeId=nativeId)
 
-        this_class = type(self)
-        self.logger_name = f"{this_class.__name__}[{nativeId}]"
+        self.logger_name = f"{nativeId}.camera"
 
         self.nativeId = nativeId
         self.arlo_device = arlo_device
@@ -33,7 +33,8 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         self.start_battery_subscription()
 
         self.speaker = None
-        asyncio.get_event_loop().create_task(self.discoverDevices())
+
+        self.create_task(self.discoverDevices())
 
     def __del__(self):
         self.stop_subscriptions = True
@@ -43,14 +44,18 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
             self.motionDetected = motionDetected
             return self.stop_subscriptions
 
-        self.provider.arlo.SubscribeToMotionEvents(self.arlo_basestation, self.arlo_device, callback)
+        self.register_task(
+            self.provider.arlo.SubscribeToMotionEvents(self.arlo_basestation, self.arlo_device, callback)
+        )
 
     def start_battery_subscription(self):
         def callback(batteryLevel):
             self.batteryLevel = batteryLevel
             return self.stop_subscriptions
 
-        self.provider.arlo.SubscribeToBatteryEvents(self.arlo_basestation, self.arlo_device, callback)
+        self.register_task(
+            self.provider.arlo.SubscribeToBatteryEvents(self.arlo_basestation, self.arlo_device, callback)
+        )
 
     async def getPictureOptions(self):
         return []
@@ -138,12 +143,11 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         self.batteryLevel = arlo_device["properties"].get("batteryLevel")
 
 
-class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLoggerMixin):
+class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     def __init__(self, nativeId, arlo_device, arlo_basestation, provider):
         super().__init__(nativeId=nativeId)
 
-        this_class = type(self)
-        self.logger_name = f"{this_class.__name__}[{nativeId}]"
+        self.logger_name = f"{nativeId}"
 
         self.nativeId = nativeId
         self.arlo_device = arlo_device
@@ -157,48 +161,70 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
 
         self.rtc_session = None
         self.rtc_setup = None
-        self.rtc_answered = False
+        self.sdp_sent = False
+        self.sdp_answered = False
+        self.candidate_answered = set()
 
     def __del__(self):
         self.stop_subscriptions = True
 
     def start_sdp_answer_subscription(self):
         def callback(sdp):
-            if self.rtc_session and not self.rtc_answered:
+            if self.rtc_session and not self.sdp_answered:
                 if "a=mid:" not in sdp:
                     # arlo appears to not return a mux id in the response, which
                     # doesn't play nicely with our webrtc peers. let's add it
                     sdp += "a=mid:0av\r\n"
                 self.logger.info(f"Arlo response sdp:\n{sdp}")
-                asyncio.get_event_loop().create_task(self.rtc_session.setRemoteDescription(
+                
+                self.create_task(self.rtc_session.setRemoteDescription(
                     { "sdp": sdp, "type": "answer" },
                     self.rtc_setup
                 ))
-                self.rtc_answered = True
+
+                self.sdp_answered = True
             return self.stop_subscriptions
 
-        self.provider.arlo.SubscribeToSDPAnswers(self.arlo_basestation, self.arlo_device, callback)
+        self.register_task(
+            self.provider.arlo.SubscribeToSDPAnswers(self.arlo_basestation, self.arlo_device, callback)
+        )
 
     def start_candidate_answer_subscription(self):
         def callback(candidate):
             if self.rtc_session:
-                #prefix = "a="
-                #if candidate.startswith(prefix):
-                #    candidate = candidate[len(prefix):]
+                prefix = "a="
+                if candidate.startswith(prefix):
+                    # arlo returns a= in the candidate, which we should remove
+                    candidate = candidate[len(prefix):]
+
+                candidate = candidate.strip()
+
+                if candidate in self.candidate_answered:
+                    # we sometimes see duplicated responses from arlo. could be
+                    # something on their end, or could be the nature of how we
+                    # use eventstream/mqtt. filter duplicates out here
+                    return self.stop_subscriptions
+                self.candidate_answered.add(candidate)
+
                 self.logger.info(f"Arlo response candidate: {candidate}")
-                asyncio.get_event_loop().create_task(self.rtc_session.addIceCandidate(
+
+                self.create_task(self.rtc_session.addIceCandidate(
                     { "candidate": candidate, "sdpMid": "0av", "sdpMLineIndex": 0 }
                 ))
             return self.stop_subscriptions
 
-        self.provider.arlo.SubscribeToCandidateAnswers(self.arlo_basestation, self.arlo_device, callback)
+        self.register_task(
+            self.provider.arlo.SubscribeToCandidateAnswers(self.arlo_basestation, self.arlo_device, callback)
+        )
 
     async def startRTCSignalingSession(self, session):
         self.logger.info("Starting RTC signaling")
 
         try:
             self.rtc_session = session
-            self.rtc_answered = False
+            self.sdp_answered = False
+            self.sdp_sent = False
+            self.candidate_answered = set()
             session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
 
             self.rtc_setup = {
@@ -216,7 +242,7 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
 
             async def on_ice_candidate(candidate):
                 try:
-                    while not self.rtc_answered:
+                    while not self.sdp_sent:
                         await asyncio.sleep(0.01)
                     self.logger.info(f"Arlo offer candidate: {candidate['candidate']}")
                     self.provider.arlo.NotifyPushToTalkCandidate(self.arlo_basestation, self.arlo_device, session_id, candidate['candidate'])
@@ -228,6 +254,7 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
             self.logger.info(f"Arlo offer sdp:\n{offer['sdp']}")
 
             self.provider.arlo.NotifyPushToTalkSDP(self.arlo_basestation, self.arlo_device, session_id, offer["sdp"])
+            self.sdp_sent = True
 
             return ArloCameraSpeakerSessionControl(self)
         except Exception as e:
@@ -240,7 +267,9 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
         self.logger.info("Closing speaker session")
         self.rtc_session = None
         self.rtc_setup = None
-        self.rtc_answered = False
+        self.sdp_sent = False
+        self.sdp_answered = False
+        self.candidate_answered = set()
 
 
 class ArloCameraSpeakerSessionControl:

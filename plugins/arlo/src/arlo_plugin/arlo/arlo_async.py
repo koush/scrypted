@@ -337,6 +337,8 @@ class Arlo(object):
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
@@ -349,7 +351,7 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
     def SubscribeToBatteryEvents(self, basestation, camera, callback):
         """
@@ -360,6 +362,8 @@ class Arlo(object):
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
@@ -372,7 +376,7 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
     def SubscribeToDoorbellEvents(self, basestation, doorbell, callback):
         """
@@ -383,6 +387,8 @@ class Arlo(object):
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
         """
 
         resource = f"doorbells/{doorbell.get('deviceId')}"
@@ -404,7 +410,7 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
     def SubscribeToSDPAnswers(self, basestation, camera, callback):
         """
@@ -415,6 +421,8 @@ class Arlo(object):
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
         """
 
         resource = f"cameras/{camera.get('deviceId')}"
@@ -428,7 +436,7 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
 
     def SubscribeToCandidateAnswers(self, basestation, camera, callback):
         """
@@ -439,6 +447,8 @@ class Arlo(object):
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
         """
 
         resource = f"cameras/{camera.get('deviceId')}"
@@ -452,7 +462,7 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
 
     async def HandleEvents(self, basestation, resource, actions, callback):
         """
