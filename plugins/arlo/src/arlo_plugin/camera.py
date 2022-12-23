@@ -1,12 +1,11 @@
 import asyncio
-import json
-import threading
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
 from scrypted_sdk.types import Camera, VideoCamera, Intercom, MotionSensor, Battery, DeviceProvider, ScryptedDevice, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .logging import ScryptedDeviceLoggerMixin
+
 
 class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor, Battery, DeviceProvider, ScryptedDeviceLoggerMixin):
     timeout = 30
@@ -138,6 +137,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         """
         self.batteryLevel = arlo_device["properties"].get("batteryLevel")
 
+
 class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLoggerMixin):
     def __init__(self, nativeId, arlo_device, arlo_basestation, provider):
         super().__init__(nativeId=nativeId)
@@ -215,8 +215,14 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
             }
 
             async def on_ice_candidate(candidate):
-                self.logger.info(f"Arlo offer candidate: {candidate.candidate}")
-                self.provider.arlo.NotifyPushToTalkCandidate(self.arlo_basestation, self.arlo_device, session_id, candidate.candidate)
+                try:
+                    while not self.rtc_answered:
+                        await asyncio.sleep(0.01)
+                    self.logger.info(f"Arlo offer candidate: {candidate['candidate']}")
+                    self.provider.arlo.NotifyPushToTalkCandidate(self.arlo_basestation, self.arlo_device, session_id, candidate['candidate'])
+                    self.logger.info("Candidate sent")
+                except Exception as e:
+                    self.logger.error(e)
 
             offer = await session.createLocalDescription("offer", self.rtc_setup, on_ice_candidate)
             self.logger.info(f"Arlo offer sdp:\n{offer['sdp']}")
@@ -235,6 +241,7 @@ class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLogger
         self.rtc_session = None
         self.rtc_setup = None
         self.rtc_answered = False
+
 
 class ArloCameraSpeakerSessionControl:
     def __init__(self, speaker):
