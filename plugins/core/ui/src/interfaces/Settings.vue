@@ -3,29 +3,45 @@
     <CardTitle v-if="!noTitle">Settings</CardTitle>
     <v-flex xs12 v-if="showChips">
       <v-chip-group class="pt-0" mandatory active-class="deep-purple accent-4 white--text" column
-        v-model="settingsGroupName" v-if="Object.entries(settingsGroups).length < 4 || true">
+        v-model="settingsGroupName">
         <v-chip small :value="key" v-for="[key] of Object.entries(settingsGroups)" :key="key">
           {{ key.replace("Settings", "") || "General" }}
         </v-chip>
         <v-chip small value="extensions" v-if="availableMixins.length">
-          Integrations and Extensions
+          <v-avatar left>
+            <v-icon x-small>fas fa-bolt</v-icon>
+          </v-avatar>
+          Extensions
         </v-chip>
       </v-chip-group>
-      <v-select v-else dense filled outlined :items="selectGroupNames" v-model="settingsGroupName" :hide-details="true">
-
-      </v-select>
     </v-flex>
 
     <v-divider v-if="showChips"></v-divider>
 
+    <CardTitle v-if="settingsSubgroups">Settings > {{ settingsGroupName }}</CardTitle>
+    <v-flex xs12 v-if="settingsSubgroups">
+      <v-chip-group class="pt-0" mandatory active-class="deep-purple accent-4 white--text" column
+        v-model="settingsSubgroupName">
+        <v-chip small :value="key" v-for="key of settingsSubgroups" :key="key">
+          {{ key }}
+        </v-chip>
+      </v-chip-group>
+    </v-flex>
+
+    <v-divider v-if="settingsSubgroups"></v-divider>
+
+    <CardTitle v-if="settingsSubgroups">Settings > {{ settingsGroupName }} >  {{ settingsSubgroupName }}</CardTitle>
+
     <v-flex xs12 v-if="settingsGroupName !== 'extensions' || !showChips">
-      <div v-for="setting in settingsGroup" :key="setting.key">
+
+      <div v-for="setting in settingsSubgroup" :key="setting.key">
         <Setting v-if="
         setting.value.choices ||
         setting.value.type === 'device' ||
         setting.value.type === 'interface' ||
         !setting.value.multiple" v-model="setting.value" @input="onInput"
-          :device="needsDevice(setting) ? device : undefined"></Setting>
+          :device="needsDevice(setting) ? device : undefined">
+        </Setting>
         <SettingMultiple v-else v-model="setting.value" :device="needsDevice(setting) ? device : undefined"
           @input="onInput">
         </SettingMultiple>
@@ -62,6 +78,7 @@ export default {
   props: ["noTitle"],
   data() {
     return {
+      rawSettingsSubgroupName: undefined,
       rawSettingsGroupName: undefined,
       deviceSettings: [],
     };
@@ -69,9 +86,6 @@ export default {
   watch: {
     device() {
       this.refresh();
-    },
-    availableMixins() {
-      this.updateSettingsGroupName();
     },
   },
   mounted() {
@@ -82,16 +96,26 @@ export default {
       get() {
         if (this.rawSettingsGroupName)
           return this.rawSettingsGroupName;
-          return Object.keys(this.settingsGroups)?.[0] || 'extensions';
+        return Object.keys(this.settingsGroups)?.[0] || 'extensions';
       },
       set(value) {
         this.rawSettingsGroupName = value;
       },
     },
+    settingsSubgroupName: {
+      get() {
+        if (!this.settingsSubgroups)
+          return;
+        if (this.settingsSubgroups.findIndex(sg => sg === this.rawSettingsSubgroupName) !== -1)
+          return this.rawSettingsSubgroupName;
+        return Object.keys(this.settingsSubgroups)?.[0];
+      },
+      set(value) {
+        this.rawSettingsSubgroupName = value;
+      },
+    },
     settings() {
       const settings = [];
-
-      let addAt = 0;
 
       if (deviceIsEditable(this.device)) {
         const inferredTypes = inferTypesFromInterfaces(
@@ -151,8 +175,9 @@ export default {
       }));
 
       const deviceSettings = this.deviceSettings.slice();
-      addAt = deviceSettings?.[0]?.value?.group ? 0 : 1;
-      deviceSettings.splice(addAt, 0, ...mergingSettings);
+      // addAt = deviceSettings?.[0]?.value?.group ? 0 : 1;
+      // deviceSettings.splice(addAt, 0, ...mergingSettings);
+      deviceSettings.push(...mergingSettings);
       return Vue.observable(deviceSettings);
     },
     selectGroupNames() {
@@ -178,6 +203,17 @@ export default {
     },
     settingsGroup() {
       return Object.entries(this.settingsGroups).find(sg => sg[0] === this.settingsGroupName)?.[1] || [];
+    },
+    settingsSubgroup() {
+      return this.settingsGroup.filter(sg => sg.value.subgroup === this.settingsSubgroupName || (!sg.value.subgroup && sg.value.group === this.settingsSubgroupName) || (!sg.value.subgroup && !sg.value.group && this.settingsSubgroupName === "General"));
+    },
+    settingsSubgroups() {
+      const subgroups = new Set();
+      for (const { value } of this.settingsGroup) {
+        subgroups.add(value.subgroup || value.group || "General");
+      }
+      if (subgroups.size > 1)
+        return [...subgroups.values()];
     },
     settingsGroups() {
       const ret = {};
@@ -227,8 +263,6 @@ export default {
         key: setting.key,
         value: setting,
       }));
-      
-      this.updateSettingsGroupName();
     },
     save() {
       for (const { value } of this.settings) {
@@ -250,19 +284,6 @@ export default {
         }
       }
     },
-    updateSettingsGroupName() {
-      return;
-      if (!this.usingDefaultSettingsGroupName) {
-        // make sure the selected settings tab still exists
-        if (this.settingsGroupName === 'extensions')
-          this.usingDefaultSettingsGroupName = !this.availableMixins.length;
-        else if (!this.settingsGroups[this.settingsGroupName])
-          this.usingDefaultSettingsGroupName = true;
-      }
-      if (this.usingDefaultSettingsGroupName) {
-        this.settingsGroupName = Object.keys(this.settingsGroups)?.[0] || 'extensions';
-      }
-    }
   },
 };
 </script>
