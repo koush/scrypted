@@ -803,7 +803,7 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
 
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
     let objectDetection = systemManager.getDeviceById<ObjectDetection>(this.id);
-    const group = objectDetection.name;
+    const group = objectDetection.name.replace('Plugin', '').trim();
     return new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.modelName, group, this.internal);
   }
 

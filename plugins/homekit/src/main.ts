@@ -28,7 +28,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     videoClipsId: string;
     cameraMixins = new Map<string, CameraMixin>();
     storageSettings = new StorageSettings(this, {
-        ...createHAPUsernameStorageSettingsDict(this, undefined, 'Network'),
+        ...createHAPUsernameStorageSettingsDict(this, undefined),
         addressOverride: {
             group: 'Network',
             title: 'Scrypted Server Address',
@@ -100,7 +100,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         })();
     }
 
-    async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     async getDevice(nativeId: string) {
@@ -212,7 +212,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                             return device.name
                         }
                     },
-                        'HomeKit', 'HomeKit Pairing'));
+                        undefined, 'Pairing'));
                     storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
 
                     const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
@@ -372,7 +372,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         const options: SettingsMixinDeviceOptions<any> = {
             mixinProviderNativeId: this.nativeId,
             mixinDeviceInterfaces,
-            group: "HomeKit Settings",
+            group: "HomeKit",
             groupKey: "homekit",
             mixinDevice, mixinDeviceState,
         };

@@ -1,7 +1,7 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFmpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import AxiosDigestAuth from '@koush/axios-digest-auth';
-import https from 'https';
+import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, MediaObject, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { randomBytes } from "crypto";
+import https from 'https';
 
 const { deviceManager, mediaManager } = sdk;
 
@@ -106,7 +106,7 @@ export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends S
     }
 
     async getSettings(): Promise<Setting[]> {
-        return [
+        const ret:Setting[] = [
             {
                 key: 'username',
                 title: 'Username',
@@ -131,6 +131,13 @@ export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends S
                 value: (this.isAudioDisabled()).toString(),
             },
         ];
+
+        for (const s of ret) {
+            s.group = this.provider.name.replace('Plugin', '').trim();
+            s.subgroup ||= 'General';
+        }
+
+        return ret;
     }
 
     async putSettingBase(key: string, value: SettingValue) {
@@ -211,5 +218,9 @@ export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> e
                 this.devices.set(nativeId, ret);
         }
         return ret;
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+        
     }
 }

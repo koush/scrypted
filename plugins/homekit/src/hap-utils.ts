@@ -100,7 +100,7 @@ export function getRandomPort() {
     return Math.round(30000 + Math.random() * 20000);
 }
 
-export function createHAPUsernameStorageSettingsDict(device: { storage: Storage, name?: string }, group: string, networkGroup = group): StorageSettingsDict<'mac' | 'qrCode' | 'pincode' | 'portOverride' | 'resetAccessory'> {
+export function createHAPUsernameStorageSettingsDict(device: { storage: Storage, name?: string }, group: string, subgroup?: string): StorageSettingsDict<'mac' | 'qrCode' | 'pincode' | 'portOverride' | 'resetAccessory'> {
     const alertReload = () => {
         sdk.log.a(`You must reload the HomeKit plugin for the changes to ${device.name} to take effect.`);
     }
@@ -108,31 +108,37 @@ export function createHAPUsernameStorageSettingsDict(device: { storage: Storage,
     return {
         qrCode: {
             group,
+            subgroup,
             title: "Pairing QR Code",
             type: 'qrcode',
             readonly: true,
             description: "Scan with your iOS camera to pair this Scrypted with HomeKit.",
         },
         portOverride: {
-            group: networkGroup,
+            group,
+            subgroup,
             title: 'Bridge Port',
             persistedDefaultValue: getRandomPort(),
             description: 'Optional: The TCP port used by the Scrypted bridge. If none is specified, a random port will be chosen.',
             type: 'number',
-        },        pincode: {
+        },
+        pincode: {
             group,
+            subgroup,
             title: "Manual Pairing Code",
             persistedDefaultValue: randomPinCode(),
             readonly: true,
         },
         mac: {
             group,
+            subgroup,
             hide: true,
             title: "Username Override",
             persistedDefaultValue: createHAPUsername(),
         },
         resetAccessory: {
             group,
+            subgroup,
             title: 'Reset Pairing',
             description: 'Resetting the pairing will resync it to HomeKit as a new device. Bridged devices will automatically relink as a new device. Accessory devices must be manually removed from the Home app and re-paired. Enter RESET to reset the pairing.',
             placeholder: 'RESET',

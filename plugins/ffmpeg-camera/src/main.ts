@@ -1,8 +1,6 @@
-import sdk, { FFmpegInput, Intercom, MediaObject, PictureOptions, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue } from "@scrypted/sdk";
-import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "./common";
-import { StorageSettings } from "../../../common/src/settings";
-import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "../../../common/src/media-helpers";
-import child_process, { ChildProcess } from "child_process";
+import sdk, { FFmpegInput, MediaObject, PictureOptions, Setting, SettingValue } from "@scrypted/sdk";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import { CameraBase, CameraProviderBase, UrlMediaStreamOptions } from "./common";
 
 const { mediaManager } = sdk;
 

@@ -34,8 +34,11 @@ function pickBestStream(msos: ResponseMediaStreamOptions[], resolution: number) 
 }
 
 export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
+    const subgroup = "Manage";
+
     const streamTypes = getStreamTypes({
         defaultStream: {
+            subgroup,
             title: 'Local Stream',
             description: 'The media stream to use when streaming on your local network. This stream should be prebuffered. Recommended resolution: 1920x1080 to 4K.',
             hide: true,
@@ -43,6 +46,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             preferredResolution: 3840 * 2160,
         },
         remoteStream: {
+            subgroup,
             title: 'Remote (Medium Resolution) Stream',
             description: 'The media stream to use when streaming from outside your local network. Selecting a low birate stream is recommended. Recommended resolution: 1280x720.',
             hide: true,
@@ -50,6 +54,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             preferredResolution: 1280 * 720,
         },
         lowResolutionStream: {
+            subgroup,
             title: 'Low Resolution Stream',
             description: 'The media stream to use for low resolution output, such as Apple Watch and Video Analysis. Recommended resolution: 480x360.',
             hide: true,
@@ -57,6 +62,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             preferredResolution: 480 * 360,
         },
         recordingStream: {
+            subgroup,
             title: 'Local Recording Stream',
             description: 'The media stream to use when recording to local storage such as an NVR. Recommended resolution: 1920x1080 to 4K.',
             hide: true,
@@ -65,6 +71,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             preferredResolution: 3840 * 2160,
         },
         remoteRecordingStream: {
+            subgroup,
             title: 'Remote Recording Stream',
             description: 'The media stream to use when recording to cloud storage such as HomeKit Secure Video clips in iCloud. This stream should be prebuffered. Recommended resolution: 1280x720.',
             hide: true,
@@ -75,6 +82,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
 
     const storageSettings = new StorageSettings(device, {
         enabledStreams: {
+            subgroup,
             title: 'Prebuffered Streams',
             description: 'Prebuffering maintains an active connection to the stream and improves load times. Prebuffer also retains the recent video for capturing motion events with HomeKit Secure video. Enabling Prebuffer is not recommended on Cloud cameras.',
             multiple: true,
@@ -82,6 +90,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         },
         ...streamTypes,
         rebroadcastPort: {
+            subgroup,
             title: 'Rebroadcast Port',
             description: 'The port of the RTSP server that will rebroadcast your streams.',
             type: 'number',

@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/ffmpeg-camera",
-   "version": "0.0.16",
+   "version": "0.0.19",
    "description": "FFmpeg Camera Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",

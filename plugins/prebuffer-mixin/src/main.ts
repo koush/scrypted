@@ -304,12 +304,14 @@ class PrebufferSession {
     const elapsed = Date.now() - start;
     const bitrate = Math.round(total / elapsed * 8);
 
-    const group = `Stream: ${this.streamName}`;
+    const group = "Streams";
+    const subgroup = `Stream: ${this.streamName}`;
 
     settings.push(
       {
         title: 'Rebroadcast Container',
         group,
+        subgroup,
         description: `The container format to use when rebroadcasting. The default mode for this camera is RTSP.`,
         placeholder: 'RTSP',
         choices: [
@@ -327,6 +329,7 @@ class PrebufferSession {
         {
           title: 'Audio Codec Transcoding',
           group,
+          subgroup,
           description: 'Configuring your camera to output Opus, PCM, or AAC is recommended.',
           type: 'string',
           key: this.audioConfigurationKey,
@@ -346,6 +349,7 @@ class PrebufferSession {
         {
           title: 'FFmpeg Input Arguments Prefix',
           group,
+          subgroup,
           description: 'Optional/Advanced: Additional input arguments to pass to the ffmpeg command. These will be placed before the input arguments.',
           key: this.ffmpegInputArgumentsKey,
           value: this.storage.getItem(this.ffmpegInputArgumentsKey),
@@ -378,6 +382,7 @@ class PrebufferSession {
         {
           key: this.rtspParserKey,
           group,
+          subgroup,
           title: 'RTSP Parser',
           description: `The RTSP Parser used to read the stream. The default is "${defaultValue}" for this container.`,
           value: currentParser,
@@ -407,6 +412,7 @@ class PrebufferSession {
         {
           key: 'detectedOddities',
           group,
+          subgroup,
           title: 'Detected H264 Oddities',
           readonly: true,
           value: JSON.stringify(this.getLastH264Probe()),
@@ -425,6 +431,7 @@ class PrebufferSession {
         {
           key: 'detectedResolution',
           group,
+          subgroup,
           title: 'Detected Resolution and Bitrate',
           readonly: true,
           value: `${resolution} @ ${bitrate || "unknown"} Kb/s`,
@@ -433,6 +440,7 @@ class PrebufferSession {
         {
           key: 'detectedCodec',
           group,
+          subgroup,
           title: 'Detected Video/Audio Codecs',
           readonly: true,
           value: (session?.inputVideoCodec?.toString() || 'unknown') + '/' + (session?.inputAudioCodec?.toString() || 'unknown'),
@@ -441,6 +449,7 @@ class PrebufferSession {
         {
           key: 'detectedKeyframe',
           group,
+          subgroup,
           title: 'Detected Keyframe Interval',
           description: "Configuring your camera to 4 seconds is recommended (IDR aka Frame Interval = FPS * 4 seconds).",
           readonly: true,
@@ -454,6 +463,7 @@ class PrebufferSession {
         {
           title: 'Status',
           group,
+          subgroup,
           key: 'status',
           description: 'Rebroadcast is currently idle and will be started automatically on demand.',
           value: 'Idle',
@@ -466,6 +476,7 @@ class PrebufferSession {
     if (rtspMode) {
       settings.push({
         group,
+        subgroup,
         key: 'rtspRebroadcastUrl',
         title: 'RTSP Rebroadcast Url',
         description: 'The RTSP URL of the rebroadcast stream. Substitute localhost as appropriate.',
@@ -474,6 +485,7 @@ class PrebufferSession {
       });
       settings.push({
         group,
+        subgroup,
         key: 'rtspRebroadcastMutedUrl',
         title: 'RTSP Rebroadcast Url (Muted)',
         description: 'The RTSP URL of the muted rebroadcast stream. Substitute localhost as appropriate.',
@@ -1698,7 +1710,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     });
   }
 
-  async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+  async releaseDevice(id: string, nativeId: string): Promise<void> {
   }
 
   async getDevice(nativeId: string) {
@@ -1849,7 +1861,7 @@ async function newPrebufferMixin(getTranscodeStorageSettings: () => Promise<any>
     mixinDeviceState,
     mixinProviderNativeId: undefined,
     mixinDeviceInterfaces,
-    group: "Stream Management",
+    group: "Streams",
     groupKey: "prebuffer",
   })
 }
