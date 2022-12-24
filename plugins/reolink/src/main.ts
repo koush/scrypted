@@ -78,7 +78,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
             {
                 key: 'rtspChannel',
                 title: 'Channel Number Override',
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 description: "The channel number to use for snapshots and video. E.g., 0, 1, 2, etc.",
                 placeholder: '0',
                 type: 'number',
@@ -159,7 +159,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
             ...super.getRtspPortOverrideSettings(),
             {
                 key: 'rtmpPort',
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 title: 'RTMP Port Override',
                 placeholder: '1935',
                 value: this.storage.getItem('rtmpPort'),

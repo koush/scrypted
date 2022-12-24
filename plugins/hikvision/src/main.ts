@@ -124,7 +124,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
 
         ret.push(
             {
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 key: 'rtspUrlParams',
                 title: 'RTSP URL Parameters Override',
                 description: "Optional: Override the RTSP URL parameters. E.g.: ?transportmode=unicast",
@@ -138,7 +138,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
     async getUrlSettings(): Promise<Setting[]> {
         return [
             {
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 key: 'rtspChannel',
                 title: 'Channel Number',
                 description: "Optional: The channel number to use for snapshots. E.g., 101, 201, etc. The camera portion, e.g., 1, 2, etc, will be used to construct the RTSP stream.",
@@ -310,7 +310,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
 
         ret.unshift(
             {
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 key: 'motionTimeout',
                 title: 'Motion Timeout',
                 description: 'Duration to report motion after the last motion ping.',
@@ -318,7 +318,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                 type: 'number',
             },
             {
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 key: 'motionPings',
                 title: 'Motion Ping Count',
                 description: 'Number of motion pings needed to trigger motion.',

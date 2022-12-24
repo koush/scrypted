@@ -276,7 +276,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             {
                 key: 'rtspChannel',
                 title: 'Channel Number Override',
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 description: "The channel number to use for snapshots and video. E.g., 1, 2, etc.",
                 placeholder: '1',
                 value: this.storage.getItem('rtspChannel'),

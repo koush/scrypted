@@ -117,7 +117,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
 
         ret.push(
             {
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 key: 'debug',
                 title: 'Debug Events',
                 description: "Log all events to the console. This will be very noisy and should not be left enabled.",
@@ -287,7 +287,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return [
             {
                 key: 'httpPort',
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 title: 'HTTP Port Override',
                 placeholder: '80',
                 value: this.storage.getItem('httpPort'),
@@ -306,7 +306,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return [
             {
                 key: 'rtspPort',
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 title: 'RTSP Port Override',
                 placeholder: '554',
                 value: this.storage.getItem('rtspPort'),

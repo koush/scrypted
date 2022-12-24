@@ -1,7 +1,7 @@
 {
    "name": "@scrypted/hikvision",
-   "version": "0.0.116",
-   "description": "HikVision Plugin for Scrypted",
+   "version": "0.0.117",
+   "description": "Hikvision Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
    "scripts": {
@@ -24,7 +24,7 @@
       "camera"
    ],
    "scrypted": {
-      "name": "HikVision Camera Plugin",
+      "name": "Hikvision Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
