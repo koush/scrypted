@@ -588,6 +588,7 @@ class Setting(TypedDict):
     placeholder: str
     range: tuple[float, float]
     readonly: bool
+    subgroup: str
     title: str
     type: Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue

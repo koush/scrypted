@@ -1643,6 +1643,7 @@ export interface Setting {
   key?: string;
   title?: string;
   group?: string;
+  subgroup?: string;
   description?: string;
   placeholder?: string;
   type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath' | 'interface' | 'qrcode' | 'textarea';
