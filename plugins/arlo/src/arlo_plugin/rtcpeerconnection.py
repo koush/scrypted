@@ -91,11 +91,7 @@ class BackgroundRTCPeerConnection:
 
         if not await_result:
             return None
-
-        await fut
-        if fut.exception():
-            raise fut.exception()
-        return fut.result()
+        return await fut
 
     async def createOffer(self):
         return await self.__run_background(self.pc.createOffer())
