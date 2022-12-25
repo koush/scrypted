@@ -26,7 +26,7 @@ logger.addHandler(ch)
 class BackgroundRTCPeerConnection:
     """Proxy class to use RTCPeerConnection in a background thread.
 
-    The purpose of this proxy is to ensure that RTCPeerConnection opeations
+    The purpose of this proxy is to ensure that RTCPeerConnection operations
     do not block the main asyncio thread. From testing, it seems that the
     close() function blocks until the source RTSP server exits, which we
     have no control over. Additionally, since asyncio coroutines are tied
