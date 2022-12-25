@@ -14,6 +14,7 @@ from .camera import ArloCamera
 from .doorbell import ArloDoorbell
 from .logging import ScryptedDeviceLoggerMixin 
 from .util import BackgroundTaskMixin
+from .rtcpeerconnection import logger as background_rtc_logger
 
 
 class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
@@ -159,6 +160,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         for _, device in self.scrypted_devices.items():
             device.logger.setLevel(log_level)
         arlo_lib_logger.setLevel(log_level)
+        background_rtc_logger.setLevel(log_level)
 
     def propagate_transport(self):
         self.print(f"Setting plugin transport to {self.arlo_transport}")
@@ -266,9 +268,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "providerNativeId": self.nativeId,
             }
 
-            if camera['deviceType'] == 'doorbell':
-                device["interfaces"].append(ScryptedInterface.BinarySensor.value)
-
             devices.append(device)
 
             if camera["deviceId"] == camera["parentId"]:
@@ -318,11 +317,12 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             ScryptedInterface.MotionSensor.value,
             ScryptedInterface.Intercom.value,
             ScryptedInterface.Battery.value,
-            ScryptedInterface.DeviceProvider.value,
-            ScryptedInterface.DeviceDiscovery.value,
         ]
 
         if model_id.startswith("avd1001"):
             results.remove(ScryptedInterface.Battery.value)
+
+        if camera['deviceType'] == 'doorbell':
+            results.append(ScryptedInterface.BinarySensor.value)
  
         return results

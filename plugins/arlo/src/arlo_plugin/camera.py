@@ -1,14 +1,19 @@
+from aioice import Candidate
+from aiortc import RTCSessionDescription, RTCIceGatherer, RTCIceServer
+from aiortc.rtcicetransport import candidate_to_aioice, candidate_from_aioice 
 import asyncio
+import json
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
-from scrypted_sdk.types import Camera, VideoCamera, Intercom, MotionSensor, Battery, DeviceProvider, ScryptedDevice, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Camera, VideoCamera, Intercom, MotionSensor, Battery, ScryptedMimeTypes
 
 from .logging import ScryptedDeviceLoggerMixin
 from .util import BackgroundTaskMixin
+from .rtcpeerconnection import BackgroundRTCPeerConnection
 
 
-class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor, Battery, DeviceProvider, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
+class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor, Battery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     timeout = 30
     nativeId = None
     arlo_device = None
@@ -32,9 +37,10 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         self.start_motion_subscription()
         self.start_battery_subscription()
 
-        self.speaker = None
-
-        self.create_task(self.discoverDevices())
+        self.pc = None
+        self.sdp_answered = False
+        self.start_sdp_answer_subscription()
+        self.start_candidate_answer_subscription()
 
     def __del__(self):
         self.stop_subscriptions = True
@@ -55,6 +61,45 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
 
         self.register_task(
             self.provider.arlo.SubscribeToBatteryEvents(self.arlo_basestation, self.arlo_device, callback)
+        )
+
+    def start_sdp_answer_subscription(self):
+        def callback(sdp):
+            if self.pc and not self.sdp_answered:
+                if "a=mid:" not in sdp:
+                    # arlo appears to not return a mux id in the response, which
+                    # doesn't play nicely with our webrtc peers. let's add it
+                    sdp += "a=mid:0\r\n"
+                self.logger.info(f"Arlo response sdp:\n{sdp}")
+
+                sdp = RTCSessionDescription(sdp=sdp, type="answer")
+                self.create_task(self.pc.setRemoteDescription(sdp))
+                self.sdp_answered = True
+            return self.stop_subscriptions
+
+        self.register_task(
+            self.provider.arlo.SubscribeToSDPAnswers(self.arlo_basestation, self.arlo_device, callback)
+        )
+
+    def start_candidate_answer_subscription(self):
+        def callback(candidate):
+            if self.pc:
+                prefix = "a=candidate:"
+                if candidate.startswith(prefix):
+                    candidate = candidate[len(prefix):]
+                candidate = candidate.strip()
+                self.logger.info(f"Arlo response candidate: {candidate}")
+
+                candidate = candidate_from_aioice(Candidate.from_sdp(candidate))
+                if candidate.sdpMid is None:
+                    # arlo appears to not return a mux id in the response, which
+                    # doesn't play nicely with aiortc. let's add it
+                    candidate.sdpMid = 0
+                self.create_task(self.pc.addIceCandidate(candidate))
+            return self.stop_subscriptions
+
+        self.register_task(
+            self.provider.arlo.SubscribeToCandidateAnswers(self.arlo_basestation, self.arlo_device, callback)
         )
 
     async def getPictureOptions(self):
@@ -103,175 +148,65 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
 
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)
 
-    async def discoverDevices(self, duration=0):
-        self.speaker = None
-
-        speaker_device = {
-            "nativeId": f"{self.nativeId}.speaker",
-            "name": f"{self.arlo_device['deviceName']} Speaker",
-            "interfaces": [
-                ScryptedInterface.ScryptedDevice.value,
-                ScryptedInterface.RTCSignalingChannel.value,
-            ],
-            "type": ScryptedDeviceType.Speaker.value,
-            "providerNativeId": self.nativeId,
-        }
-        await scrypted_sdk.deviceManager.onDevicesChanged({
-            "devices": [speaker_device],
-            "providerNativeId": self.nativeId,
-        })
-
-    def getDevice(self, nativeId):
-        if self.speaker is None:
-            self.speaker = ArloCameraSpeaker(nativeId, self.arlo_device, self.arlo_basestation, self.provider)
-        return self.speaker
-
     async def startIntercom(self, media):
         self.logger.info("Starting intercom")
-        real_speaker = await self.speaker.real_speaker()
-        await real_speaker.startIntercom(media)
+
+        ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
+        self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
+
+        session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
+        self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
+        
+        ice_servers = [
+            RTCIceServer(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
+            for ice in ice_servers
+        ]
+        ice_gatherer = RTCIceGatherer(ice_servers)
+        await ice_gatherer.gather()
+
+        local_candidates = [
+            f"candidate:{Candidate.to_sdp(candidate_to_aioice(candidate))}"
+            for candidate in ice_gatherer.getLocalCandidates()
+        ]
+
+        log_candidates = '\n'.join(local_candidates)
+        self.logger.info(f"Local candidates:\n{log_candidates}")
+
+        # MediaPlayer/PyAV will block until the intercom stream starts, and it seems that scrypted waits
+        # for startIntercom to exit before sending data. So, let's do the remaining setup in a coroutine
+        # so this function can return early.
+        async def async_setup(self):
+            pc = self.pc = BackgroundRTCPeerConnection()
+            self.sdp_answered = False
+
+            pc.add_rtsp_audio(ffmpeg_params["url"])
+
+            offer = await pc.createOffer()
+            self.logger.info(f"Arlo offer sdp:\n{offer.sdp}")
+
+            await pc.setLocalDescription(offer)
+
+            self.provider.arlo.NotifyPushToTalkSDP(
+                self.arlo_basestation, self.arlo_device,
+                session_id, offer.sdp
+            )
+            for candidate in local_candidates:
+                self.provider.arlo.NotifyPushToTalkCandidate(
+                    self.arlo_basestation, self.arlo_device,
+                    session_id, candidate
+                )
+
+        self.create_task(async_setup(self))
 
     async def stopIntercom(self):
         self.logger.info("Stopping intercom")
-        real_speaker = await self.speaker.real_speaker()
-        await real_speaker.stopIntercom()
-        self.speaker.close()
+        if self.pc:
+            await self.pc.close()
+        self.logger.info("Stopped intercom")
+        self.pc = None
+        self.sdp_answered = False
 
     def _update_device_details(self, arlo_device):
         """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
         """
         self.batteryLevel = arlo_device["properties"].get("batteryLevel")
-
-
-class ArloCameraSpeaker(ScryptedDeviceBase, ScryptedDevice, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
-    def __init__(self, nativeId, arlo_device, arlo_basestation, provider):
-        super().__init__(nativeId=nativeId)
-
-        self.logger_name = f"{nativeId}"
-
-        self.nativeId = nativeId
-        self.arlo_device = arlo_device
-        self.arlo_basestation = arlo_basestation
-        self.provider = provider
-        self.logger.setLevel(self.provider.get_current_log_level())
-
-        self.stop_subscriptions = False
-        self.start_sdp_answer_subscription()
-        self.start_candidate_answer_subscription()
-
-        self.rtc_session = None
-        self.rtc_setup = None
-        self.sdp_answered = False
-        self.candidate_answered = set()
-
-    def __del__(self):
-        self.stop_subscriptions = True
-
-    def start_sdp_answer_subscription(self):
-        def callback(sdp):
-            if self.rtc_session and not self.sdp_answered:
-                if "a=mid:" not in sdp:
-                    # arlo appears to not return a mux id in the response, which
-                    # doesn't play nicely with our webrtc peers. let's add it
-                    sdp += "a=mid:0av\r\n"
-                self.logger.info(f"Arlo response sdp:\n{sdp}")
-                
-                self.create_task(self.rtc_session.setRemoteDescription(
-                    { "sdp": sdp, "type": "answer" },
-                    self.rtc_setup
-                ))
-
-                self.sdp_answered = True
-            return self.stop_subscriptions
-
-        self.register_task(
-            self.provider.arlo.SubscribeToSDPAnswers(self.arlo_basestation, self.arlo_device, callback)
-        )
-
-    def start_candidate_answer_subscription(self):
-        def callback(candidate):
-            if self.rtc_session:
-                prefix = "a="
-                if candidate.startswith(prefix):
-                    # arlo returns a= in the candidate, which we should remove
-                    candidate = candidate[len(prefix):]
-
-                candidate = candidate.strip()
-
-                if candidate in self.candidate_answered:
-                    # we sometimes see duplicated responses from arlo. could be
-                    # something on their end, or could be the nature of how we
-                    # use eventstream/mqtt. filter duplicates out here
-                    return self.stop_subscriptions
-                self.candidate_answered.add(candidate)
-
-                self.logger.info(f"Arlo response candidate: {candidate}")
-
-                self.create_task(self.rtc_session.addIceCandidate(
-                    { "candidate": candidate, "sdpMid": "0av", "sdpMLineIndex": 0 }
-                ))
-            return self.stop_subscriptions
-
-        self.register_task(
-            self.provider.arlo.SubscribeToCandidateAnswers(self.arlo_basestation, self.arlo_device, callback)
-        )
-
-    async def startRTCSignalingSession(self, session):
-        self.logger.info("Starting RTC signaling")
-
-        try:
-            self.rtc_session = session
-            self.sdp_answered = False
-            self.sdp_sent = False
-            self.candidate_answered = set()
-            session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
-
-            self.rtc_setup = {
-                "type": "offer",
-                "audio": {
-                    "direction": "sendonly",
-                },
-                "configuration": {
-                    "iceServers": [
-                        dict(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
-                        for ice in ice_servers
-                    ]
-                },
-            }
-
-            sdp_sent = asyncio.get_event_loop().create_future()
-            async def on_ice_candidate(candidate):
-                try:
-                    await sdp_sent
-                    self.logger.info(f"Arlo offer candidate: {candidate['candidate']}")
-                    self.provider.arlo.NotifyPushToTalkCandidate(self.arlo_basestation, self.arlo_device, session_id, candidate['candidate'])
-                except Exception as e:
-                    self.logger.error(e)
-
-            offer = await session.createLocalDescription("offer", self.rtc_setup, on_ice_candidate)
-            self.logger.info(f"Arlo offer sdp:\n{offer['sdp']}")
-
-            self.provider.arlo.NotifyPushToTalkSDP(self.arlo_basestation, self.arlo_device, session_id, offer["sdp"])
-            sdp_sent.set_result(True)
-
-            return ArloCameraSpeakerSessionControl(self)
-        except Exception as e:
-            self.logger.error(e, exc_info=True)
-
-    async def real_speaker(self):
-        return await scrypted_sdk.systemManager.api.getDeviceById(self.getScryptedProperty("id"))
-
-    def close(self):
-        self.logger.info("Closing speaker session")
-        self.rtc_session = None
-        self.rtc_setup = None
-        self.sdp_answered = False
-        self.candidate_answered = set()
-
-
-class ArloCameraSpeakerSessionControl:
-    def __init__(self, speaker):
-        self.speaker = speaker
-
-    async def endSession(self):
-        self.speaker.close()
