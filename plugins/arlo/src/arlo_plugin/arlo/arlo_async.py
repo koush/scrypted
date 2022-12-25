@@ -105,6 +105,8 @@ class Arlo(object):
 
     def UseExistingAuth(self, user_id, headers):
         self.user_id = user_id
+        if "Content-Type" not in headers:
+            headers['Content-Type'] = 'application/json; charset=UTF-8'
         self.request.session.headers.update(headers)
         self.BASE_URL = 'myapi.arlo.com'
 
