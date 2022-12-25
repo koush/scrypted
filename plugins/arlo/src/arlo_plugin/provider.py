@@ -324,5 +324,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
         if camera['deviceType'] == 'doorbell':
             results.append(ScryptedInterface.BinarySensor.value)
+
+        if camera["deviceId"] == camera["parentId"]:
+            results.remove(ScryptedInterface.Intercom.value)
  
         return results
