@@ -116,6 +116,9 @@ class BackgroundRTCPeerConnection:
 
         This constructs a MediaPlayer in the background thread's asyncio loop,
         since MediaPlayer also utilizes coroutines and asyncio.
+
+        Note that this may block the background thread's event loop if the RTSP
+        server is not yet ready.
         """
         def add_rtsp_audio_background():
             media_player = MediaPlayer(rtsp_url, format="rtsp")
