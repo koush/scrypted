@@ -24,6 +24,18 @@ logger.addHandler(ch)
 
 
 class BackgroundRTCPeerConnection:
+    """Proxy class to use RTCPeerConnection in a background thread.
+
+    The purpose of this proxy is to ensure that RTCPeerConnection opeations
+    do not block the main asyncio thread. From testing, it seems that the
+    close() function blocks until the source RTSP server exits, which we
+    have no control over. Additionally, since asyncio coroutines are tied
+    to the event loop they were constructed from, it is not possible to only
+    run close() in a separate thread. Therefore, each instance of RTCPeerConnection
+    is launched within its own ephemeral thread, which cleans itself up once
+    close() completes.
+    """
+
     def __init__(self):
         self.main_loop = asyncio.get_event_loop()
         self.background_loop = asyncio.new_event_loop()
@@ -100,6 +112,11 @@ class BackgroundRTCPeerConnection:
         await self.__run_background("close", await_result=False, stop_loop=True)
 
     def add_rtsp_audio(self, rtsp_url):
+        """Adds an audio track to the RTCPeerConnection given a source RTSP url.
+
+        This constructs a MediaPlayer in the background thread's asyncio loop,
+        since MediaPlayer also utilizes coroutines and asyncio.
+        """
         def add_rtsp_audio_background():
             media_player = MediaPlayer(rtsp_url, format="rtsp")
             self.pc.addTrack(media_player.audio)

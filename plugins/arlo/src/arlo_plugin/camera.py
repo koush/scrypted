@@ -175,7 +175,9 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         # MediaPlayer/PyAV will block until the intercom stream starts, and it seems that scrypted waits
         # for startIntercom to exit before sending data. So, let's do the remaining setup in a coroutine
         # so this function can return early.
-        async def async_setup(self):
+        # This is required even if we use BackgroundRTCPeerConnection, since setting up MediaPlayer may
+        # block the background thread's event loop and prevent other async functions from running.
+        async def async_setup():
             pc = self.pc = BackgroundRTCPeerConnection()
             self.sdp_answered = False
 
@@ -196,13 +198,12 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
                     session_id, candidate
                 )
 
-        self.create_task(async_setup(self))
+        self.create_task(async_setup())
 
     async def stopIntercom(self):
         self.logger.info("Stopping intercom")
         if self.pc:
             await self.pc.close()
-        self.logger.info("Stopped intercom")
         self.pc = None
         self.sdp_answered = False
 
