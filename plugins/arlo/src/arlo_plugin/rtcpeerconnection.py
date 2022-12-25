@@ -48,21 +48,25 @@ class BackgroundRTCPeerConnection:
     def __background_main(self):
         logger.debug(f"Background RTC loop {self.thread.name} starting")
         self.pc = RTCPeerConnection()
+
         asyncio.set_event_loop(self.background_loop)
         self.thread_started.put(True)
         self.background_loop.run_forever()
+
         logger.debug(f"Background RTC loop {self.thread.name} exiting")
 
-    async def __run_background(self, coro_name, *args, await_result=True, stop_loop=False):
+    async def __run_background(self, coroutine, await_result=True, stop_loop=False):
         fut = self.main_loop.create_future()
 
         def background_callback():
+            # callback to run on main_loop.
             def to_main(result, is_error):
                 if is_error:
                     fut.set_exception(result)
                 else:
                     fut.set_result(result)
 
+            # callback to run on background_loop., after the coroutine completes
             def callback(task):
                 is_error = False
                 if task.exception():
@@ -70,22 +74,19 @@ class BackgroundRTCPeerConnection:
                     is_error = True
                 else:
                     result = task.result()
+
+                # send results to the main loop
                 self.main_loop.call_soon_threadsafe(to_main, result, is_error)
 
+                # stopping the loop here ensures that the coroutine completed
+                # and doesn't raise any "task not awaited" exceptions
                 if stop_loop:
                     self.background_loop.stop()
 
-            coroutine = getattr(self.pc, coro_name)
-            if not inspect.iscoroutinefunction(coroutine):
-                # convert the normal function into a coroutine
-                fn = coroutine
-                async def coro(*args):
-                    return fn(*args)
-                coroutine = coro
-
-            task = self.background_loop.create_task(coroutine(*args))
+            task = self.background_loop.create_task(coroutine)
             task.add_done_callback(callback)
 
+        # start the callback in the background loop
         self.background_loop.call_soon_threadsafe(background_callback)
 
         if not await_result:
@@ -97,19 +98,19 @@ class BackgroundRTCPeerConnection:
         return fut.result()
 
     async def createOffer(self):
-        return await self.__run_background("createOffer")
+        return await self.__run_background(self.pc.createOffer())
 
     async def setLocalDescription(self, sdp):
-        return await self.__run_background("setLocalDescription", sdp)
+        return await self.__run_background(self.pc.setLocalDescription(sdp))
 
     async def setRemoteDescription(self, sdp):
-        return await self.__run_background("setRemoteDescription", sdp)
+        return await self.__run_background(self.pc.setRemoteDescription(sdp))
 
     async def addIceCandidate(self, candidate):
-        return await self.__run_background("addIceCandidate", candidate)
+        return await self.__run_background(self.pc.addIceCandidate(candidate))
 
     async def close(self):
-        await self.__run_background("close", await_result=False, stop_loop=True)
+        await self.__run_background(self.pc.close(), await_result=False, stop_loop=True)
 
     def add_rtsp_audio(self, rtsp_url):
         """Adds an audio track to the RTCPeerConnection given a source RTSP url.
