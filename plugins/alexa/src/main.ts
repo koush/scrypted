@@ -241,6 +241,7 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
                     default:
                         self.console.error(error?.response?.data);
                 }
+                throw error;
             });
             // expires_in is 1 hr
             const { access_token, expires_in } = response.data;
