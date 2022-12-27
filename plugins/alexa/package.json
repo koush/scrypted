@@ -35,10 +35,12 @@
    "dependencies": {
       "@types/node": "^16.6.1",
       "alexa-smarthome-ts": "^0.0.1",
-      "axios": "^0.24.0"
+      "axios": "^0.24.0",
+      "uuid": "^9.0.0"
    },
    "devDependencies": {
       "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk"
+      "@scrypted/sdk": "file:../../sdk",
+      "@scrypted/server": "file:../../server"
    }
 }

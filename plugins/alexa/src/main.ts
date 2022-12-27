@@ -4,7 +4,7 @@ import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { isSupported } from './types';
 import { DiscoveryEndpoint, DiscoverEvent } from 'alexa-smarthome-ts';
-import { AlexaHandler, capabilityHandlers, supportedTypes } from './types/common';
+import { AlexaHandler, addBattery, addOnline, addPowerSensor, capabilityHandlers, supportedTypes } from './types/common';
 import { createMessageId } from './message';
 
 const { systemManager, deviceManager } = sdk;
@@ -49,32 +49,39 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
                 return;
             }
 
-            const report = await supportedType.reportState(eventSource, eventDetails, eventData);
-
-            if (report?.type === 'event') {
-                const accessToken = await this.getAccessToken();
-                const data = {
-                    "context": {},
-                    "event": {
-                        "header": {
-                            "messageId": createMessageId(),
-                            "namespace": report.namespace,
-                            "name": report.name,
-                            "payloadVersion": "3"
-                        },
-                        "endpoint": {
-                            "scope": {
-                                "type": "BearerToken",
-                                "token": accessToken,
-                            },
-                            "endpointId": eventSource.id,
-                        },
-                        payload: report.payload,
-                    }
-                }
-
-                await this.postEvent(accessToken, data);
+            const report = await supportedType.sendEvent(eventSource, eventDetails, eventData);
+            let data = {
+                "event": {
+                    "header": {
+                        "messageId": createMessageId(),
+                        "namespace": report?.namespace ?? "Alexa",
+                        "name": report?.name ?? "ChangeReport",
+                        "payloadVersion": "3"
+                    },
+                    "endpoint": {
+                        "endpointId": eventSource.id,
+                        "scope": undefined
+                    },
+                    "payload": report?.payload,
+                },
+                "context": report?.context
             }
+
+            data = addOnline(data, eventSource);
+            data = addBattery(data, eventSource);
+            data = addPowerSensor(data, eventSource);
+
+            // nothing to report
+            if (data.context === undefined && data.event.payload === undefined)
+               return;
+           
+            const accessToken = await this.getAccessToken();
+            data.event.endpoint.scope = {
+                "type": "BearerToken",
+                "token": accessToken,
+            };
+
+            await this.postEvent(data);
         });
     }
 
@@ -92,11 +99,21 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
         deviceManager.requestRestart();
     }
 
-    async postEvent(accessToken: string, data: any) {
+    async postEvent(data: any) {
+        const accessToken = await this.getAccessToken();
+        const self = this;
+
         return axios.post('https://api.amazonalexa.com/v3/events', data, {
             headers: {
                 'Authorization': 'Bearer ' + accessToken,
             }
+        }).catch(error => {
+            if (error?.response?.data?.payload?.code === 'SKILL_DISABLED_EXCEPTION') {
+                self.storageSettings.values.tokenInfo = undefined;
+                self.accessToken = undefined;
+            }
+
+            self.console.error(error?.response?.data);
         });
     }
 
@@ -112,7 +129,7 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
             return [];
 
         const accessToken = await this.getAccessToken();
-        await this.postEvent(accessToken, {
+        await this.postEvent({
             "event": {
                 "header": {
                     "namespace": "Alexa.Discovery",
@@ -136,8 +153,9 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
     async deleteReport(...ids: string[]) {
         if (!ids.length)
             return;
+
         const accessToken = await this.getAccessToken();
-        return this.postEvent(accessToken, {
+        return this.postEvent({
             "event": {
                 "header": {
                     "namespace": "Alexa.Discovery",
@@ -174,11 +192,17 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
             return this.accessToken;
 
         const { tokenInfo } = this.storageSettings.values;
+
+        if (tokenInfo === undefined) {
+            this.log.e("Please reauthenticate by following the directions below.");
+            throw new Error("Please reauthenticate by following the directions below.");
+        }
+
         const { code } = tokenInfo;
 
         const body: Record<string, string> = {
             client_id,
-            client_secret,
+            client_secret
         };
         if (code) {
             body.code = code;
@@ -190,18 +214,41 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
             body.grant_type = 'refresh_token';
         }
 
+        const self = this;
+
         const accessTokenPromise = (async () => {
             const response = await axios.post('https://api.amazon.com/auth/o2/token', new URLSearchParams(body).toString(), {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 }
+            }).catch(error => {
+                switch (error?.response?.data?.error) {
+                    case 'invalid_client':
+                    case 'invalid_grant':
+                    case 'unauthorized_client':
+                        self.storageSettings.values.tokenInfo = undefined;
+                        self.log.e(error?.response?.data?.error_description);
+                        break;
+
+                    case 'authorization_pending':
+                        self.log.w(error?.response?.data?.error_description);
+                        break;
+                    
+                    case 'expired_token':
+                        self.accessToken = undefined;
+                        break;
+
+                    default:
+                        self.console.error(error?.response?.data);
+                }
             });
+            // expires_in is 1 hr
             const { access_token, expires_in } = response.data;
             this.storageSettings.values.tokenInfo = response.data;
             setTimeout(() => {
                 if (this.accessToken === accessTokenPromise)
                     this.accessToken = undefined;
-            }, expires_in * 1000 - 30000);
+            }, (expires_in - 300) * 1000);
             return access_token;
         })();
 
@@ -214,19 +261,47 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
         const json = JSON.parse(request.body);
         const { grant } = json.directive.payload;
         this.storageSettings.values.tokenInfo = grant;
-        this.getAccessToken();
+        this.accessToken = undefined;
+        
+        let accessToken = await this.getAccessToken().catch(reason => {
+            this.storageSettings.values.tokenInfo = undefined;
+            this.accessToken = undefined;
 
-        response.send(JSON.stringify({
-            "event": {
-                "header": {
-                    "namespace": "Alexa.Authorization",
-                    "name": "AcceptGrant.Response",
-                    "messageId": createMessageId(),
-                    "payloadVersion": "3"
-                },
-                "payload": {}
+            response.send(JSON.stringify({
+                "event": {
+                    "header": {
+                        "namespace": "Alexa.Authorization",
+                        "name": "ErrorResponse",
+                        "messageId": createMessageId(),
+                        "payloadVersion": "3"
+                    },
+                    "payload": {
+                        "type": "ACCEPT_GRANT_FAILED",
+                        "message": `Failed to handle the AcceptGrant directive because ${reason}`
+                    }
+                }
+            }));
+        });
+
+        if (accessToken !== undefined) {
+            try {
+                response.send(JSON.stringify({
+                    "event": {
+                        "header": {
+                            "namespace": "Alexa.Authorization",
+                            "name": "AcceptGrant.Response",
+                            "messageId": createMessageId(),
+                            "payloadVersion": "3"
+                        },
+                        "payload": {}
+                    }
+                }));
+            } catch (error) {
+                this.storageSettings.values.tokenInfo = undefined;
+                this.accessToken = undefined;
+                throw error;
             }
-        }));
+        }
     }
 
     createEndpoint(device: ScryptedDevice): DiscoveryEndpoint<any> {
@@ -238,10 +313,33 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
 
         const ret = Object.assign({
             endpointId: device.id,
-            manufacturerName: device.info?.manufacturer || 'Scrypted Camera',
-            description: device.type,
+            manufacturerName: "Scrypted",
+            description: `${device.info?.manufacturer ?? 'Unknown'} ${device.info?.model ?? `device of type ${device.type}`}, connected via Scrypted`,
             friendlyName: device.name,
+            additionalAttributes: {
+                manufacturer: device.info?.manufacturer || undefined,
+                model: device.info?.model || undefined,
+                serialNumber: device.info?.serialNumber || undefined,
+                firmwareVersion: device.info?.firmware || undefined,
+                //softwareVersion: device.info?.version || undefined
+            }
         }, discovery);
+
+        let supportedEndpointHealths = [{
+            "name": "connectivity"
+        }];
+        // {
+        //     "name": "radioDiagnostics"
+        // },
+        // {
+        //     "name": "networkThroughput"
+        // }
+
+        if (device.interfaces.includes(ScryptedInterface.Battery)) {
+            supportedEndpointHealths.push({
+                "name": "battery"
+            })
+        }
 
         ret.capabilities.push(
             {
@@ -249,20 +347,7 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
                 "interface": "Alexa.EndpointHealth",
                 "version": "3.2" as any,
                 "properties": {
-                    "supported": [
-                        {
-                            "name": "connectivity"
-                        },
-                        // {
-                        //     "name": "battery"
-                        // },
-                        // {
-                        //     "name": "radioDiagnostics"
-                        // },
-                        // {
-                        //     "name": "networkThroughput"
-                        // }
-                    ],
+                    "supported": supportedEndpointHealths,
                     "proactivelyReported": true,
                     "retrievable": true
                 }
@@ -273,6 +358,14 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
                 "version": "3"
             }
         );
+
+        //if (device.info?.mac !== undefined)
+        //    ret.connections.push(
+        //        {
+        //            "type": "TCP_IP",
+        //            "macAddress": device.info?.mac || undefined
+        //        }
+        //    );
 
         return ret as any;
     }

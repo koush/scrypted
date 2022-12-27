@@ -1,6 +1,7 @@
-import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import { BinarySensor, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
 import { getCameraCapabilities } from "./camera";
-import { addSupportedType, EventReport } from "./common";
+import { addSupportedType, EventReport, StateReport } from "./common";
+import { DisplayCategory } from "alexa-smarthome-ts";
 
 addSupportedType(ScryptedDeviceType.Doorbell, {
     probe(device) {
@@ -19,22 +20,62 @@ addSupportedType(ScryptedDeviceType.Doorbell, {
 
         return {
             displayCategories: ['CAMERA'],
-            capabilities,
+            capabilities
         }
     },
-    async reportState(eventSource: ScryptedDevice & BinarySensor, eventDetails, eventData): Promise<EventReport> {
-        if (!eventSource.binaryState)
-            return undefined;
+    async reportState(device: ScryptedDevice & MotionSensor): Promise<StateReport>{
         return {
-            type: 'event',
-            namespace: 'Alexa.DoorbellEventSource',
-            name: 'DoorbellPress',
-            payload: {
-                "cause": {
-                    "type": "PHYSICAL_INTERACTION"
-                },
-                "timestamp": new Date().toISOString(),
+            type: 'state',
+            namespace: 'Alexa',
+            name: 'StateReport',
+            context: {
+                "properties": [
+                    {
+                        "namespace": "Alexa.MotionSensor",
+                        "name": "detectionState",
+                        "value": device.motionDetected ? "DETECTED" : "NOT_DETECTED",
+                        "timeOfSample": new Date().toISOString(),
+                        "uncertaintyInMilliseconds": 0
+                    }
+                ]
             }
         };
+    },
+    async sendEvent(eventSource: ScryptedDevice, eventDetails, eventData): Promise<EventReport> {
+        if (eventDetails.eventInterface === ScryptedInterface.MotionSensor)
+            return {
+                type: 'event',
+                namespace: 'Alexa',
+                name: 'ChangeReport',
+                payload: {
+                    change: {
+                        cause: {
+                            type: "PHYSICAL_INTERACTION"
+                        },
+                        properties: [
+                            {
+                                "namespace": "Alexa.MotionSensor",
+                                "name": "detectionState",
+                                "value": eventData ? "DETECTED" : "NOT_DETECTED",
+                                "timeOfSample": new Date().toISOString(),
+                                "uncertaintyInMilliseconds": 0
+                            }
+                        ]
+                    }
+                },
+            };
+        
+        if (eventDetails.eventInterface === ScryptedInterface.BinarySensor && eventData === true)
+            return {
+                type: 'event',
+                namespace: 'Alexa.DoorbellEventSource',
+                name: 'DoorbellPress',
+                payload: {
+                    "cause": {
+                        "type": "PHYSICAL_INTERACTION"
+                    },
+                    "timestamp": new Date().toISOString(),
+                }
+            };
     }
 });
