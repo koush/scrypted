@@ -1,7 +1,8 @@
 import { HttpResponse, MotionSensor, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
-import { addSupportedType, AlexaCapabilityHandler, capabilityHandlers, EventReport } from "./common";
+import { addSupportedType, AlexaCapabilityHandler, capabilityHandlers, EventReport, StateReport } from "./common";
 import { createMessageId } from "../message";
 import { Capability } from "alexa-smarthome-ts/lib/skill/Capability";
+import { DisplayCategory } from "alexa-smarthome-ts";
 
 export function getCameraCapabilities(device: ScryptedDevice): Capability<any>[] {
     const capabilities: Capability<any>[] = [
@@ -46,12 +47,31 @@ addSupportedType(ScryptedDeviceType.Camera, {
 
         return {
             displayCategories: ['CAMERA'],
-            capabilities,
+            capabilities
         }
     },
-    async reportState(eventSource: ScryptedDevice & MotionSensor, eventDetails, eventData): Promise<EventReport> {
+    async reportState(device: ScryptedDevice & MotionSensor): Promise<StateReport>{
+        return {
+            type: 'state',
+            namespace: 'Alexa',
+            name: 'StateReport',
+            context: {
+                "properties": [
+                    {
+                        "namespace": "Alexa.MotionSensor",
+                        "name": "detectionState",
+                        "value": device.motionDetected ? "DETECTED" : "NOT_DETECTED",
+                        "timeOfSample": new Date().toISOString(),
+                        "uncertaintyInMilliseconds": 0
+                    }
+                ]
+            }
+        };
+    },
+    async sendEvent(eventSource: ScryptedDevice & MotionSensor, eventDetails, eventData): Promise<EventReport> {
         if (eventDetails.eventInterface !== ScryptedInterface.MotionSensor)
             return undefined;
+
         return {
             type: 'event',
             namespace: 'Alexa',
