@@ -52,7 +52,7 @@ RUN_IGNORE brew install pillow
 RUN_IGNORE brew install python@3.9
 PYTHON_PATH=$(brew --prefix python@3.9)
 PYTHON_BIN_PATH=
-if [ ! -d "$PYTHON_PATH" ]
+if [ -d "$PYTHON_PATH" ]
 then
     PYTHON_BIN_PATH=$PYTHON_PATH/bin
     export PATH=$PYTHON_BIN_PATH:$PATH
