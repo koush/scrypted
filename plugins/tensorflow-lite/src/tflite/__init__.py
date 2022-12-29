@@ -42,12 +42,10 @@ class QueuedSample(TypedDict):
 
 class TensorFlowLiteSession(DetectionSession):
     image: Image.Image
-    previousDetections: List[ObjectDetectionResult]
 
     def __init__(self, start_time: float) -> None:
         super().__init__()
         self.image = None
-        self.previousDetections = None
         self.processed = 0
         self.start_time = start_time
 
@@ -62,9 +60,6 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
-
-defaultThreshold = .2
-defaultSecondThreshold = .7
 
 class RawImage:
     jpegMediaObject: scrypted_sdk.MediaObject
@@ -210,31 +205,6 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             'inputSize': [int(width), int(height), int(channels)],
         }
 
-        if settings:
-            second_score_threshold = None
-            check = settings.get(
-                'second_score_threshold', None)
-            if check:
-                second_score_threshold = float(check)
-            if second_score_threshold:
-                d['inputStream'] = 'local'
-
-        confidence: Setting = {
-            'title': 'Minimum Detection Confidence',
-            'description': 'Higher values eliminate false positives and low quality recognition candidates.',
-            'key': 'score_threshold',
-            'type': 'number',
-            'value': defaultThreshold,
-            'placeholder': defaultThreshold,
-        }
-        secondConfidence: Setting = {
-            'title': 'Second Pass Confidence',
-            'description': 'Scale, crop, and reanalyze the results from the initial detection pass to get more accurate results. This will exponentially increase complexity, so using an allow list is recommended',
-            'key': 'second_score_threshold',
-            'type': 'number',
-            'value': defaultSecondThreshold,
-            'placeholder': defaultSecondThreshold,
-        }
         decoderSetting: Setting = {
             'title': "Decoder",
             'description': "The gstreamer element used to decode the stream",
@@ -266,7 +236,10 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             ],
         }
 
-        d['settings'] = [confidence, secondConfidence, decoderSetting, allowList]
+        d['settings'] = [
+            decoderSetting,
+            allowList
+        ]
         return d
 
     def create_detection_result(self, objs, size, allowList, convert_to_src_size=None) -> ObjectsDetected:
@@ -315,7 +288,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
         with self.mutex:
             return input_size(self.interpreter)
 
-    def detect_once(self, input: Image.Image, score_threshold: float, settings: Any, src_size, cvss):
+    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         with self.mutex:
             common.set_input(
                 self.interpreter, input)
@@ -324,61 +297,64 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             #     self.interpreter, cropped.size, lambda size: cropped.resize(size, Image.ANTIALIAS))
             self.interpreter.invoke()
             objs = detect.get_objects(
-                self.interpreter, score_threshold=score_threshold, image_scale=scale)
+                self.interpreter, score_threshold=.2, image_scale=scale)
 
         allowList = settings.get('allowList', None) if settings else None
         ret = self.create_detection_result(objs, src_size, allowList, cvss)
         return ret
 
-    def run_detection_image(self, detection_session: TensorFlowLiteSession, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, second_pass_crop: Tuple[float, float, float, float] = None):
-        score_threshold = defaultThreshold
-        second_score_threshold = None
-        if settings:
-            score_threshold = float(settings.get(
-                'score_threshold', score_threshold) or score_threshold)
-            check = settings.get(
-                'second_score_threshold', None)
-            if check:
-                second_score_threshold = float(check)
-
-        if second_pass_crop:
-            score_threshold = second_score_threshold
-
+    def run_detection_image(self, detection_session: TensorFlowLiteSession, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, multipass_crop: Tuple[float, float, float, float] = None):
         (w, h) = input_size(self.interpreter)
 
+        (iw, ih) = image.size
+
         # this a single pass or the second pass. detect once and return results.
-        if second_pass_crop or not second_score_threshold:
-            if second_pass_crop:
-                (l, t, r, b) = second_pass_crop
-                cropped = image.crop(second_pass_crop)
-                (cw, ch) = cropped.size
-                input = cropped.resize((w, h), Image.ANTIALIAS)
+        if multipass_crop:
+            (l, t, dx, dy) = multipass_crop
 
-                def cvss(point, normalize=False):
-                    unscaled = ((point[0] / w) * cw + l, (point[1] / h) * ch + t)
-                    converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
-                    return converted
+            test = image.crop((l, t, l + dx, t + dy))
+
+            # find center
+            cx = l + dx / 2
+            cy = t + dy / 2
+
+            # fix aspect ratio on box
+            if dx / w > dy / h:
+                dy = dx / w * h
             else:
-                (iw, ih) = image.size
-                ws = w / iw
-                hs = h / ih
-                s = max(ws, hs)
-                scaled = image.resize((round(s * iw), round(s * ih)), Image.ANTIALIAS)
-                ow = round((scaled.width - w) / 2)
-                oh = round((scaled.height - h) / 2)
-                input = scaled.crop((ow, oh, ow + w, oh + h))
+                dx = dy / h * w
 
-                def cvss(point, normalize=False):
-                    unscaled = ((point[0] + ow) / s, (point[1] + oh) / s)
-                    converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
-                    return converted
+            # crop size to fit input size
+            if dx < w:
+                dx = w
+            if dy < h:
+                dy = h
+            
+            l = cx - dx / 2
+            t = cy - dy / 2
+            if l < 0:
+                l = 0
+            if t < 0:
+                t = 0
+            if l + dx > iw:
+                l = iw - dx
+            if t + dy > ih:
+                t = ih - dy
+            crop_box = (l, t, l + dx, t + dy)
+            input = image.crop(crop_box)
+            (cw, ch) = input.size
+            if cw != w or h != ch:
+                input = input.resize((w, h), Image.ANTIALIAS)
 
-            ret = self.detect_once(input, score_threshold, settings, src_size, cvss)
+            def cvss(point, normalize=False):
+                unscaled = ((point[0] / w) * cw + l, (point[1] / h) * ch + t)
+                converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
+                return converted
+
+            ret = self.detect_once(input, settings, src_size, cvss)
             detection_session.processed = detection_session.processed + 1
             return ret, RawImage(image)
         
-        (iw, ih) = image.size
-
         ws = w / iw
         hs = h / ih
         s = max(ws, hs)
@@ -402,9 +378,9 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
             return converted
      
-        ret1 = self.detect_once(first, score_threshold, settings, src_size, cvss1)
+        ret1 = self.detect_once(first, settings, src_size, cvss1)
         detection_session.processed = detection_session.processed + 1
-        ret2 = self.detect_once(second, score_threshold, settings, src_size, cvss2)
+        ret2 = self.detect_once(second, settings, src_size, cvss2)
         detection_session.processed = detection_session.processed + 1
         r1Detections = list(ret1['detections'])
         r2Detections = list(ret2['detections'])
@@ -413,7 +389,6 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
         ret['detections'] = ret1['detections'] + ret2['detections']
 
         if not len(ret['detections']):
-            detection_session.previousDetections = []
             return ret, RawImage(image)
         
 
@@ -443,42 +418,12 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
 
         dedupe_detections()
 
-        for detection in detections:
-            if detection_session.previousDetections:
-                found = False
-                for pd in detection_session.previousDetections:
-                    if is_same_detection(detection, pd):
-                        detection['score'] = max(detection['score'], pd['score'])
-                        ret['detections'].append(detection)
-                        found = True
-                        break
-                if found:
-                    continue
-
-            if detection['score'] >= second_score_threshold:
-                ret['detections'].append(detection)
-                continue
-
-            (x, y, dw, dh) = detection['boundingBox']
-            cx = x + dw / 2
-            cy = y + dh / 2
-            d = round(max(dw, dh) * 1.5)
-            x = round(cx - d / 2)
-            y = round(cy - d / 2)
-            x = max(0, x)
-            y = max(0, y)
-            x2 = x + d
-            y2 = y + d
-
-            secondPassResult, _ = self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size, (x, y, x2, y2))
-            filtered = list(filter(lambda d: d['className'] == detection['className'], secondPassResult['detections']))
-            filtered.sort(key = lambda c: c['score'], reverse = True)
-            ret['detections'].extend(filtered[:1])
-
-        detection_session.previousDetections = ret['detections']
-        dedupe_detections()
         ret['detections'] = detections
         return ret, RawImage(image)
+
+    def run_detection_crop(self, detection_session: DetectionSession, sample: RawImage, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
+        (ret, _) = self.run_detection_image(detection_session, sample.image, settings, src_size, convert_to_src_size, bounding_box)
+        return ret
 
     def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Image.Image]:
         # todo reenable this if detection images aren't needed.

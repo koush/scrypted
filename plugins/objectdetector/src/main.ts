@@ -14,6 +14,8 @@ const defaultDetectionDuration = 60;
 const defaultDetectionInterval = 60;
 const defaultDetectionTimeout = 60;
 const defaultMotionDuration = 10;
+const defaultScoreThreshold = .2;
+const defaultSecondScoreThreshold = .7;
 
 const DETECT_PERIODIC_SNAPSHOTS = "Periodic Snapshots";
 const DETECT_MOTION_SNAPSHOTS = "Motion Snapshots";
@@ -21,13 +23,24 @@ const DETECT_VIDEO_MOTION = "Video Motion";
 
 type ClipPath = [number, number][];
 type Zones = { [zone: string]: ClipPath };
+interface ZoneInfo {
+  exclusion?: boolean;
+  type?: 'Intersect' | 'Contain';
+  classes?: string[];
+  scoreThreshold?: number;
+  secondScoreThreshold?: number;
+}
+type ZoneInfos = { [zone: string]: ZoneInfo };
 
-type TrackedDetection = ObjectDetectionResult & { bestScore?: number };
+type TrackedDetection = ObjectDetectionResult & {
+  newOrBetterDetection?: boolean;
+  bestScore?: number;
+  bestSecondPassScore?: number;
+};
 
 class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera & MotionSensor & ObjectDetector> implements ObjectDetector, Settings, ObjectDetectionCallbacks {
   released = false;
   motionListener: EventListenerRegister;
-  detectionListener: EventListenerRegister;
   detectorListener: EventListenerRegister;
   detections = new Map<string, MediaObject>();
   cameraDevice: ScryptedDevice & Camera & VideoCamera & MotionSensor;
@@ -40,7 +53,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   motionTimeout: NodeJS.Timeout;
   detectionInterval = parseInt(this.storage.getItem('detectionInterval')) || defaultDetectionInterval;
   zones = this.getZones();
-  exclusionZones = this.getExclusionZones();
+  zoneInfos = this.getZoneInfos();
   detectionIntervalTimeout: NodeJS.Timeout;
   detectionState: DenoisedDetectionState<TrackedDetection> = {};
   detectionId: string;
@@ -148,30 +161,16 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       detectionId: this.detectionId,
       settings: await this.getCurrentSettings(),
     });
-    this.objectsDetected(detections, true);
+    this.trackObjects(detections, true);
     this.reportObjectDetections(detections);
   }
 
   bindObjectDetection() {
     this.running = false;
-    this.detectionListener?.removeListener();
-    this.detectionListener = undefined;
     this.detectorListener?.removeListener();
     this.detectorListener = undefined;
     this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
-    });
-
-    this.detectionListener = this.objectDetection.listen({
-      event: ScryptedInterface.ObjectDetection,
-      watch: false,
-    }, (eventSource, eventDetails, eventData: ObjectsDetected) => {
-      if (eventData?.detectionId !== this.detectionId)
-        return;
-      this.objectsDetected(eventData);
-      this.reportObjectDetections(eventData);
-
-      this.running = eventData.running;
     });
 
     this.maybeStartMotionDetection();
@@ -191,7 +190,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           detectionId: this.detectionId,
           settings: await this.getCurrentSettings(),
         });
-        this.objectsDetected(detections, true);
+        this.trackObjects(detections, true);
         this.setDetection(detections, mo);
         this.reportObjectDetections(detections);
       });
@@ -223,10 +222,66 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     });
   }
 
-  handleDetectionEvent(detection: ObjectsDetected, mediaObject?: MediaObject) {
+  async handleDetectionEvent(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject) {
     this.running = detection.running;
 
-    const newOrBetterDetection = this.objectsDetected(detection);
+    // track the objects on a pre-zoned set.
+    this.trackObjects(detection);
+
+    // apply the zones to the detections and get a shallow copy list of detections after
+    // exclusion zones have applied
+    const zonedDetections = this.applyZones(detection)
+      .filter(d => {
+        if (!d.zones?.length)
+          return d.bestSecondPassScore >= this.secondScoreThreshold || d.score >= this.scoreThreshold;
+
+        for (const zone of d.zones || []) {
+          const zi = this.zoneInfos[zone];
+          const scoreThreshold = zi?.scoreThreshold || this.scoreThreshold;
+          const secondScoreThreshold = zi?.secondScoreThreshold || this.secondScoreThreshold;
+          // keep the object if it passes the score check, or has already passed a second score check.
+          if (d.bestSecondPassScore >= secondScoreThreshold || d.score >= scoreThreshold)
+            return true;
+        }
+      });
+
+    let newOrBetterDetection = false;
+
+    if (!this.hasMotionType && redetect && this.secondScoreThreshold && detection.detections) {
+      const detections = detection.detections as TrackedDetection[];
+      const newOrBetterDetections = zonedDetections.filter(d => d.newOrBetterDetection);
+      detections?.forEach(d => d.newOrBetterDetection = false);
+
+      // anything with a higher pass initial score should be redetected
+      // as it may yield a better second pass score and thus a better thumbnail.
+      await Promise.allSettled(newOrBetterDetections.map(async d => {
+        const maybeUpdateSecondPassScore = (secondPassScore: number) => {
+          if (!d.bestSecondPassScore || secondPassScore > d.bestSecondPassScore) {
+            newOrBetterDetection = true;
+            d.bestSecondPassScore = secondPassScore;
+          }
+        }
+
+        // the initial score may be sufficient.
+        if (d.score >= this.secondScoreThreshold) {
+          maybeUpdateSecondPassScore(d.score);
+          return;
+        }
+
+        const redetected = await redetect(d.boundingBox);
+        const best = redetected.filter(r => r.className === d.className).sort((a, b) => b.score - a.score)?.[0];
+        if (best)
+          maybeUpdateSecondPassScore(best.score)
+      }));
+
+      const secondPassDetections = zonedDetections.filter(d => d.bestSecondPassScore >= this.secondScoreThreshold)
+        .map(d => ({
+          ...d,
+          score: d.bestSecondPassScore,
+        }));
+      detection.detections = secondPassDetections;
+    }
+
     if (newOrBetterDetection)
       this.setDetection(detection, mediaObject);
 
@@ -242,9 +297,22 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return newOrBetterDetection;
   }
 
-  async onDetection(detection: ObjectsDetected, mediaObject?: MediaObject): Promise<boolean> {
-    return this.handleDetectionEvent(detection, mediaObject);
+  get scoreThreshold() {
+    return parseFloat(this.storage.getItem('scoreThreshold')) || defaultScoreThreshold;
   }
+
+  get secondScoreThreshold() {
+    const r = parseFloat(this.storage.getItem('secondScoreThreshold'));
+    if (isNaN(r))
+      return defaultSecondScoreThreshold;
+    return r;
+  }
+
+  async onDetection(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject): Promise<boolean> {
+    // detection.detections = detection.detections?.filter(d => d.score >= this.scoreThreshold);
+    return this.handleDetectionEvent(detection, redetect, mediaObject);
+  }
+
   async onDetectionEnded(detection: ObjectsDetected): Promise<void> {
     this.handleDetectionEvent(detection);
   }
@@ -269,20 +337,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.detectionState.lastDetection = Date.now();
 
       this.running = true;
-
-      let model: ObjectDetectionModel;
-      try {
-        model = await this.objectDetection.getDetectionModel(settings);
-      }
-      catch (e) {
-      }
-
       let stream: MediaObject;
 
       // internal streams must implicitly be available.
       if (!this.internal) {
         stream = await this.cameraDevice.getVideoStream({
-          destination: model?.inputStream || 'low-resolution',
+          destination: !this.hasMotionType ? 'local-recorder' : 'low-resolution',
           // ask rebroadcast to mute audio, not needed.
           audio: null,
         });
@@ -311,55 +371,74 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return this.hasMotionType ? this.detectionInterval * 1000 * 5 : this.detectionDuration * 1000;
   }
 
-  reportObjectDetections(detection: ObjectsDetected) {
+  applyZones(detection: ObjectsDetected) {
     // determine zones of the objects, if configured.
-    if (detection.detections && (Object.keys(this.zones).length || Object.keys(this.exclusionZones).length)) {
-      let copy = detection.detections.slice();
-      for (const o of detection.detections) {
-        if (!o.boundingBox)
-          continue;
-        o.zones = []
-        let [x, y, width, height] = o.boundingBox;
-        let x2 = x + width;
-        let y2 = y + height;
-        // the zones are point paths in percentage format
-        x = x * 100 / detection.inputDimensions[0];
-        y = y * 100 / detection.inputDimensions[1];
-        x2 = x2 * 100 / detection.inputDimensions[0];
-        y2 = y2 * 100 / detection.inputDimensions[1];
+    if (!detection.detections)
+      return;
+    let copy = detection.detections.slice();
+    for (const o of detection.detections) {
+      if (!o.boundingBox)
+        continue;
 
-        let excluded = false;
-        for (const [zone, zoneValue] of Object.entries(this.exclusionZones)) {
-          if (insidePolygon([x, y], zoneValue) &&
-            insidePolygon([x, y2], zoneValue) &&
-            insidePolygon([x2, y], zoneValue) &&
-            insidePolygon([x2, y2], zoneValue)) {
-            excluded = true;
+      o.zones = []
+      let [x, y, width, height] = o.boundingBox;
+      let x2 = x + width;
+      let y2 = y + height;
+      // the zones are point paths in percentage format
+      x = x * 100 / detection.inputDimensions[0];
+      y = y * 100 / detection.inputDimensions[1];
+      x2 = x2 * 100 / detection.inputDimensions[0];
+      y2 = y2 * 100 / detection.inputDimensions[1];
+      const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
+
+      let included: boolean;
+      for (const [zone, zoneValue] of Object.entries(this.zones)) {
+        if (zoneValue.length < 3) {
+          // this.console.warn(zone, 'Zone is unconfigured, skipping.');
+          continue;
+        }
+
+        const zoneInfo = this.zoneInfos[zone];
+        // track if there are any inclusion zones
+        if (!zoneInfo?.exclusion && !included)
+          included = false;
+
+        let match = false;
+        if (zoneInfo?.type === 'Contain') {
+          match = insidePolygon(box[0], zoneValue) &&
+            insidePolygon(box[1], zoneValue) &&
+            insidePolygon(box[2], zoneValue) &&
+            insidePolygon(box[3], zoneValue);
+        }
+        else {
+          match = polygonOverlap(box, zoneValue);
+        }
+
+        if (match && zoneInfo?.classes?.length) {
+          match = zoneInfo.classes.includes(o.className);
+        }
+        if (match) {
+          o.zones.push(zone);
+
+          if (zoneInfo?.exclusion && match) {
             copy = copy.filter(c => c !== o);
             break;
           }
-        }
 
-        if (excluded)
-          continue;
-
-        const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
-        for (const [zone, zoneValue] of Object.entries(this.zones)) {
-          if (polygonOverlap(box, zoneValue)) {
-            // this.console.log(o.className, 'inside', zone);
-            o.zones.push(zone);
-          }
+          included = true;
         }
       }
 
-      detection.detections = copy;
+      // if there are inclusion zones and this object
+      // was not in any of them, filter it out.
+      if (included === false)
+        copy = copy.filter(c => c !== o);
     }
 
-    // if this detector supports bounding boxes, and there are zones configured,
-    // filter the detections to the zones.
-    if (Object.keys(this.zones).length)
-      detection.detections = detection.detections.filter(o => !o.boundingBox || o?.zones?.length);
+    return copy as TrackedDetection[];
+  }
 
+  reportObjectDetections(detection: ObjectsDetected) {
     if (this.hasMotionType) {
       const found = detection.detections?.find(d => d.className === 'motion');
       if (found) {
@@ -391,7 +470,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
-  objectsDetected(detectionResult: ObjectsDetected, showAll?: boolean) {
+  trackObjects(detectionResult: ObjectsDetected, showAll?: boolean) {
     // do not denoise
     if (this.hasMotionType) {
       return;
@@ -403,8 +482,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     const { detections } = detectionResult;
-
-    let newOrBetterDetection = false;
 
     const found: DenoisedDetectionEntry<TrackedDetection>[] = [];
     denoiseDetections<TrackedDetection>(this.detectionState, detections.map(detection => ({
@@ -442,8 +519,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       timeout: this.detectionTimeout * 1000,
       added: d => {
         found.push(d);
-        newOrBetterDetection = true;
         d.detection.bestScore = d.detection.score;
+        d.detection.newOrBetterDetection = true;
       },
       removed: d => {
         this.console.log('expired detection:', `${d.detection.className} (${d.detection.score})`);
@@ -452,12 +529,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       },
       retained: (d, o) => {
         if (d.detection.score > o.detection.bestScore) {
-          newOrBetterDetection = true;
           d.detection.bestScore = d.detection.score;
+          d.detection.newOrBetterDetection = true;
         }
         else {
           d.detection.bestScore = o.detection.bestScore;
         }
+        d.detection.bestSecondPassScore = o.detection.bestSecondPassScore;
       },
       expiring: (d) => {
       },
@@ -473,8 +551,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     // removes items that is not tracked yet (may require more present frames)
     detectionResult.detections = detectionResult.detections.filter(d => d.id);
-
-    return newOrBetterDetection;
   }
 
   setDetection(detection: ObjectsDetected, detectionInput: MediaObject) {
@@ -522,13 +598,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         value: 'WARNING',
         key: 'existingMotionSensor',
       })
-    }
-
-    let msos: MediaStreamOptions[] = [];
-    try {
-      msos = await this.cameraDevice.getVideoStreamOptions();
-    }
-    catch (e) {
     }
 
     if (!this.hasMotionType) {
@@ -610,54 +679,120 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     if (!this.hasMotionType) {
+      let hasInclusionZone = false;
+      for (const zone of Object.keys(this.zones)) {
+        const zi = this.zoneInfos[zone];
+        if (!zi?.exclusion) {
+          hasInclusionZone = true;
+          break;
+        }
+      }
+      if (!hasInclusionZone) {
+        settings.push(
+          {
+            title: 'Minimum Detection Confidence',
+            description: 'Higher values eliminate false positives and low quality recognition candidates.',
+            key: 'scoreThreshold',
+            type: 'number',
+            value: this.scoreThreshold,
+            placeholder: '.2',
+          },
+          {
+            title: 'Second Pass Confidence',
+            description: 'Crop and reanalyze a result from the initial detection pass to get more accurate results.',
+            key: 'secondScoreThreshold',
+            type: 'number',
+            value: this.secondScoreThreshold,
+            placeholder: '.7',
+          },
+        );
+      }
+
       settings.push(
         {
           title: 'Analyze',
           description: 'Analyzes the video stream for 1 minute. Results will be shown in the Console.',
           key: 'analyzeButton',
           type: 'button',
-        }
+        },
       );
     }
 
     settings.push({
       key: 'zones',
-      title: 'Inclusion Zones',
+      title: 'Zones',
       type: 'string',
-      description: 'Inclusion zones limit detections to those within the included areas. Enter the name of a new zone or delete an existing zone.',
+      description: 'Enter the name of a new zone or delete an existing zone.',
       multiple: true,
       value: Object.keys(this.zones),
       choices: Object.keys(this.zones),
       combobox: true,
     });
 
-    settings.push({
-      key: 'exclusionZones',
-      title: 'Exclusion Zones',
-      description: 'Exclusion zones prevent detections that are fully contained within excluded areas. Enter the name of a new zone or delete an existing zone.',
-      type: 'string',
-      multiple: true,
-      value: Object.keys(this.exclusionZones),
-      choices: Object.keys(this.exclusionZones),
-      combobox: true,
-    });
-
     for (const [name, value] of Object.entries(this.zones)) {
-      settings.push({
-        key: `zone-${name}`,
-        title: `Edit Zone: ${name}`,
-        type: 'clippath',
-        value: JSON.stringify(value),
-      });
-    }
+      const zi = this.zoneInfos[name];
 
-    for (const [name, value] of Object.entries(this.exclusionZones)) {
+      const subgroup = `Zone: ${name}`;
       settings.push({
+        subgroup,
         key: `zone-${name}`,
-        title: `Edit Zone: ${name}`,
+        title: `Edit Zone`,
         type: 'clippath',
         value: JSON.stringify(value),
       });
+
+      settings.push({
+        subgroup,
+        key: `zoneinfo-exclusion-${name}`,
+        title: `Exclusion Zone`,
+        description: 'Detections in this zone will be excluded.',
+        type: 'boolean',
+        value: zi?.exclusion,
+      });
+
+      settings.push({
+        subgroup,
+        key: `zoneinfo-type-${name}`,
+        title: `Zone Type`,
+        description: 'An Intersect zone will match objects that are partially or fully inside the zone. A Contain zone will only match objects that are fully inside the zone.',
+        choices: [
+          'Intersect',
+          'Contain',
+        ],
+        value: zi?.type || 'Intersect',
+      });
+
+      if (!this.hasMotionType) {
+        settings.push(
+          {
+            subgroup,
+            key: `zoneinfo-classes-${name}`,
+            title: `Detection Classes`,
+            description: 'The detection classes to match inside this zone. An empty list will match all classes.',
+            choices: (await this.getObjectTypes())?.classes || [],
+            value: zi?.classes || [],
+            multiple: true,
+          },
+          {
+            subgroup,
+            title: 'Minimum Detection Confidence',
+            description: 'Higher values eliminate false positives and low quality recognition candidates.',
+            key: `zoneinfo-scoreThreshold-${name}`,
+            type: 'number',
+            value: zi?.scoreThreshold || this.scoreThreshold,
+            placeholder: '.2',
+          },
+          {
+            subgroup,
+            title: 'Second Pass Confidence',
+            description: 'Crop and reanalyze a result from the initial detection pass to get more accurate results.',
+            key: `zoneinfo-secondScoreThreshold-${name}`,
+            type: 'number',
+            value: zi?.secondScoreThreshold || this.secondScoreThreshold,
+            placeholder: '.7',
+          },
+        );
+      }
     }
 
     return settings;
@@ -672,9 +807,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
-  getExclusionZones(): Zones {
+  getZoneInfos(): ZoneInfos {
     try {
-      return JSON.parse(this.storage.getItem('exclusionZones'));
+      return JSON.parse(this.storage.getItem('zoneInfos'));
     }
     catch (e) {
       return {};
@@ -686,32 +821,30 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     if (key === 'zones') {
       const newZones: Zones = {};
+      const newZoneInfos: ZoneInfos = {};
       for (const name of value as string[]) {
         newZones[name] = this.zones[name] || [];
+        newZoneInfos[name] = this.zoneInfos[name];
       }
       this.zones = newZones;
+      this.zoneInfos = newZoneInfos;
       this.storage.setItem('zones', JSON.stringify(newZones));
-      return;
-    }
-    if (key === 'exclusionZones') {
-      const newZones: Zones = {};
-      for (const name of value as string[]) {
-        newZones[name] = this.exclusionZones[name] || [];
-      }
-      this.exclusionZones = newZones;
-      this.storage.setItem('exclusionZones', JSON.stringify(newZones));
+      this.storage.setItem('zoneInfos', JSON.stringify(newZoneInfos));
       return;
     }
     if (key.startsWith('zone-')) {
-      const zoneName = key.substring(5);
+      const zoneName = key.substring('zone-'.length);
       if (this.zones[zoneName]) {
         this.zones[zoneName] = JSON.parse(vs);
         this.storage.setItem('zones', JSON.stringify(this.zones));
       }
-      if (this.exclusionZones[zoneName]) {
-        this.exclusionZones[zoneName] = JSON.parse(vs);
-        this.storage.setItem('exclusionZones', JSON.stringify(this.exclusionZones));
-      }
+      return;
+    }
+    if (key.startsWith('zoneinfo-')) {
+      const [zkey, zoneName] = key.substring('zoneinfo-'.length).split('-');
+      this.zoneInfos[zoneName] ||= {};
+      this.zoneInfos[zoneName][zkey] = value;
+      this.storage.setItem('zoneInfos', JSON.stringify(this.zoneInfos));
       return;
     }
 
@@ -762,7 +895,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.clearDetectionTimeout();
     this.clearMotionTimeout();
     this.motionListener?.removeListener();
-    this.detectionListener?.removeListener();
     this.detectorListener?.removeListener();
     this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,

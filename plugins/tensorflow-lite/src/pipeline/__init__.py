@@ -9,6 +9,7 @@ gi.require_version('GstBase', '1.0')
 from .safe_set_result import safe_set_result
 from gi.repository import GObject, Gst
 import math
+import asyncio
 
 GObject.threads_init()
 Gst.init(None)
@@ -80,7 +81,7 @@ class GstPipeline(GstPipelineBase):
         self.pad_size = None
         self.scale_size = None
         self.crop = crop
-        self.condition = threading.Condition()
+        self.condition = None
 
     def attach_launch(self, gst):
         super().attach_launch(gst)
@@ -92,12 +93,14 @@ class GstPipeline(GstPipelineBase):
     async def run_attached(self):
         # Start inference worker.
         self.running = True
-        worker = threading.Thread(target=self.inference_loop)
+        worker = threading.Thread(target=self.inference_main)
         worker.start()
+        while not self.condition:
+            await asyncio.sleep(10)
 
         await super().run_attached()
 
-        with self.condition:
+        async with self.condition:
             self.running = False
             self.condition.notify_all()
         # we should join, but this blocks the asyncio thread.
@@ -108,9 +111,12 @@ class GstPipeline(GstPipelineBase):
         if not self.sink_size:
             s = sample.get_caps().get_structure(0)
             self.sink_size = (s.get_value('width'), s.get_value('height'))
-        with self.condition:
-            self.gstsample = sample
-            self.condition.notify_all()
+        self.gstsample = sample
+        async def notifier(): 
+            async with self.condition:
+                self.condition.notify_all()
+        asyncio.run_coroutine_threadsafe(notifier(), loop = self.selfLoop)
+        # should block?
         return Gst.FlowReturn.OK
 
     def get_src_size(self):
@@ -184,17 +190,29 @@ class GstPipeline(GstPipelineBase):
 
         return (int(math.ceil(x)), int(math.ceil(y)), valid)
 
-    def inference_loop(self):
+
+    def inference_main(self):
+        loop = asyncio.new_event_loop()
+        self.selfLoop = loop
+        self.condition = asyncio.Condition(loop = loop)
+        loop.run_until_complete(self.inference_loop())
+        loop.close()
+
+    async def inference_loop(self):
         while True:
-            with self.condition:
+            async with self.condition:
                 while not self.gstsample and self.running:
-                    self.condition.wait()
+                    await self.condition.wait()
                 if not self.running:
                     break
                 gstsample = self.gstsample
                 self.gstsample = None
-                self.user_callback(gstsample, self.get_src_size(
+            try:
+                await self.user_callback(gstsample, self.get_src_size(
                 ), lambda p, normalize=False: self.convert_to_src_size(p, normalize))
+            except:
+                print("callback failure")
+                raise
 
 
 def get_dev_board_model():

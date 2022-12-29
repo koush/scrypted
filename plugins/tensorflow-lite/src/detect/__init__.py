@@ -135,11 +135,11 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         self.crop = False
         self.loop = asyncio.get_event_loop()
 
-    async def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, mediaObject = None):
+    async def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, redetect: Any = None, mediaObject = None):
         detection_result['timestamp'] = int(time.time() * 1000)
         if detection_session.callbacks:
             if detection_session.running:
-                return await detection_session.callbacks.onDetection(detection_result, mediaObject)
+                return await detection_session.callbacks.onDetection(detection_result, redetect, mediaObject)
             else:
                 await detection_session.callbacks.onDetectionEnded(detection_result)
         else:
@@ -187,6 +187,10 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         return DetectionSession()
 
     def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+        pass
+
+    def run_detection_crop(self, detection_session: DetectionSession, sample: Any, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
+        print("not implemented")
         pass
 
     def ensure_session(self, mediaObjectMimeType: str, session: ObjectDetectionSession) -> Tuple[bool, DetectionSession, ObjectsDetected]:
@@ -353,7 +357,23 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def create_user_callback(self, detection_session: DetectionSession, duration: number):
         first_frame = True
 
-        def user_callback(gst_sample, src_size, convert_to_src_size):
+        current_data = None
+        current_src_size = None
+        current_convert_to_src_size = None
+
+        async def redetect(boundingBox: Tuple[number, number, number, number]):
+            nonlocal current_data
+            nonlocal current_src_size
+            nonlocal current_convert_to_src_size
+            if not current_data:
+                raise Exception('no sample')
+
+            detection_result = self.run_detection_crop(
+                detection_session, current_data, detection_session.settings, current_src_size, current_convert_to_src_size, boundingBox)
+
+            return detection_result['detections']
+
+        async def user_callback(gst_sample, src_size, convert_to_src_size):
             try:
                 detection_session.last_sample = time.time()
 
@@ -374,20 +394,25 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                         if not retain:
                             self.invalidateMedia(detection_session, data)
 
-                    async def report_event():
-                        nonlocal mo
-                        mo = await self.createMedia(data)
-                        async def report():
-                            nonlocal retain
-                            retain = await self.detection_event(detection_session, detection_result, mo)
-                        t = asyncio.ensure_future(report(), loop = self.loop)
+                    mo = await self.createMedia(data)
+                    try:
+                        nonlocal current_data
+                        nonlocal current_src_size
+                        nonlocal current_convert_to_src_size
                         try:
-                            await asyncio.wait_for(asyncio.shield(t), 10)
+                            current_data = data
+                            current_src_size = src_size
+                            current_convert_to_src_size = convert_to_src_size
+                            retain = await self.detection_event(detection_session, detection_result, redetect, mo)
+                        finally:
+                            current_data = None
+                            current_convert_to_src_size = None
+                            current_src_size = None
                             maybeInvalidate()
-                        except:
-                            self.invalidateMedia(detection_session, data)
+                    except:
+                        self.invalidateMedia(detection_session, data)
 
-                    asyncio.run_coroutine_threadsafe(report_event(), loop = self.loop)
+                    # asyncio.run_coroutine_threadsafe(, loop = self.loop).result()
                     self.detection_event_notified(detection_session.settings)
 
                 if not detection_session or duration == None:
