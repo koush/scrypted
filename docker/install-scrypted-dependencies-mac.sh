@@ -52,10 +52,12 @@ RUN_IGNORE brew install pillow
 RUN_IGNORE brew install python@3.9
 PYTHON_PATH=$(brew --prefix python@3.9)
 PYTHON_BIN_PATH=
+SCRYPTED_PYTHON_PATH=
 if [ -d "$PYTHON_PATH" ]
 then
     PYTHON_BIN_PATH=$PYTHON_PATH/bin
     export PATH=$PYTHON_BIN_PATH:$PATH
+    export SCRYPTED_PYTHON_PATH=python3.9
 fi
 
 RUN python3.9 -m pip install --upgrade pip
@@ -141,6 +143,8 @@ cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
                 <string>$NODE_BIN_PATH:$PYTHON_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
                 <string>/Users/$USER</string>
+            <key>SCRYPTED_PYTHON_PATH</string>
+                <string>$SCRYPTED_PYTHON_PATH</string>
         </dict>
 </dict>
 </plist>
