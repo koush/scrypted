@@ -49,19 +49,19 @@ RUN_IGNORE brew install gst-python
 # python image library
 RUN_IGNORE brew install pillow
 
-RUN_IGNORE brew install python@3.9
-PYTHON_PATH=$(brew --prefix python@3.9)
+RUN_IGNORE brew install python@3.10
+PYTHON_PATH=$(brew --prefix python@3.10)
 PYTHON_BIN_PATH=
 SCRYPTED_PYTHON_PATH=
 if [ -d "$PYTHON_PATH" ]
 then
     PYTHON_BIN_PATH=$PYTHON_PATH/bin
     export PATH=$PYTHON_BIN_PATH:$PATH
-    export SCRYPTED_PYTHON_PATH=python3.9
+    export SCRYPTED_PYTHON_PATH=python3.10
 fi
 
-RUN python3.9 -m pip install --upgrade pip
-RUN python3.9 -m pip install aiofiles debugpy typing_extensions typing opencv-python
+RUN python3.10 -m pip install --upgrade pip
+RUN python3.10 -m pip install aiofiles debugpy typing_extensions typing opencv-python
 
 echo "Installing Scrypted Launch Agent..."
 
