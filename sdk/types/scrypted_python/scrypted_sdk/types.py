@@ -434,7 +434,6 @@ class NotifierOptions(TypedDict):
 class ObjectDetectionModel(TypedDict):
     classes: list[str]
     inputSize: list[float]
-    inputStream: MediaStreamDestination
     name: str
     settings: list[Setting]
     pass
@@ -2312,7 +2311,7 @@ class HttpResponse:
     pass
 
 class ObjectDetectionCallbacks:
-    async def onDetection(self, detection: ObjectsDetected, mediaObject: MediaObject = None) -> bool:
+    async def onDetection(self, detection: ObjectsDetected, redetect: Any = None, mediaObject: MediaObject = None) -> bool:
         pass
     async def onDetectionEnded(self, detection: ObjectsDetected) -> None:
         pass

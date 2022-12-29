@@ -1184,10 +1184,9 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;
   inputSize?: number[];
   settings: Setting[];
-  inputStream?: MediaStreamDestination;
 }
 export interface ObjectDetectionCallbacks {
-  onDetection(detection: ObjectsDetected, mediaObject?: MediaObject): Promise<boolean>;
+  onDetection(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject): Promise<boolean>;
   onDetectionEnded(detection: ObjectsDetected): Promise<void>;
 }
 /**
