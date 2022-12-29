@@ -143,7 +143,7 @@ cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
                 <string>$NODE_BIN_PATH:$PYTHON_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
                 <string>/Users/$USER</string>
-            <key>SCRYPTED_PYTHON_PATH</string>
+            <key>SCRYPTED_PYTHON_PATH</key>
                 <string>$SCRYPTED_PYTHON_PATH</string>
         </dict>
 </dict>
