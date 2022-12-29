@@ -1,4 +1,4 @@
-import monkey_patch
+import monkey_patch as _
 
 from arlo_plugin import ArloProvider 
 

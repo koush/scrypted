@@ -1,18 +1,20 @@
 import logging
+from logging import Logger
+from scrypted_sdk import ScryptedDeviceBase
 
 
 class ScryptedDeviceLoggingWrapper(logging.Handler):
-    scrypted_device = None
+    scrypted_device: ScryptedDeviceBase = None
 
-    def __init__(self, scrypted_device):
+    def __init__(self, scrypted_device: ScryptedDeviceBase) -> None:
         super().__init__()
         self.scrypted_device = scrypted_device
 
-    def emit(self, record):
+    def emit(self, record) -> None:
         self.scrypted_device.print(self.format(record))
 
 
-def createScryptedLogger(scrypted_device, name):
+def createScryptedLogger(scrypted_device: ScryptedDeviceBase, name: str) -> Logger:
     logger = logging.getLogger(name)
     if logger.hasHandlers():
         return logger
@@ -33,11 +35,11 @@ def createScryptedLogger(scrypted_device, name):
 
 
 class ScryptedDeviceLoggerMixin:
-    _logger = None
-    logger_name = None
+    _logger: Logger = None
+    logger_name: str = None
 
     @property
-    def logger(self):
+    def logger(self) -> Logger:
         if self._logger is None:
             self._logger = createScryptedLogger(self, self.logger_name)
         return self._logger
