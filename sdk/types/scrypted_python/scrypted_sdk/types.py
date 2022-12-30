@@ -322,6 +322,7 @@ class EventDetails(TypedDict):
 class EventListenerOptions(TypedDict):
     denoise: bool
     event: str
+    mixinId: str
     watch: bool
     pass
 

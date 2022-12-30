@@ -56,6 +56,10 @@ export interface EventListenerOptions {
    * This EventListener will passively watch for events, and not initiate polling.
    */
   watch?: boolean;
+  /**
+   * The EventListener will listen to events and property changes from a device or mixin that is suppressed by a mixin.
+   */
+  mixinId?: string;
 }
 
 /**
