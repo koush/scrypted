@@ -849,7 +849,7 @@ class PrebufferSession {
     session.killed.finally(() => clearTimeout(this.inactivityTimeout));
 
     // settings ui refresh
-    deviceManager.onMixinEvent(this.mixin.id, this.mixin.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
+    deviceManager.onMixinEvent(this.mixin.id, this.mixin, ScryptedInterface.Settings, undefined);
 
     // cloud streams need a periodic token refresh.
     if (sessionMso?.refreshAt) {

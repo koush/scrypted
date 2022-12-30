@@ -191,6 +191,6 @@ The latest troubleshooting guide for all known streaming or recording issues can
             super.alertReload();
         }
 
-        deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
+        deviceManager.onMixinEvent(this.id, this, ScryptedInterface.Settings, undefined);
     }
 }
