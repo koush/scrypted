@@ -1,4 +1,4 @@
-import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MediaStreamOptions, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MediaStreamOptions, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedNativeId, Setting, Settings, VideoCamera } from '@scrypted/sdk';
 import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
@@ -42,6 +42,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   released = false;
   motionListener: EventListenerRegister;
   detectorListener: EventListenerRegister;
+  motionMixinListeners: EventListenerRegister[];
   detections = new Map<string, MediaObject>();
   cameraDevice: ScryptedDevice & Camera & VideoCamera & MotionSensor;
   detectSnapshotsOnly = this.storage.getItem('detectionMode');
@@ -144,8 +145,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
   async maybeStartMotionDetection() {
     await this.ensureSettings();
-    if (this.hasMotionType)
-      await this.startVideoDetection();
+    if (!this.hasMotionType)
+      return;
+    await this.startVideoDetection();
   }
 
   async snapshotDetection() {
@@ -220,6 +222,17 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (this.detectionModes.includes(DETECT_VIDEO_MOTION))
         await this.startVideoDetection();
     });
+
+    // this.motionMixinListeners = (this.mixins || [])
+    // .map(id => {
+    //   return this.cameraDevice.listen({
+    //     event: ScryptedInterface.MotionSensor,
+    //     mixinId: id,
+    //   }, (source, details, data) => {
+    //     this.console.log('mixiner')
+    //     details.property
+    //   })
+    // })
   }
 
   async handleDetectionEvent(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject) {
@@ -928,7 +941,12 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
     }
 
     if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell) && (interfaces.includes(ScryptedInterface.VideoCamera) || interfaces.includes(ScryptedInterface.Camera))) {
-      return [ScryptedInterface.ObjectDetector, ScryptedInterface.MotionSensor, ScryptedInterface.Settings];
+      const ret = [ScryptedInterface.ObjectDetector, ScryptedInterface.Settings];
+      const model = await this.mixinDevice.getDetectionModel();
+      if (model.classes?.includes('motion'))
+        ret.push(ScryptedInterface.MotionSensor)
+      return ret;
+
     }
     return null;
   }
