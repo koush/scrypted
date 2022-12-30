@@ -367,7 +367,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
 
         const accessControls: AccessControls = peer.tags.acl;
 
-        const getAccessControlDeviceState = (id: string, state?:  { [property: string]: SystemDeviceState } ) => {
+        const getAccessControlDeviceState = (id: string, state?: { [property: string]: SystemDeviceState }) => {
             state = state || getSystemState()[id];
             if (accessControls && state) {
                 state = Object.assign({}, state);
@@ -567,11 +567,11 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             async updateDeviceState(id: string, state: { [property: string]: SystemDeviceState }) {
                 if (!state) {
                     delete systemManager.state[id];
-                    systemManager.events.notify(undefined, undefined, ScryptedInterface.ScryptedDevice, ScryptedInterfaceProperty.id, id, true);
+                    systemManager.events.notify(undefined, undefined, ScryptedInterface.ScryptedDevice, ScryptedInterfaceProperty.id, id, { changed: true });
                 }
                 else {
                     systemManager.state[id] = state;
-                    systemManager.events.notify(id, undefined, ScryptedInterface.ScryptedDevice, undefined, state, true);
+                    systemManager.events.notify(id, undefined, ScryptedInterface.ScryptedDevice, undefined, state, { changed: true });
                 }
             },
 
@@ -583,10 +583,10 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                         return;
                     }
                     state[property] = value;
-                    systemManager.events.notify(id, eventTime, eventInterface, property, value.value, changed);
+                    systemManager.events.notify(id, eventTime, eventInterface, property, value.value, { changed });
                 }
                 else {
-                    systemManager.events.notify(id, eventTime, eventInterface, property, value, changed);
+                    systemManager.events.notify(id, eventTime, eventInterface, property, value, { changed });
                 }
             },
 

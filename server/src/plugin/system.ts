@@ -166,15 +166,11 @@ export class SystemManagerImpl implements SystemManager {
         return this.events.listen(makeOneWayCallback((id, eventDetails, eventData) => callback(this.getDeviceById(id), eventDetails, eventData)));
     }
     listenDevice(id: string, options: string | EventListenerOptions, callback: EventListener): EventListenerRegister {
-        let { event, watch } = (options || {}) as EventListenerOptions;
-        if (!event && typeof options === 'string')
-            event = options as string;
-        if (!event)
-            event = undefined;
+        let { watch } = (options || {}) as EventListenerOptions;
 
         // passive watching can be fast pathed to observe local state
         if (watch)
-            return this.events.listenDevice(id, event, (eventDetails, eventData) => callback(this.getDeviceById(id), eventDetails, eventData));
+            return this.events.listenDevice(id, options, (eventDetails, eventData) => callback(this.getDeviceById(id), eventDetails, eventData));
 
         return new EventListenerRegisterImpl(this.api.listenDevice(id, options, makeOneWayCallback((eventDetails, eventData) => callback(this.getDeviceById(id), eventDetails, eventData))));
     }

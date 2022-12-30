@@ -260,7 +260,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
             const propertyInterfaces = getPropertyInterfaces(host.api.descriptors || ScryptedInterfaceDescriptors);
             // todo: remove this and pass the setter directly.
             const deviceState = await host.remote.createDeviceState(this.id,
-                async (property, value) => this.scrypted.stateManager.setPluginDeviceState(pluginDevice, property, value, propertyInterfaces[property]));
+                async (property, value) => this.scrypted.stateManager.setPluginDeviceStateFromMixin(pluginDevice, property, value, propertyInterfaces[property], mixinId));
             const mixinProxy = await mixinProvider.getMixin(wrappedProxy, previousInterfaces as ScryptedInterface[], deviceState);
             if (!mixinProxy)
                 throw new PluginError(`mixin provider ${mixinId} did not return mixin for ${this.id}`);

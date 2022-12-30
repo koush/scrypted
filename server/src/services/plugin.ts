@@ -70,6 +70,8 @@ export class PluginComponent {
     async kill(pluginId: string) {
         return this.scrypted.plugins[pluginId]?.kill();
     }
+    // TODO: Remove this, ScryptedPlugin exists now.
+    // 12/29/2022
     async getPackageJson(pluginId: string) {
         return this.scrypted.getPackageJson(pluginId);
     }

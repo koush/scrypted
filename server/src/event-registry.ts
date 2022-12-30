@@ -8,6 +8,18 @@ export class EventListenerRegisterImpl implements EventListenerRegister {
     }
 }
 
+export function getMixinEventName(options: string | EventListenerOptions) {
+    let { event, mixinId } = (options || {}) as EventListenerOptions;
+    if (!event && typeof options === 'string')
+        event = options as string;
+    if (!event)
+        event = undefined;
+    if (!mixinId)
+        return event;
+    let ret = `${event}-mixin-${mixinId}`;
+    return ret;
+}
+
 // todo: storage should only go to host plugin
 const allowedEventInterfaces = new Set<string>([ScryptedInterface.ScryptedDevice, 'Logger', 'Storage'])
 
@@ -25,11 +37,7 @@ export class EventRegistry {
     }
 
     listenDevice(id: string, options: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
-        let { event } = (options || {}) as EventListenerOptions;
-        if (!event && typeof options === 'string')
-            event = options as string;
-        if (!event)
-            event = undefined;
+        let event = getMixinEventName(options)
         const token = `${id}#${event}`;
         let events = this.listeners[token];
         if (!events) {
@@ -44,7 +52,11 @@ export class EventRegistry {
         });
     }
 
-    notify(id: string|undefined, eventTime: number, eventInterface: string, property: string|undefined, value: any, changed?: boolean): boolean {
+    notify(id: string | undefined, eventTime: number, eventInterface: string, property: string | undefined, value: any, options?: {
+        changed?: boolean;
+        mixinId?: string;
+    }): boolean {
+        const { changed, mixinId } = options || {};
         // prevent property event noise
         if (property && !changed)
             return false;
@@ -55,12 +67,13 @@ export class EventRegistry {
             eventInterface,
             eventTime,
             property,
+            mixinId,
         };
 
         // system listeners only get state changes.
         // there are many potentially noisy stateless events, like
         // object detection and settings changes.
-        if (property || allowedEventInterfaces.has(eventInterface)) {
+        if ((property && !mixinId) || allowedEventInterfaces.has(eventInterface)) {
             for (const event of this.systemListeners) {
                 event(id, eventDetails, value);
             }

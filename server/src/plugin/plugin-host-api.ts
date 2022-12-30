@@ -100,7 +100,11 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
 
     async setState(nativeId: ScryptedNativeId, key: string, value: any) {
         checkProperty(key, value);
-        this.scrypted.stateManager.setPluginState(this.pluginId, nativeId, this.propertyInterfaces?.[key], key, value);
+        const { pluginId } = this;
+        const device = this.scrypted.findPluginDevice(pluginId, nativeId);
+        if (!device)
+            throw new Error(`device not found for plugin id ${pluginId} native id ${nativeId}`);
+        await this.scrypted.stateManager.setPluginDeviceStateFromMixin(device, key, value, this.propertyInterfaces?.[key], device._id);
     }
 
     async setStorage(nativeId: ScryptedNativeId, storage: { [key: string]: string }) {
@@ -146,11 +150,11 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         return this.manageListener(this.scrypted.stateManager.listen(callback));
     }
     async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
-        const device = this.scrypted.findPluginDeviceById(id);
-        if (device) {
-            const self = this.scrypted.findPluginDevice(this.pluginId);
-            this.scrypted.getDeviceLogger(self).log('i', `requested listen ${getState(device, ScryptedInterfaceProperty.name)} ${JSON.stringify(event)}`);
-        }
+        // const device = this.scrypted.findPluginDeviceById(id);
+        // if (device) {
+        //     const self = this.scrypted.findPluginDevice(this.pluginId);
+        //     this.scrypted.getDeviceLogger(self).log('i', `requested listen ${getState(device, ScryptedInterfaceProperty.name)} ${JSON.stringify(event)}`);
+        // }
         return this.manageListener(this.scrypted.stateManager.listenDevice(id, event, callback));
     }
 
