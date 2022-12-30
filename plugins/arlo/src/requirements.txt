@@ -1,7 +1,6 @@
 paho-mqtt==1.6.1
 sseclient==0.0.22
-git+https://github.com/bjia56/aiortc@5dfaf63ae6734055d385eabbead33dfeeddd1044#egg=aiortc
-cryptography==3.3.2; platform_machine=="armv7l"
-cryptography; platform_machine!="armv7l"
+aiortc==1.3.2
+cryptography==3.3.2
 requests
 --no-binary=cffi

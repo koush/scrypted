@@ -1,6 +1,5 @@
 from aioice import Candidate
-from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceGatherer, RTCIceServer
-from aiortc.codecs import get_capabilities
+from aiortc import RTCSessionDescription, RTCIceGatherer, RTCIceServer
 from aiortc.rtcicetransport import candidate_to_aioice, candidate_from_aioice 
 import asyncio
 import json
@@ -11,7 +10,7 @@ from scrypted_sdk.types import Camera, VideoCamera, Intercom, MotionSensor, Batt
 
 from .logging import ScryptedDeviceLoggerMixin
 from .util import BackgroundTaskMixin
-from .ffmpeg_aiortc_bridge import FFmpegAudioStreamEncoder, FFmpegAudioStreamTrack
+from .rtcpeerconnection import BackgroundRTCPeerConnection
 
 
 class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor, Battery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
@@ -39,7 +38,6 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         self.start_battery_subscription()
 
         self.pc = None
-        self.track = None
         self.sdp_answered = False
         self.start_sdp_answer_subscription()
         self.start_candidate_answer_subscription()
@@ -151,46 +149,39 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)
 
     async def startIntercom(self, media):
-        try:
-            self.logger.info("Starting intercom")
+        self.logger.info("Starting intercom")
 
-            ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
-            self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
-            ffmpeg_path = await scrypted_sdk.mediaManager.getFFmpegPath()
+        ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
+        self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
 
-            session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
-            self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
-            
-            ice_servers = [
-                RTCIceServer(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
-                for ice in ice_servers
-            ]
-            ice_gatherer = RTCIceGatherer(ice_servers)
-            await ice_gatherer.gather()
+        session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
+        self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
+        
+        ice_servers = [
+            RTCIceServer(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
+            for ice in ice_servers
+        ]
+        ice_gatherer = RTCIceGatherer(ice_servers)
+        await ice_gatherer.gather()
 
-            local_candidates = [
-                f"candidate:{Candidate.to_sdp(candidate_to_aioice(candidate))}"
-                for candidate in ice_gatherer.getLocalCandidates()
-            ]
+        local_candidates = [
+            f"candidate:{Candidate.to_sdp(candidate_to_aioice(candidate))}"
+            for candidate in ice_gatherer.getLocalCandidates()
+        ]
 
-            log_candidates = '\n'.join(local_candidates)
-            self.logger.info(f"Local candidates:\n{log_candidates}")
+        log_candidates = '\n'.join(local_candidates)
+        self.logger.info(f"Local candidates:\n{log_candidates}")
 
-            pc = self.pc = RTCPeerConnection()
+        # MediaPlayer/PyAV will block until the intercom stream starts, and it seems that scrypted waits
+        # for startIntercom to exit before sending data. So, let's do the remaining setup in a coroutine
+        # so this function can return early.
+        # This is required even if we use BackgroundRTCPeerConnection, since setting up MediaPlayer may
+        # block the background thread's event loop and prevent other async functions from running.
+        async def async_setup():
+            pc = self.pc = BackgroundRTCPeerConnection()
             self.sdp_answered = False
 
-            # Hacks to implement our custom ffmpeg-based track and encoder
-            # to get around aiortc's dependency on native libraries and PyAV
-            track = self.track = FFmpegAudioStreamTrack(
-                ffmpeg_path=ffmpeg_path, ffmpeg_args=ffmpeg_params['inputArguments'],
-            )
-            await track.start()
-            encoder = FFmpegAudioStreamEncoder()
-            sender = pc.addTrack(track)
-            sender._RTCRtpSender__encoder = encoder
-            transceiver = pc.getTransceivers()[0]
-            opus = get_capabilities("audio").codecs[0]
-            transceiver.setCodecPreferences([opus])
+            pc.add_rtsp_audio(ffmpeg_params["url"])
 
             offer = await pc.createOffer()
             self.logger.info(f"Arlo offer sdp:\n{offer.sdp}")
@@ -206,13 +197,12 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
                     self.arlo_basestation, self.arlo_device,
                     session_id, candidate
                 )
-        except Exception as e:
-            self.logger.error(e)
+
+        self.create_task(async_setup())
 
     async def stopIntercom(self):
         self.logger.info("Stopping intercom")
         if self.pc:
-            await self.track.stop()
             await self.pc.close()
         self.pc = None
         self.sdp_answered = False
