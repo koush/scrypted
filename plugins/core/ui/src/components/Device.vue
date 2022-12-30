@@ -499,11 +499,13 @@ export default {
       pluginData.nativeId = device.nativeId;
       pluginData.storage = await plugins.getStorage(this.id);
       pluginData.pluginId = this.device.pluginId;
-      pluginData.packageJson = await plugins.getPackageJson(this.device.pluginId);
+      if (device.interfaces.includes(ScryptedInterface.ScryptedPlugin)) {
+        pluginData.packageJson = await this.device.getPluginJson();
+        checkUpdate(this.device.pluginId, pluginData.packageJson.version).then(
+          (result) => Object.assign(pluginData, result)
+        );
+      }
       this.pluginData = pluginData;
-      checkUpdate(this.device.pluginId, pluginData.packageJson.version).then(
-        (result) => Object.assign(pluginData, result)
-      );
 
       if (this.device.pluginId === "@scrypted/core") {
         const storage = await plugins.getStorage(device.id);
