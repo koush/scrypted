@@ -64,7 +64,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         }
         else {
             const mixin: object = nativeIdOrMixinDevice;
-            if (!await this.scrypted.devices[device._id]?.handler?.isMixin(id, mixin)) {
+            if (!await this.scrypted.devices[device._id]?.handler?.getMixinProviderId(id, mixin)) {
                 throw new Error(`${mixin} does not mixin ${eventInterface} for ${id}`);
             }
         }

@@ -62,8 +62,7 @@ export class EventRegistry {
             return false;
 
         const eventDetails: EventDetails = {
-            eventId: Math.random().toString(36),
-            changed,
+            eventId: undefined,
             eventInterface,
             eventTime,
             property,
@@ -73,17 +72,20 @@ export class EventRegistry {
         return this.notifyEventDetails(id, eventDetails, value);
     }
 
-    notifyEventDetails(id: string | undefined, eventDetails: EventDetails, value: any) {
+    notifyEventDetails(id: string | undefined, eventDetails: EventDetails, value: any, eventInterface?: string) {
+        eventDetails.eventId ||= Math.random().toString(36).substring(2);
+        eventInterface ||= eventDetails.eventInterface;
+
         // system listeners only get state changes.
         // there are many potentially noisy stateless events, like
         // object detection and settings changes.
-        if ((eventDetails.property && !eventDetails.mixinId) || allowedEventInterfaces.has(eventDetails.eventInterface)) {
+        if ((eventDetails.property && !eventDetails.mixinId) || allowedEventInterfaces.has(eventInterface)) {
             for (const event of this.systemListeners) {
                 event(id, eventDetails, value);
             }
         }
 
-        const events = this.listeners[`${id}#${eventDetails.eventInterface}`];
+        const events = this.listeners[`${id}#${eventInterface}`];
         if (events) {
             for (const event of events) {
                 event(eventDetails, value);

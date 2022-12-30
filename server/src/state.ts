@@ -55,9 +55,7 @@ export class ScryptedStateManager extends EventRegistry {
             });
         }
 
-        this.notify(pluginDevice?._id, Date.now(), eventInterface, undefined, value, {
-            changed: true,
-        });
+        this.notify(pluginDevice?._id, Date.now(), eventInterface, undefined, value);
     }
 
     async setPluginDeviceStateFromMixin(pluginDevice: PluginDevice, property: string, value: any, eventInterface: ScryptedInterface, mixinId: string) {
@@ -68,7 +66,13 @@ export class ScryptedStateManager extends EventRegistry {
                 mixinId,
             });
             this.scrypted.getDeviceLogger(pluginDevice).log('i', `${property}: ${value} (mixin)`);
-            this.notify(pluginDevice?._id, Date.now(), event, property, value, { changed: true, mixinId });
+            this.notifyEventDetails(pluginDevice._id, {
+                eventId: undefined,
+                eventInterface,
+                eventTime: Date.now(),
+                mixinId,
+                property,
+            }, value, event);
             return false;
         }
 
@@ -78,14 +82,12 @@ export class ScryptedStateManager extends EventRegistry {
     setPluginDeviceState(device: PluginDevice, property: string, value: any, eventInterface?: ScryptedInterface) {
         eventInterface = eventInterface || propertyInterfaces[property];
         if (!eventInterface)
-            throw new Error(`${property} is not a valid property`);
+            throw new Error(`eventInterface must be provided`);
 
         const changed = setState(device, property, value);
 
-        const eventTime = device?.state?.[property]?.lastEventTime;
-
         if (eventInterface !== ScryptedInterface.ScryptedDevice) {
-            if (this.notify(device?._id, eventTime, eventInterface, property, value, { changed: true }) && device) {
+            if (this.notify(device?._id, Date.now(), eventInterface, property, value, { changed }) && device) {
                 this.scrypted.getDeviceLogger(device).log('i', `${property}: ${value}`);
             }
         }
@@ -253,10 +255,7 @@ export function setState(pluginDevice: PluginDevice, property: string, value: an
     const state = pluginDevice.state[property];
     const now = Date.now();
     const changed = !isSameValue(value, state.value);
-    if (changed)
-        state.stateTime = now;
     state.value = value;
-    state.lastEventTime = now;
     return changed;
 }
 

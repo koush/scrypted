@@ -154,6 +154,9 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
 
         if (this.proxyOneWayMethods?.includes?.(method)) {
             rpcApply.oneway = true;
+            // a oneway callable object doesn't need to be in the JSON payload.
+            if (method === null)
+                delete rpcApply.method;
             this.peer.send(rpcApply, undefined, serializationContext);
             return Promise.resolve();
         }

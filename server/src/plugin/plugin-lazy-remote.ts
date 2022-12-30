@@ -44,7 +44,7 @@ import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
     }
     // TODO: deprecate/clean up this signature
     // 12/30/2022
-    async notify(idOrDetails: string | EventDetails, eventTimeOrData: number | SystemDeviceState | any, eventInterface?: string, property?: string, value?: SystemDeviceState | any, changed?: boolean) {
+    async notify(id: string, eventTimeOrDetails: number| EventDetails, eventInterfaceOrData: string | SystemDeviceState | any, property?: string, value?: SystemDeviceState | any, changed?: boolean) {
         try {
             if (!this.remote)
                 await this.remoteReadyPromise;
@@ -52,7 +52,7 @@ import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
         catch (e) {
             return;
         }
-        return this.remote.notify(idOrDetails as any, eventTimeOrData, eventInterface, property, value, changed);
+        return this.remote.notify(id, eventTimeOrDetails as any, eventInterfaceOrData, property, value, changed);
     }
     async ioEvent(id: string, event: string, message?: any): Promise<void> {
         if (!this.remote)

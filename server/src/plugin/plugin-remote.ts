@@ -175,8 +175,6 @@ class DeviceStateProxyHandler implements ProxyHandler<any> {
         checkProperty(p.toString(), value);
         const now = Date.now();
         this.deviceManager.systemManager.state[this.id][p as string] = {
-            lastEventTime: now,
-            stateTime: now,
             value,
         };
         this.setState(p.toString(), value);
@@ -420,11 +418,11 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
                 return;
             }
 
-            if (eventDetails.property) {
-                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, getSystemState()[id]?.[eventDetails.property], eventDetails.changed).catch(() => { });
+            if (eventDetails.property && !eventDetails.mixinId) {
+                remote.notify(id, eventDetails, getSystemState()[id]?.[eventDetails.property]).catch(() => { });
             }
             else {
-                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed).catch(() => { });
+                remote.notify(id, eventDetails, eventData).catch(() => { });
             }
         });
 
