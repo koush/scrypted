@@ -1,4 +1,4 @@
-import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointManager, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
+import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointManager, EventDetails, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { AccessControls } from './acl';
 import { BufferSerializer } from './buffer-serializer';
@@ -575,18 +575,40 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 }
             },
 
-            async notify(id: string, eventTime: number, eventInterface: string, property: string, value: SystemDeviceState | any, changed?: boolean) {
-                if (property) {
-                    const state = systemManager.state?.[id];
-                    if (!state) {
-                        log.w(`state not found for ${id}`);
-                        return;
+            async notify(id: string, eventTimeOrDetails: number| EventDetails, eventInterfaceOrData: string | SystemDeviceState | any, property?: string, value?: SystemDeviceState | any, changed?: boolean) {
+                if (typeof eventTimeOrDetails === 'number') {
+                    // TODO: remove legacy code path
+                    // 12/30/2022
+                    const eventTime = eventTimeOrDetails as number;
+                    const eventInterface = eventInterfaceOrData as string;
+                    if (property) {
+                        const state = systemManager.state?.[id];
+                        if (!state) {
+                            log.w(`state not found for ${id}`);
+                            return;
+                        }
+                        state[property] = value;
+                        systemManager.events.notify(id, eventTime, eventInterface, property, value.value, { changed });
                     }
-                    state[property] = value;
-                    systemManager.events.notify(id, eventTime, eventInterface, property, value.value, { changed });
+                    else {
+                        systemManager.events.notify(id, eventTime, eventInterface, property, value, { changed });
+                    }
                 }
                 else {
-                    systemManager.events.notify(id, eventTime, eventInterface, property, value, { changed });
+                    const eventDetails = eventTimeOrDetails as EventDetails;
+                    const eventData = eventInterfaceOrData as any;
+                    if (eventDetails.property && !eventDetails.mixinId) {
+                        const state = systemManager.state?.[id];
+                        if (!state) {
+                            log.w(`state not found for ${id}`);
+                            return;
+                        }
+                        state[eventDetails.property] = eventData;
+                        systemManager.events.notifyEventDetails(id, eventDetails, eventData.value);
+                    }
+                    else {
+                        systemManager.events.notifyEventDetails(id, eventDetails, eventData);
+                    }
                 }
             },
 

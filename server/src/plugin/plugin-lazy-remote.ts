@@ -1,4 +1,4 @@
-import { ScryptedNativeId, SystemDeviceState } from '@scrypted/types'
+import { EventDetails, ScryptedNativeId, SystemDeviceState } from '@scrypted/types'
 import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 
 /**
@@ -42,7 +42,9 @@ import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
         }
         return this.remote.updateDeviceState(id, state);
     }
-    async notify(id: string, eventTime: number, eventInterface: string, property: string, propertyState: SystemDeviceState, changed?: boolean): Promise<void> {
+    // TODO: deprecate/clean up this signature
+    // 12/30/2022
+    async notify(idOrDetails: string | EventDetails, eventTimeOrData: number | SystemDeviceState | any, eventInterface?: string, property?: string, value?: SystemDeviceState | any, changed?: boolean) {
         try {
             if (!this.remote)
                 await this.remoteReadyPromise;
@@ -50,7 +52,7 @@ import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
         catch (e) {
             return;
         }
-        return this.remote.notify(id, eventTime, eventInterface, property, propertyState, changed);
+        return this.remote.notify(idOrDetails as any, eventTimeOrData, eventInterface, property, value, changed);
     }
     async ioEvent(id: string, event: string, message?: any): Promise<void> {
         if (!this.remote)

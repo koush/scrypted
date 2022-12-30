@@ -171,7 +171,11 @@ export interface PluginRemote {
     setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState } }): Promise<void>;
     setNativeId(nativeId: ScryptedNativeId, id: string, storage: { [key: string]: any }): Promise<void>;
     updateDeviceState(id: string, state: { [property: string]: SystemDeviceState }): Promise<void>;
+    /**
+     * @deprecated
+     */
     notify(id: string, eventTime: number, eventInterface: string, property: string | undefined, value: SystemDeviceState | any, changed?: boolean): Promise<void>;
+    notify(id: string, eventDetails: EventDetails, eventData: SystemDeviceState | any): Promise<void>;
 
     ioEvent(id: string, event: string, message?: any): Promise<void>;
 
