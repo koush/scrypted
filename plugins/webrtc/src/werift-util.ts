@@ -44,8 +44,11 @@ export function getWeriftIceServers(configuration: RTCConfiguration): RTCIceServ
 
 export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection) {
     let isPrivate = true;
+    let destinationId: string;
     for (const ice of pc.iceTransports) {
-        const [address, port] = ice.connection.remoteAddr;
+        const [address, port] = (ice.connection as any).nominated[1].remoteAddr;
+        if (!destinationId)
+            destinationId = address;
         const { turnServer } = ice.connection;
         isPrivate = isPrivate && ip.isPrivate(address);
         console.log('ice transport ip', {
@@ -57,7 +60,6 @@ export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection
             console.warn('Turn server is in use. For optimal performance ensure that your router supports source NAT.');
     }
     console.log('Connection is local network:', isPrivate);
-    const destinationId = pc.iceTransports[0]?.connection?.remoteAddr?.[0];
     const ipv4 = ip.isV4Format(destinationId);
     return {
         ipv4,
