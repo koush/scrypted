@@ -59,7 +59,10 @@ export interface EventListenerOptions {
   /**
    * The EventListener will listen to events and property changes from a device or mixin that is suppressed by a mixin.
    */
-  mixinId?: string;
+  mixin?: {
+    id: string;
+    property?: string;
+  };
 }
 
 /**
