@@ -59,10 +59,7 @@ export interface EventListenerOptions {
   /**
    * The EventListener will listen to events and property changes from a device or mixin that is suppressed by a mixin.
    */
-  mixin?: {
-    id: string;
-    property?: string;
-  };
+  mixinId?: string;
 }
 
 /**
@@ -76,6 +73,7 @@ export interface EventDetails {
   eventInterface?: string;
   eventTime: number;
   property?: string;
+  mixinId?: string;
 }
 /**
  * Returned when an event listener is attached to an EventEmitter. Call removeListener to unregister from events.

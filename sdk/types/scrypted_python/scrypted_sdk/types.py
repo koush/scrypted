@@ -316,13 +316,14 @@ class EventDetails(TypedDict):
     eventId: str
     eventInterface: str
     eventTime: float
+    mixinId: str
     property: str
     pass
 
 class EventListenerOptions(TypedDict):
     denoise: bool
     event: str
-    mixin: Any
+    mixinId: str
     watch: bool
     pass
 
