@@ -69,7 +69,6 @@ export type EventListener = (eventSource: ScryptedDevice | undefined, eventDetai
 
 export interface EventDetails {
   eventId: string;
-  changed?: boolean;
   eventInterface?: string;
   eventTime: number;
   property?: string;
@@ -1619,15 +1618,8 @@ export interface PushHandler {
   onPush(request: HttpRequest): Promise<void>;
 
 }
+// the value is wrapped to add additional properties later for backwards compat or whatever.
 export interface SystemDeviceState {
-  /**
-   * The last time the state was updated, even if it did not change.
-   */
-  lastEventTime?: number;
-  /**
-   * The last time the state changed.
-   */
-  stateTime?: number;
   value?: any;
 }
 export interface MediaStatus {

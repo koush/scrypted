@@ -312,7 +312,6 @@ class DeviceManifest(TypedDict):
     pass
 
 class EventDetails(TypedDict):
-    changed: bool
     eventId: str
     eventInterface: str
     eventTime: float
