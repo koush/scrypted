@@ -394,7 +394,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         let accessControls: AccessControls;
         if (username) {
             const user = await this.datastore.tryGet(ScryptedUser, username);
-            if (user.aclId) {
+            if (user?.aclId) {
                 const accessControl = this.getDevice<SU>(user.aclId);
                 try {
                     const acls = await accessControl.getScryptedUserAccessControl();
