@@ -91,6 +91,8 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         this.ensurePackageCamera();
         return this.packageCamera;
     }
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+    }
 
     async startIntercom(media: MediaObject) {
         this.stopIntercom();
