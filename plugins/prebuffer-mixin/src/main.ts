@@ -1241,6 +1241,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     closeQuiet(this.rtspServer);
 
     this.rtspServer = new net.Server(async (client) => {
+      this.console.log('external rtsp client', client.localAddress, client.localPort);
+
       let prebufferSession: PrebufferSession;
 
       const server = new RtspServer(client, undefined, false, async (method, url, headers, rawMessage) => {
