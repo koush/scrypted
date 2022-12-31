@@ -266,15 +266,15 @@ export default {
     },
     save() {
       for (const { value } of this.settings) {
-        if (value.key === '__name') {
+        if (value.key === '__name' && value.value !== value.originalValue) {
           this.device.setName(value.value);
           continue;
         }
-        if (value.key === '__type') {
+        if (value.key === '__type' && value.value !== value.originalValue) {
           this.device.setType(value.value);
           continue;
         }
-        if (value.key === '__room') {
+        if (value.key === '__room' && value.value !== value.originalValue) {
           this.device.setRoom(value.value);
           continue;
         }
