@@ -56,7 +56,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
             // allow mixins in the process of being released to manage final
             // events, etc, before teardown.
             this.releasing.add(proxy);
-            mixinProvider?.releaseMixin(this.id, proxy);
+            mixinProvider?.releaseMixin(this.id, proxy).catch(() => { });
             await sleep(1000);
             this.releasing.delete(proxy);
         })().catch(() => { });

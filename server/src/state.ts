@@ -2,7 +2,7 @@ import { EventDetails, EventListenerOptions, EventListenerRegister, Refresh, Scr
 import throttle from 'lodash/throttle';
 import { PluginDevice } from "./db-types";
 import { EventListenerRegisterImpl, EventRegistry, getMixinEventName } from "./event-registry";
-import { allInterfaceProperties, propertyInterfaces } from "./plugin/descriptor";
+import { propertyInterfaces } from "./plugin/descriptor";
 import { QueryInterfaceSymbol, RefreshSymbol } from "./plugin/plugin-device";
 import { ScryptedRuntime } from "./runtime";
 import { sleep } from "./sleep";
@@ -47,12 +47,25 @@ export class ScryptedStateManager extends EventRegistry {
     }
 
     async notifyInterfaceEventFromMixin(pluginDevice: PluginDevice, eventInterface: ScryptedInterface | string, value: any, mixinId: string) {
-        const implementerId = await this.getImplementerId(pluginDevice, eventInterface);
-        if (implementerId !== mixinId) {
-            eventInterface = getMixinEventName({
-                event: eventInterface,
-                mixinId,
-            });
+        // TODO: figure out how to clean this up this hack. For now,
+        // Settings interface is allowed to bubble from mixin devices..
+        if (eventInterface !== ScryptedInterface.Settings) {
+            const implementerId = await this.getImplementerId(pluginDevice, eventInterface);
+            if (implementerId !== mixinId) {
+                const event = getMixinEventName({
+                    event: eventInterface,
+                    mixinId,
+                });
+
+                this.notifyEventDetails(pluginDevice._id, {
+                    eventId: undefined,
+                    eventInterface,
+                    eventTime: Date.now(),
+                    mixinId,
+                }, value, event);
+
+                return;
+            }
         }
 
         this.notify(pluginDevice?._id, Date.now(), eventInterface, undefined, value);
@@ -253,7 +266,6 @@ export function setState(pluginDevice: PluginDevice, property: string, value: an
     if (!pluginDevice.state[property])
         pluginDevice.state[property] = {};
     const state = pluginDevice.state[property];
-    const now = Date.now();
     const changed = !isSameValue(value, state.value);
     state.value = value;
     return changed;

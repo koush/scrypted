@@ -61,14 +61,20 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
             const { interfaces } = await tableEntry.entry;
             if (!interfaces.has(eventInterface))
                 throw new Error(`${mixinProvider._id} does not mixin ${eventInterface} for ${id}`);
+
+            this.scrypted.stateManager.notifyInterfaceEvent(device, eventInterface, eventData);
         }
         else {
             const mixin: object = nativeIdOrMixinDevice;
-            if (!await this.scrypted.devices[device._id]?.handler?.getMixinProviderId(id, mixin)) {
+            let mixinProviderId = await this.scrypted.devices[device._id]?.handler?.getMixinProviderId(id, mixin);
+            if (!mixinProviderId)
                 throw new Error(`${mixin} does not mixin ${eventInterface} for ${id}`);
-            }
+
+            if (mixinProviderId === true)
+                mixinProviderId = undefined;
+            // this.scrypted.stateManager.notifyInterfaceEvent(device, eventInterface, eventData);
+            this.scrypted.stateManager.notifyInterfaceEventFromMixin(device, eventInterface, eventData, mixinProviderId as string);
         }
-        this.scrypted.stateManager.notifyInterfaceEvent(device, eventInterface, eventData);
     }
 
     async getMediaManager(): Promise<MediaManager> {
@@ -140,7 +146,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
 
     async onDeviceEvent(nativeId: any, eventInterface: any, eventData?: any) {
         const plugin = this.scrypted.findPluginDevice(this.pluginId, nativeId);
-        this.scrypted.stateManager.notifyInterfaceEvent(plugin, eventInterface, eventData);
+        this.scrypted.stateManager.notifyInterfaceEventFromMixin(plugin, eventInterface, eventData, plugin._id);
     }
 
     async getDeviceById<T>(id: string): Promise<T & ScryptedDevice> {

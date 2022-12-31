@@ -223,16 +223,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         await this.startVideoDetection();
     });
 
-    // this.motionMixinListeners = (this.mixins || [])
-    // .map(id => {
-    //   return this.cameraDevice.listen({
-    //     event: ScryptedInterface.MotionSensor,
-    //     mixinId: id,
-    //   }, (source, details, data) => {
-    //     this.console.log('mixiner')
-    //     details.property
-    //   })
-    // })
+    this.motionMixinListeners = [...(this.mixins || []), this.id]
+    .map(id => {
+      return this.cameraDevice.listen({
+        event: ScryptedInterface.MotionSensor,
+        mixinId: id,
+      }, (source, details, data) => {
+        this.console.log('received suppressed motion event.');
+      });
+    });
   }
 
   async handleDetectionEvent(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject) {
@@ -908,6 +907,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.clearDetectionTimeout();
     this.clearMotionTimeout();
     this.motionListener?.removeListener();
+    this.motionMixinListeners?.forEach(l => l.removeListener());
+    this.motionMixinListeners = undefined;
     this.detectorListener?.removeListener();
     this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
