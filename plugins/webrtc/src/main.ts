@@ -125,7 +125,9 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
         const device = systemManager.getDeviceById<VideoCamera & Intercom>(this.id);
         const hasIntercom = this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom);
 
-        const mo = await sdk.mediaManager.createMediaObject(device, ScryptedMimeTypes.ScryptedDevice);
+        const mo = await sdk.mediaManager.createMediaObject(device, ScryptedMimeTypes.ScryptedDevice, {
+            sourceId: device.id,
+        });
 
         return createRTCPeerConnectionSink(
             session,
