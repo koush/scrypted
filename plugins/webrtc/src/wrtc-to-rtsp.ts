@@ -1,5 +1,6 @@
-import { BundlePolicy, RTCIceCandidate, RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
-import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
+import { BundlePolicy, RTCIceCandidate, RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket } from "./werift";
+// import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
+import { FullIntraRequest } from "../../../external/werift/packages/rtp/src/rtcp/psfb/fullIntraRequest";
 import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { getNaluTypesInNalu, RtspServer } from "@scrypted/common/src/rtsp-server";
@@ -86,63 +87,82 @@ export async function createRTCPeerConnectionSource(options: {
             pc.connectionStateChange.subscribe(() => {
                 console.log('connectionState', pc.connectionState);
             });
-            audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
-            audioTransceiver.mid = '0';
-            audioTransceiver.onTrack.subscribe((track) => {
-                track.onReceiveRtp.subscribe(rtp => {
-                    if (!gotAudio) {
-                        gotAudio = true;
-                        console.log('first audio packet', Date.now() - timeStart);
+
+            const setupAudioTranscevier = (transciever: RTCRtpTransceiver) => {
+                audioTransceiver = transciever;
+                audioTransceiver.setDirection('sendrecv');
+                audioTransceiver.mid = '0';
+                audioTransceiver.onTrack.subscribe((track) => {
+                    track.onReceiveRtp.subscribe(rtp => {
+                        if (!gotAudio) {
+                            gotAudio = true;
+                            console.log('first audio packet', Date.now() - timeStart);
+                        }
+                        rtspServer.sendTrack(audioTrack, rtp.serialize(), false);
+                    });
+                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(audioTrack, rtp.serialize(), true));
+                });
+            };
+
+            const setupVideoTransceiver = (transceiver: RTCRtpTransceiver) => {
+                const videoTransceiver = transceiver;
+                videoTransceiver.mid = '1';
+                videoTransceiver.onTrack.subscribe((track) => {
+                    console.log('received video track');
+                    track.onReceiveRtp.subscribe(rtp => {
+                        if (!gotVideo) {
+                            gotVideo = true;
+                            console.log('first video packet', Date.now() - timeStart);
+                            const naluTypes = getNaluTypesInNalu(rtp.payload);
+                            console.log('video packet types', ...[...naluTypes]);
+                        }
+                        rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
+                    });
+                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
+
+                    track.onReceiveRtp.once(() => {
+                        let firSequenceNumber = 0;
+                        const pictureLossInterval = setInterval(() => {
+                            // i think this is necessary for older clients like ring
+                            // which is really a sip gateway?
+                            const fir = new FullIntraRequest({
+                                senderSsrc: videoTransceiver.receiver.rtcpSsrc,
+                                mediaSsrc: track.ssrc,
+                                fir: [
+                                    {
+                                        sequenceNumber: firSequenceNumber++,
+                                        ssrc: track.ssrc,
+                                    }
+                                ]
+                            });
+                            const packet = new RtcpPayloadSpecificFeedback({
+                                feedback: fir,
+                            });
+                            videoTransceiver.receiver.dtlsTransport.sendRtcp([packet]);
+
+                            // from my testing with browser clients, the pli is what
+                            // triggers a i-frame to be sent, and not the prior FIR request.
+                            videoTransceiver.receiver.sendRtcpPLI(track.ssrc!);
+                        }, 4000);
+                        waitClosed(pc).then(() => clearInterval(pictureLossInterval));
+                    });
+                });
+            };
+
+            if (setup.type === 'answer') {
+                pc.onTransceiverAdded.subscribe(transceiver => {
+                    if (transceiver.kind === 'audio') {
+                        setupAudioTranscevier(transceiver);
                     }
-                    rtspServer.sendTrack(audioTrack, rtp.serialize(), false);
-                });
-                track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(audioTrack, rtp.serialize(), true));
-            });
-
-            const videoTransceiver = pc.addTransceiver("video", setup.video as any);
-            videoTransceiver.mid = '1';
-            videoTransceiver.onTrack.subscribe((track) => {
-                console.log('received video track');
-                track.onReceiveRtp.subscribe(rtp => {
-                    if (!gotVideo) {
-                        gotVideo = true;
-                        console.log('first video packet', Date.now() - timeStart);
-                        const naluTypes = getNaluTypesInNalu(rtp.payload);
-                        console.log('video packet types', ...[...naluTypes]);
+                    else if (transceiver.kind === 'video') {
+                        setupVideoTransceiver(transceiver);
                     }
-                    rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
                 });
-                track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
+                return;
+            }
 
-                track.onReceiveRtp.once(() => {
-                    let firSequenceNumber = 0;
-                    const pictureLossInterval = setInterval(() => {
-                        // i think this is necessary for older clients like ring
-                        // which is really a sip gateway?
-                        const fir = new FullIntraRequest({
-                            senderSsrc: videoTransceiver.receiver.rtcpSsrc,
-                            mediaSsrc: track.ssrc,
-                            fir: [
-                                {
-                                    sequenceNumber: firSequenceNumber++,
-                                    ssrc: track.ssrc,
-                                }
-                            ]
-                        });
-                        const packet = new RtcpPayloadSpecificFeedback({
-                            feedback: fir,
-                        });
-                        videoTransceiver.receiver.dtlsTransport.sendRtcp([packet]);
-
-                        // from my testing with browser clients, the pli is what
-                        // triggers a i-frame to be sent, and not the prior FIR request.
-                        videoTransceiver.receiver.sendRtcpPLI(track.ssrc!);
-                    }, 4000);
-                    waitClosed(pc).then(() => clearInterval(pictureLossInterval));
-                });
-            });
-
-            console.log('peer connection setup complete');
+            setupAudioTranscevier(pc.addTransceiver("audio", setup.audio as any));
+            setupVideoTransceiver(pc.addTransceiver("video", setup.video as any));
         }
 
         const handleRtspSetup = async (description: RTCSessionDescriptionInit) => {

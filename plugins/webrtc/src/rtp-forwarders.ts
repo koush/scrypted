@@ -1,4 +1,4 @@
-import { RtpPacket } from "@koush/werift";
+import { RtpPacket } from "./werift";
 import { Deferred } from "@scrypted/common/src/deferred";
 import { closeQuiet, createBindZero, listenZeroSingleClient, reserveUdpPort } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";

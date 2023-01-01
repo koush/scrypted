@@ -1,4 +1,4 @@
-import { RTCRtpTransceiver } from "@koush/werift";
+import { RTCRtpTransceiver } from "./werift";
 import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";

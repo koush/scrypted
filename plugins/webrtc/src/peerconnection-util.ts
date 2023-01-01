@@ -1,4 +1,4 @@
-import { RTCPeerConnection } from "@koush/werift";
+import { RTCPeerConnection } from "./werift";
 
 interface Event {
     subscribe: (execute: () => void) => {

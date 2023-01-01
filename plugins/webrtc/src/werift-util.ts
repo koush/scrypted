@@ -1,4 +1,4 @@
-import { RTCIceServer, RTCPeerConnection, RTCSessionDescription } from "@koush/werift";
+import { RTCIceServer, RTCPeerConnection, RTCSessionDescription } from "./werift";
 import ip from 'ip';
 
 export function createRawResponse(response: RTCSessionDescription): RTCSessionDescriptionInit {

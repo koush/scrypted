@@ -1,4 +1,4 @@
-import { RTCIceCandidate, RTCPeerConnection } from "@koush/werift";
+import { RTCIceCandidate, RTCPeerConnection } from "./werift";
 import { RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession } from '@scrypted/sdk';
 import { createRawResponse } from "./werift-util";
 

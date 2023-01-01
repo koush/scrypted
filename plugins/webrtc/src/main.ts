@@ -1,4 +1,4 @@
-import { defaultPeerConfig, MediaStreamTrack, PeerConfig, RTCPeerConnection } from '@koush/werift';
+import { defaultPeerConfig, MediaStreamTrack, PeerConfig, RTCPeerConnection } from './werift';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';

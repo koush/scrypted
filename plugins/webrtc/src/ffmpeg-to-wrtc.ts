@@ -1,4 +1,4 @@
-import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RtcpRrPacket, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
+import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RtcpRrPacket, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "./werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";

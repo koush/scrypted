@@ -1,4 +1,4 @@
-import { RTCRtpCodecParameters } from "@koush/werift";
+import { RTCRtpCodecParameters } from "./werift";
 import sdk from "@scrypted/sdk";
 
 const { mediaManager } = sdk;
