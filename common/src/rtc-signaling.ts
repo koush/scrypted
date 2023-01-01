@@ -139,6 +139,11 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         if (setup.audio) {
             const audio = pc.addTransceiver('audio', setup.audio);
             if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
+                // offering a sendrecv on safari requires a mic be attached, or it fails to connect,
+                // even if a silent track is used...
+                if (setup.type === 'offer' && navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome'))
+                    await navigator.mediaDevices.getUserMedia({ audio: true })
+
                 this.microphone = audio.sender;
             }
         }
@@ -146,7 +151,6 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         if (setup.video) {
             if (setup.video.direction === 'sendrecv' || setup.video.direction === 'sendonly') {
                 try {
-                    // doing sendrecv on safari requires a mic be attached, or it fails to connect.
                     const camera = await navigator.mediaDevices.getUserMedia({ video: true })
                     for (const track of camera.getTracks()) {
                         pc.addTrack(track);
