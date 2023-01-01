@@ -502,12 +502,8 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
             };
             const answerSetup: RTCAVSignalingSetup = {
                 type: 'answer',
-                audio: {
-                    direction: 'sendrecv',
-                },
-                video: {
-                    direction: 'recvonly',
-                },
+                audio: undefined,
+                video: undefined,
                 configuration,
             };
 
@@ -565,6 +561,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
 
     async getDevice(nativeId: string) {
         return new RingCameraLight(this);
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
@@ -713,6 +712,9 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
             this.devices.set(nativeId, location);
         }
         return this.devices.get(nativeId);
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 }
 
@@ -999,6 +1001,9 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             this.devices.set(nativeId, location);
         }
         return this.devices.get(nativeId);
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 }
 
