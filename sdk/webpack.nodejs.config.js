@@ -78,10 +78,23 @@ module.exports = {
             //     test: /\.(js)x?$/,
             //     loader: 'babel-loader',
             // },
-            {
-                test: /\.([cm]?ts|tsx)$/,
-                loader: "ts-loader",
-            }
+            process.env.SCRYPTED_WEBPACK_BABEL ?
+                {
+                    test: /\.(ts|js)x?$/,
+                    exclude: /(core-js)/,
+                    use: {
+                        loader: 'babel-loader',
+                        options: {
+                            "presets": [
+                                "@babel/preset-typescript",
+                            ]
+                        }
+                    }
+                } :
+                {
+                    test: /\.([cm]?ts|tsx)$/,
+                    loader: "ts-loader",
+                }
         ],
     },
 

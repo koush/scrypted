@@ -102,6 +102,10 @@ else {
     const packageJson = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json').toString()));
     const optionalDependencies = Object.keys(packageJson.optionalDependencies || {});
 
+    if (packageJson.scrypted.babel) {
+        process.env.SCRYPTED_WEBPACK_BABEL = 'true';
+    }
+
     const runtimes = [
         // {
         //     config: 'webpack.duktape.config.js',
