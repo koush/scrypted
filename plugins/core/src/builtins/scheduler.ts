@@ -86,8 +86,8 @@ export class Scheduler {
                     reschedule();
 
                     callback(ret, {
+                        eventId: undefined,
                         eventInterface: 'Scheduler',
-                        changed: true,
                         eventTime: Date.now(),
                     }, when)
                 }, delay);
