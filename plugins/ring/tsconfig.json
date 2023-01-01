@@ -1,8 +1,9 @@
 {
     "compilerOptions": {
+        "module": "commonjs",
+        "target": "ES2021",
         "resolveJsonModule": true,
         "moduleResolution": "Node16",
-        "target": "esnext",
         "esModuleInterop": true,
     },
     "include": [

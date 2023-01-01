@@ -25,6 +25,7 @@
          "DeviceProvider",
          "Settings"
       ],
+      "babel": true,
       "pluginDependencies": [
          "@scrypted/prebuffer-mixin",
          "@scrypted/snapshot",
@@ -36,11 +37,12 @@
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "@types/node": "^16.6.1",
-      "axios": "^0.24.0"
+      "axios": "^0.24.0",
+      "rxjs": "^7.5.5"
    },
    "optionalDependencies": {
       "got": "11.8.2",
       "socket.io-client": "^2.4.0"
    },
-   "version": "0.0.88"
+   "version": "0.0.90"
 }
