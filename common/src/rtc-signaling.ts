@@ -1,4 +1,4 @@
-import type { RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession } from "@scrypted/sdk/types";
+import type { RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession } from "../../sdk/types/src/types.input";
 import { Deferred } from "./deferred";
 
 function getUserAgent() {
