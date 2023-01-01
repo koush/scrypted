@@ -74,19 +74,15 @@ module.exports = {
     },
     module: {
         rules: [
+            // {
+            //     test: /\.(js)x?$/,
+            //     loader: 'babel-loader',
+            // },
             {
-                test: /\.(ts|js)x?$/,
-                exclude: /(core-js)/,
-                use: {
-                    loader: 'babel-loader',
-                    options: {
-                        "presets": [
-                            "@babel/preset-typescript",
-                        ]
-                    }
-                }
-            },
-        ]
+                test: /\.([cm]?ts|tsx)$/,
+                loader: "ts-loader",
+            }
+        ],
     },
 
     node: {
