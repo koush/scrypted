@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } from './denoise';
+import { serverSupportsMixinEventMasking } from './server-version';
 import { safeParseJson } from './util';
 
 const polygonOverlap = require('polygon-overlap');
@@ -626,7 +627,18 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   get motionSensorSupplementation() {
-    return this.storage.getItem('motionSensorSupplementation') === BUILTIN_MOTION_SENSOR_REPLACE ? BUILTIN_MOTION_SENSOR_REPLACE : BUILTIN_MOTION_SENSOR_ASSIST;
+    if (!serverSupportsMixinEventMasking())
+      return BUILTIN_MOTION_SENSOR_REPLACE;
+
+    const supp = this.storage.getItem('motionSensorSupplementation');
+    switch (supp) {
+      case BUILTIN_MOTION_SENSOR_REPLACE:
+        return BUILTIN_MOTION_SENSOR_REPLACE;
+      case BUILTIN_MOTION_SENSOR_ASSIST:
+        return BUILTIN_MOTION_SENSOR_ASSIST;
+
+    }
+    return BUILTIN_MOTION_SENSOR_ASSIST;
   }
 
   async getMixinSettings(): Promise<Setting[]> {
