@@ -19,8 +19,7 @@
       "scrypted-debug": "scrypted-debug",
       "scrypted-deploy": "scrypted-deploy",
       "scrypted-readme": "scrypted-readme",
-      "scrypted-package-json": "scrypted-package-json",
-      "scrypted-webpack": "scrypted-webpack"
+      "scrypted-package-json": "scrypted-package-json"
    },
    "scrypted": {
       "name": "Arlo Camera Plugin",
