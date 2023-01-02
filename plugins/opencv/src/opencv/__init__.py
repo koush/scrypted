@@ -23,9 +23,9 @@ class OpenCVDetectionSession(DetectionSession):
 
 
 defaultThreshold = 25
-defaultArea = 2000
+defaultArea = 200
 defaultInterval = 250
-
+defaultBlur = 5
 
 class OpenCVPlugin(DetectPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -68,6 +68,14 @@ class OpenCVPlugin(DetectPlugin):
                 'type': 'number',
             },
             {
+                'title': "Blur Radius",
+                'description': "The radius of the blur applied to denoise small amounts of motion.",
+                'value': defaultBlur,
+                'key': 'blur',
+                'placeholder': defaultBlur,
+                'type': 'number',
+            },
+            {
                 'title': "Frame Analysis Interval",
                 'description': "The number of milliseconds to wait between motion analysis.",
                 'value': defaultInterval,
@@ -99,14 +107,16 @@ class OpenCVPlugin(DetectPlugin):
         area = defaultArea
         threshold = defaultThreshold
         interval = defaultInterval
+        blur = defaultBlur
         if settings:
             area = float(settings.get('area', area))
             threshold = int(settings.get('threshold', threshold))
             interval = float(settings.get('interval', interval))
-        return area, threshold, interval
+            blur = int(settings.get('blur', blur))
+        return area, threshold, interval, blur
 
     def detect(self, detection_session: OpenCVDetectionSession, frame, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
-        area, threshold, interval = self.parse_settings(settings)
+        area, threshold, interval, blur = self.parse_settings(settings)
 
         # see get_detection_input_size on undocumented size requirements for GRAY8
         if self.color2Gray != None:
@@ -116,7 +126,7 @@ class OpenCVPlugin(DetectPlugin):
         else:
             gray = frame
         detection_session.curFrame = cv2.GaussianBlur(
-            gray, (21, 21), 0, dst=detection_session.curFrame)
+            gray, (blur, blur), 0, dst=detection_session.curFrame)
 
         if detection_session.previous_frame is None:
             detection_session.previous_frame = detection_session.curFrame
@@ -230,7 +240,7 @@ class OpenCVPlugin(DetectPlugin):
         return OpenCVDetectionSession()
 
     def detection_sleep(self, settings: Any):
-        area, threshold, interval = self.parse_settings(settings)
+        area, threshold, interval, blur = self.parse_settings(settings)
         # it is safe to block here because gstreamer creates a queue thread
         sleep(interval / 1000)
 
