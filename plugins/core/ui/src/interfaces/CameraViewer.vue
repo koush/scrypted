@@ -1,37 +1,7 @@
 <template>
-  <div
-    style="position: relative; overflow: hidden; width: 100%; height: 100%; display: flex;"
-    @wheel="doTimeScroll"
-  >
-    <video
-      ref="video"
-      style="
-        background-color: black;
-        width: 100%;
-        height: 100%;
-        z-index: 0;
-        -webkit-transform-style: preserve-3d;
-      "
-      playsinline
-      autoplay
-    ></video>
-
-    <svg
-      :viewBox="`0 0 ${svgWidth} ${svgHeight}`"
-      ref="svg"
-      style="
-        top: 0;
-        left: 0;
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        z-index: 1;
-      "
-      v-html="svgContents"
-    ></svg>
-    <ClipPathEditor
-      v-if="clipPath"
-      style="
+  <div style="background: black; position: relative; overflow: hidden; width: 100%; height: 100%; display: flex;"
+    @wheel="doTimeScroll">
+    <ClipPathEditor v-if="clipPath" style="
         background: transparent;
         top: 0;
         left: 0;
@@ -39,83 +9,56 @@
         width: 100%;
         height: 100%;
         z-index: 2;
-      "
-      v-model="clipPath"
-    ></ClipPathEditor>
-    <v-btn
-      v-if="$isMobile()"
-      @click="$emit('exitFullscreen')"
-      small
-      icon
-      color="white"
-      style="position: absolute; top: 10px; right: 10px; z-index: 3"
-    >
-      <v-icon small>fa fa-times</v-icon></v-btn
-    >
+      " v-model="clipPath"></ClipPathEditor>
 
-    <div style="position: absolute; bottom: 10px; right: 10px; z-index: 3">
-      <v-dialog width="unset" v-model="dateDialog" v-if="showNvr">
-        <template v-slot:activator="{ on }">
-          <v-btn
-            :dark="!isLive"
-            v-on="on"
-            small
-            :color="isLive ? 'white' : 'blue'"
-            :outlined="isLive"
-          >
-            <v-icon small color="white" :outlined="isLive"
-              >fa fa-calendar-alt</v-icon
-            >&nbsp;{{ monthDay }}</v-btn
-          >
-        </template>
-        <v-date-picker @input="datePicked"></v-date-picker>
-      </v-dialog>
 
-      <v-btn
-        v-if="showNvr"
-        :dark="!isLive"
-        small
-        :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
-        :outlined="isLive"
-        @click="streamRecorder(Date.now() - 2 * 60 * 1000)"
-      >
-        <v-btn
-          v-if="!isLive && adjustingTime"
-          small
-          :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
-          :outlined="isLive"
-        >
-          {{ time }}</v-btn
-        >
-        <v-icon v-else small color="white" :outlined="isLive"
-          >fa fa-video</v-icon
-        ></v-btn
-      >
+    <div style="position: relative; width: 100%; height: 100%;" :class="clipPath ? 'clip-path' : undefined">
+      <video ref="video" style="
+        background-color: black;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        -webkit-transform-style: preserve-3d;
+      " playsinline autoplay ></video>
 
-      <v-btn
-        small
-        v-if="isLive && hasIntercom"
-        @click="toggleMute"
-        color="white"
-        outlined
-      >
-        <v-icon v-if="muted" small color="white" :outlined="isLive"
-          >fa fa-microphone-slash
-        </v-icon>
-        <v-icon v-else small color="white" :outlined="isLive"
-          >fa fa-microphone
-        </v-icon>
-      </v-btn>
+      <svg :viewBox="`0 0 ${svgWidth} ${svgHeight}`" ref="svg" style="
+        top: 0;
+        left: 0;
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      " v-html="svgContents"></svg>
 
-      <v-btn
-        v-if="showNvr"
-        :dark="!isLive"
-        small
-        color="red"
-        :outlined="!isLive"
-        @click="streamCamera"
-        >Live</v-btn
-      >
+      <v-btn v-if="$isMobile()" @click="$emit('exitFullscreen')" small icon color="white"
+        style="position: absolute; top: 10px; right: 10px; z-index: 3">
+        <v-icon small>fa fa-times</v-icon></v-btn>
+
+      <div style="position: absolute; bottom: 10px; right: 10px; z-index: 3">
+        <v-dialog width="unset" v-model="dateDialog" v-if="showNvr">
+          <template v-slot:activator="{ on }">
+            <v-btn :dark="!isLive" v-on="on" small :color="isLive ? 'white' : 'blue'" :outlined="isLive">
+              <v-icon small color="white" :outlined="isLive">fa fa-calendar-alt</v-icon>&nbsp;{{ monthDay }}</v-btn>
+          </template>
+          <v-date-picker @input="datePicked"></v-date-picker>
+        </v-dialog>
+
+        <v-btn v-if="showNvr" :dark="!isLive" small :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
+          :outlined="isLive" @click="streamRecorder(Date.now() - 2 * 60 * 1000)">
+          <v-btn v-if="!isLive && adjustingTime" small :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
+            :outlined="isLive">
+            {{ time }}</v-btn>
+          <v-icon v-else small color="white" :outlined="isLive">fa fa-video</v-icon></v-btn>
+
+        <v-btn small v-if="isLive && hasIntercom" @click="toggleMute" color="white" outlined>
+          <v-icon v-if="muted" small color="white" :outlined="isLive">fa fa-microphone-slash
+          </v-icon>
+          <v-icon v-else small color="white" :outlined="isLive">fa fa-microphone
+          </v-icon>
+        </v-btn>
+
+        <v-btn v-if="showNvr" :dark="!isLive" small color="red" :outlined="!isLive" @click="streamCamera">Live</v-btn>
+      </div>
     </div>
   </div>
 </template>
@@ -133,6 +76,14 @@ export default {
   },
   props: ["clipPathValue", "device"],
   data() {
+    const clipPath = this.clipPathValue ? cloneDeep(this.clipPathValue) : undefined;
+    if (clipPath) {
+      for (const point of clipPath) {
+        point[0] = point[0] * .8 + 10;
+        point[1] = point[1] * .8 + 10;
+      }
+    }
+
     return {
       dateDialog: false,
       adjustingTime: null,
@@ -147,7 +98,7 @@ export default {
       muted: true,
       sessionControl: undefined,
       control: undefined,
-      clipPath: this.clipPathValue ? cloneDeep(this.clipPathValue) : undefined,
+      clipPath,
     };
   },
   computed: {
@@ -201,9 +152,8 @@ export default {
         const t = detection.className;
         const fs = 20;
         const box = `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="${sw}" fill="none" />
-        <text x="${x}" y="${
-          y - 5
-        }" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
+        <text x="${x}" y="${y - 5
+          }" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
         <text x="${x}" y="${y - 5}" font-size="${fs}" fill="white">${t}</text>`;
         contents += box;
       }
@@ -279,8 +229,18 @@ export default {
   },
   watch: {
     clipPath() {
-      this.$emit("clipPath", cloneDeep(this.clipPath));
+      const clipPath = cloneDeep(this.clipPath);
+      for (const point of clipPath) {
+        point[0] = (point[0] - 10) / .8;
+        point[1] = (point[1] - 10) / .8;
+      }
+      this.$emit("clipPath", clipPath);
     },
   },
 };
 </script>
+<style scoped>
+.clip-path {
+  transform: scale(.8)
+}
+</style>
