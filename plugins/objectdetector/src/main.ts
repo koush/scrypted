@@ -293,6 +293,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         }));
       detection.detections = secondPassDetections;
     }
+    else {
+      detection.detections = zonedDetections;
+    }
 
     if (newOrBetterDetection)
       this.setDetection(detection, mediaObject);

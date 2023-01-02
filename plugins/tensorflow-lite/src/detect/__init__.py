@@ -311,7 +311,9 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             else:
                 raise Exception('unknown container %s' % container)
         elif videosrc.startswith('rtsp'):
-            videosrc = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0 is-live=false ! rtph264depay ! h264parse' % videosrc
+            videosrc = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0 is-live=false' % videosrc
+
+        videosrc += ' ! parsebin'
 
         decoder = settings and settings.get('decoder', 'decodebin')
         decoder = decoder or 'Default'
