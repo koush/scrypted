@@ -1973,6 +1973,8 @@ export interface ScryptedStatic {
   mediaManager: MediaManager,
   systemManager: SystemManager,
 
+  version?: string;
+
   pluginHostAPI: any;
   pluginRemoteAPI: any;
 

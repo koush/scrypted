@@ -49,6 +49,10 @@ export class ScryptedStateManager extends EventRegistry {
     async notifyInterfaceEventFromMixin(pluginDevice: PluginDevice, eventInterface: ScryptedInterface | string, value: any, mixinId: string) {
         // TODO: figure out how to clean this up this hack. For now,
         // Settings interface is allowed to bubble from mixin devices..
+
+        // TODO: mixin masking of property-less events is disabled due to ObjectDetector.
+        // Running opencv and tensorflow-lite masks one or the other object events.
+        // Need to think this through more.
         if (eventInterface !== ScryptedInterface.Settings) {
             const implementerId = await this.getImplementerId(pluginDevice, eventInterface);
             if (implementerId !== mixinId) {
