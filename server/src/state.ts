@@ -53,7 +53,7 @@ export class ScryptedStateManager extends EventRegistry {
         // TODO: mixin masking of property-less events is disabled due to ObjectDetector.
         // Running opencv and tensorflow-lite masks one or the other object events.
         // Need to think this through more.
-        if (eventInterface !== ScryptedInterface.Settings) {
+        if (false && eventInterface !== ScryptedInterface.Settings) {
             const implementerId = await this.getImplementerId(pluginDevice, eventInterface);
             if (implementerId !== mixinId) {
                 const event = getMixinEventName({
