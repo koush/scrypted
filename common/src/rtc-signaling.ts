@@ -137,13 +137,22 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         }
 
         if (setup.audio) {
-            const audio = pc.addTransceiver('audio', setup.audio);
-            if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
-                // offering a sendrecv on safari requires a mic be attached, or it fails to connect,
+            let audio: RTCRtpTransceiver;
+            if (setup.getUserMediaSafariHack && navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
+                // offering a sendrecv on safari requires a mic be attached for ring webrtc, or it fails to stream?
                 // even if a silent track is used...
-                if (setup.type === 'offer' && navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome'))
-                    await navigator.mediaDevices.getUserMedia({ audio: true })
+                audio = pc.addTransceiver('audio', {
+                    ...setup.audio,
+                    streams: [
+                        await navigator.mediaDevices.getUserMedia({ audio: true })
+                    ],
+                });
+            }
+            else {
+                audio = pc.addTransceiver('audio', setup.audio);
+            }
 
+            if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
                 this.microphone = audio.sender;
             }
         }

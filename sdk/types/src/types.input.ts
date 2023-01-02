@@ -1851,8 +1851,12 @@ export interface RTCAVSignalingSetup {
    * Mechanism to allow configuration of TURN/STUN servers, etc.
    */
   configuration?: RTCConfiguration;
-  audio: RTCRtpTransceiverInit;
-  video: RTCRtpTransceiverInit;
+  audio?: RTCRtpTransceiverInit;
+  video?: RTCRtpTransceiverInit;
+  /**
+   * Some endpoints like Ring do not stream to Safari unless getUserMedia is called. Unclear why.
+   */
+  getUserMediaSafariHack?: boolean;
   datachannel?: {
     label: string;
     dict?: RTCDataChannelInit;

@@ -441,6 +441,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
                 video: {
                     direction: 'recvonly',
                 },
+                getUserMediaSafariHack: true,
             }, {
                 createLocalDescription: async (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) => {
                     if (type !== 'answer')
