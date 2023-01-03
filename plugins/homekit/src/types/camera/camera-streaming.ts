@@ -14,6 +14,7 @@ import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, Pre
 import type { HomeKitPlugin } from "../../main";
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
+import { getDebugMode } from './camera-debug-mode-storage';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
 import { CameraStreamingSession } from './camera-streaming-session';
 import { getStreamingConfiguration } from './camera-utils';
@@ -295,7 +296,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }
             }
 
-            const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
+            const debugMode = getDebugMode(storage);
             const mediaOptions: RequestMediaStreamOptions = {
                 destination,
                 destinationId: session.prepareRequest.targetAddress,
@@ -310,7 +311,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     // pcm/g711 the second best option for aac-eld, since it's raw audio.
                     codec: request.audio.codec === AudioStreamingCodecType.OPUS ? 'opus' : 'pcm',
                 },
-                tool: transcodingDebugMode ? 'ffmpeg' : 'scrypted',
+                tool: debugMode.video ? 'ffmpeg' : 'scrypted',
             };
 
             const mediaObject = await device.getVideoStream(mediaOptions);

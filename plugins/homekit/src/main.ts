@@ -83,12 +83,11 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             await deviceManager.onDevicesChanged({
                 devices: [
                     {
-                        name: 'HomeKit Secure Video Local Copy',
+                        name: 'HomeKit Secure Video Debug Mode Clips',
                         nativeId: VIDEO_CLIPS_NATIVE_ID,
                         type: ScryptedDeviceType.DataSource,
                         interfaces: [
                             ScryptedInterface.VideoClips,
-                            ScryptedInterface.MixinProvider,
                             ScryptedInterface.Settings,
                             ScryptedInterface.Readme,
                         ],
@@ -310,9 +309,6 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
         systemManager.listen(async (eventSource, eventDetails, eventData) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)
-                return;
-
-            if (!eventDetails.changed)
                 return;
 
             if (eventDetails.property === ScryptedInterfaceProperty.id)

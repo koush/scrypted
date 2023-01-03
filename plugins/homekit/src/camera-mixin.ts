@@ -1,7 +1,8 @@
-import { StorageSettings, StorageSettingsDevice } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { ObjectDetector, Readme, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import { StorageSettings, StorageSettingsDevice } from "@scrypted/sdk/storage-settings";
 import { HomekitMixin } from "./homekit-mixin";
+import { getDebugMode } from "./types/camera/camera-debug-mode-storage";
 
 const { systemManager, deviceManager, log } = sdk;
 
@@ -108,12 +109,19 @@ The latest troubleshooting guide for all known streaming or recording issues can
             value: this.storage.getItem('rtpSender') || 'Default',
         });
 
+        let debugMode = getDebugMode(this.storage);
+
         settings.push({
-            title: 'Transcoding Debug Mode',
-            key: 'transcodingDebugMode',
+            title: 'Debug Mode',
+            key: 'debugMode',
             description: 'Force transcoding on this camera for streaming and recording. This setting can be used to diagnose errors with HomeKit functionality. Enable the Rebroadcast plugin for more robust transcoding options.',
-            type: 'boolean',
-            value: (this.storage.getItem('transcodingDebugMode') === 'true').toString(),
+            choices: [
+                'Transcode Video',
+                'Transcode Audio',
+                'Save Recordings',
+            ],
+            multiple: true,
+            value: debugMode.value,
         });
 
         if (this.interfaces.includes(ScryptedInterface.AudioSensor)) {
@@ -180,7 +188,7 @@ The latest troubleshooting guide for all known streaming or recording issues can
             return super.putMixinSetting(key, value);
         }
 
-        if (key === 'objectDetectionContactSensors') {
+        if (key === 'objectDetectionContactSensors' || key === 'debugMode') {
             this.storage.setItem(key, JSON.stringify(value));
         }
         else {

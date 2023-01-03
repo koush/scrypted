@@ -17,6 +17,7 @@ import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from '.
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
 import { NAL_TYPE_DELIMITER, NAL_TYPE_FU_A, NAL_TYPE_IDR, NAL_TYPE_PPS, NAL_TYPE_SEI, NAL_TYPE_SPS, NAL_TYPE_STAP_A } from "./h264-packetizer";
 import path from 'path';
+import { getDebugMode } from "./camera-debug-mode-storage";
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -97,7 +98,8 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
     console.log(device.name, 'recording session starting', connection.remoteAddress, configuration);
 
     const storage = deviceManager.getMixinStorage(device.id, undefined);
-    const saveRecordings = device.mixins.includes(homekitPlugin.videoClipsId);
+    const debugMode = getDebugMode(storage);
+    const saveRecordings = debugMode.recording;
 
     // request more than needed, and determine what to do with the fragments after receiving them.
     const prebuffer = configuration.mediaContainerConfiguration.prebufferLength * 2.5;
@@ -122,15 +124,14 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
     const audioCodec = ffmpegInput.mediaStreamOptions?.audio?.codec;
     const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
     const isDefinitelyNotAAC = !audioCodec || audioCodec.toLowerCase().indexOf('aac') === -1;
-    const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
     const transcodeRecording = !!ffmpegInput.h264EncoderArguments?.length || !!ffmpegInput.h264FilterArguments?.length;
-    const needsFFmpeg = transcodingDebugMode
+    const needsFFmpeg = debugMode.video || debugMode.video
         || !ffmpegInput.url.startsWith('tcp://')
         || transcodeRecording
         || ffmpegInput.container !== 'mp4'
         || noAudio;
 
-    if (transcodingDebugMode)
+    if (debugMode.video || debugMode.video)
         transcodingDebugModeWarning();
 
     let session: FFmpegFragmentedMP4Session & { socket?: Duplex };
@@ -168,8 +169,8 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
         }
 
         let audioArgs: string[];
-        if (transcodeRecording || isDefinitelyNotAAC || transcodingDebugMode) {
-            if (!(transcodeRecording || transcodingDebugMode))
+        if (transcodeRecording || isDefinitelyNotAAC || debugMode.audio) {
+            if (!(transcodeRecording || debugMode.audio))
                 console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
 
             let aacLowEncoder = 'aac';
@@ -199,8 +200,8 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
         }
 
         const videoArgs = ffmpegInput.h264FilterArguments?.slice() || [];
-        if (transcodingDebugMode || transcodeRecording) {
-            if (transcodingDebugMode || !ffmpegInput.h264EncoderArguments) {
+        if (debugMode.video || transcodeRecording) {
+            if (debugMode.video || !ffmpegInput.h264EncoderArguments) {
                 videoArgs.push(...getDebugModeH264EncoderArgs());
             }
             else {

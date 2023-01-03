@@ -1,16 +1,13 @@
+import sdk, { MediaObject, Readme, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoClip, VideoClipOptions, VideoClips } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
-import sdk, { MediaObject, MixinProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoClip, VideoClipOptions, VideoClips } from "@scrypted/sdk";
 import checkDiskSpace from 'check-disk-space';
-import { canCameraMixin } from "./camera-mixin";
-import { HOMEKIT_MIXIN } from "./homekit-mixin";
 import { getSavePath, getVideoClip, getVideoClips, getVideoClipThumbnail, nukeClips, parseHksvId, pruneClips, removeVideoClip } from "./types/camera/camera-recording-files";
-import { ClipsMixin } from "./video-clips-mixin";
 
 const DAYS_TO_KEEP = 10;
 const PRUNE_AGE = DAYS_TO_KEEP * 24 * 60 * 60 * 1000;
 const { systemManager } = sdk;
 
-export class VideoClipsMixinProvider extends ScryptedDeviceBase implements MixinProvider, Settings, Readme, VideoClips {
+export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Settings, Readme, VideoClips {
     storageSettings = new StorageSettings(this, {
         reset: {
             title: 'Remove All Clips',
@@ -95,30 +92,5 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
 
     putSetting(key: string, value: SettingValue): Promise<void> {
         return this.storageSettings.putSetting(key, value);
-    }
-
-    async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
-        // prevent this from interfering with anything that provides native video clips, like nvr.
-        if (interfaces.includes(ScryptedInterface.VideoClips))
-            return;
-        if (canCameraMixin(type, interfaces) && interfaces.includes(HOMEKIT_MIXIN)) {
-            return [
-                ScryptedInterface.VideoClips,
-            ];
-        }
-    }
-
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-        const ret = new ClipsMixin({
-            mixinDevice,
-            mixinDeviceInterfaces,
-            mixinDeviceState,
-            mixinProviderNativeId: this.nativeId,
-        });
-        this.resetPruneInterval();
-        return ret;
-    }
-
-    async releaseMixin(id: string, mixinDevice: any): Promise<void> {
     }
 }
