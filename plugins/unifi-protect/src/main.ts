@@ -1,13 +1,13 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, Device, ScryptedInterface, ObjectsDetected, ObjectDetectionResult } from "@scrypted/sdk";
 import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '@scrypted/common/src/provider-plugin';
-import fetch, { RequestInfo, RequestInit, Response } from "node-fetch";
 import { defaultSensorTimeout, UnifiCamera } from "./camera";
 import { FeatureFlagsShim, LastSeenShim } from "./shim";
 import { UnifiSensor } from "./sensor";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
 import { sleep } from "@scrypted/common/src/sleep";
+import axios from "axios";
 
 const { deviceManager } = sdk;
 
@@ -84,15 +84,23 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
     }
 
-    public async loginFetch(url: RequestInfo, options: RequestInit = { method: "GET" }): Promise<Response> {
+    public async loginFetch(url: string, options?: { method?: string, signal?: AbortSignal, responseType?: axios.ResponseType }) {
         const api = this.api as any;
         if (!(await api.login()))
             throw new Error('Login failed.');
 
-        options.agent = api.httpsAgent;
-        options.headers = api.headers;
+        const headers: Record<string, string> = {};
+        for (const [header, value] of api.headers) {
+            headers[header] = value;
+        }
 
-        return fetch(url, options);
+        return axios(url, {
+            responseType: options?.responseType,
+            method: options?.method,
+            headers,
+            httpsAgent: api.httpsAgent,
+            signal: options?.signal,
+        })
     }
 
     listener(event: Buffer) {
@@ -487,6 +495,9 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             this.log.a(`login error: ${e}`);
             this.console.error('login error', e);
         }
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     async getDevice(nativeId: string): Promise<UnifiCamera | UnifiLight | UnifiSensor | UnifiLock> {

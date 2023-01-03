@@ -103,7 +103,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const camera = this.findCamera();
         const params = new URLSearchParams({ camera: camera.id });
         const response = await this.protect.loginFetch(this.protect.api.wsUrl() + "/talkback?" + params.toString());
-        const tb = await response.json() as Record<string, string>;
+        const tb = response.data as Record<string, string>;
 
         // Adjust the URL for our address.
         const tbUrl = new URL(tb.url);
@@ -276,11 +276,12 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const timeout = setTimeout(() => abort.abort('Unifi Protect Snapshot timed out after 10 seconds. Aborted.'), 10000);
         const response = await this.protect.loginFetch(url, {
             signal: abort.signal,
+            responseType: 'arraybuffer',
         });
         clearTimeout(timeout);
         if (!response)
             throw new Error('login failed');
-        const data = await response.arrayBuffer();
+        const data = Buffer.from(response.data);
         return Buffer.from(data);
     }
 

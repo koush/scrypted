@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/unifi-protect",
-   "version": "0.0.128",
+   "version": "0.0.129",
    "description": "Unifi Protect Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -28,6 +28,7 @@
          "DeviceProvider",
          "Settings"
       ],
+      "babel": true,
       "pluginDependencies": [
          "@scrypted/prebuffer-mixin"
       ]
@@ -40,7 +41,7 @@
       "@koush/unifi-protect": "file:../../external/unifi-protect",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "node-fetch": "^3.2.1",
+      "axios": "^1.2.2",
       "ws": "^8.5.0"
    }
 }
