@@ -126,7 +126,7 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
         });
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         let ret = this.devices.get(nativeId);
         if (!ret) {
             ret = new DummyDevice(nativeId);
@@ -141,6 +141,10 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
         }
         return ret;
     }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+        
+    }
 }
 
-export default new DummyDeviceProvider();
+export default DummyDeviceProvider;
