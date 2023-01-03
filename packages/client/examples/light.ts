@@ -1,4 +1,4 @@
-import { connectScryptedClient } from '..';
+import { connectScryptedClient } from '../dist/packages/client/src';
 import { OnOff } from '@scrypted/types';
 
 import https from 'https';
