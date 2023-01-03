@@ -215,8 +215,9 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             'choices': [
                 'Default',
                 'decodebin',
-                'vtdec_hw',
-                'nvh264dec',
+                'parsebin ! vtdec_hw',
+                'parsebin ! h264parse ! nvh264dec',
+                'rtph264depay ! h264parse ! nvh264dec',
             ],
         }
         allowList: Setting = {

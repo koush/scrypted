@@ -313,8 +313,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         elif videosrc.startswith('rtsp'):
             videosrc = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0 is-live=false' % videosrc
 
-        videosrc += ' ! parsebin'
-
         decoder = settings and settings.get('decoder', 'decodebin')
         decoder = decoder or 'Default'
         if decoder == 'Default':
