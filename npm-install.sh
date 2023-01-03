@@ -33,7 +33,7 @@ echo "external/werift > npm install"
 npm install
 popd
 
-for directory in ffmpeg-camera rtsp amcrest onvif hikvision unifi-protect homekit
+for directory in ffmpeg-camera rtsp amcrest onvif hikvision unifi-protect webrtc homekit
 do
     echo "$directory > npm ci"
     pushd plugins/$directory
