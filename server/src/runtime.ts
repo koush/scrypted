@@ -639,7 +639,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         });
     }
 
-    runPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
+    loadPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
         const pluginId = plugin._id;
         this.killPlugin(pluginId);
 
@@ -651,6 +651,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         const pluginHost = new PluginHost(this, plugin, pluginDebug);
         this.setupPluginHostAutoRestart(pluginHost);
         this.plugins[pluginId] = pluginHost;
+
+        return pluginHost;
+    }
+
+    probePluginDevices(plugin: Plugin) {
+        const pluginId = plugin._id;
+        const pluginDevices = this.findPluginDevices(pluginId);
 
         const pluginDeviceSet = new Set<string>();
         for (const pluginDevice of pluginDevices) {
@@ -671,6 +678,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             }
         }
 
+    }
+
+    runPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
+        const pluginHost = this.loadPlugin(plugin, pluginDebug);
+        this.probePluginDevices(plugin);
         return pluginHost;
     }
 
@@ -893,17 +905,31 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             }
         }
 
+        const plugins: Plugin[] = [];
         for await (const plugin of this.datastore.getAll(Plugin)) {
+            plugins.push(plugin);
+        }
+
+        for (const plugin of plugins) {
             try {
                 const pluginDevice = this.findPluginDevice(plugin._id);
                 setState(pluginDevice, ScryptedInterfaceProperty.info, {
                     manufacturer: plugin.packageJson.name,
                     version: plugin.packageJson.version,
                 } as DeviceInformation);
-                this.runPlugin(plugin);
+                this.loadPlugin(plugin);
             }
             catch (e) {
-                console.error('error starting plugin', plugin._id, e);
+                console.error('error loading plugin', plugin._id, e);
+            }
+        }
+
+        for (const plugin of plugins) {
+            try {
+                this.probePluginDevices(plugin);
+            }
+            catch (e) {
+                console.error('error probing plugin devices', plugin._id, e);
             }
         }
     }
