@@ -119,7 +119,7 @@ addSupportedType(ScryptedDeviceType.Garage, {
         );
 
         return {
-            displayCategories: ['GARAGE_DOOR'],
+            displayCategories: ['GARAGE_DOOR'] as any,
             capabilities
         }
     },

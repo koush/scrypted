@@ -637,7 +637,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 };
 
                 params.pluginRuntimeAPI = ret;
-                ret.version = zipOptions.version;
+                ret.serverVersion = zipOptions.serverVersion;
 
                 return options.onLoadZip(ret, params, packageJson, zipData, zipOptions);
             },

@@ -242,7 +242,7 @@ export class PluginHost {
             try {
                 const isPython = runtime === 'python';
                 const loadZipOptions: PluginRemoteLoadZipOptions = {
-                    version: serverVersion,
+                    serverVersion: serverVersion,
                     // if debugging, use a normalized path for sourcemap resolution, otherwise
                     // prefix with module path.
                     filename: isPython

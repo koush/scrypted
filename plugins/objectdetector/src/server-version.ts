@@ -3,9 +3,9 @@ import sdk from '@scrypted/sdk';
 
 export function serverSupportsMixinEventMasking() {
     try {
-        if (!sdk.version)
+        if (!sdk.serverVersion)
             return false;
-        return semver.gte(sdk.version, '0.5.0');
+        return semver.gte(sdk.serverVersion, '0.5.0');
     }
     catch (e) {
     }

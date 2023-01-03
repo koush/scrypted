@@ -154,7 +154,7 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
 }
 
 export interface PluginRemoteLoadZipOptions {
-    version?: string;
+    serverVersion?: string;
     /**
      * The filename to load the script as. Use for debugger source mapping.
      */
