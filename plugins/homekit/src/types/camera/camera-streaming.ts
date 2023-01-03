@@ -181,6 +181,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 console.warn('If there are issues streaming, set this address to your wired IP address manually.');
                 console.warn('More information can be found in the HomeKit Plugin README.');
                 console.warn('===========================================================================');
+
+                sdk.log.a('The Scrypted Server Address should be set in the Scrypted settings. More information can be found in the HomeKit Plugin README.');
             }
 
             console.log('source address', response.addressOverride, videoPort, audioPort);
