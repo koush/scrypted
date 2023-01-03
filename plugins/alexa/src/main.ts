@@ -108,12 +108,12 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
                 'Authorization': 'Bearer ' + accessToken,
             }
         }).catch(error => {
-            if (error?.response?.data?.payload?.code === 'SKILL_DISABLED_EXCEPTION') {
+            self.console.error(error?.response?.data);
+
+            if (error?.response?.status === 401 || error?.response?.status === 403) {
                 self.storageSettings.values.tokenInfo = undefined;
                 self.accessToken = undefined;
             }
-
-            self.console.error(error?.response?.data);
         });
     }
 
@@ -195,7 +195,7 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
 
         if (tokenInfo === undefined) {
             this.log.e("Please reauthenticate by following the directions below.");
-            throw new Error("Please reauthenticate by following the directions below.");
+            throw new Error("'tokenInfo' is undefined");
         }
 
         const { code } = tokenInfo;
@@ -226,15 +226,20 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
                     case 'invalid_client':
                     case 'invalid_grant':
                     case 'unauthorized_client':
-                        self.storageSettings.values.tokenInfo = undefined;
+                        self.console.error(error?.response?.data);
                         self.log.e(error?.response?.data?.error_description);
+                        self.storageSettings.values.tokenInfo = undefined;
+                        self.accessToken = undefined;
                         break;
 
                     case 'authorization_pending':
+                        self.console.warn(error?.response?.data);
                         self.log.w(error?.response?.data?.error_description);
                         break;
                     
                     case 'expired_token':
+                        self.console.warn(error?.response?.data);
+                        self.log.w(error?.response?.data?.error_description);
                         self.accessToken = undefined;
                         break;
 
@@ -264,7 +269,10 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
         this.storageSettings.values.tokenInfo = grant;
         this.accessToken = undefined;
         
+        const self = this;
         let accessToken = await this.getAccessToken().catch(reason => {
+            self.console.error(`Failed to handle the AcceptGrant directive because ${reason}`);
+
             this.storageSettings.values.tokenInfo = undefined;
             this.accessToken = undefined;
 
@@ -282,6 +290,8 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
                     }
                 }
             }));
+
+            return undefined;
         });
 
         if (accessToken !== undefined) {
@@ -298,6 +308,8 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
                     }
                 }));
             } catch (error) {
+                this.console.error(`AcceptGrant.Response failed because ${error}`);
+
                 this.storageSettings.values.tokenInfo = undefined;
                 this.accessToken = undefined;
                 throw error;
