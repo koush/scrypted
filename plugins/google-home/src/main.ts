@@ -97,15 +97,12 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         }
 
         systemManager.listen((source, details) => {
-            if (source && details.changed && details.property)
+            if (source && details.property)
                 this.queueReportState(source);
         });
 
         systemManager.listen((eventSource, eventDetails) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)
-                return;
-
-            if (!eventDetails.changed)
                 return;
 
             if (!eventDetails.property)
@@ -143,6 +140,12 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 txt: {
                     port: url.port,
                 }
+            });
+            service.on('name-change', d => {
+                this.console.log('name-change', d)
+            });
+            service.on('hostname-change', d => {
+                this.console.log('hostname-change', d)
             });
             service.advertise();
         });

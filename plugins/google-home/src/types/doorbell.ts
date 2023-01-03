@@ -29,29 +29,13 @@ addSupportedType({
         if (!device.binaryState)
             return {};
 
-        // store and compare the timestamp of this binary state 
-        const detectionTimestamp = systemManager.getSystemState()?.[device.id]?.[ScryptedInterfaceProperty.binaryState]?.stateTime;
-
-        // can this happen?
-        if (!detectionTimestamp) {
-            console.warn(ScryptedInterfaceProperty.binaryState, 'timestamp is missing?')
-            return {};
-        }
-
-        // existing event.
-        if (notificationsState[ScryptedInterfaceProperty.binaryState] === detectionTimestamp)
-            return {};
-
-        // new event
-        notificationsState[ScryptedInterfaceProperty.binaryState] = detectionTimestamp;
-
         const ret = {
             ObjectDetection: {
                 objects: {
                     "unfamiliar": 1
                 },
                 priority: 0,
-                detectionTimestamp,
+                detectionTimestamp: Date.now(),
             }
         }
         return ret;
