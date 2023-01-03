@@ -2,7 +2,7 @@ import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointManager, Ev
 import { RpcPeer, RPCResultError } from '../rpc';
 import { AccessControls } from './acl';
 import { BufferSerializer } from './buffer-serializer';
-import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
+import { PluginAPI, PluginHostInfo, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketConnection, WebSocketMethods, WebSocketSerializer } from './plugin-remote-websocket';
 import { checkProperty } from './plugin-state-check';
 import { SystemManagerImpl } from './system';
@@ -352,7 +352,7 @@ class StorageImpl implements Storage {
     }
 }
 
-export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string, getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } }): Promise<PluginRemote> {
+export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string, hostInfo: PluginHostInfo, getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } }): Promise<PluginRemote> {
     try {
         // the host/remote connection can be from server to plugin (node to node),
         // core plugin to web (node to browser).
@@ -361,7 +361,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
         if (!peer.constructorSerializerMap.get(Buffer))
             peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
         const getRemote = await peer.getParam('getRemote');
-        const remote = await getRemote(api, pluginId) as PluginRemote;
+        const remote = await getRemote(api, pluginId, hostInfo) as PluginRemote;
 
         const accessControls: AccessControls = peer.tags.acl;
 
@@ -463,7 +463,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
     let done: (scrypted: ScryptedStatic) => void;
     const retPromise = new Promise<ScryptedStatic>(resolve => done = resolve);
 
-    peer.params.getRemote = async (api: PluginAPI, pluginId: string) => {
+    peer.params.getRemote = async (api: PluginAPI, pluginId: string, hostInfo: PluginHostInfo) => {
         websocketSerializer.WebSocket = createWebSocketClass((connection, callbacks) => {
             const { url } = connection;
             if (url.startsWith('io://') || url.startsWith('ws://')) {
@@ -506,7 +506,8 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             log,
             pluginHostAPI: api,
             pluginRemoteAPI: undefined,
-        }
+            serverVersion: hostInfo?.serverVersion,
+        };
 
         delete peer.params.getRemote;
 
@@ -637,7 +638,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 };
 
                 params.pluginRuntimeAPI = ret;
-                ret.serverVersion = zipOptions.serverVersion;
 
                 return options.onLoadZip(ret, params, packageJson, zipData, zipOptions);
             },

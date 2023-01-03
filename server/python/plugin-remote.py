@@ -209,13 +209,15 @@ class PluginRemote:
     systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}
     nativeIds: Mapping[str, DeviceStorage] = {}
     pluginId: str
+    hostInfo: Any
     mediaManager: MediaManager
     loop: AbstractEventLoop
     consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
 
-    def __init__(self, api, pluginId, loop: AbstractEventLoop):
+    def __init__(self, api, pluginId, hostInfo, loop: AbstractEventLoop):
         self.api = api
         self.pluginId = pluginId
+        self.hostInfo = hostInfo
         self.loop = loop
         self.__dict__['__proxy_oneway_methods'] = [
             'notify',
@@ -463,8 +465,8 @@ async def async_main(loop: AbstractEventLoop):
     peer.constructorSerializerMap[bytes] = 'Buffer'
     peer.constructorSerializerMap[bytearray] = 'Buffer'
     peer.params['print'] = print
-    peer.params['getRemote'] = lambda api, pluginId: PluginRemote(
-        api, pluginId, loop)
+    peer.params['getRemote'] = lambda api, pluginId, hostInfo: PluginRemote(
+        api, pluginId, hostInfo, loop)
 
     async def get_update_stats():
         update_stats = await peer.getParam('updateStats')

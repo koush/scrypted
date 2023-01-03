@@ -217,7 +217,7 @@ export class PluginHost {
         logger.log('i', `loading ${this.pluginName}`);
         logger.log('i', 'pid ' + this.worker?.pid);
 
-        const remotePromise = setupPluginRemote(this.peer, this.api, self.pluginId, () => this.scrypted.stateManager.getSystemState());
+        const remotePromise = setupPluginRemote(this.peer, this.api, self.pluginId, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
         const init = (async () => {
             const remote = await remotePromise;
 
@@ -242,7 +242,6 @@ export class PluginHost {
             try {
                 const isPython = runtime === 'python';
                 const loadZipOptions: PluginRemoteLoadZipOptions = {
-                    serverVersion: serverVersion,
                     // if debugging, use a normalized path for sourcemap resolution, otherwise
                     // prefix with module path.
                     filename: isPython
@@ -396,7 +395,7 @@ export class PluginHost {
         socket.on('close', kill);
         socket.on('error', kill);
 
-        return setupPluginRemote(rpcPeer, api, null, () => this.scrypted.stateManager.getSystemState());
+        return setupPluginRemote(rpcPeer, api, null, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
     }
 
     async createRpcPeer(duplex: Duplex) {
@@ -410,6 +409,6 @@ export class PluginHost {
         };
         duplex.on('close', kill);
 
-        return setupPluginRemote(rpcPeer, api, null, () => this.scrypted.stateManager.getSystemState());
+        return setupPluginRemote(rpcPeer, api, null, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
     }
 }

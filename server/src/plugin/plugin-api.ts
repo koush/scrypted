@@ -8,6 +8,10 @@ export interface PluginLogger {
     clearAlerts(): Promise<void>;
 }
 
+export interface PluginHostInfo {
+    serverVersion: string;
+}
+
 export interface PluginAPI {
     setState(nativeId: ScryptedNativeId, key: string, value: any): Promise<void>;
     onDevicesChanged(deviceManifest: DeviceManifest): Promise<void>;
@@ -154,7 +158,6 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
 }
 
 export interface PluginRemoteLoadZipOptions {
-    serverVersion?: string;
     /**
      * The filename to load the script as. Use for debugger source mapping.
      */

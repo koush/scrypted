@@ -22,6 +22,8 @@ interface PluginStats {
     memoryUsage: NodeJS.MemoryUsage;
 }
 
+const serverVersion = require('../../package.json').version;
+
 export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
@@ -371,7 +373,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
                     }
                     const forkApi = new PluginForkAPI(api);
 
-                    const remote = await setupPluginRemote(threadPeer, forkApi, pluginId, () => systemManager.getSystemState());
+                    const remote = await setupPluginRemote(threadPeer, forkApi, pluginId, { serverVersion }, () => systemManager.getSystemState());
                     forks.add(remote);
                     ntw.worker.on('exit', () => {
                         threadPeer.kill('worker exited');
