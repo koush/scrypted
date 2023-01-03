@@ -91,9 +91,11 @@ class OpenCVPlugin(DetectPlugin):
                 'placeholder': 'decodebin',
                 'key': 'decoder',
                 'choices': [
+                    'Default',
                     'decodebin',
-                    'vtdec_hw',
-                    'nvh264dec',
+                    'parsebin ! vtdec_hw',
+                    'parsebin ! h264parse ! nvh264dec',
+                    'rtph264depay ! h264parse ! nvh264dec',
                 ],
             }
         ]
