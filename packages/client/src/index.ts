@@ -71,7 +71,7 @@ export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
 }
 
 function isRunningStandalone() {
-    return globalThis.matchMedia?.('(display-mode: standalone)').matches || navigator.userAgent.includes('InstalledApp');
+    return globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.navigator?.userAgent.includes('InstalledApp');
 }
 
 export async function logoutScryptedClient(baseUrl?: string) {
@@ -462,6 +462,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         setTimeout(() => flush.resolve(undefined), 0);
         const scrypted = await attachPluginRemote(rpcPeer, undefined);
         const {
+            serverVersion,
             systemManager,
             deviceManager,
             endpointManager,
@@ -535,6 +536,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
         const ret: ScryptedClientStatic = {
             userId: userDevice?.id,
+            serverVersion,
             username,
             pluginRemoteAPI: undefined,
             connectionType,
