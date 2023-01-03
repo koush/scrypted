@@ -205,7 +205,10 @@ export default {
       return Object.entries(this.settingsGroups).find(sg => sg[0] === this.settingsGroupName)?.[1] || [];
     },
     settingsSubgroup() {
-      return this.settingsGroup.filter(sg => sg.value.subgroup === this.settingsSubgroupName || (!sg.value.subgroup && sg.value.group === this.settingsSubgroupName) || (!sg.value.subgroup && !sg.value.group && this.settingsSubgroupName === "General"));
+      if (!this.settingsSubgroups || this.settingsSubgroups.length === 1)
+        return this.settingsGroup;
+      const ret = this.settingsGroup.filter(sg => sg.value.subgroup === this.settingsSubgroupName || (!sg.value.subgroup && sg.value.group === this.settingsSubgroupName) || (!sg.value.subgroup && !sg.value.group && this.settingsSubgroupName === "General"));
+      return ret;
     },
     settingsSubgroups() {
       const subgroups = new Set();
