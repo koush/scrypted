@@ -316,10 +316,13 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         decoder = settings and settings.get('decoder', 'decodebin')
         decoder = decoder or 'Default'
         if decoder == 'Default':
-            if platform.system() == 'Darwin':
-                decoder = 'vtdec_hw'
-            else:
-                decoder = 'decodebin'
+            # parsebin is not reliable.
+            # works on most rtsp, but not unifi.
+            # if platform.system() == 'Darwin':
+            #     decoder = 'parsebin ! vtdec_hw'
+            # else:
+            #     decoder = 'decodebin'
+            decoder = 'decodebin'
         videosrc += " ! %s " % decoder
 
         width = optional_chain(j, 'mediaStreamOptions',
