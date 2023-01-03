@@ -1,3 +1,9 @@
+echo 'if (!process.version.startsWith("v18")) throw new Error("node 18 required")' | node
+if [ "$?" != 0 ]
+then
+    exit
+fi
+
 echo ######################################
 echo "Setting up popular plugins."
 echo "Additional will need npm install manually."
