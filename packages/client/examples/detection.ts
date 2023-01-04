@@ -19,7 +19,7 @@ async function example() {
     });
     console.log('server version', sdk.serverVersion);
 
-    const backyard = sdk.systemManager.getDeviceByName<ObjectDetector>("Front Door");
+    const backyard = sdk.systemManager.getDeviceByName<ObjectDetector>("Hikvision Test");
     if (!backyard)
         throw new Error('Device not found');
 

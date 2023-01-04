@@ -1,5 +1,4 @@
-import sdk, { RequestMediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
-import { FFmpegInput } from '@scrypted/sdk/types';
+import sdk, { FFmpegInput, RequestMediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import child_process, { ChildProcess, StdioOptions } from 'child_process';
 import { EventEmitter } from 'events';
 import { Server } from 'net';

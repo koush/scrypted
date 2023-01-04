@@ -342,7 +342,7 @@ class RpcPeer:
                 if local:
                     localProxiedEntry = self.localProxied.get(local)
                     if localProxiedEntry and finalizerId and localProxiedEntry['finalizerId'] != finalizerId:
-                        print('mismatch finalizer id', file=sys.stderr)
+                        # print('mismatch finalizer id', file=sys.stderr)
                         return
                     self.localProxied.pop(local, None)
                     local = self.localProxyMap.pop(proxyId, None)
