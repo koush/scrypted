@@ -103,7 +103,10 @@ class DeviceState(scrypted_python.scrypted_sdk.types.DeviceState):
         if not deviceState:
             print("missing id %s" % self._id)
             return None
-        return deviceState.get(property, None)
+        sdd = deviceState.get(property, None)
+        if not sdd:
+            return None
+        return sdd.get('value', None)
 
     def setScryptedProperty(self, property: str, value: Any):
         if property == ScryptedInterfaceProperty.id.value:
