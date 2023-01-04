@@ -22,7 +22,6 @@ from gi.repository import Gst
 
 from scrypted_sdk.types import FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
-
 def optional_chain(root, *keys):
     result = root
     for k in keys:
@@ -295,11 +294,13 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         detection_session.running = True
 
         print('detection starting', detection_id)
-        b = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.MediaStreamUrl.value)
+        b = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput.value)
         s = b.decode('utf8')
         j: FFmpegInput = json.loads(s)
         container = j.get('container', None)
         videosrc = j['url']
+        videoCodec = optional_chain(j, 'mediaStreamOptions', 'video', 'codec')
+
         if videosrc.startswith('tcp://'):
             parsed_url = urlparse(videosrc)
             videosrc = 'tcpclientsrc port=%s host=%s' % (
@@ -312,18 +313,18 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 raise Exception('unknown container %s' % container)
         elif videosrc.startswith('rtsp'):
             videosrc = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0 is-live=false' % videosrc
+            if videoCodec == 'h264':
+                videosrc += ' ! rtph264depay ! h264parse'
 
         decoder = settings and settings.get('decoder', 'decodebin')
         decoder = decoder or 'Default'
         if decoder == 'Default':
-            # parsebin is not reliable.
-            # works on most rtsp, but not unifi.
-            # if platform.system() == 'Darwin':
-            #     decoder = 'parsebin ! vtdec_hw'
-            # else:
-            #     decoder = 'decodebin'
-            decoder = 'decodebin'
-        videosrc += " ! %s " % decoder
+            if platform.system() == 'Darwin':
+                decoder = 'vtdec_hw'
+            else:
+                decoder = 'decodebin'
+            # decoder = 'decodebin'
+        videosrc += " ! %s" % decoder
 
         width = optional_chain(j, 'mediaStreamOptions',
                                'video', 'width') or 1920

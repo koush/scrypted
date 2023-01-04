@@ -1,0 +1,7 @@
+--extra-index-url https://google-coral.github.io/py-repo/
+
+# plugin
+numpy>=1.16.2
+Pillow>=5.4.1
+PyGObject>=3.30.4
+coremltools~=6.1

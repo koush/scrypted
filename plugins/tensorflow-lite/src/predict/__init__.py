@@ -79,6 +79,11 @@ def is_same_detection(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
 
     return True, (l, t, w, h)
 
+class Prediction:
+    def __init__(self, id: int, score: float, bbox: Tuple[float, float, float, float]):
+        self.id = id
+        self.score = score
+        self.bbox = bbox
 
 class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     labels: dict
@@ -96,15 +101,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         loop.call_later(60 * 60, lambda: self.requestRestart())
 
     async def getSettings(self) -> list[Setting]:
-        coral: Setting = {
-            'title': 'Detected Edge TPU',
-            'description': 'The device paths of the Coral Edge TPUs that will be used for detections.',
-            'value': self.edge_tpu_found,
-            'readonly': True,
-            'key': 'coral',
-        }
-
-        return [coral]
+        return []
     
     async def putSetting(self, key: str, value: scrypted_sdk.SettingValue) -> None:
         pass
@@ -140,7 +137,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         if not mo:
             image = data.image
             if not image:
-                raise Exception('tensorflow-lite data is no longer valid')
+                raise Exception('coreml data is no longer valid')
 
             bio = io.BytesIO()
             image.save(bio, format='JPEG')
@@ -203,7 +200,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         ]
         return d
 
-    def create_detection_result(self, objs, size, allowList, convert_to_src_size=None) -> ObjectsDetected:
+    def create_detection_result(self, objs: List[Prediction], size, allowList, convert_to_src_size=None) -> ObjectsDetected:
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections

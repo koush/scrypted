@@ -16,6 +16,7 @@ except Exception as e:
 import tflite_runtime.interpreter as tflite
 import re
 import scrypted_sdk
+from scrypted_sdk.types import Setting
 from typing import Any, Tuple
 from predict import PredictPlugin
 
@@ -57,6 +58,17 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
             self.interpreter = tflite.Interpreter(model_content=model)
         self.interpreter.allocate_tensors()
         self.mutex = threading.Lock()
+
+    async def getSettings(self) -> list[Setting]:
+        coral: Setting = {
+            'title': 'Detected Edge TPU',
+            'description': 'The device paths of the Coral Edge TPUs that will be used for detections.',
+            'value': self.edge_tpu_found,
+            'readonly': True,
+            'key': 'coral',
+        }
+
+        return [coral]
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:

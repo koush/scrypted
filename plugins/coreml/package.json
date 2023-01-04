@@ -1,14 +1,11 @@
 {
-   "name": "@scrypted/tensorflow-lite",
-   "description": "Scrypted Tensorflow Lite Object Detection",
+   "name": "@scrypted/coreml",
+   "description": "Scrypted CoreML Object Detection",
    "keywords": [
       "scrypted",
       "plugin",
-      "tensorflow",
-      "coral",
-      "tpu",
-      "edge",
-      "motion",
+      "coreml",
+      "neural",
       "object",
       "detect",
       "detection",
@@ -29,7 +26,7 @@
       "scrypted-package-json": "scrypted-package-json"
    },
    "scrypted": {
-      "name": "Tensorflow Lite Object Detection",
+      "name": "CoreML Object Detection",
       "pluginDependencies": [
          "@scrypted/objectdetector"
       ],
@@ -44,5 +41,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.75"
+   "version": "0.0.4"
 }
