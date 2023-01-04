@@ -76,6 +76,9 @@ export class ScryptedStateManager extends EventRegistry {
     }
 
     async setPluginDeviceStateFromMixin(pluginDevice: PluginDevice, property: string, value: any, eventInterface: ScryptedInterface, mixinId: string) {
+        // TODO: crashing here. send descriptor from python too.
+        eventInterface = eventInterface || propertyInterfaces[property];
+
         const implementerId = await this.getImplementerId(pluginDevice, eventInterface);
         if (implementerId !== mixinId) {
             const event = getMixinEventName({
