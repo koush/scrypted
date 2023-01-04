@@ -692,6 +692,16 @@ export interface EventRecorder {
   getRecordedEvents(options: RecordedEventOptions): Promise<RecordedEvent[]>;
 }
 
+export interface Resource {
+  file?: string;
+  href?: string;
+}
+
+export interface VideoResource {
+  thumbnail?: Resource;
+  video?: Resource;
+}
+
 export interface VideoClip {
   id: string;
   startTime: number;
@@ -701,6 +711,7 @@ export interface VideoClip {
   detectionClasses?: ObjectDetectionClass[];
   thumbnailId?: string;
   videoId?: string;
+  resources?: VideoResource;
 }
 
 export interface VideoClipOptions {
@@ -1140,6 +1151,7 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
   id?: string;
   className: ObjectDetectionClass;
   score: number;
+  resources?: VideoResource;
 }
 export interface ObjectsDetected {
   /**
@@ -1159,6 +1171,7 @@ export interface ObjectsDetected {
   eventId?: any;
   inputDimensions?: [number, number],
   timestamp: number;
+  resources?: VideoResource;
 }
 export type ObjectDetectionClass = 'motion' | 'face' | 'person' | string;
 export interface ObjectDetectionTypes {

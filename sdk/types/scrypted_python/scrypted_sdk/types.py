@@ -207,6 +207,11 @@ class ObjectDetectionHistory(TypedDict):
     lastSeen: float
     pass
 
+class Resource(TypedDict):
+    file: str
+    href: str
+    pass
+
 class AudioStreamOptions(TypedDict):
     bitrate: float
     codec: str
@@ -224,6 +229,7 @@ class ObjectDetectionResult(TypedDict):
     className: str
     history: ObjectDetectionHistory
     id: str
+    resources: VideoResource
     score: float
     zoneHistory: Any
     zones: list[str]
@@ -239,6 +245,11 @@ class ScryptedDeviceAccessControl(TypedDict):
     interfaces: list[str]
     methods: list[str]
     properties: list[str]
+    pass
+
+class VideoResource(TypedDict):
+    thumbnail: Resource
+    video: Resource
     pass
 
 class VideoStreamOptions(TypedDict):
@@ -454,6 +465,7 @@ class ObjectsDetected(TypedDict):
     detections: list[ObjectDetectionResult]
     eventId: Any
     inputDimensions: tuple[float, float]
+    resources: VideoResource
     running: bool
     timestamp: float
     pass
@@ -612,6 +624,7 @@ class VideoClip(TypedDict):
     duration: float
     event: str
     id: str
+    resources: VideoResource
     startTime: float
     thumbnailId: str
     videoId: str
