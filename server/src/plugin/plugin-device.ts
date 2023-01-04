@@ -203,9 +203,14 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         }
 
         return this.mixinTable[0].entry.then(entry => {
-            const changed = this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, PluginDeviceProxyHandler.sortInterfaces(entry.allInterfaces));
-            if (changed)
-                this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
+            if (!entry.error) {
+                const changed = this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, PluginDeviceProxyHandler.sortInterfaces(entry.allInterfaces));
+                if (changed)
+                    this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
+            }
+            else {
+                console.error('Mixin device creation completed with error.');
+            }
             return pluginDevice;
         });
     }
@@ -216,29 +221,35 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
 
         const type = getDisplayType(pluginDevice);
 
-        let { allInterfaces } = await previousEntry;
+        let { allInterfaces, error } = await previousEntry;
         try {
             const mixinProvider = this.scrypted.getDevice(mixinId) as ScryptedDevice & MixinProvider;
             const isMixinProvider = mixinProvider?.interfaces?.includes(ScryptedInterface.MixinProvider);
             const interfaces = isMixinProvider && await mixinProvider?.canMixin(type, allInterfaces) as any as ScryptedInterface[];
             if (!interfaces) {
+                console.log(`Mixin provider ${mixinId} can no longer mixin ${this.id}.`, {
+                    mixinProvider: !!mixinProvider,
+                    interfaces,
+                });
+                if (!error) {
+                    if (!mixinProvider || (isMixinProvider && !interfaces)) {
+                        const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
+                        this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId));
+                        this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
+                        this.scrypted.datastore.upsert(pluginDevice);
+                    }
+                    else {
+                        console.log(`Mixin provider ${mixinId} can not mixin ${this.id}. It is no longer a MixinProvider. This may be temporary. Passing through.`);
+                    }
+                }
+                else {
+                    console.error(`Error encountered in previous mixin entry may have caused mixin error. Ignoring.`);
+                }
                 // this is not an error
                 // do not advertise interfaces so it is skipped during
                 // vtable lookup.
-                if (!mixinProvider || (isMixinProvider && !interfaces)) {
-                    console.log(`Mixin provider ${mixinId} can no longer mixin ${this.id}. Removing.`, {
-                        mixinProvider: !!mixinProvider,
-                        interfaces,
-                    });
-                    const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
-                    this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId));
-                    this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
-                    this.scrypted.datastore.upsert(pluginDevice);
-                }
-                else {
-                    console.log(`Mixin provider ${mixinId} can not mixin ${this.id}. It is no longer a MixinProvider. This may be temporary. Passing through.`);
-                }
                 return {
+                    error,
                     passthrough: true,
                     allInterfaces,
                     interfaces: new Set<string>(),
@@ -273,6 +284,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
             const passthrough = wrappedProxy === mixinProxy && previousInterfaces.length === combinedInterfaces.length;
 
             return {
+                error,
                 passthrough,
                 interfaces: new Set<string>(interfaces),
                 allInterfaces: combinedInterfaces,
@@ -285,7 +297,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
             // this has been the behavior for a while,
             // but maybe interfaces implemented by that mixin
             // should rethrow the error caught here in applyMixin.
-            console.warn('mixin error', e);
+            console.error('Mixin error', e);
             return {
                 passthrough: false,
                 allInterfaces,
