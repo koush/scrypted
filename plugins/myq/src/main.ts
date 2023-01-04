@@ -1,4 +1,5 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting, EntrySensor, ScryptedInterface, Battery } from '@scrypted/sdk';
+
+import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting, EntrySensor, ScryptedInterface, Battery, Online } from '@scrypted/sdk';
 const { log } = sdk;
 import { myQApi, myQDevice, myQDeviceInterface } from '@hjdhjd/myq';
 import throttle from 'lodash/throttle';
@@ -61,6 +62,11 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
     this.devices[nativeId]?.refresh();
     return this.devices[nativeId];
   }
+
+  async releaseDevice(id: string, nativeId: string) {
+    this.console.info(`Device with serial number '${nativeId}' was removed`)
+  }
+
   async discoverDevices(duration: number) {
     if (!this.account) {
       const email = localStorage.getItem('email');
@@ -82,7 +88,8 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
         continue;
       }
       
-      const interfaces = [ScryptedInterface.Entry, ScryptedInterface.EntrySensor, ScryptedInterface.Refresh];
+      const parent = this.account.devices.find((value: any) => value.serial_number === device.parent_device_id) as any;
+      const interfaces = [ScryptedInterface.Entry, ScryptedInterface.EntrySensor, ScryptedInterface.Refresh, ScryptedInterface.Online];
 
       if (device.state.dps_low_battery_mode !== undefined)
         interfaces.push(ScryptedInterface.Battery);
@@ -92,6 +99,11 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
         nativeId: device.serial_number,
         interfaces,
         type: ScryptedDeviceType.Garage,
+        info: {
+          manufacturer: parent?.state?.brand_name ?? 'MyQ',
+          serialNumber: device.serial_number,
+          firmware: parent?.state?.firmware_version
+        }
       });
     }
 
@@ -118,12 +130,13 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
   }
 }
 
-class GarageDoor extends ScryptedDeviceBase implements Entry, Refresh, EntrySensor {
+class GarageDoor extends ScryptedDeviceBase implements Entry, Refresh, EntrySensor, Online {
   controller: GarageController;
 
   constructor(controller: GarageController, public device: myQDevice) {
     super(device.serial_number)
     this.controller = controller;
+    this.online = device.state.online;
     this.refresh();
   }
 
