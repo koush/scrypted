@@ -321,6 +321,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         delete d.bestSecondPassScore;
         delete d.newOrBetterDetection;
       }
+      detection.detections = trackedDetections;
     }
 
     if (newOrBetterDetection)
