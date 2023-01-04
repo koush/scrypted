@@ -1,5 +1,6 @@
 import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MediaStreamOptions, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedNativeId, Setting, Settings, VideoCamera } from '@scrypted/sdk';
 import crypto from 'crypto';
+import cloneDeep from 'lodash/cloneDeep';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } from './denoise';
@@ -311,6 +312,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
     else {
       detection.detections = zonedDetections;
+    }
+
+    if (detection.detections) {
+      const trackedDetections = cloneDeep(detection.detections) as TrackedDetection[];
+      for (const d of trackedDetections) {
+        delete d.bestScore;
+        delete d.bestSecondPassScore;
+        delete d.newOrBetterDetection;
+      }
     }
 
     if (newOrBetterDetection)
