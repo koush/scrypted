@@ -285,7 +285,7 @@ class PluginRemote:
             sys.version_info[0])+"."+str(sys.version_info[1])
         print('python version:', python_version)
 
-        python_prefix = os.path.join(plugin_volume, 'python%s-%s-%s' % (python_version, platform.system(), platform.machine()))
+        python_prefix = os.path.join(plugin_volume, '%s-%s-%s' % (python_version, platform.system(), platform.machine()))
         if not os.path.exists(python_prefix):
             os.makedirs(python_prefix)
 
