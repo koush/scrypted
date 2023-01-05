@@ -19,7 +19,7 @@
         height: 100%;
         z-index: 0;
         -webkit-transform-style: preserve-3d;
-      " playsinline autoplay ></video>
+      " playsinline autoplay></video>
 
       <svg :viewBox="`0 0 ${svgWidth} ${svgHeight}`" ref="svg" style="
         top: 0;
@@ -143,18 +143,28 @@ export default {
 
       for (const detection of this.lastDetection.detections || []) {
         if (!detection.boundingBox) continue;
-        const sw = 2;
+        const svgScale = this.svgWidth / 1080;
+        const sw = 2 * svgScale;
         const s = "red";
         const x = detection.boundingBox[0];
         const y = detection.boundingBox[1];
         const w = detection.boundingBox[2];
         const h = detection.boundingBox[3];
-        const t = detection.className;
-        const fs = 20;
+        let t = ``;
+        let toffset = 0;
+        if (detection.score && detection.className !== 'motion') {
+          t += `<tspan x='${x}' dy='${toffset}em'>${Math.round(detection.score * 100) / 100}</tspan>`
+          toffset -= 1.2;
+        }
+        const tname = detection.className + (detection.id ? `: ${detection.id}` : '')
+        t += `<tspan x='${x}' dy='${toffset}em'>${tname}</tspan>`
+
+        const fs = 20 * svgScale;
+
         const box = `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="${sw}" fill="none" />
-        <text x="${x}" y="${y - 5
-          }" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
-        <text x="${x}" y="${y - 5}" font-size="${fs}" fill="white">${t}</text>`;
+        <text x="${x}" y="${y - 5}" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
+        <text x="${x}" y="${y - 5}" font-size="${fs}" fill="white">${t}</text>
+      `;
         contents += box;
       }
 
