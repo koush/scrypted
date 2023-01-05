@@ -101,7 +101,15 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         loop.call_later(60 * 60, lambda: self.requestRestart())
 
     async def getSettings(self) -> list[Setting]:
-        return []
+        activeSessions: Setting = {
+            'key': 'activeSessions',
+            'readonly': True,
+            'title': 'Active Detection Sessions',
+            'value': len(self.detection_sessions),
+        }
+        return [
+            activeSessions
+        ]
     
     async def putSetting(self, key: str, value: scrypted_sdk.SettingValue) -> None:
         pass

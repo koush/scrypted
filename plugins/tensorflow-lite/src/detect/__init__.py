@@ -5,7 +5,6 @@ from asyncio.futures import Future
 from typing import Any, Mapping, Tuple
 from typing_extensions import TypedDict
 
-from numpy import number
 from pipeline import GstPipeline, GstPipelineBase, create_pipeline_sink, safe_set_result
 import scrypted_sdk
 import json
@@ -124,7 +123,7 @@ class DetectionSession:
 
 class DetectionSink(TypedDict):
     pipeline: str
-    input_size: Tuple[number, number]
+    input_size: Tuple[float, float]
 
 
 class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
@@ -362,14 +361,14 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def invalidateMedia(self, detection_session: DetectionSession, data: Any):
         pass
 
-    def create_user_callback(self, detection_session: DetectionSession, duration: number):
+    def create_user_callback(self, detection_session: DetectionSession, duration: float):
         first_frame = True
 
         current_data = None
         current_src_size = None
         current_convert_to_src_size = None
 
-        async def redetect(boundingBox: Tuple[number, number, number, number]):
+        async def redetect(boundingBox: Tuple[float, float, float, float]):
             nonlocal current_data
             nonlocal current_src_size
             nonlocal current_convert_to_src_size

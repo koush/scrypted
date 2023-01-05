@@ -106,9 +106,6 @@ class GstPipeline(GstPipelineBase):
                 self.condition.notify_all()
         asyncio.run_coroutine_threadsafe(notifier(), loop = self.selfLoop)
 
-        # we should join, but this blocks the asyncio thread.
-        # worker.join()
-
     def on_new_sample(self, sink, preroll):
         sample = sink.emit('pull-preroll' if preroll else 'pull-sample')
         if not self.sink_size:
@@ -118,8 +115,11 @@ class GstPipeline(GstPipelineBase):
         async def notifier(): 
             async with self.condition:
                 self.condition.notify_all()
-        asyncio.run_coroutine_threadsafe(notifier(), loop = self.selfLoop)
-        # should block?
+        try:
+            asyncio.run_coroutine_threadsafe(notifier(), loop = self.selfLoop).result()
+        except:
+            # dow what?
+            pass
         return Gst.FlowReturn.OK
 
     def get_src_size(self):
@@ -197,11 +197,11 @@ class GstPipeline(GstPipelineBase):
     def inference_main(self):
         loop = asyncio.new_event_loop()
         self.selfLoop = loop
-        self.condition = asyncio.Condition(loop = loop)
         loop.run_until_complete(self.inference_loop())
         loop.close()
 
     async def inference_loop(self):
+        self.condition = asyncio.Condition()
         while self.running:
             async with self.condition:
                 while not self.gstsample and self.running:
