@@ -8,7 +8,9 @@ export class DenoisedDetectionEntry<T> {
     detection: T;
 
     firstSeen?: number;
+    firstBox?: [number, number, number, number];
     lastSeen?: number;
+    lastBox?: [number, number, number, number];
     durationGone?: number;
 }
 
@@ -134,13 +136,18 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
             current.lastSeen = now;
             current.durationGone = 0;
             if (previous) {
-                current.firstSeen = previous.lastSeen;
                 previous.lastSeen = now;
+                current.firstSeen = previous.firstSeen;
+                current.firstBox = previous.firstBox;
+                current.lastBox = previous.boundingBox;
+                previous.lastBox = current.boundingBox;
                 previous.durationGone = 0;
                 options.retained?.(current, previous);
             }
             else {
                 current.firstSeen = now;
+                current.firstBox = current.boundingBox;
+                current.lastBox = current.boundingBox;
                 options.added?.(current);
             }
 

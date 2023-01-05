@@ -647,9 +647,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         return BUILTIN_MOTION_SENSOR_REPLACE;
       case BUILTIN_MOTION_SENSOR_ASSIST:
         return BUILTIN_MOTION_SENSOR_ASSIST;
-
     }
-    return BUILTIN_MOTION_SENSOR_ASSIST;
+
+    if (this.mixinDeviceInterfaces?.includes(ScryptedInterface.MotionSensor))
+      return BUILTIN_MOTION_SENSOR_ASSIST;
+    return BUILTIN_MOTION_SENSOR_REPLACE;
   }
 
   async getMixinSettings(): Promise<Setting[]> {
