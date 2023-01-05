@@ -134,6 +134,20 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         self.crop = False
         self.loop = asyncio.get_event_loop()
 
+    async def getSettings(self) -> list[Setting]:
+        activeSessions: Setting = {
+            'key': 'activeSessions',
+            'readonly': True,
+            'title': 'Active Detection Sessions',
+            'value': len(self.detection_sessions),
+        }
+        return [
+            activeSessions
+        ]
+    
+    async def putSetting(self, key: str, value: scrypted_sdk.SettingValue) -> None:
+        pass
+
     async def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, redetect: Any = None, mediaObject = None):
         if not detection_session.running and detection_result.get('running'):
             return

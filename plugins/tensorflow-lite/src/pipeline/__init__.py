@@ -52,7 +52,15 @@ class GstPipelineBase:
         except:
             pass
 
+    async def attach(self):
+        pass
+
+    async def detach(self):
+        pass
+
     async def run(self):
+        await self.attach()
+
         # Run pipeline.
         self.gst.set_state(Gst.State.PLAYING)
 
@@ -66,6 +74,8 @@ class GstPipelineBase:
             self.bus = None
             self.watchId = None
             self.gst = None
+            await self.detach()
+
 
 
 class GstPipeline(GstPipelineBase):
@@ -90,20 +100,19 @@ class GstPipeline(GstPipelineBase):
         appsink.connect('new-preroll', self.on_new_sample, True)
         appsink.connect('new-sample', self.on_new_sample, False)
 
-    async def run_attached(self):
+    async def attach(self):
         # Start inference worker.
         self.running = True
         worker = threading.Thread(target=self.inference_main)
         worker.start()
         while not self.condition:
-            await asyncio.sleep(10)
+            await asyncio.sleep(.1)
 
-        await super().run_attached()
-
+    async def detach(self):
         async def notifier(): 
-            self.running = False
             async with self.condition:
                 self.condition.notify_all()
+        self.running = False
         asyncio.run_coroutine_threadsafe(notifier(), loop = self.selfLoop)
 
     def on_new_sample(self, sink, preroll):
@@ -116,9 +125,12 @@ class GstPipeline(GstPipelineBase):
             async with self.condition:
                 self.condition.notify_all()
         try:
-            asyncio.run_coroutine_threadsafe(notifier(), loop = self.selfLoop).result()
-        except:
-            # dow what?
+            if self.running:
+                asyncio.run_coroutine_threadsafe(notifier(), loop = self.selfLoop).result()
+        except Exception as e:
+            # now what?
+            # print('sample error')
+            # print(e)
             pass
         return Gst.FlowReturn.OK
 
@@ -197,8 +209,10 @@ class GstPipeline(GstPipelineBase):
     def inference_main(self):
         loop = asyncio.new_event_loop()
         self.selfLoop = loop
-        loop.run_until_complete(self.inference_loop())
-        loop.close()
+        try:
+            loop.run_until_complete(self.inference_loop())
+        finally:
+            loop.close()
 
     async def inference_loop(self):
         self.condition = asyncio.Condition()

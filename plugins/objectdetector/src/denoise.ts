@@ -35,6 +35,10 @@ export interface TrackedItem<T> extends TrackerItem<T> {
     isZombie: boolean;
     bearing: number;
     frameUnmatchedLeftBeforeDying: number;
+    velocity: {
+        dx: number,
+        dy: number,
+    }
 }
 
 export interface DenoisedDetectionState<T> {
@@ -101,6 +105,9 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
     tracker.updateTrackedItemsWithNewFrame(items, state.frameCount);
     // console.log(tracker.getAllTrackedItems());
     const trackedObjects: TrackedItem<T>[] = [...tracker.getTrackedItems().values()];
+    // for (const to of trackedObjects) {
+    //     console.log(to.velocity);
+    // }
 
     const now = options.now || Date.now();
 

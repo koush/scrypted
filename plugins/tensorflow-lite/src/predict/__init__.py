@@ -100,20 +100,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         loop = asyncio.get_event_loop()
         loop.call_later(60 * 60, lambda: self.requestRestart())
 
-    async def getSettings(self) -> list[Setting]:
-        activeSessions: Setting = {
-            'key': 'activeSessions',
-            'readonly': True,
-            'title': 'Active Detection Sessions',
-            'value': len(self.detection_sessions),
-        }
-        return [
-            activeSessions
-        ]
-    
-    async def putSetting(self, key: str, value: scrypted_sdk.SettingValue) -> None:
-        pass
-
     async def createMedia(self, data: RawImage) -> scrypted_sdk.MediaObject:
         mo = await scrypted_sdk.mediaManager.createMediaObject(data, self.fromMimeType)
         return mo

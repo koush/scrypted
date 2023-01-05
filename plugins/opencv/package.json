@@ -26,7 +26,8 @@
       "runtime": "python",
       "type": "API",
       "interfaces": [
-         "ObjectDetection"
+         "ObjectDetection",
+         "Settings"
       ],
       "pluginDependencies": [
          "@scrypted/objectdetector"
@@ -35,5 +36,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.59"
+   "version": "0.0.60"
 }
