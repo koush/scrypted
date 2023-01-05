@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import aiofiles
 import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
+                                                EventDetails,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
 from typing_extensions import TypedDict
@@ -375,7 +376,8 @@ class PluginRemote:
         else:
             self.systemState[id] = state
 
-    async def notify(self, id, eventTime, eventInterface, property, value, changed=False):
+    async def notify(self, id, eventDetails: EventDetails, value):
+        property = eventDetails.get('property')
         if property:
             state = None
             if self.systemState:
