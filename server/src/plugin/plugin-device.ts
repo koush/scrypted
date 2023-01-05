@@ -203,27 +203,16 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         }
 
         return this.mixinTable[0].entry.then(entry => {
-            let persist = !entry.error;
             if (entry.error) {
-                console.error('Mixin device creation completed with error.');
-                const allInterfaces = new Set(entry.allInterfaces);
+                console.error('Mixin device creation completed with error. Merging with previous interface set to retain device descriptor.');
                 const previousInterfaces = getState(pluginDevice, ScryptedInterfaceProperty.interfaces) as string[] || [];
-
-                let containsAll = true;
-                while (containsAll && previousInterfaces.length) {
-                    containsAll &&= allInterfaces.has(previousInterfaces.pop());
-                }
-
-                persist = containsAll;
-                if (persist)
-                    console.log('Mixin device completed with interface same set or super set of previous set. Persisting.')
+                const allInterfaces = new Set([...entry.allInterfaces, ...previousInterfaces]);
+                entry.allInterfaces = [...allInterfaces];
             }
 
-            if (persist) {
-                const changed = this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, PluginDeviceProxyHandler.sortInterfaces(entry.allInterfaces));
-                if (changed)
-                    this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
-            }
+            const changed = this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, PluginDeviceProxyHandler.sortInterfaces(entry.allInterfaces));
+            if (changed)
+                this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
             return pluginDevice;
         });
     }
