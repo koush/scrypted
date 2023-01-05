@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 import threading
 from pipeline import run_pipeline
 import platform
+from .corohelper import run_coro_threadsafe
 
 from gi.repository import Gst
 
@@ -135,6 +136,9 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         self.loop = asyncio.get_event_loop()
 
     async def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, redetect: Any = None, mediaObject = None):
+        if not detection_session.running and detection_result.get('running'):
+            return
+
         detection_result['timestamp'] = int(time.time() * 1000)
         if detection_session.callbacks:
             if detection_session.running:
@@ -407,13 +411,14 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                             current_data = data
                             current_src_size = src_size
                             current_convert_to_src_size = convert_to_src_size
-                            retain = await self.detection_event(detection_session, detection_result, redetect, mo)
+                            retain = await run_coro_threadsafe(self.detection_event(detection_session, detection_result, redetect, mo), other_loop=detection_session.loop)
                         finally:
                             current_data = None
                             current_convert_to_src_size = None
                             current_src_size = None
                             maybeInvalidate()
-                    except:
+                    except Exception as e:
+                        print(e)
                         self.invalidateMedia(detection_session, data)
 
                     # asyncio.run_coroutine_threadsafe(, loop = self.loop).result()

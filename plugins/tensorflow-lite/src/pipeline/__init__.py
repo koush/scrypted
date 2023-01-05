@@ -100,9 +100,12 @@ class GstPipeline(GstPipelineBase):
 
         await super().run_attached()
 
-        async with self.condition:
+        async def notifier(): 
             self.running = False
-            self.condition.notify_all()
+            async with self.condition:
+                self.condition.notify_all()
+        asyncio.run_coroutine_threadsafe(notifier(), loop = self.selfLoop)
+
         # we should join, but this blocks the asyncio thread.
         # worker.join()
 
@@ -199,12 +202,12 @@ class GstPipeline(GstPipelineBase):
         loop.close()
 
     async def inference_loop(self):
-        while True:
+        while self.running:
             async with self.condition:
                 while not self.gstsample and self.running:
                     await self.condition.wait()
                 if not self.running:
-                    break
+                    return
                 gstsample = self.gstsample
                 self.gstsample = None
             try:

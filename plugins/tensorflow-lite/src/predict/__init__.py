@@ -137,7 +137,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         if not mo:
             image = data.image
             if not image:
-                raise Exception('coreml data is no longer valid')
+                raise Exception('data is no longer valid')
 
             bio = io.BytesIO()
             image.save(bio, format='JPEG')
