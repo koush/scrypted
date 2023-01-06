@@ -1,4 +1,4 @@
-echo 'if (!process.version.startsWith("v18")) throw new Error("node 18 required")' | node
+echo 'if (!process.version.startsWith("v18")) throw new Error("Node 18 is required. Install Node Version Manager (nvm) for versioned node installations. See https://github.com/koush/scrypted/pull/498#issuecomment-1373854020")' | node
 if [ "$?" != 0 ]
 then
     exit
