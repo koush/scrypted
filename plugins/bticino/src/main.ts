@@ -326,7 +326,7 @@ export class SipCamProvider extends ScryptedDeviceBase implements DeviceProvider
         }
     }
 
-    async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {
