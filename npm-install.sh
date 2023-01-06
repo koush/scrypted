@@ -1,4 +1,4 @@
-echo 'if (!process.version.startsWith("v18")) throw new Error("node 18 required")' | node
+echo 'if (!process.versions.node.split(".")[0] >= 18) throw new Error("node 18 required")' | node
 if [ "$?" != 0 ]
 then
     exit
