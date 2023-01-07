@@ -65,9 +65,8 @@ def is_same_detection(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
     a1 = bb1[2] * bb1[3]
     a2 = bb2[2] * bb2[3]
 
-    min_intersect = .4
     # if area intersect area is too small, these are different boxes
-    if ia / a1 < min_intersect and ia / a2 < min_intersect:
+    if ia / a1 < .4 and ia / a2 < .4:
         return False, None
 
     l = min(bb1[0], bb2[0])
@@ -246,7 +245,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def get_input_size(self) -> Tuple[float, float]:
         pass
 
-    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
+    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         pass
 
     def run_detection_image(self, detection_session: PredictSession, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, multipass_crop: Tuple[float, float, float, float] = None):
