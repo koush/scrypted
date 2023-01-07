@@ -1,4 +1,4 @@
-winget install -h OpenJS.NodeJS
+winget install -h --id "OpenJS.NodeJS.LTS"
 winget install -h --id "Python.Python.3.10"
 
 py -m pip install --upgrade pip
