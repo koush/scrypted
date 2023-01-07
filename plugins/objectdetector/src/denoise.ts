@@ -96,7 +96,9 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
     const { tracker, previousDetections } = state;
 
     const items: TrackerItem<T>[] = currentDetections.filter(cd => cd.boundingBox).map(cd => {
-        const [x, y, w, h] = cd.boundingBox;
+        const [l, t, w, h] = cd.boundingBox;
+        const x = l + w / 2;
+        const y = t + h / 2;
         return {
             x, y, w, h,
             confidence: cd.score,
@@ -127,7 +129,9 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
 
         const previous = previousCopy.find(d => d.id === trackedObject.id);
         const current = currentDetections.find(d => {
-            const [x, y, w, h] = d.boundingBox;
+            const [l, t, w, h] = d.boundingBox;
+            const x = l + w / 2;
+            const y = t + h / 2;
             return !d.id && x === trackedObject.x && y === trackedObject.y && w === trackedObject.w && h === trackedObject.h;
         });
 
