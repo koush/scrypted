@@ -64,7 +64,7 @@ $INSTALL_SERVICE_JS | Out-File -Encoding ASCII -FilePath $INSTALL_SERVICE_JS_PAT
 node $INSTALL_SERVICE_JS_PATH
 
 # Manually start service, node-windows has issues starting service
-sc start scrypted.exe
+sc.exe start scrypted.exe
 
 Write-Output "Scrypted is now running at: https://localhost:10443/"
 Write-Output "Note that it is https and that you'll be asked to approve/ignore the website certificate."
