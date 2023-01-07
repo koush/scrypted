@@ -40,8 +40,8 @@ $SERVICE_JS_ESCAPED_PATH = $SERVICE_JS_PATH.replace('\', '\\')
 $SERVICE_JS | Out-File -Encoding ASCII -FilePath $SERVICE_JS_PATH
 
 $INSTALL_SERVICE_JS = @"
-var Service = require('node-windows').Service;
-var svc = new Service({
+const Service = require('node-windows').Service;
+const svc = new Service({
   name: 'Scrypted',
   description: 'Scrypted Home Automation',
   script: '$($SERVICE_JS_ESCAPED_PATH)',
@@ -52,8 +52,26 @@ var svc = new Service({
     },
   ]
 });
-svc.on('install', () => {
-  console.log("Service installed");
+svc.on('alreadyinstalled', () => {
+   console.log('Service already installed, uninstalling first');
+   // wait 5 seconds after uninstalling before deleting daemon to prevent unlink error
+   svc.uninstall(5);
+});
+svc.on('uninstall', () => {
+   console.log('Service uninstalled, reinstalling');
+   svc.install();
+});
+svc.on("install", () => {
+   console.log("Service installed");
+   // wait 5 seconds for install to actually complete before attempting to start
+   // https://github.com/coreybutler/node-windows/issues/318#issuecomment-1232801990
+   setTimeout(() => {
+     console.log("Starting service");
+     svc.start();
+   }, 5000);
+});
+svc.on("start", () => {
+  console.log("Service started");
 });
 svc.install();
 "@
@@ -62,9 +80,6 @@ $INSTALL_SERVICE_JS_PATH = $SCRYPTED_HOME + '\install-service.js'
 $INSTALL_SERVICE_JS | Out-File -Encoding ASCII -FilePath $INSTALL_SERVICE_JS_PATH
 
 node $INSTALL_SERVICE_JS_PATH
-
-# Manually start service, node-windows has issues starting service
-sc.exe start scrypted.exe
 
 Write-Output "Scrypted is now running at: https://localhost:10443/"
 Write-Output "Note that it is https and that you'll be asked to approve/ignore the website certificate."
