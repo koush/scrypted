@@ -212,7 +212,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     // watch for this flush.
     const flush = new Deferred<void>();
 
-    if (scryptedCloud || options.webrtc) {
+    if ((scryptedCloud && options.webrtc === undefined) || options.webrtc) {
         const publicEioOptions: Partial<SocketOptions> = {
             path: `${endpointPath}/public/engine.io/api`,
             withCredentials: true,
