@@ -207,7 +207,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             headers: {
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
                 'Access-Control-Allow-Origin': request.headers?.origin,
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Length, X-Requested-With'            
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Length, X-Requested-With'
             },
         });
 
@@ -373,8 +373,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 if (Date.now() < backoff + 5000)
                     return;
                 backoff = Date.now();
-                this.console.log('scrypted server requested a connection.');
+                const random = Math.random().toString(36).substring(2);
+                this.console.log('scrypted server requested a connection:', random);
                 const client = net.connect(4000, SCRYPTED_SERVER);
+                client.on('close', () => this.console.log('scrypted server connection ended:', random));
                 const registrationId = await this.manager.registrationId;
                 client.write(registrationId + '\n');
                 const mux: any = new bpmux.BPMux(client as any);
