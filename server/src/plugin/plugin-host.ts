@@ -9,7 +9,7 @@ import path from 'path';
 import rimraf from 'rimraf';
 import { Duplex } from 'stream';
 import WebSocket from 'ws';
-import { Plugin, ScryptedUser } from '../db-types';
+import { Plugin } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
 import { Logger } from '../logger';
 import { RpcPeer } from '../rpc';
@@ -24,7 +24,7 @@ import { PluginDebug } from './plugin-debug';
 import { PluginHostAPI } from './plugin-host-api';
 import { LazyRemote } from './plugin-lazy-remote';
 import { setupPluginRemote } from './plugin-remote';
-import { WebSocketConnection, WebSocketSerializer } from './plugin-remote-websocket';
+import { WebSocketConnection } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { NodeForkWorker } from './runtime/node-fork-worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
@@ -342,15 +342,22 @@ export class PluginHost {
             disconnect();
         });
 
-        this.worker.on('rpc', (message, sendHandle) => {
+        this.worker.on('rpc', async (message, sendHandle) => {
             const socket = sendHandle as net.Socket;
-            const { pluginId } = message;
+            const { pluginId, username } = message;
             const host = this.scrypted.plugins[pluginId];
             if (!host) {
                 socket.destroy();
                 return;
             }
-            host.createRpcPeer(socket);
+            try {
+                const accessControls = await this.scrypted.getAccessControls(username)
+                host.createRpcPeer(socket, accessControls);
+            }
+            catch (e) {
+                socket.destroy();
+                return;
+            }
         });
 
         this.peer.params.updateStats = (stats: any) => {
@@ -398,8 +405,9 @@ export class PluginHost {
         return setupPluginRemote(rpcPeer, api, null, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
     }
 
-    async createRpcPeer(duplex: Duplex) {
+    async createRpcPeer(duplex: Duplex, accessControls: AccessControls) {
         const rpcPeer = createDuplexRpcPeer(`api/${this.pluginId}`, 'duplex', duplex, duplex);
+        rpcPeer.tags.acl = accessControls;
 
         // wrap the host api with a connection specific api that can be torn down on disconnect
         const createMediaManager = await this.peer.getParam('createMediaManager');

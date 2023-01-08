@@ -387,29 +387,35 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         return packageJson;
     }
 
+    async getAccessControls(username: string) {
+        if (!username)
+            return;
+
+        const user = await this.datastore.tryGet(ScryptedUser, username);
+        if (user?.aclId) {
+            const accessControl = this.getDevice<SU>(user.aclId);
+            const acls = await accessControl.getScryptedUserAccessControl();
+            if (!acls)
+                return;
+            return new AccessControls(acls);
+        }
+    }
+
     async handleEngineIOEndpoint(req: Request, res: ServerResponse & { locals: any }, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
         const { pluginHost, pluginDevice } = pluginData;
 
         const { username } = res.locals;
         let accessControls: AccessControls;
-        if (username) {
-            const user = await this.datastore.tryGet(ScryptedUser, username);
-            if (user?.aclId) {
-                const accessControl = this.getDevice<SU>(user.aclId);
-                try {
-                    const acls = await accessControl.getScryptedUserAccessControl();
-                    if (acls) {
-                        accessControls = new AccessControls(acls);
-                        if (accessControls.shouldRejectMethod(pluginDevice._id, ScryptedInterfaceMethod.onConnection))
-                            accessControls.deny();
-                    }
-                }
-                catch (e) {
-                    res.writeHead(401);
-                    res.end();
-                    return;
-                }
-            }
+
+        try {
+            accessControls = await this.getAccessControls(username);
+            if (accessControls?.shouldRejectMethod(pluginDevice._id, ScryptedInterfaceMethod.onConnection))
+                accessControls.deny();
+        }
+        catch (e) {
+            res.writeHead(401);
+            res.end();
+            return;
         }
 
         if (!pluginHost || !pluginDevice) {
