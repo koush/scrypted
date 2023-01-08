@@ -1816,7 +1816,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       const { id } = mixinDeviceState;
       const cleanupWorker = () => {
         const found = this.currentMixins.get(id);
-        if (found.worker === worker) {
+        if (found?.worker === worker) {
           worker.terminate();
           this.currentMixins.delete(id);
         }
@@ -1828,13 +1828,18 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       forked.worker.on('exit', exitCode => {
         if (exitCode)
           this.console.error('prebuffer worker error non-zero result:', exitCode);
+        else
+          this.console.log('prebuffer worker exited');
         cleanupWorker();
       });
-      const result = await forked.result as RebroadcastPluginFork;
-      const ret = result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
+      const ret = forked.result.then(result => result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState));
+
       // scrypted should call release on the mixin, but just in case...
       const previous = this.currentMixins.get(id);
-      previous?.worker?.terminate();
+      if (previous?.worker) {
+        this.console.log('terminating previous worker');
+        previous.worker.terminate();
+      }
       this.currentMixins.set(id, {
         worker,
         mixin: ret,
@@ -1860,6 +1865,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
         this.currentMixins.delete(id);
         // TODO: 1/7/2023 remove this legacy code check, there will always be a worker
         if (current.worker) {
+          this.console.log('terminating worker for mixin release');
           current.worker?.terminate();
           return;
         }
