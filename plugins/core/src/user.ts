@@ -22,7 +22,10 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
         const ret: ScryptedUserAccessControl =  {
             devicesAccessControls: [
                 addAccessControlsForInterface(self.id, ScryptedInterface.ScryptedDevice),
-                addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/core').id,
+                addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/webrtc').id,
+                    ScryptedInterface.ScryptedDevice,
+                    ScryptedInterface.EngineIOHandler),
+                    addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/core').id,
                     ScryptedInterface.ScryptedDevice,
                     ScryptedInterface.EngineIOHandler),
                 ...this.storageSettings.values.devices.map((id: string) => ({
