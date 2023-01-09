@@ -190,8 +190,11 @@ export async function createTrackForwarder(options: {
     // ipv4 mtu is 1500
     // so max usable packet size is 1500 - rtp header - tcp header - ip header
     // 1500 - 12 - 20 - 20 = 1448.
-    // but set to 1440 cause that's what cameras seem to use for some reason.
-    const videoPacketSize = options.ipv4 ? 1440 : 1300;
+    // but set to 1424 just to be safe.
+    // 1/9/2023: bug report from eweber discovered that usable MTU on tmobile is 1424.
+    // additional consideration should be given whether to always enforce ipv6 mtu on
+    // non-local destination?
+    const videoPacketSize = options.ipv4 ? 1424 : 1300;
     let h264Repacketizer: H264Repacketizer;
     let spsPps: ReturnType<typeof getSpsPps>;
 
