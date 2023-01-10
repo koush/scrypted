@@ -188,13 +188,20 @@ export async function createTrackForwarder(options: {
     };
 
     // ipv4 mtu is 1500
-    // so max usable packet size is 1500 - rtp header - tcp header - ip header
-    // 1500 - 12 - 20 - 20 = 1448.
-    // but set to 1424 just to be safe.
+    // so max usable packet size is 1500 - tcp header - ip header
+    // 1500 - 20 - 20 = 1460.
+    // but set to 1440 just to be safe.
     // 1/9/2023: bug report from eweber discovered that usable MTU on tmobile is 1424.
     // additional consideration should be given whether to always enforce ipv6 mtu on
     // non-local destination?
-    const videoPacketSize = options.ipv4 ? 1424 : 1300;
+    // const videoPacketSize = options.ipv4 ? 1424 : 1300;
+    // 1/9/2023:
+    // 1378 is what homekit requests, regardless of local or remote network.
+    // so setting 1378 as the fixed value seems wise, given apple probably has
+    // better knowledge of network capabilities, and also mirrors 
+    // from my cursory research into ipv6, the MTU is no lesser than ipv4, in fact
+    // the min mtu is larger.
+    const videoPacketSize = 1378;
     let h264Repacketizer: H264Repacketizer;
     let spsPps: ReturnType<typeof getSpsPps>;
 
@@ -205,7 +212,8 @@ export async function createTrackForwarder(options: {
         onRtp: (buffer) => {
             if (needPacketization) {
                 if (!h264Repacketizer) {
-                    h264Repacketizer = new H264Repacketizer(console, videoPacketSize, {
+                    // adjust packet size for the rtp packet header (12).
+                    h264Repacketizer = new H264Repacketizer(console, videoPacketSize - 12, {
                         ...spsPps,
                     });
                 }
