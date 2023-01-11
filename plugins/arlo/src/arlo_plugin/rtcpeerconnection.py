@@ -108,7 +108,7 @@ class BackgroundRTCPeerConnection:
     async def close(self):
         await self.__run_background(self.pc.close(), await_result=False, stop_loop=True)
 
-    def add_rtsp_audio(self, rtsp_url):
+    def add_rtsp_audio(self, endpoint, options):
         """Adds an audio track to the RTCPeerConnection given a source RTSP url.
 
         This constructs a MediaPlayer in the background thread's asyncio loop,
@@ -118,7 +118,7 @@ class BackgroundRTCPeerConnection:
         server is not yet ready.
         """
         def add_rtsp_audio_background():
-            media_player = MediaPlayer(rtsp_url, format="rtsp")
+            media_player = MediaPlayer(endpoint, options=options)
             self.pc.addTrack(media_player.audio)
 
         self.background_loop.call_soon_threadsafe(add_rtsp_audio_background)
