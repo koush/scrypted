@@ -44,12 +44,12 @@ class Request(object):
         import logging
         import http.client
         http.client.HTTPConnection.debuglevel = 1
-        logging.basicConfig()
+        #logging.basicConfig()
         logging.getLogger().setLevel(logging.DEBUG)
         req_log = logging.getLogger('requests.packages.urllib3')
         req_log.setLevel(logging.DEBUG)
         req_log.propagate = True
-        """
+        #"""
 
         url =  f'{url}?eventId={self.gen_event_id()}&time={self.get_time()}'
 

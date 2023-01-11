@@ -13,8 +13,11 @@ from .arlo.logging import logger as arlo_lib_logger
 from .camera import ArloCamera
 from .doorbell import ArloDoorbell
 from .logging import ScryptedDeviceLoggerMixin 
+from .util import BackgroundTaskMixin
+from .rtcpeerconnection import logger as background_rtc_logger
 
-class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery, ScryptedDeviceLoggerMixin):
+
+class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     arlo_cameras = None
     arlo_basestations = None
     _arlo_mfa_code = None
@@ -32,7 +35,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
     def __init__(self, nativeId=None):
         super().__init__(nativeId=nativeId)
-        self.logger_name = "ArloProvider"
+        self.logger_name = "provider"
 
         self.arlo_cameras = {}
         self.arlo_basestations = {}
@@ -93,7 +96,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 self.storage.setItem("arlo_auth_headers", json.dumps(dict(self._arlo.request.session.headers.items())))
                 self.storage.setItem("arlo_user_id", self._arlo.user_id)
 
-                asyncio.get_event_loop().create_task(self.do_arlo_setup())
+                self.create_task(self.do_arlo_setup())
 
             return self._arlo
 
@@ -108,7 +111,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 self._arlo.UseExistingAuth(self.arlo_user_id, json.loads(headers))
                 self.logger.info(f"Initialized Arlo client, reusing stored auth headers")
 
-                asyncio.get_event_loop().create_task(self.do_arlo_setup())
+                self.create_task(self.do_arlo_setup())
                 return self._arlo
             else:
                 self._arlo_mfa_complete_auth = self._arlo.LoginMFA()
@@ -138,6 +141,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         except Exception as e:
             self.logger.error(f"Error performing post-login Arlo setup: {type(e)} with message {str(e)}")
 
+    def invalidate_arlo_client(self):
+        if self.arlo is not None:
+            self._arlo.Unsubscribe()
+        self._arlo = None
+        self._arlo_mfa_code = None
+        self._arlo_mfa_complete_auth = None
+        self.storage.setItem("arlo_auth_headers", "")
+        self.storage.setItem("arlo_user_id", "")
+
     def get_current_log_level(self):
         return ArloProvider.plugin_verbosity_choices[self.plugin_verbosity]
 
@@ -148,6 +160,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         for _, device in self.scrypted_devices.items():
             device.logger.setLevel(log_level)
         arlo_lib_logger.setLevel(log_level)
+        background_rtc_logger.setLevel(log_level)
 
     def propagate_transport(self):
         self.print(f"Setting plugin transport to {self.arlo_transport}")
@@ -172,6 +185,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "description": "Enter the code sent by Arlo to your email or phone number.",
             },
             {
+                "key": "force_reauth",
+                "title": "Force Re-Authentication",
+                "description": "Resets the authentication flow of the plugin. Will also re-do 2FA.",
+                "value": "No",
+                "choices": ["No", "Yes"],
+            },
+            {
                 "key": "arlo_transport",
                 "title": "Underlying Transport Protocol",
                 "description": "Select the underlying transport protocol used to connect to Arlo Cloud.",
@@ -190,6 +210,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     async def putSetting(self, key, value):
         if key == "arlo_mfa_code":
             self._arlo_mfa_code = value
+        elif key == "force_reauth":
+            # force arlo client to be invalidated and reloaded
+            self.invalidate_arlo_client()
         else:
             self.storage.setItem(key, value)
 
@@ -204,13 +227,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                     self._arlo = None
             else:
                 # force arlo client to be invalidated and reloaded
-                if self.arlo is not None:
-                    self._arlo.Unsubscribe()
-                    self._arlo = None
-                    self._arlo_mfa_code = None
-                    self._arlo_mfa_complete_auth = None
-                    self.storage.setItem("arlo_auth_headers", "")
-                    self.storage.setItem("arlo_user_id", "")
+                self.invalidate_arlo_client()
 
         # initialize Arlo client or continue MFA
         _ = self.arlo
@@ -246,13 +263,10 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 },
                 "nativeId": camera["deviceId"],
                 "name": camera["deviceName"],
-                "interfaces": self.get_interfaces_by_model(camera['properties']['modelId']),
+                "interfaces": self.get_interfaces(camera),
                 "type": ScryptedDeviceType.Camera.value,
                 "providerNativeId": self.nativeId,
             }
-
-            if camera['deviceType'] == 'doorbell':
-                device["interfaces"].append(ScryptedInterface.BinarySensor.value)
 
             devices.append(device)
 
@@ -293,20 +307,25 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         else:
             return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
 
-    def get_interfaces_by_model(self, model_id):
-        model_id = model_id.lower()
+    def get_interfaces(self, camera):
+        model_id = camera['properties']['modelId'].lower()
         self.logger.debug(f"Checking applicable scrypted interfaces for {model_id}")
 
-        if model_id.startswith("avd1001"):
-            return [
-                ScryptedInterface.VideoCamera.value,
-                ScryptedInterface.Camera.value,
-                ScryptedInterface.MotionSensor.value,
-            ]
- 
-        return [
+        results = [
             ScryptedInterface.VideoCamera.value,
             ScryptedInterface.Camera.value,
             ScryptedInterface.MotionSensor.value,
+            ScryptedInterface.Intercom.value,
             ScryptedInterface.Battery.value,
         ]
+
+        if model_id.startswith("avd1001"):
+            results.remove(ScryptedInterface.Battery.value)
+
+        if camera['deviceType'] == 'doorbell':
+            results.append(ScryptedInterface.BinarySensor.value)
+
+        if camera["deviceId"] == camera["parentId"]:
+            results.remove(ScryptedInterface.Intercom.value)
+ 
+        return results

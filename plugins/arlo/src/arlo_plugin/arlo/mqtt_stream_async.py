@@ -39,7 +39,7 @@ class MQTTStream(Stream):
         self.event_stream = mqtt.Client(client_id=f"user_{self.arlo.user_id}_{self._gen_client_number()}", transport="websockets", clean_session=False)
         self.event_stream.username_pw_set(self.arlo.user_id, password=self.arlo.request.session.headers.get('Authorization'))
         self.event_stream.ws_set_options(path="/mqtt", headers={"Origin": "https://my.arlo.com"})
-        self.event_stream.enable_logger(logger=logger)
+        #self.event_stream.enable_logger(logger=logger)
         self.event_stream.on_connect = on_connect
         self.event_stream.on_message = on_message
         self.event_stream.tls_set()

@@ -105,6 +105,8 @@ class Arlo(object):
 
     def UseExistingAuth(self, user_id, headers):
         self.user_id = user_id
+        if "Content-Type" not in headers:
+            headers['Content-Type'] = 'application/json; charset=UTF-8'
         self.request.session.headers.update(headers)
         self.BASE_URL = 'myapi.arlo.com'
 
@@ -178,6 +180,7 @@ class Arlo(object):
                 'Auth-Version': '2',
                 'Authorization': finish_auth_body['data']['token'],
                 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
+                'Content-Type': 'application/json; charset=UTF-8',
             }
             self.request.session.headers.update(headers)
             self.BASE_URL = 'myapi.arlo.com'
@@ -336,6 +339,8 @@ class Arlo(object):
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
@@ -348,7 +353,7 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
     def SubscribeToBatteryEvents(self, basestation, camera, callback):
         """
@@ -359,6 +364,8 @@ class Arlo(object):
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
@@ -371,7 +378,7 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
     def SubscribeToDoorbellEvents(self, basestation, doorbell, callback):
         """
@@ -382,6 +389,8 @@ class Arlo(object):
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
         """
 
         resource = f"doorbells/{doorbell.get('deviceId')}"
@@ -403,7 +412,59 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+
+    def SubscribeToSDPAnswers(self, basestation, camera, callback):
+        """
+        Use this method to subscribe to pushToTalk SDP answer events. You must provide a callback function which will get called once per SDP event.
+
+        The callback function should have the following signature:
+        def callback(self, event)
+
+        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
+        that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
+        """
+
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        def callbackwrapper(self, event):
+            properties = event.get("properties", {})
+            stop = None 
+            if properties.get("type") == "answerSdp":
+                stop = callback(properties.get("data"))
+            if not stop:
+                return None
+            return stop
+
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
+
+    def SubscribeToCandidateAnswers(self, basestation, camera, callback):
+        """
+        Use this method to subscribe to pushToTalk ICE candidate answer events. You must provide a callback function which will get called once per candidate event.
+
+        The callback function should have the following signature:
+        def callback(self, event)
+
+        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
+        that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
+        """
+
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        def callbackwrapper(self, event):
+            properties = event.get("properties", {})
+            stop = None 
+            if properties.get("type") == "answerCandidate":
+                stop = callback(properties.get("data"))
+            if not stop:
+                return None
+            return stop
+
+        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
 
     async def HandleEvents(self, basestation, resource, actions, callback):
         """
@@ -443,13 +504,14 @@ class Arlo(object):
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
         NOTE: Use this function if you need to run some code after subscribing to the eventstream, but before your callback to handle the events runs.
         """
-        if not callable(trigger):
+        if trigger is not None and not callable(trigger):
             raise Exception('The trigger(self, camera) should be a callable function.')
         if not callable(callback):
             raise Exception('The callback(self, event) should be a callable function.')
 
         await self.Subscribe()
-        trigger(self)
+        if trigger:
+            trigger(self)
 
         # NOTE: Calling HandleEvents() calls Subscribe() again, which basically turns into a no-op. Hackie I know, but it cleans up the code a bit.
         return await self.HandleEvents(basestation, resource, actions, callback)
@@ -479,11 +541,57 @@ class Arlo(object):
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
         """
-        stream_url_dict = self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/startStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"startUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId":camera.get('xCloudId')})
+        stream_url_dict = self.request.post(
+            f'https://{self.BASE_URL}/hmsweb/users/devices/startStream',
+            {
+                "to": camera.get('parentId'),
+                "from": self.user_id + "_web",
+                "resource": "cameras/" + camera.get('deviceId'),
+                "action": "set",
+                "responseUrl": "",
+                "publishResponse": True,
+                "transId": self.genTransId(),
+                "properties": {
+                    "activityState": "startUserStream",
+                    "cameraId": camera.get('deviceId')
+                }
+            },
+            headers={"xcloudId":camera.get('xCloudId')}
+        )
         return stream_url_dict['url'].replace("rtsp://", "rtsps://")
 
-    def StopStream(self, basestation, camera):
-        return self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/stopStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"stopUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId": camera.get('xCloudId')})
+    def StartPushToTalk(self, basestation, camera):
+        url = f'https://{self.BASE_URL}/hmsweb/users/devices/{self.user_id}_{camera.get("deviceId")}/pushtotalk'
+        resp = self.request.get(url)
+        return resp.get("uSessionId"), resp.get("data")
+
+    def NotifyPushToTalkSDP(self, basestation, camera, uSessionId, localSdp):
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        self.Notify(basestation, {
+            "action": "pushToTalk",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "data": localSdp,
+                "type": "offerSdp",
+                "uSessionId": uSessionId
+            }
+        })
+
+    def NotifyPushToTalkCandidate(self, basestation, camera, uSessionId, localCandidate):
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        self.Notify(basestation, {
+            "action": "pushToTalk",
+            "resource": resource,
+            "publishResponse": False,
+            "properties": {
+                "data": localCandidate,
+                "type": "offerCandidate",
+                "uSessionId": uSessionId
+            }
+        })
 
     async def TriggerFullFrameSnapshot(self, basestation, camera):
         """
@@ -494,7 +602,21 @@ class Arlo(object):
         resource = f"cameras/{camera.get('deviceId')}"
 
         def trigger(self):
-            self.request.post(f"https://{self.BASE_URL}/hmsweb/users/devices/fullFrameSnapshot", {"to":camera.get("parentId"),"from":self.user_id+"_web","resource":"cameras/"+camera.get("deviceId"),"action":"set","publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"fullFrameSnapshot"}}, headers={"xcloudId":camera.get("xCloudId")})
+            self.request.post(
+                f"https://{self.BASE_URL}/hmsweb/users/devices/fullFrameSnapshot",
+                {
+                    "to": camera.get("parentId"),
+                    "from": self.user_id + "_web",
+                    "resource": "cameras/" + camera.get("deviceId"),
+                    "action": "set",
+                    "publishResponse": True,
+                    "transId": self.genTransId(),
+                    "properties": {
+                        "activityState": "fullFrameSnapshot"
+                    }
+                },
+                headers={"xcloudId":camera.get("xCloudId")}
+            )
 
         def callback(self, event):
             properties = event.get("properties", {})
