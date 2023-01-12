@@ -509,7 +509,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
 export async function fork() {
     return {
-        async createConnection(message: any, portOrDummy: number | boolean, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, transcodeWidth: number, sessionSupportsH264High: boolean, options: { disableIntercom?: boolean; configuration: RTCConfiguration, weriftConfiguration: PeerConfig; }) {
+        async createConnection(message: any, port: number, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, transcodeWidth: number, sessionSupportsH264High: boolean, options: { disableIntercom?: boolean; configuration: RTCConfiguration, weriftConfiguration: PeerConfig; }) {
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
             cleanup.promise.finally(() => setTimeout(() => process.exit(), 10000));
@@ -529,8 +529,7 @@ export async function fork() {
                 }
             }
 
-            if (typeof portOrDummy === 'number') {
-                const port = portOrDummy;
+            if (port) {
                 const socket = net.connect(port, '127.0.0.1');
                 cleanup.promise.finally(() => socket.destroy());
 
@@ -549,10 +548,6 @@ export async function fork() {
             }
             else {
                 pc.createDataChannel('dummy');
-                if (portOrDummy) {
-                    const offer = await pc.createOffer();
-                    pc.setLocalDescription(offer);
-                }
             }
 
             return connection;
