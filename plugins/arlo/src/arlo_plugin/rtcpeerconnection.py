@@ -87,11 +87,6 @@ class BackgroundRTCPeerConnection:
                 # send results to the main loop
                 self.main_loop.call_soon_threadsafe(to_main, result, is_error)
 
-                # stopping the loop here ensures that the coroutine completed
-                # and doesn't raise any "task not awaited" exceptions
-                if stop_loop:
-                    self.background_loop.stop()
-
             task = self.background_loop.create_task(coroutine)
             self.pending_tasks.add(task)
             task.add_done_callback(callback)
