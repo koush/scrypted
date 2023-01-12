@@ -2,9 +2,12 @@ from scrypted_sdk.types import BinarySensor
 
 from .camera import ArloCamera
 
+
 class ArloDoorbell(ArloCamera, BinarySensor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.logger_name = f"{self.nativeId}.doorbell"
 
         self.start_doorbell_subscription()
 
@@ -13,4 +16,6 @@ class ArloDoorbell(ArloCamera, BinarySensor):
             self.binaryState = doorbellPressed
             return self.stop_subscriptions
  
-        self.provider.arlo.SubscribeToDoorbellEvents(self.arlo_basestation, self.arlo_device, callback)
+        self.register_task(
+            self.provider.arlo.SubscribeToDoorbellEvents(self.arlo_basestation, self.arlo_device, callback)
+        )
