@@ -10,7 +10,7 @@
     <div v-else-if="lazyValue.type === 'button'" @click="save">
       <v-btn small block> {{ lazyValue.title }} </v-btn>
       <span v-if="lazyValue.description" class="caption pl-1">{{
-          lazyValue.description
+        lazyValue.description
       }}</span>
     </div>
     <v-combobox v-else-if="lazyValue.choices && lazyValue.combobox" dense :readonly="lazyValue.readonly"
@@ -33,7 +33,7 @@
       </template>
     </v-select>
     <DevicePicker v-else-if="lazyValue.type === 'device'" v-model="lazyValue.value" :multiple="lazyValue.multiple"
-      :devices="devices" :title="lazyValue.title" :description="lazyValue.description">
+      :readonly="lazyValue.readonly" :devices="devices" :title="lazyValue.title" :description="lazyValue.description">
       <template v-slot:append-outer>
         <v-btn v-if="dirty && device" color="success" @click="save" class="shift-up">
           <v-icon>send</v-icon>
@@ -41,7 +41,8 @@
       </template>
     </DevicePicker>
     <DevicePicker v-else-if="lazyValue.type === 'interface'" v-model="lazyValue.value" :multiple="lazyValue.multiple"
-      :devices="interfaces" :title="lazyValue.title" :description="lazyValue.description">
+      :readonly="lazyValue.readonly" :devices="interfaces" :title="lazyValue.title"
+      :description="lazyValue.description">
       <template v-slot:append-outer>
         <v-btn v-if="dirty && device" color="success" @click="save" class="shift-up">
           <v-icon>send</v-icon>
