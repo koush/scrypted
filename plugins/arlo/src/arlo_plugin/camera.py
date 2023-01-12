@@ -195,7 +195,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
             pc = self.pc = BackgroundRTCPeerConnection()
             self.sdp_answered = False
 
-            pc.add_audio(options)
+            await pc.add_audio(options)
 
             offer = await pc.createOffer()
             self.logger.info(f"Arlo offer sdp:\n{offer.sdp}")
