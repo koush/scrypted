@@ -154,7 +154,6 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
         self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
 
-        endpoint = ffmpeg_params.get("url")
         options = {}
         current_key = None
         for arg in ffmpeg_params["inputArguments"]:
@@ -166,13 +165,8 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
                 options[current_key] = ""
                 continue
             options[current_key] = (options[current_key] + " " + arg).strip()
-            if current_key == "i":
-                endpoint = options[current_key]
 
         self.logger.debug(f"Parsed ffmpeg params: {options}")
-
-        if endpoint is None:
-            raise Exception("Malformed ffmpeg arguments, input endpoint not provided")
 
         session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
         self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
@@ -201,7 +195,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
             pc = self.pc = BackgroundRTCPeerConnection()
             self.sdp_answered = False
 
-            pc.add_rtsp_audio(endpoint, options)
+            pc.add_audio(options)
 
             offer = await pc.createOffer()
             self.logger.info(f"Arlo offer sdp:\n{offer.sdp}")

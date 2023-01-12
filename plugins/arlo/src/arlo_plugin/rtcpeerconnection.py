@@ -1,7 +1,6 @@
 from aiortc import RTCPeerConnection
 from aiortc.contrib.media import MediaPlayer
 import asyncio
-import inspect
 import threading
 import logging
 import queue
@@ -108,17 +107,35 @@ class BackgroundRTCPeerConnection:
     async def close(self):
         await self.__run_background(self.pc.close(), await_result=False, stop_loop=True)
 
-    def add_rtsp_audio(self, endpoint, options):
-        """Adds an audio track to the RTCPeerConnection given a source RTSP url.
+    def add_audio(self, options):
+        """Adds an audio track to the RTCPeerConnection given FFmpeg options.
 
         This constructs a MediaPlayer in the background thread's asyncio loop,
         since MediaPlayer also utilizes coroutines and asyncio.
 
-        Note that this may block the background thread's event loop if the RTSP
+        Note that this may block the background thread's event loop if the
         server is not yet ready.
         """
-        def add_rtsp_audio_background():
-            media_player = MediaPlayer(endpoint, options=options)
+        try:
+            input = options["i"]
+            format = options.get("f")
+            if format is None and input.startswith("rtsp"):
+                format = "rtsp"
+        except:
+            logger.error("error detecting what input file and format to use")
+            raise
+
+        def add_audio_background():
+            media_player = MediaPlayer(input, format=format, options=options)
+
+            # patch the player's stop function to close RTC if
+            # the media ends before RTC is closed
+            old_stop = media_player._stop
+            def new_stop(*args, **kwargs):
+                old_stop(*args, **kwargs)
+                self.main_loop.call_soon_threadsafe(self.main_loop.create_task, self.close())
+            media_player._stop = new_stop
+
             self.pc.addTrack(media_player.audio)
 
-        self.background_loop.call_soon_threadsafe(add_rtsp_audio_background)
+        self.background_loop.call_soon_threadsafe(add_audio_background)
