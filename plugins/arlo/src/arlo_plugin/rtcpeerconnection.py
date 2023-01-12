@@ -125,6 +125,8 @@ class BackgroundRTCPeerConnection:
             logger.error("error detecting what input file and format to use")
             raise
 
+        logger.info(f"Intercom sourced from {input} with format {format}")
+
         def add_audio_background():
             media_player = MediaPlayer(input, format=format, options=options)
 
