@@ -321,7 +321,10 @@ export function parseOptions(options: RTCSignalingOptions) {
             return false;
         });
     const transcodeWidth = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
-    const isMediumResolution = options?.screen?.width && options.screen.width < 1920;
+    const width = options?.screen?.width;
+    const height = options?.screen?.height;
+    const max = Math.max(width, height);
+    const isMediumResolution = max && max < 1920;
 
     // firefox is misleading. special case that to disable transcoding.
     if (options?.userAgent?.includes('Firefox/'))
