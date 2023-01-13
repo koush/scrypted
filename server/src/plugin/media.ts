@@ -398,7 +398,7 @@ export abstract class MediaManagerBase implements MediaManager {
 
         const route = graph.path('mediaObject', 'output') as Array<string>;
         if (!route || !route.length)
-            throw new Error('no converter found');
+            throw new Error(`no converter found: ${mediaObject?.mimeType} to ${toMimeType}`);
         // pop off the mediaObject start node, no conversion necessary.
         route.shift();
         // also remove the output node.
