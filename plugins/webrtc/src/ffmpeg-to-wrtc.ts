@@ -1,8 +1,7 @@
-import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RtcpRrPacket, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "./werift";
+import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "./werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
-import type { WebRTCPlugin } from "./main";
+import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { logIsPrivateIceTransport } from "./werift-util";
@@ -37,29 +36,44 @@ export async function createTrackForwarder(options: {
     isPrivate: boolean, destinationId: string, ipv4: boolean,
     requestMediaStream: RequestMediaStream,
     videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver,
-    sessionSupportsH264High: boolean, maximumCompatibilityMode: boolean, transcodeWidth: number,
+    maximumCompatibilityMode: boolean, clientOptions: RTCSignalingOptions,
 }) {
     const {
         timeStart,
         isPrivate, destinationId,
         requestMediaStream,
         videoTransceiver, audioTransceiver,
-        sessionSupportsH264High, maximumCompatibilityMode, transcodeWidth
+        maximumCompatibilityMode,
+        clientOptions,
     } = options;
 
-    const transcodeBaseline = !sessionSupportsH264High || maximumCompatibilityMode;
-    const requestDestination: MediaStreamDestination = transcodeBaseline ? 'medium-resolution' : 'local';
+    const { sessionSupportsH264High, transcodeWidth, isMediumResolution } = parseOptions(clientOptions);
+
+    let transcodeBaseline = maximumCompatibilityMode;
+    // const transcodeBaseline = !sessionSupportsH264High || maximumCompatibilityMode;
+    const handlesHighResolution = !isMediumResolution && !transcodeBaseline;
+
+    let requestDestination: MediaStreamDestination;
+    if (transcodeBaseline) {
+        requestDestination = 'medium-resolution';
+    }
+    else if (!isPrivate) {
+        requestDestination = 'remote';
+    }
+
     const mo = await requestMediaStream({
         video: {
             codec: 'h264',
+            width: clientOptions?.screen?.width,
+            height: clientOptions?.screen?.height,
         },
         audio: {
             codec: 'opus',
         },
-        adaptive: !transcodeBaseline,
-        destination: isPrivate ? requestDestination : 'remote',
+        adaptive: handlesHighResolution,
+        destination: requestDestination,
         destinationId,
-        tool: transcodeBaseline ? 'ffmpeg' : 'scrypted',
+        tool: !handlesHighResolution ? 'ffmpeg' : 'scrypted',
     });
 
     if (!mo)
@@ -78,14 +92,20 @@ export async function createTrackForwarder(options: {
     }
 
     const console = sdk.deviceManager.getMixinConsole(mo.sourceId, RTC_BRIDGE_NATIVE_ID);
-    if (transcodeBaseline) {
-        console.log('Requesting medium-resolution stream', {
-            sessionSupportsH264High,
-            maximumCompatibilityMode,
-        });
-    }
     const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
     const { mediaStreamOptions } = ffmpegInput;
+
+    if (isMediumResolution && !transcodeBaseline) {
+        const width = ffmpegInput?.mediaStreamOptions?.video?.width;
+        transcodeBaseline = !width || width > 1280;
+    }
+
+    console.log('Client Stream Profile', {
+        transcodeBaseline,
+        sessionSupportsH264High,
+        maximumCompatibilityMode,
+        width: ffmpegInput?.mediaStreamOptions?.video?.width,
+    });
 
     if (!maximumCompatibilityMode) {
         let found: RTCRtpCodecParameters;
@@ -301,6 +321,7 @@ export function parseOptions(options: RTCSignalingOptions) {
             return false;
         });
     const transcodeWidth = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
+    const isMediumResolution = options?.screen?.width && options.screen.width < 1920;
 
     // firefox is misleading. special case that to disable transcoding.
     if (options?.userAgent?.includes('Firefox/'))
@@ -309,6 +330,7 @@ export function parseOptions(options: RTCSignalingOptions) {
     return {
         sessionSupportsH264High,
         transcodeWidth,
+        isMediumResolution,
     };
 }
 
@@ -366,8 +388,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     activeTracks = new Set<WebRTCTrack>();
     closed = false;
 
-    constructor(public console: Console, public clientSession: RTCSignalingSession, public maximumCompatibilityMode: boolean, public transcodeWidth: number,
-        public sessionSupportsH264High: boolean,
+    constructor(public console: Console, public clientSession: RTCSignalingSession,
+        public maximumCompatibilityMode: boolean,
+        public clientOptions: RTCSignalingOptions,
         public options: {
             configuration: RTCConfiguration,
             weriftConfiguration: PeerConfig,
@@ -419,6 +442,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         const console = sdk.deviceManager.getMixinConsole(mediaObject?.sourceId || intercomId);
 
         const timeStart = Date.now();
+
         return {
             vtrack,
             atrack,
@@ -430,9 +454,8 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                     requestMediaStream,
                     videoTransceiver,
                     audioTransceiver,
-                    sessionSupportsH264High: this.sessionSupportsH264High,
                     maximumCompatibilityMode: this.maximumCompatibilityMode,
-                    transcodeWidth: this.transcodeWidth,
+                    clientOptions: this.clientOptions,
                 }),
         }
     }
@@ -538,9 +561,8 @@ export async function createRTCPeerConnectionSink(
 ) {
     const clientOptions = await clientSignalingSession.getOptions();
     console.log('remote options', clientOptions);
-    const { transcodeWidth, sessionSupportsH264High } = parseOptions(clientOptions);
 
-    const connection = new WebRTCConnectionManagement(console, clientSignalingSession, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
+    const connection = new WebRTCConnectionManagement(console, clientSignalingSession, maximumCompatibilityMode, clientOptions, {
         configuration,
         weriftConfiguration,
     });

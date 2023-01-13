@@ -1368,9 +1368,30 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
           result = this.streamSettings.getRemoteRecordingStream(msos);
           destinationVideoBitrate = defaultLocalBitrate;
           break;
-        default:
+        case 'local':
           result = this.streamSettings.getDefaultStream(msos);
           destinationVideoBitrate = defaultLocalBitrate;
+          break;
+        default:
+          const width = options?.video?.width && options.video.width;
+          if (width) {
+            if (width > 1280) {
+              result = this.streamSettings.getDefaultStream(msos);
+              destinationVideoBitrate = defaultLocalBitrate;
+            }
+            else if (width > 720) {
+              result = this.streamSettings.getRemoteStream(msos);
+              destinationVideoBitrate = transcodeStorageSettings.remoteStreamingBitrate;
+            }
+            else {
+              result = this.streamSettings.getLowResolutionStream(msos);
+              destinationVideoBitrate = defaultLowResolutionBitrate;
+            }
+          }
+          else {
+            result = this.streamSettings.getDefaultStream(msos);
+            destinationVideoBitrate = defaultLocalBitrate;
+          }
           break;
       }
 
