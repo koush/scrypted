@@ -177,7 +177,7 @@ export async function createTrackForwarder(options: {
 
     const audioRtpTrack: RtpTrack = {
         codecCopy: audioCodecCopy,
-        onRtp: buffer => audioTransceiver.sender.sendRtp(buffer),
+        onRtp: audioTransceiver.sender.sendRtp.bind(audioTransceiver.sender),
         encoderArguments: [
             ...audioTranscodeArguments,
         ],
@@ -210,6 +210,8 @@ export async function createTrackForwarder(options: {
         packetSize: videoPacketSize,
         onMSection: (videoSection) => spsPps = getSpsPps(videoSection),
         onRtp: (buffer) => {
+            let onRtp: (rtp: Buffer) => void;
+
             if (needPacketization) {
                 if (!h264Repacketizer) {
                     // adjust packet size for the rtp packet header (12).
@@ -217,14 +219,21 @@ export async function createTrackForwarder(options: {
                         ...spsPps,
                     });
                 }
-                const repacketized = h264Repacketizer.repacketize(RtpPacket.deSerialize(buffer));
-                for (const packet of repacketized) {
-                    videoTransceiver.sender.sendRtp(packet);
-                }
+                onRtp = buffer => {
+                    const repacketized = h264Repacketizer.repacketize(RtpPacket.deSerialize(buffer));
+                    for (const packet of repacketized) {
+                        videoTransceiver.sender.sendRtp(packet);
+                    }
+                };
             }
             else {
-                videoTransceiver.sender.sendRtp(buffer);
+                onRtp = buffer => {
+                    videoTransceiver.sender.sendRtp(buffer);
+                };
             }
+
+            videoRtpTrack.onRtp = onRtp;
+            videoRtpTrack.onRtp(buffer);
         },
         encoderArguments: [
             ...videoTranscodeArguments,

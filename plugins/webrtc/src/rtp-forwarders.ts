@@ -46,14 +46,14 @@ export type RtpSockets = {
 };
 
 function createPacketDelivery(track: RtpTrack) {
-    let firstPacket = true;
-    return (rtp: Buffer) => {
-        if (firstPacket) {
-            firstPacket = false;
-            track.firstPacket?.(rtp);
-        }
+    const original = track.onRtp;
+    track.onRtp = rtp => {
+        track.onRtp = original;
+        track.firstPacket?.(rtp);
         track.onRtp(rtp);
     }
+
+    return (rtp: Buffer) => track.onRtp(rtp);
 }
 
 function attachTrackDgram(track: RtpTrack, server: dgram.Socket) {
