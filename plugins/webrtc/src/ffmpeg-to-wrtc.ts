@@ -47,7 +47,7 @@ export async function createTrackForwarder(options: {
         clientOptions,
     } = options;
 
-    const { sessionSupportsH264High, transcodeWidth, isMediumResolution } = parseOptions(clientOptions);
+    const { sessionSupportsH264High, transcodeWidth, isMediumResolution, width, height } = parseOptions(clientOptions);
 
     let transcodeBaseline = maximumCompatibilityMode;
     // const transcodeBaseline = !sessionSupportsH264High || maximumCompatibilityMode;
@@ -64,8 +64,8 @@ export async function createTrackForwarder(options: {
     const mo = await requestMediaStream({
         video: {
             codec: 'h264',
-            width: clientOptions?.screen?.width,
-            height: clientOptions?.screen?.height,
+            width,
+            height,
         },
         audio: {
             codec: 'opus',
@@ -323,8 +323,8 @@ export function parseOptions(options: RTCSignalingOptions) {
     const transcodeWidth = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
     const width = options?.screen?.width;
     const height = options?.screen?.height;
-    const max = Math.max(width, height);
-    const isMediumResolution = max && max < 1920;
+    const max = Math.max(width, height) * options?.screen?.devicePixelRatio;
+    const isMediumResolution = !sessionSupportsH264High || (max && max < 1920);
 
     // firefox is misleading. special case that to disable transcoding.
     if (options?.userAgent?.includes('Firefox/'))
@@ -334,6 +334,8 @@ export function parseOptions(options: RTCSignalingOptions) {
         sessionSupportsH264High,
         transcodeWidth,
         isMediumResolution,
+        width: isMediumResolution ? 1280 : width,
+        height: isMediumResolution ? 720 : height,
     };
 }
 

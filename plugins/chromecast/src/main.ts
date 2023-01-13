@@ -201,7 +201,15 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
 
     const engineio = await endpointManager.getPublicLocalEndpoint(this.nativeId) + 'engine.io/';
     const mo = await mediaManager.createMediaObject(Buffer.from(engineio), ScryptedMimeTypes.LocalUrl);
-    const cameraStreamAuthToken = await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
+    let cameraStreamAuthToken: string;
+
+    try {
+      cameraStreamAuthToken= await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
+    }
+    catch (e) {
+      this.log.a('Streaming failed. Install and set up Scrypted Cloud to cast this media type.');
+      throw e;
+    }
 
     const castMedia: any = {
       contentId: cameraStreamAuthToken,
@@ -550,7 +558,7 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
     return ret;
   }
 
-  async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+  async releaseDevice(id: string, nativeId: string): Promise<void> {
       
   }
 
