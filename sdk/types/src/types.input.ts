@@ -1794,6 +1794,7 @@ export interface RTCSignalingOptions {
   };
   userAgent?: string;
   screen?: {
+    devicePixelRatio: number;
     width: number;
     height: number;
   };
