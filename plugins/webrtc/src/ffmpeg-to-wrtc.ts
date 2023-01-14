@@ -104,7 +104,7 @@ export async function createTrackForwarder(options: {
         transcodeBaseline,
         sessionSupportsH264High,
         maximumCompatibilityMode,
-        width: ffmpegInput?.mediaStreamOptions?.video?.width,
+        ...clientOptions,
     });
 
     if (!maximumCompatibilityMode) {
