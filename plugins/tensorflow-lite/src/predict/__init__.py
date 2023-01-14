@@ -4,7 +4,7 @@ import io
 from PIL import Image
 import re
 import scrypted_sdk
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Mapping
 from gi.repository import Gst
 import asyncio
 import time
@@ -100,10 +100,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         self.toMimeType = scrypted_sdk.ScryptedMimeTypes.MediaObject.value
 
         self.crop = False
+        self.trackers: Mapping[str, tracker.Sort_OH] = {}
 
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
-        loop.call_later(60 * 60, lambda: self.requestRestart())
+        # loop.call_later(60 * 60, lambda: self.requestRestart())
 
     async def createMedia(self, data: RawImage) -> scrypted_sdk.MediaObject:
         mo = await scrypted_sdk.mediaManager.createMediaObject(data, self.fromMimeType)
@@ -258,7 +259,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         (iw, ih) = image.size
 
         if not detection_session.tracker:
-            detection_session.tracker = tracker.Sort_OH(scene=np.array([iw, ih]))
+            t = self.trackers.get(detection_session.id)
+            if not t:
+                t = tracker.Sort_OH(scene=np.array([iw, ih]))
+                self.trackers[detection_session.id] = t
+            detection_session.tracker = t
             conf_trgt = 0.35
             conf_objt = 0.75
             detection_session.tracker.conf_trgt = conf_trgt
@@ -379,12 +384,13 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 sort_input.append([l, t, l + w, t + h, r['score']])
             trackers, unmatched_trckr, unmatched_gts = detection_session.tracker.update(np.array(sort_input), [])
 
+            detections = ret['detections']
+            ret['detections'] = []
+
             for td in trackers:
                 x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
                 ), td[2].item(), td[3].item(), td[4].item()
                 overlap = 0
-                detections = ret['detections']
-                ret['detections'] = []
                 for d in detections:
                     obj: ObjectDetectionResult = None
                     ob: ObjectDetectionResult = d
