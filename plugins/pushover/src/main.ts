@@ -1,4 +1,4 @@
-import { MediaObject, Notifier, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
+import { MediaObject, Notifier, NotifierOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { AddProvider } from "../../../common/src/provider-plugin";
 import { getCredentials, getCredentialsSettings } from "../../../common/src/credentials-settings";
@@ -45,7 +45,7 @@ class PushoverClient extends ScryptedDeviceBase implements Notifier, Settings {
         super(nativeId);
     }
 
-    async sendNotification(title: string, body: string, media: string | MediaObject, mimeType?: string): Promise<void> {
+    async sendNotification(title: string, options?: NotifierOptions, media?: MediaObject | string, icon?: MediaObject | string): Promise<void> {
         const { username, password } = getCredentials(this);
         const push = new Push({
             user: username,
@@ -54,13 +54,13 @@ class PushoverClient extends ScryptedDeviceBase implements Notifier, Settings {
 
         let data: Buffer;
         if (typeof media === 'string')
-            media = await mediaManager.createMediaObjectFromUrl(media as string, mimeType);
+            media = await mediaManager.createMediaObjectFromUrl(media as string);
         if (media)
             data = await mediaManager.convertMediaObjectToBuffer(media as MediaObject, 'image/*');
 
 
         const msg = {
-            message: body,
+            message: options?.body || options?.subtitle,
             title,
             sound: this.storage.getItem('sound') || 'none',
             device: this.storage.getItem('device'),

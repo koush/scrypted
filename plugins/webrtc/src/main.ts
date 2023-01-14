@@ -4,7 +4,7 @@ import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { BufferConverter, BufferConvertorOptions, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, BufferConvertorOptions, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import net from 'net';
@@ -86,9 +86,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
                 audioTransceiver,
                 isPrivate: undefined, destinationId: undefined, ipv4: undefined,
                 requestMediaStream: async () => media,
-                sessionSupportsH264High: true,
                 maximumCompatibilityMode: false,
-                transcodeWidth: 1280,
+                clientOptions: undefined,
             });
 
             waitClosed(pc).finally(() => forwarder.kill());
@@ -467,7 +466,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
         try {
             const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
-            const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
+            const clientOptions = await session.getOptions();
 
             const result = zygote();
             this.activeConnections++;
@@ -481,7 +480,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
             const { createConnection } = await result.result;
             const connection = await createConnection(message, client.port, session,
-                this.storageSettings.values.maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
+                this.storageSettings.values.maximumCompatibilityMode, clientOptions, {
                 configuration: this.getRTCConfiguration(),
                 weriftConfiguration: this.getWeriftConfiguration(),
             });
@@ -509,12 +508,12 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
 export async function fork() {
     return {
-        async createConnection(message: any, portOrDummy: number | boolean, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, transcodeWidth: number, sessionSupportsH264High: boolean, options: { disableIntercom?: boolean; configuration: RTCConfiguration, weriftConfiguration: PeerConfig; }) {
+        async createConnection(message: any, port: number, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, clientOptions: RTCSignalingOptions, options: { disableIntercom?: boolean; configuration: RTCConfiguration, weriftConfiguration: PeerConfig; }) {
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
             cleanup.promise.finally(() => setTimeout(() => process.exit(), 10000));
 
-            const connection = new WebRTCConnectionManagement(console, clientSession, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, options);
+            const connection = new WebRTCConnectionManagement(console, clientSession, maximumCompatibilityMode, clientOptions, options);
             const { pc } = connection;
             waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
 
@@ -529,8 +528,7 @@ export async function fork() {
                 }
             }
 
-            if (typeof portOrDummy === 'number') {
-                const port = portOrDummy;
+            if (port) {
                 const socket = net.connect(port, '127.0.0.1');
                 cleanup.promise.finally(() => socket.destroy());
 
@@ -549,10 +547,6 @@ export async function fork() {
             }
             else {
                 pc.createDataChannel('dummy');
-                if (portOrDummy) {
-                    const offer = await pc.createOffer();
-                    pc.setLocalDescription(offer);
-                }
             }
 
             return connection;
@@ -571,9 +565,7 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
     async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<any> {
         const session = data as RTCSignalingSession;
         const maximumCompatibilityMode = !!this.plugin.storageSettings.values.maximumCompatibilityMode;
-        const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
-
-        const console = sdk.deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
+        const clientOptions = await session.getOptions();
 
         const result = zygote();
 
@@ -590,10 +582,13 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
 
         const { createConnection } = await result.result;
         const connection = await createConnection({}, undefined, session,
-            maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
-            configuration: this.plugin.getRTCConfiguration(),
-            weriftConfiguration: this.plugin.getWeriftConfiguration(),
-        });
+            maximumCompatibilityMode,
+            clientOptions,
+            {
+                configuration: this.plugin.getRTCConfiguration(),
+                weriftConfiguration: this.plugin.getWeriftConfiguration(),
+            }
+        );
         cleanup.promise.finally(() => connection.close().catch(() => { }));
         connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
         await connection.negotiateRTCSignalingSession();

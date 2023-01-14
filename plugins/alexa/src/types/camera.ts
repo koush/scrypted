@@ -50,7 +50,7 @@ addSupportedType(ScryptedDeviceType.Camera, {
             capabilities
         }
     },
-    async reportState(device: ScryptedDevice & MotionSensor): Promise<StateReport>{
+    async reportState(device: ScryptedDevice & MotionSensor): Promise<StateReport> {
         return {
             type: 'state',
             namespace: 'Alexa',
@@ -110,6 +110,12 @@ export class AlexaSignalingSession implements RTCSignalingSession {
                 sdp: this.directive.payload.offer.value,
             },
             disableTrickle: true,
+            // this could be a low resolution screen, no way of knowing, so never send a
+            // 1080p+ stream.
+            screen: {
+                width: 1280,
+                height: 720,
+            }
         }
     }
 

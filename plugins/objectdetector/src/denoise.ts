@@ -49,6 +49,8 @@ export interface DenoisedDetectionState<T> {
     tracked?: TrackedItem<T>[];
     frameCount?: number;
     lastDetection?: number;
+    // id to time
+    externallyTracked?: Map<string, DenoisedDetectionEntry<T>>;
 }
 
 type Rectangle = {
@@ -93,6 +95,43 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
     if (!state.previousDetections)
         state.previousDetections = [];
 
+    const now = options.now || Date.now();
+
+    const externallyTracked = currentDetections.filter(d => d.id);
+    if (externallyTracked.length) {
+        if (!state.externallyTracked)
+            state.externallyTracked = new Map();
+        
+        for (const tracked of externallyTracked) {
+            tracked.lastSeen = now;
+
+            let previous = state.externallyTracked.get(tracked.id);
+            if (state.externallyTracked.has(tracked.id)) {
+                previous.lastSeen = now;
+                tracked.firstBox = previous.firstBox;
+                tracked.lastBox = previous.lastBox = tracked.boundingBox;
+                previous.durationGone = 0;
+                options?.retained(tracked, previous);
+            }
+            else {
+                state.externallyTracked.set(tracked.id, tracked);
+                tracked.firstSeen = now;
+                tracked.durationGone = 0;
+                tracked.firstBox = tracked.lastBox = tracked.boundingBox;
+                options?.added(tracked);
+            }
+        }
+
+        for (const tracked of state.externallyTracked.values()) {
+            if (now - tracked.lastSeen > options.timeout) {
+                options?.expiring(tracked);
+            }
+        }
+    }
+
+    if (state.externallyTracked)
+        return;
+
     const { tracker, previousDetections } = state;
 
     const items: TrackerItem<T>[] = currentDetections.filter(cd => cd.boundingBox).map(cd => {
@@ -111,7 +150,6 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
     //     console.log(to.velocity);
     // }
 
-    const now = options.now || Date.now();
 
     const lastDetection = state.lastDetection || now;
     const sinceLastDetection = now - lastDetection;

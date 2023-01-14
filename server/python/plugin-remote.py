@@ -19,7 +19,7 @@ from asyncio.streams import StreamReader, StreamWriter
 from collections.abc import Mapping
 from io import StringIO
 from os import sys
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 
 import aiofiles
 import scrypted_python.scrypted_sdk.types
@@ -479,10 +479,15 @@ async def async_main(loop: AbstractEventLoop):
         def stats_runner():
             ptime = round(time.process_time() * 1000000)
             try:
-                import resource
-                heapTotal = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                import psutil
+                process = psutil.Process(os.getpid())
+                heapTotal = process.memory_info().rss
             except:
-                heapTotal = 0
+                try:
+                    import resource
+                    heapTotal = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                except:
+                    heapTotal = 0
             stats = {
                 'type': 'stats',
                 'cpuUsage': {

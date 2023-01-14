@@ -71,6 +71,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
             },
         },
         screen: {
+            devicePixelRatio: window.devicePixelRatio,
             width: screen.width,
             height: screen.height,
         },

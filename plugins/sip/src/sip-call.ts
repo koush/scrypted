@@ -3,6 +3,7 @@ import { randomInteger, randomString } from './util'
 import { RtpDescription, RtpOptions, RtpStreamDescription } from './rtp-utils'
 import { decodeSrtpOptions } from '@homebridge/camera-utils'
 import { stringify } from 'sip/sip'
+import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 
 const sip = require('sip'),
   sdp = require('sdp')
@@ -15,7 +16,7 @@ export interface SipOptions {
   localIp: string
   localPort: number
   debugSip?: boolean
-  messageHandler?: SipMessageHandler 
+  messageHandler?: SipMessageHandler
   shouldRegister?: boolean
 }
 
@@ -178,10 +179,14 @@ export class SipCall {
         ws: false,
         logger: {
           recv:  function(m, remote) {
+            if( m.status == '200' && m.reason =='Ok' && m.headers.contact ) {
+              // ACK for INVITE and BYE must use the registrar contact uri
+              this.registrarContact = m.headers.contact[0].uri;
+            }
             if( sipOptions.debugSip ) {
               console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
               console.log(stringify( m ));
-              console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")            
+              console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
             }
           },
           send:  function(m, remote) {
@@ -195,30 +200,31 @@ export class SipCall {
             // While underlying UDP socket is bound to the IP, the header is rewritten to match the domain
             let toWithDomain: string = (sipOptions.to.split('@')[0] + '@' + sipOptions.domain).trim()
             let fromWithDomain: string = (sipOptions.from.split('@')[0] + '@' + sipOptions.domain).trim()
-            if( m.method == 'REGISTER' || m.method == 'INVITE' ) {
+
               if( m.method == 'REGISTER' ) {
                 m.uri = "sip:" + sipOptions.domain
               } else if( m.method == 'INVITE' ) {
                 m.uri = toWithDomain
+              } else if( m.method == 'ACK' || m.method == 'BYE' ) {
+                m.uri = this.registrarContact
               } else {
                 throw new Error("Error: Method construct for uri not implemented: " + m.method)
               }
-              
+
               m.headers.to.uri = toWithDomain
               m.headers.from.uri = fromWithDomain
-              if( m.headers.contact[0].uri.split('@')[0].indexOf('-') < 0 ) {
+              if( m.headers.contact && m.headers.contact[0].uri.split('@')[0].indexOf('-') < 0 ) {
                 m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + contactId + "@");
               }
-           }
-
             }
+
             if( sipOptions.debugSip ) {
               console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
               console.log(stringify( m ));
-              console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");            
+              console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
             }
-          },          
-        },        
+          },
+        },
       },
         (request: SipRequest) => {
           if (request.method === 'BYE') {
@@ -368,24 +374,27 @@ export class SipCall {
 
   /**
   * Register the user agent with a Registrar
-  */  
+  */
   async register() {
-    const { from } = this.sipOptions,
-      inviteResponse = await this.request({
-        method: 'REGISTER',
-        headers: {
-          //supported: 'replaces, outbound',
-          allow:
-            'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
-          'content-type': 'application/sdp',
-          contact: [{ uri: from, params: { expires: this.sipOptions.expire } }],
-        },
-      });
+    const { from } = this.sipOptions;
+    await timeoutPromise( 500,
+      this.request({
+      method: 'REGISTER',
+      headers: {
+        //supported: 'replaces, outbound',
+        allow:
+          'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
+        'content-type': 'application/sdp',
+        contact: [{ uri: from, params: { expires: this.sipOptions.expire } }],
+      },
+      }).catch(() => {
+      // Don't care if we get an exception here.
+    }));
   }
 
   /**
   * Send a message to the current call contact
-  */    
+  */
   async message( content: string ) {
     const { from } = this.sipOptions,
       inviteResponse = await this.request({
@@ -399,13 +408,13 @@ export class SipCall {
         },
         content: content
       });
-  }  
+  }
 
   async sendBye() {
     this.console.log('Sending BYE...')
-    return this.request({ method: 'BYE' }).catch(() => {
+    return await timeoutPromise( 3000, this.request({ method: 'BYE' }).catch(() => {
       // Don't care if we get an exception here.
-    })
+    }));
   }
 
   destroy() {

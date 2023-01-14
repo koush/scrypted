@@ -2,7 +2,6 @@ import child_process from 'child_process';
 import fs from "fs";
 import os from "os";
 import path from 'path';
-import readline from 'readline';
 import { Readable, Writable } from 'stream';
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { createRpcDuplexSerializer } from '../../rpc-serializer';

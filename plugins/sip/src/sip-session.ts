@@ -149,7 +149,6 @@ export class SipSession extends Subscribed {
 
       return rtpDescription
     } catch (e) {
-
       this.callEnded(true)
       throw e
     }
