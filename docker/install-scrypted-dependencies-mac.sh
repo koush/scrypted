@@ -69,7 +69,7 @@ then
 fi
 
 RUN python$PYTHON_VERSION -m pip install --upgrade pip
-RUN python$PYTHON_VERSION -m pip install aiofiles debugpy typing_extensions typing opencv-python
+RUN python$PYTHON_VERSION -m pip install aiofiles debugpy typing_extensions typing opencv-python psutil
 
 echo "Installing Scrypted Launch Agent..."
 
