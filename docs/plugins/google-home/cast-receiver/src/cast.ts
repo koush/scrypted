@@ -53,8 +53,11 @@ document.addEventListener("DOMContentLoaded", function (event) {
       });
 
       const session = new BrowserSignalingSession();
+      // nest hub devices lie about their capabilties, such as
+      // reporting that they support 4k and h264 high.
       session.options.screen.width = 1280;
       session.options.screen.height = 720;
+      session.options.screen.devicePixelRatio = 1;
 
       const cleanup = () => {
         console.log('cleanup');
