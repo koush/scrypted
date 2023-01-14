@@ -12,6 +12,9 @@ import time
 from detect import DetectionSession, DetectPlugin
 from collections import namedtuple
 
+from .sort_oh import tracker
+import numpy as np
+
 Rectangle = namedtuple('Rectangle', 'xmin ymin xmax ymax')
 
 def intersect_area(a: Rectangle, b: Rectangle):  # returns None if rectangles don't intersect
@@ -22,12 +25,14 @@ def intersect_area(a: Rectangle, b: Rectangle):  # returns None if rectangles do
 
 class PredictSession(DetectionSession):
     image: Image.Image
+    tracker: sort_oh.tracker.Sort_OH
 
     def __init__(self, start_time: float) -> None:
         super().__init__()
         self.image = None
         self.processed = 0
         self.start_time = start_time
+        self.tracker = None
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -250,8 +255,14 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
     def run_detection_image(self, detection_session: PredictSession, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, multipass_crop: Tuple[float, float, float, float] = None):
         (w, h) = self.get_input_size()
-
         (iw, ih) = image.size
+
+        if not detection_session.tracker:
+            detection_session.tracker = tracker.Sort_OH(scene=np.array([iw, ih]))
+            conf_trgt = 0.35
+            conf_objt = 0.75
+            detection_session.tracker.conf_trgt = conf_trgt
+            detection_session.tracker.conf_objt = conf_objt
 
         # this a single pass or the second pass. detect once and return results.
         if multipass_crop:
@@ -359,6 +370,36 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         dedupe_detections()
 
         ret['detections'] = detections
+
+        if not multipass_crop:
+            sort_input = []
+            for d in ret['detections']:
+                r: ObjectDetectionResult = d
+                l, t, w, h = r['boundingBox']
+                sort_input.append([l, t, l + w, t + h, r['score']])
+            trackers, unmatched_trckr, unmatched_gts = detection_session.tracker.update(np.array(sort_input), [])
+
+            for td in trackers:
+                x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
+                ), td[2].item(), td[3].item(), td[4].item()
+                overlap = 0
+                detections = ret['detections']
+                ret['detections'] = []
+                for d in detections:
+                    obj: ObjectDetectionResult = None
+                    ob: ObjectDetectionResult = d
+                    dx0, dy0, dw, dh = ob['boundingBox']
+                    dx1 = dx0 + dw
+                    dy1 = dy0 + dh
+                    area = (min(dx1, x1)-max(dx0, x0))*(min(dy1, y1)-max(dy0, y0))
+                    if (area > overlap):
+                        overlap = area
+                        obj = ob
+
+                    if obj:
+                        obj['id'] = str(trackID)
+                        ret['detections'].append(obj)
+
         return ret, RawImage(image)
 
     def run_detection_crop(self, detection_session: DetectionSession, sample: RawImage, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:

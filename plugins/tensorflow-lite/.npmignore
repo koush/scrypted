@@ -9,3 +9,6 @@ dist/*.js
 dist/*.txt
 __pycache__
 all_models
+sort_oh
+download_models.sh
+tsconfig.json

@@ -49,3 +49,6 @@
 [submodule "plugins/tensorflow-lite/src/predict/sort_oh"]
 	path = plugins/tensorflow-lite/src/predict/sort_oh
 	url = https://github.com/nonocam/sort_oh.git
+[submodule "plugins/tensorflow-lite/sort_oh"]
+	path = plugins/tensorflow-lite/sort_oh
+	url = https://github.com/nonocam/sort_oh.git
