@@ -53,6 +53,8 @@ document.addEventListener("DOMContentLoaded", function (event) {
       });
 
       const session = new BrowserSignalingSession();
+      session.options.screen.width = 1280;
+      session.options.screen.height = 720;
 
       const cleanup = () => {
         console.log('cleanup');
