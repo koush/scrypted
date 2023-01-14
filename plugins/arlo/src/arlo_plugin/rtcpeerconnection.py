@@ -3,11 +3,11 @@ from aiortc.contrib.media import MediaPlayer
 import asyncio
 import threading
 import logging
-import os
 import queue
+import socket
 import sys
-import tempfile
-from urllib.parse import urlparse
+
+import scrypted_sdk
 
 
 # construct logger instance to be used by BackgroundRTCPeerConnection
@@ -49,7 +49,7 @@ class BackgroundRTCPeerConnection:
 
         self.pending_tasks = set()
         self.stopped = False
-        self.cleanup_background = None
+        self.cleanup = None
 
     def __background_main(self):
         logger.debug(f"Background RTC loop {self.thread.name} starting")
@@ -58,9 +58,6 @@ class BackgroundRTCPeerConnection:
         asyncio.set_event_loop(self.background_loop)
         self.thread_started.put(True)
         self.background_loop.run_forever()
-
-        if self.cleanup_background is not None:
-            self.cleanup_background()
 
         logger.debug(f"Background RTC loop {self.thread.name} exiting")
 
@@ -120,10 +117,12 @@ class BackgroundRTCPeerConnection:
         if self.stopped:
             return
         self.stopped = True
+        if self.cleanup:
+            await self.cleanup()
         await self.__run_background(self.pc.close(), await_result=False, stop_loop=True)
 
-    async def add_audio(self, options):
-        """Adds an audio track to the RTCPeerConnection given FFmpeg options.
+    async def add_audio(self, endpoint, format, options={}):
+        """Adds an audio track to the RTCPeerConnection, using provided FFmpeg args.
 
         This constructs a MediaPlayer in the background thread's asyncio loop,
         since MediaPlayer also utilizes coroutines and asyncio.
@@ -131,22 +130,10 @@ class BackgroundRTCPeerConnection:
         Note that this may block the background thread's event loop if the
         server is not yet ready.
         """
-        try:
-            input = options["i"]
-            format = options.get("f")
-            if format is None and input.startswith("rtsp"):
-                format = "rtsp"
-        except:
-            logger.error("error detecting what input file and format to use")
-            raise
-
-        logger.info(f"Intercom sourced from {input} with format {format}")
-
-        if format == "sdp" and input.startswith("tcp"):
-            input = await self.__sdp_to_file(input)
 
         def add_audio_background():
-            media_player = MediaPlayer(input, format=format, options=options)
+            media_player = MediaPlayer(endpoint, format=format, options=options)
+            media_player._throttle_playback = False
 
             # patch the player's stop function to close RTC if
             # the media ends before RTC is closed
@@ -159,35 +146,3 @@ class BackgroundRTCPeerConnection:
             self.pc.addTrack(media_player.audio)
 
         self.background_loop.call_soon_threadsafe(add_audio_background)
-
-    async def __sdp_to_file(self, endpoint):
-        url = urlparse(endpoint)
-        logger.debug(f"Reading sdp file from {url.hostname}:{url.port}")
-        reader, writer = await asyncio.open_connection(url.hostname, url.port)
-
-        sdp_contents = bytes()
-        while True:
-            line = await reader.readline()
-            if not line:
-                break
-            sdp_contents += line
-
-        logger.debug("Finished reading sdp")
-
-        writer.close()
-        await writer.wait_closed()
-
-        logger.info(f"Received intercom input sdp:\n{sdp_contents.decode('utf-8')}")
-
-        fd, filename = tempfile.mkstemp(".sdp")
-        os.write(fd, sdp_contents)
-        os.close(fd)
-
-        logger.info(f"Wrote sdp to file {filename}")
-
-        def cleanup_background():
-            os.remove(filename)
-            logger.info(f"Deleted sdp file {filename}")
-        self.cleanup_background = cleanup_background
-
-        return filename

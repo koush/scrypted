@@ -3,6 +3,7 @@ from aiortc import RTCSessionDescription, RTCIceGatherer, RTCIceServer
 from aiortc.rtcicetransport import candidate_to_aioice, candidate_from_aioice 
 import asyncio
 import json
+import socket
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
@@ -154,19 +155,31 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
         self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
 
-        options = {}
-        current_key = None
-        for arg in ffmpeg_params["inputArguments"]:
-            if current_key is None and not arg.startswith("-"):
-                self.logger.warning(f"Ignoring unknown ffmpeg argument {arg}")
-                continue
-            if arg.startswith("-"):
-                current_key = arg.lstrip("-")
-                options[current_key] = ""
-                continue
-            options[current_key] = (options[current_key] + " " + arg).strip()
+        # Reserve a port for us to give to ffmpeg
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(('localhost', 0))
+        port = sock.getsockname()[1]
 
-        self.logger.debug(f"Parsed ffmpeg params: {options}")
+        # Start ffmpeg to convert input into something we know PyAV understands
+        ffmpeg_path = await scrypted_sdk.mediaManager.getFFmpegPath()
+        ffmpeg_args = [
+            "-y",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-analyzeduration", "0",
+            "-fflags", "-nobuffer",
+            "-probesize", "32",
+            *ffmpeg_params["inputArguments"],
+            "-vn", "-dn", "-sn",
+            "-f", "mpegts",
+            "-flush_packets", "1",
+            f"udp://localhost:{port}"
+        ]
+        ffmpeg = await asyncio.create_subprocess_exec(ffmpeg_path, *ffmpeg_args)
+
+        def cleanup():
+            ffmpeg.kill()
+        self.cleanup = cleanup
 
         session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
         self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
@@ -195,7 +208,12 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
             pc = self.pc = BackgroundRTCPeerConnection()
             self.sdp_answered = False
 
-            await pc.add_audio(options)
+            sock.close()
+            await pc.add_audio(
+                f"udp://localhost:{port}",
+                format="mpegts",
+                options={"analyzeduration": "0", "probesize": "32", "flush_packets": "1"}
+            )
 
             offer = await pc.createOffer()
             self.logger.info(f"Arlo offer sdp:\n{offer.sdp}")
@@ -218,7 +236,9 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
         self.logger.info("Stopping intercom")
         if self.pc:
             await self.pc.close()
+            self.cleanup()
         self.pc = None
+        self.cleanup = None
         self.sdp_answered = False
 
     def _update_device_details(self, arlo_device):
