@@ -212,7 +212,6 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, Intercom, MotionSensor
             await pc.add_audio(
                 f"udp://localhost:{port}",
                 format="mpegts",
-                options={"analyzeduration": "0", "probesize": "32", "flush_packets": "1"}
             )
 
             offer = await pc.createOffer()
