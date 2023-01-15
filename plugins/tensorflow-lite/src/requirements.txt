@@ -6,3 +6,10 @@ Pillow>=5.4.1
 pycoral~=2.0
 PyGObject>=3.30.4
 tflite-runtime==2.5.0.post1
+
+
+# sort_oh
+scipy
+numba
+filterpy
+numpy
