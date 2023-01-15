@@ -46,3 +46,6 @@
 [submodule "plugins/objectdetector/node-moving-things-tracker"]
 	path = plugins/objectdetector/node-moving-things-tracker
 	url = ../../koush/node-moving-things-tracker.git
+[submodule "plugins/tensorflow-lite/sort_oh"]
+	path = plugins/tensorflow-lite/sort_oh
+	url = git@github.com:koush/sort_oh
