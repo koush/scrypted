@@ -9,7 +9,5 @@ tflite-runtime==2.5.0.post1
 
 
 # sort_oh
-scipy
 numba
 filterpy
-numpy

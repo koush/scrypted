@@ -378,12 +378,14 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         ret['detections'] = detections
 
         if not multipass_crop:
+            print('trackering')
             sort_input = []
             for d in ret['detections']:
                 r: ObjectDetectionResult = d
                 l, t, w, h = r['boundingBox']
                 sort_input.append([l, t, l + w, t + h, r['score']])
             trackers, unmatched_trckr, unmatched_gts = detection_session.tracker.update(np.array(sort_input), [])
+            print('trackers %s', trackers)
 
             detections = ret['detections']
             ret['detections'] = []
