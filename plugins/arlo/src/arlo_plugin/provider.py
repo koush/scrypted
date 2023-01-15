@@ -162,6 +162,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         arlo_lib_logger.setLevel(log_level)
         background_rtc_logger.setLevel(log_level)
         propagate_aiortc_logging_level(log_level)
+        logging.getLogger('libav').setLevel(log_level)
 
     def propagate_transport(self):
         self.print(f"Setting plugin transport to {self.arlo_transport}")

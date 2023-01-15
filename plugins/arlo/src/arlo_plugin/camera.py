@@ -123,15 +123,12 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
         }
         plugin_setup = {}
 
-        try:
-            scrypted_offer = await scrypted_session.createLocalDescription("offer", scrypted_setup, sendIceCandidate=plugin_session.addIceCandidate)
-            await plugin_session.setRemoteDescription(scrypted_offer, plugin_setup)
-            plugin_answer = await plugin_session.createLocalDescription("answer", plugin_setup, scrypted_session.sendIceCandidate)
-            await scrypted_session.setRemoteDescription(plugin_answer, scrypted_setup)
-        except Exception as e:
-            self.logger.error(e)
+        scrypted_offer = await scrypted_session.createLocalDescription("offer", scrypted_setup, sendIceCandidate=plugin_session.addIceCandidate)
+        await plugin_session.setRemoteDescription(scrypted_offer, plugin_setup)
+        plugin_answer = await plugin_session.createLocalDescription("answer", plugin_setup, scrypted_session.sendIceCandidate)
+        await scrypted_session.setRemoteDescription(plugin_answer, scrypted_setup)
 
-        return {}
+        return ArloCameraRTCSessionControl(plugin_session)
 
     async def startIntercom(self, media):
         self.logger.info("Starting intercom")
@@ -243,6 +240,8 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         self.arlo_device = camera.arlo_device
         self.arlo_basestation = camera.arlo_basestation
 
+        self.ffmpeg_subprocess = None
+
         self.pc = None
         self.local_candidates = None
         self.arlo_pc = None
@@ -296,8 +295,43 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
 
     async def initialize(self):
         rtsp_url = await self.camera._getVideoStreamURL()
+
+        # Reserve a port for us to give to ffmpeg
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(('localhost', 0))
+        port = sock.getsockname()[1]
+        sock.close()
+
+        ffmpeg_path = await scrypted_sdk.mediaManager.getFFmpegPath()
+        ffmpeg_args = [
+            "-y",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-analyzeduration", "0",
+            "-fflags", "-nobuffer",
+            "-probesize", "32",
+            "-vcodec", "h264",
+            "-acodec", "aac",
+            "-i", rtsp_url,
+            "-vcodec", "copy",
+            "-acodec", "copy",
+            "-f", "mpegts",
+            "-flush_packets", "1",
+            f"udp://localhost:{port}"
+        ]
+        self.ffmpeg_subprocess = await asyncio.create_subprocess_exec(ffmpeg_path, *ffmpeg_args)
+
         self.pc = BackgroundRTCPeerConnection()
-        self.pc.add_media(rtsp_url, format="rtsp")
+        self.pc.add_media(
+            f"udp://localhost:{port}",
+            format="mpegts",
+            options={
+                "vcodec": "h264",
+                "acodec": "pcm_s16le",
+                "analyzeduration": "0",
+                "probesize": "32"
+            }
+        )
 
         ice_gatherer = RTCIceGatherer()
         await ice_gatherer.gather()
@@ -337,3 +371,19 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
 
     async def getOptions(self):
         pass
+
+    async def shutdown(self):
+        if self.ffmpeg_subprocess is not None:
+            self.ffmpeg_subprocess.kill()
+        if self.pc is not None:
+            await self.pc.close()
+        if self.arlo_pc is not None:
+            await self.arlo_pc.close()
+
+
+class ArloCameraRTCSessionControl:
+    def __init__(self, arlo_session):
+        self.arlo_session = arlo_session
+
+    async def endSession(self):
+        await self.arlo_session.shutdown()

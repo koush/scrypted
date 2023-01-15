@@ -4,10 +4,7 @@ import asyncio
 import threading
 import logging
 import queue
-import socket
 import sys
-
-import scrypted_sdk
 
 
 # construct logger instance to be used by BackgroundRTCPeerConnection
