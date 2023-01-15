@@ -4,10 +4,7 @@ PyGObject>=3.30.4
 coremltools~=6.1
 
 # sort_oh
-
-
-# sort_oh
+scipy
 numba
 filterpy
-numba
-filterpy
+numpy
