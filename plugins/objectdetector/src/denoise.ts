@@ -96,6 +96,8 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
         state.previousDetections = [];
 
     const now = options.now || Date.now();
+    const lastDetection = state.lastDetection || now;
+    const sinceLastDetection = now - lastDetection;
 
     const externallyTracked = currentDetections.filter(d => d.id);
     if (externallyTracked.length) {
@@ -122,9 +124,12 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
             }
         }
 
-        for (const tracked of state.externallyTracked.values()) {
-            if (now - tracked.lastSeen > options.timeout) {
-                options?.expiring(tracked);
+        for (const previous of state.externallyTracked.values()) {
+            if (now - previous.lastSeen) {
+                previous.durationGone += sinceLastDetection;
+                if (previous.durationGone >= options.timeout) {
+                    options?.expiring(previous);
+                }
             }
         }
     }
@@ -151,8 +156,6 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
     // }
 
 
-    const lastDetection = state.lastDetection || now;
-    const sinceLastDetection = now - lastDetection;
     const previousCopy = previousDetections.slice();
     previousDetections.splice(0, previousDetections.length);
     const map = new Map<string, DenoisedDetectionEntry<T>>();
