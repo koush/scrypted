@@ -15,7 +15,7 @@ class WebhookExample implements HttpRequestHandler {
 
 device.handleTypes(ScryptedInterface.Thermometer);
 
-endpointManager.getInsecurePublicLocalEndpoint(device.nativeId)
+endpointManager.getLocalEndpoint(device.nativeId, { insecure: true, public: true })
     .then(endpoint => {
         console.log('motion webhook:', endpoint);
         console.log('example:');
