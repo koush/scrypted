@@ -34,8 +34,12 @@ export class AddProvider extends ScryptedDeviceBase implements DeviceProvider, S
 
     async discoverDevices(duration: number): Promise<void> {
     }
-    getDevice(nativeId: string) {
+    
+    async getDevice(nativeId: string) {
         return this.pluginClass(nativeId);
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 }
 
