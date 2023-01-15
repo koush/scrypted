@@ -404,6 +404,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     dy1 = dy0 + dh
                     da = dw * dh
                     area = intersect_area(Rectangle(dx0, dy0, dx1, dy1), box)
+                    if not area:
+                        continue
                     dslop = ta + da - area * 2
                     if (dslop < slop):
                         slop = dslop
