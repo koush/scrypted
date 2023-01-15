@@ -48,4 +48,4 @@
 	url = ../../koush/node-moving-things-tracker.git
 [submodule "plugins/tensorflow-lite/sort_oh"]
 	path = plugins/tensorflow-lite/sort_oh
-	url = git@github.com:koush/sort_oh
+	url = ../../koush/sort_oh.git
