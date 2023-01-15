@@ -133,7 +133,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             this.console.log(endpoint);
 
             const service = responder.createService({
-                name: 'Scrypted',
+                name: 'Scrypted Google Home',
                 type: 'scrypted-gh',
                 protocol: Protocol.TCP,
                 port: parseInt(url.port),
