@@ -105,11 +105,10 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
             state.externallyTracked = new Map();
         
         for (const tracked of externallyTracked) {
-            tracked.lastSeen = now;
-
             let previous = state.externallyTracked.get(tracked.id);
             if (state.externallyTracked.has(tracked.id)) {
-                previous.lastSeen = now;
+                tracked.firstSeen = previous.firstSeen;
+                tracked.lastSeen = previous.lastSeen = now;
                 tracked.firstBox = previous.firstBox;
                 tracked.lastBox = previous.lastBox = tracked.boundingBox;
                 previous.durationGone = 0;
@@ -118,6 +117,7 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
             else {
                 state.externallyTracked.set(tracked.id, tracked);
                 tracked.firstSeen = now;
+                tracked.lastSeen = now;
                 tracked.durationGone = 0;
                 tracked.firstBox = tracked.lastBox = tracked.boundingBox;
                 options?.added(tracked);
