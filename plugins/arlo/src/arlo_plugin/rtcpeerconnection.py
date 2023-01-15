@@ -49,7 +49,6 @@ class BackgroundRTCPeerConnection:
 
         self.pending_tasks = set()
         self.stopped = False
-        self.cleanup = None
 
     def __background_main(self):
         logger.debug(f"Background RTC loop {self.thread.name} starting")
@@ -104,6 +103,9 @@ class BackgroundRTCPeerConnection:
     async def createOffer(self):
         return await self.__run_background(self.pc.createOffer())
 
+    async def createAnswer(self):
+        return await self.__run_background(self.pc.createAnswer())
+
     async def setLocalDescription(self, sdp):
         return await self.__run_background(self.pc.setLocalDescription(sdp))
 
@@ -117,21 +119,19 @@ class BackgroundRTCPeerConnection:
         if self.stopped:
             return
         self.stopped = True
-        if self.cleanup:
-            await self.cleanup()
         await self.__run_background(self.pc.close(), await_result=False, stop_loop=True)
 
-    async def add_audio(self, endpoint, format, options={}):
-        """Adds an audio track to the RTCPeerConnection, using provided FFmpeg args.
+    def add_media(self, endpoint, format=None, options={}):
+        """Adds media track(s) to the RTCPeerConnection, using provided arguments.
 
         This constructs a MediaPlayer in the background thread's asyncio loop,
         since MediaPlayer also utilizes coroutines and asyncio.
 
         Note that this may block the background thread's event loop if the
-        server is not yet ready.
+        endpoint server is not yet ready.
         """
 
-        def add_audio_background():
+        def add_media_background():
             media_player = MediaPlayer(endpoint, format=format, options=options)
             media_player._throttle_playback = False
 
@@ -143,6 +143,9 @@ class BackgroundRTCPeerConnection:
                 self.main_loop.call_soon_threadsafe(self.main_loop.create_task, self.close())
             media_player._stop = new_stop
 
-            self.pc.addTrack(media_player.audio)
+            if media_player.audio is not None:
+                self.pc.addTrack(media_player.audio)
+            if media_player.video is not None:
+                self.pc.addTrack(media_player.video)
 
-        self.background_loop.call_soon_threadsafe(add_audio_background)
+        self.background_loop.call_soon_threadsafe(add_media_background)

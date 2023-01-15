@@ -316,8 +316,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             ScryptedInterface.VideoCamera.value,
             ScryptedInterface.Camera.value,
             ScryptedInterface.MotionSensor.value,
-            ScryptedInterface.Intercom.value,
             ScryptedInterface.Battery.value,
+            ScryptedInterface.RTCSignalingChannel.value,
         ]
 
         if model_id.startswith("avd1001"):
@@ -327,6 +327,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             results.append(ScryptedInterface.BinarySensor.value)
 
         if camera["deviceId"] == camera["parentId"]:
-            results.remove(ScryptedInterface.Intercom.value)
+            results.remove(ScryptedInterface.RTCSignalingChannel.value)
  
         return results

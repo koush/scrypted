@@ -75,8 +75,8 @@ def init_aiortc_logger(logger_name):
 
     if logger_name == "aiortc.rtcrtpsender":
         # rtcrtpsender is extremely noisy for DEBUG, so filter out all
-        # the packet logs
-        logger.addFilter(lambda record: 0 if ") > " in record.getMessage() else 1)
+        # the packet and bitrate logs
+        logger.addFilter(lambda record: 0 if ") > " in record.getMessage() or ") - receiver" in record.getMessage() else 1)
 
 for log in aiortc_loggers:
     init_aiortc_logger(log)
