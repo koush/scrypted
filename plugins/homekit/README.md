@@ -20,9 +20,10 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
   * Cloud cameras:
     * Motion delivery issue from the cloud service.
 
-2) After a motion trigger, the home hub will start recording. Verify that HomeKit is requesting recording by looking in the Camera's Console: you will see logs such as `[HomeKit]: Camera recording session starting`. If you do not see this, there are two possible causes and solutions:
+2) After a motion trigger, the home hub will start recording. Verify that HomeKit is requesting recording by looking in the Camera's Console: you will see logs such as `[HomeKit]: Camera recording session starting`. If you do not see this, there are three possible causes and solutions:
   * The Home Hubs are bugged out and have stopped responding to motion. Reboot all Home Hubs when this happens. **iPads and HomePods, which are wireless, are not reliable Home Hubs.** If you have an iPad as a Home Hub, remove it from acting as a Home Hub from within the iOS Home app. Unfortunately this is not possible to do with HomePods.
   * Your iCloud account is in a bad state. Log out of iCloud on your iPhone, and log back in. Then disable and reenable HomeKit Secure Video on your cameras again.
+  * You are running Scrypted on a different subnet from your home hub(s) and are exposing it to the home hub subnet via an mDNS reflector. For some reason, this works perfectly fine for live streaming, but your home hubs will not initiate recording if they see that they are on a different subnet.
 
 3) If HomeKit requested the video, but nothing showed up in the timeline:
   * HomeKit may have decided the motion wasn't worth recording. Set your HomeKit recording options to all motion when testing.
