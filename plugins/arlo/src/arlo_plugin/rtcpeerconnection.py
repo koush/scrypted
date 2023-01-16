@@ -1,41 +1,15 @@
 from aiortc import RTCPeerConnection
-from aiortc.contrib.media import MediaPlayer
+from aiortc.contrib.media import MediaPlayer, MediaRelay
 import asyncio
 import threading
-import logging
 import queue
-import sys
 
 
-# construct logger instance to be used by BackgroundRTCPeerConnection
-logger = logging.getLogger("rtc")
-logger.setLevel(logging.INFO)
+class BackgroundThreadedLoop:
+    """Class that manages a background thread and its asyncio loop."""
 
-# output logger to stdout
-ch = logging.StreamHandler(sys.stdout)
-
-# log formatting
-fmt = logging.Formatter("(arlo) %(levelname)s:%(name)s:%(asctime)s.%(msecs)03d %(message)s", "%H:%M:%S")
-ch.setFormatter(fmt)
-
-# configure handler to logger
-logger.addHandler(ch)
-
-
-class BackgroundRTCPeerConnection:
-    """Proxy class to use RTCPeerConnection in a background thread.
-
-    The purpose of this proxy is to ensure that RTCPeerConnection operations
-    do not block the main asyncio thread. From testing, it seems that the
-    close() function blocks until the source RTSP server exits, which we
-    have no control over. Additionally, since asyncio coroutines are tied
-    to the event loop they were constructed from, it is not possible to only
-    run close() in a separate thread. Therefore, each instance of RTCPeerConnection
-    is launched within its own ephemeral thread, which cleans itself up once
-    close() completes.
-    """
-
-    def __init__(self):
+    def __init__(self, logger):
+        self.logger = logger
         self.main_loop = asyncio.get_event_loop()
         self.background_loop = asyncio.new_event_loop()
 
@@ -45,19 +19,18 @@ class BackgroundRTCPeerConnection:
         self.thread_started.get()
 
         self.pending_tasks = set()
-        self.stopped = False
+        self.handles = 1
 
     def __background_main(self):
-        logger.debug(f"Background RTC loop {self.thread.name} starting")
-        self.pc = RTCPeerConnection()
+        self.logger.debug(f"Background RTC loop {self.thread.name} starting")
 
         asyncio.set_event_loop(self.background_loop)
         self.thread_started.put(True)
         self.background_loop.run_forever()
 
-        logger.debug(f"Background RTC loop {self.thread.name} exiting")
+        self.logger.debug(f"Background RTC loop {self.thread.name} exiting")
 
-    async def __run_background(self, coroutine, await_result=True, stop_loop=False):
+    async def run_background(self, coroutine, await_result=True):
         fut = self.main_loop.create_future()
 
         def background_callback():
@@ -86,7 +59,7 @@ class BackgroundRTCPeerConnection:
             task.add_done_callback(self.pending_tasks.discard)
             task.add_done_callback(
                 lambda _:
-                self.background_loop.stop() if self.stopped and len(self.pending_tasks)
+                self.background_loop.stop() if self.handles == 0 and len(self.pending_tasks) == 0
                 else None
             )
 
@@ -96,6 +69,57 @@ class BackgroundRTCPeerConnection:
         if not await_result:
             return None
         return await fut
+
+    async def close_with(self, coroutine, await_result=False):
+        if self.handles == 0:
+            return
+        self.handles -= 1
+        await self.run_background(coroutine, await_result=await_result)
+
+
+class BackgroundRTCPeerConnection:
+    """Proxy class to use RTCPeerConnection in a background thread.
+
+    The purpose of this proxy is to ensure that RTCPeerConnection operations
+    do not block the main asyncio thread. From testing, it seems that the
+    close() function blocks until the source RTSP server exits, which we
+    have no control over. Additionally, since asyncio coroutines are tied
+    to the event loop they were constructed from, it is not possible to only
+    run close() in a separate thread. Therefore, each instance of RTCPeerConnection
+    is launched within its own ephemeral thread, which cleans itself up once
+    close() completes.
+    """
+
+    def __init__(self, logger, background=None):
+        self.background = background
+        if background:
+            self.background.handles += 1
+        else:
+            self.background = BackgroundThreadedLoop(logger)
+        self.logger = logger
+
+        self.pc = None
+        self.track_queue = asyncio.Queue()
+        self.stopped = False
+
+        self.initialized = queue.Queue(1)
+        self.background.background_loop.call_soon_threadsafe(self.__background_init)
+        self.initialized.get()
+
+    def __background_init(self):
+        pc = self.pc = RTCPeerConnection()
+
+        @pc.on("track")
+        def on_track(track):
+            self.background.main_loop.call_soon_threadsafe(
+                self.background.main_loop.create_task,
+                self.track_queue.put(track),
+            )
+
+        self.initialized.put(True)
+    
+    async def __run_background(self, coroutine, await_result=True):
+        return await self.background.run_background(coroutine, await_result=await_result)
 
     async def createOffer(self):
         return await self.__run_background(self.pc.createOffer())
@@ -116,9 +140,10 @@ class BackgroundRTCPeerConnection:
         if self.stopped:
             return
         self.stopped = True
-        await self.__run_background(self.pc.close(), await_result=False, stop_loop=True)
+        await self.track_queue.put(None)
+        await self.background.close_with(self.pc.close())
 
-    def add_media(self, endpoint, format=None, options={}):
+    async def add_media(self, endpoint, format=None, options={}):
         """Adds media track(s) to the RTCPeerConnection, using provided arguments.
 
         This constructs a MediaPlayer in the background thread's asyncio loop,
@@ -127,17 +152,21 @@ class BackgroundRTCPeerConnection:
         Note that this may block the background thread's event loop if the
         endpoint server is not yet ready.
         """
+        main_loop = self.background.main_loop
+        background_loop = self.background.background_loop
 
         def add_media_background():
+            self.logger.debug(f"Adding endpoint {endpoint} to MediaPlayer")
             media_player = MediaPlayer(endpoint, format=format, options=options)
             media_player._throttle_playback = False
+            self.logger.debug(f"Added endpoint {endpoint} to MediaPlayer")
 
             # patch the player's stop function to close RTC if
             # the media ends before RTC is closed
             old_stop = media_player._stop
             def new_stop(*args, **kwargs):
                 old_stop(*args, **kwargs)
-                self.main_loop.call_soon_threadsafe(self.main_loop.create_task, self.close())
+                main_loop.call_soon_threadsafe(main_loop.create_task, self.close())
             media_player._stop = new_stop
 
             if media_player.audio is not None:
@@ -145,4 +174,44 @@ class BackgroundRTCPeerConnection:
             if media_player.video is not None:
                 self.pc.addTrack(media_player.video)
 
-        self.background_loop.call_soon_threadsafe(add_media_background)
+        background_loop.call_soon_threadsafe(add_media_background)
+
+    async def subscribe_track(self, track):
+        relay_fut = self.background.main_loop.create_future()
+
+        def relay_background():
+            self.logger.debug("Starting track relay")
+            relay = MediaRelay()
+            relay_track = relay.subscribe(track, buffered=False)
+            self.pc.addTrack(relay_track)
+            self.background.main_loop.call_soon_threadsafe(relay_fut.set_result, (relay, relay_track))
+            self.logger.debug("Started track relay")
+
+        self.background.background_loop.call_soon_threadsafe(relay_background)
+        return await relay_fut
+
+    async def mute_relay(self, relay, relay_track):
+        def mute_background():
+            self.logger.debug("Muting track relay")
+            relay._stop(relay_track)
+            self.logger.debug("Muted track relay")
+        self.background.background_loop.call_soon_threadsafe(mute_background)
+
+    async def unmute_relay(self, relay, relay_track):
+        def unmute_background():
+            self.logger.debug("Unmuting track relay")
+            relay._start(relay_track)
+            self.logger.debug("Unmuted track relay")
+        self.background.background_loop.call_soon_threadsafe(unmute_background)
+
+    def on_track(self, callback):
+        async def loop():
+            while not self.stopped:
+                try:
+                    track = await asyncio.wait_for(self.track_queue.get(), 5)
+                except asyncio.TimeoutError:
+                    continue
+                if not track:
+                    break
+                await callback(track)
+        self.background.main_loop.create_task(loop())

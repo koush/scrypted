@@ -115,7 +115,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
         scrypted_setup = {
             "type": "offer",
             "audio": {
-                "direction": "recvonly",
+                "direction": "sendrecv" if self._can_push_to_talk() else "recvonly",
             },
             "video": {
                 "direction": "recvonly",
@@ -124,102 +124,13 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
         plugin_setup = {}
 
         scrypted_offer = await scrypted_session.createLocalDescription("offer", scrypted_setup, sendIceCandidate=plugin_session.addIceCandidate)
+        self.logger.info(f"Scrypted offer sdp:\n{scrypted_offer['sdp']}")
         await plugin_session.setRemoteDescription(scrypted_offer, plugin_setup)
         plugin_answer = await plugin_session.createLocalDescription("answer", plugin_setup, scrypted_session.sendIceCandidate)
+        self.logger.info(f"Scrypted answer sdp:\n{plugin_answer['sdp']}")
         await scrypted_session.setRemoteDescription(plugin_answer, scrypted_setup)
 
         return ArloCameraRTCSessionControl(plugin_session)
-
-    async def startIntercom(self, media):
-        self.logger.info("Starting intercom")
-
-        ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
-        self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
-
-        # Reserve a port for us to give to ffmpeg
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(('localhost', 0))
-        port = sock.getsockname()[1]
-
-        # Start ffmpeg to convert input into something we know PyAV understands
-        ffmpeg_path = await scrypted_sdk.mediaManager.getFFmpegPath()
-        ffmpeg_args = [
-            "-y",
-            "-hide_banner",
-            "-loglevel", "error",
-            "-analyzeduration", "0",
-            "-fflags", "-nobuffer",
-            "-probesize", "32",
-            *ffmpeg_params["inputArguments"],
-            "-vn", "-dn", "-sn",
-            "-f", "mpegts",
-            "-flush_packets", "1",
-            f"udp://localhost:{port}"
-        ]
-        ffmpeg = await asyncio.create_subprocess_exec(ffmpeg_path, *ffmpeg_args)
-
-        def cleanup():
-            ffmpeg.kill()
-        self.cleanup = cleanup
-
-        session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
-        self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
-        
-        ice_servers = [
-            RTCIceServer(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
-            for ice in ice_servers
-        ]
-        ice_gatherer = RTCIceGatherer(ice_servers)
-        await ice_gatherer.gather()
-
-        local_candidates = [
-            f"candidate:{Candidate.to_sdp(candidate_to_aioice(candidate))}"
-            for candidate in ice_gatherer.getLocalCandidates()
-        ]
-
-        log_candidates = '\n'.join(local_candidates)
-        self.logger.info(f"Local candidates:\n{log_candidates}")
-
-        # MediaPlayer/PyAV will block until the intercom stream starts, and it seems that scrypted waits
-        # for startIntercom to exit before sending data. So, let's do the remaining setup in a coroutine
-        # so this function can return early.
-        # This is required even if we use BackgroundRTCPeerConnection, since setting up MediaPlayer may
-        # block the background thread's event loop and prevent other async functions from running.
-        async def async_setup():
-            pc = self.pc = BackgroundRTCPeerConnection()
-            self.sdp_answered = False
-
-            sock.close()
-            await pc.add_audio(
-                f"udp://localhost:{port}",
-                format="mpegts",
-            )
-
-            offer = await pc.createOffer()
-            self.logger.info(f"Arlo offer sdp:\n{offer.sdp}")
-
-            await pc.setLocalDescription(offer)
-
-            self.provider.arlo.NotifyPushToTalkSDP(
-                self.arlo_basestation, self.arlo_device,
-                session_id, offer.sdp
-            )
-            for candidate in local_candidates:
-                self.provider.arlo.NotifyPushToTalkCandidate(
-                    self.arlo_basestation, self.arlo_device,
-                    session_id, candidate
-                )
-
-        self.create_task(async_setup())
-
-    async def stopIntercom(self):
-        self.logger.info("Stopping intercom")
-        if self.pc:
-            await self.pc.close()
-            self.cleanup()
-        self.pc = None
-        self.cleanup = None
-        self.sdp_answered = False
 
     def _update_device_details(self, arlo_device):
         """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
@@ -246,6 +157,8 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         self.local_candidates = None
         self.arlo_pc = None
         self.arlo_sdp_answered = False
+        self.arlo_relay = None
+        self.arlo_relay_track = None
 
         self.stop_subscriptions = False
         self.start_sdp_answer_subscription()
@@ -294,6 +207,7 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         )
 
     async def initialize(self):
+        self.logger.info("Initializing video stream for RTC")
         rtsp_url = await self.camera._getVideoStreamURL()
 
         # Reserve a port for us to give to ffmpeg
@@ -314,20 +228,21 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
             "-acodec", "aac",
             "-i", rtsp_url,
             "-vcodec", "copy",
-            "-acodec", "copy",
+            "-acodec", "aac",
             "-f", "mpegts",
             "-flush_packets", "1",
             f"udp://localhost:{port}"
         ]
+        self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with {ffmpeg_args}")
         self.ffmpeg_subprocess = await asyncio.create_subprocess_exec(ffmpeg_path, *ffmpeg_args)
 
-        self.pc = BackgroundRTCPeerConnection()
-        self.pc.add_media(
+        self.pc = BackgroundRTCPeerConnection(self.logger)
+        await self.pc.add_media(
             f"udp://localhost:{port}",
             format="mpegts",
             options={
                 "vcodec": "h264",
-                "acodec": "pcm_s16le",
+                "acodec": "aac",
                 "analyzeduration": "0",
                 "probesize": "32"
             }
@@ -336,6 +251,67 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         ice_gatherer = RTCIceGatherer()
         await ice_gatherer.gather()
         self.local_candidates = ice_gatherer.getLocalCandidates()
+
+        #return
+        try:
+            if self.camera._can_push_to_talk():
+                await self.initialize_push_to_talk()
+        except Exception as e:
+            self.logger.error(e)
+
+    async def initialize_push_to_talk(self):
+        self.logger.info("Initializing push to talk for RTC")
+
+        session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
+        self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
+        
+        ice_servers = [
+            RTCIceServer(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
+            for ice in ice_servers
+        ]
+        ice_gatherer = RTCIceGatherer(ice_servers)
+        await ice_gatherer.gather()
+
+        local_candidates = [
+            f"candidate:{Candidate.to_sdp(candidate_to_aioice(candidate))}"
+            for candidate in ice_gatherer.getLocalCandidates()
+        ]
+
+        log_candidates = '\n'.join(local_candidates)
+        self.logger.debug(f"Local candidates:\n{log_candidates}")
+
+        self.arlo_pc = BackgroundRTCPeerConnection(self.logger, background=self.pc.background)
+
+        received_audio_track = asyncio.get_event_loop().create_future()
+        async def on_track(track):
+            self.logger.debug(f"Received track from scrypted: {track.kind}")
+            if track.kind == "audio" and self.arlo_relay is None:
+                self.arlo_relay, self.arlo_relay_track = await self.arlo_pc.subscribe_track(track)
+                received_audio_track.set_result(True)
+        self.pc.on_track(on_track)
+
+        # Perform the remaining setup asynchronously later, since we need to finish initializing
+        # before RTC session exchange can happen.
+        async def async_setup():
+            await received_audio_track
+            self.sdp_answered = False
+
+            offer = await self.arlo_pc.createOffer()
+            self.logger.info(f"Arlo offer sdp:\n{offer.sdp}")
+
+            await self.arlo_pc.setLocalDescription(offer)
+
+            self.provider.arlo.NotifyPushToTalkSDP(
+                self.arlo_basestation, self.arlo_device,
+                session_id, offer.sdp
+            )
+            for candidate in local_candidates:
+                self.provider.arlo.NotifyPushToTalkCandidate(
+                    self.arlo_basestation, self.arlo_device,
+                    session_id, candidate
+                )
+
+        self.create_task(async_setup())
 
     async def createLocalDescription(self, type, setup, sendIceCandidate=None):
         if type == "offer":
@@ -372,9 +348,15 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
     async def getOptions(self):
         pass
 
+    async def unmute_relay(self):
+        await self.arlo_pc.unmute_relay(self.arlo_relay, self.arlo_relay_track)
+
+    async def mute_relay(self):
+        await self.arlo_pc.mute_relay(self.arlo_relay, self.arlo_relay_track)
+
     async def shutdown(self):
         if self.ffmpeg_subprocess is not None:
-            self.ffmpeg_subprocess.kill()
+            self.ffmpeg_subprocess.terminate()
         if self.pc is not None:
             await self.pc.close()
         if self.arlo_pc is not None:
@@ -384,6 +366,17 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
 class ArloCameraRTCSessionControl:
     def __init__(self, arlo_session):
         self.arlo_session = arlo_session
+        self.logger = arlo_session.logger
+
+    async def setPlayback(self, options):
+        self.logger.debug(f"setPlayback options {options}")
+        audio = options.get("audio")
+        if audio is None:
+            return
+        if audio:
+            await self.arlo_session.unmute_relay()
+        else:
+            await self.arlo_session.mute_relay()
 
     async def endSession(self):
         await self.arlo_session.shutdown()

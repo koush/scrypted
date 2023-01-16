@@ -14,7 +14,6 @@ from .camera import ArloCamera
 from .doorbell import ArloDoorbell
 from .logging import ScryptedDeviceLoggerMixin, propagate_aiortc_logging_level
 from .util import BackgroundTaskMixin
-from .rtcpeerconnection import logger as background_rtc_logger
 
 
 class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
@@ -160,7 +159,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         for _, device in self.scrypted_devices.items():
             device.logger.setLevel(log_level)
         arlo_lib_logger.setLevel(log_level)
-        background_rtc_logger.setLevel(log_level)
         propagate_aiortc_logging_level(log_level)
         logging.getLogger('libav').setLevel(log_level)
 
