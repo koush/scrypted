@@ -10,7 +10,7 @@ export class SipSession extends Subscribed {
   private hasStarted = false
   private hasCallEnded = false
   private onCallEndedSubject = new ReplaySubject(1)
-  private sipCall: SipCall
+  public sipCall: SipCall
   onCallEnded = this.onCallEndedSubject.asObservable()
 
   constructor(
@@ -90,7 +90,7 @@ export class SipSession extends Subscribed {
     try {
       if( this.sipOptions.shouldRegister )
         await this.sipCall.register()
-      const rtpDescription = await this.sipCall.invite( audioSection, videoSection ),
+      const rtpDescription : RtpDescription = await this.sipCall.invite( audioSection, videoSection ),
         sendStunRequests = () => {
           sendStunBindingRequest({
             rtpSplitter: this.audioSplitter,

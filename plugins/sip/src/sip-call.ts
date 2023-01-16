@@ -16,6 +16,7 @@ export interface SipOptions {
   localIp: string
   localPort: number
   debugSip?: boolean
+  useTcp?: boolean
   messageHandler?: SipMessageHandler
   shouldRegister?: boolean
 }
@@ -169,8 +170,8 @@ export class SipCall {
         host,
         hostname: host,
         port: port,
-        udp: true,
-        tcp: false,
+        udp: !this.sipOptions.useTcp,
+        tcp: this.sipOptions.useTcp,
         tls: false,
         // tls_port: tlsPort,
         // tls: {
@@ -203,8 +204,11 @@ export class SipCall {
 
               if( m.method == 'REGISTER' ) {
                 m.uri = "sip:" + sipOptions.domain
-              } else if( m.method == 'INVITE' ) {
+              } else if( m.method == 'INVITE' || m.method == 'MESSAGE' ) {
                 m.uri = toWithDomain
+                if( m.method == 'MESSAGE' && m.headers.to ) {
+                  m.headers.to.params = null;
+                }
               } else if( m.method == 'ACK' || m.method == 'BYE' ) {
                 m.uri = this.registrarContact
               } else {
@@ -215,6 +219,9 @@ export class SipCall {
               m.headers.from.uri = fromWithDomain
               if( m.headers.contact && m.headers.contact[0].uri.split('@')[0].indexOf('-') < 0 ) {
                 m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + contactId + "@");
+                // Also a bug in SIP.js ? append the transport for the contact if the transport is udp (according to RFC)
+                if( remote.protocol != 'udp' && m.headers.contact[0].uri.indexOf( "transport=" ) < 0 ) {
+                  m.headers.contact[0].uri = m.headers.contact[0].uri + ":" + remote.port + ";transport=" + remote.protocol
               }
             }
 
@@ -342,7 +349,7 @@ export class SipCall {
   /**
   * Initiate a call by sending a SIP INVITE request
   */
-  async invite( audioSection, videoSection? ) {
+  async invite( audioSection, videoSection? ) : Promise<RtpDescription> {
     let ssrc = randomInteger()
     let audio = audioSection ? audioSection( this.rtpOptions.audio, ssrc ).concat( ...[`a=ssrc:${ssrc}`, `a=rtcp:${this.rtpOptions.audio.rtcpPort}`] ) : []
     let video = videoSection ? videoSection( this.rtpOptions.video, ssrc ).concat( ...[`a=ssrc:${ssrc}`, `a=rtcp:${this.rtpOptions.video.rtcpPort}`] ) : []
@@ -375,7 +382,7 @@ export class SipCall {
   /**
   * Register the user agent with a Registrar
   */
-  async register() {
+  async register() : Promise<void> {
     const { from } = this.sipOptions;
     await timeoutPromise( 500,
       this.request({
@@ -384,33 +391,31 @@ export class SipCall {
         //supported: 'replaces, outbound',
         allow:
           'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
-        'content-type': 'application/sdp',
         contact: [{ uri: from, params: { expires: this.sipOptions.expire } }],
       },
-      }).catch(() => {
-      // Don't care if we get an exception here.
-    }));
+      }).catch(noop));
   }
 
   /**
   * Send a message to the current call contact
   */
-  async message( content: string ) {
+  async message( content: string ) : Promise<SipResponse> {
     const { from } = this.sipOptions,
-      inviteResponse = await this.request({
+    messageResponse = await this.request({
         method: 'MESSAGE',
         headers: {
           //supported: 'replaces, outbound',
           allow:
             'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
-          'content-type': 'application/sdp',
+          'content-type': 'text/plain',
           contact: [{ uri: from, params: { expires: this.sipOptions.expire } }],
         },
         content: content
       });
+      return messageResponse;
   }
 
-  async sendBye() {
+  async sendBye() : Promise<void | SipResponse> {
     this.console.log('Sending BYE...')
     return await timeoutPromise( 3000, this.request({ method: 'BYE' }).catch(() => {
       // Don't care if we get an exception here.
