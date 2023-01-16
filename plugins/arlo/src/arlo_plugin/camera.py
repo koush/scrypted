@@ -2,13 +2,13 @@ from aioice import Candidate
 from aiortc import RTCSessionDescription, RTCIceGatherer, RTCIceServer
 from aiortc.rtcicetransport import candidate_to_aioice, candidate_from_aioice 
 import asyncio
-import json
 import socket
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
 from scrypted_sdk.types import Camera, VideoCamera, MotionSensor, Battery, ScryptedMimeTypes
 
+from .child_process import ChildProcess
 from .logging import ScryptedDeviceLoggerMixin
 from .util import BackgroundTaskMixin
 from .rtcpeerconnection import BackgroundRTCPeerConnection
@@ -233,7 +233,9 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
             f"udp://localhost:{port}"
         ]
         self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with {ffmpeg_args}")
-        self.ffmpeg_subprocess = await asyncio.create_subprocess_exec(ffmpeg_path, *ffmpeg_args)
+
+        self.ffmpeg_subprocess = ChildProcess(ffmpeg_path, *ffmpeg_args)
+        self.ffmpeg_subprocess.start()
 
         self.pc = BackgroundRTCPeerConnection(self.logger)
         await self.pc.add_media(
@@ -251,12 +253,8 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         await ice_gatherer.gather()
         self.local_candidates = ice_gatherer.getLocalCandidates()
 
-        #return
-        try:
-            if self.camera._can_push_to_talk():
-                await self.initialize_push_to_talk()
-        except Exception as e:
-            self.logger.error(e)
+        if self.camera._can_push_to_talk():
+            await self.initialize_push_to_talk()
 
     async def initialize_push_to_talk(self):
         self.logger.info("Initializing push to talk for RTC")
@@ -355,11 +353,15 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
 
     async def shutdown(self):
         if self.ffmpeg_subprocess is not None:
-            self.ffmpeg_subprocess.terminate()
+            self.ffmpeg_subprocess.stop()
+            self.ffmpeg_subprocess = None
         if self.pc is not None:
             await self.pc.close()
+            self.pc = None
         if self.arlo_pc is not None:
             await self.arlo_pc.close()
+            self.arlo_pc = None
+            self.arlo_relay_track = None
 
 
 class ArloCameraRTCSessionControl:
