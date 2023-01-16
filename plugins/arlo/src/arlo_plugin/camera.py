@@ -157,7 +157,6 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         self.local_candidates = None
         self.arlo_pc = None
         self.arlo_sdp_answered = False
-        self.arlo_relay = None
         self.arlo_relay_track = None
 
         self.stop_subscriptions = False
@@ -285,8 +284,8 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         received_audio_track = asyncio.get_event_loop().create_future()
         async def on_track(track):
             self.logger.debug(f"Received track from scrypted: {track.kind}")
-            if track.kind == "audio" and self.arlo_relay is None:
-                self.arlo_relay, self.arlo_relay_track = await self.arlo_pc.subscribe_track(track)
+            if track.kind == "audio" and self.arlo_relay_track is None:
+                self.arlo_relay_track = await self.arlo_pc.subscribe_track(track)
                 received_audio_track.set_result(True)
         self.pc.on_track(on_track)
 
@@ -349,10 +348,10 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         pass
 
     async def unmute_relay(self):
-        await self.arlo_pc.unmute_relay(self.arlo_relay, self.arlo_relay_track)
+        await self.arlo_pc.unmute_relay(self.arlo_relay_track)
 
     async def mute_relay(self):
-        await self.arlo_pc.mute_relay(self.arlo_relay, self.arlo_relay_track)
+        await self.arlo_pc.mute_relay(self.arlo_relay_track)
 
     async def shutdown(self):
         if self.ffmpeg_subprocess is not None:

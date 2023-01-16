@@ -1,4 +1,5 @@
 from aiortc import RTCPeerConnection
+from aiortc.mediastreams import AudioStreamTrack as SilenceStreamTrack
 from aiortc.contrib.media import MediaPlayer, MediaRelay
 import asyncio
 import threading
@@ -102,6 +103,8 @@ class BackgroundRTCPeerConnection:
         self.track_queue = asyncio.Queue()
         self.stopped = False
 
+        self.muted_relays = {}
+
         self.initialized = queue.Queue(1)
         self.background.background_loop.call_soon_threadsafe(self.__background_init)
         self.initialized.get()
@@ -184,23 +187,34 @@ class BackgroundRTCPeerConnection:
             relay = MediaRelay()
             relay_track = relay.subscribe(track, buffered=False)
             self.pc.addTrack(relay_track)
-            self.background.main_loop.call_soon_threadsafe(relay_fut.set_result, (relay, relay_track))
+            self.background.main_loop.call_soon_threadsafe(relay_fut.set_result, relay_track)
             self.logger.debug("Started track relay")
 
         self.background.background_loop.call_soon_threadsafe(relay_background)
         return await relay_fut
 
-    async def mute_relay(self, relay, relay_track):
+    async def mute_relay(self, relay_track):
         def mute_background():
             self.logger.debug("Muting track relay")
-            relay._stop(relay_track)
+            if relay_track in self.muted_relays:
+                self.logger.debug("Track already muted!")
+                return
+
+            silence = SilenceStreamTrack()
+            self.muted_relays[relay_track] = relay_track.recv
+            relay_track.recv = silence.recv
             self.logger.debug("Muted track relay")
+
         self.background.background_loop.call_soon_threadsafe(mute_background)
 
-    async def unmute_relay(self, relay, relay_track):
+    async def unmute_relay(self, relay_track):
         def unmute_background():
             self.logger.debug("Unmuting track relay")
-            relay._start(relay_track)
+            if relay_track not in self.muted_relays:
+                self.logger.debug("Track already unmuted!")
+                return
+            relay_track.recv = self.muted_relays[relay_track]
+            del self.muted_relays[relay_track]
             self.logger.debug("Unmuted track relay")
         self.background.background_loop.call_soon_threadsafe(unmute_background)
 
