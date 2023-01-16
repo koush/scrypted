@@ -8,7 +8,7 @@ import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
 from scrypted_sdk.types import Camera, VideoCamera, MotionSensor, Battery, ScryptedMimeTypes
 
-from .child_process import ChildProcess
+from .child_process import HeartbeatChildProcess
 from .logging import ScryptedDeviceLoggerMixin
 from .util import BackgroundTaskMixin
 from .rtcpeerconnection import BackgroundRTCPeerConnection
@@ -234,7 +234,7 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         ]
         self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with {ffmpeg_args}")
 
-        self.ffmpeg_subprocess = ChildProcess(ffmpeg_path, *ffmpeg_args)
+        self.ffmpeg_subprocess = HeartbeatChildProcess(ffmpeg_path, *ffmpeg_args)
         self.ffmpeg_subprocess.start()
 
         self.pc = BackgroundRTCPeerConnection(self.logger)

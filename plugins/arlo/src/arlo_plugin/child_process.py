@@ -21,7 +21,7 @@ def multiprocess_main(child_conn, exe, args):
     sp.wait()
 
 
-class ChildProcess:
+class HeartbeatChildProcess:
     """Class to manage running a child process that gets cleaned up if the parent exits.
     
     When spawining subprocesses in Python, if the parent is forcibly killed (as is the case
