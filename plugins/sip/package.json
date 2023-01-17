@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/sip",
-   "version": "0.0.5",
+   "version": "0.0.6-beta.1",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -34,11 +34,10 @@
    },
    "dependencies": {
       "@homebridge/camera-utils": "^2.0.4",
-      "rxjs": "^7.5.5",
       "sdp": "^3.0.3",
       "sip": "0.0.6",
       "stun": "^2.1.0",
-      "uuid": "^8.3.2"
+      "uuid": "^8.3.4"
    },
    "devDependencies": {
       "@scrypted/common": "file:../../common",

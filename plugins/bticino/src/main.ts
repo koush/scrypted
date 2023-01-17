@@ -2,6 +2,8 @@ import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Lock
 import { randomBytes } from 'crypto';
 import { BticinoSipCamera } from './bticino-camera';
 
+const { systemManager, deviceManager, mediaManager } = sdk;
+
 export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
 
     devices = new Map<string, BticinoSipCamera>();
@@ -17,12 +19,9 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
     }
 
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {
-        this.console.log("main::createDevice")
         const nativeId = randomBytes(4).toString('hex')
         const name = settings.newCamera?.toString()
         const camera = await this.updateDevice(nativeId, name);
-
-        this.console.log("main::createDevice: " + camera )
 
         const device: Device = {
             providerNativeId: nativeId,
@@ -38,32 +37,22 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
             interfaces: [ScryptedInterface.Lock],
         };
 
-        const ret = await sdk.deviceManager.onDevicesChanged({
+        const ret = await deviceManager.onDevicesChanged({
             providerNativeId: nativeId,
             devices: [device],
         });
 
-        let x : BticinoSipCamera = await this.getDevice(nativeId)
+        let sipCamera : BticinoSipCamera = await this.getDevice(nativeId)
+        let foo : BticinoSipCamera = systemManager.getDeviceById<BticinoSipCamera>(sipCamera.id)
 
-        let foo : BticinoSipCamera = sdk.systemManager.getDeviceById<BticinoSipCamera>(x.id)
-
-        this.console.log("main::getDevice: " + x )
-        this.console.log("main::" + this.devices.size )
-        this.devices.forEach( e => this.console.log("main::device::" + e )  )
-
-        this.console.log("main::getDevice::done" )
-
-        let y = await x.getDevice(undefined)
-        y.lockState = LockState.Locked
-        //foo.getDevice()
-
-        //let y = await foo.
+        let lock = await sipCamera.getDevice(undefined)
+        lock.lockState = LockState.Locked
 
         return nativeId;
     }
 
     updateDevice(nativeId: string, name: string) {
-        return sdk.deviceManager.onDeviceDiscovered({
+        return deviceManager.onDeviceDiscovered({
             nativeId,
             info: {
                 //model: `${camera.model} (${camera.data.kind})`,

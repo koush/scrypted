@@ -1,7 +1,7 @@
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
-import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { SipSession } from '../../sip/src/sip-session';
 import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from '../../sip/src/rtp-utils';
 import { VoicemailHandler } from './bticino-voicemailHandler';
@@ -9,7 +9,7 @@ import { CompositeSipMessageHandler } from '../../sip/src/compositeSipMessageHan
 import { sleep } from '@scrypted/common/src/sleep';
 import { SipHelper } from './sip-helper';
 import { BticinoStorageSettings } from './storage-settings';
-import { BticinoSipPlugin } from './main';
+import mediaManager, { BticinoSipPlugin } from './main';
 import { BticinoSipLock } from './bticino-lock';
 
 const STREAM_TIMEOUT = 50000;
@@ -112,7 +112,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 refreshAt: currentMedia.mediaStreamOptions.refreshAt
             };
             this.resetStreamTimeout();
-            return sdk.mediaManager.createMediaObject(currentMedia, this.currentMediaMimeType);
+            return mediaManager.createMediaObject(currentMedia, this.currentMediaMimeType);
         }
 
         this.stopSession();
@@ -260,7 +260,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         this.currentMedia = mediaStreamUrl;
         this.currentMediaMimeType = ScryptedMimeTypes.MediaStreamUrl;
 
-        return sdk.mediaManager.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
+        return mediaManager.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
     }
 
     getSipMediaStreamOptions(): ResponseMediaStreamOptions {

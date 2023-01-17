@@ -1,7 +1,7 @@
-import sdk, { ScryptedDeviceBase, Lock, LockState, DeviceCreator, DeviceCreatorSettings, Setting } from "@scrypted/sdk";
+import { ScryptedDeviceBase, Lock, LockState } from "@scrypted/sdk";
 import { BticinoSipCamera } from "./bticino-camera";
 
-export class BticinoSipLock extends ScryptedDeviceBase  implements Lock {
+export class BticinoSipLock extends ScryptedDeviceBase implements Lock {
     private timeout : NodeJS.Timeout
 
     constructor(public camera: BticinoSipCamera) {

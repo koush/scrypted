@@ -1,4 +1,4 @@
-import { ScryptedInterface, Setting, SettingValue } from '@scrypted/sdk';
+import { Setting, SettingValue } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { BticinoSipCamera } from './bticino-camera';
 

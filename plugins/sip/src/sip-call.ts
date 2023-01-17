@@ -1,7 +1,7 @@
 import { noop, Subject } from 'rxjs'
 import { randomInteger, randomString } from './util'
 import { RtpDescription, RtpOptions, RtpStreamDescription } from './rtp-utils'
-import { decodeSrtpOptions } from '@homebridge/camera-utils'
+import { decodeSrtpOptions } from '../../ring/src/srtp-utils'
 import { stringify } from 'sip/sip'
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 
@@ -222,6 +222,7 @@ export class SipCall {
                 // Also a bug in SIP.js ? append the transport for the contact if the transport is udp (according to RFC)
                 if( remote.protocol != 'udp' && m.headers.contact[0].uri.indexOf( "transport=" ) < 0 ) {
                   m.headers.contact[0].uri = m.headers.contact[0].uri + ":" + remote.port + ";transport=" + remote.protocol
+                }
               }
             }
 

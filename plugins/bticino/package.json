@@ -33,17 +33,16 @@
       ]
    },
    "dependencies": {
-      "@homebridge/camera-utils": "^2.0.4",
       "sdp": "^3.0.3",
       "sip": "0.0.6",
       "stun": "^2.1.0",
-      "ts-node": "^10.9.1",
       "uuid": "^8.3.2"
    },
    "devDependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "@types/node": "^16.9.6",
-      "@types/uuid": "^8.3.4"
+      "@types/uuid": "^8.3.4",
+      "ts-node": "^10.9.1"
    }
 }
