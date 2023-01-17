@@ -1,4 +1,4 @@
-import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, LockState, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from '@scrypted/sdk';
+import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, LockState, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting } from '@scrypted/sdk';
 import { randomBytes } from 'crypto';
 import { BticinoSipCamera } from './bticino-camera';
 
@@ -12,7 +12,7 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
         super()
         systemManager.listen(
             async (eventSource, eventDetails, eventData) => {
-                if( !eventSource ) {
+                if( !eventSource && ScryptedInterface.ScryptedDevice == eventDetails?.eventInterface && ScryptedInterfaceProperty.id == eventDetails.property ) {
                     this.devices.forEach( (camera) => {
                         if(camera?.id === eventData) {
                             camera.voicemailHandler.cancelVoicemailCheck()
