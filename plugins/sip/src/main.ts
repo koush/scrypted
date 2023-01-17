@@ -437,8 +437,7 @@ export class SipCamProvider extends ScryptedDeviceBase implements DeviceProvider
         }
     }
 
-    async releaseDevice(id: string, nativeId: string): Promise<void> {
-    }    
+    
 
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {
         const nativeId = randomBytes(4).toString('hex');
@@ -481,6 +480,12 @@ export class SipCamProvider extends ScryptedDeviceBase implements DeviceProvider
         }
         return ret;
     }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+        if( this.devices.delete( nativeId ) ) {
+            this.console.log("Removed device from list: " + id + " / " + nativeId )   
+        }
+    }    
 
     createCamera(nativeId: string): SipCamera {
         return new SipCamera(nativeId, this);

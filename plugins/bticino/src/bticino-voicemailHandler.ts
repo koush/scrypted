@@ -1,5 +1,5 @@
-import { SipMessageHandler, SipRequest } from "../../sip/src/sip-call";
-import { BticinoSipCamera } from "./bticino-camera";
+import { SipMessageHandler, SipRequest } from "../../sip/src/sip-call"
+import { BticinoSipCamera } from "./bticino-camera"
 
 export class VoicemailHandler extends SipMessageHandler {
     private sipCamera : BticinoSipCamera

@@ -1,29 +1,12 @@
-import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, LockState, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting } from '@scrypted/sdk';
-import { randomBytes } from 'crypto';
-import { BticinoSipCamera } from './bticino-camera';
+import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, LockState, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting } from '@scrypted/sdk'
+import { randomBytes } from 'crypto'
+import { BticinoSipCamera } from './bticino-camera'
 
-const { systemManager, deviceManager, mediaManager } = sdk;
+const { systemManager, deviceManager, mediaManager } = sdk
 
 export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
 
-    devices = new Map<string, BticinoSipCamera>();
-
-    constructor() {
-        super()
-        systemManager.listen(
-            async (eventSource, eventDetails, eventData) => {
-                if( !eventSource && ScryptedInterface.ScryptedDevice == eventDetails?.eventInterface && ScryptedInterfaceProperty.id == eventDetails.property ) {
-                    this.devices.forEach( (camera) => {
-                        if(camera?.id === eventData) {
-                            camera.voicemailHandler.cancelVoicemailCheck()
-                            if( this.devices.delete(camera.nativeId) ) {
-                                this.console.log("Removed device from list: " + eventData)   
-                            }
-                        }
-                    } )
-                }
-            });
-    }
+    devices = new Map<string, BticinoSipCamera>()
 
     async getCreateDeviceSettings(): Promise<Setting[]> {
         return [
@@ -38,7 +21,7 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {
         const nativeId = randomBytes(4).toString('hex')
         const name = settings.newCamera?.toString()
-        const camera = await this.updateDevice(nativeId, name);
+        const camera = await this.updateDevice(nativeId, name)
 
         const device: Device = {
             providerNativeId: nativeId,
@@ -52,12 +35,12 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
             name: name + ' Lock',
             type: ScryptedDeviceType.Lock,
             interfaces: [ScryptedInterface.Lock],
-        };
+        }
 
         const ret = await deviceManager.onDevicesChanged({
             providerNativeId: nativeId,
             devices: [device],
-        });
+        })
 
         let sipCamera : BticinoSipCamera = await this.getDevice(nativeId)
         let foo : BticinoSipCamera = systemManager.getDeviceById<BticinoSipCamera>(sipCamera.id)
@@ -65,7 +48,7 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
         let lock = await sipCamera.getDevice(undefined)
         lock.lockState = LockState.Locked
 
-        return nativeId;
+        return nativeId
     }
 
     updateDevice(nativeId: string, name: string) {
@@ -92,13 +75,20 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
 
     async getDevice(nativeId: string): Promise<any> {
         if (!this.devices.has(nativeId)) {
-            const camera = new BticinoSipCamera(nativeId, this);
-            this.devices.set(nativeId, camera);
+            const camera = new BticinoSipCamera(nativeId, this)
+            this.devices.set(nativeId, camera)
         }
-        return this.devices.get(nativeId);
+        return this.devices.get(nativeId)
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
+        let camera = this.devices.get(nativeId)
+        if( camera ) {
+            camera.voicemailHandler.cancelVoicemailCheck()
+            if( this.devices.delete( nativeId ) ) {
+                this.console.log("Removed device from list: " + id + " / " + nativeId )   
+            }
+        }
     }
 }
 
