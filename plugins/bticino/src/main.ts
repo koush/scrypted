@@ -82,7 +82,6 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-        this.console.log('release')
     }
 }
 
