@@ -15,10 +15,10 @@ export class VoicemailHandler extends SipMessageHandler {
         if( !this.sipCamera )
             return
         if( this.isEnabled() ) {
-            this.sipCamera.console.info("Checking answering machine, cameraId: " + this.sipCamera.id )
+            this.sipCamera.console.debug("Checking answering machine, cameraId: " + this.sipCamera.id )
             this.sipCamera.getAswmStatus().catch( e => this.sipCamera.console.error(e) )
         } else {
-            this.sipCamera.console.info("Answering machine check not enabled, cameraId: " + this.sipCamera.id )
+            this.sipCamera.console.debug("Answering machine check not enabled, cameraId: " + this.sipCamera.id )
         }
         //TODO: make interval customizable, now every 5 minutes
         this.timeout = setTimeout( () => this.checkVoicemail() , 5 * 60 * 1000 )

@@ -21,7 +21,7 @@ export class SipHelper {
             throw new Error('SIP From/To/Domain URIs not specified!')
         }        
 
-        let sipOptions : SipOptions = { 
+        return { 
             from: "sip:" + from,
             //TCP is more reliable for large messages, also see useTcp=true below
             to: "sip:" + to + ";transport=tcp",
@@ -33,11 +33,10 @@ export class SipHelper {
             debugSip: sipdebug,
             useTcp: true,
             messageHandler: camera.messageHandler
-         };
-         return sipOptions    
+         } 
     }
 
-    public static sipSession( camera : BticinoSipCamera ) : Promise<SipSession> {
-        return SipSession.createSipSession(console, "Bticino", this.sipOptions( camera ) )        
+    public static sipSession( sipOptions : SipOptions ) : Promise<SipSession> {
+        return SipSession.createSipSession(console, "Bticino", sipOptions )        
     }
 }

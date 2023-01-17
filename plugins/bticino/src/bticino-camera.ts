@@ -31,7 +31,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
     sipUnlock(): Promise<void> {
         this.log.i("unlocking C300X door ")
-        return SipHelper.sipSession( this )
+        return SipHelper.sipSession( SipHelper.sipOptions( this ) )
             .then( ( sip ) => {
                 sip.sipCall.register()
                     .then( () =>
@@ -49,7 +49,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }
 
     getAswmStatus() : Promise<void> {
-        return SipHelper.sipSession( this )
+        return SipHelper.sipSession( SipHelper.sipOptions( this ) )
                 .then( ( sip ) => {
                     sip.sipCall.register()
                                     .then( () => sip.sipCall.message( "GetAswmStatus!") )
@@ -64,36 +64,36 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
-        return;
+        return
     }
 
     getSettings(): Promise<Setting[]> {
-        return this.settingsStorage.getSettings();
+        return this.settingsStorage.getSettings()
     }
  
     putSetting(key: string, value: SettingValue): Promise<void> {
-        return this.settingsStorage.putSetting(key, value);
+        return this.settingsStorage.putSetting(key, value)
     }    
 
     async startIntercom(media: MediaObject): Promise<void> {
-        this.log.d( "TODO: startIntercom" + media );
+        this.log.d( "TODO: startIntercom" + media )
     }
 
     async stopIntercom(): Promise<void> {
-        this.log.d( "TODO: stopIntercom" );
+        this.log.d( "TODO: stopIntercom" )
     }
 
     resetStreamTimeout() {
-        this.log.d('starting/refreshing stream');
-        clearTimeout(this.refreshTimeout);
-        this.refreshTimeout = setTimeout(() => this.stopSession(), STREAM_TIMEOUT);
+        this.log.d('starting/refreshing stream')
+        clearTimeout(this.refreshTimeout)
+        this.refreshTimeout = setTimeout(() => this.stopSession(), STREAM_TIMEOUT)
     }
 
     stopSession() {
         if (this.session) {
-            this.log.d('ending sip session');
-            this.session.stop();
-            this.session = undefined;
+            this.log.d('ending sip session')
+            this.session.stop()
+            this.session = undefined
         }
     }
 
@@ -107,48 +107,53 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             if (!this.currentMedia?.mediaStreamOptions)
                 throw new Error("no stream to refresh");
 
-            const currentMedia = this.currentMedia;
+            const currentMedia = this.currentMedia
             currentMedia.mediaStreamOptions.refreshAt = Date.now() + STREAM_TIMEOUT;
             currentMedia.mediaStreamOptions.metadata = {
                 refreshAt: currentMedia.mediaStreamOptions.refreshAt
             };
-            this.resetStreamTimeout();
-            return mediaManager.createMediaObject(currentMedia, this.currentMediaMimeType);
+            this.resetStreamTimeout()
+            return mediaManager.createMediaObject(currentMedia, this.currentMediaMimeType)
         }
 
         this.stopSession();
 
 
-        const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient();
+        const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient()
 
-        const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`;
+        const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`
 
         playbackPromise.then(async (client) => {
-            client.setKeepAlive(true, 10000);
-            let sip: SipSession;
+            client.setKeepAlive(true, 10000)
+            let sip: SipSession
             try {
                 let rtsp: RtspServer;
                 const cleanup = () => {
                     client.destroy();
                     if (this.session === sip)
-                        this.session = undefined;
+                        this.session = undefined
                     try {
-                        this.log.d('cleanup(): stopping sip session.');
-                        sip.stop();
+                        this.log.d('cleanup(): stopping sip session.')
+                        sip.stop()
                     }
                     catch (e) {
                     }
-                    rtsp?.destroy();
+                    rtsp?.destroy()
                 }
 
-                client.on('close', cleanup);
-                client.on('error', cleanup);
+                client.on('close', cleanup)
+                client.on('error', cleanup)
 
-                sip = await SipHelper.sipSession( this )
+                let sipOptions = SipHelper.sipOptions( this )
+
+                // A normal call session doesn't require registering
+                sipOptions.shouldRegister = false
+
+                sip = await SipHelper.sipSession( sipOptions )
                 // Validate this sooner
-                if( !sip ) return Promise.reject("Cannot create session");
+                if( !sip ) return Promise.reject("Cannot create session")
                 
-                sip.onCallEnded.subscribe(cleanup);
+                sip.onCallEnded.subscribe(cleanup)
 
                 // Call the C300X
                 let remoteRtpDescription = await sip.call(
@@ -171,9 +176,9 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 if( sip.sipOptions.debugSip )
                     this.log.d('SIP: Received remote SDP:\n' + remoteRtpDescription.sdp)
 
-                let sdp: string = replacePorts( remoteRtpDescription.sdp, 0, 0 );
-                sdp = addTrackControls(sdp);
-                sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n');
+                let sdp: string = replacePorts( remoteRtpDescription.sdp, 0, 0 )
+                sdp = addTrackControls(sdp)
+                sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n')
                 if( sip.sipOptions.debugSip )
                     this.log.d('SIP: Updated SDP:\n' + sdp);
 
@@ -186,64 +191,64 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
                 rtsp = new RtspServer(client, sdp, true);
                 const parsedSdp = parseSdp(rtsp.sdp);
-                const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control;
-                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
+                const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control
+                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control
                 if( sip.sipOptions.debugSip ) {
-                    rtsp.console = this.console;
+                    rtsp.console = this.console
                 }
                 
                 await rtsp.handlePlayback();
                 sip.videoSplitter.on('message', message => {
                     if (!isStunMessage(message)) {
-                        const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                        const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message))
                         if (!isRtpMessage)
-                            return;
+                            return
                         vseen++;
-                        rtsp.sendTrack(videoTrack, message, !isRtpMessage);
-                        const seq = getSequenceNumber(message);
+                        rtsp.sendTrack(videoTrack, message, !isRtpMessage)
+                        const seq = getSequenceNumber(message)
                         if (seq !== (vseq + 1) % 0x0FFFF)
-                            vlost++;
-                        vseq = seq;
+                            vlost++
+                        vseq = seq
                     }
                 });
 
                 sip.videoRtcpSplitter.on('message', message => {
-                    rtsp.sendTrack(videoTrack, message, true);
+                    rtsp.sendTrack(videoTrack, message, true)
                 });
                 
                 sip.audioSplitter.on('message', message => {
                     if (!isStunMessage(message)) {
-                        const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                        const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message))
                         if (!isRtpMessage)
                             return;
                         aseen++;
-                        rtsp.sendTrack(audioTrack, message, !isRtpMessage);
-                        const seq = getSequenceNumber(message);
+                        rtsp.sendTrack(audioTrack, message, !isRtpMessage)
+                        const seq = getSequenceNumber(message)
                         if (seq !== (aseq + 1) % 0x0FFFF)
                             alost++;
-                        aseq = seq;
+                        aseq = seq
                     }
                 });
 
                 sip.audioRtcpSplitter.on('message', message => {
-                    rtsp.sendTrack(audioTrack, message, true);
+                    rtsp.sendTrack(audioTrack, message, true)
                 });
 
-                this.session = sip;
+                this.session = sip
 
                 try {
-                    await rtsp.handleTeardown();
-                    this.log.d('rtsp client ended');
+                    await rtsp.handleTeardown()
+                    this.log.d('rtsp client ended')
                 }
                 catch (e) {
                     this.log.e('rtsp client ended ungracefully' + e);
                 }
                 finally {
-                    cleanup();
+                    cleanup()
                 }
             }
             catch (e) {
-                sip?.stop();
+                sip?.stop()
                 throw e;
             }
         });
@@ -287,7 +292,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }
 
     async getDevice(nativeId: string) : Promise<BticinoSipLock> {
-        return new BticinoSipLock(this);
+        return new BticinoSipLock(this)
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
