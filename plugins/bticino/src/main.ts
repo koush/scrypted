@@ -8,6 +8,23 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
 
     devices = new Map<string, BticinoSipCamera>();
 
+    constructor() {
+        super()
+        systemManager.listen(
+            async (eventSource, eventDetails, eventData) => {
+                if( !eventSource ) {
+                    this.devices.forEach( (camera) => {
+                        if(camera?.id === eventData) {
+                            camera.voicemailHandler.cancelVoicemailCheck()
+                            if( this.devices.delete(camera.nativeId) ) {
+                                this.console.log("Removed device from list: " + eventData)   
+                            }
+                        }
+                    } )
+                }
+            });
+    }
+
     async getCreateDeviceSettings(): Promise<Setting[]> {
         return [
             {

@@ -15,17 +15,18 @@ import { BticinoSipLock } from './bticino-lock';
 const STREAM_TIMEOUT = 50000;
 
 export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor {
-    session: SipSession
-    currentMedia: FFmpegInput | MediaStreamUrl
-    currentMediaMimeType: string
-    refreshTimeout: NodeJS.Timeout
-    messageHandler: CompositeSipMessageHandler
-    settingsStorage: BticinoStorageSettings = new BticinoStorageSettings( this )
+    private session: SipSession
+    private currentMedia: FFmpegInput | MediaStreamUrl
+    private currentMediaMimeType: string
+    private refreshTimeout: NodeJS.Timeout
+    public messageHandler: CompositeSipMessageHandler
+    private settingsStorage: BticinoStorageSettings = new BticinoStorageSettings( this )
+    public voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
         this.messageHandler = new CompositeSipMessageHandler()
-        this.messageHandler.add( new VoicemailHandler( this ) )
+        this.messageHandler.add( this.voicemailHandler )
     }
 
     sipUnlock(): Promise<void> {
