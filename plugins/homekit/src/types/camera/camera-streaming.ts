@@ -397,6 +397,21 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                         device.startIntercom(mo).catch(e => console.error('intercom failed to start', e));
 
                         const client = await clientPromise;
+
+                        const cleanup = () => {
+                            // remove listeners to prevent a double invocation of stopIntercom.
+                            client.removeAllListeners();
+                            console.log('Stopping intercom.');
+                            device.stopIntercom();
+                            client.destroy();
+                            rtspServer = undefined;
+                            playing = false;
+                        }
+                        // stop the intercom if the client dies for any reason.
+                        // allow the streaming session to continue however.
+                        client.on('close', cleanup);
+                        session.killPromise.finally(cleanup);
+
                         rtspServer = new RtspServer(client, sdp);
                         await rtspServer.handlePlayback();
                         playing = true;
@@ -419,42 +434,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                     rtspServer.sendTrack(track, decrypted, false);
                 });
-
-                // const socketType = session.prepareRequest.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-                // const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
-
-                // // this is a bit hacky, as it picks random ports and spams audio at it.
-                // // the resultant port is returned as an ffmpeg input to the device intercom,
-                // // if it has one. which, i guess works.
-                // const rtpSink = await startRtpSink(socketType, session.prepareRequest.targetAddress,
-                //     audioKey, session.startRequest.audio, console);
-                // session.killPromise.finally(() => rtpSink.destroy());
-
-                // // demux the audio return socket to distinguish between rtp audio return
-                // // packets and rtcp.
-                // // send the audio return off to the rtp
-                // let startedIntercom = false;
-                // session.audioReturn.on('message', buffer => {
-                //     const rtp = RtpPacket.deSerialize(buffer);
-                //     if (rtp.header.payloadType === session.startRequest.audio.pt) {
-                //         if (!startedIntercom) {
-                //             console.log('Received first two way audio packet, starting intercom.');
-                //             startedIntercom = true;
-                //             mediaManager.createFFmpegMediaObject(rtpSink.ffmpegInput)
-                //                 .then(mo => {
-                //                     device.startIntercom(mo).catch(e => console.error('intercom failed to start', e));
-                //                     session.audioReturn.once('close', () => {
-                //                         console.log('Stopping intercom.');
-                //                         device.stopIntercom();
-                //                     });
-                //                 });
-                //         }
-                //         session.audioReturn.send(buffer, rtpSink.rtpPort);
-                //     }
-                //     else {
-                //         rtpSink.heartbeat(session.audioReturn, buffer);
-                //     }
-                // });
             }
         },
     };
