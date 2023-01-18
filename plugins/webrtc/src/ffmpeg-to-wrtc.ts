@@ -320,15 +320,17 @@ export function parseOptions(options: RTCSignalingOptions) {
             }
             return false;
         });
+
+
+    // firefox is misleading. special case that to disable transcoding.
+    if (options?.userAgent?.includes('Firefox/'))
+        sessionSupportsH264High = true;
+
     const transcodeWidth = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
     const width = options?.screen?.width;
     const height = options?.screen?.height;
     const max = Math.max(width, height) * options?.screen?.devicePixelRatio;
     const isMediumResolution = !sessionSupportsH264High || (max && max < 1920);
-
-    // firefox is misleading. special case that to disable transcoding.
-    if (options?.userAgent?.includes('Firefox/'))
-        sessionSupportsH264High = true;
 
     return {
         sessionSupportsH264High,
