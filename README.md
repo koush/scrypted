@@ -51,20 +51,6 @@ Supported accessories:
 
 ## Development
 
-## Debug the Scrypted Server in VSCode
-
-```sh
-# check out the code
-git clone https://github.com/koush/scrypted
-cd scrypted
-# get the dependencies for the server and various plugins
-./npm-install.sh
-# open server project in VS Code
-code server
-```
-
-You can now launch Scrypted in VSCode.
-
 ## Debug Scrypted Plugins in VSCode
 
 ```sh
@@ -87,7 +73,23 @@ If you do not want to set up VS Code, you can also run build and install the plu
 npm run build && npm run scrypted-deploy 127.0.0.1
 ```
 
-## Plugin Development
+### Plugin SDK Documentation
 
 Want to write your own plugin? Full documentation is available here: https://developer.scrypted.app
 
+
+## Debug the Scrypted Server in VSCode
+
+Debugging the server should not be necessary, as the server only provides the hosting and RPC mechanism for plugins. The following is for reference purpose. Most development can be done by debugging the relevant plugin.
+
+```sh
+# check out the code
+git clone https://github.com/koush/scrypted
+cd scrypted
+# get the dependencies for the server and various plugins
+./npm-install.sh
+# open server project in VS Code
+code server
+```
+
+You can now launch the Scrypted Server in VSCode.
