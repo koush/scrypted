@@ -230,7 +230,7 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
             "-acodec", "aac",
             "-f", "mpegts",
             "-flush_packets", "1",
-            f"udp://localhost:{port}"
+            f"udp://localhost:{port}?overrun_nonfatal=1&fifo_size=50000000"
         ]
         self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with {ffmpeg_args}")
 
@@ -239,7 +239,7 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
 
         self.pc = BackgroundRTCPeerConnection(self.logger)
         await self.pc.add_media(
-            f"udp://localhost:{port}",
+            f"udp://localhost:{port}?overrun_nonfatal=1&fifo_size=50000000",
             format="mpegts",
             options={
                 "vcodec": "h264",
