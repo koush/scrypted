@@ -2,6 +2,7 @@ from aioice import Candidate
 from aiortc import RTCSessionDescription, RTCIceGatherer, RTCIceServer
 from aiortc.rtcicetransport import candidate_to_aioice, candidate_from_aioice 
 import asyncio
+import json
 import socket
 
 import scrypted_sdk
@@ -38,6 +39,13 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
         self.start_motion_subscription()
         self.start_battery_subscription()
 
+    @property
+    def prebuffer_enabled(self):
+        return 'mixin:@scrypted/prebuffer-mixin' in self.interfaces
+
+    async def real_device(self):
+        return await scrypted_sdk.systemManager.api.getDeviceById(self.getScryptedProperty("id"))
+
     def __del__(self):
         self.stop_subscriptions = True
 
@@ -65,11 +73,12 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
     async def takePicture(self, options=None):
         self.logger.info("Taking picture")
 
-        real_device = await scrypted_sdk.systemManager.api.getDeviceById(self.getScryptedProperty("id"))
-        msos = await real_device.getVideoStreamOptions()
-        if any(["prebuffer" in m for m in msos]):
-            self.logger.info("Getting snapshot from prebuffer")
-            return await real_device.getVideoStream({"refresh": False})
+        if self.prebuffer_enabled:
+            real_device = await self.real_device()
+            msos = await real_device.getVideoStreamOptions()
+            if any(["prebuffer" in m for m in msos]):
+                self.logger.info("Getting snapshot from prebuffer")
+                return await real_device.getVideoStream({"refresh": False})
 
         pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=self.timeout)
         self.logger.debug(f"Got snapshot URL for at {pic_url}")
@@ -207,7 +216,23 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
 
     async def initialize(self):
         self.logger.info("Initializing video stream for RTC")
-        rtsp_url = await self.camera._getVideoStreamURL()
+        if self.camera.prebuffer_enabled:
+            self.logger.info("Getting stream from prebuffer")
+            real_device = await self.camera.real_device()
+            mo = await real_device.getVideoStream({"id": "default"})
+            ffmpeg_input = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput.value))
+            self.logger.info(f"Received ffmpeg input from prebuffer: {ffmpeg_input}")
+            ffmpeg_args = ffmpeg_input["inputArguments"]
+        else:
+            rtsp_url = await self.camera._getVideoStreamURL()
+            ffmpeg_args = [
+                "-analyzeduration", "0",
+                "-fflags", "-nobuffer",
+                "-probesize", "32",
+                "-vcodec", "h264",
+                "-acodec", "aac",
+                "-i", rtsp_url,
+            ]
 
         # Reserve a port for us to give to ffmpeg
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -215,23 +240,19 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         port = sock.getsockname()[1]
         sock.close()
 
-        ffmpeg_path = await scrypted_sdk.mediaManager.getFFmpegPath()
         ffmpeg_args = [
             "-y",
             "-hide_banner",
             "-loglevel", "error",
-            "-analyzeduration", "0",
-            "-fflags", "-nobuffer",
-            "-probesize", "32",
-            "-vcodec", "h264",
-            "-acodec", "aac",
-            "-i", rtsp_url,
+            *ffmpeg_args,
             "-vcodec", "copy",
             "-acodec", "aac",
             "-f", "mpegts",
             "-flush_packets", "1",
             f"udp://localhost:{port}"
         ]
+
+        ffmpeg_path = await scrypted_sdk.mediaManager.getFFmpegPath()
         self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with {ffmpeg_args}")
 
         self.ffmpeg_subprocess = HeartbeatChildProcess(ffmpeg_path, *ffmpeg_args)
