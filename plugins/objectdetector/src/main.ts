@@ -382,7 +382,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       let stream: MediaObject;
 
       stream = await this.cameraDevice.getVideoStream({
-        tool: 'ffmpeg',
         destination: !this.hasMotionType ? 'local-recorder' : 'low-resolution',
         // ask rebroadcast to mute audio, not needed.
         audio: null,
