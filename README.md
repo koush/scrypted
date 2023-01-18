@@ -80,7 +80,7 @@ Want to write your own plugin? Full documentation is available here: https://dev
 
 ## Debug the Scrypted Server in VSCode
 
-Debugging the server should not be necessary, as the server only provides the hosting and RPC mechanism for plugins. The following is for reference purpose. Most development can be done by debugging the plugin.
+Debugging the server should not be necessary, as the server only provides the hosting and RPC mechanism for plugins. The following is for reference purpose. Most development can be done by debugging the relevant plugin.
 
 ```sh
 # check out the code
