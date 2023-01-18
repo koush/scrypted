@@ -417,7 +417,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                         playing = true;
                     }
                     catch (e) {
-                        console.error('two way aidio failed', e);
+                        console.error('two way audio failed', e);
                     }
                 });
 
