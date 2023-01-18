@@ -219,20 +219,17 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         if self.camera.prebuffer_enabled:
             self.logger.info("Getting stream from prebuffer")
             real_device = await self.camera.real_device()
-            mo = await real_device.getVideoStream({"id": "default"})
+            mo = await real_device.getVideoStream({"id": "default", "tool": "ffmpeg"})
             ffmpeg_input = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput.value))
             self.logger.info(f"Received ffmpeg input from prebuffer: {ffmpeg_input}")
-            ffmpeg_args = ffmpeg_input["inputArguments"]
+
+            if "url" not in ffmpeg_input:
+                self.logger.warning("No rtsp url found in ffmpeg input, falling back to fetching raw video stream")
+                rtsp_url = await self.camera._getVideoStreamURL()
+            else:
+                rtsp_url = ffmpeg_input["url"] 
         else:
             rtsp_url = await self.camera._getVideoStreamURL()
-            ffmpeg_args = [
-                "-analyzeduration", "0",
-                "-fflags", "-nobuffer",
-                "-probesize", "32",
-                "-vcodec", "h264",
-                "-acodec", "aac",
-                "-i", rtsp_url,
-            ]
 
         # Reserve a port for us to give to ffmpeg
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -241,10 +238,15 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         sock.close()
 
         ffmpeg_args = [
-            "-y",
-            "-hide_banner",
-            "-loglevel", "error",
-            *ffmpeg_args,
+            #"-y",
+            #"-hide_banner",
+            #"-loglevel", "error",
+            "-analyzeduration", "0",
+            "-fflags", "-nobuffer",
+            "-probesize", "32",
+            "-vcodec", "h264",
+            "-acodec", "aac",
+            "-i", rtsp_url,
             "-vcodec", "copy",
             "-acodec", "aac",
             "-f", "mpegts",
