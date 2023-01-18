@@ -330,7 +330,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     console.log('Media Stream reconfiguration was requested. Upgrade to Scrypted NVR for adaptive bitrate support.');
                     return;
                 }
-                mediaStreamFeedback.requestBitrate(bitrate);
+                mediaStreamFeedback.reconfigureStream({
+                    video: {
+                        bitrate,
+                    }
+                });
             }
 
             session.videoReturn.on('message', data => {
