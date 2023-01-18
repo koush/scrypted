@@ -36,11 +36,17 @@ export class SipSession extends Subscribed {
       rtpOptions : RtpOptions = {
         audio: {
           port: audioSplitter.port,
-          rtcpPort: audioRtcpSplitter.port
+          rtcpPort: audioRtcpSplitter.port,
+          //TODO: make this cleaner
+          srtpKey: undefined,
+          srtpSalt: undefined
         },
         video: {
           port: videoSplitter.port,
-          rtcpPort: videoRtcpSplitter.port
+          rtcpPort: videoRtcpSplitter.port,
+          //TODO: make this cleaner
+          srtpKey: undefined,
+          srtpSalt: undefined 
         }
       }
 

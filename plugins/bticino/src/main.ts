@@ -2,7 +2,7 @@ import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Lock
 import { randomBytes } from 'crypto'
 import { BticinoSipCamera } from './bticino-camera'
 
-const { systemManager, deviceManager, mediaManager } = sdk
+const { systemManager, deviceManager } = sdk
 
 export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
 

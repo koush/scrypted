@@ -1,27 +1,38 @@
-import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
-import { BinarySensor, Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { SipSession } from '../../sip/src/sip-session';
-import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from '../../sip/src/rtp-utils';
+import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType, RtpDescription } from '../../sip/src/rtp-utils';
 import { VoicemailHandler } from './bticino-voicemailHandler';
 import { CompositeSipMessageHandler } from '../../sip/src/compositeSipMessageHandler';
+import { decodeSrtpOptions, encodeSrtpOptions, SrtpOptions } from '../../ring/src/srtp-utils'
 import { sleep } from '@scrypted/common/src/sleep';
 import { SipHelper } from './sip-helper';
+import child_process, { ChildProcess } from 'child_process';
+import dgram from 'dgram';
 import { BticinoStorageSettings } from './storage-settings';
-import mediaManager, { BticinoSipPlugin } from './main';
+import { BticinoSipPlugin } from './main';
 import { BticinoSipLock } from './bticino-lock';
+import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 
 const STREAM_TIMEOUT = 50000;
+const { mediaManager } = sdk;
 
 export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor {
     private session: SipSession
+    private remoteRtpDescription: RtpDescription
+    private audioOutForwarder: dgram.Socket
+    private audioOutProcess: ChildProcess
     private currentMedia: FFmpegInput | MediaStreamUrl
     private currentMediaMimeType: string
     private refreshTimeout: NodeJS.Timeout
     public messageHandler: CompositeSipMessageHandler
     private settingsStorage: BticinoStorageSettings = new BticinoStorageSettings( this )
     public voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
+    //TODO: randomize this
+    private keyAndSalt : string = "/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X"
+    private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
@@ -76,11 +87,54 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }    
 
     async startIntercom(media: MediaObject): Promise<void> {
-        this.log.d( "TODO: startIntercom" + media )
+        if (!this.session)
+            throw new Error("not in call");
+
+        this.stopIntercom();
+
+        const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
+
+        const rtpOptions = this.remoteRtpDescription
+        const audioOutForwarder = await createBindZero()
+        this.audioOutForwarder = audioOutForwarder.server
+        audioOutForwarder.server.on('message', message => {
+            if( this.session )
+                this.session.audioSplitter.send(message, rtpOptions.audio.port, rtpOptions.address)
+            return null
+        });
+
+        const args = ffmpegInput.inputArguments.slice();
+        args.push(
+            '-vn', '-dn', '-sn',
+            '-acodec', 'speex',
+            '-flags', '+global_header',
+            '-ac', '1',
+            '-ar', '8k',
+            '-f', 'rtp',
+            '-srtp_out_suite', 'AES_CM_128_HMAC_SHA1_80',
+            '-srtp_out_params', encodeSrtpOptions(this.decodedSrtpOptions),
+            `srtp://127.0.0.1:${audioOutForwarder.port}?pkt_size=188`,
+        );
+
+        this.console.log("===========================================")
+        safePrintFFmpegArguments( this.console, args )
+        this.console.log("===========================================")
+
+        const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
+        ffmpegLogInitialOutput(this.console, cp)
+        this.audioOutProcess = cp;
+        cp.on('exit', () => this.console.log('two way audio ended'));
+        this.session.onCallEnded.subscribe(() => {
+            closeQuiet(audioOutForwarder.server);
+            safeKillFFmpeg(cp)
+        });
     }
 
     async stopIntercom(): Promise<void> {
-        this.log.d( "TODO: stopIntercom" )
+        closeQuiet(this.audioOutForwarder)
+        this.audioOutProcess?.kill('SIGKILL')
+        this.audioOutProcess = undefined
+        this.audioOutForwarder = undefined
     }
 
     resetStreamTimeout() {
@@ -156,27 +210,27 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 sip.onCallEnded.subscribe(cleanup)
 
                 // Call the C300X
-                let remoteRtpDescription = await sip.call(
+                this.remoteRtpDescription = await sip.call(
                     ( audio ) => {
                     return [
                         'a=DEVADDR:20', // Needed for bt_answering_machine (bticino specific)
                         `m=audio ${audio.port} RTP/SAVP 97`,
                         `a=rtpmap:97 speex/8000`,
-                        `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X`,
+                        `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
                     ]
                 }, ( video ) => {
                     return [
                         `m=video ${video.port} RTP/SAVP 97`,
                         `a=rtpmap:97 H264/90000`,
                         `a=fmtp:97 profile-level-id=42801F`,
-                        `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X`,
+                        `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
                         'a=recvonly'                        
                     ]
                 } );
                 if( sip.sipOptions.debugSip )
-                    this.log.d('SIP: Received remote SDP:\n' + remoteRtpDescription.sdp)
+                    this.log.d('SIP: Received remote SDP:\n' + this.remoteRtpDescription.sdp)
 
-                let sdp: string = replacePorts( remoteRtpDescription.sdp, 0, 0 )
+                let sdp: string = replacePorts(this.remoteRtpDescription.sdp, 0, 0 )
                 sdp = addTrackControls(sdp)
                 sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n')
                 if( sip.sipOptions.debugSip )

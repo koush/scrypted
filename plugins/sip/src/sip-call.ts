@@ -87,7 +87,9 @@ function getRtpDescription(
     if( section === undefined ) {
       return {
         port: 0,
-        rtcpPort: 0
+        rtcpPort: 0,
+        srtpKey: undefined,
+        srtpSalt: undefined
       };
     }
 
@@ -115,7 +117,7 @@ function getRtpDescription(
       ssrc: (ssrcLine && Number(ssrcLine.match(/ssrc:(\S*)/)?.[1])) || undefined,
       iceUFrag: (iceUFragLine && iceUFragLine.match(/ice-ufrag:(\S*)/)?.[1]) || undefined,
       icePwd: (icePwdLine && icePwdLine.match(/ice-pwd:(\S*)/)?.[1]) || undefined,
-      ...(encodedCrypto? decodeSrtpOptions(encodedCrypto) : {})
+      ...(encodedCrypto? decodeSrtpOptions(encodedCrypto) : { srtpKey: undefined, srtpSalt: undefined })
     }
   } catch (e) {
     console.error('Failed to parse SDP from remote end')
