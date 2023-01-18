@@ -37,7 +37,7 @@
       "sdp": "^3.0.3",
       "sip": "0.0.6",
       "stun": "^2.1.0",
-      "uuid": "^8.3.4"
+      "uuid": "^8.3.2"
    },
    "devDependencies": {
       "@scrypted/common": "file:../../common",
