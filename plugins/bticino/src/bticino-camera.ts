@@ -16,7 +16,7 @@ import { BticinoSipPlugin } from './main';
 import { BticinoSipLock } from './bticino-lock';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 
-const STREAM_TIMEOUT = 50000;
+const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
 
 export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor {
@@ -27,7 +27,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     private currentMedia: FFmpegInput | MediaStreamUrl
     private currentMediaMimeType: string
     private refreshTimeout: NodeJS.Timeout
-    public messageHandler: CompositeSipMessageHandler
+    public messageHandler: CompositeSipMessageHandler = new CompositeSipMessageHandler()
     private settingsStorage: BticinoStorageSettings = new BticinoStorageSettings( this )
     public voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
     //TODO: randomize this
@@ -36,7 +36,6 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
-        this.messageHandler = new CompositeSipMessageHandler()
         this.messageHandler.add( this.voicemailHandler )
     }
 
