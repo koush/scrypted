@@ -15,7 +15,7 @@ import os from 'os';
 import { getAddressOverride } from '../../address-override';
 import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
 import type { HomeKitPlugin } from "../../main";
-import { createReturnAudioSdp } from '../../rtp/rtp-ffmpeg-input';
+import { createReturnAudioSdp } from './camera-return-audio';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
 import { getDebugMode } from './camera-debug-mode-storage';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
