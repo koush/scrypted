@@ -138,7 +138,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
             // audio will work so long as the rtp timestamps are created properly: which is a construct of the sample rate
             // HAP requests, and the packet time is respected,
             // opus 48khz will work just fine.
-            rtp.header.timestamp = (firstTimestamp + packetCount * 180 * audioIntervalScale) % 0xFFFFFFFF;
+            rtp.header.timestamp = (firstTimestamp + packetCount * 160 * audioIntervalScale) % 0xFFFFFFFF;
             sendPacket(rtp);
             return;
         }
