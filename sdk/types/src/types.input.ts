@@ -599,7 +599,13 @@ export interface MediaStreamPacketLoss {
 
 export interface MediaStreamFeedback {
   onRtcp(buffer: Buffer): Promise<void>;
-  requestBitrate(bitrate: number): Promise<void>;
+  reconfigureStream(options: {
+    video: {
+      bitrate?: number;
+      width?: number;
+      height?: number;
+    },
+  }): Promise<void>;
   requestKeyframe(): Promise<void>;
   reportPacketLoss(report: MediaStreamPacketLoss): Promise<void>;
   reportPictureLoss(): Promise<void>;

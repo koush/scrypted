@@ -8,6 +8,7 @@ from typing import Any, List, Tuple, Mapping
 from gi.repository import Gst
 import asyncio
 import time
+import sys
 
 from detect import DetectionSession, DetectPlugin
 from collections import namedtuple
@@ -264,10 +265,10 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 t = tracker.Sort_OH(scene=np.array([iw, ih]))
                 self.trackers[detection_session.id] = t
             detection_session.tracker = t
-            conf_trgt = 0.35
-            conf_objt = 0.75
-            detection_session.tracker.conf_trgt = conf_trgt
-            detection_session.tracker.conf_objt = conf_objt
+            # conf_trgt = 0.35
+            # conf_objt = 0.75
+            # detection_session.tracker.conf_trgt = conf_trgt
+            # detection_session.tracker.conf_objt = conf_objt
 
         # this a single pass or the second pass. detect once and return results.
         if multipass_crop:
@@ -390,21 +391,29 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             for td in trackers:
                 x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
                 ), td[2].item(), td[3].item(), td[4].item()
-                overlap = 0
+                slop = sys.maxsize
+                obj: ObjectDetectionResult = None
+                ta = (x1 - x0) * (y1 - y0)
+                box = Rectangle(x0, y0, x1, y1)
                 for d in detections:
-                    obj: ObjectDetectionResult = None
+                    if d.get('id'):
+                        continue
                     ob: ObjectDetectionResult = d
                     dx0, dy0, dw, dh = ob['boundingBox']
                     dx1 = dx0 + dw
                     dy1 = dy0 + dh
-                    area = (min(dx1, x1)-max(dx0, x0))*(min(dy1, y1)-max(dy0, y0))
-                    if (area > overlap):
-                        overlap = area
+                    da = dw * dh
+                    area = intersect_area(Rectangle(dx0, dy0, dx1, dy1), box)
+                    if not area:
+                        continue
+                    dslop = ta + da - area * 2
+                    if (dslop < slop):
+                        slop = dslop
                         obj = ob
 
-                    if obj:
-                        obj['id'] = str(trackID)
-                        ret['detections'].append(obj)
+                if obj:
+                    obj['id'] = str(trackID)
+                    ret['detections'].append(obj)
 
         return ret, RawImage(image)
 

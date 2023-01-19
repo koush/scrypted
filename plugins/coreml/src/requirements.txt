@@ -5,7 +5,5 @@ coremltools~=6.1
 
 # sort_oh
 scipy
-numba
-matplotlib
 filterpy
 numpy

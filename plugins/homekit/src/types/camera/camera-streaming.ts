@@ -1,23 +1,27 @@
+import { RtpPacket } from '@koush/werift-src/packages/rtp/src/index';
 import type { RtcpRrPacket } from '@koush/werift-src/packages/rtp/src/rtcp/rr';
 import { RtcpPacketConverter } from '@koush/werift-src/packages/rtp/src/rtcp/rtcp';
-import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '@koush/werift-src/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtcp';
-import { bindUdp, closeQuiet } from '@scrypted/common/src/listen-cluster';
+import { SrtpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtp';
+import { bindUdp, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
-import sdk, { Camera, FFmpegInput, Intercom, MediaStreamFeedback, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import { RtspServer } from '@scrypted/common/src/rtsp-server';
+import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
+import sdk, { Camera, FFmpegInput, Intercom, MediaStreamFeedback, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
 import { getAddressOverride } from '../../address-override';
 import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
 import type { HomeKitPlugin } from "../../main";
-import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
+import { createReturnAudioSdp } from './camera-return-audio';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
 import { getDebugMode } from './camera-debug-mode-storage';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
 import { CameraStreamingSession } from './camera-streaming-session';
 import { getStreamingConfiguration } from './camera-utils';
+
 
 const { mediaManager } = sdk;
 const v4Regex = /^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/
@@ -326,11 +330,15 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             session.mediaStreamOptions = videoInput.mediaStreamOptions;
 
             session.tryReconfigureBitrate = (reason: string, bitrate: number) => {
-                if (!mediaStreamFeedback){ 
+                if (!mediaStreamFeedback) {
                     console.log('Media Stream reconfiguration was requested. Upgrade to Scrypted NVR for adaptive bitrate support.');
                     return;
                 }
-                mediaStreamFeedback.requestBitrate(bitrate);
+                mediaStreamFeedback.reconfigureStream({
+                    video: {
+                        bitrate,
+                    }
+                });
             }
 
             session.videoReturn.on('message', data => {
@@ -362,40 +370,69 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             // audio talkback
             if (twoWayAudio) {
-                const socketType = session.prepareRequest.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-                const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
+                let rtspServer: RtspServer;
+                let track: string;
+                let playing = false;
+                session.audioReturn.once('message', async buffer => {
+                    try {
+                        const { clientPromise, url } = await listenZeroSingleClient();
+                        const rtspUrl = url.replace('tcp', 'rtsp');
+                        let sdp = createReturnAudioSdp(session.startRequest.audio);
+                        sdp = addTrackControls(sdp);
+                        const parsed = parseSdp(sdp);
+                        track = parsed.msections[0].control;
+                        const isOpus = session.startRequest.audio.codec === AudioStreamingCodecType.OPUS;
 
-                // this is a bit hacky, as it picks random ports and spams audio at it.
-                // the resultant port is returned as an ffmpeg input to the device intercom,
-                // if it has one. which, i guess works.
-                const rtpSink = await startRtpSink(socketType, session.prepareRequest.targetAddress,
-                    audioKey, session.startRequest.audio, console);
-                session.killPromise.finally(() => rtpSink.destroy());
+                        const ffmpegInput: FFmpegInput = {
+                            url: rtspUrl,
+                            // this may not work if homekit is using aac to deliver audio, since 
+                            inputArguments: [
+                                "-acodec", isOpus ? "libopus" : "libfdk_aac",
+                                '-i', rtspUrl,
+                            ],
+                        };
+                        const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput, {
+                            sourceId: device.id,
+                        });
+                        device.startIntercom(mo).catch(e => console.error('intercom failed to start', e));
 
-                // demux the audio return socket to distinguish between rtp audio return
-                // packets and rtcp.
-                // send the audio return off to the rtp
-                let startedIntercom = false;
-                session.audioReturn.on('message', buffer => {
-                    const rtp = RtpPacket.deSerialize(buffer);
-                    if (rtp.header.payloadType === session.startRequest.audio.pt) {
-                        if (!startedIntercom) {
-                            console.log('Received first two way audio packet, starting intercom.');
-                            startedIntercom = true;
-                            mediaManager.createFFmpegMediaObject(rtpSink.ffmpegInput)
-                                .then(mo => {
-                                    device.startIntercom(mo).catch(e => console.error('intercom failed to start', e));
-                                    session.audioReturn.once('close', () => {
-                                        console.log('Stopping intercom.');
-                                        device.stopIntercom();
-                                    });
-                                });
+                        const client = await clientPromise;
+
+                        const cleanup = () => {
+                            // remove listeners to prevent a double invocation of stopIntercom.
+                            client.removeAllListeners();
+                            console.log('Stopping intercom.');
+                            device.stopIntercom();
+                            client.destroy();
+                            rtspServer = undefined;
+                            playing = false;
                         }
-                        session.audioReturn.send(buffer, rtpSink.rtpPort);
+                        // stop the intercom if the client dies for any reason.
+                        // allow the streaming session to continue however.
+                        client.on('close', cleanup);
+                        session.killPromise.finally(cleanup);
+
+                        rtspServer = new RtspServer(client, sdp);
+                        await rtspServer.handlePlayback();
+                        playing = true;
                     }
-                    else {
-                        rtpSink.heartbeat(session.audioReturn, buffer);
+                    catch (e) {
+                        console.error('two way audio failed', e);
                     }
+                });
+
+                const srtpSession = new SrtpSession(session.aconfig);
+                session.audioReturn.on('message', buffer => {
+                    if (!playing)
+                        return;
+
+                    const decrypted = srtpSession.decrypt(buffer);
+                    const rtp = RtpPacket.deSerialize(decrypted);
+
+                    if (rtp.header.payloadType !== session.startRequest.audio.pt)
+                        return;
+
+                    rtspServer.sendTrack(track, decrypted, false);
                 });
             }
         },

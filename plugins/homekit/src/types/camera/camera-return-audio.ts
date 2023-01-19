@@ -1,43 +1,6 @@
-import { listenZero } from "@scrypted/common/src/listen-cluster";
-import { FFmpegInput } from "@scrypted/sdk";
-import { Socket, SocketType } from "dgram";
-import { createServer, Server } from "net";
-import { AudioStreamingCodecType, AudioInfo, AudioStreamingSamplerate } from "../hap";
-import { pickPort } from "../hap-utils";
+import { AudioInfo, AudioStreamingCodecType, AudioStreamingSamplerate } from "../../hap";
 
-export class HomeKitRtpSink {
-    heartbeatTimer: NodeJS.Timeout;
-
-    constructor(public server: Server, public rtpPort: number, public ffmpegInput: FFmpegInput, public console: Console) {
-    }
-
-    // Send a regular heartbeat to FFmpeg to ensure the pipe remains open and the process alive.
-    heartbeat(socket: Socket, heartbeat: Buffer): void {
-
-        // Clear the old heartbeat timer.
-        clearTimeout(this.heartbeatTimer);
-
-        // Send a heartbeat to FFmpeg every few seconds to keep things open. FFmpeg has a five-second timeout
-        // in reading input, and we want to be comfortably within the margin for error to ensure the process
-        // continues to run.
-        this.heartbeatTimer = setTimeout(() => {
-            socket.send(heartbeat, this.rtpPort);
-            this.heartbeat(socket, heartbeat);
-
-        }, 3.5 * 1000);
-    }
-
-    destroy() {
-        this.console.log('rtp sink closed');
-        this.server?.close();
-        clearTimeout(this.heartbeatTimer);
-    }
-}
-
-export async function startRtpSink(socketType: SocketType, address: string, srtp: Buffer, audioInfo: AudioInfo, console: Console) {
-    const sdpIpVersion = socketType === "udp6" ? "IP6 " : "IP4";
-    const rtpPort = await pickPort();
-
+export function createReturnAudioSdp(audioInfo: AudioInfo, srtp: Buffer = undefined, sdpIpVersion = 'IP4', address = '127.0.0.1', rtpPort = 0) {
     const isOpus = audioInfo.codec === AudioStreamingCodecType.OPUS;
     const { sample_rate } = audioInfo;
 
@@ -130,39 +93,11 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
             : [
                 "a=rtpmap:110 MPEG4-GENERIC/16000/1",
                 "a=fmtp:110 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3; config=" + csd,
-            ]),
-        "a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:" + srtp.toString("base64")
-    ].join("\n");
+            ])
+    ];
 
-    const server = createServer(socket => {
-        socket.write(Buffer.from(sdpReturnAudio));
-        socket.end();
-    });
-    const sdpServerPort = await listenZero(server);
+    if (srtp)
+        sdpReturnAudio.push("a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:" + srtp.toString("base64"));
 
-    const ffmpegInput: FFmpegInput = {
-        url: undefined,
-        mediaStreamOptions: {
-            id: undefined,
-            video: null,
-            audio: isOpus
-                ? {
-                    codec: 'opus',
-                    encoder: 'libopus',
-                }
-                : {
-                    codec: 'aac',
-                    encoder: 'libfdk_aac',
-                },
-        },
-        inputArguments: [
-            "-protocol_whitelist", "pipe,udp,rtp,file,crypto,tcp",
-            "-acodec", isOpus ? "libopus" : "libfdk_aac",
-            '-ac', '1',
-            "-f", "sdp",
-            "-i", "tcp://127.0.0.1:" + sdpServerPort,
-        ]
-    };
-
-    return new HomeKitRtpSink(server, rtpPort, ffmpegInput, console);
+    return sdpReturnAudio.join('\n');
 }
