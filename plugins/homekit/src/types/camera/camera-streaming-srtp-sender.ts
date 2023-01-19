@@ -31,8 +31,6 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     let octetCount = 0;
     let lastRtcp = 0;
     let firstSequenceNumber: number;
-    let allowRollover = false;
-    let rolloverCount = 0;
     let opusPacketizer: OpusRepacketizer;
     let h264Packetizer: H264Repacketizer;
     let analyzeVideo = true;
@@ -115,17 +113,6 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         if (firstSequenceNumber === undefined) {
             console.log(`received first ${audioOptions ? 'audio' : 'video'} packet`);
             firstSequenceNumber = rtp.header.sequenceNumber;
-        }
-
-        // rough rollover detection to keep packet count accurate.
-        // once within 256 packets of the 0 and 65536, wait for rollover.
-        if (!allowRollover) {
-            if (rtp.header.sequenceNumber > 0xFF00)
-                allowRollover = true;
-        }
-        else if (rtp.header.sequenceNumber < 0x00FF) {
-            allowRollover = false;
-            rolloverCount++;
         }
 
         if (!firstTimestamp)
