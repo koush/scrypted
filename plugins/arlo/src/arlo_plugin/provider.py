@@ -1,7 +1,10 @@
 import asyncio
 import json
 import logging
+import os
+import platform
 import requests
+import sys
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
@@ -149,6 +152,19 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         self.storage.setItem("arlo_auth_headers", "")
         self.storage.setItem("arlo_user_id", "")
 
+    def force_update_deps(self):
+        plugin_volume = os.environ.get('SCRYPTED_PLUGIN_VOLUME')
+        python_version = f'python{sys.version_info[0]}.{sys.version_info[1]}'
+        python_prefix = os.path.join(plugin_volume, '%s-%s-%s' % (python_version, platform.system(), platform.machine()))
+        installed_requirementstxt = os.path.join(
+            python_prefix, 'requirements.installed.txt'
+        )
+        self.logger.info(f"Removing {installed_requirementstxt}")
+        os.remove(installed_requirementstxt)
+        import subprocess
+        subprocess.run([sys.executable, '-m', 'pip', 'cache', 'purge'])
+        self.create_task(scrypted_sdk.deviceManager.requestRestart())
+
     def get_current_log_level(self):
         return ArloProvider.plugin_verbosity_choices[self.plugin_verbosity]
 
@@ -205,6 +221,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "value": self.plugin_verbosity,
                 "choices": sorted(self.plugin_verbosity_choices.keys()),
             },
+            {
+                "key": "force_update_deps",
+                "title": "Force Re-Install Python Dependencies",
+                "description": "(WARNING: Will purge your pip cache!) Re-downloads and re-installs the plugin's Python dependencies.",
+                "value": "No",
+                "choices": ["No", "Yes"],
+            },
         ]
 
     async def putSetting(self, key, value):
@@ -213,6 +236,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         elif key == "force_reauth":
             # force arlo client to be invalidated and reloaded
             self.invalidate_arlo_client()
+        elif key == "force_update_deps":
+            self.force_update_deps()
         else:
             self.storage.setItem(key, value)
 
