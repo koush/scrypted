@@ -3,5 +3,5 @@ sseclient==0.0.22
 requests
 aiortc==1.3.2
 cryptography<39.0.0
---extra-index-url=https://bjia56.github.io/scrypted-python-wheels/
+--extra-index-url=https://bjia56.github.io/scrypted-python-wheels/v1/
 --no-binary=cffi
