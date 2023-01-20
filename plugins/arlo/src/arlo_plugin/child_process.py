@@ -7,6 +7,7 @@ HEARTBEAT_INTERVAL = 1
 
 
 def multiprocess_main(child_conn, exe, args):
+    print("Child process starting")
     sp = subprocess.Popen([exe, *args])
 
     while True:
@@ -19,6 +20,7 @@ def multiprocess_main(child_conn, exe, args):
 
     sp.terminate()
     sp.wait()
+    print("Child process exiting")
 
 
 class HeartbeatChildProcess:

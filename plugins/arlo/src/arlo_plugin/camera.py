@@ -380,4 +380,5 @@ class ArloCameraRTCSessionControl:
             await self.arlo_session.mute_relay()
 
     async def endSession(self):
+        self.logger.info("Ending RTC session")
         await self.arlo_session.shutdown()
