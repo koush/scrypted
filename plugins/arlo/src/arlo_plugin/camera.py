@@ -2,6 +2,7 @@ from aioice import Candidate
 from aiortc import RTCSessionDescription, RTCIceGatherer, RTCIceServer
 from aiortc.rtcicetransport import candidate_to_aioice, candidate_from_aioice 
 import asyncio
+import json
 import socket
 
 import scrypted_sdk
@@ -33,6 +34,8 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
         self.logger.setLevel(self.provider.get_current_log_level())
         
         self._update_device_details(arlo_device)
+
+        self.intercom_session = None
 
         self.stop_subscriptions = False
         self.start_motion_subscription()
@@ -178,6 +181,17 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
 
         return ArloCameraRTCSessionControl(plugin_session)
 
+    async def startIntercom(self, media):
+        self.logger.info("Starting intercom")
+        self.intercom_session = ArloCameraRTCSignalingSession(self)
+        await self.intercom_session.initialize_push_to_talk(media)
+
+    async def stopIntercom(self):
+        self.logger.info("Stopping intercom")
+        if self.intercom_session is not None:
+            await self.intercom_session.shutdown()
+            self.intercom_session = None
+
     def _update_device_details(self, arlo_device):
         """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
         """
@@ -199,7 +213,7 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
 
         self.ffmpeg_subprocess = None
 
-        self.pc = None
+        self.scrypted_pc = None
         self.local_candidates = None
         self.arlo_pc = None
         self.arlo_sdp_answered = False
@@ -283,8 +297,8 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         self.ffmpeg_subprocess = HeartbeatChildProcess(ffmpeg_path, *ffmpeg_args)
         self.ffmpeg_subprocess.start()
 
-        self.pc = BackgroundRTCPeerConnection(self.logger)
-        await self.pc.add_media(
+        self.scrypted_pc = BackgroundRTCPeerConnection(self.logger)
+        await self.scrypted_pc.add_media(
             f"udp://localhost:{port}?overrun_nonfatal=1&fifo_size=50000000",
             format="mpegts",
             options={
@@ -302,8 +316,24 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         if self.camera._can_push_to_talk():
             await self.initialize_push_to_talk()
 
-    async def initialize_push_to_talk(self):
-        self.logger.info("Initializing push to talk for RTC")
+    async def initialize_push_to_talk(self, media=None):
+        # if we get a media object, we are initializing through
+        # the camera's startIntercom function
+        is_standalone = media is not None
+        if is_standalone:
+            self.logger.info("Initializing standalone push to talk")
+            ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
+            self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
+
+            rtsp_url = ffmpeg_params.get("url")
+            if rtsp_url is None:
+                for idx in range(len(ffmpeg_params["inputArguments"])):
+                    if ffmpeg_params["inputArguments"][idx] == "-i":
+                        rtsp_url = ffmpeg_params["inputArguments"][idx+1]
+                        break
+            self.logger.debug(f"Will use rtsp url {rtsp_url}")
+        else:
+            self.logger.info("Initializing push to talk for RTC")
 
         session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
         self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
@@ -321,22 +351,28 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         ]
 
         log_candidates = '\n'.join(local_candidates)
-        self.logger.debug(f"Local candidates:\n{log_candidates}")
+        self.logger.debug(f"Local candidates for Arlo:\n{log_candidates}")
 
-        self.arlo_pc = BackgroundRTCPeerConnection(self.logger, background=self.pc.background)
+        if not is_standalone:
+            self.arlo_pc = BackgroundRTCPeerConnection(self.logger, background=self.scrypted_pc.background)
 
-        received_audio_track = asyncio.get_event_loop().create_future()
-        async def on_track(track):
-            self.logger.debug(f"Received track from scrypted: {track.kind}")
-            if track.kind == "audio" and self.arlo_relay_track is None:
-                self.arlo_relay_track = await self.arlo_pc.subscribe_track(track)
-                received_audio_track.set_result(True)
-        self.pc.on_track(on_track)
+            received_audio_track = asyncio.get_event_loop().create_future()
+            async def on_track(track):
+                self.logger.debug(f"Received track from scrypted: {track.kind}")
+                if track.kind == "audio" and self.arlo_relay_track is None:
+                    self.arlo_relay_track = await self.arlo_pc.subscribe_track(track)
+                    received_audio_track.set_result(True)
+            self.scrypted_pc.on_track(on_track)
+        else:
+            self.arlo_pc = BackgroundRTCPeerConnection(self.logger)
 
         # Perform the remaining setup asynchronously later, since we need to finish initializing
         # before RTC session exchange can happen.
         async def async_setup():
-            await received_audio_track
+            if is_standalone:
+                await self.arlo_pc.add_media(rtsp_url)
+            else:
+                await received_audio_track
             self.sdp_answered = False
 
             offer = await self.arlo_pc.createOffer()
@@ -370,8 +406,8 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
                 for c in self.local_candidates
             ] 
 
-        answer = await self.pc.createAnswer()
-        await self.pc.setLocalDescription(answer)
+        answer = await self.scrypted_pc.createAnswer()
+        await self.scrypted_pc.setLocalDescription(answer)
         return {
             "sdp": answer.sdp,
             "type": "answer"
@@ -382,11 +418,11 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
             raise Exception("can only accept offers in ArloCameraRTCSignalingSession.createLocalDescription")
 
         sdp = RTCSessionDescription(sdp=description["sdp"], type="offer")
-        await self.pc.setRemoteDescription(sdp)
+        await self.scrypted_pc.setRemoteDescription(sdp)
 
     async def addIceCandidate(self, candidate):
         candidate = candidate_from_aioice(Candidate.from_sdp(candidate["candidate"]))
-        await self.pc.addIceCandidate(candidate)
+        await self.scrypted_pc.addIceCandidate(candidate)
 
     async def getOptions(self):
         pass
@@ -401,9 +437,9 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         if self.ffmpeg_subprocess is not None:
             self.ffmpeg_subprocess.stop()
             self.ffmpeg_subprocess = None
-        if self.pc is not None:
-            await self.pc.close()
-            self.pc = None
+        if self.scrypted_pc is not None:
+            await self.scrypted_pc.close()
+            self.scrypted_pc = None
         if self.arlo_pc is not None:
             await self.arlo_pc.close()
             self.arlo_pc = None
