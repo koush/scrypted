@@ -354,6 +354,10 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         self.logger.debug(f"Local candidates for Arlo:\n{log_candidates}")
 
         if not is_standalone:
+            # for webrtc emulation, we need to pass through media from the
+            # scrypted-facing webrtc stream to the arlo-facing webrtc stream,
+            # so we need to have both running on the same asyncio event loop
+            # due to the inability to share coroutines across loops
             self.arlo_pc = BackgroundRTCPeerConnection(self.logger, background=self.scrypted_pc.background)
 
             received_audio_track = asyncio.get_event_loop().create_future()
