@@ -133,7 +133,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             ])
 
             for nativeId in self.arlo_cameras.keys():
-                self.getDevice(nativeId)
+                await self.getDevice(nativeId)
         except requests.exceptions.HTTPError as e:
             self.logger.error(f"HTTPError '{str(e)}' while performing post-login Arlo setup, will retry with fresh login")
             self._arlo = None
@@ -204,8 +204,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "key": "force_reauth",
                 "title": "Force Re-Authentication",
                 "description": "Resets the authentication flow of the plugin. Will also re-do 2FA.",
-                "value": "No",
-                "choices": ["No", "Yes"],
+                "value": False,
+                "type": "boolean",
             },
             {
                 "key": "arlo_transport",
@@ -225,8 +225,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "key": "force_update_deps",
                 "title": "Force Re-Install Python Dependencies",
                 "description": "(WARNING: Will purge your pip cache!) Re-downloads and re-installs the plugin's Python dependencies.",
-                "value": "No",
-                "choices": ["No", "Yes"],
+                "value": False,
+                "type": "boolean",
             },
         ]
 
@@ -279,6 +279,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 self.logger.info(f"Skipping camera {camera['deviceId']} because its basestation was not found")
                 continue
 
+            if camera["deviceId"] == camera["parentId"]:
+                self.arlo_basestations[camera["deviceId"]] = camera
+
+            nativeId = camera["deviceId"]
+            self.arlo_cameras[nativeId] = camera
+
+            scrypted_interfaces = (await self.getDevice(nativeId)).get_applicable_interfaces()
+            self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']}): {scrypted_interfaces}")
+
             device = {
                 "info": {
                     "model": f"{camera['properties']['modelId']} ({camera['properties'].get('hwVersion', '')})".strip(),
@@ -288,18 +297,12 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 },
                 "nativeId": camera["deviceId"],
                 "name": camera["deviceName"],
-                "interfaces": self.get_interfaces(camera),
+                "interfaces": scrypted_interfaces,
                 "type": ScryptedDeviceType.Camera.value,
                 "providerNativeId": self.nativeId,
             }
 
             devices.append(device)
-
-            if camera["deviceId"] == camera["parentId"]:
-                self.arlo_basestations[camera["deviceId"]] = camera
-
-            nativeId = camera["deviceId"]
-            self.arlo_cameras[nativeId] = camera
 
         await scrypted_sdk.deviceManager.onDevicesChanged({
             "devices": devices,
@@ -310,15 +313,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         else:
             self.logger.info(f"Discovered {len(cameras)} cameras")
 
-    def getDevice(self, nativeId):
+    async def getDevice(self, nativeId):
         ret = self.scrypted_devices.get(nativeId, None)
         if ret is None:
-            ret = self.createCamera(nativeId)
+            ret = self.create_camera(nativeId)
             if ret is not None:
                 self.scrypted_devices[nativeId] = ret
         return ret
 
-    def createCamera(self, nativeId):
+    def create_camera(self, nativeId):
         if nativeId not in self.arlo_cameras:
             return None
         arlo_camera = self.arlo_cameras[nativeId]
@@ -331,26 +334,3 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             return ArloDoorbell(nativeId, arlo_camera, arlo_basestation, self)
         else:
             return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
-
-    def get_interfaces(self, camera):
-        model_id = camera['properties']['modelId'].lower()
-        self.logger.debug(f"Checking applicable scrypted interfaces for {model_id}")
-
-        results = [
-            ScryptedInterface.VideoCamera.value,
-            ScryptedInterface.Camera.value,
-            ScryptedInterface.MotionSensor.value,
-            ScryptedInterface.Battery.value,
-            ScryptedInterface.RTCSignalingChannel.value,
-        ]
-
-        if model_id.startswith("avd1001"):
-            results.remove(ScryptedInterface.Battery.value)
-
-        if camera['deviceType'] == 'doorbell':
-            results.append(ScryptedInterface.BinarySensor.value)
-
-        if camera["deviceId"] == camera["parentId"]:
-            results.remove(ScryptedInterface.RTCSignalingChannel.value)
- 
-        return results

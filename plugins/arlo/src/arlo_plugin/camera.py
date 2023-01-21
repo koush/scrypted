@@ -6,7 +6,7 @@ import socket
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
-from scrypted_sdk.types import Camera, VideoCamera, MotionSensor, Battery, ScryptedMimeTypes
+from scrypted_sdk.types import Settings, Camera, VideoCamera, MotionSensor, Battery, ScryptedMimeTypes, ScryptedInterface
 
 from .child_process import HeartbeatChildProcess
 from .logging import ScryptedDeviceLoggerMixin
@@ -14,7 +14,7 @@ from .util import BackgroundTaskMixin
 from .rtcpeerconnection import BackgroundRTCPeerConnection
 
 
-class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
+class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Battery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     timeout = 30
     nativeId = None
     arlo_device = None
@@ -58,6 +58,52 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
         self.register_task(
             self.provider.arlo.SubscribeToBatteryEvents(self.arlo_basestation, self.arlo_device, callback)
         )
+
+    def get_applicable_interfaces(self):
+        results = [
+            ScryptedInterface.VideoCamera.value,
+            ScryptedInterface.Camera.value,
+            ScryptedInterface.MotionSensor.value,
+            ScryptedInterface.Battery.value,
+            ScryptedInterface.Settings.value,
+            ScryptedInterface.RTCSignalingChannel.value,
+        ]
+
+        if not self.webrtc_peer_enabled:
+            results.remove(ScryptedInterface.RTCSignalingChannel.value)
+            results.append(ScryptedInterface.Intercom.value)
+
+        if self.arlo_device["deviceId"] == self.arlo_device["parentId"]:
+            try:
+                results.remove(ScryptedInterface.RTCSignalingChannel.value)
+            except:
+                pass
+            try:
+                results.remove(ScryptedInterface.Intercom.value)
+            except:
+                pass
+
+        return results
+
+    @property
+    def webrtc_peer_enabled(self):
+        return self.storage.getItem("webrtc_peer_enabled")
+
+    async def getSettings(self):
+        return [
+            {
+                "key": "webrtc_peer_enabled",
+                "title": "Emulate WebRTC Camera",
+                "value": self.webrtc_peer_enabled,
+                "description": "Configures the plugin to offer this device as a WebRTC camera. May use increased system resources.",
+                "type": "boolean",
+            },
+        ]
+
+    async def putSetting(self, key, value):
+        if key == "webrtc_peer_enabled":
+            self.storage.setItem(key, value == "true")
+            await self.provider.discoverDevices()
 
     async def getPictureOptions(self):
         return []
