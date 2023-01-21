@@ -69,7 +69,7 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
             ScryptedInterface.RTCSignalingChannel.value,
         ]
 
-        if not self.webrtc_peer_enabled:
+        if not self.webrtc_emulation:
             results.remove(ScryptedInterface.RTCSignalingChannel.value)
             results.append(ScryptedInterface.Intercom.value)
 
@@ -86,22 +86,22 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
         return results
 
     @property
-    def webrtc_peer_enabled(self):
-        return self.storage.getItem("webrtc_peer_enabled")
+    def webrtc_emulation(self):
+        return self.storage.getItem("webrtc_emulation")
 
     async def getSettings(self):
         return [
             {
-                "key": "webrtc_peer_enabled",
+                "key": "webrtc_emulation",
                 "title": "Emulate WebRTC Camera",
-                "value": self.webrtc_peer_enabled,
+                "value": self.webrtc_emulation,
                 "description": "Configures the plugin to offer this device as a WebRTC camera. May use increased system resources.",
                 "type": "boolean",
             },
         ]
 
     async def putSetting(self, key, value):
-        if key == "webrtc_peer_enabled":
+        if key == "webrtc_emulation":
             self.storage.setItem(key, value == "true")
             await self.provider.discoverDevices()
 
