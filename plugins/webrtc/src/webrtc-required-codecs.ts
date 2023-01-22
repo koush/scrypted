@@ -1,7 +1,5 @@
 import { RTCRtpCodecParameters } from "./werift";
-import sdk from "@scrypted/sdk";
 
-const { mediaManager } = sdk;
 export const requiredVideoCodec = new RTCRtpCodecParameters({
     mimeType: "video/H264",
     clockRate: 90000,
