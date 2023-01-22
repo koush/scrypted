@@ -400,7 +400,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         public clientOptions: RTCSignalingOptions,
         public options: {
             configuration: RTCConfiguration,
-            weriftConfiguration: PeerConfig,
+            weriftConfiguration: Partial<PeerConfig>,
         }) {
 
         this.pc = new RTCPeerConnection({
@@ -563,7 +563,7 @@ export async function createRTCPeerConnectionSink(
     mo: MediaObject,
     maximumCompatibilityMode: boolean,
     configuration: RTCConfiguration,
-    weriftConfiguration: PeerConfig,
+    weriftConfiguration: Partial<PeerConfig>,
     clientOffer = true,
 ) {
     const clientOptions = await clientSignalingSession.getOptions();
