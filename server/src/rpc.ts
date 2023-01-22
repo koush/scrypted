@@ -189,6 +189,7 @@ function compileFunction(code: string, params?: ReadonlyArray<string>, options?:
 }
 
 try {
+    // @ts-ignore
     const fr = FinalizationRegistry;
 }
 catch (e) {
@@ -225,8 +226,10 @@ export class RpcPeer {
     proxyCounter = 1;
     localProxied = new Map<any, LocalProxiedEntry>();
     localProxyMap: { [id: string]: any } = {};
-    remoteWeakProxies: { [id: string]: WeakRef<any> } = {};
-    finalizers = new FinalizationRegistry(entry => this.finalize(entry as LocalProxiedEntry));
+    // @ts-ignore
+    private remoteWeakProxies: { [id: string]: WeakRef<any> } = {};
+    // @ts-ignore
+    private finalizers = new FinalizationRegistry(entry => this.finalize(entry as LocalProxiedEntry));
     nameDeserializerMap = new Map<string, RpcSerializer>();
     constructorSerializerMap = new Map<any, string>();
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
@@ -505,6 +508,7 @@ export class RpcPeer {
         const rpc = new RpcProxy(this, localProxiedEntry, proxyConstructorName, proxyProps, proxyOneWayMethods);
         const target = proxyConstructorName === 'Function' || proxyConstructorName === 'AsyncFunction' ? function () { } : rpc;
         const proxy = new Proxy(target, rpc);
+        // @ts-ignore
         const weakref = new WeakRef(proxy);
         this.remoteWeakProxies[proxyId] = weakref;
         this.finalizers.register(rpc, localProxiedEntry);

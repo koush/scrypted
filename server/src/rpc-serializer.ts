@@ -1,5 +1,5 @@
 import type { Readable, Writable } from "stream";
-import { SidebandBufferSerializer } from "./plugin/buffer-serializer";
+import { SidebandBufferSerializer } from "./rpc-buffer-serializer";
 import { RpcPeer } from "./rpc";
 
 export function createDuplexRpcPeer(selfName: string, peerName: string, readable: Readable, writable: Writable) {

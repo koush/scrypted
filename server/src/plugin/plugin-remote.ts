@@ -1,7 +1,7 @@
 import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointManager, EventDetails, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { AccessControls } from './acl';
-import { BufferSerializer } from './buffer-serializer';
+import { BufferSerializer } from '../rpc-buffer-serializer';
 import { PluginAPI, PluginHostInfo, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketConnection, WebSocketMethods, WebSocketSerializer } from './plugin-remote-websocket';
 import { checkProperty } from './plugin-state-check';
