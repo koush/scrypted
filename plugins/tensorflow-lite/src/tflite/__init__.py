@@ -60,6 +60,7 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
         self.mutex = threading.Lock()
 
     async def getSettings(self) -> list[Setting]:
+        ret = await super().getSettings()
         coral: Setting = {
             'title': 'Detected Edge TPU',
             'description': 'The device paths of the Coral Edge TPUs that will be used for detections.',
@@ -68,7 +69,9 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
             'key': 'coral',
         }
 
-        return [coral]
+        ret.append(coral)
+
+        return ret
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
