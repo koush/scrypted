@@ -1,1 +1,3 @@
-../../../server/src/rpc.ts
+export * from './rpc';
+export * from './rpc-buffer-serializer';
+export * from './rpc-serializer';
