@@ -105,20 +105,23 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
             state.externallyTracked = new Map();
         
         for (const tracked of externallyTracked) {
+            tracked.durationGone = 0;
+            tracked.lastSeen = now;
+            tracked.lastBox = tracked.boundingBox;
+
             let previous = state.externallyTracked.get(tracked.id);
-            if (state.externallyTracked.has(tracked.id)) {
+            if (previous) {
+                state.externallyTracked.delete(tracked.id);
                 tracked.firstSeen = previous.firstSeen;
-                tracked.lastSeen = previous.lastSeen = now;
                 tracked.firstBox = previous.firstBox;
-                tracked.lastBox = previous.lastBox = tracked.boundingBox;
+
                 previous.durationGone = 0;
+                previous.lastSeen = now;
+                previous.lastBox = tracked.boundingBox;
                 options?.retained(tracked, previous);
             }
             else {
-                state.externallyTracked.set(tracked.id, tracked);
                 tracked.firstSeen = now;
-                tracked.lastSeen = now;
-                tracked.durationGone = 0;
                 tracked.firstBox = tracked.lastBox = tracked.boundingBox;
                 options?.added(tracked);
             }
@@ -131,6 +134,10 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
                     options?.expiring(previous);
                 }
             }
+        }
+
+        for (const tracked of externallyTracked) {
+            state.externallyTracked.set(tracked.id, tracked);
         }
     }
 

@@ -20,7 +20,7 @@ from .corohelper import run_coro_threadsafe
 
 from gi.repository import Gst
 
-from scrypted_sdk.types import FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
+from scrypted_sdk.types import ObjectDetectionModel, Setting, FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
 def optional_chain(root, *keys):
     result = root
@@ -147,6 +147,35 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     
     async def putSetting(self, key: str, value: scrypted_sdk.SettingValue) -> None:
         pass
+
+    async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
+        height, width, channels = self.get_input_details()
+        d: ObjectDetectionModel = {
+            'name': self.pluginId,
+            'classes': list(self.labels.values()),
+            'inputSize': [int(width), int(height), int(channels)],
+        }
+
+        decoderSetting: Setting = {
+            'title': "Decoder",
+            'description': "The gstreamer element used to decode the stream",
+            'combobox': True,
+            'value': 'Default',
+            'placeholder': 'Default',
+            'key': 'decoder',
+            'choices': [
+                'Default',
+                'decodebin',
+                'vtdec_hw',
+                'nvh264dec',
+                'vaapih264dec',
+            ],
+        }
+
+        d['settings'] = [
+            decoderSetting,
+        ]
+        return d
 
     async def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, redetect: Any = None, mediaObject = None):
         if not detection_session.running and detection_result.get('running'):
@@ -414,6 +443,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     def maybeInvalidate():
                         if not retain:
                             self.invalidateMedia(detection_session, data)
+                        else:
+                            print('retaining')
 
                     mo = await self.createMedia(data)
                     try:
