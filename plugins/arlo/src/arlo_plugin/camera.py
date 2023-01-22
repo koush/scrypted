@@ -374,7 +374,13 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         # before RTC session exchange can happen.
         async def async_setup():
             if is_standalone:
-                await self.arlo_pc.add_media(rtsp_url)
+                await self.arlo_pc.add_media(
+                    rtsp_url,
+                    options={
+                        "analyzeduration": "0",
+                        "probesize": "32"
+                    },
+                )
             else:
                 await received_audio_track
             self.sdp_answered = False
