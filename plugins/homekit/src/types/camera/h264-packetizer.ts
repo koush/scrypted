@@ -1,5 +1,4 @@
-import type { RtpPacket } from "@koush/werift-src/packages/rtp/src/rtp/rtp";
-import { isNextSequenceNumber, JitterBuffer } from "./jitter-buffer";
+import { isNextSequenceNumber, JitterBuffer, RtpPacket } from "./jitter-buffer";
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
 export const NAL_TYPE_STAP_A = 24;
@@ -34,7 +33,7 @@ function depacketizeStapA(data: Buffer) {
     return ret;
 }
 
-function splitBitstream(data: Buffer) {
+export function splitH264NaluStartCode(data: Buffer) {
     const ret: Buffer[] = [];
     let previous = 0;
     let offset = 0;
@@ -72,7 +71,7 @@ export class H264Repacketizer {
         pps: Buffer,
     }, public jitterBuffer = new JitterBuffer(console, 4)) {
         // 12 is the rtp/srtp header size.
-        this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;;
+        this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;
     }
 
     ensureCodecInfo() {
@@ -250,7 +249,7 @@ export class H264Repacketizer {
         if (originalNalType === NAL_TYPE_SPS) {
             const defragmented = getDefragmentedPendingFua();
 
-            const splits = splitBitstream(defragmented);
+            const splits = splitH264NaluStartCode(defragmented);
             while (splits.length) {
                 const split = splits.shift();
                 const splitNaluType = split[0] & 0x1f;
@@ -352,8 +351,8 @@ export class H264Repacketizer {
         }
     }
 
-    repacketize(packet: RtpPacket): RtpPacket[] {
-        const ret: RtpPacket[] = [];
+    repacketize<T extends RtpPacket>(packet: T): T[] {
+        const ret: T[] = [];
         for (const dejittered of this.jitterBuffer.queue(packet)) {
             this.repacketizeOne(dejittered, ret);
         }

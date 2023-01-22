@@ -90,7 +90,7 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     }
 
     return {
-        destination,
+        destination: 'remote',
         isWatch,
         isLowBandwidth,
     }
