@@ -39,10 +39,10 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
-        return (self.inputheight, self.inputwidth, 3)
+        return (self.inputwidth, self.inputheight, 3)
 
     def get_input_size(self) -> Tuple[float, float]:
-        return (self.inputheight, self.inputwidth)
+        return (self.inputwidth, self.inputheight)
 
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         out_dict = self.model.predict({'image': input, 'confidenceThreshold': .2 })
