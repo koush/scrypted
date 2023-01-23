@@ -105,7 +105,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
-        # loop.call_later(60 * 60, lambda: self.requestRestart())
+        loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
 
     async def createMedia(self, data: RawImage) -> scrypted_sdk.MediaObject:
         mo = await scrypted_sdk.mediaManager.createMediaObject(data, self.fromMimeType)
@@ -173,7 +173,25 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             ],
         }
 
+        trackerWindow: Setting = {
+            'title': 'Tracker Window',
+            'description': 'Internal Setting. Do not change.',
+            'key': 'trackerWindow',
+            'value': 6,
+            'type': 'number',
+        }
+
+        trackerCertainty: Setting = {
+            'title': 'Tracker Certainty',
+            'description': 'Internal Setting. Do not change.',
+            'key': 'trackerCertainty',
+            'value': .2,
+            'type': 'number',
+        }
+
         d['settings'].append(allowList)
+        d['settings'].append(trackerWindow)
+        d['settings'].append(trackerCertainty)
         return d
 
     def create_detection_result(self, objs: List[Prediction], size, allowList, convert_to_src_size=None) -> ObjectsDetected:
@@ -238,8 +256,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             t = self.trackers.get(detection_session.id)
             if not t:
                 t = tracker.Sort_OH(scene=np.array([iw, ih]))
-                t.conf_three_frame_certainty = .6
-                # t.conf_unmatched_history_size = 6
+                t.conf_three_frame_certainty = (settings.get('trackerCertainty') or .2) * 3
+                t.conf_unmatched_history_size = settings.get('trackerWindow') or 6
                 self.trackers[detection_session.id] = t
             detection_session.tracker = t
             # conf_trgt = 0.35
@@ -369,9 +387,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 sort_input.append([l, t, l + w, t + h, r['score']])
             trackers, unmatched_trckr, unmatched_gts = detection_session.tracker.update(np.array(sort_input), [])
 
-            detections = ret['detections']
-            ret['detections'] = []
-
             for td in trackers:
                 x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
                 ), td[2].item(), td[3].item(), td[4].item()
@@ -397,7 +412,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
                 if obj:
                     obj['id'] = str(trackID)
-                    ret['detections'].append(obj)
                 # this may happen if tracker predicts something is still in the scene
                 # but was not detected
                 # else:
