@@ -39,11 +39,9 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
-        # TODO: is there a way to get this from the model itself?
         return (self.inputheight, self.inputwidth, 3)
 
     def get_input_size(self) -> Tuple[float, float]:
-        # TODO: is there a way to get this from the model itself?
         return (self.inputheight, self.inputwidth)
 
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
