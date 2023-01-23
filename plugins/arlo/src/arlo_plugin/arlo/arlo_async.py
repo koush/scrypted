@@ -500,10 +500,11 @@ class Arlo(object):
             raise Exception('The callback(self, event) should be a callable function.')
 
         await self.Subscribe()
-        if self.event_stream and self.event_stream.connected:
+
+        async def loop_action_listener(action):
             seen_events = {}
             while self.event_stream.connected:
-                event, action = await self.event_stream.get(resource, actions, seen_events)
+                event, _ = await self.event_stream.get(resource, [action], seen_events)
 
                 if event is None or self.event_stream is None \
                     or self.event_stream.event_stream_stop_event.is_set():
@@ -522,6 +523,13 @@ class Arlo(object):
                 for uuid in list(seen_events):
                     if seen_events[uuid].expired:
                         del seen_events[uuid]
+
+        if self.event_stream and self.event_stream.connected:
+            listeners = [loop_action_listener(action) for action in actions]
+            done, pending = await asyncio.wait(listeners, return_when=asyncio.FIRST_COMPLETED)
+            for task in pending:
+                task.cancel()
+            return done.pop().result()
 
     async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback):
         """

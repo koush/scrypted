@@ -74,9 +74,10 @@ class Stream:
             action = actions[0]
             key = f"{resource}/{action}"
 
-            while key not in self.queues:
-                await asyncio.sleep(random.uniform(0, 0.01))
-            q = self.queues[key]
+            if key not in self.queues:
+                q = self.queues[key] = asyncio.Queue()
+            else:
+                q = self.queues[key]
 
             while True:
                 event = await q.get()
@@ -93,10 +94,12 @@ class Stream:
             while True:
                 for action in actions:
                     key = f"{resource}/{action}"
-                    if key not in self.queues:
-                        continue
 
-                    q = self.queues[key]
+                    if key not in self.queues:
+                        q = self.queues[key] = asyncio.Queue()
+                    else:
+                        q = self.queues[key]
+
                     if q.empty():
                         continue
 
