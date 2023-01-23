@@ -443,8 +443,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     def maybeInvalidate():
                         if not retain:
                             self.invalidateMedia(detection_session, data)
-                        else:
-                            print('retaining')
+                        # else:
+                        #     print('retaining')
 
                     mo = await self.createMedia(data)
                     try:

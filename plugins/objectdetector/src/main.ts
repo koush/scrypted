@@ -286,16 +286,19 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       await Promise.allSettled(newOrBetterDetections.map(async d => {
         const maybeUpdateSecondPassScore = (secondPassScore: number) => {
           let better = false;
+          // initialize second pass result
           if (!d.bestSecondPassScore) {
             better = true;
+            d.bestSecondPassScore = 0;
           }
+          // retain passing the second pass threshold for first time.
           if (d.bestSecondPassScore < this.secondScoreThreshold && secondPassScore >= this.secondScoreThreshold) {
-            this.console.log('improved', d.id, d.bestSecondPassScore,d.score);
+            this.console.log('improved', d.id, d.bestSecondPassScore, d.score);
             better = true;
             retainImage = true;
           }
           else if (secondPassScore > d.bestSecondPassScore * 1.1) {
-            this.console.log('improved', d.id, d.bestSecondPassScore,d.score);
+            this.console.log('improved', d.id, d.bestSecondPassScore, d.score);
             better = true;
             retainImage = true;
           }
@@ -340,8 +343,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       detection.detections = trackedDetections;
     }
 
-    if (retainImage)
+    if (retainImage) {
+      this.console.log('retaining detection image');
       this.setDetection(detection, mediaObject);
+    }
 
     this.reportObjectDetections(detection);
     // if (newOrBetterDetection) {
@@ -606,16 +611,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       },
     });
     if (found.length) {
-      this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score})`).join(', '));
+      this.console.log('new detection:', found.map(d => `${d.id} ${d.detection.className} (${d.detection.score})`).join(', '));
       if (detectionResult.running)
         this.extendedObjectDetect();
     }
     if (found.length || showAll) {
       this.console.log('current detections:', this.detectionState.previousDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.boundingBox?.join(', ')})`).join(', '));
     }
-
-    // removes items that is not tracked yet (may require more present frames)
-    detectionResult.detections = detectionResult.detections.filter(d => d.id);
   }
 
   setDetection(detection: ObjectsDetected, detectionInput: MediaObject) {

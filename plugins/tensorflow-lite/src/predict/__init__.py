@@ -177,7 +177,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             'title': 'Tracker Window',
             'description': 'Internal Setting. Do not change.',
             'key': 'trackerWindow',
-            'value': 6,
+            'value': 3,
             'type': 'number',
         }
 
@@ -257,7 +257,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             if not t:
                 t = tracker.Sort_OH(scene=np.array([iw, ih]))
                 t.conf_three_frame_certainty = (settings.get('trackerCertainty') or .2) * 3
-                t.conf_unmatched_history_size = settings.get('trackerWindow') or 6
+                t.conf_unmatched_history_size = settings.get('trackerWindow') or 3
                 self.trackers[detection_session.id] = t
             detection_session.tracker = t
             # conf_trgt = 0.35
@@ -420,9 +420,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             for d in detections:
                 if not d.get('id'):
                     # this happens if the tracker is not confident in a new detection yet due
-                    # to low score
+                    # to low score or has not been found in enough frames
                     if d['className'] == 'person':
-                        print('dropped %s: %s' % (d['className'], d['score']))
+                        print('untracked %s: %s' % (d['className'], d['score']))
 
         return ret, RawImage(image)
 
