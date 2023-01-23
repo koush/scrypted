@@ -1,14 +1,15 @@
-import { SipMessageHandler, SipRequest } from "../../sip/src/sip-call"
+import { SipRequestHandler, SipRequest } from "../../sip/src/sip-call"
 import { BticinoSipCamera } from "./bticino-camera"
 
-export class VoicemailHandler extends SipMessageHandler {
-    private sipCamera : BticinoSipCamera
+export class VoicemailHandler extends SipRequestHandler {
     private timeout : NodeJS.Timeout
     
-    constructor( sipCamera : BticinoSipCamera ) {
+    constructor( private sipCamera : BticinoSipCamera ) {
         super()
-        this.sipCamera = sipCamera
-        this.checkVoicemail()
+        setTimeout( () => {
+            // Delay a bit an run in a different thread in case this fails
+            this.checkVoicemail()
+        }, 10000 )
     }
 
     checkVoicemail() {
@@ -21,7 +22,7 @@ export class VoicemailHandler extends SipMessageHandler {
             this.sipCamera.console.debug("Answering machine check not enabled, cameraId: " + this.sipCamera.id )
         }
         //TODO: make interval customizable, now every 5 minutes
-        this.timeout = setTimeout( () => this.checkVoicemail() , 5 * 60 * 1000 )
+        this.timeout = setTimeout( () => this.checkVoicemail() , 60 * 1000 )
     }
 
     cancelVoicemailCheck() {

@@ -15,6 +15,8 @@ import { BticinoStorageSettings } from './storage-settings';
 import { BticinoSipPlugin } from './main';
 import { BticinoSipLock } from './bticino-lock';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
+import { SipRegisteredSession } from './sip-registered-session';
+import { InviteHandler } from './bticino-inviteHandler';
 
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
@@ -27,46 +29,37 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     private currentMedia: FFmpegInput | MediaStreamUrl
     private currentMediaMimeType: string
     private refreshTimeout: NodeJS.Timeout
-    public messageHandler: CompositeSipMessageHandler = new CompositeSipMessageHandler()
+    public requestHandlers: CompositeSipMessageHandler = new CompositeSipMessageHandler()
     private settingsStorage: BticinoStorageSettings = new BticinoStorageSettings( this )
     public voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
+    private inviteHandler : InviteHandler = new InviteHandler(this)
     //TODO: randomize this
     private keyAndSalt : string = "/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X"
     private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
+    private persistentSipSession : SipRegisteredSession
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
-        this.messageHandler.add( this.voicemailHandler )
+        this.requestHandlers.add( this.voicemailHandler )
+        this.requestHandlers.add( this.inviteHandler )
+        this.persistentSipSession = new SipRegisteredSession( this )
     }
 
     sipUnlock(): Promise<void> {
         this.log.i("unlocking C300X door ")
-        return SipHelper.sipSession( SipHelper.sipOptions( this ) )
-            .then( ( sip ) => {
-                sip.sipCall.register()
-                    .then( () =>
-                        sip.sipCall.message( '*8*19*20##' )
-                            .then( () =>
-                                sleep(1000)
-                                    .then( () => sip.sipCall.message( '*8*20*20##' ) )
-                            )
-                        .catch( () => {} )
-                        .finally( () => sip.sipCall.destroy() )
-                    )
-                    .catch( e => this.console.error() )
-            } )
-            .catch(  e => this.console.error(e) )
+        return this.persistentSipSession.enable().then( (sipCall) => {
+            sipCall.message( '*8*19*20##' )
+            .then( () =>
+                sleep(1000)
+                    .then( () => sipCall.message( '*8*20*20##' ) )
+            )
+        } )
     }
 
     getAswmStatus() : Promise<void> {
-        return SipHelper.sipSession( SipHelper.sipOptions( this ) )
-                .then( ( sip ) => {
-                    sip.sipCall.register()
-                                    .then( () => sip.sipCall.message( "GetAswmStatus!") )
-                                    .catch( () => {})
-                                    .finally( () => sip.sipCall.destroy() )
-                        } )
-                .catch(  e => this.console.error(e) )
+        return this.persistentSipSession.enable().then( (sipCall) => {
+            sipCall.message( "GetAswmStatus!" )
+        } )        
     }
 
     async takePicture(option?: PictureOptions): Promise<MediaObject> {

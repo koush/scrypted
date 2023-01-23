@@ -13,7 +13,7 @@ export class SipHelper {
         const localIp = from?.split(':')[0].split('@')[1]
         const localPort = parseInt(from?.split(':')[1]) || 5060
         const domain = camera.storage.getItem('sipdomain')?.trim()
-        const expiration : string = camera.storage.getItem('sipexpiration')?.trim() || '3600'
+        const expiration : string = camera.storage.getItem('sipexpiration')?.trim() || '600'
         const sipdebug : boolean = camera.storage.getItem('sipdebug')?.toLocaleLowerCase() === 'true' || false
 
         if (!from || !to || !localIp || !localPort || !domain || !expiration ) {
@@ -32,7 +32,7 @@ export class SipHelper {
             shouldRegister: true,
             debugSip: sipdebug,
             useTcp: true,
-            messageHandler: camera.messageHandler
+            sipRequestHandler: camera.requestHandlers
          } 
     }
 

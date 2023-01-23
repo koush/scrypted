@@ -17,14 +17,14 @@ export interface SipOptions {
   localPort: number
   debugSip?: boolean
   useTcp?: boolean
-  messageHandler?: SipMessageHandler
+  sipRequestHandler?: SipRequestHandler
   shouldRegister?: boolean
 }
 
 /**
  * Allows handling of SIP messages
  */
-export abstract class SipMessageHandler {
+export abstract class SipRequestHandler {
   abstract handle( request: SipRequest )
 }
 
@@ -206,18 +206,20 @@ export class SipCall {
 
               if( m.method == 'REGISTER' ) {
                 m.uri = "sip:" + sipOptions.domain
+                m.headers.to.uri = fromWithDomain
               } else if( m.method == 'INVITE' || m.method == 'MESSAGE' ) {
                 m.uri = toWithDomain
+                m.headers.to.uri = toWithDomain
                 if( m.method == 'MESSAGE' && m.headers.to ) {
                   m.headers.to.params = null;
                 }
               } else if( m.method == 'ACK' || m.method == 'BYE' ) {
+                m.headers.to.uri = toWithDomain
                 m.uri = this.registrarContact
               } else {
                 throw new Error("Error: Method construct for uri not implemented: " + m.method)
               }
 
-              m.headers.to.uri = toWithDomain
               m.headers.from.uri = fromWithDomain
               if( m.headers.contact && m.headers.contact[0].uri.split('@')[0].indexOf('-') < 0 ) {
                 m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + contactId + "@");
@@ -244,16 +246,18 @@ export class SipCall {
             if (this.destroyed) {
               this.onEndedByRemote.next(null)
             }
-          } else if( request.method === 'MESSAGE' && sipOptions.messageHandler ) {
-            sipOptions.messageHandler.handle( request )
+          } else if( request.method === 'MESSAGE'  && sipOptions.sipRequestHandler ) {
+            sipOptions.sipRequestHandler.handle( request )
             this.sipStack.send(this.sipStack.makeResponse(request, 200, 'Ok'))
+          } else if( request.method === 'INVITE' && sipOptions.sipRequestHandler ) {
+            sipOptions.sipRequestHandler.handle( request )
           } else {
             if( sipOptions.debugSip ) {
               this.console.warn("unimplemented method received from remote: " + request.method)
             }
           }
         }
-      )
+        )
     }
   }
 
