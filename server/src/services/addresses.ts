@@ -1,7 +1,7 @@
 import { Settings } from "../db-types";
 import { ScryptedRuntime } from "../runtime";
 
-export class AddressSettigns {
+export class AddressSettings {
     constructor(public scrypted: ScryptedRuntime) {
     }
 

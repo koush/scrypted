@@ -29,7 +29,7 @@ import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
-import { AddressSettigns as AddressSettings } from './services/addresses';
+import { AddressSettings as AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
 import { CORSControl, CORSServer } from './services/cors';
 import { Info } from './services/info';
