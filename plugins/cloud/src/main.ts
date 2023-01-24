@@ -68,13 +68,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             persistedDefaultValue: crypto.randomBytes(8).toString('hex'),
         },
         upnpPort: {
-            title: 'UPNP Port',
-            description: 'The external port to reserve for UPNP NAT.',
+            title: 'UPNP Port (Optional)',
+            description: 'The external port to reserve for UPNP NAT. UPNP must be enabled on your router.',
             type: 'number',
         },
         upnpStatus: {
-            title: 'UPNP Status',
-            description: 'The status of the UPNP reservation.',
+            title: 'UPNP Status (Optional)',
+            description: 'The status of the UPNP NAT reservation.',
             readonly: true,
             mapGet: () => {
                 return this.upnpStatus;
@@ -82,7 +82,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         },
         lastPersistedUpnpPort: {
             hide: true,
-        }
+            type: 'number',
+        },
+        lastPersistedIp: {
+            hide: true,
+        },
     });
     upnpInterval: NodeJS.Timeout;
     upnpClient = upnp.createClient();
@@ -127,14 +131,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const [localAddress] = await endpointManager.getLocalAddresses();
         this.upnpClient.portMapping({
             public: {
-                port: 10443,
+                port: upnpPort,
             },
             private: {
                 host: localAddress,
                 port: 10443,
             },
             ttl: 1800,
-        }, err => {
+        }, async err => {
             if (err) {
                 this.console.error('UPNP failed', err);
                 this.upnpStatus = 'Error: See Console';
@@ -146,12 +150,18 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.onDeviceEvent(ScryptedInterface.Settings, undefined);
             this.storageSettings.values.upnpPort = upnpPort;
 
-            if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort) {
-                this.console.log('Registering UPNP Port');
+            const response = await axios('https://jsonip.com');
+            const { ip } = response.data;
+            this.console.log('External IP:', ip);
 
-                // this.manager.registrationId.then(async registrationId => {
-                //     this.sendRegistrationId(registrationId);
-                // })
+            // the ip is not sent, but should be checked to see if it changed.
+            if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort || ip !== this.storageSettings.values.lastPersistedIp) {
+                this.console.log('Registering UPNP IP and Port', ip, upnpPort);
+
+                const registrationId = await this.manager.registrationId;
+                await this.sendRegistrationId(registrationId, upnpPort);
+                this.storageSettings.values.lastPersistedUpnpPort = upnpPort;
+                this.storageSettings.values.lastPersistedIp = ip;
             }
         });
     }
@@ -235,9 +245,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    async sendRegistrationId(registration_id: string) {
+    async sendRegistrationId(registration_id: string, upnp_port?: string) {
         const registration_secret = this.storageSettings.values.registrationSecret || crypto.randomBytes(8).toString('base64');
         const q = qs.stringify({
+            upnp_port: upnp_port || this.storageSettings.values.lastPersistedUpnpPort,
             registration_id,
             sender_id: DEFAULT_SENDER_ID,
             registration_secret,

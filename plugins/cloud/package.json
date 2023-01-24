@@ -49,5 +49,5 @@
       "@types/http-proxy": "^1.17.5",
       "@types/nat-upnp": "^1.1.2"
    },
-   "version": "0.0.38"
+   "version": "0.0.40"
 }
