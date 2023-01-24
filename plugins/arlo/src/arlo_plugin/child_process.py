@@ -3,7 +3,7 @@ import subprocess
 import time
 import threading
 
-HEARTBEAT_INTERVAL = 1
+HEARTBEAT_INTERVAL = 5
 
 
 def multiprocess_main(child_conn, exe, args):
@@ -11,7 +11,7 @@ def multiprocess_main(child_conn, exe, args):
     sp = subprocess.Popen([exe, *args])
 
     while True:
-        has_data = child_conn.poll(HEARTBEAT_INTERVAL * 5)
+        has_data = child_conn.poll(HEARTBEAT_INTERVAL * 3)
         if not has_data:
             break
         keep_alive = child_conn.recv()
