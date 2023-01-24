@@ -1,20 +1,20 @@
+import sdk, { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios from 'axios';
-import { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
-import { StorageSettings } from "@scrypted/sdk/storage-settings"
+import bpmux from 'bpmux';
+import crypto from 'crypto';
+import { once } from 'events';
+import { createServer, Server } from 'http';
+import HttpProxy from 'http-proxy';
+import upnp from 'nat-upnp';
+import net from 'net';
+import os from 'os';
+import path from 'path';
 import qs from 'query-string';
 import { Duplex } from 'stream';
-import net from 'net';
-import HttpProxy from 'http-proxy';
-import { Server, createServer } from 'http';
 import Url from 'url';
-import sdk from "@scrypted/sdk";
-import { once } from 'events';
-import path from 'path';
-import bpmux from 'bpmux';
-import { PushManager } from './push';
 import type { CORSControl } from '../../../server/src/services/cors';
-import os from 'os';
-import crypto from 'crypto';
+import { PushManager } from './push';
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -50,7 +50,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     whitelisted = new Map<string, string>();
     storageSettings = new StorageSettings(this, {
         hostname: {
-            title: 'Hostname',
+            title: 'Hostname (Custom Domain)',
             description: 'Optional/Recommended: The hostname to reach this Scrypted server on https port 443. This will bypass usage of Scrypted cloud when possible. You will need to set up SSL termination.',
             placeholder: 'my-server.dyndns.com'
         },
@@ -66,8 +66,27 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         cloudMessageToken: {
             hide: true,
             persistedDefaultValue: crypto.randomBytes(8).toString('hex'),
+        },
+        upnpPort: {
+            title: 'UPNP Port',
+            description: 'The external port to reserve for UPNP NAT.',
+            type: 'number',
+        },
+        upnpStatus: {
+            title: 'UPNP Status',
+            description: 'The status of the UPNP reservation.',
+            readonly: true,
+            mapGet: () => {
+                return this.upnpStatus;
+            },
+        },
+        lastPersistedUpnpPort: {
+            hide: true,
         }
     });
+    upnpInterval: NodeJS.Timeout;
+    upnpClient = upnp.createClient();
+    upnpStatus = 'Starting';
 
     constructor() {
         super();
@@ -90,6 +109,51 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         })
 
         this.updateCors();
+
+        this.upnpInterval = setInterval(this.refreshUpnp, 30 * 60 * 1000);
+        this.refreshUpnp();
+    }
+
+    async refreshUpnp() {
+        if (this.storageSettings.values.hostname) {
+            this.upnpStatus = 'Disabled: Using Custom Domain';
+            this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+            return;
+        }
+
+        let { upnpPort } = this.storageSettings.values;
+        if (!upnpPort)
+            upnpPort = Math.round(Math.random() * 30000 + 20000);
+        const [localAddress] = await endpointManager.getLocalAddresses();
+        this.upnpClient.portMapping({
+            public: {
+                port: 10443,
+            },
+            private: {
+                host: localAddress,
+                port: 10443,
+            },
+            ttl: 1800,
+        }, err => {
+            if (err) {
+                this.console.error('UPNP failed', err);
+                this.upnpStatus = 'Error: See Console';
+                this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+                return;
+            }
+
+            this.upnpStatus = 'Active';
+            this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+            this.storageSettings.values.upnpPort = upnpPort;
+
+            if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort) {
+                this.console.log('Registering UPNP Port');
+
+                // this.manager.registrationId.then(async registrationId => {
+                //     this.sendRegistrationId(registrationId);
+                // })
+            }
+        });
     }
 
     async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer> {
