@@ -439,7 +439,7 @@ async function start() {
         const { username, password, change_password, maxAge: maxAgeRequested } = req.body;
         const timestamp = Date.now();
         const maxAge = parseInt(maxAgeRequested) || ONE_DAY_MILLISECONDS;
-        const addresses = getHostAddresses(true, true).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
+        const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true)).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
 
         if (hasLogin) {
             const user = await db.tryGet(ScryptedUser, username);
@@ -520,14 +520,13 @@ async function start() {
         });
     });
 
-
     app.get('/login', async (req, res) => {
         await checkResetLogin();
 
         scrypted.addAccessControlHeaders(req, res);
         const hostname = os.hostname()?.split('.')?.[0];
 
-        const addresses = getHostAddresses(true, true).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
+        const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true)).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
         if (req.protocol === 'https' && req.headers.authorization) {
             const username = await new Promise(resolve => {
                 const basicChecker = basicAuth.check((req) => {

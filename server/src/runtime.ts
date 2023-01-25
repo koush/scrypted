@@ -4,10 +4,12 @@ import axios from 'axios';
 import * as io from 'engine.io';
 import { once } from 'events';
 import express, { Request, Response } from 'express';
+import { ParamsDictionary } from 'express-serve-static-core';
 import http, { ServerResponse } from 'http';
 import https from 'https';
 import type { spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
 import path from 'path';
+import { ParsedQs } from 'qs';
 import rimraf from 'rimraf';
 import semver from 'semver';
 import { PassThrough } from 'stream';
@@ -155,11 +157,23 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }, 60 * 60 * 1000);
     }
 
+    checkUpgrade(req: express.Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>, res: express.Response<any, Record<string, any>>, pluginData: HttpPluginData): void {
+        // pluginData.pluginHost.io.
+        const { sid } = req.query;
+        const client = (pluginData.pluginHost.io as any).clients[sid as string];
+        if (client) {
+            res.locals.username = 'existing-io-session';
+        }
+    }
+
     addAccessControlHeaders(req: http.IncomingMessage, res: http.ServerResponse) {
         res.setHeader('Vary', 'Origin,Referer');
         const header = this.getAccessControlAllowOrigin(req.headers);
-        if (header)
+        if (header) {
             res.setHeader('Access-Control-Allow-Origin', header);
+            res.setHeader("Access-Control-Allow-Credentials", "true");
+            res.setHeader('Access-Control-Allow-Private-Network', 'true');
+        }
     }
 
     getAccessControlAllowOrigin(headers: http.IncomingHttpHeaders) {
