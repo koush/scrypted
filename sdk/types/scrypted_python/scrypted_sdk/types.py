@@ -322,6 +322,11 @@ class DeviceManifest(TypedDict):
     providerNativeId: str
     pass
 
+class EndpointAccessControlAllowOrigin(TypedDict):
+    nativeId: str
+    origins: list[str]
+    pass
+
 class EventDetails(TypedDict):
     eventId: str
     eventInterface: str
@@ -1217,6 +1222,8 @@ class EndpointManager:
     async def getPublicLocalEndpoint(self, nativeId: str = None) -> str:
         pass
     async def getPublicPushEndpoint(self, nativeId: str = None) -> str:
+        pass
+    async def setAccessControlAllowOrigin(self, options: EndpointAccessControlAllowOrigin) -> None:
         pass
     async def setLocalAddresses(self, addresses: list[str]) -> None:
         pass

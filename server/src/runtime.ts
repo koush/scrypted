@@ -33,7 +33,7 @@ import { getPluginVolume } from './plugin/plugin-volume';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings as AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
-import { CORSControl, CORSServer } from './services/cors';
+import { CORSControl } from './services/cors';
 import { Info } from './services/info';
 import { PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
@@ -74,7 +74,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             })
         },
     });
-    cors: CORSServer[] = [];
     pluginComponent = new PluginComponent(this);
     servieControl = new ServiceControl(this);
     alerts = new Alerts(this);
@@ -190,7 +189,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         if (!origin)
             return;
         const servers: string[] = process.env.SCRYPTED_ACCESS_CONTROL_ALLOW_ORIGINS?.split(',') || [];
-        servers.push(...Object.values(this.cors).map(entry => entry.server));
+        servers.push(...Object.values(this.corsControl.origins).flat());
         if (!servers.includes(origin))
             return;
 

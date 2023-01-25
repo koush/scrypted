@@ -1,4 +1,4 @@
-import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointManager, EventDetails, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
+import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointAccessControlAllowOrigin, EndpointManager, EventDetails, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { AccessControls } from './acl';
 import { BufferSerializer } from '../rpc-buffer-serializer';
@@ -153,6 +153,12 @@ class EndpointManagerImpl implements EndpointManager {
     async getLocalAddresses(): Promise<string[]> {
         const addressSettings = await this.api.getComponent('addresses');
         return await addressSettings.getLocalAddresses() as string[];
+    }
+
+    async setAccessControlAllowOrigin(options: EndpointAccessControlAllowOrigin): Promise<void> {
+        const self = this;
+        const setAccessControlAllowOrigin = await this.deviceManager.systemManager.getComponent('setAccessControlAllowOrigin') as typeof self.setAccessControlAllowOrigin;
+        return setAccessControlAllowOrigin(options);
     }
 }
 
@@ -574,7 +580,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 }
             },
 
-            async notify(id: string, eventTimeOrDetails: number| EventDetails, eventInterfaceOrData: string | SystemDeviceState | any, property?: string, value?: SystemDeviceState | any, changed?: boolean) {
+            async notify(id: string, eventTimeOrDetails: number | EventDetails, eventInterfaceOrData: string | SystemDeviceState | any, property?: string, value?: SystemDeviceState | any, changed?: boolean) {
                 if (typeof eventTimeOrDetails === 'number') {
                     // TODO: remove legacy code path
                     // 12/30/2022

@@ -1407,6 +1407,12 @@ export interface Device {
 
   internal?: boolean;
 }
+
+export interface EndpointAccessControlAllowOrigin {
+  nativeId?: ScryptedNativeId;
+  origins: string[];
+}
+
 /**
  * EndpointManager provides publicly accessible URLs that can be used to contact your Scrypted Plugin.
  * 
@@ -1490,6 +1496,15 @@ export interface EndpointManager {
    * Get the recommended local addresess used by Scrypted plugins that listen for incoming connections.
    */
   getLocalAddresses(): Promise<string[]>;
+
+
+  /**
+   * Set the allowed origins for an endpoint for cross origin requests.
+   * I.e. 'https://example.com' would allow cross origin requests from that origin.
+   * For security, this setting will not persist between plugin reloads and must
+   * be called per desired origin after plugin startup.
+   */
+  setAccessControlAllowOrigin(options: EndpointAccessControlAllowOrigin): Promise<void>;
 }
 /**
  * SystemManager is used by scripts to query device state and access devices.

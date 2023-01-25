@@ -1,4 +1,4 @@
-import { Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, MediaManager, ScryptedDevice, ScryptedInterfaceDescriptor, ScryptedInterfaceProperty, ScryptedNativeId } from '@scrypted/types';
+import { Device, DeviceManifest, EndpointAccessControlAllowOrigin, EventDetails, EventListenerOptions, EventListenerRegister, MediaManager, ScryptedDevice, ScryptedInterfaceDescriptor, ScryptedInterfaceProperty, ScryptedNativeId } from '@scrypted/types';
 import debounce from 'lodash/debounce';
 import { Plugin } from '../db-types';
 import { Logger } from '../logger';
@@ -86,7 +86,16 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         return this.scrypted.getDeviceLogger(device);
     }
 
-    getComponent(id: string): Promise<any> {
+    async getComponent(id: string): Promise<any> {
+        if (id === 'setAccessControlAllowOrigin') {
+            return async (options: EndpointAccessControlAllowOrigin) => {
+                const { nativeId, origins } = options;
+                const device = this.scrypted.findPluginDevice(this.pluginId, nativeId);
+                if (!device)
+                    throw new Error(`device not found for plugin id ${this.pluginId} native id ${nativeId}`);
+                return this.scrypted.corsControl.setCORS(device._id, origins);
+            }
+        }
         return this.scrypted.getComponent(id);
     }
 
