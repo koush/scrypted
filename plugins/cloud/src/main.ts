@@ -106,7 +106,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         hostname: {
             title: 'Custom Domain (Optional)',
             description: 'Optional/Recommended: The custom domain (hostname) to reach this Scrypted server on https port 443. This will bypass usage of Scrypted Cloud when possible. You will need to set up SSL termination.',
-            placeholder: 'my-server.dyndns.com'
+            placeholder: 'my-server.dyndns.com',
+            onPut: () => {
+                this.updatePortForward(this.storageSettings.values.upnpPort);
+            },
         },
     });
     upnpInterval: NodeJS.Timeout;
@@ -150,7 +153,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.storageSettings.settings.securePort.onPut =
             this.storageSettings.settings.forwardingMode.onPut =
             this.storageSettings.settings.upnpPort.onPut = (ov, nv) => {
-                if (ov !== nv)
+                if (ov && ov !== nv)
                     this.log.a('Reload the Scrypted Cloud Plugin to apply the port change.');
             };
 
@@ -180,8 +183,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     async updatePortForward(upnpPort: number) {
         this.storageSettings.values.upnpPort = upnpPort;
 
-        const response = await axios('https://jsonip.com');
-        const { ip } = response.data;
+        let ip = this.storageSettings.values.hostname?.toString();
+
+        if (!ip) {
+            const response = await axios('https://jsonip.com');
+            ip = response.data.ip;
+        }
+
         this.console.log(`Mapped port https://127.0.0.1:${this.securePort} to https://${ip}:${upnpPort}`);
 
         // the ip is not sent, but should be checked to see if it changed.
@@ -189,7 +197,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.console.log('Registering UPNP IP and Port', ip, upnpPort);
 
             const registrationId = await this.manager.registrationId;
-            await this.sendRegistrationId(registrationId, upnpPort);
+            const data = await this.sendRegistrationId(registrationId, upnpPort);
+            if (this.storageSettings.values.hostname && ip !== data.ip_address) {
+                this.log.a(`Scrypted Cloud could not verify the IP Address of your custom domain ${this.storageSettings.values.hostname}.`);
+            }
             this.storageSettings.values.lastPersistedUpnpPort = upnpPort;
             this.storageSettings.values.lastPersistedIp = ip;
         }
@@ -327,6 +338,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             registration_id,
             sender_id: DEFAULT_SENDER_ID,
             registration_secret,
+            hostname: this.storageSettings.values.hostname,
         });
 
         const { token_info } = this.storageSettings.values;
@@ -338,6 +350,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.console.log('registered', response.data);
         this.storageSettings.values.lastPersistedRegistrationId = registration_id;
         this.storageSettings.values.registrationSecret = registration_secret;
+        return response.data;
     }
 
     async setupCloudPush() {
