@@ -51,6 +51,7 @@ export interface ScryptedClientStatic extends ScryptedStatic {
 }
 
 export interface ScryptedConnectionOptions {
+    direct?: boolean;
     webrtc?: boolean;
     baseUrl?: string;
     axiosConfig?: AxiosRequestConfig;
@@ -234,7 +235,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         addresses ||= [];
         addresses.push(directAddress);
     }
-    const tryLocalAddressess = scryptedCloud && !!addresses.length;
+    const tryLocalAddressess = options.direct && scryptedCloud && !!addresses.length;
     const tryWebrtc = !!globalThis.RTCPeerConnection && (scryptedCloud && options.webrtc === undefined) || options.webrtc;
 
     const localEioOptions: Partial<SocketOptions> = {
