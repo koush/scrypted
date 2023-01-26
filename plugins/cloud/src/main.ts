@@ -52,11 +52,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     push: ScryptedPush;
     whitelisted = new Map<string, string>();
     storageSettings = new StorageSettings(this, {
-        hostname: {
-            title: 'Hostname (Custom Domain)',
-            description: 'Optional/Recommended: The hostname to reach this Scrypted server on https port 443. This will bypass usage of Scrypted cloud when possible. You will need to set up SSL termination.',
-            placeholder: 'my-server.dyndns.com'
-        },
         token_info: {
             hide: true,
         },
@@ -70,13 +65,27 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             hide: true,
             persistedDefaultValue: crypto.randomBytes(8).toString('hex'),
         },
+        forwardingMode: {
+            title: "Port Forwarding Mode",
+            description: "The port forwarding mode used to expose the HTTPS port. If port forwarding is disabled or unavailable, Scrypted Cloud will fall back to push to initiate connections with this Scrypted server. Port Forwarding and UPNP are optional but will significantly speed up cloud connections.",
+            choices: [
+                "UPNP",
+                "Router Forward",
+                "Disabled",
+            ],
+            defaultValue: 'UPNP',
+        },
+        securePort: {
+            title: 'Local HTTPS Port',
+            description: 'The Scrypted Cloud plugin listens on this port for for cloud connections. The router must use UPNP or port forwarding rules to send requests to this port.',
+            type: 'number',
+        },
         upnpPort: {
-            title: 'UPNP Port (Optional)',
-            description: 'The external port to reserve for UPNP NAT. UPNP must be enabled on your router.',
+            title: 'External HTTPS Port',
             type: 'number',
         },
         upnpStatus: {
-            title: 'UPNP Status (Optional)',
+            title: 'UPNP Status',
             description: 'The status of the UPNP NAT reservation.',
             readonly: true,
             mapGet: () => {
@@ -94,9 +103,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             hide: true,
             json: true,
         },
-        securePort: {
-            hide: true,
-            type: 'number',
+        hostname: {
+            title: 'Custom Domain (Optional)',
+            description: 'Optional/Recommended: The custom domain (hostname) to reach this Scrypted server on https port 443. This will bypass usage of Scrypted Cloud when possible. You will need to set up SSL termination.',
+            placeholder: 'my-server.dyndns.com'
         },
     });
     upnpInterval: NodeJS.Timeout;
@@ -106,6 +116,43 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     constructor() {
         super();
+
+        this.storageSettings.settings.upnpStatus.onGet = async () => {
+            return {
+                hide: this.storageSettings.values.forwardingMode !== 'UPNP',
+            }
+        };
+
+        this.storageSettings.settings.upnpPort.onGet = async () => {
+            if (this.storageSettings.values.forwardingMode === 'Router Forward') {
+                return {
+                    description: 'The external port to forward through your router.',
+                }
+            }
+            else if (this.storageSettings.values.forwardingMode === 'UPNP') {
+                return {
+                    description: 'The external port that will be reserved by UPNP on your router.',
+                }
+            }
+            return {
+                hide: true,
+            }
+        };
+
+        this.storageSettings.settings.securePort.onGet = async () => {
+            return {
+                hide: this.storageSettings.values.forwardingMode === 'Disabled',
+            }
+        };
+
+        this.log.clearAlerts();
+
+        this.storageSettings.settings.securePort.onPut =
+            this.storageSettings.settings.forwardingMode.onPut =
+            this.storageSettings.settings.upnpPort.onPut = (ov, nv) => {
+                if (ov !== nv)
+                    this.log.a('Reload the WebTRC Plugin to apply the port change.');
+            };
 
         this.fromMimeType = ScryptedMimeTypes.LocalUrl;
         this.toMimeType = ScryptedMimeTypes.Url;
@@ -130,16 +177,35 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.updateCors();
     }
 
-    async refreshUpnp() {
-        if (this.storageSettings.values.hostname) {
-            this.upnpStatus = 'Disabled: Using Custom Domain';
-            this.onDeviceEvent(ScryptedInterface.Settings, undefined);
-            return;
+    async updatePortForward(upnpPort: number) {
+        this.storageSettings.values.upnpPort = upnpPort;
+
+        const response = await axios('https://jsonip.com');
+        const { ip } = response.data;
+        this.console.log(`Mapped port https://127.0.0.1:${this.securePort} to https://${ip}:${upnpPort}`);
+
+        // the ip is not sent, but should be checked to see if it changed.
+        if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort || ip !== this.storageSettings.values.lastPersistedIp) {
+            this.console.log('Registering UPNP IP and Port', ip, upnpPort);
+
+            const registrationId = await this.manager.registrationId;
+            await this.sendRegistrationId(registrationId, upnpPort);
+            this.storageSettings.values.lastPersistedUpnpPort = upnpPort;
+            this.storageSettings.values.lastPersistedIp = ip;
         }
+    }
+
+    async refreshPortForward() {
+        if (this.storageSettings.values.forwardingMode === 'Disabled')
+            return;
 
         let { upnpPort } = this.storageSettings.values;
         if (!upnpPort)
             upnpPort = Math.round(Math.random() * 30000 + 20000);
+
+        if (this.storageSettings.values.forwardingMode === 'Router Forward')
+            return this.updatePortForward(upnpPort);
+
         const [localAddress] = await endpointManager.getLocalAddresses();
         this.upnpClient.portMapping({
             public: {
@@ -165,21 +231,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
             this.upnpStatus = 'Active';
             this.onDeviceEvent(ScryptedInterface.Settings, undefined);
-            this.storageSettings.values.upnpPort = upnpPort;
 
-            const response = await axios('https://jsonip.com');
-            const { ip } = response.data;
-            this.console.log(`Mapped port https://127.0.0.1:${this.securePort} to https://${ip}:${upnpPort}`);
-
-            // the ip is not sent, but should be checked to see if it changed.
-            if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort || ip !== this.storageSettings.values.lastPersistedIp) {
-                this.console.log('Registering UPNP IP and Port', ip, upnpPort);
-
-                const registrationId = await this.manager.registrationId;
-                await this.sendRegistrationId(registrationId, upnpPort);
-                this.storageSettings.values.lastPersistedUpnpPort = upnpPort;
-                this.storageSettings.values.lastPersistedIp = ip;
-            }
+            await this.updatePortForward(upnpPort);
         });
     }
 
@@ -266,7 +319,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    async sendRegistrationId(registration_id: string, upnp_port?: string) {
+    async sendRegistrationId(registration_id: string, upnp_port?: number) {
         const registration_secret = this.storageSettings.values.registrationSecret || crypto.randomBytes(8).toString('base64');
         const q = qs.stringify({
             upnp_port: upnp_port || this.storageSettings.values.lastPersistedUpnpPort,
@@ -455,8 +508,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         await once(this.secureServer, 'listening');
         this.storageSettings.values.securePort = this.securePort = (this.secureServer.address() as any).port;
 
-        this.upnpInterval = setInterval(() => this.refreshUpnp(), 30 * 60 * 1000);
-        this.refreshUpnp();
+        this.upnpInterval = setInterval(() => this.refreshPortForward(), 30 * 60 * 1000);
+        this.refreshPortForward();
 
         this.proxy = HttpProxy.createProxy({
             target: httpTarget,
