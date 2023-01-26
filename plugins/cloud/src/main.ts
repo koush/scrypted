@@ -302,6 +302,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     origins: [
                         'http://home.scrypted.app',
                         'https://home.scrypted.app',
+                        // chromecast receiver. move this into google home and chromecast plugins?
+                        'https://koush.github.io',
                     ],
                 });
             }
@@ -319,6 +321,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     {
                         tag: '@scrypted/cloud',
                         server: 'http://home.scrypted.app',
+                    },
+                    {
+                        tag: '@scrypted/cloud',
+                        server: 'https://koush.github.io',
                     },
                 );
                 const { hostname } = this.storageSettings.values;
@@ -457,12 +463,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async setupProxyServer() {
         // TODO: 1/25/2023 change this to getInsecurePublicLocalEndpoint to avoid double crypto
-        const ep = await endpointManager.getPublicLocalEndpoint();
+        const secure = false;
+        const ep = secure ? await endpointManager.getPublicLocalEndpoint() : await endpointManager.getInsecurePublicLocalEndpoint();
         const httpTarget = new URL(ep);
         httpTarget.hostname = '127.0.0.1';
         httpTarget.pathname = '';
         const wsTarget = new URL(httpTarget);
-        wsTarget.protocol = 'ws';
+        wsTarget.protocol = secure ? 'wss' : 'ws';
         const googleHomeTarget = new URL(httpTarget);
         googleHomeTarget.pathname = '/endpoint/@scrypted/google-home/public/';
         const alexaTarget = new URL(httpTarget);
