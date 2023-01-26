@@ -77,7 +77,6 @@ export abstract class PluginHttp<T> {
         }
 
         if (isEngineIOEndpoint && !isUpgrade) {
-            console.log('req', req.method, req.url, req.headers);
             this.addAccessControlHeaders(req, res);
             res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
             res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Access-Control-Request-Method');

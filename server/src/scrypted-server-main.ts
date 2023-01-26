@@ -26,6 +26,7 @@ import { getScryptedVolume } from './plugin/plugin-volume';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 import os from 'os';
 import { setScryptedUserPassword } from './services/users';
+import ip from 'ip';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -386,8 +387,8 @@ async function start() {
         });
     });
 
-    const getLoginUserToken = (reqSecure: boolean) => {
-        return reqSecure ? 'login_user_token' : 'login_user_token_insecure';
+    const getLoginUserToken = (req: express.Request) => {
+        return req.secure || ip.isLoopback(req.socket?.remoteAddress)  ? 'login_user_token' : 'login_user_token_insecure';
     };
 
     const validateToken = (token: string) => {
@@ -401,11 +402,11 @@ async function start() {
         }
     }
 
-    const getSignedLoginUserTokenRawValue = (req: Request<any>) => req.signedCookies[getLoginUserToken(req.secure)] as string;
+    const getSignedLoginUserTokenRawValue = (req: Request<any>) => req.signedCookies[getLoginUserToken(req)] as string;
     const getSignedLoginUserToken = (req: Request<any>) => validateToken(getSignedLoginUserTokenRawValue(req));
 
     app.get('/logout', (req, res) => {
-        res.clearCookie(getLoginUserToken(req.secure));
+        res.clearCookie(getLoginUserToken(req));
         if (req.headers['accept']?.startsWith('application/json')) {
             res.send({});
         }
@@ -465,7 +466,7 @@ async function start() {
 
             const userToken = new UserToken(username, user.aclId, timestamp, maxAge);
             const login_user_token = userToken.toString();
-            res.cookie(getLoginUserToken(req.secure), login_user_token, {
+            res.cookie(getLoginUserToken(req), login_user_token, {
                 maxAge,
                 secure: req.secure,
                 signed: true,
@@ -504,7 +505,7 @@ async function start() {
 
         const userToken = new UserToken(username, user.aclId, timestamp);
         const login_user_token = userToken.toString();
-        res.cookie(getLoginUserToken(req.secure), login_user_token, {
+        res.cookie(getLoginUserToken(req), login_user_token, {
             maxAge,
             secure: req.secure,
             signed: true,
