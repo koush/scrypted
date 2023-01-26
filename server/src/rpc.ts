@@ -636,6 +636,8 @@ export function getEvalSource() {
         ${RpcProxy}
 
         ${RpcPeer}
+
+        ${startPeriodicGarbageCollection}
     
         return {
             startPeriodicGarbageCollection,
