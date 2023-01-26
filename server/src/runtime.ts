@@ -914,7 +914,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             }
 
             if (dirty) {
-                this.datastore.upsert(pluginDevice);
+                this.datastore.upsert(pluginDevice)
+                    .catch(e => {
+                        console.error('There was an error saving the device? Ignoring...', e);
+                        // return this.datastore.remove(pluginDevice);
+                    });
             }
         }
 
