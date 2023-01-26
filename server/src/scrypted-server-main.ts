@@ -388,7 +388,7 @@ async function start() {
     });
 
     const getLoginUserToken = (req: express.Request) => {
-        return req.secure || ip.isLoopback(req.socket?.remoteAddress)  ? 'login_user_token' : 'login_user_token_insecure';
+        return req.secure || ip.isLoopback(req.socket?.remoteAddress) ? 'login_user_token' : 'login_user_token_insecure';
     };
 
     const validateToken = (token: string) => {
