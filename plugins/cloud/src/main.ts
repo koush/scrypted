@@ -4,7 +4,8 @@ import axios from 'axios';
 import bpmux from 'bpmux';
 import crypto from 'crypto';
 import { once } from 'events';
-import { createServer, Server } from 'http';
+import http from 'http';
+import https from 'https';
 import HttpProxy from 'http-proxy';
 import upnp from 'nat-upnp';
 import net from 'net';
@@ -13,8 +14,10 @@ import path from 'path';
 import qs from 'query-string';
 import { Duplex } from 'stream';
 import Url from 'url';
-import type { CORSControl, CORSControlLegacy } from '../../../server/src/services/cors';
+import type { CORSControlLegacy } from '../../../server/src/services/cors';
+import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { PushManager } from './push';
+import tls from 'tls';
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -31,7 +34,6 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
         this.toMimeType = ScryptedMimeTypes.Url;
     }
 
-
     async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer> {
         if (this.cloud.storageSettings.values.hostname) {
             return Buffer.from(`https://${this.cloud.getHostname()}${await this.cloud.getCloudMessagePath()}/${data}`);
@@ -44,7 +46,8 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
 
 class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider, HttpRequestHandler {
     manager = new PushManager(DEFAULT_SENDER_ID);
-    server: Server;
+    server: http.Server;
+    secureServer: https.Server;
     proxy: HttpProxy;
     push: ScryptedPush;
     whitelisted = new Map<string, string>();
@@ -87,16 +90,28 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         lastPersistedIp: {
             hide: true,
         },
+        certificate: {
+            hide: true,
+            json: true,
+        },
+        securePort: {
+            hide: true,
+            type: 'number',
+        },
     });
     upnpInterval: NodeJS.Timeout;
     upnpClient = upnp.createClient();
     upnpStatus = 'Starting';
+    securePort: number;
 
     constructor() {
         super();
 
         this.fromMimeType = ScryptedMimeTypes.LocalUrl;
         this.toMimeType = ScryptedMimeTypes.Url;
+
+        if (!this.storageSettings.values.certificate)
+            this.storageSettings.values.certificate = createSelfSignedCertificate();
 
         this.setupProxyServer();
         this.setupCloudPush();
@@ -113,9 +128,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         })
 
         this.updateCors();
-
-        this.upnpInterval = setInterval(this.refreshUpnp, 30 * 60 * 1000);
-        this.refreshUpnp();
     }
 
     async refreshUpnp() {
@@ -135,10 +147,15 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             },
             private: {
                 host: localAddress,
-                port: 10443,
+                port: this.securePort,
             },
             ttl: 1800,
         }, async err => {
+
+            this.upnpClient.getMappings(function (err, results) {
+                console.log('current upnp mappings', results);
+            });
+
             if (err) {
                 this.console.error('UPNP failed', err);
                 this.upnpStatus = 'Error: See Console';
@@ -152,7 +169,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
             const response = await axios('https://jsonip.com');
             const { ip } = response.data;
-            this.console.log('External IP:', ip);
+            this.console.log(`Mapped port https://127.0.0.1:${this.securePort} to https://${ip}:${upnpPort}`);
 
             // the ip is not sent, but should be checked to see if it changed.
             if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort || ip !== this.storageSettings.values.lastPersistedIp) {
@@ -361,18 +378,19 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async setupProxyServer() {
+        // TODO: 1/25/2023 change this to getInsecurePublicLocalEndpoint to avoid double crypto
         const ep = await endpointManager.getPublicLocalEndpoint();
-        const httpsTarget = new URL(ep);
-        httpsTarget.hostname = 'localhost';
-        httpsTarget.pathname = '';
-        const wssTarget = new URL(httpsTarget);
-        wssTarget.protocol = 'wss';
-        const googleHomeTarget = new URL(httpsTarget);
+        const httpTarget = new URL(ep);
+        httpTarget.hostname = 'localhost';
+        httpTarget.pathname = '';
+        const wsTarget = new URL(httpTarget);
+        wsTarget.protocol = 'ws';
+        const googleHomeTarget = new URL(httpTarget);
         googleHomeTarget.pathname = '/endpoint/@scrypted/google-home/public/';
-        const alexaTarget = new URL(httpsTarget);
+        const alexaTarget = new URL(httpTarget);
         alexaTarget.pathname = '/endpoint/@scrypted/alexa/public/';
 
-        this.server = createServer(async (req, res) => {
+        const handler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
             const url = Url.parse(req.url);
             if (url.path.startsWith('/web/oauth/callback') && url.query) {
                 const query = qs.parse(url.query);
@@ -412,19 +430,36 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
 
             this.proxy.web(req, res, undefined, (err) => console.error(err));
-        });
+        }
 
+        this.server = http.createServer(handler);
         this.server.on('upgrade', (req, socket, head) => {
-            this.proxy.ws(req, socket, head, { target: wssTarget.toString(), ws: true, secure: false });
-        })
-
+            this.proxy.ws(req, socket, head, { target: wsTarget.toString(), ws: true, secure: false });
+        });
+        // this can be localhost because this is server initiated loopback proxy
         this.server.listen(0, '127.0.0.1');
-
         await once(this.server, 'listening');
         const port = (this.server.address() as any).port;
 
+        this.secureServer = https.createServer({
+            key: this.storageSettings.values.certificate.serviceKey,
+            cert: this.storageSettings.values.certificate.certificate,
+        }, (req, res) => {
+            handler(req, res);
+        });
+        this.secureServer.on('upgrade', (req, socket, head) => {
+            this.proxy.ws(req, socket, head, { target: wsTarget.toString(), ws: true, secure: false });
+        })
+        // this is the direct connection port
+        this.secureServer.listen(this.storageSettings.values.securePort, '0.0.0.0');
+        await once(this.secureServer, 'listening');
+        this.storageSettings.values.securePort = this.securePort = (this.secureServer.address() as any).port;
+
+        this.upnpInterval = setInterval(this.refreshUpnp, 30 * 60 * 1000);
+        this.refreshUpnp();
+
         this.proxy = HttpProxy.createProxy({
-            target: httpsTarget,
+            target: httpTarget,
             secure: false,
         });
         this.proxy.on('error', () => { });
@@ -456,7 +491,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 backoff = Date.now();
                 const random = Math.random().toString(36).substring(2);
                 this.console.log('scrypted server requested a connection:', random);
-                const client = net.connect(4000, SCRYPTED_SERVER);
+                const client = tls.connect(4001, SCRYPTED_SERVER, {
+                    rejectUnauthorized: false,
+                });
                 client.on('close', () => this.console.log('scrypted server connection ended:', random));
                 const registrationId = await this.manager.registrationId;
                 client.write(registrationId + '\n');
