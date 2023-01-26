@@ -114,8 +114,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         this.updateCors();
 
-        // this.upnpInterval = setInterval(this.refreshUpnp, 30 * 60 * 1000);
-        // this.refreshUpnp();
+        this.upnpInterval = setInterval(this.refreshUpnp, 30 * 60 * 1000);
+        this.refreshUpnp();
     }
 
     async refreshUpnp() {
@@ -430,7 +430,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.proxy.on('error', () => { });
         this.proxy.on('proxyRes', (res, req) => {
             res.headers['X-Scrypted-Cloud'] = 'true';
-            res.headers['Access-Control-Expose-Headers'] = 'X-Scrypted-Cloud';
+            res.headers['X-Scrypted-Direct-Address'] = req.headers['x-scrypted-direct-address'];
+            res.headers['Access-Control-Expose-Headers'] = 'X-Scrypted-Cloud, X-Scrypted-Direct-Address';
         });
 
         let backoff = 0;
