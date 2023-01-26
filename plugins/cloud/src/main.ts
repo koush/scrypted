@@ -226,6 +226,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.console.error('UPNP failed', err);
                 this.upnpStatus = 'Error: See Console';
                 this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+                this.log.a('UPNP Port Reservation failed. Enable UPNP on your router, set up port forwarding, or disable Port Forwarding Mode in the Scrypted Cloud Plugin to suppress this error.');
                 return;
             }
 
