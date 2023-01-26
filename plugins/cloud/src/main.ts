@@ -151,7 +151,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.storageSettings.settings.forwardingMode.onPut =
             this.storageSettings.settings.upnpPort.onPut = (ov, nv) => {
                 if (ov !== nv)
-                    this.log.a('Reload the WebTRC Plugin to apply the port change.');
+                    this.log.a('Reload the Scrypted Cloud Plugin to apply the port change.');
             };
 
         this.fromMimeType = ScryptedMimeTypes.LocalUrl;
