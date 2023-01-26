@@ -455,7 +455,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         await once(this.secureServer, 'listening');
         this.storageSettings.values.securePort = this.securePort = (this.secureServer.address() as any).port;
 
-        this.upnpInterval = setInterval(this.refreshUpnp, 30 * 60 * 1000);
+        this.upnpInterval = setInterval(() => this.refreshUpnp(), 30 * 60 * 1000);
         this.refreshUpnp();
 
         this.proxy = HttpProxy.createProxy({
