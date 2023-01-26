@@ -106,6 +106,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
     // the cloud plugin will include this header.
     // should maybe move this into the cloud server itself.
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
+    const directAddress = response.headers['x-scrypted-direct-address'];
 
     return {
         authorization: response.data.authorization as string,
@@ -113,6 +114,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
         token: response.data.token as string,
         addresses,
         scryptedCloud,
+        directAddress,
     };
 }
 
@@ -124,6 +126,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         ...options?.axiosConfig,
     });
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
+    const directAddress = response.headers['x-scrypted-direct-address'];
 
     return {
         redirect: response.data.redirect as string,
@@ -134,6 +137,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         hasLogin: !!response.data.hasLogin,
         addresses: response.data.addresses as string[],
         scryptedCloud,
+        directAddress,
     };
 }
 
@@ -174,6 +178,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const extraHeaders: { [header: string]: string } = {};
     let addresses: string[];
     let scryptedCloud: boolean;
+    let directAddress: string;
 
     console.log('@scrypted/client', packageJson.version);
 
@@ -193,6 +198,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             throw new ScryptedClientLoginError(loginCheck);
         addresses = loginCheck.addresses;
         scryptedCloud = loginCheck.scryptedCloud;
+        directAddress = loginCheck.directAddress;
         username = loginCheck.username;
         authorization = loginCheck.authorization;
         console.log('login checked', Date.now() - start, loginCheck);
@@ -215,6 +221,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     // watch for this flush.
     const flush = new Deferred<void>();
 
+    if (directAddress) {
+        addresses ||= [];
+        addresses.push(directAddress);
+    }
     const tryLocalAddressess = scryptedCloud && !!addresses.length;
     const tryWebrtc = !!globalThis.RTCPeerConnection && (scryptedCloud && options.webrtc === undefined) || options.webrtc;
 
