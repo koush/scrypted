@@ -111,6 +111,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.updatePortForward(this.storageSettings.values.upnpPort);
             },
         },
+        register: {
+            group: 'Advanced',
+            title: 'Register',
+            type: 'button',
+        },
     });
     upnpInterval: NodeJS.Timeout;
     upnpClient = upnp.createClient();
@@ -119,6 +124,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     constructor() {
         super();
+
+        this.storageSettings.settings.register.onPut = async () => {
+            const registrationId = await this.manager.registrationId;
+            await this.sendRegistrationId(registrationId);
+        }
 
         this.storageSettings.settings.upnpStatus.onGet = async () => {
             return {
@@ -197,11 +207,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.console.log('Registering UPNP IP and Port', ip, upnpPort);
 
             const registrationId = await this.manager.registrationId;
-            const data = await this.sendRegistrationId(registrationId, upnpPort);
+            const data = await this.sendRegistrationId(registrationId);
             if (this.storageSettings.values.hostname && ip !== data.ip_address) {
                 this.log.a(`Scrypted Cloud could not verify the IP Address of your custom domain ${this.storageSettings.values.hostname}.`);
             }
-            this.storageSettings.values.lastPersistedUpnpPort = upnpPort;
             this.storageSettings.values.lastPersistedIp = ip;
         }
     }
@@ -348,10 +357,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    async sendRegistrationId(registration_id: string, upnp_port?: number) {
+    async sendRegistrationId(registration_id: string) {
         const registration_secret = this.storageSettings.values.registrationSecret || crypto.randomBytes(8).toString('base64');
         const q = qs.stringify({
-            upnp_port: upnp_port || this.storageSettings.values.lastPersistedUpnpPort,
+            upnp_port: this.storageSettings.values.upnpPort,
             registration_id,
             sender_id: DEFAULT_SENDER_ID,
             registration_secret,
@@ -366,6 +375,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
         this.console.log('registered', response.data);
         this.storageSettings.values.lastPersistedRegistrationId = registration_id;
+        this.storageSettings.values.lastPersistedUpnpPort = this.storageSettings.values.upnpPort;
         this.storageSettings.values.registrationSecret = registration_secret;
         return response.data;
     }
