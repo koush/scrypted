@@ -1042,8 +1042,7 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
   }
 
   async releaseMixin(id: string, mixinDevice: any) {
-    this.console.log('releasing ObjectDetection mixin', id);
-    mixinDevice.release();
+    return mixinDevice.release();
   }
 }
 
