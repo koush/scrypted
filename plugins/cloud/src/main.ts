@@ -207,8 +207,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async refreshPortForward() {
-        if (this.storageSettings.values.forwardingMode === 'Disabled')
+        if (this.storageSettings.values.forwardingMode === 'Disabled') {
+            this.updatePortForward(0);
             return;
+        }
 
         let { upnpPort } = this.storageSettings.values;
         if (!upnpPort)
@@ -216,6 +218,15 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         if (this.storageSettings.values.forwardingMode === 'Router Forward')
             return this.updatePortForward(upnpPort);
+
+        if (upnpPort === 443) {
+            this.upnpStatus = 'Error: Port 443 Not Allowed';
+            const err = 'Scrypted Cloud does not allow reserving port 443 with UPNP. Set up a manual port forward if this is intended.';
+            this.log.a(err);
+            this.console.error(err);
+            this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+            return;
+        }
 
         const [localAddress] = await endpointManager.getLocalAddresses();
         this.upnpClient.portMapping({
