@@ -1,32 +1,32 @@
+import axios from 'axios';
+import bodyParser from 'body-parser';
+import cookieParser from 'cookie-parser';
+import crypto from 'crypto';
+import express, { Request } from 'express';
+import fs from 'fs';
+import http from 'http';
+import httpAuth from 'http-auth';
+import https from 'https';
+import ip from 'ip';
+import mkdirp from 'mkdirp';
+import net from 'net';
+import os from 'os';
 import path from 'path';
 import process from 'process';
-import http from 'http';
-import https from 'https';
-import express, { Request } from 'express';
-import bodyParser from 'body-parser';
-import net from 'net';
-import { ScryptedRuntime } from './runtime';
-import level from './level';
-import { Plugin, ScryptedUser, Settings } from './db-types';
-import { getHostAddresses, SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
-import crypto from 'crypto';
-import cookieParser from 'cookie-parser';
-import axios from 'axios';
-import { RPCResultError } from './rpc';
-import fs from 'fs';
-import mkdirp from 'mkdirp';
-import { install as installSourceMapSupport } from 'source-map-support';
-import httpAuth from 'http-auth';
 import semver from 'semver';
-import { Info } from './services/info';
-import { sleep } from './sleep';
+import { install as installSourceMapSupport } from 'source-map-support';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
+import { Plugin, ScryptedUser, Settings } from './db-types';
+import level from './level';
 import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
-import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
-import os from 'os';
+import { RPCResultError } from './rpc';
+import { ScryptedRuntime } from './runtime';
+import { getHostAddresses, SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
+import { Info } from './services/info';
 import { setScryptedUserPassword } from './services/users';
-import ip from 'ip';
+import { sleep } from './sleep';
+import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -163,12 +163,21 @@ async function start() {
     })
 
     const authSalt = crypto.randomBytes(16);
-    const createAuthorizationToken = (login_user_token: string) => {
+    const createTokens = (userToken: UserToken) => {
+        const login_user_token = userToken.toString();
         const salted = login_user_token + authSalt;
         const hash = crypto.createHash('sha256');
         hash.update(salted);
         const sha = hash.digest().toString('hex');
-        return `Bearer ${sha}#${login_user_token}`;
+        const queryToken = `${sha}#${login_user_token}`;
+        return {
+            authorization: `Bearer ${queryToken}`,
+            // query token are the query parameters that must be added to an url for authorization.
+            // useful for cross origin img tags.
+            queryToken: {
+                scryptedToken: queryToken,
+            },
+        };
     }
 
     app.use(async (req, res, next) => {
@@ -181,6 +190,24 @@ async function start() {
         // this is a trap for all auth.
         // only basic auth will fail with 401. it is up to the endpoints to manage
         // lack of login from cookie auth.
+
+        const checkToken = (token: string) => {
+            const [checkHash, ...tokenParts] = token.split('#');
+            const tokenPart = tokenParts?.join('#');
+            if (checkHash && tokenPart) {
+                const salted = tokenPart + authSalt;
+                const hash = crypto.createHash('sha256');
+                hash.update(salted);
+                const sha = hash.digest().toString('hex');
+
+                if (checkHash === sha) {
+                    const userToken = validateToken(tokenPart);
+                    if (userToken)
+                        res.locals.username = userToken.username;
+                    res.locals.aclId = userToken.aclId;
+                }
+            }
+        }
 
         const userToken = getSignedLoginUserToken(req);
         if (userToken) {
@@ -201,21 +228,10 @@ async function start() {
             res.locals.aclId = aclId;
         }
         else if (req.headers.authorization?.startsWith('Bearer ')) {
-            const [checkHash, ...tokenParts] = req.headers.authorization.substring('Bearer '.length).split('#');
-            const tokenPart = tokenParts?.join('#');
-            if (checkHash && tokenPart) {
-                const salted = tokenPart + authSalt;
-                const hash = crypto.createHash('sha256');
-                hash.update(salted);
-                const sha = hash.digest().toString('hex');
-
-                if (checkHash === sha) {
-                    const userToken = validateToken(tokenPart);
-                    if (userToken)
-                        res.locals.username = userToken.username;
-                    res.locals.aclId = userToken.aclId;
-                }
-            }
+            checkToken(req.headers.authorization.substring('Bearer '.length));
+        }
+        else if (req.query['scryptedToken']) {
+            checkToken(req.query.scryptedToken.toString());
         }
         next();
     });
@@ -479,7 +495,7 @@ async function start() {
             }
 
             res.send({
-                authorization: createAuthorizationToken(login_user_token),
+                ...createTokens(userToken),
                 username,
                 expiration: maxAge,
                 addresses,
@@ -513,7 +529,7 @@ async function start() {
         });
 
         res.send({
-            authorization: createAuthorizationToken(login_user_token),
+            ...createTokens(userToken),
             username,
             token: user.token,
             expiration: maxAge,
@@ -524,7 +540,6 @@ async function start() {
     app.get('/login', async (req, res) => {
         await checkResetLogin();
 
-        scrypted.addAccessControlHeaders(req, res);
         const hostname = os.hostname()?.split('.')?.[0];
 
         const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true)).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
@@ -569,7 +584,7 @@ async function start() {
             const userToken = UserToken.validateToken(login_user_token);
 
             res.send({
-                authorization: createAuthorizationToken(login_user_token),
+                ...createTokens(userToken),
                 expiration: (userToken.timestamp + userToken.duration) - Date.now(),
                 username: userToken.username,
                 addresses,

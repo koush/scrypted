@@ -34,7 +34,7 @@ function once(socket: IOClientSocket, event: 'open' | 'message') {
     });
 }
 
-export type ScryptedClientConnectionType = 'http' | 'webrtc' | 'http-local';
+export type ScryptedClientConnectionType = 'http' | 'webrtc' | 'http-direct';
 
 export interface ScryptedClientStatic extends ScryptedStatic {
     userId?: string;
@@ -42,9 +42,12 @@ export interface ScryptedClientStatic extends ScryptedStatic {
     disconnect(): void;
     onClose?: Function;
     version: string;
-    connectionType: ScryptedClientConnectionType;
     rtcConnectionManagement?: RTCConnectionManagement;
     browserSignalingSession?: BrowserSignalingSession;
+    address?: string;
+    connectionType: ScryptedClientConnectionType;
+    authorization?: string;
+    queryToken?: { [parameter: string]: string };
 }
 
 export interface ScryptedConnectionOptions {
@@ -109,8 +112,9 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
     const directAddress = response.headers['x-scrypted-direct-address'];
 
     return {
-        authorization: response.data.authorization as string,
         error: response.data.error as string,
+        authorization: response.data.authorization as string,
+        queryToken: response.data.queryToken as any,
         token: response.data.token as string,
         addresses,
         scryptedCloud,
@@ -130,11 +134,12 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
 
     return {
         redirect: response.data.redirect as string,
-        error: response.data.error as string,
-        authorization: response.data.authorization as string,
         username: response.data.username as string,
         expiration: response.data.expiration as number,
         hasLogin: !!response.data.hasLogin,
+        error: response.data.error as string,
+        authorization: response.data.authorization as string,
+        queryToken: response.data.queryToken as any,
         addresses: response.data.addresses as string[],
         scryptedCloud,
         directAddress,
@@ -174,6 +179,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const start = Date.now();
     let { baseUrl, pluginId, clientName, username, password } = options;
     let authorization: string;
+    let queryToken: any;
 
     const extraHeaders: { [header: string]: string } = {};
     let addresses: string[];
@@ -188,6 +194,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             extraHeaders['Authorization'] = loginResult.authorization;
         addresses = loginResult.addresses;
         scryptedCloud = loginResult.scryptedCloud;
+        authorization = loginResult.authorization;
+        queryToken = loginResult.queryToken;
         console.log('login result', Date.now() - start, loginResult);
     }
     else {
@@ -201,6 +209,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         directAddress = loginCheck.directAddress;
         username = loginCheck.username;
         authorization = loginCheck.authorization;
+        queryToken = loginCheck.queryToken;
         console.log('login checked', Date.now() - start, loginCheck);
     }
 
@@ -257,7 +266,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             promises.push((async () => {
                 await once(check, 'open');
                 return {
-                    connectionType: 'http-local',
+                    connectionType: 'http-direct',
                     ready: check,
                     address,
                 };
@@ -307,7 +316,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         await once(check, 'open');
         return {
             ready: check,
-            connectionType: scryptedCloud ? 'http' : 'http-local',
+            connectionType: 'http',
         };
     })());
 
@@ -557,6 +566,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             serverVersion,
             username,
             pluginRemoteAPI: undefined,
+            address,
             connectionType,
             version,
             systemManager,
@@ -569,6 +579,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             pluginHostAPI: undefined,
             rtcConnectionManagement,
             browserSignalingSession,
+            authorization,
+            queryToken,
         }
 
         socket.on('close', () => {

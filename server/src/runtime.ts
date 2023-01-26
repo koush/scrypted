@@ -31,7 +31,7 @@ import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
-import { AddressSettings as AddressSettings } from './services/addresses';
+import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
 import { CORSControl } from './services/cors';
 import { Info } from './services/info';
@@ -170,9 +170,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         const header = this.getAccessControlAllowOrigin(req.headers);
         if (header) {
             res.setHeader('Access-Control-Allow-Origin', header);
-            res.setHeader("Access-Control-Allow-Credentials", "true");
-            res.setHeader('Access-Control-Allow-Private-Network', 'true');
         }
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader('Access-Control-Allow-Private-Network', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Access-Control-Request-Method');
     }
 
     getAccessControlAllowOrigin(headers: http.IncomingHttpHeaders) {

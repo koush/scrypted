@@ -1,7 +1,7 @@
 import { HttpRequest } from '@scrypted/types';
 import bodyParser from 'body-parser';
 import { Request, Response, Router } from 'express';
-import { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'http';
+import { IncomingHttpHeaders, ServerResponse } from 'http';
 import WebSocket, { Server as WebSocketServer } from "ws";
 
 export function isConnectionUpgrade(headers: IncomingHttpHeaders) {
@@ -40,7 +40,6 @@ export abstract class PluginHttp<T> {
     abstract handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: T): void;
     abstract getEndpointPluginData(req: Request, endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<T>;
     abstract handleWebSocket(endpoint: string, httpRequest: HttpRequest, ws: WebSocket, pluginData: T): Promise<void>;
-    abstract addAccessControlHeaders(req: IncomingMessage, res: ServerResponse): void;
     abstract checkUpgrade(req: Request, res: Response, pluginData: T): void;
 
     async endpointHandler(req: Request, res: Response, isPublicEndpoint: boolean, isEngineIOEndpoint: boolean,
@@ -74,12 +73,6 @@ export abstract class PluginHttp<T> {
 
         if (isEngineIOEndpoint && isUpgrade) {
             this.checkUpgrade(req, res, pluginData);
-        }
-
-        if (isEngineIOEndpoint && !isUpgrade) {
-            this.addAccessControlHeaders(req, res);
-            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Access-Control-Request-Method');
         }
 
         if (isEngineIOEndpoint && req.method === 'OPTIONS') {
