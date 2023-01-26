@@ -39,7 +39,7 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
             return Buffer.from(`https://${this.cloud.getHostname()}${await this.cloud.getCloudMessagePath()}/${data}`);
         }
 
-        const url = `http://localhost/push/${data}`;
+        const url = `http://127.0.0.1/push/${data}`;
         return this.cloud.whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.cloud.getHostname()}${SCRYPTED_CLOUD_MESSAGE_PATH}`);
     }
 }
@@ -435,7 +435,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         // TODO: 1/25/2023 change this to getInsecurePublicLocalEndpoint to avoid double crypto
         const ep = await endpointManager.getPublicLocalEndpoint();
         const httpTarget = new URL(ep);
-        httpTarget.hostname = 'localhost';
+        httpTarget.hostname = '127.0.0.1';
         httpTarget.pathname = '';
         const wsTarget = new URL(httpTarget);
         wsTarget.protocol = 'ws';
@@ -443,6 +443,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         googleHomeTarget.pathname = '/endpoint/@scrypted/google-home/public/';
         const alexaTarget = new URL(httpTarget);
         alexaTarget.pathname = '/endpoint/@scrypted/alexa/public/';
+
+        const headers = {
+            'X-Forwarded-Proto': 'https',
+        };
 
         const handler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
             const url = Url.parse(req.url);
@@ -483,14 +487,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 return;
             }
 
-            this.proxy.web(req, res, undefined, (err) => console.error(err));
+            this.proxy.web(req, res, { headers }, (err) => console.error(err));
         }
 
+        const wsHandler = (req: http.IncomingMessage, socket: Duplex, head: Buffer) => this.proxy.ws(req, socket, head, { target: wsTarget.toString(), ws: true, secure: false, headers }, (err) => console.error(err));
+
         this.server = http.createServer(handler);
-        this.server.on('upgrade', (req, socket, head) => {
-            this.proxy.ws(req, socket, head, { target: wsTarget.toString(), ws: true, secure: false });
-        });
-        // this can be localhost because this is server initiated loopback proxy
+        this.server.on('upgrade', wsHandler);
+        // this can be localhost because this is a server initiated loopback proxy through bpmux
         this.server.listen(0, '127.0.0.1');
         await once(this.server, 'listening');
         const port = (this.server.address() as any).port;
@@ -498,12 +502,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.secureServer = https.createServer({
             key: this.storageSettings.values.certificate.serviceKey,
             cert: this.storageSettings.values.certificate.certificate,
-        }, (req, res) => {
-            handler(req, res);
-        });
-        this.secureServer.on('upgrade', (req, socket, head) => {
-            this.proxy.ws(req, socket, head, { target: wsTarget.toString(), ws: true, secure: false });
-        })
+        }, handler);
+        this.secureServer.on('upgrade', wsHandler)
         // this is the direct connection port
         this.secureServer.listen(this.storageSettings.values.securePort, '0.0.0.0');
         await once(this.secureServer, 'listening');
