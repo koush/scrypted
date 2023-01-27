@@ -204,9 +204,10 @@ async function start() {
 
                 if (checkHash === sha) {
                     const userToken = validateToken(tokenPart);
-                    if (userToken)
+                    if (userToken) {
                         res.locals.username = userToken.username;
-                    res.locals.aclId = userToken.aclId;
+                        res.locals.aclId = userToken.aclId;
+                    }
                 }
             }
         }
