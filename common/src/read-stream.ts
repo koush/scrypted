@@ -57,33 +57,6 @@ export async function read16BELengthLoop(readable: Readable, options: {
   throw new Error('stream ended');
 }
 
-
-async function readLengthRaw(readable: Readable, length: number): Promise<Buffer> {
-  if (!length) {
-    return Buffer.alloc(0);
-  }
-
-  {
-    const ret = readable.read(length);
-    if (ret) {
-      return ret;
-    }
-  }
-
-  return new Promise((resolve, reject) => {
-    const r = () => {
-      const ret = readable.read(length);
-      if (ret) {
-        readable.removeListener('readable', r);
-        resolve(ret);
-      }
-    };
-
-
-    readable.on('readable', r);
-  });
-}
-
 export class StreamEndError extends Error {
   constructor() {
     super()
