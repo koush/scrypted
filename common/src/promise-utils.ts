@@ -31,15 +31,15 @@ export function timeoutPromise<T>(timeout: number, promise: Promise<T>): Promise
     return new Promise<T>((resolve, reject) => {
         const t = setTimeout(() => reject(new TimeoutError(promise)), timeout);
 
-        promise.then(v => {
-            clearTimeout(t);
-            resolve(v);
-        });
-
-        promise.catch(e => {
-            clearTimeout(t);
-            reject(e);
-        });
+        promise
+            .then(v => {
+                clearTimeout(t);
+                resolve(v);
+            })
+            .catch(e => {
+                clearTimeout(t);
+                reject(e);
+            });
     })
 }
 
