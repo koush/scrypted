@@ -146,7 +146,7 @@ else {
         let readmeText = fs.readFileSync(readme).toString();;
         const changelog = path.join(cwd, 'CHANGELOG.md');
         if (fs.existsSync(changelog)) {
-            readmeText += '\n\n' + fs.readFileSync(changelog).toString();
+            readmeText += '\n\n\n<br/><br/>' + fs.readFileSync(changelog).toString();
         }
         zip.addFile('README.md', readmeText);
     }
