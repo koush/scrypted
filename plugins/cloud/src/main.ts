@@ -240,7 +240,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
             const registrationId = await this.manager.registrationId;
             const data = await this.sendRegistrationId(registrationId);
-            if (this.storageSettings.values.hostname && ip !== data.ip_address) {
+            if (ip !== 'localhost' && ip !== data.ip_address) {
                 this.log.a(`Scrypted Cloud could not verify the IP Address of your custom domain ${this.storageSettings.values.hostname}.`);
             }
             this.storageSettings.values.lastPersistedIp = ip;
