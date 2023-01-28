@@ -71,13 +71,22 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             choices: [
                 "UPNP",
                 "Router Forward",
+                "Custom Domain",
                 "Disabled",
             ],
             defaultValue: 'UPNP',
         },
+        hostname: {
+            title: 'Hostname',
+            description: 'The hostname to reach this Scrypted server on https port 443. Requires a valid SSL certificate.',
+            placeholder: 'my-server.dyndns.com',
+            onPut: () => {
+                this.updatePortForward(this.storageSettings.values.upnpPort);
+            },
+        },
         securePort: {
             title: 'Local HTTPS Port',
-            description: 'The Scrypted Cloud plugin listens on this port for for cloud connections. The router must use UPNP or port forwarding rules to send requests to this port.',
+            description: 'The Scrypted Cloud plugin listens on this port for for cloud connections. The router must use UPNP, port forwarding, or a reverse proxy to send requests to this port.',
             type: 'number',
         },
         upnpPort: {
@@ -103,24 +112,26 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             hide: true,
             json: true,
         },
-        hostname: {
-            title: 'Custom Domain (Optional)',
-            description: 'Optional/Recommended: The custom domain (hostname) to reach this Scrypted server on https port 443. This will bypass usage of Scrypted Cloud when possible. You will need to set up SSL termination.',
-            placeholder: 'my-server.dyndns.com',
-            onPut: () => {
-                this.updatePortForward(this.storageSettings.values.upnpPort);
-            },
-        },
         register: {
             group: 'Advanced',
             title: 'Register',
             type: 'button',
+            onPut: () => this.manager.registrationId.then(r => this.sendRegistrationId(r)),
+            description: 'Register server with Scrypted Cloud.',
+        },
+        testPortForward: {
+            group: 'Advanced',
+            title: 'Test Port Forward',
+            type: 'button',
+            onPut: () => this.testPortForward(),
+            description: 'Test the port forward connection from Scrypted Cloud.',
         },
     });
     upnpInterval: NodeJS.Timeout;
     upnpClient = upnp.createClient();
     upnpStatus = 'Starting';
     securePort: number;
+    randomBytes = crypto.randomBytes(16).toString('base64');
 
     constructor() {
         super();
@@ -155,6 +166,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.storageSettings.settings.securePort.onGet = async () => {
             return {
                 hide: this.storageSettings.values.forwardingMode === 'Disabled',
+            }
+        };
+
+        this.storageSettings.settings.hostname.onGet = async () => {
+            return {
+                hide: this.storageSettings.values.forwardingMode !== 'Custom Domain',
             }
         };
 
@@ -193,18 +210,18 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     async updatePortForward(upnpPort: number) {
         this.storageSettings.values.upnpPort = upnpPort;
 
-        let ip = this.storageSettings.values.hostname?.toString();
+        const ip = this.storageSettings.values.forwardingMode === 'Custom Domain'
+            ? this.storageSettings.values.hostname?.toString()
+            : (await axios('https://jsonip.com')).data.ip;
 
-        if (!ip) {
-            const response = await axios('https://jsonip.com');
-            ip = response.data.ip;
-        }
+        if (this.storageSettings.values.forwardingMode === 'Custom Domain')
+            upnpPort = 443;
 
         this.console.log(`Mapped port https://127.0.0.1:${this.securePort} to https://${ip}:${upnpPort}`);
 
         // the ip is not sent, but should be checked to see if it changed.
         if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort || ip !== this.storageSettings.values.lastPersistedIp) {
-            this.console.log('Registering UPNP IP and Port', ip, upnpPort);
+            this.console.log('Registering IP and Port', ip, upnpPort);
 
             const registrationId = await this.manager.registrationId;
             const data = await this.sendRegistrationId(registrationId);
@@ -212,6 +229,30 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.log.a(`Scrypted Cloud could not verify the IP Address of your custom domain ${this.storageSettings.values.hostname}.`);
             }
             this.storageSettings.values.lastPersistedIp = ip;
+        }
+    }
+
+    async testPortForward() {
+        try {
+            const pluginPath = await endpointManager.getPath(undefined, {
+                public: true,
+            });
+            const url = new URL(`https://${SCRYPTED_SERVER}/_punch/curl`);
+            let { upnp_port, hostname } = this.getAuthority();
+            if (!hostname)
+                hostname = (await axios('https://jsonip.com')).data.ip;
+            url.searchParams.set('url', `https://${hostname}:${upnp_port}${pluginPath}/testPortForward`);
+            const response = await axios(url.toString());
+            this.console.log('test data:', response.data);
+            if (response.data.error)
+                throw new Error(response.data.error);
+            if (response.data.data !== this.randomBytes)
+                throw new Error('Server received data that did not match this server.');
+            this.log.a("Port Forward Test Succeeded.");
+        }
+        catch (e) {
+            this.console.error('port forward test failed', e);
+            this.log.a(`Port Forward Test Failed: ${e}`);
         }
     }
 
@@ -225,17 +266,20 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         if (!upnpPort)
             upnpPort = Math.round(Math.random() * 30000 + 20000);
 
-        if (this.storageSettings.values.forwardingMode === 'Router Forward')
-            return this.updatePortForward(upnpPort);
-
         if (upnpPort === 443) {
             this.upnpStatus = 'Error: Port 443 Not Allowed';
-            const err = 'Scrypted Cloud does not allow reserving port 443 with UPNP. Set up a manual port forward if this is intended.';
+            const err = 'Scrypted Cloud does not allow usage of port 443. Use a custom domain with a SSL terminating reverse proxy.';
             this.log.a(err);
             this.console.error(err);
             this.onDeviceEvent(ScryptedInterface.Settings, undefined);
             return;
         }
+
+        if (this.storageSettings.values.forwardingMode === 'Router Forward')
+            return this.updatePortForward(upnpPort);
+
+        if (this.storageSettings.values.forwardingMode === 'Custom Domain')
+            return this.updatePortForward(upnpPort);
 
         const [localAddress] = await endpointManager.getLocalAddresses();
         this.upnpClient.portMapping({
@@ -303,7 +347,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         return Buffer.from(url);
     }
 
-
     async updateCors() {
         try {
             if (endpointManager.setAccessControlAllowOrigin) {
@@ -357,14 +400,34 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
+    getAuthority() {
+        const upnp_port = this.storageSettings.values.forwardingMode === 'Custom Domain' ? 443 : this.storageSettings.values.upnpPort;
+        const hostname = this.storageSettings.values.forwardingMode === 'Custom Domain' ? this.storageSettings.values.hostname : undefined;
+
+        if (upnp_port === 443 && !hostname) {
+            const error = this.storageSettings.values.forwardingMode === 'Custom Domain'
+                ? 'Hostname is required for port Custom Domain setup.'
+                : 'Port 443 requires Custom Domain configuration.';
+            this.log.a(error);
+            throw new Error(error);
+        }
+
+        return {
+            upnp_port,
+            hostname,
+        }
+    }
+
     async sendRegistrationId(registration_id: string) {
+        const { upnp_port, hostname } = this.getAuthority();
         const registration_secret = this.storageSettings.values.registrationSecret || crypto.randomBytes(8).toString('base64');
+
         const q = qs.stringify({
-            upnp_port: this.storageSettings.values.upnpPort,
+            upnp_port,
             registration_id,
             sender_id: DEFAULT_SENDER_ID,
             registration_secret,
-            hostname: this.storageSettings.values.hostname,
+            hostname,
         });
 
         const { token_info } = this.storageSettings.values;
@@ -375,7 +438,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
         this.console.log('registered', response.data);
         this.storageSettings.values.lastPersistedRegistrationId = registration_id;
-        this.storageSettings.values.lastPersistedUpnpPort = this.storageSettings.values.upnpPort;
+        this.storageSettings.values.lastPersistedUpnpPort = upnp_port;
         this.storageSettings.values.registrationSecret = registration_secret;
         return response.data;
     }
@@ -393,6 +456,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        if (request.url.endsWith('/testPortForward')) {
+            response.send(this.randomBytes);
+            return;
+        }
+
         response.send('', {
             headers: {
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -421,8 +489,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     getHostname() {
-        const hostname = this.storageSettings.values.hostname || SCRYPTED_SERVER;
-        return hostname;
+        if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
+            return this.storageSettings.values.hostname;
+        return SCRYPTED_SERVER;
     }
 
     async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
@@ -503,7 +572,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 }
             }
             else if (url.path === '/web/') {
-                if (this.storageSettings.values.hostname)
+                if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
                     res.setHeader('Location', `https://${this.storageSettings.values.hostname}/endpoint/@scrypted/core/public/`);
                 else
                     res.setHeader('Location', '/endpoint/@scrypted/core/public/');
@@ -611,4 +680,4 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 }
 
-export default new ScryptedCloud();
+export default ScryptedCloud;
