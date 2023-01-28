@@ -51,6 +51,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     proxy: HttpProxy;
     push: ScryptedPush;
     whitelisted = new Map<string, string>();
+    reregisterTimer: NodeJS.Timeout;
     storageSettings = new StorageSettings(this, {
         token_info: {
             hide: true,
@@ -75,23 +76,30 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 "Disabled",
             ],
             defaultValue: 'UPNP',
+            onPut: () => this.scheduleRefreshPortForward(),
         },
         hostname: {
             title: 'Hostname',
             description: 'The hostname to reach this Scrypted server on https port 443. Requires a valid SSL certificate.',
             placeholder: 'my-server.dyndns.com',
-            onPut: () => {
-                this.updatePortForward(this.storageSettings.values.upnpPort);
-            },
+            onPut: () => this.scheduleRefreshPortForward(),
         },
         securePort: {
             title: 'Local HTTPS Port',
             description: 'The Scrypted Cloud plugin listens on this port for for cloud connections. The router must use UPNP, port forwarding, or a reverse proxy to send requests to this port.',
             type: 'number',
+            onPut: (ov, nv) => {
+                if (ov && ov !== nv)
+                    this.log.a('Reload the Scrypted Cloud Plugin to apply the port change.');
+            }
         },
         upnpPort: {
             title: 'External HTTPS Port',
             type: 'number',
+            onPut: (ov, nv) => {
+                if (ov !== nv)
+                    this.scheduleRefreshPortForward();
+            },
         },
         upnpStatus: {
             title: 'UPNP Status',
@@ -137,8 +145,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         super();
 
         this.storageSettings.settings.register.onPut = async () => {
-            const registrationId = await this.manager.registrationId;
-            await this.sendRegistrationId(registrationId);
+            await this.sendRegistrationId(await this.manager.registrationId);
         }
 
         this.storageSettings.settings.upnpStatus.onGet = async () => {
@@ -177,12 +184,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         this.log.clearAlerts();
 
-        this.storageSettings.settings.securePort.onPut =
-            this.storageSettings.settings.forwardingMode.onPut =
-            this.storageSettings.settings.upnpPort.onPut = (ov, nv) => {
-                if (ov && ov !== nv)
-                    this.log.a('Reload the Scrypted Cloud Plugin to apply the port change.');
-            };
+        this.storageSettings.settings.securePort.onPut = (ov, nv) => {
+            if (ov && ov !== nv)
+                this.log.a('Reload the Scrypted Cloud Plugin to apply the port change.');
+        };
 
         this.fromMimeType = ScryptedMimeTypes.LocalUrl;
         this.toMimeType = ScryptedMimeTypes.Url;
@@ -207,12 +212,22 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.updateCors();
     }
 
+    scheduleRefreshPortForward() {
+        if (this.reregisterTimer)
+            return;
+        this.reregisterTimer = setTimeout(() => {
+            this.reregisterTimer = undefined;
+            this.refreshPortForward();
+        }, 1000);
+    }
+
     async updatePortForward(upnpPort: number) {
         this.storageSettings.values.upnpPort = upnpPort;
 
+        // scrypted cloud will replace localhost with requesting ip.
         const ip = this.storageSettings.values.forwardingMode === 'Custom Domain'
             ? this.storageSettings.values.hostname?.toString()
-            : (await axios('https://jsonip.com')).data.ip;
+            : 'localhost';
 
         if (this.storageSettings.values.forwardingMode === 'Custom Domain')
             upnpPort = 443;
@@ -239,8 +254,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             });
             const url = new URL(`https://${SCRYPTED_SERVER}/_punch/curl`);
             let { upnp_port, hostname } = this.getAuthority();
+            // scrypted cloud will replace localhost with requesting ip
             if (!hostname)
-                hostname = (await axios('https://jsonip.com')).data.ip;
+                hostname = 'localhost';
             url.searchParams.set('url', `https://${hostname}:${upnp_port}${pluginPath}/testPortForward`);
             const response = await axios(url.toString());
             this.console.log('test data:', response.data);
