@@ -28,6 +28,7 @@
       "name": "Scrypted Cloud",
       "type": "API",
       "interfaces": [
+         "SystemSettings",
          "BufferConverter",
          "OauthClient",
          "Settings",
