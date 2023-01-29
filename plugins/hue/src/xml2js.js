@@ -1,1 +1,0 @@
-log.i('Using empty xml2js shim. NupnpSearch will be used.');
