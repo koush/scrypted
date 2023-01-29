@@ -5,9 +5,8 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/in
 # Install node.js
 choco upgrade -y nodejs-lts --version=18.13.0
 
-# Install Node.js additional tools for Windows to compile native modules
-# https://github.com/nodejs/node/blob/main/tools/msvs/install_tools/install_tools.bat#L55
-choco upgrade -y python visualstudio2019-workload-vctools
+# Install Python
+choco upgrade -y python
 
 # Refresh environment variables for py and npx to work
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
