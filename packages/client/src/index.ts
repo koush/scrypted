@@ -234,8 +234,12 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         addresses ||= [];
         addresses.push(directAddress);
     }
-    const tryLocalAddressess = options.direct && scryptedCloud && !!addresses.length;
+    const tryLocalAddressess = ((scryptedCloud && options.direct === undefined) || options.direct) && !!addresses.length;
     const tryWebrtc = !!globalThis.RTCPeerConnection && (scryptedCloud && options.webrtc === undefined) || options.webrtc;
+    console.log({
+        tryLocalAddressess,
+        tryWebrtc,
+    });
 
     const localEioOptions: Partial<SocketOptions> = {
         ...eioOptions,
