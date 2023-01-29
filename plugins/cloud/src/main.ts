@@ -35,7 +35,7 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
     }
 
     async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer> {
-        if (this.cloud.storageSettings.values.hostname) {
+        if (this.cloud.storageSettings.values.forwardingMode === 'Custom Domain' && this.cloud.storageSettings.values.hostname) {
             return Buffer.from(`https://${this.cloud.getHostname()}${await this.cloud.getCloudMessagePath()}/${data}`);
         }
 
@@ -229,6 +229,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             ? this.storageSettings.values.hostname?.toString()
             : 'localhost';
 
+        if (!ip)
+            throw new Error('Hostname is required for port Custom Domain setup.');
+
         if (this.storageSettings.values.forwardingMode === 'Custom Domain')
             upnpPort = 443;
 
@@ -331,7 +334,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer> {
         const local = Url.parse(localUrl);
 
-        if (this.storageSettings.values.hostname) {
+        if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname) {
             return Buffer.from(`${baseUrl}${local.path}`);
         }
 
