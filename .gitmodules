@@ -7,9 +7,6 @@
 [submodule "plugins/myq/src/myq"]
 	path = plugins/myq/src/myq
 	url = ../../koush/myq.git
-[submodule "plugins/neato/node-botvac"]
-	path = plugins/neato/node-botvac
-	url = ../../koush/node-botvac
 [submodule "plugins/tensorflow/face-api.js"]
 	path = external/face-api.js
 	url = ../../koush/face-api.js
