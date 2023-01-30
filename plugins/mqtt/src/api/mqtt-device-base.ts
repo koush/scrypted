@@ -49,6 +49,7 @@ export class MqttDeviceBase extends ScriptableDeviceBase implements Settings {
     }
 
     connectClient() {
+        this.client?.removeAllListeners();
         this.client?.end();
         this.client = undefined;
         const url = new URL(this.storage.getItem('url'));

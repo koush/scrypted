@@ -90,12 +90,14 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
     }): Promise<any> {
         const { script } = source;
         try {
-            const client = this.connectClient();
-            client.on('connect', () => this.console.log('mqtt client connected'));
-            client.on('disconnect', () => this.console.log('mqtt client disconnected'));
-            client.on('error', e => {
-                this.console.log('mqtt client error', e);
-            });
+            {
+                const client = this.connectClient();
+                client.on('connect', () => this.console.log('mqtt client connected'));
+                client.on('disconnect', () => this.console.log('mqtt client disconnected'));
+                client.on('error', e => {
+                    this.console.log('mqtt client error', e);
+                });
+            }
 
             const sd = this.prepareScript();
 
@@ -105,12 +107,12 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
                         const fullTopic = this.pathname + topic;
                         const cb = subscriptions[topic];
                         if (options) {
-                            client.subscribe(fullTopic, options)
+                            this.client.subscribe(fullTopic, options)
                         }
                         else {
-                            client.subscribe(fullTopic)
+                            this.client.subscribe(fullTopic)
                         }
-                        client.on('message', (messageTopic, message) => {
+                        this.client.on('message', (messageTopic, message) => {
                             if (fullTopic !== messageTopic && fullTopic !== '/' + messageTopic)
                                 return;
                             this.console.log('mqtt message', topic, message.toString());
@@ -137,7 +139,7 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
                         value = JSON.stringify(value);
                     if (value.constructor.name !== Buffer.name)
                         value = value.toString();
-                    client.publish(this.pathname + topic, value);
+                    this.client.publish(this.pathname + topic, value);
                 },
                 ...sd
             }
@@ -482,6 +484,10 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
     }
 
     async discoverDevices(duration: number) {
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+        
     }
 
     createMqttDevice(nativeId: string): MqttDevice {
