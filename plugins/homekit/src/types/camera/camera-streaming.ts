@@ -63,7 +63,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             });
 
             const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-            let addressOverride = await getAddressOverride(homekitPlugin.storageSettings.values.addressOverride || undefined);
+            let addressOverride = await getAddressOverride();
 
             if (addressOverride) {
                 const infos = Object.values(os.networkInterfaces()).flat().map(i => i?.address);

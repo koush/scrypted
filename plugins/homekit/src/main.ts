@@ -13,6 +13,7 @@ import { randomPinCode } from './pincode';
 import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { VideoClipsMixinProvider } from './video-clips-provider';
+import { getAddressOverride } from "./address-override";
 
 const { systemManager, deviceManager } = sdk;
 
@@ -29,19 +30,6 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     cameraMixins = new Map<string, CameraMixin>();
     storageSettings = new StorageSettings(this, {
         ...createHAPUsernameStorageSettingsDict(this, undefined),
-        addressOverride: {
-            group: 'Network',
-            title: 'Scrypted Server Address',
-            key: 'addressOverride',
-            description: 'Optional: The IP address used by the Scrypted server. Set this to the wired IP address to prevent usage of a wireless address.',
-            placeholder: '192.168.2.100',
-            combobox: true,
-            async onGet() {
-                return {
-                    choices: getAddresses(),
-                }
-            }
-        },
         portOverride: {
             group: 'Network',
             title: 'Server Port',
@@ -109,26 +97,13 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     }
 
     async getSettings(): Promise<Setting[]> {
-        try {
-            this.storageSettings.settings.addressOverride.hide = false;
-            const service = await sdk.systemManager.getComponent('addresses');
-            if (service) {
-                if (this.storageSettings.values.addressOverride) {
-                    await service.setLocalAddresses([this.storageSettings.values.addressOverride]);
-                    this.storageSettings.values.addressOverride = undefined;
-                }
-                this.storageSettings.settings.addressOverride.hide = true;;
-            }
-        }
-        catch (e) {
-        }
         return this.storageSettings.getSettings();
     }
 
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
         await this.storageSettings.putSetting(key, value);
 
-        if (key === this.storageSettings.keys.portOverride || key === this.storageSettings.keys.addressOverride) {
+        if (key === this.storageSettings.keys.portOverride) {
             this.log.a('Reload the HomeKit plugin to apply this change.');
         }
     }
@@ -300,7 +275,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             category: Categories.BRIDGE,
             addIdentifyingMaterial: true,
             advertiser: this.storageSettings.values.advertiserOverride,
-            // bind: this.storageSettings.values.addressOverride || undefined,
+            bind: await getAddressOverride(),
         };
 
         this.bridge.publish(publishInfo, true);
@@ -360,7 +335,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             category,
             addIdentifyingMaterial: false,
             advertiser: this.storageSettings.values.advertiserOverride,
-            // bind: this.storageSettings.values.addressOverride || undefined,
+            bind: await getAddressOverride(),
         });
     }
 
