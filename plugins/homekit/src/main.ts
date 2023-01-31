@@ -44,6 +44,19 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             choices: [MDNSAdvertiser.CIAO, MDNSAdvertiser.BONJOUR, MDNSAdvertiser.AVAHI],
             defaultValue: MDNSAdvertiser.CIAO,
         },
+        advertiserAddresses: {
+            group: 'Network',
+            title: 'mDNS Interfaces',
+            description: 'Optional: Change the address or interfaces that will advertise the HomeKit bridge and accessories.',
+            placeholder: '192.168.2.111, en0, etc.',
+            combobox: true,
+            choices: [
+                'Default',
+                'Server Address',
+                'All Addresses',
+            ],
+            defaultValue: 'Default',
+        },
         slowConnections: {
             group: 'Network',
             title: 'Slow Mode Addresses',
@@ -268,6 +281,10 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         info.updateCharacteristic(Characteristic.SerialNumber, username);
         info.updateCharacteristic(Characteristic.FirmwareRevision, packageJson.version);
 
+        let bind = this.storageSettings.values.advertiserAddresses;
+        if (!bind || bind === 'Default')
+            bind = await getAddressOverride();
+
         const publishInfo: PublishInfo = {
             username,
             port: this.storageSettings.values.portOverride,
@@ -275,7 +292,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             category: Categories.BRIDGE,
             addIdentifyingMaterial: true,
             advertiser: this.storageSettings.values.advertiserOverride,
-            bind: await getAddressOverride(),
+            bind,
         };
 
         this.bridge.publish(publishInfo, true);
@@ -328,6 +345,10 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     }
 
     async publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories, port: number) {
+        let bind = this.storageSettings.values.advertiserAddresses;
+        if (!bind || bind === 'Default')
+            bind = await getAddressOverride();
+
         await accessory.publish({
             username,
             port,
@@ -335,7 +356,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             category,
             addIdentifyingMaterial: false,
             advertiser: this.storageSettings.values.advertiserOverride,
-            bind: await getAddressOverride(),
+            bind,
         });
     }
 
