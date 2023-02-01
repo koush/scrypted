@@ -20,7 +20,7 @@ class ArloDoorbell(ArloCamera, BinarySensor):
             self.provider.arlo.SubscribeToDoorbellEvents(self.arlo_basestation, self.arlo_device, callback)
         )
 
-    def get_interfaces(self):
+    def get_applicable_interfaces(self):
         camera_interfaces = super().get_applicable_interfaces()
         camera_interfaces.append(ScryptedInterface.BinarySensor.value)
 
