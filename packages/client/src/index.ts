@@ -3,7 +3,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
 import { Deferred } from "../../../common/src/deferred";
-import { timeoutFunction, timeoutPromise } from "../../../common/src/promise-utils";
+import { timeoutPromise } from "../../../common/src/promise-utils";
 import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
 import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-debouncer";
 import type { IOSocket } from '../../../server/src/io';
@@ -12,6 +12,7 @@ import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import packageJson from '../package.json';
+import { isIPAddress } from "./ip";
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -52,6 +53,7 @@ export interface ScryptedClientStatic extends ScryptedStatic {
 
 export interface ScryptedConnectionOptions {
     direct?: boolean;
+    local?: boolean;
     webrtc?: boolean;
     baseUrl?: string;
     axiosConfig?: AxiosRequestConfig;
@@ -183,7 +185,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let queryToken: any;
 
     const extraHeaders: { [header: string]: string } = {};
-    let addresses: string[];
+    let localAddresses: string[];
     let scryptedCloud: boolean;
     let directAddress: string;
 
@@ -193,7 +195,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);
         if (loginResult.authorization)
             extraHeaders['Authorization'] = loginResult.authorization;
-        addresses = loginResult.addresses;
+        localAddresses = loginResult.addresses;
         scryptedCloud = loginResult.scryptedCloud;
         authorization = loginResult.authorization;
         queryToken = loginResult.queryToken;
@@ -205,7 +207,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         });
         if (loginCheck.error || loginCheck.redirect)
             throw new ScryptedClientLoginError(loginCheck);
-        addresses = loginCheck.addresses;
+        localAddresses = loginCheck.addresses;
         scryptedCloud = loginCheck.scryptedCloud;
         directAddress = loginCheck.directAddress;
         username = loginCheck.username;
@@ -230,14 +232,26 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     // watch for this flush.
     const flush = new Deferred<void>();
 
-    if (directAddress) {
-        addresses ||= [];
+    // Chrome will complain about websites making xhr requests to self signed https sites, even
+    // if the cert has been accepted. Other browsers seem fine.
+    // So the default is not to connect to IP addresses on Chrome, but do so on other browsers.
+    const isChrome = globalThis.navigator?.userAgent.includes('Chrome');
+
+    const addresses: string[] = [];
+    const localAddressDefault = !isChrome;
+    if (((scryptedCloud && options.local === undefined && localAddressDefault) || options.local) && localAddresses) {
+        addresses.push(...localAddresses);
+    }
+
+    const directAddressDefault = directAddress && (!isChrome || !isIPAddress(directAddress));
+    if (((scryptedCloud && options.direct === undefined && directAddressDefault) || options.direct) && directAddress) {
         addresses.push(directAddress);
     }
-    const tryLocalAddressess = ((scryptedCloud && options.direct === undefined) || options.direct) && !!addresses.length;
+
+    const tryAddresses = !!addresses.length;
     const tryWebrtc = !!globalThis.RTCPeerConnection && (scryptedCloud && options.webrtc === undefined) || options.webrtc;
     console.log({
-        tryLocalAddressess,
+        tryLocalAddressess: tryAddresses,
         tryWebrtc,
     });
 
@@ -257,7 +271,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     type EIOResult = { ready: IOClientSocket, connectionType: ScryptedClientConnectionType, address?: string, rpcPeer?: RpcPeer };
     const promises: Promise<EIOResult>[] = [];
 
-    if (tryLocalAddressess) {
+    if (tryAddresses) {
         // creating a LAN API connection is supported, but it typically does not work
         // because the self signed cert has not been accepted, or not on the local network at all.
         // It is probably better to simply prompt and redirect to the LAN address
@@ -412,7 +426,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const p2pPromises = [...promises];
 
     promises.push((async () => {
-        const waitDuration = tryWebrtc ? 3000 : (tryLocalAddressess ? 1000 : 0);
+        const waitDuration = tryWebrtc ? 3000 : (tryAddresses ? 1000 : 0);
         console.log('waiting', waitDuration);
         if (waitDuration) {
             // give the peer to peers a second, but then try connecting directly.
