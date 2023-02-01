@@ -349,6 +349,15 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         this.control = new ScryptedSessionControl(intercom, audio);
     }
 
+    async onStop(): Promise<void> {
+        return this.removed.promise;
+    }
+
+    attachForwarder(f: Awaited<ReturnType<typeof createTrackForwarder>>) {
+        const stopped = this.removed;
+        f.killPromise.then(() => stopped.resolve(undefined)).catch(e => stopped.reject(e));
+    }
+
     async replace(mediaObject: MediaObject): Promise<void> {
         const { createTrackForwarder, intercom } = await this.connectionManagement.createTracks(mediaObject);
 
@@ -358,6 +367,7 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         this.control = new ScryptedSessionControl(intercom, this.audio);
 
         const f = await createTrackForwarder(this.video, this.audio);
+        this.attachForwarder(f);
         waitClosed(this.connectionManagement.pc).finally(() => f.kill());
         this.removed.promise.finally(() => f.kill());
     }
@@ -454,8 +464,8 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             vtrack,
             atrack,
             intercom,
-            createTrackForwarder: (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) =>
-                createTrackForwarder({
+            createTrackForwarder: async (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) => {
+                const ret = await createTrackForwarder({
                     timeStart,
                     ...logIsPrivateIceTransport(console, this.pc),
                     requestMediaStream,
@@ -463,7 +473,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                     audioTransceiver,
                     maximumCompatibilityMode: this.maximumCompatibilityMode,
                     clientOptions: this.clientOptions,
-                }),
+                });
+                return ret;
+            },
         }
     }
 
@@ -531,6 +543,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                 return;
             this.console.log('done waiting ice connected');
             const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
+            ret.attachForwarder(f);
             waitClosed(this.pc).finally(() => f?.kill());
             ret.removed.promise.finally(() => f?.kill());
         });

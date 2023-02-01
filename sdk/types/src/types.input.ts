@@ -1845,6 +1845,7 @@ export interface RTCSessionControl {
  * @category WebRTC Reference
  */
 export interface RTCMediaObjectTrack {
+  onStop(): Promise<void>;
   replace(mediaObject: MediaObject): Promise<void>;
   stop(): Promise<void>;
   setPlayback(options: {

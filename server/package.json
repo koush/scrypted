@@ -5,7 +5,7 @@
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@mapbox/node-pre-gyp": "^1.0.10",
-    "@scrypted/types": "^0.2.53",
+    "@scrypted/types": "^0.2.54",
     "adm-zip": "^0.5.9",
     "axios": "^0.21.4",
     "body-parser": "^1.19.0",
