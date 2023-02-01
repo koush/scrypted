@@ -28,7 +28,7 @@ from .logging import logger
 
 class Stream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=30):
+    def __init__(self, arlo, expire=10):
         self.event_stream = None
         self.initializing = True
         self.connected = False
@@ -48,6 +48,9 @@ class Stream:
         await asyncio.sleep(interval)
         while not self.event_stream_stop_event.is_set():
             for key, q in self.queues.items():
+                if q.empty():
+                    continue
+
                 items = []
                 num_dropped = 0
 
@@ -74,29 +77,42 @@ class Stream:
             action = actions[0]
             key = f"{resource}/{action}"
 
-            while key not in self.queues:
-                await asyncio.sleep(random.uniform(0, 0.01))
-            q = self.queues[key]
+            if key not in self.queues:
+                q = self.queues[key] = asyncio.Queue()
+            else:
+                q = self.queues[key]
 
+            first_requeued = None
             while True:
                 event = await q.get()
                 q.task_done()
+
+                if first_requeued is not None and first_requeued is event:
+                    # if we reach here, we've cycled through the whole queue
+                    # and found nothing for us, so sleep and give the next
+                    # subscriber a chance
+                    q.put_nowait(event)
+                    await asyncio.sleep(random.uniform(0, 0.01))
+                    continue
 
                 if event.expired:
                     continue
                 elif event.uuid in skip_uuids:
                     q.put_nowait(event)
-                    await asyncio.sleep(random.uniform(0, 0.01))
+                    if first_requeued is None:
+                        first_requeued = event
                 else:
                     return event, action
         else:
             while True:
                 for action in actions:
                     key = f"{resource}/{action}"
-                    if key not in self.queues:
-                        continue
 
-                    q = self.queues[key]
+                    if key not in self.queues:
+                        q = self.queues[key] = asyncio.Queue()
+                    else:
+                        q = self.queues[key]
+
                     if q.empty():
                         continue
 

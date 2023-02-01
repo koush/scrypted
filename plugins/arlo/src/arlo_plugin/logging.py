@@ -1,4 +1,5 @@
 import logging
+import sys
 
 
 class ScryptedDeviceLoggingWrapper(logging.Handler):
@@ -23,7 +24,7 @@ def createScryptedLogger(scrypted_device, name):
     sh = ScryptedDeviceLoggingWrapper(scrypted_device)
 
     # log formatting
-    fmt = logging.Formatter("(arlo) %(levelname)s:%(name)s:%(asctime)s.%(msecs)03d %(message)s", "%H:%M:%S")
+    fmt = logging.Formatter("[Arlo %(name)s] %(message)s")
     sh.setFormatter(fmt)
 
     # configure handler to logger
