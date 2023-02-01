@@ -6,8 +6,8 @@ import threading
 HEARTBEAT_INTERVAL = 5
 
 
-def multiprocess_main(child_conn, exe, args):
-    print("Child process starting")
+def multiprocess_main(name, child_conn, exe, args):
+    print(f"[{name}] Child process starting")
     sp = subprocess.Popen([exe, *args])
 
     while True:
@@ -20,7 +20,7 @@ def multiprocess_main(child_conn, exe, args):
 
     sp.terminate()
     sp.wait()
-    print("Child process exiting")
+    print(f"[{name}] Child process exiting")
 
 
 class HeartbeatChildProcess:
@@ -32,12 +32,13 @@ class HeartbeatChildProcess:
     exit the child if the parent has terminated.
     """
 
-    def __init__(self, exe, *args):
+    def __init__(self, name, exe, *args):
+        self.name = name
         self.exe = exe
         self.args = args
 
         self.parent_conn, self.child_conn = multiprocessing.Pipe()
-        self.process = multiprocessing.Process(target=multiprocess_main, args=(self.child_conn, exe, args))
+        self.process = multiprocessing.Process(target=multiprocess_main, args=(name, self.child_conn, exe, args))
         self.process.daemon = True
         self._stop = False
 

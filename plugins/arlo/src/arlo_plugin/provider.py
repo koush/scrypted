@@ -1,10 +1,7 @@
 import asyncio
 import json
 import logging
-import os
-import platform
 import requests
-import sys
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
@@ -15,7 +12,7 @@ from .arlo.arlo_async import change_stream_class
 from .arlo.logging import logger as arlo_lib_logger
 from .camera import ArloCamera
 from .doorbell import ArloDoorbell
-from .logging import ScryptedDeviceLoggerMixin, propagate_aiortc_logging_level
+from .logging import ScryptedDeviceLoggerMixin 
 from .util import BackgroundTaskMixin
 
 
@@ -162,8 +159,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         for _, device in self.scrypted_devices.items():
             device.logger.setLevel(log_level)
         arlo_lib_logger.setLevel(log_level)
-        propagate_aiortc_logging_level(log_level)
-        logging.getLogger('libav').setLevel(log_level)
 
     def propagate_transport(self):
         self.print(f"Setting plugin transport to {self.arlo_transport}")

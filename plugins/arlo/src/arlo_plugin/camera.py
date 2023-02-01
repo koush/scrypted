@@ -1,9 +1,8 @@
-from aioice import Candidate
-from aiortc import RTCSessionDescription, RTCIceGatherer, RTCIceServer
-from aiortc.rtcicetransport import candidate_to_aioice, candidate_from_aioice 
 import asyncio
 import json
-import socket
+import threading
+
+import scrypted_arlo_go
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
@@ -12,7 +11,6 @@ from scrypted_sdk.types import Settings, Camera, VideoCamera, MotionSensor, Batt
 from .child_process import HeartbeatChildProcess
 from .logging import ScryptedDeviceLoggerMixin
 from .util import BackgroundTaskMixin
-from .rtcpeerconnection import BackgroundRTCPeerConnection
 
 
 class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Battery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
@@ -96,7 +94,7 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
         return [
             {
                 "key": "webrtc_emulation",
-                "title": "Emulate WebRTC Camera",
+                "title": "(Experimental) Emulate WebRTC Camera",
                 "value": self.webrtc_emulation,
                 "description": "Configures the plugin to offer this device as a WebRTC camera. May use increased system resources.",
                 "type": "boolean",
@@ -158,28 +156,31 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)
 
     async def startRTCSignalingSession(self, scrypted_session):
-        plugin_session = ArloCameraRTCSignalingSession(self)
-        await plugin_session.initialize()
+        try:
+            plugin_session = ArloCameraRTCSignalingSession(self)
+            await plugin_session.initialize()
 
-        scrypted_setup = {
-            "type": "offer",
-            "audio": {
-                "direction": "sendrecv" if self._can_push_to_talk() else "recvonly",
-            },
-            "video": {
-                "direction": "recvonly",
+            scrypted_setup = {
+                "type": "offer",
+                "audio": {
+                    "direction": "sendrecv" if self._can_push_to_talk() else "recvonly",
+                },
+                "video": {
+                    "direction": "recvonly",
+                }
             }
-        }
-        plugin_setup = {}
+            plugin_setup = {}
 
-        scrypted_offer = await scrypted_session.createLocalDescription("offer", scrypted_setup, sendIceCandidate=plugin_session.addIceCandidate)
-        self.logger.info(f"Scrypted offer sdp:\n{scrypted_offer['sdp']}")
-        await plugin_session.setRemoteDescription(scrypted_offer, plugin_setup)
-        plugin_answer = await plugin_session.createLocalDescription("answer", plugin_setup, scrypted_session.sendIceCandidate)
-        self.logger.info(f"Scrypted answer sdp:\n{plugin_answer['sdp']}")
-        await scrypted_session.setRemoteDescription(plugin_answer, scrypted_setup)
+            scrypted_offer = await scrypted_session.createLocalDescription("offer", scrypted_setup, sendIceCandidate=plugin_session.addIceCandidate)
+            self.logger.info(f"Scrypted offer sdp:\n{scrypted_offer['sdp']}")
+            await plugin_session.setRemoteDescription(scrypted_offer, plugin_setup)
+            plugin_answer = await plugin_session.createLocalDescription("answer", plugin_setup, scrypted_session.sendIceCandidate)
+            self.logger.info(f"Scrypted answer sdp:\n{plugin_answer['sdp']}")
+            await scrypted_session.setRemoteDescription(plugin_answer, scrypted_setup)
 
-        return ArloCameraRTCSessionControl(plugin_session)
+            return ArloCameraRTCSessionControl(plugin_session)
+        except Exception as e:
+            self.logger.error(e)
 
     async def startIntercom(self, media):
         self.logger.info("Starting intercom")
@@ -212,12 +213,11 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         self.arlo_basestation = camera.arlo_basestation
 
         self.ffmpeg_subprocess = None
+        self.intercom_ffmpeg_subprocess = None
 
         self.scrypted_pc = None
-        self.local_candidates = None
         self.arlo_pc = None
         self.arlo_sdp_answered = False
-        self.arlo_relay_track = None
 
         self.stop_subscriptions = False
         self.start_sdp_answer_subscription()
@@ -235,8 +235,8 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
                     sdp += "a=mid:0\r\n"
                 self.logger.info(f"Arlo response sdp:\n{sdp}")
 
-                sdp = RTCSessionDescription(sdp=sdp, type="answer")
-                self.create_task(self.arlo_pc.setRemoteDescription(sdp))
+                sdp = scrypted_arlo_go.WebRTCSessionDescription(scrypted_arlo_go.NewWebRTCSDPType("answer"), sdp)
+                self.arlo_pc.SetRemoteDescription(sdp)
                 self.arlo_sdp_answered = True
             return self.stop_subscriptions
 
@@ -253,12 +253,8 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
                 candidate = candidate.strip()
                 self.logger.info(f"Arlo response candidate: {candidate}")
 
-                candidate = candidate_from_aioice(Candidate.from_sdp(candidate))
-                if candidate.sdpMid is None:
-                    # arlo appears to not return a mux id in the response, which
-                    # doesn't play nicely with aiortc. let's add it
-                    candidate.sdpMid = 0
-                self.create_task(self.arlo_pc.addIceCandidate(candidate))
+                candidate = scrypted_arlo_go.WebRTCICECandidateInit(candidate, "0", 0)
+                self.arlo_pc.AddICECandidate(candidate)
             return self.stop_subscriptions
 
         self.register_task(
@@ -269,11 +265,20 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         self.logger.info("Initializing video stream for RTC")
         rtsp_url = await self.camera._getVideoStreamURL()
 
-        # Reserve a port for us to give to ffmpeg
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(('localhost', 0))
-        port = sock.getsockname()[1]
-        sock.close()
+        cfg = scrypted_arlo_go.WebRTCConfiguration(
+            ICEServers=scrypted_arlo_go.Slice_webrtc_ICEServer([
+                scrypted_arlo_go.NewWebRTCICEServer(
+                    scrypted_arlo_go.go.Slice_string(["turn:turn0.clockworkmod.com", "turn:n0.clockworkmod.com", "turn:n1.clockworkmod.com"]),
+                    "foo",
+                    "bar"
+                )
+            ])
+        )
+        cfg = scrypted_arlo_go.WebRTCConfiguration()
+        self.scrypted_pc = scrypted_arlo_go.NewWebRTCManager("Arlo "+self.camera.logger_name, cfg)
+
+        audio_port = self.scrypted_pc.InitializeAudioRTPListener(scrypted_arlo_go.WebRTCMimeTypeOpus)
+        video_port = self.scrypted_pc.InitializeVideoRTPListener(scrypted_arlo_go.WebRTCMimeTypeH264)
 
         ffmpeg_path = await scrypted_sdk.mediaManager.getFFmpegPath()
         ffmpeg_args = [
@@ -282,144 +287,145 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
             "-loglevel", "error",
             "-analyzeduration", "0",
             "-fflags", "-nobuffer",
-            "-probesize", "32",
+            "-max_probe_packets", "2",
             "-vcodec", "h264",
             "-acodec", "aac",
             "-i", rtsp_url,
+            "-an",
             "-vcodec", "copy",
-            "-acodec", "aac",
-            "-f", "mpegts",
+            "-f", "rtp",
             "-flush_packets", "1",
-            f"udp://localhost:{port}?overrun_nonfatal=1&fifo_size=50000000"
+            f"rtp://localhost:{video_port}",
+            "-vn",
+            "-acodec", "libopus",
+            "-f", "rtp",
+            "-flush_packets", "1",
+            f"rtp://localhost:{audio_port}?pkt_size={scrypted_arlo_go.UDP_PACKET_SIZE()}",
         ]
         self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with {ffmpeg_args}")
 
-        self.ffmpeg_subprocess = HeartbeatChildProcess(ffmpeg_path, *ffmpeg_args)
+        self.ffmpeg_subprocess = HeartbeatChildProcess("Arlo "+self.camera.logger_name, ffmpeg_path, *ffmpeg_args)
         self.ffmpeg_subprocess.start()
 
-        self.scrypted_pc = BackgroundRTCPeerConnection(self.logger)
-        await self.scrypted_pc.add_media(
-            f"udp://localhost:{port}?overrun_nonfatal=1&fifo_size=50000000",
-            format="mpegts",
-            options={
-                "vcodec": "h264",
-                "acodec": "aac",
-                "analyzeduration": "0",
-                "probesize": "32"
-            }
-        )
-
-        ice_gatherer = RTCIceGatherer()
-        await ice_gatherer.gather()
-        self.local_candidates = ice_gatherer.getLocalCandidates()
-
         if self.camera._can_push_to_talk():
-            await self.initialize_push_to_talk()
+            self.create_task(self.initialize_push_to_talk())
 
     async def initialize_push_to_talk(self, media=None):
-        # if we get a media object, we are initializing through
-        # the camera's startIntercom function
-        is_standalone = media is not None
-        if is_standalone:
-            self.logger.info("Initializing standalone push to talk")
-            ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
-            self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
+        try:
+            self.logger.info("Initializing push to talk")
 
-            rtsp_url = ffmpeg_params.get("url")
-            if rtsp_url is None:
-                for idx in range(len(ffmpeg_params["inputArguments"])):
-                    if ffmpeg_params["inputArguments"][idx] == "-i":
-                        rtsp_url = ffmpeg_params["inputArguments"][idx+1]
-                        break
-            self.logger.debug(f"Will use rtsp url {rtsp_url}")
-        else:
-            self.logger.info("Initializing push to talk for RTC")
+            session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
+            self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}") 
 
-        session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
-        self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
-        
-        ice_servers = [
-            RTCIceServer(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
-            for ice in ice_servers
-        ]
-        ice_gatherer = RTCIceGatherer(ice_servers)
-        await ice_gatherer.gather()
+            cfg = scrypted_arlo_go.WebRTCConfiguration(
+                ICEServers=scrypted_arlo_go.Slice_webrtc_ICEServer([
+                    scrypted_arlo_go.NewWebRTCICEServer(
+                        scrypted_arlo_go.go.Slice_string([ice['url']]),
+                        ice.get('username', ''),
+                        ice.get('credential', '')
+                    )
+                    for ice in ice_servers
+                ])
+            )
+            self.arlo_pc = scrypted_arlo_go.NewWebRTCManager("Arlo "+self.camera.logger_name, cfg)
 
-        local_candidates = [
-            f"candidate:{Candidate.to_sdp(candidate_to_aioice(candidate))}"
-            for candidate in ice_gatherer.getLocalCandidates()
-        ]
+            if media is not None:
+                ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
+                self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
+                audio_port = self.arlo_pc.InitializeAudioRTPListener(scrypted_arlo_go.WebRTCMimeTypeOpus)
 
-        log_candidates = '\n'.join(local_candidates)
-        self.logger.debug(f"Local candidates for Arlo:\n{log_candidates}")
+                ffmpeg_path = await scrypted_sdk.mediaManager.getFFmpegPath()
+                ffmpeg_args = [
+                    "-y",
+                    "-hide_banner",
+                    "-loglevel", "error",
+                    "-analyzeduration", "0",
+                    "-fflags", "-nobuffer",
+                    "-probesize", "500000",
+                    *ffmpeg_params["inputArguments"],
+                    "-vn",
+                    "-acodec", "libopus",
+                    "-f", "rtp",
+                    "-flush_packets", "1",
+                    f"rtp://localhost:{audio_port}?pkt_size={scrypted_arlo_go.UDP_PACKET_SIZE()}",
+                ]
+                self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with {ffmpeg_args}")
 
-        if not is_standalone:
-            # for webrtc emulation, we need to pass through media from the
-            # scrypted-facing webrtc stream to the arlo-facing webrtc stream,
-            # so we need to have both running on the same asyncio event loop
-            # due to the inability to share coroutines across loops
-            self.arlo_pc = BackgroundRTCPeerConnection(self.logger, background=self.scrypted_pc.background)
-
-            received_audio_track = asyncio.get_event_loop().create_future()
-            async def on_track(track):
-                self.logger.debug(f"Received track from scrypted: {track.kind}")
-                if track.kind == "audio" and self.arlo_relay_track is None:
-                    self.arlo_relay_track = await self.arlo_pc.subscribe_track(track)
-                    received_audio_track.set_result(True)
-            self.scrypted_pc.on_track(on_track)
-        else:
-            self.arlo_pc = BackgroundRTCPeerConnection(self.logger)
-
-        # Perform the remaining setup asynchronously later, since we need to finish initializing
-        # before RTC session exchange can happen.
-        async def async_setup():
-            if is_standalone:
-                await self.arlo_pc.add_media(
-                    rtsp_url,
-                    options={
-                        "analyzeduration": "0",
-                        "probesize": "32"
-                    },
-                )
+                self.intercom_ffmpeg_subprocess = HeartbeatChildProcess("Arlo "+self.camera.logger_name, ffmpeg_path, *ffmpeg_args)
+                self.intercom_ffmpeg_subprocess.start()
             else:
-                await received_audio_track
+                self.logger.debug("Starting audio track forwarder")
+                self.scrypted_pc.ForwardAudioTo(self.arlo_pc)
+                self.logger.debug("Started audio track forwarder")
+            
             self.sdp_answered = False
 
-            offer = await self.arlo_pc.createOffer()
-            self.logger.info(f"Arlo offer sdp:\n{offer.sdp}")
+            offer = self.arlo_pc.CreateOffer()
+            offer_sdp = scrypted_arlo_go.WebRTCSessionDescriptionSDP(offer)
+            self.logger.info(f"Arlo offer sdp:\n{offer_sdp}")
 
-            await self.arlo_pc.setLocalDescription(offer)
+            self.arlo_pc.SetLocalDescription(offer)
 
             self.provider.arlo.NotifyPushToTalkSDP(
                 self.arlo_basestation, self.arlo_device,
-                session_id, offer.sdp
+                session_id, offer_sdp
             )
-            for candidate in local_candidates:
-                self.provider.arlo.NotifyPushToTalkCandidate(
-                    self.arlo_basestation, self.arlo_device,
-                    session_id, candidate
-                )
 
-        self.create_task(async_setup())
+            def forward_candidates():
+                try:
+                    candidates = self.arlo_pc.WaitAndGetICECandidates()
+                    self.logger.debug(f"Gathered {len(candidates)} candidates")
+                    for candidate in candidates:
+                        candidate = scrypted_arlo_go.WebRTCICECandidateInit(
+                            scrypted_arlo_go.WebRTCICECandidate(handle=candidate).ToJSON()
+                        ).Candidate
+                        self.logger.debug(f"Sending candidate to Arlo: {candidate}")
+                        self.provider.arlo.NotifyPushToTalkCandidate(
+                            self.arlo_basestation, self.arlo_device,
+                            session_id, candidate,
+                        )
+                except Exception as e:
+                    self.logger.error(e)
+            t = threading.Thread(target=forward_candidates)
+            t.start()
+        except Exception as e:
+            self.logger.error(e)
 
     async def createLocalDescription(self, type, setup, sendIceCandidate=None):
         if type == "offer":
             raise Exception("can only create answers in ArloCameraRTCSignalingSession.createLocalDescription")
 
-        if sendIceCandidate is not None:
-            [
-                await sendIceCandidate({
-                    "candidate": Candidate.to_sdp(candidate_to_aioice(c)),
-                    "sdpMid": c.sdpMid,
-                    "sdpMLineIndex": c.sdpMLineIndex
-                })
-                for c in self.local_candidates
-            ] 
+        answer = self.scrypted_pc.CreateAnswer()
+        answer_sdp = scrypted_arlo_go.WebRTCSessionDescriptionSDP(answer)
 
-        answer = await self.scrypted_pc.createAnswer()
-        await self.scrypted_pc.setLocalDescription(answer)
+        self.scrypted_pc.SetLocalDescription(answer)
+
+        if sendIceCandidate is not None:
+            loop = asyncio.get_event_loop()
+            def forward_candidates():
+                try:
+                    candidates = self.scrypted_pc.WaitAndGetICECandidates()
+                    self.logger.debug(f"Gathered {len(candidates)} candidates")
+                    for candidate in candidates:
+                        candidate = scrypted_arlo_go.WebRTCICECandidateInit(
+                            scrypted_arlo_go.WebRTCICECandidate(handle=candidate).ToJSON()
+                        ).Candidate
+                        self.logger.debug(f"Sending candidate to scrypted: {candidate}")
+                        loop.call_soon_threadsafe(
+                            self.create_task,
+                            sendIceCandidate({
+                                "candidate": candidate,
+                                "sdpMid": "0",
+                                "sdpMLineIndex": 0,
+                            })
+                        )
+                except Exception as e:
+                    self.logger.error(e)
+            t = threading.Thread(target=forward_candidates)
+            t.start()
+
         return {
-            "sdp": answer.sdp,
+            "sdp": answer_sdp,
             "type": "answer"
         }
 
@@ -427,33 +433,37 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
         if description["type"] != "offer":
             raise Exception("can only accept offers in ArloCameraRTCSignalingSession.createLocalDescription")
 
-        sdp = RTCSessionDescription(sdp=description["sdp"], type="offer")
-        await self.scrypted_pc.setRemoteDescription(sdp)
+        sdp = scrypted_arlo_go.WebRTCSessionDescription(scrypted_arlo_go.NewWebRTCSDPType("offer"), description["sdp"])
+        self.scrypted_pc.SetRemoteDescription(sdp)
 
     async def addIceCandidate(self, candidate):
-        candidate = candidate_from_aioice(Candidate.from_sdp(candidate["candidate"]))
-        await self.scrypted_pc.addIceCandidate(candidate)
+        candidate = scrypted_arlo_go.WebRTCICECandidateInit(candidate["candidate"], "0", 0)
+        self.scrypted_pc.AddICECandidate(candidate)
 
     async def getOptions(self):
         pass
 
     async def unmute_relay(self):
+        return
         await self.arlo_pc.unmute_relay(self.arlo_relay_track)
 
     async def mute_relay(self):
+        return
         await self.arlo_pc.mute_relay(self.arlo_relay_track)
 
     async def shutdown(self):
         if self.ffmpeg_subprocess is not None:
             self.ffmpeg_subprocess.stop()
             self.ffmpeg_subprocess = None
+        if self.intercom_ffmpeg_subprocess is not None:
+            self.intercom_ffmpeg_subprocess.stop()
+            self.intercom_ffmpeg_subprocess = None
         if self.scrypted_pc is not None:
-            await self.scrypted_pc.close()
+            self.scrypted_pc.Close()
             self.scrypted_pc = None
         if self.arlo_pc is not None:
-            await self.arlo_pc.close()
+            self.arlo_pc.Close()
             self.arlo_pc = None
-            self.arlo_relay_track = None
 
 
 class ArloCameraRTCSessionControl:
