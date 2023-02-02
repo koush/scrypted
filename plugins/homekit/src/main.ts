@@ -282,7 +282,9 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         info.updateCharacteristic(Characteristic.FirmwareRevision, packageJson.version);
 
         let bind = this.storageSettings.values.advertiserAddresses;
-        if (!bind || bind === 'Default')
+        if (bind === 'All Addresses')
+            bind = undefined;
+        else
             bind = await getAddressOverride();
 
         const publishInfo: PublishInfo = {
