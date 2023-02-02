@@ -5,8 +5,8 @@ import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import dgram from 'dgram';
 import net from 'net';
-import { SipSession } from './sip-session';
-import { SipOptions } from './sip-call';
+import { SipCallSession } from './sip-call-session';
+import { SipOptions } from './sip-manager';
 import { RtpDescription, isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './rtp-utils';
 import { randomBytes } from "crypto";
 
@@ -14,7 +14,7 @@ const { deviceManager, mediaManager } = sdk;
 
 class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, Settings, BinarySensor {
     buttonTimeout: NodeJS.Timeout;
-    session: SipSession;
+    callSession: SipCallSession;
     remoteRtpDescription: RtpDescription;
     audioOutForwarder: dgram.Socket;
     audioOutProcess: ChildProcess;
@@ -107,7 +107,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
 
         await this.callDoorbell();
 
-        if (!this.session)
+        if (!this.callSession)
             throw new Error("not in call");
 
         this.stopAudioOut();
@@ -118,7 +118,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         const audioOutForwarder = await createBindZero();
         this.audioOutForwarder = audioOutForwarder.server;
         audioOutForwarder.server.on('message', message => {
-            this.session.audioSplitter.send(message, remoteRtpDescription.audio.port, remoteRtpDescription.address);
+            this.callSession.audioSplitter.send(message, remoteRtpDescription.audio.port, remoteRtpDescription.address);
             return null;
         });
 
@@ -136,7 +136,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
         this.audioOutProcess = cp;
         cp.on('exit', () => this.console.log('two way audio ended'));
-        this.session.onCallEnded.subscribe(() => {
+        this.callSession.onCallEnded.subscribe(() => {
             closeQuiet(audioOutForwarder.server);
             cp.kill('SIGKILL');
         });
@@ -157,19 +157,19 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
     stopSession() {
         this.doorbellAudioActive = false;
         this.audioInProcess?.kill('SIGKILL');
-        if (this.session) {
+        if (this.callSession) {
             this.console.log('ending sip session');
-            this.session.stop();
-            this.session = undefined;
+            this.callSession.stop();
+            this.callSession = undefined;
         }
     }
 
     async callDoorbell(): Promise<void> {
-        let sip: SipSession;
+        let sip: SipCallSession;
 
         const cleanup = () => {
-            if (this.session === sip)
-                this.session = undefined;
+            if (this.callSession === sip)
+                this.callSession = undefined;
             try {
                 this.console.log('stopping sip session.');
                 sip.stop();
@@ -193,7 +193,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
 
         let sipOptions: SipOptions = { from: "sip:" + from, to: "sip:" + to, localIp, localPort };
 
-        sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
+        sip = await SipCallSession.createCallSession(this.console, this.name, sipOptions);
         sip.onCallEnded.subscribe(cleanup);
         this.remoteRtpDescription = await sip.call(
             ( audio ) => {
@@ -206,7 +206,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         );
         this.console.log('SIP: Received remote SDP:\n', this.remoteRtpDescription.sdp)
 
-        let [rtpPort, rtcpPort] = await SipSession.reserveRtpRtcpPorts()
+        let [rtpPort, rtcpPort] = await SipCallSession.reserveRtpRtcpPorts()
         this.console.log(`Reserved RTP port ${rtpPort} and RTCP port ${rtcpPort} for incoming SIP audio`);
 
         const ffmpegPath = await mediaManager.getFFmpegPath();
@@ -260,7 +260,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
             sip.audioRtcpSplitter.send(message, rtcpPort, "127.0.0.1");
         });
 
-        this.session = sip;
+        this.callSession = sip;
     }
 
     getRawVideoStreamOptions(): ResponseMediaStreamOptions[] {

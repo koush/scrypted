@@ -1,4 +1,4 @@
-import { SipRequestHandler, SipRequest } from "../../sip/src/sip-call"
+import { SipRequestHandler, SipRequest } from "../../sip/src/sip-manager"
 import { BticinoSipCamera } from "./bticino-camera"
 
 export class InviteHandler extends SipRequestHandler {

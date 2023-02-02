@@ -1,5 +1,5 @@
-import { SipOptions } from "../../sip/src/sip-call";
-import { SipSession } from "../../sip/src/sip-session";
+import { SipOptions } from "../../sip/src/sip-manager";
+import { SipCallSession } from "../../sip/src/sip-call-session";
 import { BticinoSipCamera } from "./bticino-camera";
 
 export class SipHelper {
@@ -36,7 +36,7 @@ export class SipHelper {
          } 
     }
 
-    public static sipSession( sipOptions : SipOptions ) : Promise<SipSession> {
-        return SipSession.createSipSession(console, "Bticino", sipOptions )        
+    public static sipSession( sipOptions : SipOptions ) : Promise<SipCallSession> {
+        return SipCallSession.createCallSession(console, "Bticino", sipOptions )        
     }
 }

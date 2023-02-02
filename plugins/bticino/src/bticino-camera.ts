@@ -2,7 +2,7 @@ import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/co
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
-import { SipSession } from '../../sip/src/sip-session';
+import { SipCallSession } from '../../sip/src/sip-call-session';
 import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType, RtpDescription } from '../../sip/src/rtp-utils';
 import { VoicemailHandler } from './bticino-voicemailHandler';
 import { CompositeSipMessageHandler } from '../../sip/src/compositeSipMessageHandler';
@@ -22,7 +22,7 @@ const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
 
 export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor {
-    private session: SipSession
+    private session: SipCallSession
     private remoteRtpDescription: RtpDescription
     private audioOutForwarder: dgram.Socket
     private audioOutProcess: ChildProcess
@@ -171,7 +171,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
         playbackPromise.then(async (client) => {
             client.setKeepAlive(true, 10000)
-            let sip: SipSession
+            let sip: SipCallSession
             try {
                 let rtsp: RtspServer;
                 const cleanup = () => {

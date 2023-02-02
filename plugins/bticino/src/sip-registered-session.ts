@@ -1,7 +1,7 @@
-import { SipSession } from "../../sip/src/sip-session";
+import { SipCallSession } from "../../sip/src/sip-call-session";
 import { BticinoSipCamera } from "./bticino-camera";
 import { SipHelper } from "./sip-helper";
-import { SipCall, SipOptions } from "../../sip/src/sip-call";
+import { SipManager, SipOptions } from "../../sip/src/sip-manager";
 
 /**
  * This class registers itself with the SIP server as a contact for a user account.
@@ -9,14 +9,14 @@ import { SipCall, SipOptions } from "../../sip/src/sip-call";
  * The sip session will re-register itself after the expires time is reached.
  */
 export class SipRegisteredSession {
-    private currentSipSession : SipSession
+    private currentSipSession : SipCallSession
 
     constructor( private camera : BticinoSipCamera ) {
         // Give it a second
        setTimeout( () => this.enable(), 10 * 1000 )
     }
 
-    async enable() : Promise<SipCall> {
+    async enable() : Promise<SipManager> {
         if( this.currentSipSession ) {
             return this.currentSipSession.sipCall
         }

@@ -1,4 +1,4 @@
-import { SipRequestHandler, SipRequest } from "../../sip/src/sip-call";
+import { SipRequestHandler, SipRequest } from "./sip-manager";
 
 export class CompositeSipMessageHandler extends SipRequestHandler {
     private handlers : SipRequestHandler[] = []
