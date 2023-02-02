@@ -344,10 +344,10 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     }
 
     async getAdvertiserInterfaceBind() {
-        let bind = this.storageSettings.values.advertiserAddresses;
+        let bind: string = this.storageSettings.values.advertiserAddresses;
         if (bind === 'All Addresses')
             bind = undefined;
-        else
+        else if (!bind || bind === 'Default')
             bind = await getAddressOverride();
         return bind;
     }
