@@ -143,7 +143,12 @@ else {
 
     const readme = path.join(cwd, 'README.md');
     if (fs.existsSync(readme)) {
-        zip.addLocalFile(readme);
+        let readmeText = fs.readFileSync(readme).toString();;
+        const changelog = path.join(cwd, 'CHANGELOG.md');
+        if (fs.existsSync(changelog)) {
+            readmeText += '\n\n\n<br/><br/>' + fs.readFileSync(changelog).toString();
+        }
+        zip.addFile('README.md', readmeText);
     }
 
     const NODE_PATH = path.resolve(__dirname, '..', 'node_modules');

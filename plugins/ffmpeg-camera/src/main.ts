@@ -79,7 +79,7 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> {
     }
 
     getRawVideoStreamOptions(): UrlMediaStreamOptions[] {
-        const ffmpegInputs = this.storageSettings.values.ffmpegInputs as string[];
+        const ffmpegInputs = this.storageSettings.values.ffmpegInputs as string[] || [];
 
         // filter out empty strings.
         const ret = ffmpegInputs
@@ -87,7 +87,7 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> {
             .map((ffmpegInput, index) => this.createFFmpegMediaStreamOptions(ffmpegInput, index));
 
         if (!ret.length)
-            return;
+            return [];
         return ret;
 
     }

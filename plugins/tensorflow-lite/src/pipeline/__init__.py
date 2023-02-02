@@ -227,8 +227,9 @@ class GstPipeline(GstPipelineBase):
             try:
                 await self.user_callback(gstsample, self.get_src_size(
                 ), lambda p, normalize=False: self.convert_to_src_size(p, normalize))
-            except:
+            except Exception as e:
                 print("callback failure")
+                print(e)
                 raise
 
 

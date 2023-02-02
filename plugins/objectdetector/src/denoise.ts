@@ -18,6 +18,7 @@ export interface DenoisedDetectionOptions<T> {
     added?: (detection: DenoisedDetectionEntry<T>) => void;
     removed?: (detection: DenoisedDetectionEntry<T>) => void;
     retained?: (detection: DenoisedDetectionEntry<T>, previous: DenoisedDetectionEntry<T>) => void;
+    untracked?: (detection: DenoisedDetectionOptions<T>) => void,
     expiring?: (previous: DenoisedDetectionEntry<T>) => void;
     timeout?: number;
     now?: number;
@@ -103,25 +104,37 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
     if (externallyTracked.length) {
         if (!state.externallyTracked)
             state.externallyTracked = new Map();
-        
-        for (const tracked of externallyTracked) {
+
+        for (const tracked of currentDetections) {
+            tracked.durationGone = 0;
+            tracked.lastSeen = now;
+            tracked.lastBox = tracked.boundingBox;
+
+            if (!tracked.id) {
+                const id = tracked.id = `untracked-${tracked.name}`;
+                if (!state.externallyTracked.get(id)) {
+                    // crappy track untracked objects for 1 minute.
+                    setTimeout(() => state.externallyTracked.delete(id), 60000);
+                }
+            }
+
             let previous = state.externallyTracked.get(tracked.id);
-            if (state.externallyTracked.has(tracked.id)) {
+            if (previous) {
+                state.externallyTracked.delete(tracked.id);
                 tracked.firstSeen = previous.firstSeen;
-                tracked.lastSeen = previous.lastSeen = now;
                 tracked.firstBox = previous.firstBox;
-                tracked.lastBox = previous.lastBox = tracked.boundingBox;
+
                 previous.durationGone = 0;
+                previous.lastSeen = now;
+                previous.lastBox = tracked.boundingBox;
                 options?.retained(tracked, previous);
             }
             else {
-                state.externallyTracked.set(tracked.id, tracked);
                 tracked.firstSeen = now;
-                tracked.lastSeen = now;
-                tracked.durationGone = 0;
                 tracked.firstBox = tracked.lastBox = tracked.boundingBox;
                 options?.added(tracked);
             }
+
         }
 
         for (const previous of state.externallyTracked.values()) {
@@ -131,6 +144,10 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
                     options?.expiring(previous);
                 }
             }
+        }
+
+        for (const tracked of currentDetections) {
+            state.externallyTracked.set(tracked.id, tracked);
         }
     }
 

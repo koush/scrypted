@@ -42,8 +42,22 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
             }
             outputs.set(nativeId, pts);
 
+            let writeTimestamp = true;
+            let timestampTimer: NodeJS.Timeout;
+            stdout.on('close', () => clearTimeout(timestampTimer));
+            stderr.on('close', () => clearTimeout(timestampTimer));
+
             const appendOutput = (data: Buffer) => {
                 const { buffers } = pts;
+
+                if (writeTimestamp) {
+                    writeTimestamp = false;
+                    buffers.push(Buffer.from(`########################\n`));
+                    buffers.push(Buffer.from(`${new Date().toLocaleString()}\n`));
+                    buffers.push(Buffer.from(`########################\n`));
+                    timestampTimer = setTimeout(() => writeTimestamp = true, 5 * 60 * 1000);
+                }
+
                 buffers.push(data);
                 // when we're over 4000 lines or whatever these buffer are,
                 // truncate down to 2000.

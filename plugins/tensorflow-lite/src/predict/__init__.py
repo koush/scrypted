@@ -105,7 +105,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
-        # loop.call_later(60 * 60, lambda: self.requestRestart())
+        loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
 
     async def createMedia(self, data: RawImage) -> scrypted_sdk.MediaObject:
         mo = await scrypted_sdk.mediaManager.createMediaObject(data, self.fromMimeType)
@@ -155,29 +155,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         pass
 
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
-        height, width, channels = self.get_input_details()
-
-        d: ObjectDetectionModel = {
-            'name': self.pluginId,
-            'classes': list(self.labels.values()),
-            'inputSize': [int(width), int(height), int(channels)],
-        }
-
-        decoderSetting: Setting = {
-            'title': "Decoder",
-            'description': "The gstreamer element used to decode the stream",
-            'combobox': True,
-            'value': 'Default',
-            'placeholder': 'Default',
-            'key': 'decoder',
-            'choices': [
-                'Default',
-                'decodebin',
-                'parsebin ! vtdec_hw',
-                'parsebin ! h264parse ! nvh264dec',
-                'rtph264depay ! h264parse ! nvh264dec',
-            ],
-        }
+        d = await super().getDetectionModel(settings)
         allowList: Setting = {
             'title': 'Allow List',
             'description': 'The detection classes that will be reported. If none are specified, all detections will be reported.',
@@ -195,10 +173,25 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             ],
         }
 
-        d['settings'] = [
-            decoderSetting,
-            allowList
-        ]
+        trackerWindow: Setting = {
+            'title': 'Tracker Window',
+            'description': 'Internal Setting. Do not change.',
+            'key': 'trackerWindow',
+            'value': 3,
+            'type': 'number',
+        }
+
+        trackerCertainty: Setting = {
+            'title': 'Tracker Certainty',
+            'description': 'Internal Setting. Do not change.',
+            'key': 'trackerCertainty',
+            'value': .2,
+            'type': 'number',
+        }
+
+        d['settings'].append(allowList)
+        d['settings'].append(trackerWindow)
+        d['settings'].append(trackerCertainty)
         return d
 
     def create_detection_result(self, objs: List[Prediction], size, allowList, convert_to_src_size=None) -> ObjectsDetected:
@@ -263,6 +256,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             t = self.trackers.get(detection_session.id)
             if not t:
                 t = tracker.Sort_OH(scene=np.array([iw, ih]))
+                t.conf_three_frame_certainty = (settings.get('trackerCertainty') or .2) * 3
+                t.conf_unmatched_history_size = settings.get('trackerWindow') or 3
                 self.trackers[detection_session.id] = t
             detection_session.tracker = t
             # conf_trgt = 0.35
@@ -304,7 +299,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             input = image.crop(crop_box)
             (cw, ch) = input.size
             if cw != w or h != ch:
-                input = input.resize((w, h), Image.ANTIALIAS)
+                input_resized = input.resize((w, h), Image.ANTIALIAS)
+                input.close()
+                input = input_resized
 
             def cvss(point, normalize=False):
                 unscaled = ((point[0] / w) * cw + l, (point[1] / h) * ch + t)
@@ -312,6 +309,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 return converted
 
             ret = self.detect_once(input, settings, src_size, cvss)
+            input.close()
             detection_session.processed = detection_session.processed + 1
             return ret, RawImage(image)
         
@@ -328,6 +326,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         ow = sx - w
         oh = sy - h
         second = scaled.crop((ow, oh, ow + w, oh + h))
+        if scaled is not image:
+            scaled.close()
 
         def cvss1(point, normalize=False):
             unscaled = (point[0] / s, point[1] / s)
@@ -339,9 +339,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             return converted
      
         ret1 = self.detect_once(first, settings, src_size, cvss1)
+        first.close()
         detection_session.processed = detection_session.processed + 1
         ret2 = self.detect_once(second, settings, src_size, cvss2)
         detection_session.processed = detection_session.processed + 1
+        second.close()
 
         ret = ret1
         ret['detections'] = ret1['detections'] + ret2['detections']
@@ -385,9 +387,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 sort_input.append([l, t, l + w, t + h, r['score']])
             trackers, unmatched_trckr, unmatched_gts = detection_session.tracker.update(np.array(sort_input), [])
 
-            detections = ret['detections']
-            ret['detections'] = []
-
             for td in trackers:
                 x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
                 ), td[2].item(), td[3].item(), td[4].item()
@@ -413,7 +412,17 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
                 if obj:
                     obj['id'] = str(trackID)
-                    ret['detections'].append(obj)
+                # this may happen if tracker predicts something is still in the scene
+                # but was not detected
+                # else:
+                #     print('unresolved tracker')
+
+            for d in detections:
+                if not d.get('id'):
+                    # this happens if the tracker is not confident in a new detection yet due
+                    # to low score or has not been found in enough frames
+                    if d['className'] == 'person':
+                        print('untracked %s: %s' % (d['className'], d['score']))
 
         return ret, RawImage(image)
 

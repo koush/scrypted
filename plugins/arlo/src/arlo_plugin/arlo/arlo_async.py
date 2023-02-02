@@ -49,6 +49,31 @@ def change_stream_class(s_class):
     else:
         raise NotImplementedError(s_class)
 
+
+# https://github.com/twrecked/pyaarlo/blob/03c99b40b67529d81c0ba399fe91a3e6d1a35a80/pyaarlo/constant.py#L265-L285
+USER_AGENTS = {
+    "arlo":
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) "
+        "AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 "
+        "(iOS Vuezone)",
+    "iphone":
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 13_1_3 like Mac OS X) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.1 Mobile/15E148 Safari/604.1",
+    "ipad":
+        "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1 Mobile/15E148 Safari/604.1",
+    "mac":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/11.1.2 Safari/605.1.15",
+    "firefox":
+        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:85.0) "
+        "Gecko/20100101 Firefox/85.0",
+    "linux":
+        "Mozilla/5.0 (X11; Linux x86_64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36"
+}
+
+
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
@@ -105,8 +130,8 @@ class Arlo(object):
 
     def UseExistingAuth(self, user_id, headers):
         self.user_id = user_id
-        if "Content-Type" not in headers:
-            headers['Content-Type'] = 'application/json; charset=UTF-8'
+        headers['Content-Type'] = 'application/json; charset=UTF-8'
+        headers['User-Agent'] = USER_AGENTS['arlo']
         self.request.session.headers.update(headers)
         self.BASE_URL = 'myapi.arlo.com'
 
@@ -118,7 +143,7 @@ class Arlo(object):
             'schemaVersion': '1',
             'Auth-Version': '2',
             'Content-Type': 'application/json; charset=UTF-8',
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
+            'User-Agent': USER_AGENTS['arlo'],
             'Origin': f'https://{self.BASE_URL}',
             'Referer': f'https://{self.BASE_URL}/',
             'Source': 'arloCamWeb',
@@ -179,7 +204,7 @@ class Arlo(object):
             headers = {
                 'Auth-Version': '2',
                 'Authorization': finish_auth_body['data']['token'],
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
+                'User-Agent': USER_AGENTS['arlo'],
                 'Content-Type': 'application/json; charset=UTF-8',
             }
             self.request.session.headers.update(headers)
@@ -475,10 +500,11 @@ class Arlo(object):
             raise Exception('The callback(self, event) should be a callable function.')
 
         await self.Subscribe()
-        if self.event_stream and self.event_stream.connected:
+
+        async def loop_action_listener(action):
             seen_events = {}
             while self.event_stream.connected:
-                event, action = await self.event_stream.get(resource, actions, seen_events)
+                event, _ = await self.event_stream.get(resource, [action], seen_events)
 
                 if event is None or self.event_stream is None \
                     or self.event_stream.event_stream_stop_event.is_set():
@@ -497,6 +523,13 @@ class Arlo(object):
                 for uuid in list(seen_events):
                     if seen_events[uuid].expired:
                         del seen_events[uuid]
+
+        if self.event_stream and self.event_stream.connected:
+            listeners = [loop_action_listener(action) for action in actions]
+            done, pending = await asyncio.wait(listeners, return_when=asyncio.FIRST_COMPLETED)
+            for task in pending:
+                task.cancel()
+            return done.pop().result()
 
     async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback):
         """
@@ -541,24 +574,39 @@ class Arlo(object):
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
         """
-        stream_url_dict = self.request.post(
-            f'https://{self.BASE_URL}/hmsweb/users/devices/startStream',
-            {
-                "to": camera.get('parentId'),
-                "from": self.user_id + "_web",
-                "resource": "cameras/" + camera.get('deviceId'),
-                "action": "set",
-                "responseUrl": "",
-                "publishResponse": True,
-                "transId": self.genTransId(),
-                "properties": {
-                    "activityState": "startUserStream",
-                    "cameraId": camera.get('deviceId')
-                }
-            },
-            headers={"xcloudId":camera.get('xCloudId')}
-        )
-        return stream_url_dict['url'].replace("rtsp://", "rtsps://")
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        # nonlocal variable hack for Python 2.x.
+        class nl:
+            stream_url_dict = None
+
+        def trigger(self):
+            nl.stream_url_dict = self.request.post(
+                f'https://{self.BASE_URL}/hmsweb/users/devices/startStream',
+                {
+                    "to": camera.get('parentId'),
+                    "from": self.user_id + "_web",
+                    "resource": "cameras/" + camera.get('deviceId'),
+                    "action": "set",
+                    "responseUrl": "",
+                    "publishResponse": True,
+                    "transId": self.genTransId(),
+                    "properties": {
+                        "activityState": "startUserStream",
+                        "cameraId": camera.get('deviceId')
+                    }
+                },
+                headers={"xcloudId":camera.get('xCloudId')}
+            )
+
+        def callback(self, event):
+            #return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+            properties = event.get("properties", {})
+            if properties.get("activityState") == "userStreamActive":
+                return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+            return None
+
+        return await self.TriggerAndHandleEvent(basestation, resource, ["is"], trigger, callback)
 
     def StartPushToTalk(self, basestation, camera):
         url = f'https://{self.BASE_URL}/hmsweb/users/devices/{self.user_id}_{camera.get("deviceId")}/pushtotalk'

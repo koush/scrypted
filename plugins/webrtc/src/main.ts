@@ -195,6 +195,12 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             type: 'boolean',
             defaultValue: true,
         },
+        useIPv6: {
+            title: 'Use IPv6',
+            description: 'Use IPv6 addresses when connecting. This is disabled by default due to commonly misconfigured IPv6 local networks.',
+            type: 'boolean',
+            defaultValue: false,
+        },
         activeConnections: {
             readonly: true,
             title: "Current Open Connections",
@@ -403,15 +409,21 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         };
     }
 
-    getWeriftConfiguration(): PeerConfig {
+    getWeriftConfiguration(): Partial<PeerConfig> {
+        let ret: Partial<PeerConfig>;
         if (this.storageSettings.values.weriftConfiguration) {
             try {
-                return JSON.parse(this.storageSettings.values.weriftConfiguration);
+                ret = JSON.parse(this.storageSettings.values.weriftConfiguration);
             }
             catch (e) {
                 this.console.error('Custom Werift configuration failed. Invalid JSON?', e);
             }
         }
+
+        return {
+            iceUseIpv6: false,
+            ...ret,
+        };
     }
 
     async onConnection(request: HttpRequest, webSocketUrl: string) {
@@ -508,7 +520,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
 export async function fork() {
     return {
-        async createConnection(message: any, port: number, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, clientOptions: RTCSignalingOptions, options: { disableIntercom?: boolean; configuration: RTCConfiguration, weriftConfiguration: PeerConfig; }) {
+        async createConnection(message: any, port: number, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, clientOptions: RTCSignalingOptions, options: { disableIntercom?: boolean; configuration: RTCConfiguration, weriftConfiguration: Partial<PeerConfig>; }) {
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
             cleanup.promise.finally(() => setTimeout(() => process.exit(), 10000));

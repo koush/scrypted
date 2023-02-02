@@ -1,4 +1,16 @@
-import type { RtpPacket } from "@koush/werift-src/packages/rtp/src/rtp/rtp";
+/**
+ * This is a subset of Werift's RtpPacket.
+ */
+export interface RtpPacket {
+    payload: Buffer;
+    header: {
+        padding: boolean;
+        marker: boolean;
+        timestamp: number;
+        sequenceNumber: number;
+    };
+    clone(): typeof this;
+}
 
 export function sequenceNumberDistance(s1: number, s2: number): number {
     if (s2 === s1)

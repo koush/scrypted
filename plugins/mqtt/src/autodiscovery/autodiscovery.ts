@@ -179,6 +179,10 @@ export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceP
         return ret;
     }
 
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+        
+    }
+
     async putSetting(key: string, value: string) {
         await super.putSetting(key, value);
         this.bind();

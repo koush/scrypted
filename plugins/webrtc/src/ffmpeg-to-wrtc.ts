@@ -320,15 +320,17 @@ export function parseOptions(options: RTCSignalingOptions) {
             }
             return false;
         });
+
+
+    // firefox is misleading. special case that to disable transcoding.
+    if (options?.userAgent?.includes('Firefox/'))
+        sessionSupportsH264High = true;
+
     const transcodeWidth = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
     const width = options?.screen?.width;
     const height = options?.screen?.height;
     const max = Math.max(width, height) * options?.screen?.devicePixelRatio;
     const isMediumResolution = !sessionSupportsH264High || (max && max < 1920);
-
-    // firefox is misleading. special case that to disable transcoding.
-    if (options?.userAgent?.includes('Firefox/'))
-        sessionSupportsH264High = true;
 
     return {
         sessionSupportsH264High,
@@ -347,6 +349,15 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         this.control = new ScryptedSessionControl(intercom, audio);
     }
 
+    async onStop(): Promise<void> {
+        return this.removed.promise;
+    }
+
+    attachForwarder(f: Awaited<ReturnType<typeof createTrackForwarder>>) {
+        const stopped = this.removed;
+        f.killPromise.then(() => stopped.resolve(undefined)).catch(e => stopped.reject(e));
+    }
+
     async replace(mediaObject: MediaObject): Promise<void> {
         const { createTrackForwarder, intercom } = await this.connectionManagement.createTracks(mediaObject);
 
@@ -356,6 +367,7 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         this.control = new ScryptedSessionControl(intercom, this.audio);
 
         const f = await createTrackForwarder(this.video, this.audio);
+        this.attachForwarder(f);
         waitClosed(this.connectionManagement.pc).finally(() => f.kill());
         this.removed.promise.finally(() => f.kill());
     }
@@ -398,7 +410,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         public clientOptions: RTCSignalingOptions,
         public options: {
             configuration: RTCConfiguration,
-            weriftConfiguration: PeerConfig,
+            weriftConfiguration: Partial<PeerConfig>,
         }) {
 
         this.pc = new RTCPeerConnection({
@@ -452,8 +464,8 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             vtrack,
             atrack,
             intercom,
-            createTrackForwarder: (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) =>
-                createTrackForwarder({
+            createTrackForwarder: async (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) => {
+                const ret = await createTrackForwarder({
                     timeStart,
                     ...logIsPrivateIceTransport(console, this.pc),
                     requestMediaStream,
@@ -461,7 +473,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                     audioTransceiver,
                     maximumCompatibilityMode: this.maximumCompatibilityMode,
                     clientOptions: this.clientOptions,
-                }),
+                });
+                return ret;
+            },
         }
     }
 
@@ -529,6 +543,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                 return;
             this.console.log('done waiting ice connected');
             const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
+            ret.attachForwarder(f);
             waitClosed(this.pc).finally(() => f?.kill());
             ret.removed.promise.finally(() => f?.kill());
         });
@@ -561,7 +576,7 @@ export async function createRTCPeerConnectionSink(
     mo: MediaObject,
     maximumCompatibilityMode: boolean,
     configuration: RTCConfiguration,
-    weriftConfiguration: PeerConfig,
+    weriftConfiguration: Partial<PeerConfig>,
     clientOffer = true,
 ) {
     const clientOptions = await clientSignalingSession.getOptions();

@@ -27,6 +27,11 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         modelPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'zip', 'unzipped', 'fs', 'MobileNetV2_SSDLite.mlmodel')
         self.model = ct.models.MLModel(modelPath)
+        
+        self.modelspec = self.model.get_spec()
+        self.inputdesc = self.modelspec.description.input[0]
+        self.inputheight = self.inputdesc.type.imageType.height
+        self.inputwidth = self.inputdesc.type.imageType.width
 
         labels_contents = scrypted_sdk.zip.open(
             'fs/coco_labels.txt').read().decode('utf8')
@@ -34,12 +39,10 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
-        # TODO: is there a way to get this from the model itself?
-        return (300, 300, 3)
+        return (self.inputwidth, self.inputheight, 3)
 
     def get_input_size(self) -> Tuple[float, float]:
-        # TODO: is there a way to get this from the model itself?
-        return (300, 300)
+        return (self.inputwidth, self.inputheight)
 
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         out_dict = self.model.predict({'image': input, 'confidenceThreshold': .2 })
@@ -58,7 +61,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             coordinates = coordinatesList[index]
 
             def torelative(value: float):
-                return value * 300
+                return value * self.inputheight
 
             x = torelative(coordinates[0])
             y = torelative(coordinates[1])

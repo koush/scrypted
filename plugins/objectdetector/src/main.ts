@@ -274,7 +274,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         }
       });
 
-    let newOrBetterDetection = false;
+    let retainImage = false;
 
     if (!this.hasMotionType && redetect && this.secondScoreThreshold && detection.detections) {
       const detections = detection.detections as TrackedDetection[];
@@ -285,10 +285,26 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       // as it may yield a better second pass score and thus a better thumbnail.
       await Promise.allSettled(newOrBetterDetections.map(async d => {
         const maybeUpdateSecondPassScore = (secondPassScore: number) => {
-          if (!d.bestSecondPassScore || secondPassScore > d.bestSecondPassScore) {
-            newOrBetterDetection = true;
-            d.bestSecondPassScore = secondPassScore;
+          let better = false;
+          // initialize second pass result
+          if (!d.bestSecondPassScore) {
+            better = true;
+            d.bestSecondPassScore = 0;
           }
+          // retain passing the second pass threshold for first time.
+          if (d.bestSecondPassScore < this.secondScoreThreshold && secondPassScore >= this.secondScoreThreshold) {
+            this.console.log('improved', d.id, d.bestSecondPassScore, d.score);
+            better = true;
+            retainImage = true;
+          }
+          else if (secondPassScore > d.bestSecondPassScore * 1.1) {
+            this.console.log('improved', d.id, d.bestSecondPassScore, d.score);
+            better = true;
+            retainImage = true;
+          }
+          if (better)
+            d.bestSecondPassScore = secondPassScore;
+          return better;
         }
 
         // the initial score may be sufficient.
@@ -299,8 +315,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
         const redetected = await redetect(d.boundingBox);
         const best = redetected.filter(r => r.className === d.className).sort((a, b) => b.score - a.score)?.[0];
-        if (best)
-          maybeUpdateSecondPassScore(best.score)
+        if (best) {
+          if (maybeUpdateSecondPassScore(best.score)) {
+            d.boundingBox = best.boundingBox;
+          }
+        }
       }));
 
       const secondPassDetections = zonedDetections.filter(d => d.bestSecondPassScore >= this.secondScoreThreshold)
@@ -324,8 +343,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       detection.detections = trackedDetections;
     }
 
-    if (newOrBetterDetection)
+    if (retainImage) {
+      this.console.log('retaining detection image');
       this.setDetection(detection, mediaObject);
+    }
 
     this.reportObjectDetections(detection);
     // if (newOrBetterDetection) {
@@ -336,7 +357,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     //     })
     //   this.console.log('retaining media');
     // }
-    return newOrBetterDetection;
+    return retainImage;
   }
 
   get scoreThreshold() {
@@ -382,7 +403,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       let stream: MediaObject;
 
       stream = await this.cameraDevice.getVideoStream({
-        tool: 'ffmpeg',
         destination: !this.hasMotionType ? 'local-recorder' : 'low-resolution',
         // ask rebroadcast to mute audio, not needed.
         audio: null,
@@ -591,16 +611,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       },
     });
     if (found.length) {
-      this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score})`).join(', '));
+      this.console.log('new detection:', found.map(d => `${d.id} ${d.detection.className} (${d.detection.score})`).join(', '));
       if (detectionResult.running)
         this.extendedObjectDetect();
     }
     if (found.length || showAll) {
       this.console.log('current detections:', this.detectionState.previousDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.boundingBox?.join(', ')})`).join(', '));
     }
-
-    // removes items that is not tracked yet (may require more present frames)
-    detectionResult.detections = detectionResult.detections.filter(d => d.id);
   }
 
   setDetection(detection: ObjectsDetected, detectionInput: MediaObject) {
@@ -1025,8 +1042,7 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
   }
 
   async releaseMixin(id: string, mixinDevice: any) {
-    this.console.log('releasing ObjectDetection mixin', id);
-    mixinDevice.release();
+    return mixinDevice.release();
   }
 }
 

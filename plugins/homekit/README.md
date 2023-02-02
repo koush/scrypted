@@ -20,9 +20,10 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
   * Cloud cameras:
     * Motion delivery issue from the cloud service.
 
-2) After a motion trigger, the home hub will start recording. Verify that HomeKit is requesting recording by looking in the Camera's Console: you will see logs such as `[HomeKit]: Camera recording session starting`. If you do not see this, there are two possible causes and solutions:
+2) After a motion trigger, the home hub will start recording. Verify that HomeKit is requesting recording by looking in the Camera's Console: you will see logs such as `[HomeKit]: Camera recording session starting`. If you do not see this, there are a few possible causes and solutions:
   * The Home Hubs are bugged out and have stopped responding to motion. Reboot all Home Hubs when this happens. **iPads and HomePods, which are wireless, are not reliable Home Hubs.** If you have an iPad as a Home Hub, remove it from acting as a Home Hub from within the iOS Home app. Unfortunately this is not possible to do with HomePods.
   * Your iCloud account is in a bad state. Log out of iCloud on your iPhone, and log back in. Then disable and reenable HomeKit Secure Video on your cameras again.
+  * Your Scrypted server is on a different subnet from your home hub(s). This may work for live streaming, but home hubs will not initiate recording if they are on a different subnet. Ensure your Scrypted server is on the same subnet as the home hubs. 
 
 3) If HomeKit requested the video, but nothing showed up in the timeline:
   * HomeKit may have decided the motion wasn't worth recording. Set your HomeKit recording options to all motion when testing.
@@ -39,7 +40,7 @@ If HomeKit fails while pairing during a Docker install, ensure host networking i
 This is always a issue with the network setup. 
   * Ensure you are not connected to a VPN.
   * You may have multiple network interfaces, such as wired and wireless, and HomeKit is preferring the wireless interface. Use the [`Scrypted Server Address` setting](/endpoint/@scrypted/core/public/#/component/settings), and set it to your wired IP address manually.
-  * If your camera/server/iOS are on a separate VLANs, try disabling VLANs to determine if that is the issue.
+  * Flatten your network topology. If your camera/server/iOS are on a separate VLANs, try disabling VLANs to determine if that is the issue.
   * You wifi network is saturated, resulting in heavy packet loss. Enabling Transcode Debug Mode in the HomeKit settings for that camera may fix this for testing purposes, but long term usage is not recommended as it reduces quality and increases CPU load.
   * This is *may* be a codec issue (but as mentioned earlier, is usually a network issue). Try enabling Transcoding on both Live and Remote streams.
 

@@ -715,10 +715,8 @@ export class RtspClient extends RtspBase {
         return Object.assign({ interleaved, options }, response);
     }
 
-    async play(start: string = '0.000') {
-        const headers: any = {
-            Range: `npt=${start}-`,
-        };
+    async play(headers: Headers = {}, start = '0.000') {
+        headers['Range'] = `npt=${start}-`;
         return this.request('PLAY', headers);
     }
 

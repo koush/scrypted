@@ -1,5 +1,5 @@
 import { Entry, EntrySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
+import { addSupportedType, bindCharacteristic, DummyDevice, } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 import type { HomeKitPlugin } from "../main";
@@ -17,22 +17,25 @@ addSupportedType({
         bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.CurrentDoorState,
             () => !!device.entryOpen ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED);
 
-        let targetState = !!device.entryOpen ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED;
+        bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.TargetDoorState,
+            () => !!device.entryOpen ? Characteristic.TargetDoorState.OPEN : Characteristic.TargetDoorState.CLOSED);
+
+        let targetState = !!device.entryOpen ? Characteristic.TargetDoorState.OPEN : Characteristic.TargetDoorState.CLOSED;
         service.getCharacteristic(Characteristic.TargetDoorState)
-        .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-            callback(null, targetState);
-        })
-        .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-            callback();
-            if (value === Characteristic.TargetDoorState.OPEN) {
-                targetState = Characteristic.TargetDoorState.OPEN;
-                device.openEntry();
-            }
-            else {
-                targetState = Characteristic.TargetDoorState.CLOSED;
-                device.closeEntry();
-            }
-        })
+            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
+                callback(null, targetState);
+            })
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                callback();
+                if (value === Characteristic.TargetDoorState.OPEN) {
+                    targetState = Characteristic.TargetDoorState.OPEN;
+                    device.openEntry();
+                }
+                else {
+                    targetState = Characteristic.TargetDoorState.CLOSED;
+                    device.closeEntry();
+                }
+            })
 
         return accessory;
     }

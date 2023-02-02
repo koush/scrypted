@@ -225,12 +225,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         console.warn(device.name, 'homekit requested unknown audio codec, audio will not be streamed.', request);
     }
 
-
-    if (session.killed) {
-        console.log('session ended before streaming could start. bailing.');
-        return;
-    }
-
     // 11/15/2022
     // legacy comment below left for posterity during the transition to rtp-forwarders.ts
     // code.
@@ -252,6 +246,11 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // ntp timestamp algorithm. aac-eld is deprecated in any case.
 
     await waitForFirstVideoRtcp(console, session);
+
+    if (session.killed) {
+        console.log('session ended before streaming could start. bailing.');
+        return;
+    }
 
     const videoOptions = {
         maxPacketSize: videomtu,

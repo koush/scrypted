@@ -188,7 +188,14 @@ function compileFunction(code: string, params?: ReadonlyArray<string>, options?:
     return eval(f);
 }
 
+declare class WeakRef {
+    target: any;
+    constructor(target: any);
+    deref(): any;
+}
+
 try {
+    // @ts-ignore
     const fr = FinalizationRegistry;
 }
 catch (e) {
@@ -225,7 +232,9 @@ export class RpcPeer {
     proxyCounter = 1;
     localProxied = new Map<any, LocalProxiedEntry>();
     localProxyMap: { [id: string]: any } = {};
+    // @ts-ignore
     remoteWeakProxies: { [id: string]: WeakRef<any> } = {};
+    // @ts-ignore
     finalizers = new FinalizationRegistry(entry => this.finalize(entry as LocalProxiedEntry));
     nameDeserializerMap = new Map<string, RpcSerializer>();
     constructorSerializerMap = new Map<any, string>();
@@ -505,6 +514,7 @@ export class RpcPeer {
         const rpc = new RpcProxy(this, localProxiedEntry, proxyConstructorName, proxyProps, proxyOneWayMethods);
         const target = proxyConstructorName === 'Function' || proxyConstructorName === 'AsyncFunction' ? function () { } : rpc;
         const proxy = new Proxy(target, rpc);
+        // @ts-ignore
         const weakref = new WeakRef(proxy);
         this.remoteWeakProxies[proxyId] = weakref;
         this.finalizers.register(rpc, localProxiedEntry);
@@ -626,8 +636,11 @@ export function getEvalSource() {
         ${RpcProxy}
 
         ${RpcPeer}
+
+        ${startPeriodicGarbageCollection}
     
         return {
+            startPeriodicGarbageCollection,
             RpcPeer,
             RpcProxy,
         };

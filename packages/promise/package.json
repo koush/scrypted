@@ -1,0 +1,19 @@
+{
+  "name": "@scrypted/promise",
+  "version": "0.0.6",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "tsc --outDir dist",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^18.11.18",
+    "rimraf": "^4.1.1",
+    "typescript": "^4.7.4"
+  }
+}

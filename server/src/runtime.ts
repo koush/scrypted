@@ -4,10 +4,12 @@ import axios from 'axios';
 import * as io from 'engine.io';
 import { once } from 'events';
 import express, { Request, Response } from 'express';
+import { ParamsDictionary } from 'express-serve-static-core';
 import http, { ServerResponse } from 'http';
 import https from 'https';
 import type { spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
 import path from 'path';
+import { ParsedQs } from 'qs';
 import rimraf from 'rimraf';
 import semver from 'semver';
 import { PassThrough } from 'stream';
@@ -29,9 +31,9 @@ import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
-import { AddressSettigns as AddressSettings } from './services/addresses';
+import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
-import { CORSControl, CORSServer } from './services/cors';
+import { CORSControl } from './services/cors';
 import { Info } from './services/info';
 import { PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
@@ -72,7 +74,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             })
         },
     });
-    cors: CORSServer[] = [];
     pluginComponent = new PluginComponent(this);
     servieControl = new ServiceControl(this);
     alerts = new Alerts(this);
@@ -155,11 +156,25 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }, 60 * 60 * 1000);
     }
 
+    checkUpgrade(req: express.Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>, res: express.Response<any, Record<string, any>>, pluginData: HttpPluginData): void {
+        // pluginData.pluginHost.io.
+        const { sid } = req.query;
+        const client = (pluginData.pluginHost.io as any).clients[sid as string];
+        if (client) {
+            res.locals.username = 'existing-io-session';
+        }
+    }
+
     addAccessControlHeaders(req: http.IncomingMessage, res: http.ServerResponse) {
         res.setHeader('Vary', 'Origin,Referer');
         const header = this.getAccessControlAllowOrigin(req.headers);
-        if (header)
+        if (header) {
             res.setHeader('Access-Control-Allow-Origin', header);
+        }
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader('Access-Control-Allow-Private-Network', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Access-Control-Request-Method');
     }
 
     getAccessControlAllowOrigin(headers: http.IncomingHttpHeaders) {
@@ -176,7 +191,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         if (!origin)
             return;
         const servers: string[] = process.env.SCRYPTED_ACCESS_CONTROL_ALLOW_ORIGINS?.split(',') || [];
-        servers.push(...Object.values(this.cors).map(entry => entry.server));
+        servers.push(...Object.values(this.corsControl.origins).flat());
         if (!servers.includes(origin))
             return;
 
@@ -899,7 +914,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             }
 
             if (dirty) {
-                this.datastore.upsert(pluginDevice);
+                this.datastore.upsert(pluginDevice)
+                    .catch(e => {
+                        console.error('There was an error saving the device? Ignoring...', e);
+                        // return this.datastore.remove(pluginDevice);
+                    });
             }
         }
 

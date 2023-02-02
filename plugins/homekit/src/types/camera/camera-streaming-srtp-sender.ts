@@ -31,8 +31,6 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     let octetCount = 0;
     let lastRtcp = 0;
     let firstSequenceNumber: number;
-    let allowRollover = false;
-    let rolloverCount = 0;
     let opusPacketizer: OpusRepacketizer;
     let h264Packetizer: H264Repacketizer;
     let analyzeVideo = true;
@@ -117,17 +115,6 @@ export function createCameraStreamSender(console: Console, config: Config, sende
             firstSequenceNumber = rtp.header.sequenceNumber;
         }
 
-        // rough rollover detection to keep packet count accurate.
-        // once within 256 packets of the 0 and 65536, wait for rollover.
-        if (!allowRollover) {
-            if (rtp.header.sequenceNumber > 0xFF00)
-                allowRollover = true;
-        }
-        else if (rtp.header.sequenceNumber < 0x00FF) {
-            allowRollover = false;
-            rolloverCount++;
-        }
-
         if (!firstTimestamp)
             firstTimestamp = rtp.header.timestamp;
 
@@ -151,7 +138,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
             // audio will work so long as the rtp timestamps are created properly: which is a construct of the sample rate
             // HAP requests, and the packet time is respected,
             // opus 48khz will work just fine.
-            rtp.header.timestamp = (firstTimestamp + packetCount * 180 * audioIntervalScale) % 0xFFFFFFFF;
+            rtp.header.timestamp = (firstTimestamp + packetCount * 160 * audioIntervalScale) % 0xFFFFFFFF;
             sendPacket(rtp);
             return;
         }

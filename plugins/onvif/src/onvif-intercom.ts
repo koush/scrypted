@@ -180,7 +180,9 @@ export class OnvifIntercom implements Intercom {
 
         ffmpegLogInitialOutput(this.camera.console, cp);
 
-        await this.intercomClient.play();
+        await this.intercomClient.play({
+            Require,
+        });
         this.camera.console.log('intercom playing');
     }
 
