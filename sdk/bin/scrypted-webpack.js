@@ -148,7 +148,7 @@ else {
         if (fs.existsSync(changelog)) {
             readmeText += '\n\n\n<br/><br/>' + fs.readFileSync(changelog).toString();
         }
-        zip.addFile('README.md', readmeText);
+        zip.addFile('README.md', Buffer.from(readmeText));
     }
 
     const NODE_PATH = path.resolve(__dirname, '..', 'node_modules');
