@@ -281,11 +281,8 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         info.updateCharacteristic(Characteristic.SerialNumber, username);
         info.updateCharacteristic(Characteristic.FirmwareRevision, packageJson.version);
 
-        let bind = this.storageSettings.values.advertiserAddresses;
-        if (bind === 'All Addresses')
-            bind = undefined;
-        else
-            bind = await getAddressOverride();
+        const bind = await this.getAdvertiserInterfaceBind();
+        this.console.log('mdns bind address', bind);
 
         const publishInfo: PublishInfo = {
             username,
@@ -346,10 +343,17 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         return ret;
     }
 
-    async publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories, port: number) {
+    async getAdvertiserInterfaceBind() {
         let bind = this.storageSettings.values.advertiserAddresses;
-        if (!bind || bind === 'Default')
+        if (bind === 'All Addresses')
+            bind = undefined;
+        else
             bind = await getAddressOverride();
+        return bind;
+    }
+
+    async publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories, port: number) {
+        const bind = await this.getAdvertiserInterfaceBind();
 
         await accessory.publish({
             username,
