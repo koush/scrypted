@@ -929,7 +929,7 @@ class PrebufferSession {
       }
       this.console.log(this.streamName, 'terminating rebroadcast due to inactivity');
       session.kill(new Error('stream inactivity'));
-    }, 30000);
+    }, 10000);
   }
 
   async handleRebroadcasterClient(options: {
