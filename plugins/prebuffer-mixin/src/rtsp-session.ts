@@ -1,5 +1,5 @@
 import { ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
-import { closeQuiet, createBindZero } from "@scrypted/common/src/listen-cluster";
+import { closeQuiet } from "@scrypted/common/src/listen-cluster";
 import { findH264NaluType, H264_NAL_TYPE_SPS, parseSemicolonDelimited, RtspClient, RtspClientUdpSetupOptions, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
@@ -127,8 +127,12 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                 const transport = setupResult.headers['transport'];
                 const match = transport.match(/.*?server_port=([0-9]+)-([0-9]+)/);
                 const [_, rtp, rtcp] = match;
-                const { hostname } = new URL(rtspClient.url);
-                udp.send(punch, parseInt(rtp), hostname)
+                if (rtp === '0') {
+                    console.warn(`Received server_port 0 for codec: ${codec}; skipping punch.`);
+                } else {
+                    const { hostname } = new URL(rtspClient.url);
+                    udp.send(punch, parseInt(rtp), hostname);
+                }
 
                 mapping[channel] = codec;
             }
