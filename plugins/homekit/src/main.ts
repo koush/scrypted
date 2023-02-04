@@ -347,7 +347,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         let bind: string = this.storageSettings.values.advertiserAddresses;
         if (bind === 'All Addresses')
             bind = undefined;
-        else if (!bind || bind === 'Default')
+        else if (!bind || bind === 'Default' || bind === 'Server Address')
             bind = await getAddressOverride();
         return bind;
     }
