@@ -206,6 +206,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 this.remoteRtpDescription = await sip.callOrAcceptInvite(
                     ( audio ) => {
                     return [
+
                         `m=audio ${audio.port} RTP/SAVP 97`,
                         `a=rtpmap:97 speex/8000`,
                         `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,

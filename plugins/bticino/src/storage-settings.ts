@@ -3,7 +3,10 @@ import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { BticinoSipCamera } from './bticino-camera';
 
 export class BticinoStorageSettings {
-    constructor(camera : BticinoSipCamera, private storageSettings : StorageSettings<string>) {
+    private storageSettings
+    
+    constructor(camera : BticinoSipCamera) {
+
         this.storageSettings = new StorageSettings( camera, {
             sipfrom: {
                 title: 'SIP From: URI',

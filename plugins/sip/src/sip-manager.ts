@@ -225,7 +225,7 @@ export class SipManager {
 
               if( m.method ) {
                 m.headers.from.uri = fromWithDomain
-                if( m.headers.contact && m.headers.contact[0].uri.split('@')[0].indexOf('-') < 0 ) {
+                if( m.headers.contact && m.headers.contact[0].uri.split('@')[0].lastIndexOf('-') < 0 ) {
                   m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + contactId + "@");
                   // Also a bug in SIP.js ? append the transport for the contact if the transport is udp (according to RFC)
                   if( remote.protocol != 'udp' && m.headers.contact[0].uri.indexOf( "transport=" ) < 0 ) {
