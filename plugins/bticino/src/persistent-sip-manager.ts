@@ -44,7 +44,7 @@ export class PersistentSipManager {
                 let sipOptions : SipOptions = SipHelper.sipOptions( this.camera )
 
                 this.sipManager?.destroy()
-                this.sipManager = new SipManager(console, sipOptions )
+                this.sipManager = new SipManager(this.camera.console, sipOptions )
                 await this.sipManager.register()
 
                 this.lastRegistration = now
@@ -62,6 +62,6 @@ export class PersistentSipManager {
     }
 
     async session( sipOptions: SipOptions ) : Promise<SipCallSession> {
-        return SipCallSession.createCallSession(console, "Bticino", sipOptions, this.sipManager )
+        return SipCallSession.createCallSession(this.camera.console, "Bticino", sipOptions, this.sipManager )
     }
 }

@@ -15,7 +15,7 @@ export class BticinoSipLock extends ScryptedDeviceBase implements Lock {
             this.timeout = undefined
            } , 3000);
         } else {
-            this.console.log("Still attempting previous locking ...")
+            this.camera.console.log("Still attempting previous locking ...")
         }        
         return
     }

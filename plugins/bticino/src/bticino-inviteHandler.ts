@@ -27,7 +27,7 @@ export class InviteHandler extends SipRequestHandler {
     }
 
     reset() {
-        console.log("Reset the incoming call request")
+        this.sipCamera.console.log("Reset the incoming call request")
         this.sipCamera.incomingCallRequest = undefined
         this.sipCamera.binaryState = false
     }
