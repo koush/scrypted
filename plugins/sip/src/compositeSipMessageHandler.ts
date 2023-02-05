@@ -10,5 +10,6 @@ export class CompositeSipMessageHandler extends SipRequestHandler {
     }
     add( handler : SipRequestHandler ) {
         this.handlers.push( handler )
+        return this
     }
 }

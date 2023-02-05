@@ -3,7 +3,7 @@ import { createBindUdp, createBindZero } from '@scrypted/common/src/listen-clust
 import dgram from 'dgram';
 import { ReplaySubject, timer } from 'rxjs';
 import { createStunResponder, RtpDescription, RtpOptions, sendStunBindingRequest } from './rtp-utils';
-import { SipManager, SipOptions } from './sip-manager';
+import { SipManager, SipOptions, SipRequest } from './sip-manager';
 import { Subscribed } from './subscribed';
 
 /*
@@ -13,45 +13,43 @@ export class SipCallSession extends Subscribed {
   private hasStarted = false
   private hasCallEnded = false
   private onCallEndedSubject = new ReplaySubject(1)
-  public sipCall: SipManager
   onCallEnded = this.onCallEndedSubject.asObservable()
 
   constructor(
-    public readonly console: Console,
-    public readonly sipOptions: SipOptions,
-    public readonly rtpOptions: RtpOptions,
+    private readonly console: Console,
+    private readonly sipOptions: SipOptions,
+    private readonly rtpOptions: RtpOptions,
     public readonly audioSplitter: dgram.Socket,
     public audioRtcpSplitter: dgram.Socket,
     public readonly videoSplitter: dgram.Socket,
     public videoRtcpSplitter: dgram.Socket,
-    public readonly cameraName: string
+    public readonly cameraName: string,
+    private sipManager: SipManager
   ) {
     super()
-
-    this.sipCall = this.createSipManager(this.sipOptions)
   }
 
-  static async createCallSession(console: any, cameraName: string, sipOptions: SipOptions) {
-      const audioSplitter = await createBindZero(),
-      audioRtcpSplitter = await createBindUdp(audioSplitter.port + 1),
-      videoSplitter = await createBindZero(),
-      videoRtcpSplitter = await createBindUdp(videoSplitter.port + 1),
-      rtpOptions : RtpOptions = {
-        audio: {
-          port: audioSplitter.port,
-          rtcpPort: audioRtcpSplitter.port,
-          //TODO: make this cleaner
-          srtpKey: undefined,
-          srtpSalt: undefined
-        },
-        video: {
-          port: videoSplitter.port,
-          rtcpPort: videoRtcpSplitter.port,
-          //TODO: make this cleaner
-          srtpKey: undefined,
-          srtpSalt: undefined 
-        }
+  static async createCallSession(console: any, cameraName: string, sipOptions: SipOptions, sipManager?: SipManager ) {
+    const audioSplitter = await createBindZero(),
+    audioRtcpSplitter = await createBindUdp(audioSplitter.port + 1),
+    videoSplitter = await createBindZero(),
+    videoRtcpSplitter = await createBindUdp(videoSplitter.port + 1),
+    rtpOptions : RtpOptions = {
+      audio: {
+        port: audioSplitter.port,
+        rtcpPort: audioRtcpSplitter.port,
+        //TODO: make this cleaner
+        srtpKey: undefined,
+        srtpSalt: undefined
+      },
+      video: {
+        port: videoSplitter.port,
+        rtcpPort: videoRtcpSplitter.port,
+        //TODO: make this cleaner
+        srtpKey: undefined,
+        srtpSalt: undefined 
       }
+    }
 
     return new SipCallSession(
       console,
@@ -61,29 +59,33 @@ export class SipCallSession extends Subscribed {
       audioRtcpSplitter.server,
       videoSplitter.server,
       videoRtcpSplitter.server,
-      cameraName
+      cameraName,
+      sipManager
     )
   }
 
   createSipManager(sipOptions: SipOptions) {
-    if (this.sipCall) {
-      this.sipCall.destroy()
+    if (this.sipManager) {
+      this.sipManager.destroy()
     }
 
-    const call = (this.sipCall = new SipManager(
+    const call = (this.sipManager = new SipManager(
       this.console,
-      sipOptions,
-      this.rtpOptions
+      sipOptions
     ))
 
     this.addSubscriptions(
       call.onEndedByRemote.subscribe(() => this.callEnded(false))
     )
 
-    return this.sipCall
+    return this.sipManager
   }
 
   async call( audioSection, videoSection? ): Promise<RtpDescription> {
+    return this.callOrAcceptInvite(audioSection, videoSection)
+  }
+
+  async callOrAcceptInvite( audioSection, videoSection?, incomingCallRequest? : SipRequest ): Promise<RtpDescription> {
     this.console.log(`SipSession::start()`);
 
     if (this.hasStarted) {
@@ -95,24 +97,23 @@ export class SipCallSession extends Subscribed {
       throw new Error('SIP Session has already ended')
     }
 
-
     try {
       if( this.sipOptions.shouldRegister )
-        await this.sipCall.register()
-      const rtpDescription : RtpDescription = await this.sipCall.invite( audioSection, videoSection ),
+        await this.sipManager.register()
+      const rtpDescription : RtpDescription = await this.sipManager.invite( this.rtpOptions, audioSection, videoSection, incomingCallRequest ),
         sendStunRequests = () => {
           sendStunBindingRequest({
             rtpSplitter: this.audioSplitter,
             rtcpSplitter: this.audioRtcpSplitter,
             rtpDescription,
-            localUfrag: this.sipCall.audioUfrag,
+            localUfrag: this.sipManager.audioUfrag,
             type: 'audio',
           })
           sendStunBindingRequest({
             rtpSplitter: this.videoSplitter,
             rtcpSplitter: this.videoRtcpSplitter,
             rtpDescription,
-            localUfrag: this.sipCall.videoUfrag,
+            localUfrag: this.sipManager.videoUfrag,
             type: 'video',
           })
         }
@@ -175,19 +176,19 @@ export class SipCallSession extends Subscribed {
     this.hasCallEnded = true
 
     if (sendBye) {
-      await this.sipCall.sendBye().catch(this.console.error)
+      await this.sipManager.sendBye().catch(this.console.error)
     }
 
     // clean up
-    this.console.log("sip-session callEnded")
+    this.console.log("sip-call-session callEnded")
     this.onCallEndedSubject.next(null)
-    this.sipCall.destroy()
+    //this.sipManager.destroy()
     this.audioSplitter.close()
     this.audioRtcpSplitter.close()
     this.videoSplitter.close()
     this.videoRtcpSplitter.close()
     this.unsubscribe()
-    this.console.log("sip-session callEnded: done")
+    this.console.log("sip-call-session callEnded: done")
   }
 
   async stop() {

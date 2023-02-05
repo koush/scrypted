@@ -1,16 +1,17 @@
 import { SipOptions } from "../../sip/src/sip-manager";
-import { SipCallSession } from "../../sip/src/sip-call-session";
 import { BticinoSipCamera } from "./bticino-camera";
 
 export class SipHelper {
     public static sipOptions( camera : BticinoSipCamera ) : SipOptions {
-        //Might be removed soon
+        // Might be removed soon?
         if( camera.storage.getItem('sipto') && camera.storage.getItem('sipto').toString().indexOf(';') > 0 ) {
             camera.storage.setItem('sipto', camera.storage.getItem('sipto').toString().split(';')[0] )
         }
         const from = camera.storage.getItem('sipfrom')?.trim()
         const to = camera.storage.getItem('sipto')?.trim()
         const localIp = from?.split(':')[0].split('@')[1]
+        // Although this might not occur directly, each camera should run on its own port
+        // Might need to use a random free port here (?)
         const localPort = parseInt(from?.split(':')[1]) || 5060
         const domain = camera.storage.getItem('sipdomain')?.trim()
         const expiration : string = camera.storage.getItem('sipexpiration')?.trim() || '600'
@@ -34,9 +35,5 @@ export class SipHelper {
             useTcp: true,
             sipRequestHandler: camera.requestHandlers
          } 
-    }
-
-    public static sipSession( sipOptions : SipOptions ) : Promise<SipCallSession> {
-        return SipCallSession.createCallSession(console, "Bticino", sipOptions )        
     }
 }

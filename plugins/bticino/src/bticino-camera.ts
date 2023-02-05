@@ -15,8 +15,9 @@ import { BticinoStorageSettings } from './storage-settings';
 import { BticinoSipPlugin } from './main';
 import { BticinoSipLock } from './bticino-lock';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import { SipRegisteredSession } from './sip-registered-session';
+import { PersistentSipManager } from './persistent-sip-manager';
 import { InviteHandler } from './bticino-inviteHandler';
+import { SipManager, SipRequest } from '../../sip/src/sip-manager';
 
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
@@ -30,24 +31,24 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     private currentMediaMimeType: string
     private refreshTimeout: NodeJS.Timeout
     public requestHandlers: CompositeSipMessageHandler = new CompositeSipMessageHandler()
+    public incomingCallRequest : SipRequest
     private settingsStorage: BticinoStorageSettings = new BticinoStorageSettings( this )
     public voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
     private inviteHandler : InviteHandler = new InviteHandler(this)
     //TODO: randomize this
     private keyAndSalt : string = "/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X"
     private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
-    private persistentSipSession : SipRegisteredSession
+    private persistentSipManager : PersistentSipManager
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
-        this.requestHandlers.add( this.voicemailHandler )
-        this.requestHandlers.add( this.inviteHandler )
-        this.persistentSipSession = new SipRegisteredSession( this )
+        this.requestHandlers.add( this.voicemailHandler ).add( this.inviteHandler )
+        this.persistentSipManager = new PersistentSipManager( this )
     }
 
     sipUnlock(): Promise<void> {
         this.log.i("unlocking C300X door ")
-        return this.persistentSipSession.enable().then( (sipCall) => {
+        return this.persistentSipManager.enable().then( (sipCall) => {
             sipCall.message( '*8*19*20##' )
             .then( () =>
                 sleep(1000)
@@ -57,7 +58,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }
 
     getAswmStatus() : Promise<void> {
-        return this.persistentSipSession.enable().then( (sipCall) => {
+        return this.persistentSipManager.enable().then( (sipCall) => {
             sipCall.message( "GetAswmStatus!" )
         } )        
     }
@@ -195,17 +196,16 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 // A normal call session doesn't require registering
                 sipOptions.shouldRegister = false
 
-                sip = await SipHelper.sipSession( sipOptions )
+                sip = await this.persistentSipManager.session( sipOptions );
                 // Validate this sooner
                 if( !sip ) return Promise.reject("Cannot create session")
                 
                 sip.onCallEnded.subscribe(cleanup)
 
                 // Call the C300X
-                this.remoteRtpDescription = await sip.call(
+                this.remoteRtpDescription = await sip.callOrAcceptInvite(
                     ( audio ) => {
                     return [
-                        'a=DEVADDR:20', // Needed for bt_answering_machine (bticino specific)
                         `m=audio ${audio.port} RTP/SAVP 97`,
                         `a=rtpmap:97 speex/8000`,
                         `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
@@ -218,28 +218,23 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                         `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
                         'a=recvonly'                        
                     ]
-                } );
-                if( sip.sipOptions.debugSip )
+                }, this.incomingCallRequest );
+                if( sipOptions.debugSip )
                     this.log.d('SIP: Received remote SDP:\n' + this.remoteRtpDescription.sdp)
 
                 let sdp: string = replacePorts(this.remoteRtpDescription.sdp, 0, 0 )
                 sdp = addTrackControls(sdp)
                 sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n')
-                if( sip.sipOptions.debugSip )
+                if( sipOptions.debugSip )
                     this.log.d('SIP: Updated SDP:\n' + sdp);
 
-                let vseq = 0;
-                let vseen = 0;
-                let vlost = 0;
-                let aseq = 0;
-                let aseen = 0;
-                let alost = 0;  
+                let vseq = 0, vseen = 0, vlost = 0, aseq = 0, aseen = 0, alost = 0;  
 
                 rtsp = new RtspServer(client, sdp, true);
                 const parsedSdp = parseSdp(rtsp.sdp);
                 const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control
                 const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control
-                if( sip.sipOptions.debugSip ) {
+                if( sipOptions.debugSip ) {
                     rtsp.console = this.console
                 }
                 

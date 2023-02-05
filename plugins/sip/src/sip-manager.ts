@@ -2,11 +2,10 @@ import { noop, Subject } from 'rxjs'
 import { randomInteger, randomString } from './util'
 import { RtpDescription, RtpOptions, RtpStreamDescription } from './rtp-utils'
 import { decodeSrtpOptions } from '../../ring/src/srtp-utils'
-import { stringify } from 'sip/sip'
+import { stringify, stringifyUri } from 'sip/sip'
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 
-const sip = require('sip'),
-  sdp = require('sdp')
+const sip = require('sip'), sdp = require('sdp')
 
 export interface SipOptions {
   to: string
@@ -69,7 +68,11 @@ interface SipStack {
   makeResponse: (
     response: SipRequest,
     status: number,
-    method: string
+    method: string,
+    extension?: {
+      headers: Partial<SipHeaders>,
+      content
+    }
   ) => SipResponse
 }
 
@@ -157,8 +160,6 @@ export class SipManager {
   constructor(
     console: Console,
     private sipOptions: SipOptions,
-    private rtpOptions: RtpOptions,
-    //tlsPort: number
   ) {
     this.console = console;
 
@@ -216,16 +217,20 @@ export class SipManager {
               } else if( m.method == 'ACK' || m.method == 'BYE' ) {
                 m.headers.to.uri = toWithDomain
                 m.uri = this.registrarContact
+              } else if( (m.method == undefined && m.status) && m.headers.cseq ) {
+                // 183, 200, OK, CSeq: INVITE
               } else {
-                throw new Error("Error: Method construct for uri not implemented: " + m.method)
+                console.error("Error: Method construct for uri not implemented: " + m.method)
               }
 
-              m.headers.from.uri = fromWithDomain
-              if( m.headers.contact && m.headers.contact[0].uri.split('@')[0].indexOf('-') < 0 ) {
-                m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + contactId + "@");
-                // Also a bug in SIP.js ? append the transport for the contact if the transport is udp (according to RFC)
-                if( remote.protocol != 'udp' && m.headers.contact[0].uri.indexOf( "transport=" ) < 0 ) {
-                  m.headers.contact[0].uri = m.headers.contact[0].uri + ":" + remote.port + ";transport=" + remote.protocol
+              if( m.method ) {
+                m.headers.from.uri = fromWithDomain
+                if( m.headers.contact && m.headers.contact[0].uri.split('@')[0].indexOf('-') < 0 ) {
+                  m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + contactId + "@");
+                  // Also a bug in SIP.js ? append the transport for the contact if the transport is udp (according to RFC)
+                  if( remote.protocol != 'udp' && m.headers.contact[0].uri.indexOf( "transport=" ) < 0 ) {
+                    m.headers.contact[0].uri = m.headers.contact[0].uri + ":" + remote.port + ";transport=" + remote.protocol
+                  }
                 }
               }
             }
@@ -250,6 +255,12 @@ export class SipManager {
             sipOptions.sipRequestHandler.handle( request )
             this.sipStack.send(this.sipStack.makeResponse(request, 200, 'Ok'))
           } else if( request.method === 'INVITE' && sipOptions.sipRequestHandler ) {
+            let ringResponse = this.sipStack.makeResponse(request, 180, 'Ringing')
+            ringResponse.headers["Supported"] = "replaces, outbound, gruu"
+            ringResponse.headers.to.params.tag = '2pAx2dBB'
+            this.sipStack.send(ringResponse)
+            sipOptions.sipRequestHandler.handle( request )
+          } else if( request.method === 'CANCEL' ) {
             sipOptions.sipRequestHandler.handle( request )
           } else {
             if( sipOptions.debugSip ) {
@@ -356,12 +367,45 @@ export class SipManager {
   /**
   * Initiate a call by sending a SIP INVITE request
   */
-  async invite( audioSection, videoSection? ) : Promise<RtpDescription> {
+  async invite( rtpOptions : RtpOptions, audioSection, videoSection?, incomingCallRequest? ) : Promise<RtpDescription> {
     let ssrc = randomInteger()
-    let audio = audioSection ? audioSection( this.rtpOptions.audio, ssrc ).concat( ...[`a=ssrc:${ssrc}`, `a=rtcp:${this.rtpOptions.audio.rtcpPort}`] ) : []
-    let video = videoSection ? videoSection( this.rtpOptions.video, ssrc ).concat( ...[`a=ssrc:${ssrc}`, `a=rtcp:${this.rtpOptions.video.rtcpPort}`] ) : []
-    const { from, localIp } = this.sipOptions,
-      inviteResponse = await this.request({
+    let audio = audioSection ? audioSection( rtpOptions.audio, ssrc ).concat( ...[`a=rtcp:${rtpOptions.audio.rtcpPort}`] ) : []
+    let video = videoSection ? videoSection( rtpOptions.video, ssrc ).concat( ...[`a=rtcp:${rtpOptions.video.rtcpPort}`] ) : []
+    const { from, localIp } = this.sipOptions;
+
+
+    if( incomingCallRequest ) {
+      let callResponse = this.sipStack.makeResponse(incomingCallRequest, 200, 'Ok', {
+        headers: {
+          supported: 'replaces, outbound',
+          allow:
+            'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
+          'content-type': 'application/sdp',
+        },
+        content:  ([
+          'v=0',
+          `o=${from.split(':')[1].split('@')[0]} 3747 461 IN IP4 ${localIp}`,
+          's=ScryptedSipPlugin',
+          `c=IN IP4 ${this.sipOptions.localIp}`,
+          't=0 0',
+          ...audio,
+          ...video
+          ]
+          .filter((l) => l)
+          .join('\r\n')) + '\r\n'
+      } )
+      callResponse.headers["record-route"] = '<' + stringifyUri( incomingCallRequest.headers["record-route"] ) + '>'
+      callResponse.headers.to.params.tag = '2pAx2dBB' //whatever, just some value
+      callResponse.headers.contact = [{ uri: incomingCallRequest.headers.to.uri }]
+      await this.sipStack.send(callResponse)
+
+      return parseRtpDescription(this.console, incomingCallRequest)
+    } else {
+      if( this.sipOptions.to.toLocaleLowerCase().indexOf('c300x') >= 0 ) {
+        // Needed for bt_answering_machine (bticino specific)
+        audio.unshift('a=DEVADDR:20')
+    }
+      let inviteResponse = await this.request({
         method: 'INVITE',
         headers: {
           supported: 'replaces, outbound',
@@ -383,7 +427,8 @@ export class SipManager {
           .join('\r\n')) + '\r\n'
       })
 
-    return parseRtpDescription(this.console, inviteResponse)
+      return parseRtpDescription(this.console, inviteResponse)
+    }
   }
 
   /**
@@ -391,7 +436,7 @@ export class SipManager {
   */
   async register() : Promise<void> {
     const { from } = this.sipOptions;
-    await timeoutPromise( 500,
+    await timeoutPromise( 1000,
       this.request({
       method: 'REGISTER',
       headers: {
@@ -430,9 +475,9 @@ export class SipManager {
   }
 
   destroy() {
-    this.console.debug("detroying sip-call")
+    this.console.debug("detroying sip-manager")
     this.destroyed = true
     this.sipStack.destroy()
-    this.console.debug("detroying sip-call: done")
+    this.console.debug("detroying sip-manager: done")
   }
 }

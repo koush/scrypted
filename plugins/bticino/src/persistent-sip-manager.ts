@@ -1,0 +1,67 @@
+import { SipCallSession } from "../../sip/src/sip-call-session";
+import { BticinoSipCamera } from "./bticino-camera";
+import { SipHelper } from "./sip-helper";
+import { SipManager, SipOptions } from "../../sip/src/sip-manager";
+
+/**
+ * This class registers itself with the SIP server as a contact for a user account.
+ * The registration expires after the expires time in sipOptions is reached.
+ * The sip session will re-register itself after the expires time is reached.
+ */
+const CHECK_INTERVAL : number = 10 * 1000
+export class PersistentSipManager {
+    
+    private sipManager : SipManager
+    private lastRegistration : number = 0
+    private expireInterval : number = 0
+
+    constructor( private camera : BticinoSipCamera ) {
+        // Give it a second and run in seperate thread to avoid failure on creation for from/to/domain check
+        setTimeout( () => this.register(), CHECK_INTERVAL )
+    }
+
+    async enable() : Promise<SipManager> {
+        if( this.sipManager ) {
+            return this.sipManager
+        } else { 
+            return this.register()
+        }
+    }
+
+    private async register() : Promise<SipManager> {
+        let now = Date.now()
+        try {
+            let sipOptions : SipOptions = SipHelper.sipOptions( this.camera )
+            if( this.expireInterval == 0 ) {
+                if( sipOptions.expire <= 0 || sipOptions.expire > 3600 ) {
+                    // Safe guard just in case
+                    sipOptions.expire = 300
+                }                
+                this.expireInterval = (sipOptions.expire * 1000) - 10000
+            }
+
+            if( now - this.lastRegistration >= this.expireInterval )  {
+                let sipOptions : SipOptions = SipHelper.sipOptions( this.camera )
+
+                this.sipManager?.destroy()
+                this.sipManager = new SipManager(console, sipOptions )
+                await this.sipManager.register()
+
+                this.lastRegistration = now
+
+                return this.sipManager;
+            }
+        } catch(e) {
+            this.camera.console.error("Error enabling persistent SIP manager: " + e )
+            // Try again in a minute
+            this.lastRegistration = now + (60 * 1000)
+            throw e
+        } finally {
+            setTimeout( () => this.register(), CHECK_INTERVAL )      
+        }
+    }
+
+    async session( sipOptions: SipOptions ) : Promise<SipCallSession> {
+        return SipCallSession.createCallSession(console, "Bticino", sipOptions, this.sipManager )
+    }
+}
