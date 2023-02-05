@@ -1,19 +1,18 @@
-import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import sdk, { DeviceProvider, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from '@scrypted/sdk';
-import crypto from 'crypto';
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import packageJson from "../package.json";
+import { getAddressOverride } from "./address-override";
 import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
 import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
-import { createHAPUsernameStorageSettingsDict, getAddresses, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, logConnections, typeToCategory } from './hap-utils';
+import { createHAPUsernameStorageSettingsDict, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, logConnections, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { randomPinCode } from './pincode';
 import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { VideoClipsMixinProvider } from './video-clips-provider';
-import { getAddressOverride } from "./address-override";
 
 const { systemManager, deviceManager } = sdk;
 
@@ -41,8 +40,8 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             group: 'Network',
             title: 'mDNS Advertiser',
             description: 'Optional: Override the mDNS advertiser used to locate the Scrypted bridge',
-            choices: [MDNSAdvertiser.CIAO, MDNSAdvertiser.BONJOUR, MDNSAdvertiser.AVAHI],
-            defaultValue: MDNSAdvertiser.CIAO,
+            choices: ['Default', MDNSAdvertiser.CIAO, MDNSAdvertiser.BONJOUR, MDNSAdvertiser.AVAHI],
+            defaultValue: 'Default',
         },
         advertiserAddresses: {
             group: 'Network',
@@ -119,6 +118,20 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         if (key === this.storageSettings.keys.portOverride) {
             this.log.a('Reload the HomeKit plugin to apply this change.');
         }
+    }
+
+    getAdvertiser() {
+        let advertiser: MDNSAdvertiser = this.storageSettings.values.advertiserOverride;
+        switch (advertiser) {
+            case MDNSAdvertiser.BONJOUR:
+            case MDNSAdvertiser.AVAHI:
+            case MDNSAdvertiser.CIAO:
+                break;
+            default:
+                advertiser = MDNSAdvertiser.CIAO;
+                break;
+        }
+        return advertiser;
     }
 
     async start() {
@@ -290,7 +303,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             pincode: this.storageSettings.values.pincode,
             category: Categories.BRIDGE,
             addIdentifyingMaterial: true,
-            advertiser: this.storageSettings.values.advertiserOverride,
+            advertiser: this.getAdvertiser(),
             bind,
         };
 
@@ -361,7 +374,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             pincode,
             category,
             addIdentifyingMaterial: false,
-            advertiser: this.storageSettings.values.advertiserOverride,
+            advertiser: this.getAdvertiser(),
             bind,
         });
     }
