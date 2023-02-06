@@ -1,13 +1,12 @@
 {
    "name": "@scrypted/homekit",
-   "version": "1.1.99",
+   "version": "1.2.6",
    "description": "HomeKit Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
       "build": "scrypted-webpack",
-      "preprepublishOnly": "scrypted-changelog",
-      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prepublishOnly": "scrypted-changelog && NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
       "scrypted-vscode-launch": "scrypted-deploy-debug",
       "scrypted-deploy-debug": "scrypted-deploy-debug",
