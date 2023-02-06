@@ -33,7 +33,7 @@ export class PersistentSipManager {
         try {
             let sipOptions : SipOptions = SipHelper.sipOptions( this.camera )
             if( this.expireInterval == 0 ) {
-                if( sipOptions.expire <= 0 || sipOptions.expire > 3600 ) {
+                if( !Number.isNaN( sipOptions.expire ) ||  sipOptions.expire <= 0 || sipOptions.expire > 3600 ) {
                     // Safe guard just in case
                     sipOptions.expire = 300
                 }                
@@ -54,7 +54,7 @@ export class PersistentSipManager {
         } catch(e) {
             this.camera.console.error("Error enabling persistent SIP manager: " + e )
             // Try again in a minute
-            this.lastRegistration = now + (60 * 1000)
+            this.lastRegistration = now + (60 * 1000) - this.expireInterval
             throw e
         } finally {
             setTimeout( () => this.register(), CHECK_INTERVAL )      
