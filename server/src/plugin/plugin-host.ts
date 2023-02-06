@@ -364,7 +364,7 @@ export class PluginHost {
         // this can be used as a check for liveness.
         let lastStats = 0;
         const statsInterval = setInterval(async () => {
-            if (lastStats + 60000 < Date.now()) {
+            if (!pluginDebug && lastStats + 60000 < Date.now()) {
                 const logger = await this.api.getLogger(undefined);
                 logger.log('e', 'plugin is unresponsive. restarting.');
                 this.api.requestRestart();
