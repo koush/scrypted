@@ -50,7 +50,7 @@ RUN_IGNORE brew install gst-python
 RUN_IGNORE brew install pillow
 
 ARCH=$(arch)
-if [ "$ARCH" = "arm64 "]
+if [ "$ARCH" = "arm64"]
 then
     PYTHON_VERSION=3.10
 else
