@@ -129,6 +129,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             track.onRtp = rtp => {
                 if (killDeferred.finished)
                     return;
+                const payloadType = rtp.readUint8(1) & 0x7f;
+                // ignore rtcp.
+                if (payloadType >= 72 && payloadType <= 76)
+                    return;
                 old(rtp);
             }
         }
