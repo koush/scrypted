@@ -2,17 +2,20 @@ from asyncio.events import AbstractEventLoop
 from asyncio.futures import Future
 import threading
 
-import gi
-gi.require_version('Gst', '1.0')
-gi.require_version('GstBase', '1.0')
-
 from .safe_set_result import safe_set_result
-from gi.repository import GObject, Gst
 import math
 import asyncio
 
-GObject.threads_init()
-Gst.init(None)
+try:
+    import gi
+    gi.require_version('Gst', '1.0')
+    gi.require_version('GstBase', '1.0')
+
+    from gi.repository import GObject, Gst
+    GObject.threads_init()
+    Gst.init(None)
+except:
+    pass
 
 class GstPipelineBase:
     def __init__(self, loop: AbstractEventLoop, finished: Future) -> None:

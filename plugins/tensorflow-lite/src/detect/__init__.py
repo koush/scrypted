@@ -18,7 +18,10 @@ from pipeline import run_pipeline
 import platform
 from .corohelper import run_coro_threadsafe
 
-from gi.repository import Gst
+try:
+    from gi.repository import Gst
+except:
+    pass
 
 from scrypted_sdk.types import ObjectDetectionModel, Setting, FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
