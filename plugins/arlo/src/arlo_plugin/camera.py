@@ -60,49 +60,63 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
             self.provider.arlo.SubscribeToBatteryEvents(self.arlo_basestation, self.arlo_device, callback)
         )
 
-    def get_applicable_interfaces(self):
-        results = [
+    def get_applicable_interfaces(self) -> list:
+        results = set([
             ScryptedInterface.VideoCamera.value,
             ScryptedInterface.Camera.value,
             ScryptedInterface.MotionSensor.value,
             ScryptedInterface.Battery.value,
             ScryptedInterface.Settings.value,
-            ScryptedInterface.RTCSignalingChannel.value,
-        ]
+        ])
 
-        if not self.webrtc_emulation:
-            results.remove(ScryptedInterface.RTCSignalingChannel.value)
-            results.append(ScryptedInterface.Intercom.value)
+        if self.two_way_audio:
+            results.discard(ScryptedInterface.RTCSignalingChannel.value)
+            results.add(ScryptedInterface.Intercom.value)
 
-        if self.arlo_device["deviceId"] == self.arlo_device["parentId"]:
-            try:
-                results.remove(ScryptedInterface.RTCSignalingChannel.value)
-            except:
-                pass
-            try:
-                results.remove(ScryptedInterface.Intercom.value)
-            except:
-                pass
+        if self.webrtc_emulation:
+            results.add(ScryptedInterface.RTCSignalingChannel.value)
+            results.discard(ScryptedInterface.Intercom.value)
 
-        return results
+        if not self._can_push_to_talk():
+            results.discard(ScryptedInterface.RTCSignalingChannel.value)
+            results.discard(ScryptedInterface.Intercom.value)
+
+        return list(results)
 
     @property
     def webrtc_emulation(self):
         return self.storage.getItem("webrtc_emulation")
 
+    @property
+    def two_way_audio(self):
+        val = self.storage.getItem("two_way_audio")
+        if val is None:
+            val = True
+        return val
+
     async def getSettings(self):
-        return [
-            {
-                "key": "webrtc_emulation",
-                "title": "(Experimental) Emulate WebRTC Camera",
-                "value": self.webrtc_emulation,
-                "description": "Configures the plugin to offer this device as a WebRTC camera. May use increased system resources.",
-                "type": "boolean",
-            },
-        ]
+        if self._can_push_to_talk():
+            return [
+                {
+                    "key": "two_way_audio",
+                    "title": "(Experimental) Enable native two-way audio",
+                    "value": self.two_way_audio,
+                    "description": "Enables two-way audio for this device. Not yet completely functional on all audio senders.",
+                    "type": "boolean",
+                },
+                {
+                    "key": "webrtc_emulation",
+                    "title": "(Highly Experimental) Emulate WebRTC Camera",
+                    "value": self.webrtc_emulation,
+                    "description": "Configures the plugin to offer this device as a WebRTC camera, merging video/audio stream with two-way audio. "
+                                   "If enabled, takes precedence over native two-way audio. May use increased system resources.",
+                    "type": "boolean",
+                },
+            ]
+        return []
 
     async def putSetting(self, key, value):
-        if key == "webrtc_emulation":
+        if key in ["webrtc_emulation", "two_way_audio"]:
             self.storage.setItem(key, value == "true")
             await self.provider.discoverDevices()
 
