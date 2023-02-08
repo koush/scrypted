@@ -31,6 +31,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
     arlo_transport_choices = ["MQTT", "SSE"]
 
+    mfa_strategy_choices = ["Manual", "IMAP"]
+
     def __init__(self, nativeId=None):
         super().__init__(nativeId=nativeId)
         self.logger_name = "provider"
@@ -77,6 +79,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             verbosity = "Normal"
             self.storage.setItem("plugin_verbosity", verbosity)
         return verbosity
+
+    @property
+    def mfa_strategy(self):
+        strategy = self.storage.getItem("mfa_strategy")
+        if strategy is None or strategy not in ArloProvider.mfa_strategy_choices:
+            strategy = "Manual"
+            self.storage.setItem("mfa_strategy", strategy)
+        return strategy
 
     @property
     def arlo(self):
@@ -164,36 +174,75 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         change_stream_class(self.arlo_transport)
 
     async def getSettings(self):
-        return [
+        results = [
             {
-                "group": "Main Settings",
+                "group": "General",
                 "key": "arlo_username",
                 "title": "Arlo Username",
                 "value": self.arlo_username,
             },
             {
-                "group": "Main Settings",
+                "group": "General",
                 "key": "arlo_password",
                 "title": "Arlo Password",
                 "type": "password",
                 "value": self.arlo_password,
             },
             {
-                "group": "Main Settings",
-                "key": "arlo_mfa_code",
-                "title": "Two Factor Code",
-                "description": "Enter the code sent by Arlo to your email or phone number.",
+                "group": "General",
+                "key": "mfa_strategy",
+                "title": "Two Factor Strategy",
+                "description": "Mechanism to fetch the two factor code for Arlo login. Save after changing this field for more settings.",
+                "value": self.mfa_strategy,
+                "choices": self.mfa_strategy_choices,
             },
+        ]
+
+        if self.mfa_strategy == "Manual":
+            results.extend([
+                {
+                    "group": "General",
+                    "key": "arlo_mfa_code",
+                    "title": "Two Factor Code",
+                    "description": "Enter the code sent by Arlo to your email or phone number.",
+                },
+                {
+                    "group": "General",
+                    "key": "force_reauth",
+                    "title": "Force Re-Authentication",
+                    "description": "Resets the authentication flow of the plugin. Will also re-do 2FA.",
+                    "value": False,
+                    "type": "boolean",
+                },
+            ])
+        else:
+            results.extend([
+                {
+                    "group": "IMAP 2FA",
+                    "key": "imap_mfa_host",
+                    "title": "IMAP Hostname",
+                },
+                {
+                    "group": "IMAP 2FA",
+                    "key": "imap_mfa_port",
+                    "title": "IMAP Port",
+                },
+                {
+                    "group": "IMAP 2FA",
+                    "key": "imap_mfa_username",
+                    "title": "IMAP Username",
+                },
+                {
+                    "group": "IMAP 2FA",
+                    "key": "imap_mfa_password",
+                    "title": "IMAP Password",
+                    "type": "password",
+                },
+            ])
+        
+        results.extend([
             {
-                "group": "Main Settings",
-                "key": "force_reauth",
-                "title": "Force Re-Authentication",
-                "description": "Resets the authentication flow of the plugin. Will also re-do 2FA.",
-                "value": False,
-                "type": "boolean",
-            },
-            {
-                "group": "Main Settings",
+                "group": "General",
                 "key": "arlo_transport",
                 "title": "Underlying Transport Protocol",
                 "description": "Select the underlying transport protocol used to connect to Arlo Cloud.",
@@ -201,7 +250,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "choices": self.arlo_transport_choices,
             },
             {
-                "group": "Main Settings",
+                "group": "General",
                 "key": "plugin_verbosity",
                 "title": "Plugin Verbosity",
                 "description": "Select the verbosity of this plugin. 'Verbose' will show debugging messages, "
@@ -209,7 +258,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "value": self.plugin_verbosity,
                 "choices": sorted(self.plugin_verbosity_choices.keys()),
             },
-        ]
+        ])
+
+        return results
 
     async def putSetting(self, key, value):
         if key == "arlo_mfa_code":
@@ -229,6 +280,11 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 if self.arlo is not None:
                     self._arlo.Unsubscribe()
                     self._arlo = None
+            elif key == "mfa_strategy":
+                # don't do anything with the Arlo client if all we are doing
+                # is changing the strategy
+                await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
+                return
             else:
                 # force arlo client to be invalidated and reloaded
                 self.invalidate_arlo_client()

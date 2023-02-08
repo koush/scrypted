@@ -28,19 +28,37 @@ from .logging import logger
 
 class Stream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=10):
+    def __init__(self, arlo, expire=10, refresh=90):
         self.event_stream = None
         self.initializing = True
         self.connected = False
+        self.reconnecting = False
         self.queues = {}
         self.expire = expire
+        self.refresh = refresh
         self.event_stream_stop_event = threading.Event()
         self.event_stream_thread = None
         self.arlo = arlo
         self.event_loop = asyncio.get_event_loop()
+        self.event_loop.create_task(self._clean_queues())
+        self.event_loop.create_task(self._refresh_interval())
  
     def __del__(self):
         self.disconnect()
+
+    @property
+    def active(self):
+        """Represents if this stream is connected or in the process of reconnecting."""
+        return self.connected or self.reconnecting
+
+    async def _refresh_interval(self):
+        # refresh interval is in minutes
+        interval = self.refresh * 60 
+        await asyncio.sleep(interval)
+        while not self.event_stream_stop_event.is_set():
+            logger.info("Refreshing event stream")
+            await self.restart()
+            await asyncio.sleep(interval)
 
     async def _clean_queues(self):
         interval = self.expire * 2
@@ -141,6 +159,9 @@ class Stream:
     async def start(self):
         raise NotImplementedError()
 
+    async def restart(self):
+        raise NotImplementedError()
+
     def subscribe(self, topics):
         raise NotImplementedError()
 
@@ -160,6 +181,11 @@ class Stream:
         self.queues[key].put_nowait(event)
 
     def disconnect(self):
+        if self.reconnecting:
+            # disconnect may be called when an old stream is being refreshed/restarted,
+            # so don't completely shut down if we are reconnecting
+            return
+
         self.connected = False
 
         def exit_queues(self):

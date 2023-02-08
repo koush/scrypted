@@ -14,7 +14,9 @@ class EventStream(Stream):
             return
 
         def thread_main(self):
-            for event in self.event_stream:
+            connected = False
+            event_stream = self.event_stream
+            for event in event_stream:
                 logger.debug(f"Received event: {event}")
                 if event is None or self.event_stream_stop_event.is_set():
                     return None
@@ -27,15 +29,17 @@ class EventStream(Stream):
                 except json.JSONDecodeError:
                     continue
 
-                if self.connected:
+                if connected:
                     if response.get('action') == 'logout':
+                        logger.info(f"SSE {id(event_stream)} logged out")
                         self.disconnect()
                         return None
                     else:
                         self.event_loop.call_soon_threadsafe(self._queue_response, response)
                 elif response.get('status') == 'connected':
+                    logger.info(f"SSE {id(event_stream)} connected")
                     self.initializing = False
-                    self.connected = True
+                    connected = self.connected = True
 
         self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization'), session=self.arlo.request.session)
         self.event_stream_thread = threading.Thread(name="EventStream", target=thread_main, args=(self, ))
@@ -44,8 +48,16 @@ class EventStream(Stream):
 
         while not self.connected and not self.event_stream_stop_event.is_set():
             await asyncio.sleep(0.5)
+        # give it an extra sleep to ensure any previous connections have disconnected properly
+        # this is so we can mark reconnecting to False properly
+        await asyncio.sleep(0.5)
 
-        asyncio.get_event_loop().create_task(self._clean_queues())
+    async def restart(self):
+        self.reconnecting = True
+        self.connected = False
+        self.event_stream = None
+        await self.start()
+        self.reconnecting = False
 
     def subscribe(self, topics):
         pass
