@@ -25,7 +25,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     _arlo_mfa_complete_auth = None
 
     plugin_verbosity_choices = {
-        "Few": logging.WARNING,
         "Normal": logging.INFO,
         "Verbose": logging.DEBUG
     }
@@ -66,7 +65,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     @property
     def arlo_transport(self):
         transport = self.storage.getItem("arlo_transport")
-        if transport is None:
+        if transport is None or transport not in ArloProvider.arlo_transport_choices:
             transport = "SSE"
             self.storage.setItem("arlo_transport", transport)
         return transport
@@ -74,7 +73,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     @property
     def plugin_verbosity(self):
         verbosity = self.storage.getItem("plugin_verbosity")
-        if verbosity is None:
+        if verbosity is None or verbosity not in ArloProvider.plugin_verbosity_choices:
             verbosity = "Normal"
             self.storage.setItem("plugin_verbosity", verbosity)
         return verbosity
@@ -167,22 +166,26 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     async def getSettings(self):
         return [
             {
+                "group": "Main Settings",
                 "key": "arlo_username",
                 "title": "Arlo Username",
                 "value": self.arlo_username,
             },
             {
+                "group": "Main Settings",
                 "key": "arlo_password",
                 "title": "Arlo Password",
                 "type": "password",
                 "value": self.arlo_password,
             },
             {
+                "group": "Main Settings",
                 "key": "arlo_mfa_code",
                 "title": "Two Factor Code",
                 "description": "Enter the code sent by Arlo to your email or phone number.",
             },
             {
+                "group": "Main Settings",
                 "key": "force_reauth",
                 "title": "Force Re-Authentication",
                 "description": "Resets the authentication flow of the plugin. Will also re-do 2FA.",
@@ -190,6 +193,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "type": "boolean",
             },
             {
+                "group": "Main Settings",
                 "key": "arlo_transport",
                 "title": "Underlying Transport Protocol",
                 "description": "Select the underlying transport protocol used to connect to Arlo Cloud.",
@@ -197,9 +201,11 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "choices": self.arlo_transport_choices,
             },
             {
+                "group": "Main Settings",
                 "key": "plugin_verbosity",
                 "title": "Plugin Verbosity",
-                "description": "Select the verbosity of this plugin. 'Few' will only show warnings and errors. 'Verbose' will show debugging messages, including events received from connected Arlo cameras.",
+                "description": "Select the verbosity of this plugin. 'Verbose' will show debugging messages, "
+                               "including events received from connected Arlo cameras.",
                 "value": self.plugin_verbosity,
                 "choices": sorted(self.plugin_verbosity_choices.keys()),
             },
