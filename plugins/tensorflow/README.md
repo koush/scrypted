@@ -2,8 +2,7 @@
 
 This plugin adds object detection capabilities to any camera in Scrypted. Having a fast GPU and CPU is highly recommended.
 
-The TensorFlow Plugin should only be used if you are a Scrypted NVR user. It will provide no
-benefits to HomeKit, which does its own detection processing.
+The TensorFlow Plugin should only be used if you are a Scrypted NVR user. It will provide no benefits to HomeKit, which does its own detection processing.
 
 ## Platform Support
 
