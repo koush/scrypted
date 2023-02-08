@@ -362,8 +362,12 @@ export class PluginHost {
 
         // the plugin is expected to send process stats every 10 seconds.
         // this can be used as a check for liveness.
-        let lastStats = 0;
+        let lastStats: number;
         const statsInterval = setInterval(async () => {
+            // plugin may take a while to install, so wait
+            // for 1 stats report before starting the watchdog.
+            if (!lastStats)
+                return;
             if (!pluginDebug && lastStats + 60000 < Date.now()) {
                 const logger = await this.api.getLogger(undefined);
                 logger.log('e', 'plugin is unresponsive. restarting.');
