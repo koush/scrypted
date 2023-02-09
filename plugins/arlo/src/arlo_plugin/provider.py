@@ -49,6 +49,10 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         asyncio.get_event_loop().call_soon(load, self)
         self.create_task(self.onDeviceEvent(ScryptedInterface.Settings.value, None))
 
+    def print(self, *args, **kwargs):
+        """Overrides the print() from ScryptedDeviceBase to avoid double-printing in the main plugin console."""
+        print(*args, **kwargs)
+
     @property
     def arlo_username(self):
         return self.storage.getItem("arlo_username")
