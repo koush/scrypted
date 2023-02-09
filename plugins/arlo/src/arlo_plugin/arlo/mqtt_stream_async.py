@@ -7,8 +7,8 @@ from .stream_async import Stream
 from .logging import logger
 
 class MQTTStream(Stream):
-    def __init__(self, arlo, expire=10, refresh=90):
-        super().__init__(arlo, expire, refresh)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.cached_topics = []
 
     def _gen_client_number(self):
@@ -57,9 +57,8 @@ class MQTTStream(Stream):
 
         while not self.connected and not self.event_stream_stop_event.is_set():
             await asyncio.sleep(0.5)
-        # give it an extra sleep to ensure any previous connections have disconnected properly
-        # this is so we can mark reconnecting to False properly
-        await asyncio.sleep(0.5)
+        if not self.event_stream_stop_event.is_set():
+            self.resubscribe()
 
     async def restart(self):
         self.reconnecting = True
@@ -67,8 +66,10 @@ class MQTTStream(Stream):
         self.event_stream.disconnect()
         self.event_stream = None
         await self.start()
+        # give it an extra sleep to ensure any previous connections have disconnected properly
+        # this is so we can mark reconnecting to False properly
+        await asyncio.sleep(1)
         self.reconnecting = False
-        self.resubscribe()
 
     def subscribe(self, topics):
         if topics:
@@ -77,4 +78,5 @@ class MQTTStream(Stream):
             self.cached_topics.extend(new_subscriptions)
 
     def resubscribe(self):
-        self.event_stream.subscribe(self.cached_topics)
+        if self.cached_topics:
+            self.event_stream.subscribe(self.cached_topics)

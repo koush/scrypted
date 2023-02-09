@@ -47,6 +47,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         def load(self):
             _ = self.arlo
         asyncio.get_event_loop().call_soon(load, self)
+        self.create_task(self.onDeviceEvent(ScryptedInterface.Settings.value, None))
 
     @property
     def arlo_username(self):
@@ -87,6 +88,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             strategy = "Manual"
             self.storage.setItem("mfa_strategy", strategy)
         return strategy
+
+    @property
+    def refresh_interval(self):
+        interval = self.storage.getItem("refresh_interval")
+        if interval is None:
+            interval = 90
+            self.storage.setItem("refresh_interval", interval)
+        return int(interval)
 
     @property
     def arlo(self):
@@ -140,6 +149,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             for nativeId in self.arlo_cameras.keys():
                 await self.getDevice(nativeId)
+
+            self.arlo.event_stream.set_refresh_interval(self.refresh_interval)
         except requests.exceptions.HTTPError as e:
             self.logger.error(f"HTTPError '{str(e)}' while performing post-login Arlo setup, will retry with fresh login")
             self._arlo = None
@@ -150,7 +161,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             self.logger.error(f"Error performing post-login Arlo setup: {type(e)} with message {str(e)}")
 
     def invalidate_arlo_client(self):
-        if self.arlo is not None:
+        if self._arlo is not None:
             self._arlo.Unsubscribe()
         self._arlo = None
         self._arlo_mfa_code = None
@@ -238,6 +249,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                     "title": "IMAP Password",
                     "type": "password",
                 },
+                {
+                    "group": "IMAP 2FA",
+                    "key": "imap_mfa_interval",
+                    "title": "Refresh Login Interval",
+                    "description": "Interval, in days, to refresh the login session to Arlo Cloud.",
+                    "type": "number",
+                }
             ])
         
         results.extend([
@@ -248,6 +266,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "description": "Select the underlying transport protocol used to connect to Arlo Cloud.",
                 "value": self.arlo_transport,
                 "choices": self.arlo_transport_choices,
+            },
+            {
+                "group": "General",
+                "key": "refresh_interval",
+                "title": "Refresh Event Stream Interval",
+                "description": "Interval, in minutes, to refresh the underlying event stream connection to Arlo Cloud. "
+                               "A value of 0 disables this feature.",
+                "type": "number",
+                "value": self.refresh_interval,
             },
             {
                 "group": "General",
@@ -263,6 +290,11 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         return results
 
     async def putSetting(self, key, value):
+        if not self.validate_setting(key, value):
+            await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
+            return
+
+        skip_arlo_client = False
         if key == "arlo_mfa_code":
             self._arlo_mfa_code = value
         elif key == "force_reauth":
@@ -273,25 +305,39 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             if key == "plugin_verbosity":
                 self.propagate_verbosity()
+                skip_arlo_client = True
             elif key == "arlo_transport":
                 self.propagate_transport()
                 # force arlo client to be invalidated and reloaded, but
                 # keep any mfa codes
-                if self.arlo is not None:
+                if self._arlo is not None:
                     self._arlo.Unsubscribe()
                     self._arlo = None
             elif key == "mfa_strategy":
-                # don't do anything with the Arlo client if all we are doing
-                # is changing the strategy
-                await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
-                return
+                skip_arlo_client = True
+            elif key == "refresh_interval":
+                if self._arlo is not None and self._arlo.event_stream:
+                    self._arlo.event_stream.set_refresh_interval(self.refresh_interval)
+                skip_arlo_client = True
             else:
                 # force arlo client to be invalidated and reloaded
                 self.invalidate_arlo_client()
 
-        # initialize Arlo client or continue MFA
-        _ = self.arlo
+        if not skip_arlo_client:
+            # initialize Arlo client or continue MFA
+            _ = self.arlo
         await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
+
+    def validate_setting(self, key, val):
+        if key == "refresh_interval":
+            try:
+                val = int(val)
+            except ValueError:
+                self.logger.error(f"Invalid refresh interval '{val}' - must be an integer")
+                return False
+            if val < 0:
+                self.logger.error(f"Invalid refresh interval '{val}' - must be nonnegative")
+        return True
 
     async def discoverDevices(self, duration=0):
         if not self.arlo:

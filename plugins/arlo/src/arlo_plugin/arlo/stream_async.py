@@ -28,14 +28,15 @@ from .logging import logger
 
 class Stream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=10, refresh=90):
+    def __init__(self, arlo, expire=10):
         self.event_stream = None
         self.initializing = True
         self.connected = False
         self.reconnecting = False
         self.queues = {}
         self.expire = expire
-        self.refresh = refresh
+        self.refresh = 0
+        self.refresh_loop_signal = asyncio.Queue()
         self.event_stream_stop_event = threading.Event()
         self.event_stream_thread = None
         self.arlo = arlo
@@ -52,13 +53,34 @@ class Stream:
         return self.connected or self.reconnecting
 
     async def _refresh_interval(self):
-        # refresh interval is in minutes
-        interval = self.refresh * 60 
-        await asyncio.sleep(interval)
         while not self.event_stream_stop_event.is_set():
+            if self.refresh == 0:
+                # to avoid spinning, wait until an interval is set
+                signal = await self.refresh_loop_signal.get()
+                if signal is None:
+                    # exit signal received from disconnect()
+                    return
+                continue
+
+            interval = self.refresh * 60  # interval in seconds from refresh in minutes
+            signal_task = asyncio.create_task(self.refresh_loop_signal.get())
+
+            # wait until either we receive a signal or the refresh interval expires
+            done, pending = await asyncio.wait([signal_task, asyncio.sleep(interval)], return_when=asyncio.FIRST_COMPLETED)
+            for task in pending:
+                task.cancel()
+
+            done_task = done.pop()
+            if done_task is signal_task and done_task.result() is None:
+                # exit signal received from disconnect()
+                return
+
             logger.info("Refreshing event stream")
             await self.restart()
-            await asyncio.sleep(interval)
+
+    def set_refresh_interval(self, interval):
+        self.refresh = interval
+        self.refresh_loop_signal.put_nowait(object())
 
     async def _clean_queues(self):
         interval = self.expire * 2
@@ -191,6 +213,7 @@ class Stream:
         def exit_queues(self):
             for q in self.queues.values():
                 q.put_nowait(None)
+            self.refresh_loop_signal.put_nowait(None)
         self.event_loop.call_soon_threadsafe(exit_queues, self)
 
         self.event_stream_stop_event.set()

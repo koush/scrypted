@@ -8,6 +8,9 @@ from .logging import logger
 
 
 class EventStream(Stream):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.shutting_down_stream = None  # record the eventstream that is currently shutting down
 
     async def start(self):
         if self.event_stream is not None:
@@ -31,9 +34,12 @@ class EventStream(Stream):
 
                 if connected:
                     if response.get('action') == 'logout':
-                        logger.info(f"SSE {id(event_stream)} logged out")
-                        self.disconnect()
-                        return None
+                        if self.shutting_down_stream is None or self.shutting_down_stream is event_stream:
+                            logger.info(f"SSE {id(event_stream)} logged out")
+                            if self.shutting_down_stream is None:
+                                # only fully disconnect if we are not restarting
+                                self.disconnect()
+                            return None
                     else:
                         self.event_loop.call_soon_threadsafe(self._queue_response, response)
                 elif response.get('status') == 'connected':
@@ -48,15 +54,17 @@ class EventStream(Stream):
 
         while not self.connected and not self.event_stream_stop_event.is_set():
             await asyncio.sleep(0.5)
-        # give it an extra sleep to ensure any previous connections have disconnected properly
-        # this is so we can mark reconnecting to False properly
-        await asyncio.sleep(0.5)
 
     async def restart(self):
         self.reconnecting = True
         self.connected = False
+        self.shutting_down_stream = self.event_stream
         self.event_stream = None
         await self.start()
+        # give it an extra sleep to ensure any previous connections have disconnected properly
+        # this is so we can mark reconnecting to False properly
+        await asyncio.sleep(1)
+        self.shutting_down_stream = None
         self.reconnecting = False
 
     def subscribe(self, topics):
