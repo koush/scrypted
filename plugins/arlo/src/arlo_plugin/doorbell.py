@@ -7,8 +7,6 @@ class ArloDoorbell(ArloCamera, BinarySensor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.logger_name = f"{self.nativeId}.doorbell"
-
         self.start_doorbell_subscription()
 
     def start_doorbell_subscription(self):

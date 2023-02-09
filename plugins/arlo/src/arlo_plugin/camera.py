@@ -23,7 +23,7 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
     def __init__(self, nativeId, arlo_device, arlo_basestation, provider):
         super().__init__(nativeId=nativeId)
 
-        self.logger_name = f"{nativeId}.camera"
+        self.logger_name = nativeId
 
         self.nativeId = nativeId
         self.arlo_device = arlo_device
