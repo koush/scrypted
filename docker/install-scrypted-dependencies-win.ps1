@@ -6,7 +6,7 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/in
 choco upgrade -y nodejs-lts --version=18.13.0
 
 # Install Python
-choco upgrade -y python
+choco upgrade -y python39
 
 # Refresh environment variables for py and npx to work
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
