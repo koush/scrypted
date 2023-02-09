@@ -5,6 +5,8 @@ numpy>=1.16.2
 Pillow>=5.4.1
 pycoral~=2.0
 PyGObject>=3.30.4; sys_platform != 'win32'
+# roughly the available wheels.
+av>=10.0.0; sys_platform != 'linux' or platform_machine == 'x86_64' or platform_machine == 'aarch64'
 tflite-runtime==2.5.0.post1
 
 # sort_oh

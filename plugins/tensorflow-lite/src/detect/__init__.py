@@ -17,9 +17,19 @@ import threading
 from pipeline import run_pipeline
 import platform
 from .corohelper import run_coro_threadsafe
+from PIL import Image
+import math
 
+Gst = None
 try:
     from gi.repository import Gst
+except:
+    pass
+
+av = None
+try:
+    import av
+    av.logging.set_level(av.logging.PANIC) 
 except:
     pass
 
@@ -237,6 +247,9 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pass
 
+    def run_detection_image(self, detection_session: DetectionSession, image: Image.Image, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+        pass
+
     def run_detection_crop(self, detection_session: DetectionSession, sample: Any, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
         print("not implemented")
         pass
@@ -346,8 +359,49 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         b = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput.value)
         s = b.decode('utf8')
         j: FFmpegInput = json.loads(s)
+
         container = j.get('container', None)
         videosrc = j['url']
+
+        if not Gst:
+            user_callback = self.create_user_callback(self.run_detection_image, detection_session, duration)
+
+            async def inference_loop():
+                options = {
+                    'analyzeduration': '0',
+                    'probesize': '500000',
+                    'reorder_queue_size': '0',
+                }
+                container = av.open(videosrc, options = options)
+                stream = container.streams.video[0]
+
+                start = 0
+                for idx, frame in enumerate(container.decode(stream)):
+                    if detection_session.future.done():
+                        container.close()
+                        break
+                    now = time.time()
+                    if not start:
+                        start = now
+                    elapsed = now - start
+                    if (frame.time or 0) < elapsed - 0.500:
+                        # print('too slow, skipping frame')
+                        continue
+                    # print(frame)
+                    pil: Image.Image = frame.to_image()
+                    def convert_to_src_size(point, normalize):
+                        x, y = point
+                        return (int(math.ceil(x)), int(math.ceil(y)), True)
+                    await user_callback(pil, pil.size, convert_to_src_size)
+
+            def thread_main():
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(inference_loop())
+          
+            thread = threading.Thread(target=thread_main)
+            thread.start()
+            return self.create_detection_result_status(detection_id, True)
+      
         videoCodec = optional_chain(j, 'mediaStreamOptions', 'video', 'codec')
 
         if videosrc.startswith('tcp://'):
@@ -407,7 +461,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def invalidateMedia(self, detection_session: DetectionSession, data: Any):
         pass
 
-    def create_user_callback(self, detection_session: DetectionSession, duration: float):
+    def create_user_callback(self, run_detection: Any, detection_session: DetectionSession, duration: float):
         first_frame = True
 
         current_data = None
@@ -426,7 +480,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
             return detection_result['detections']
 
-        async def user_callback(gst_sample, src_size, convert_to_src_size):
+        async def user_callback(sample, src_size, convert_to_src_size):
             try:
                 detection_session.last_sample = time.time()
 
@@ -435,8 +489,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     first_frame = False
                     print("first frame received", detection_session.id)
 
-                detection_result, data = self.run_detection_gstsample(
-                    detection_session, gst_sample, detection_session.settings, src_size, convert_to_src_size)
+                detection_result, data = run_detection(
+                    detection_session, sample, detection_session.settings, src_size, convert_to_src_size)
                 if detection_result:
                     detection_result['running'] = True
 
@@ -497,7 +551,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             duration = session.get('duration', None)
 
         pipeline = GstPipeline(gstPipeline.loop, gstPipeline.finished, type(
-            self).__name__, self.create_user_callback(detection_session, duration))
+            self).__name__, self.create_user_callback(self.run_detection_gstsample, detection_session, duration))
         pipeline.attach_launch(gstPipeline.gst)
 
         return create, detection_session, objects_detected, pipeline
