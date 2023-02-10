@@ -3,14 +3,12 @@ Set-PSDebug -Trace 1
 # stop existing service if any
 sc.exe stop scrypted.exe
 
-$ErrorActionPreference = "Stop"
-
 # Install Chocolatey
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
 # Install node.js
-choco upgrade -y nodejs-lts --version=18.13.0
+choco upgrade -y nodejs-lts --version=18.14.0
 
 # Install Python
 choco upgrade -y python39
