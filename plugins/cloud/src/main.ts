@@ -227,7 +227,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         // scrypted cloud will replace localhost with requesting ip.
         const ip = this.storageSettings.values.forwardingMode === 'Custom Domain'
             ? this.storageSettings.values.hostname?.toString()
-            : 'localhost';
+            : (await axios(`https://${SCRYPTED_SERVER}/_punch/ip`)).data.ip;
 
         if (!ip)
             throw new Error('Hostname is required for port Custom Domain setup.');
