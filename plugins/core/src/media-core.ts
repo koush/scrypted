@@ -3,6 +3,7 @@ import { ScryptedDeviceBase, DeviceProvider, ScryptedInterface, ScryptedDeviceTy
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import { RequestMediaObjectHost, FileHost, BufferHost } from './converters';
+import url from 'url';
 
 export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, BufferConverter, HttpRequestHandler {
     httpHost: BufferHost;
@@ -102,8 +103,8 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
 
     async getLocalSnapshot(id: string, iface: string, search: string) {
         const endpoint = await endpointManager.getAuthenticatedPath(this.nativeId);
-        const url = path.join(endpoint, id, iface, `${Date.now()}.jpg`) + `${search}`;
-        return mediaManager.createMediaObject(Buffer.from(url), ScryptedMimeTypes.LocalUrl);
+        const ret = url.resolve(path.join(endpoint, id, iface, `${Date.now()}.jpg`) + `${search}`, '');
+        return mediaManager.createMediaObject(Buffer.from(ret), ScryptedMimeTypes.LocalUrl);
     }
 
     async convert(data: string, fromMimeType: string, toMimeType: string): Promise<MediaObject> {
