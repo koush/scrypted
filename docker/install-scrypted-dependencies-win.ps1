@@ -1,3 +1,10 @@
+Set-PSDebug -Trace 1
+
+# stop existing service if any
+sc.exe stop scrypted.exe
+
+$ErrorActionPreference = "Stop"
+
 # Install Chocolatey
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
@@ -6,7 +13,7 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/in
 choco upgrade -y nodejs-lts --version=18.13.0
 
 # Install Python
-choco upgrade -y python
+choco upgrade -y python39
 
 # Refresh environment variables for py and npx to work
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
@@ -38,6 +45,9 @@ $SERVICE_JS_PATH = $SCRYPTED_HOME + '\service.js'
 $SERVICE_JS_ESCAPED_PATH = $SERVICE_JS_PATH.replace('\', '\\')
 $SERVICE_JS | Out-File -Encoding ASCII -FilePath $SERVICE_JS_PATH
 
+Write-Output "Scrypted service will run as user $($env:USERNAME). Password is required for service setup."
+$env:PASSWORD = Read-Host -Prompt "Enter password for $($env:USERNAME)"
+
 $INSTALL_SERVICE_JS = @"
 const Service = require('node-windows').Service;
 const svc = new Service({
@@ -51,6 +61,9 @@ const svc = new Service({
     },
   ]
 });
+svc.logOnAs.domain = '$($env:COMPUTERNAME)';
+svc.logOnAs.account = '$($env:USERNAME)';
+svc.logOnAs.password = '$($env:PASSWORD)';
 svc.on('alreadyinstalled', () => {
    console.log('Service already installed, uninstalling first');
    // wait 5 seconds after uninstalling before deleting daemon to prevent unlink error
@@ -79,6 +92,7 @@ $INSTALL_SERVICE_JS_PATH = $SCRYPTED_HOME + '\install-service.js'
 $INSTALL_SERVICE_JS | Out-File -Encoding ASCII -FilePath $INSTALL_SERVICE_JS_PATH
 
 node $INSTALL_SERVICE_JS_PATH
+del $INSTALL_SERVICE_JS_PATH
 
 Write-Output "Scrypted is now running at: https://localhost:10443/"
 Write-Output "Note that it is https and that you'll be asked to approve/ignore the website certificate."
