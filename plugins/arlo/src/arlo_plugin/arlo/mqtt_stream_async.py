@@ -80,3 +80,7 @@ class MQTTStream(Stream):
     def resubscribe(self):
         if self.cached_topics:
             self.event_stream.subscribe(self.cached_topics)
+
+    def disconnect(self):
+        super().disconnect()
+        self.event_stream.disconnect()

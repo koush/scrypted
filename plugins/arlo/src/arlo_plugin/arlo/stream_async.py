@@ -98,6 +98,10 @@ class Stream:
                     item = q.get_nowait()
                     q.task_done()
 
+                    if not item:
+                        # exit signal received
+                        return
+
                     if item.expired:
                         num_dropped += 1
                         continue
@@ -126,6 +130,10 @@ class Stream:
             while True:
                 event = await q.get()
                 q.task_done()
+
+                if not event:
+                    # exit signal received
+                    return None, action
 
                 if first_requeued is not None and first_requeued is event:
                     # if we reach here, we've cycled through the whole queue
@@ -160,6 +168,10 @@ class Stream:
                     while not q.empty():
                         event = q.get_nowait()
                         q.task_done()
+
+                        if not event:
+                            # exit signal received
+                            return None, action
 
                         if first_requeued is not None and first_requeued is event:
                             # if we reach here, we've cycled through the whole queue
@@ -217,10 +229,6 @@ class Stream:
         self.event_loop.call_soon_threadsafe(exit_queues, self)
 
         self.event_stream_stop_event.set()
-
-        if self.event_stream_thread is not None and \
-            self.event_stream_thread != threading.current_thread():
-            self.event_stream_thread.join()
 
 
 class StreamEvent:

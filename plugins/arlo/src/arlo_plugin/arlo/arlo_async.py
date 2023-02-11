@@ -297,8 +297,8 @@ class Arlo(object):
     def Unsubscribe(self):
         """ This method stops the EventStream subscription and removes it from the event_stream collection. """
         if self.event_stream and self.event_stream.connected:
-            self.request.get(f'https://{self.BASE_URL}/hmsweb/client/unsubscribe')
             self.event_stream.disconnect()
+            self.request.get(f'https://{self.BASE_URL}/hmsweb/client/unsubscribe')
 
         self.event_stream = None
 
