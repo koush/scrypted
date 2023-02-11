@@ -213,12 +213,10 @@ class OpenCVPlugin(DetectPlugin):
         raise Exception('can not run motion detection on image')
 
     def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
-        format = avframe.format
-        if format != 'yuv420p' or format != 'yuvj420p':
-            format = 'yuvj420p'
+        if avframe.format.name != 'yuv420p' and avframe.format.name != 'yuvj420p':
+            mat = avframe.to_ndarray(format='gray8')
         else:
-            format = None
-        mat = avframe.to_ndarray(format=format)
+            mat = np.ndarray((avframe.height, avframe.width, self.pixelFormatChannelCount), buffer=avframe.planes[0], dtype=np.uint8)
         detections = self.detect(
             detection_session, mat, settings, src_size, convert_to_src_size)
         if not detections or not len(detections['detections']):
