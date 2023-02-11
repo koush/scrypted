@@ -57,6 +57,10 @@ const svc = new Service({
       name: "USERPROFILE",
       value: '$($USER_HOME_ESCAPED)'
     },
+    {
+      name: "SCRYPTED_PYTHON_PATH",
+      value: "python3.9.exe",
+    }
   ]
 });
 svc.logOnAs.domain = '$($env:COMPUTERNAME)';
