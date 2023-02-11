@@ -103,14 +103,14 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
         }
         const methodOrProperty = pathSegments[3];
         if (allInterfaceMethods.includes(methodOrProperty)) {
-            const query = new URLSearchParams(request.url.split('?')[1] || '');
-            let parameters = [];
-            const p = query.get('parameters');
-            if (p) {
-                parameters = JSON.parse(p);
-            }
-
             try {
+                const query = new URLSearchParams(request.url.split('?')[1] || '');
+                let parameters = [];
+                const p = query.get('parameters');
+                if (p) {
+                    parameters = JSON.parse(p);
+                }
+                
                 const result = await device[methodOrProperty](...parameters);
                 this.maybeSendMediaObject(response, result, methodOrProperty);
             }
