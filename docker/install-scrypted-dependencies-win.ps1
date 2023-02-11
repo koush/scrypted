@@ -12,12 +12,15 @@ choco upgrade -y nodejs-lts --version=18.14.0
 
 # Install Python
 choco upgrade -y python39
+# Run py.exe with a specific version
+$SCRYPTED_WINDOWS_PYTHON_VERSION="-3.9"
 
 # Refresh environment variables for py and npx to work
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
 
-py -m pip install --upgrade pip
-py -m pip install aiofiles debugpy typing_extensions typing opencv-python
+
+py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install --upgrade pip
+py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install aiofiles debugpy typing_extensions typing opencv-python
 
 npx -y scrypted@latest install-server
 
@@ -57,6 +60,10 @@ const svc = new Service({
       name: "USERPROFILE",
       value: '$($USER_HOME_ESCAPED)'
     },
+    {
+      name: "SCRYPTED_WINDOWS_PYTHON_VERSION",
+      value: '$($SCRYPTED_WINDOWS_PYTHON_VERSION)'
+    }
   ]
 });
 svc.logOnAs.domain = '$($env:COMPUTERNAME)';
