@@ -300,7 +300,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         if (this.storageSettings.values.forwardingMode === 'Custom Domain')
             return this.updatePortForward(upnpPort);
 
-        const [localAddress] = await endpointManager.getLocalAddresses();
+        const [localAddress] = await endpointManager.getLocalAddresses() || [];
+        if (!localAddress) {
+            this.log.a('UPNP Port Reservation failed. Scrypted Server Address is not configured in system Settings.');
+            return;
+        }
+
         this.upnpClient.portMapping({
             public: {
                 port: upnpPort,
