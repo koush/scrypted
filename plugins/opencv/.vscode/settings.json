@@ -9,10 +9,10 @@
     // "scrypted.serverRoot": "/server",
 
     // local checkout
-    // "scrypted.debugHost": "127.0.0.1",
-    // "scrypted.serverRoot": "/Users/koush/.scrypted",
-    "scrypted.debugHost": "koushik-windows",
-    "scrypted.serverRoot": "C:\\Users\\koush\\.scrypted",
+    "scrypted.debugHost": "127.0.0.1",
+    "scrypted.serverRoot": "/Users/koush/.scrypted",
+    // "scrypted.debugHost": "koushik-windows",
+    // "scrypted.serverRoot": "C:\\Users\\koush\\.scrypted",
 
     "scrypted.pythonRemoteRoot": "${config:scrypted.serverRoot}/volume/plugin.zip",
     "python.analysis.extraPaths": [

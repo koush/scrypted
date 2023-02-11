@@ -12,3 +12,4 @@ all_models
 sort_oh
 download_models.sh
 tsconfig.json
+.venv
