@@ -5,7 +5,11 @@ from typing import Any, List, Tuple
 import numpy as np
 import cv2
 import imutils
-from gi.repository import Gst
+Gst = None
+try:
+    from gi.repository import Gst
+except:
+    pass
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 from PIL import Image
 
