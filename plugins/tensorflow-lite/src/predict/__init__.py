@@ -111,6 +111,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         loop = asyncio.get_event_loop()
         loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
 
+    def getClasses(self) -> list[str]:
+        return list(self.labels.values())
+
     async def createMedia(self, data: RawImage) -> scrypted_sdk.MediaObject:
         mo = await scrypted_sdk.mediaManager.createMediaObject(data, self.fromMimeType)
         return mo

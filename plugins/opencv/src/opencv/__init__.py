@@ -1,13 +1,13 @@
 from __future__ import annotations
 from time import sleep
 from detect import DetectionSession, DetectPlugin
-from typing import Any, List
+from typing import Any, List, Tuple
 import numpy as np
 import cv2
 import imutils
 from gi.repository import Gst
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
-
+from PIL import Image
 
 class OpenCVDetectionSession(DetectionSession):
     def __init__(self) -> None:
@@ -45,11 +45,11 @@ class OpenCVPlugin(DetectPlugin):
             self.pixelFormat = "BGRA"
             self.pixelFormatChannelCount = 4
 
-    async def getDetectionModel(self) -> ObjectDetectionModel:
-        d: ObjectDetectionModel = {
-            'name': '@scrypted/opencv',
-            'classes': ['motion'],
-        }
+
+    def getClasses(self) -> list[str]:
+        return ['motion']
+
+    async def getSettings(self) -> list[Setting]:
         settings = [
             {
                 'title': "Motion Area",
@@ -99,8 +99,8 @@ class OpenCVPlugin(DetectPlugin):
                 ],
             }
         ]
-        d['settings'] = settings
-        return d
+
+        return settings
 
     def get_pixel_format(self):
         return self.pixelFormat
@@ -175,9 +175,6 @@ class OpenCVPlugin(DetectPlugin):
 
         return detection_result
 
-    def run_detection_jpeg(self, detection_session: DetectionSession, image_bytes: bytes, min_score: float) -> ObjectsDetected:
-        raise Exception('can not run motion detection on image')
-
     def get_detection_input_size(self, src_size):
         # The initial implementation of this plugin used BGRA
         # because it seemed impossible to pull the Y frame out of I420 without corruption.
@@ -210,6 +207,24 @@ class OpenCVPlugin(DetectPlugin):
             detection_session.cap.release()
             detection_session.cap = None
         return super().end_session(detection_session)
+
+    def run_detection_image(self, detection_session: DetectionSession, image: Image.Image, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+        # todo
+        raise Exception('can not run motion detection on image')
+
+    def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+        format = avframe.format
+        if format != 'yuv420p' or format != 'yuvj420p':
+            format = 'yuvj420p'
+        else:
+            format = None
+        mat = avframe.to_ndarray(format=format)
+        detections = self.detect(
+            detection_session, mat, settings, src_size, convert_to_src_size)
+        if not detections or not len(detections['detections']):
+            self.detection_sleep(settings)
+            return None, None
+        return detections, None
 
     def run_detection_gstsample(self, detection_session: OpenCVDetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         buf = gst_sample.get_buffer()
