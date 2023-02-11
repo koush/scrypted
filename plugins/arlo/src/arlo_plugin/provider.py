@@ -265,6 +265,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
     async def imap_relogin_loop(self):
         imap_signal = self.imap_signal
+        self.logger.info(f"Starting IMAP refresh loop {id(imap_signal)}")
         while True:
             self.logger.info("Performing IMAP login flow")
 
@@ -361,7 +362,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             done_task = done.pop()
             if done_task is signal_task and done_task.result() is None:
                 # exit signal received
-                self.logger.info("Exiting IMAP refresh loop")
+                self.logger.info(f"Exiting IMAP refresh loop {id(imap_signal)}")
                 return
 
     async def getSettings(self):
