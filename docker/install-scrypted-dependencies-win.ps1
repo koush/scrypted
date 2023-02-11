@@ -12,7 +12,8 @@ choco upgrade -y nodejs-lts --version=18.14.0
 
 # Install Python
 choco upgrade -y python39
-$SCRYPTED_PYTHON_PATH = (get-command python3.9.exe).Path
+$SCRYPTED_PYTHON_EXE = (get-command python3.9.exe).Path
+$SCRYPTED_PYTHON_EXE_ESCAPED_PATH = $SCRYPTED_PYTHON_EXE.replace('\', '\\')
 
 # Refresh environment variables for py and npx to work
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
@@ -60,7 +61,7 @@ const svc = new Service({
     },
     {
       name: "SCRYPTED_PYTHON_PATH",
-      value: "$($SCRYPTED_PYTHON_PATH)",
+      value: "$($SCRYPTED_PYTHON_EXE_ESCAPED_PATH)",
     }
   ]
 });
