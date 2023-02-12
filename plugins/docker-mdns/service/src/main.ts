@@ -5,6 +5,7 @@ import ciao from '@homebridge/ciao';
 import type { MdnsServiceRecord } from './mdns-service-record';
 import net from 'net';
 import { once } from "events";
+import fs from 'fs';
 
 async function listenZero(server: net.Server) {
     server.listen(0);
@@ -46,12 +47,16 @@ const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
 });
 
+const host = '127.0.0.1:10443';
+
+const creds = JSON.parse(fs.readFileSync(process.env.HOME + '/.scrypted/login.json').toString())[host];
+
 async function main() {
     const pluginId = '@scrypted/docker-mdns';
     const client = await connectScryptedClient({
-        username: process.env.SCRYPTED_USERNAME,
-        password: process.env.SCRYPTED_PASSWORD,
-        baseUrl: 'https://localhost:10443',
+        username: creds.username,
+        password: creds.token,
+        baseUrl: `https://${host}`,
         pluginId,
         axiosConfig: {
             httpsAgent,
@@ -81,6 +86,7 @@ async function main() {
                 const value = `${record.srv.port}:${port}`;
                 await plugin.putSetting('callback', value);
                 const remote = await clientPromise;
+                console.log('got a client for', record);
                 remote.pipe(client).pipe(remote);
                 client.on('error', () => remote.destroy());
                 remote.on('error', () => client.destroy());
