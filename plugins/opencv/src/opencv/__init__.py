@@ -53,7 +53,7 @@ class OpenCVPlugin(DetectPlugin):
     def getClasses(self) -> list[str]:
         return ['motion']
 
-    async def getSettings(self) -> list[Setting]:
+    def getModelSettings(self) -> list[Setting]:
         settings = [
             {
                 'title': "Motion Area",

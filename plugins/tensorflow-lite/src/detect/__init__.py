@@ -116,6 +116,9 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def get_input_details(self) -> Tuple[int, int, int]:
         pass
 
+    def getModelSettings(self) -> list[Setting]:
+        return []
+
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         d: ObjectDetectionModel = {
             'name': self.pluginId,
@@ -127,7 +130,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if Gst:
             decoderSetting: Setting = {
                 'title': "Decoder",
-                'description': "The toolto use to decode the stream. The may be libav or the gstreamer element.",
+                'description': "The tool used to decode the stream. The may be libav or the gstreamer element.",
                 'combobox': True,
                 'value': 'Default',
                 'placeholder': 'Default',
@@ -145,6 +148,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 decoderSetting['choices'].append('libav')
 
             d['settings'].append(decoderSetting)
+            d['settings'] += self.getModelSettings()
 
         return d
 
@@ -296,7 +300,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             # if the initial request was for an image.
             # however, attached sessions should be unchoked, as the pipeline
             # is not managed here.
-            if not detection_session or detection_session.attached or detection_session.running or not mediaObject:
+            if not detection_session or detection_session.running or not mediaObject:
                 return objects_detected
 
         detection_id = detection_session.id

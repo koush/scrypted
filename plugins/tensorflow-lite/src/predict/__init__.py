@@ -161,8 +161,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def get_input_details(self) -> Tuple[int, int, int]:
         pass
 
-    async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
-        d = await super().getDetectionModel(settings)
+    def getModelSettings(self) -> list[Setting]:
         allowList: Setting = {
             'title': 'Allow List',
             'description': 'The detection classes that will be reported. If none are specified, all detections will be reported.',
@@ -196,10 +195,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             'type': 'number',
         }
 
-        d['settings'].append(allowList)
-        d['settings'].append(trackerWindow)
-        d['settings'].append(trackerCertainty)
-        return d
+        return [allowList, trackerWindow, trackerCertainty]
+
 
     def create_detection_result(self, objs: List[Prediction], size, allowList, convert_to_src_size=None) -> ObjectsDetected:
         detections: List[ObjectDetectionResult] = []
