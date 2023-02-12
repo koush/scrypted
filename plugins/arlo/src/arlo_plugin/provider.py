@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import requests
+import traceback
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
@@ -177,7 +178,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 self.logger.info(f"Initialized Arlo client, waiting for MFA code")
                 return None
         except Exception as e:
-            self.logger.error(f"Error initializing Arlo client: {type(e)} with message {str(e)}")
+            traceback.print_exc()
             self._arlo = None
             self._arlo_mfa_code = None
             return None
@@ -194,13 +195,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             self.arlo.event_stream.set_refresh_interval(self.refresh_interval)
         except requests.exceptions.HTTPError as e:
-            self.logger.error(f"HTTPError '{str(e)}' while performing post-login Arlo setup, will retry with fresh login")
+            traceback.print_exc()
+            self.logger.error(f"Error logging in, will retry with fresh login")
             self._arlo = None
             self._arlo_mfa_code = None
             self.storage.setItem("arlo_auth_headers", None)
             _ = self.arlo
         except Exception as e:
-            self.logger.error(f"Error performing post-login Arlo setup: {type(e)} with message {str(e)}")
+            traceback.print_exc()
 
     def invalidate_arlo_client(self):
         if self._arlo is not None:
@@ -249,7 +251,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             if res.lower() != "ok":
                 raise Exception(f"IMAP failed to fetch old Arlo emails: {res}")
         except Exception as e:
-            self.logger.error(f"{type(e)}: {str(e)}")
+            traceback.print_exc()
             self.exit_imap()
         else:
             self.logger.info("Connected to IMAP")
@@ -338,7 +340,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                     self.logger.info("No MFA code found, will sleep and retry")
                     await asyncio.sleep(1)
             except Exception as e:
-                self.logger.error(f"{type(e)}: {str(e)}\nWill retry on next IMAP interval")
+                traceback.print_exc()
+                self.logger.error("Will retry on next IMAP interval")
                 self._arlo = old_arlo
                 self.storage.setItem("arlo_auth_headers", old_headers)
                 self.storage.setItem("arlo_user_id", old_user_id)

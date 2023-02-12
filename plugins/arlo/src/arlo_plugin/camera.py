@@ -30,8 +30,6 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
         self.arlo_basestation = arlo_basestation
         self.provider = provider
         self.logger.setLevel(self.provider.get_current_log_level())
-        
-        self._update_device_details(arlo_device)
 
         self.intercom_session = None
 
@@ -86,14 +84,20 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
 
     @property
     def webrtc_emulation(self):
-        return self.storage.getItem("webrtc_emulation")
+        if self.storage:
+            return self.storage.getItem("webrtc_emulation")
+        else:
+            return False
 
     @property
     def two_way_audio(self):
-        val = self.storage.getItem("two_way_audio")
-        if val is None:
-            val = True
-        return val
+        if self.storage:
+            val = self.storage.getItem("two_way_audio")
+            if val is None:
+                val = True
+            return val
+        else:
+            return True
 
     async def getSettings(self):
         if self._can_push_to_talk():
@@ -207,11 +211,6 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
         if self.intercom_session is not None:
             await self.intercom_session.shutdown()
             self.intercom_session = None
-
-    def _update_device_details(self, arlo_device):
-        """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
-        """
-        self.batteryLevel = arlo_device["properties"].get("batteryLevel")
 
     def _can_push_to_talk(self):
         # Right now, only implement push to talk for basestation cameras
