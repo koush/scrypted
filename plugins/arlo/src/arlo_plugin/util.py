@@ -20,3 +20,7 @@ class BackgroundTaskMixin:
         self.background_tasks.add(task)
         task.add_done_callback(print_exception)
         task.add_done_callback(self.background_tasks.discard)
+
+    def cancel_pending_tasks(self):
+        for task in self.background_tasks:
+            task.cancel()

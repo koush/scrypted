@@ -41,6 +41,7 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
 
     def __del__(self):
         self.stop_subscriptions = True
+        self.cancel_pending_tasks()
 
     def start_motion_subscription(self):
         def callback(motionDetected):
@@ -239,6 +240,7 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
 
     def __del__(self):
         self.stop_subscriptions = True
+        self.cancel_pending_tasks()
 
     def start_sdp_answer_subscription(self):
         def callback(sdp):

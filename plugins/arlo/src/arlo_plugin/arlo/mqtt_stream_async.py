@@ -31,7 +31,6 @@ class MQTTStream(Stream):
 
         def on_disconnect(client, *args, **kwargs):
             logger.info(f"MQTT {id(client)} disconnected")
-            self.disconnect()
 
         def on_message(client, userdata, msg):
             payload = msg.payload.decode()
