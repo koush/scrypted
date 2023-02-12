@@ -65,6 +65,7 @@ export class H264Repacketizer {
     fuaMax: number;
     pendingFuA: RtpPacket[];
     seenStapASps = false;
+    fuaMin: number;
 
     constructor(public console: Console, public maxPacketSize: number, public codecInfo: {
         sps: Buffer,
@@ -72,6 +73,7 @@ export class H264Repacketizer {
     }, public jitterBuffer = new JitterBuffer(console, 4)) {
         // 12 is the rtp/srtp header size.
         this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;
+        this.fuaMin = Math.round(maxPacketSize * .8);
     }
 
     ensureCodecInfo() {
@@ -275,7 +277,7 @@ export class H264Repacketizer {
         else {
             while (this.pendingFuA.length) {
                 const fua = this.pendingFuA[0];
-                if (fua.payload.length > this.maxPacketSize)
+                if (fua.payload.length > this.maxPacketSize || fua.payload.length < this.fuaMin)
                     break;
                 this.pendingFuA.shift();
                 ret.push(this.createPacket(fua, fua.payload, fua.header.marker));
@@ -423,13 +425,7 @@ export class H264Repacketizer {
 
             this.pendingFuA.push(packet);
 
-            // fua packets over rtsp/tcp may be a full size 64k packet.
-            // when fragmenting those for a udp transport, don't flush
-            // the tiny fragmented packet at the end. prepend it
-            // to the beginning of the next fat packet.
-            const fatPacket = packet.payload.length > this.maxPacketSize * 2;
-
-            if (isFuEnd || !fatPacket) {
+            if (isFuEnd) {
                 this.flushPendingFuA(ret);
             }
             else if (this.pendingFuA.reduce((p, c) => p + c.payload.length - FU_A_HEADER_SIZE, NAL_HEADER_SIZE) > this.maxPacketSize) {

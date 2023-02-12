@@ -23,15 +23,13 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
     def __init__(self, nativeId, arlo_device, arlo_basestation, provider):
         super().__init__(nativeId=nativeId)
 
-        self.logger_name = f"{nativeId}.camera"
+        self.logger_name = nativeId
 
         self.nativeId = nativeId
         self.arlo_device = arlo_device
         self.arlo_basestation = arlo_basestation
         self.provider = provider
         self.logger.setLevel(self.provider.get_current_log_level())
-        
-        self._update_device_details(arlo_device)
 
         self.intercom_session = None
 
@@ -41,6 +39,7 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
 
     def __del__(self):
         self.stop_subscriptions = True
+        self.cancel_pending_tasks()
 
     def start_motion_subscription(self):
         def callback(motionDetected):
@@ -60,49 +59,69 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
             self.provider.arlo.SubscribeToBatteryEvents(self.arlo_basestation, self.arlo_device, callback)
         )
 
-    def get_applicable_interfaces(self):
-        results = [
+    def get_applicable_interfaces(self) -> list:
+        results = set([
             ScryptedInterface.VideoCamera.value,
             ScryptedInterface.Camera.value,
             ScryptedInterface.MotionSensor.value,
             ScryptedInterface.Battery.value,
             ScryptedInterface.Settings.value,
-            ScryptedInterface.RTCSignalingChannel.value,
-        ]
+        ])
 
-        if not self.webrtc_emulation:
-            results.remove(ScryptedInterface.RTCSignalingChannel.value)
-            results.append(ScryptedInterface.Intercom.value)
+        if self.two_way_audio:
+            results.discard(ScryptedInterface.RTCSignalingChannel.value)
+            results.add(ScryptedInterface.Intercom.value)
 
-        if self.arlo_device["deviceId"] == self.arlo_device["parentId"]:
-            try:
-                results.remove(ScryptedInterface.RTCSignalingChannel.value)
-            except:
-                pass
-            try:
-                results.remove(ScryptedInterface.Intercom.value)
-            except:
-                pass
+        if self.webrtc_emulation:
+            results.add(ScryptedInterface.RTCSignalingChannel.value)
+            results.discard(ScryptedInterface.Intercom.value)
 
-        return results
+        if not self._can_push_to_talk():
+            results.discard(ScryptedInterface.RTCSignalingChannel.value)
+            results.discard(ScryptedInterface.Intercom.value)
+
+        return list(results)
 
     @property
     def webrtc_emulation(self):
-        return self.storage.getItem("webrtc_emulation")
+        if self.storage:
+            return self.storage.getItem("webrtc_emulation")
+        else:
+            return False
+
+    @property
+    def two_way_audio(self):
+        if self.storage:
+            val = self.storage.getItem("two_way_audio")
+            if val is None:
+                val = True
+            return val
+        else:
+            return True
 
     async def getSettings(self):
-        return [
-            {
-                "key": "webrtc_emulation",
-                "title": "(Experimental) Emulate WebRTC Camera",
-                "value": self.webrtc_emulation,
-                "description": "Configures the plugin to offer this device as a WebRTC camera. May use increased system resources.",
-                "type": "boolean",
-            },
-        ]
+        if self._can_push_to_talk():
+            return [
+                {
+                    "key": "two_way_audio",
+                    "title": "(Experimental) Enable native two-way audio",
+                    "value": self.two_way_audio,
+                    "description": "Enables two-way audio for this device. Not yet completely functional on all audio senders.",
+                    "type": "boolean",
+                },
+                {
+                    "key": "webrtc_emulation",
+                    "title": "(Highly Experimental) Emulate WebRTC Camera",
+                    "value": self.webrtc_emulation,
+                    "description": "Configures the plugin to offer this device as a WebRTC camera, merging video/audio stream with two-way audio. "
+                                   "If enabled, takes precedence over native two-way audio. May use increased system resources.",
+                    "type": "boolean",
+                },
+            ]
+        return []
 
     async def putSetting(self, key, value):
-        if key == "webrtc_emulation":
+        if key in ["webrtc_emulation", "two_way_audio"]:
             self.storage.setItem(key, value == "true")
             await self.provider.discoverDevices()
 
@@ -193,11 +212,6 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
             await self.intercom_session.shutdown()
             self.intercom_session = None
 
-    def _update_device_details(self, arlo_device):
-        """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
-        """
-        self.batteryLevel = arlo_device["properties"].get("batteryLevel")
-
     def _can_push_to_talk(self):
         # Right now, only implement push to talk for basestation cameras
         return self.arlo_device["deviceId"] != self.arlo_device["parentId"]
@@ -225,6 +239,7 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
 
     def __del__(self):
         self.stop_subscriptions = True
+        self.cancel_pending_tasks()
 
     def start_sdp_answer_subscription(self):
         def callback(sdp):

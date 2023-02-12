@@ -5,7 +5,6 @@ from PIL import Image
 import re
 import scrypted_sdk
 from typing import Any, List, Tuple, Mapping
-from gi.repository import Gst
 import asyncio
 import time
 import sys
@@ -15,6 +14,11 @@ from collections import namedtuple
 
 from .sort_oh import tracker
 import numpy as np
+
+try:
+    from gi.repository import Gst
+except:
+    pass
 
 Rectangle = namedtuple('Rectangle', 'xmin ymin xmax ymax')
 
@@ -107,6 +111,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         loop = asyncio.get_event_loop()
         loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
 
+    def getClasses(self) -> list[str]:
+        return list(self.labels.values())
+
     async def createMedia(self, data: RawImage) -> scrypted_sdk.MediaObject:
         mo = await scrypted_sdk.mediaManager.createMediaObject(data, self.fromMimeType)
         return mo
@@ -154,8 +161,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def get_input_details(self) -> Tuple[int, int, int]:
         pass
 
-    async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
-        d = await super().getDetectionModel(settings)
+    def getModelSettings(self) -> list[Setting]:
         allowList: Setting = {
             'title': 'Allow List',
             'description': 'The detection classes that will be reported. If none are specified, all detections will be reported.',
@@ -189,10 +195,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             'type': 'number',
         }
 
-        d['settings'].append(allowList)
-        d['settings'].append(trackerWindow)
-        d['settings'].append(trackerCertainty)
-        return d
+        return [allowList, trackerWindow, trackerCertainty]
+
 
     def create_detection_result(self, objs: List[Prediction], size, allowList, convert_to_src_size=None) -> ObjectsDetected:
         detections: List[ObjectDetectionResult] = []
@@ -252,7 +256,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         (w, h) = self.get_input_size()
         (iw, ih) = image.size
 
-        if not detection_session.tracker:
+        if detection_session and not detection_session.tracker:
             t = self.trackers.get(detection_session.id)
             if not t:
                 t = tracker.Sort_OH(scene=np.array([iw, ih]))
@@ -340,9 +344,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
      
         ret1 = self.detect_once(first, settings, src_size, cvss1)
         first.close()
-        detection_session.processed = detection_session.processed + 1
+        if detection_session:
+            detection_session.processed = detection_session.processed + 1
         ret2 = self.detect_once(second, settings, src_size, cvss2)
-        detection_session.processed = detection_session.processed + 1
+        if detection_session:
+            detection_session.processed = detection_session.processed + 1
         second.close()
 
         ret = ret1
@@ -379,7 +385,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         ret['detections'] = detections
 
-        if not multipass_crop:
+        if not multipass_crop and detection_session:
             sort_input = []
             for d in ret['detections']:
                 r: ObjectDetectionResult = d

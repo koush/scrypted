@@ -1,15 +1,10 @@
-# TensorFlow Object detection for VideoCamera devices.
+# TensorFlow Object Detection for Scrypted
 
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
+This plugin adds object detection capabilities to any camera in Scrypted. Having a fast GPU and CPU is highly recommended.
 
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
+The TensorFlow Plugin should only be used if you are a Scrypted NVR user. It will provide no benefits to HomeKit, which does its own detection processing.
 
-## Visual Studio Code configuration
+## Platform Support
 
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
+  * Edge TPU (Coral.ai) hardware acceleration is NOT supported by this plugin, install TensorFlow-Lite instead.
+  * Mac users should install CoreML Plugin for hardware acceleration.

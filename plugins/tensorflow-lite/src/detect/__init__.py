@@ -17,8 +17,21 @@ import threading
 from pipeline import run_pipeline
 import platform
 from .corohelper import run_coro_threadsafe
+from PIL import Image
+import math
 
-from gi.repository import Gst
+Gst = None
+try:
+    from gi.repository import Gst
+except:
+    pass
+
+av = None
+try:
+    import av
+    av.logging.set_level(av.logging.PANIC) 
+except:
+    pass
 
 from scrypted_sdk.types import ObjectDetectionModel, Setting, FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
@@ -32,55 +45,6 @@ def optional_chain(root, *keys):
         if result is None:
             break
     return result
-
-
-class PipelineValve:
-    allowPacketCounter: int
-
-    def __init__(self, gst, name) -> None:
-        self.allowPacketCounter = 1
-        self.mutex = threading.Lock()
-        valve = gst.get_by_name(name + "Valve")
-        self.pad = valve.get_static_pad("src")
-        self.name = name
-
-        needRemove = False
-
-        def probe(pad, info):
-            nonlocal needRemove
-            if needRemove:
-                self.close()
-                return Gst.PadProbeReturn.DROP
-            # REMOVE - remove this probe, passing the data.
-            needRemove = True
-            return Gst.PadProbeReturn.PASS
-
-        # need one buffer to go through to go into flowing state
-        self.probe = self.pad.add_probe(
-            Gst.PadProbeType.BLOCK | Gst.PadProbeType.BUFFER | Gst.PadProbeType.BUFFER_LIST, probe)
-
-    def open(self):
-        with self.mutex:
-            if self.probe != None:
-                self.pad.remove_probe(self.probe)
-                self.probe = None
-
-    def close(self):
-        with self.mutex:
-            if self.probe != None:
-                self.pad.remove_probe(self.probe)
-                self.probe = None
-
-            def probe(pad, info):
-                return Gst.PadProbeReturn.OK
-
-            self.probe = self.pad.add_probe(
-                Gst.PadProbeType.BLOCK | Gst.PadProbeType.BUFFER | Gst.PadProbeType.BUFFER_LIST, probe)
-
-
-def setupPipelineValve(name: str, gst: Any) -> PipelineValve:
-    ret = PipelineValve(gst, name)
-    return ret
 
 
 class DetectionSession:
@@ -97,9 +61,7 @@ class DetectionSession:
         self.timerHandle = None
         self.future = Future()
         self.running = False
-        self.attached = False
         self.mutex = threading.Lock()
-        self.valve: PipelineValve = None
         self.last_sample = time.time()
 
     def clearTimeoutLocked(self):
@@ -148,33 +110,46 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     async def putSetting(self, key: str, value: scrypted_sdk.SettingValue) -> None:
         pass
 
+    def getClasses(self) -> list[str]:
+        pass
+
+    def get_input_details(self) -> Tuple[int, int, int]:
+        pass
+
+    def getModelSettings(self) -> list[Setting]:
+        return []
+
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
-        height, width, channels = self.get_input_details()
         d: ObjectDetectionModel = {
             'name': self.pluginId,
-            'classes': list(self.labels.values()),
-            'inputSize': [int(width), int(height), int(channels)],
+            'classes': self.getClasses(),
+            'inputSize': self.get_input_details(),
+            'settings': [],
         }
 
-        decoderSetting: Setting = {
-            'title': "Decoder",
-            'description': "The gstreamer element used to decode the stream",
-            'combobox': True,
-            'value': 'Default',
-            'placeholder': 'Default',
-            'key': 'decoder',
-            'choices': [
-                'Default',
-                'decodebin',
-                'vtdec_hw',
-                'nvh264dec',
-                'vaapih264dec',
-            ],
-        }
+        if Gst:
+            decoderSetting: Setting = {
+                'title': "Decoder",
+                'description': "The tool used to decode the stream. The may be libav or the gstreamer element.",
+                'combobox': True,
+                'value': 'Default',
+                'placeholder': 'Default',
+                'key': 'decoder',
+                'choices': [
+                    'Default',
+                    'decodebin',
+                    'vtdec_hw',
+                    'nvh264dec',
+                    'vaapih264dec',
+                ],
+            }
 
-        d['settings'] = [
-            decoderSetting,
-        ]
+            if av:
+                decoderSetting['choices'].append('libav')
+
+            d['settings'].append(decoderSetting)
+            d['settings'] += self.getModelSettings()
+
         return d
 
     async def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, redetect: Any = None, mediaObject = None):
@@ -196,19 +171,11 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         print('detection ended', detection_session.id)
 
         detection_session.clearTimeout()
-        if detection_session.attached:
-            with detection_session.mutex:
-                if detection_session.running:
-                    print("choked session", detection_session.id)
-                    detection_session.running = False
-                    if detection_session.valve:
-                        detection_session.valve.close()
-        else:
-            # leave detection_session.running as True to avoid race conditions.
-            # the removal from detection_sessions will restart it.
-            safe_set_result(detection_session.loop, detection_session.future)
-            with self.session_mutex:
-                self.detection_sessions.pop(detection_session.id, None)
+        # leave detection_session.running as True to avoid race conditions.
+        # the removal from detection_sessions will restart it.
+        safe_set_result(detection_session.loop, detection_session.future)
+        with self.session_mutex:
+            self.detection_sessions.pop(detection_session.id, None)
 
         detection_result: ObjectsDetected = {}
         detection_result['running'] = False
@@ -232,6 +199,13 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         return DetectionSession()
 
     def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+        pass
+
+    def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+        pil: Image.Image = avframe.to_image()
+        return self.run_detection_image(detection_session, pil, settings, src_size, convert_to_src_size)
+
+    def run_detection_image(self, detection_session: DetectionSession, image: Image.Image, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pass
 
     def run_detection_crop(self, detection_session: DetectionSession, sample: Any, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
@@ -299,13 +273,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         if not new_session:
             print("existing session", detection_session.id)
-            if detection_session.attached:
-                with detection_session.mutex:
-                    if not detection_session.running:
-                        print("unchoked session", detection_session.id)
-                        detection_session.running = True
-                        if detection_session.valve:
-                            detection_session.valve.open()
             return (False, detection_session, self.create_detection_result_status(detection_id, detection_session.running))
 
         return (True, detection_session, None)
@@ -333,7 +300,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             # if the initial request was for an image.
             # however, attached sessions should be unchoked, as the pipeline
             # is not managed here.
-            if not detection_session or detection_session.attached or detection_session.running or not mediaObject:
+            if not detection_session or detection_session.running or not mediaObject:
                 return objects_detected
 
         detection_id = detection_session.id
@@ -343,8 +310,68 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         b = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput.value)
         s = b.decode('utf8')
         j: FFmpegInput = json.loads(s)
+
         container = j.get('container', None)
         videosrc = j['url']
+
+        decoder = settings and settings.get('decoder')
+        if decoder == 'libav' and not av:
+            decoder = None
+        elif decoder != 'libav' and not Gst:
+            decoder = None
+
+        decoder = decoder or 'Default'
+        if decoder == 'Default':
+            if Gst:
+                if platform.system() == 'Darwin':
+                    decoder = 'vtdec_hw'
+                else:
+                    decoder = 'decodebin'
+            elif av:
+                decoder = 'libav'
+
+        if decoder == 'libav':
+            user_callback = self.create_user_callback(self.run_detection_avframe, detection_session, duration)
+
+            async def inference_loop():
+                options = {
+                    'analyzeduration': '0',
+                    'probesize': '500000',
+                    'reorder_queue_size': '0',
+                }
+                container = av.open(videosrc, options = options)
+                stream = container.streams.video[0]
+
+                start = 0
+                for idx, frame in enumerate(container.decode(stream)):
+                    if detection_session.future.done():
+                        container.close()
+                        break
+                    now = time.time()
+                    if not start:
+                        start = now
+                    elapsed = now - start
+                    if (frame.time or 0) < elapsed - 0.500:
+                        # print('too slow, skipping frame')
+                        continue
+                    # print(frame)
+                    size = (frame.width, frame.height)
+                    def convert_to_src_size(point, normalize = False):
+                        x, y = point
+                        return (int(math.ceil(x)), int(math.ceil(y)), True)
+                    await user_callback(frame, size, convert_to_src_size)
+
+            def thread_main():
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(inference_loop())
+          
+            thread = threading.Thread(target=thread_main)
+            thread.start()
+            return self.create_detection_result_status(detection_id, True)
+        
+        if not Gst:
+            raise Exception('Gstreamer is unavailable')
+      
         videoCodec = optional_chain(j, 'mediaStreamOptions', 'video', 'codec')
 
         if videosrc.startswith('tcp://'):
@@ -362,14 +389,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             if videoCodec == 'h264':
                 videosrc += ' ! rtph264depay ! h264parse'
 
-        decoder = settings and settings.get('decoder', 'decodebin')
-        decoder = decoder or 'Default'
-        if decoder == 'Default':
-            if platform.system() == 'Darwin':
-                decoder = 'vtdec_hw'
-            else:
-                decoder = 'decodebin'
-            # decoder = 'decodebin'
         videosrc += " ! %s" % decoder
 
         width = optional_chain(j, 'mediaStreamOptions',
@@ -404,7 +423,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def invalidateMedia(self, detection_session: DetectionSession, data: Any):
         pass
 
-    def create_user_callback(self, detection_session: DetectionSession, duration: float):
+    def create_user_callback(self, run_detection: Any, detection_session: DetectionSession, duration: float):
         first_frame = True
 
         current_data = None
@@ -423,7 +442,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
             return detection_result['detections']
 
-        async def user_callback(gst_sample, src_size, convert_to_src_size):
+        async def user_callback(sample, src_size, convert_to_src_size):
             try:
                 detection_session.last_sample = time.time()
 
@@ -432,8 +451,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     first_frame = False
                     print("first frame received", detection_session.id)
 
-                detection_result, data = self.run_detection_gstsample(
-                    detection_session, gst_sample, detection_session.settings, src_size, convert_to_src_size)
+                detection_result, data = run_detection(
+                    detection_session, sample, detection_session.settings, src_size, convert_to_src_size)
                 if detection_result:
                     detection_result['running'] = True
 
@@ -476,43 +495,10 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         return user_callback
 
-    def attach_pipeline(self, gstPipeline: GstPipelineBase, session: ObjectDetectionSession, valveName: str = None):
-        create, detection_session, objects_detected = self.ensure_session(
-            'video/dummy', session)
-
-        if detection_session and valveName:
-            valve = setupPipelineValve(valveName, gstPipeline.gst)
-            detection_session.valve = valve
-
-        if not create:
-            return create, detection_session, objects_detected, None
-
-        detection_session.attached = True
-
-        duration = None
-        if session:
-            duration = session.get('duration', None)
-
-        pipeline = GstPipeline(gstPipeline.loop, gstPipeline.finished, type(
-            self).__name__, self.create_user_callback(detection_session, duration))
-        pipeline.attach_launch(gstPipeline.gst)
-
-        return create, detection_session, objects_detected, pipeline
-
-    def detach_pipeline(self, detection_id: str):
-        detection_session: DetectionSession = None
-        with self.session_mutex:
-            detection_session = self.detection_sessions.pop(detection_id)
-        if not detection_session:
-            raise Exception("pipeline already detached?")
-        with detection_session.mutex:
-            detection_session.running = False
-        detection_session.clearTimeout()
-
     def run_pipeline(self, detection_session: DetectionSession, duration, src_size, video_input):
         inference_size = self.get_detection_input_size(src_size)
 
-        pipeline = run_pipeline(detection_session.loop, detection_session.future, self.create_user_callback(detection_session, duration),
+        pipeline = run_pipeline(detection_session.loop, detection_session.future, self.create_user_callback(self.run_detection_gstsample, detection_session, duration),
                                 appsink_name=type(self).__name__,
                                 appsink_size=inference_size,
                                 video_input=video_input,

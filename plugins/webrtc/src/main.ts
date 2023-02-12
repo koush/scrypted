@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
 import { createRTCPeerConnectionSink, createTrackForwarder, parseOptions, RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement } from "./ffmpeg-to-wrtc";
-import { stunServer, turnServer } from './ice-servers';
+import { stunServer, turnServer, weriftStunServer, weriftTurnServer } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
@@ -422,6 +422,10 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
         return {
             iceUseIpv6: false,
+            iceServers: [
+                weriftStunServer,
+                weriftTurnServer,
+            ],
             ...ret,
         };
     }

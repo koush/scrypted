@@ -49,8 +49,41 @@ RUN_IGNORE brew install gst-python
 # python image library
 RUN_IGNORE brew install pillow
 
+### HACK WORKAROUND
+### https://github.com/koush/scrypted/issues/544
+
+brew unpin gstreamer
+brew unpin gst-python
+brew unpin gst-plugins-ugly
+brew unpin gst-plugins-good
+brew unpin gst-plugins-base
+brew unpin gst-plugins-bad
+
+brew unlink gstreamer
+brew unlink gst-python
+brew unlink gst-plugins-ugly
+brew unlink gst-plugins-good
+brew unlink gst-plugins-base
+brew unlink gst-plugins-bad
+
+curl -O https://raw.githubusercontent.com/Homebrew/homebrew-core/49a8667f0c1a6579fe887bc0fa1c0ce682eb01c8/Formula/gstreamer.rb && brew install ./gstreamer.rb
+curl -O https://raw.githubusercontent.com/Homebrew/homebrew-core/49a8667f0c1a6579fe887bc0fa1c0ce682eb01c8/Formula/gst-python.rb && brew install ./gst-python.rb
+curl -O https://raw.githubusercontent.com/Homebrew/homebrew-core/49a8667f0c1a6579fe887bc0fa1c0ce682eb01c8/Formula/gst-plugins-ugly.rb && brew install ./gst-plugins-ugly.rb
+curl -O https://raw.githubusercontent.com/Homebrew/homebrew-core/49a8667f0c1a6579fe887bc0fa1c0ce682eb01c8/Formula/gst-plugins-good.rb && brew install ./gst-plugins-good.rb
+curl -O https://raw.githubusercontent.com/Homebrew/homebrew-core/49a8667f0c1a6579fe887bc0fa1c0ce682eb01c8/Formula/gst-plugins-base.rb && brew install ./gst-plugins-base.rb
+curl -O https://raw.githubusercontent.com/Homebrew/homebrew-core/49a8667f0c1a6579fe887bc0fa1c0ce682eb01c8/Formula/gst-plugins-bad.rb && brew install ./gst-plugins-bad.rb
+
+brew pin gstreamer
+brew pin gst-python
+brew pin gst-plugins-ugly
+brew pin gst-plugins-good
+brew pin gst-plugins-base
+brew pin gst-plugins-bad
+
+### END HACK WORKAROUND
+
 ARCH=$(arch)
-if [ "$ARCH" = "arm64 "]
+if [ "$ARCH" = "arm64" ]
 then
     PYTHON_VERSION=3.10
 else

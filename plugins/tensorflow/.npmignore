@@ -7,4 +7,8 @@ src
 .vscode
 dist/*.js
 dist/*.txt
-face-api.js
+__pycache__
+all_models
+.venv
+download_models.sh
+tsconfig.json

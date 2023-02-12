@@ -297,8 +297,8 @@ class Arlo(object):
     def Unsubscribe(self):
         """ This method stops the EventStream subscription and removes it from the event_stream collection. """
         if self.event_stream and self.event_stream.connected:
-            self.request.get(f'https://{self.BASE_URL}/hmsweb/client/unsubscribe')
             self.event_stream.disconnect()
+            self.request.get(f'https://{self.BASE_URL}/hmsweb/client/unsubscribe')
 
         self.event_stream = None
 
@@ -503,7 +503,7 @@ class Arlo(object):
 
         async def loop_action_listener(action):
             seen_events = {}
-            while self.event_stream.connected:
+            while self.event_stream.active:
                 event, _ = await self.event_stream.get(resource, [action], seen_events)
 
                 if event is None or self.event_stream is None \
@@ -524,7 +524,7 @@ class Arlo(object):
                     if seen_events[uuid].expired:
                         del seen_events[uuid]
 
-        if self.event_stream and self.event_stream.connected:
+        if self.event_stream and self.event_stream.active:
             listeners = [loop_action_listener(action) for action in actions]
             done, pending = await asyncio.wait(listeners, return_when=asyncio.FIRST_COMPLETED)
             for task in pending:

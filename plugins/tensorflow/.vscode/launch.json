@@ -6,17 +6,25 @@
     "configurations": [
         {
             "name": "Scrypted Debugger",
-            "address": "${config:scrypted.debugHost}",
-            "port": 10081,
+            "type": "python",
             "request": "attach",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
+            "connect": {
+                "host": "${config:scrypted.debugHost}",
+                "port": 10081
+            },
+            "justMyCode": false,
             "preLaunchTask": "scrypted: deploy+debug",
-            "sourceMaps": true,
-            "localRoot": "${workspaceFolder}/out",
-            "remoteRoot": "/plugin/",
-            "type": "pwa-node"
+            "pathMappings": [
+                {
+                    "localRoot": "/Volumes/Dev/scrypted/server/python/",
+                    "remoteRoot": "/Volumes/Dev/scrypted/server/python/",
+                },
+                {
+                    "localRoot": "${workspaceFolder}/src",
+                    "remoteRoot": "${config:scrypted.pythonRemoteRoot}"
+                },
+
+            ]
         }
     ]
 }

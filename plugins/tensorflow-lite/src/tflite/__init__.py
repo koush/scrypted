@@ -78,7 +78,7 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
         with self.mutex:
             _, height, width, channels = self.interpreter.get_input_details()[
                 0]['shape']
-            return height, width, channels
+            return int(width), int(height), int(channels)
 
     def get_input_size(self) -> Tuple[float, float]:
         return input_size(self.interpreter)

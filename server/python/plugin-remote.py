@@ -490,7 +490,7 @@ async def async_main(loop: AbstractEventLoop):
                     heapTotal = 0
             stats = {
                 'type': 'stats',
-                'cpuUsage': {
+                'cpu': {
                     'user': ptime,
                     'system': 0,
                 },

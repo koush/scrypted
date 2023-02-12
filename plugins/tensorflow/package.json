@@ -1,9 +1,17 @@
 {
    "name": "@scrypted/tensorflow",
-   "version": "0.0.21",
-   "description": "Scrypted Face Recognition Service.",
-   "author": "Scrypted",
-   "license": "Apache-2.0",
+   "description": "Scrypted TensorFlow Object Detection",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "coreml",
+      "neural",
+      "object",
+      "detect",
+      "detection",
+      "people",
+      "person"
+   ],
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -17,42 +25,21 @@
       "scrypted-readme": "scrypted-readme",
       "scrypted-package-json": "scrypted-package-json"
    },
-   "keywords": [
-      "scrypted",
-      "plugin",
-      "tensorflow",
-      "motion",
-      "detection",
-      "face",
-      "recognition",
-      "people",
-      "person"
-   ],
    "scrypted": {
-      "name": "TensorFlow Face Recognition Plugin",
+      "name": "TensorFlow Object Detection",
+      "pluginDependencies": [
+         "@scrypted/objectdetector"
+      ],
+      "runtime": "python",
       "type": "API",
       "interfaces": [
-         "DeviceProvider",
-         "ObjectDetection",
-         "Settings"
-      ],
-      "sharedWorker": false
-   },
-   "dependencies": {
-      "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk",
-      "@koush/face-api.js": "^0.22.3",
-      "jpeg-js": "^0.4.3",
-      "lodash": "^4.17.21"
+         "Settings",
+         "BufferConverter",
+         "ObjectDetection"
+      ]
    },
    "devDependencies": {
-      "@types/lodash": "^4.14.175",
-      "@types/node": "^14.17.11"
+      "@scrypted/sdk": "file:../../sdk"
    },
-   "optionalDependencies": {
-      "@tensorflow/tfjs": "^3.11.0",
-      "@tensorflow/tfjs-core": "^3.9.0",
-      "@tensorflow/tfjs-node-gpu": "^3.11.0",
-      "canvas": "^2.8.0"
-   }
+   "version": "0.1.2"
 }
