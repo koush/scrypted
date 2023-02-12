@@ -49,9 +49,6 @@ $SERVICE_JS_PATH = $SCRYPTED_HOME + '\service.js'
 $SERVICE_JS_ESCAPED_PATH = $SERVICE_JS_PATH.replace('\', '\\')
 $SERVICE_JS | Out-File -Encoding ASCII -FilePath $SERVICE_JS_PATH
 
-Write-Output "Scrypted service will run as user $($env:USERNAME). Password is required for service setup."
-$env:PASSWORD = Read-Host -Prompt "Enter password for $($env:USERNAME)"
-
 $INSTALL_SERVICE_JS = @"
 const Service = require('node-windows').Service;
 const svc = new Service({
@@ -69,9 +66,6 @@ const svc = new Service({
     }
   ]
 });
-// svc.logOnAs.domain = '$($env:COMPUTERNAME)';
-// svc.logOnAs.account = '$($env:USERNAME)';
-// svc.logOnAs.password = '$($env:PASSWORD)';
 svc.on('alreadyinstalled', () => {
    console.log('Service already installed, uninstalling first');
    // wait 5 seconds after uninstalling before deleting daemon to prevent unlink error
