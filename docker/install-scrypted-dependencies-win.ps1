@@ -1,4 +1,4 @@
-Set-PSDebug -Trace 1
+# Set-PSDebug -Trace 1
 
 # stop existing service if any
 sc.exe stop scrypted.exe
