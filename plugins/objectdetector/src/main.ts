@@ -64,6 +64,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   detectionId: string;
   running = false;
   analyzeStarted = 0;
+  lastDetectionInput = 0;
 
   constructor(mixinDevice: VideoCamera & Camera & MotionSensor & ObjectDetector & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, modelName: string, group: string, public hasMotionType: boolean, public settings: Setting[]) {
     super({
@@ -343,20 +344,17 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       detection.detections = trackedDetections;
     }
 
+    const now = Date.now();
+    if (this.lastDetectionInput + this.detectionTimeout * 1000 < Date.now())
+      retainImage = true;
+
     if (retainImage) {
+      this.lastDetectionInput = now;
       this.console.log('retaining detection image');
       this.setDetection(detection, mediaObject);
     }
 
     this.reportObjectDetections(detection);
-    // if (newOrBetterDetection) {
-    //   mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')
-    //     .then(jpeg => {
-    //       fs.writeFileSync(`/Volumes/External/test/${Date.now()}.jpeg`, jpeg);
-    //       this.console.log('jepg!');
-    //     })
-    //   this.console.log('retaining media');
-    // }
     return retainImage;
   }
 
