@@ -69,9 +69,9 @@ const svc = new Service({
     }
   ]
 });
-svc.logOnAs.domain = '$($env:COMPUTERNAME)';
-svc.logOnAs.account = '$($env:USERNAME)';
-svc.logOnAs.password = '$($env:PASSWORD)';
+// svc.logOnAs.domain = '$($env:COMPUTERNAME)';
+// svc.logOnAs.account = '$($env:USERNAME)';
+// svc.logOnAs.password = '$($env:PASSWORD)';
 svc.on('alreadyinstalled', () => {
    console.log('Service already installed, uninstalling first');
    // wait 5 seconds after uninstalling before deleting daemon to prevent unlink error
