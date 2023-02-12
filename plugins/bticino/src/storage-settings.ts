@@ -6,7 +6,6 @@ export class BticinoStorageSettings {
     private storageSettings
     
     constructor(camera : BticinoSipCamera) {
-
         this.storageSettings = new StorageSettings( camera, {
             sipfrom: {
                 title: 'SIP From: URI',
@@ -48,6 +47,15 @@ export class BticinoStorageSettings {
                 description: 'Enable voicemail alerts',
                 placeholder: 'true or false',
             },              
+            doorbellWebhookUrl: {
+                title: 'Doorbell Sensor Webhook',
+                type: 'string',
+                readonly: true,
+                mapGet: () => {
+                    return camera.webhookUrl;
+                },
+                description: 'Incoming doorbell sensor webhook url.',
+            }            
         });
     }
 

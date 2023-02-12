@@ -1,13 +1,13 @@
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { sleep } from '@scrypted/common/src/sleep';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
-import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { SipCallSession } from '../../sip/src/sip-call-session';
 import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType, RtpDescription } from '../../sip/src/rtp-utils';
 import { VoicemailHandler } from './bticino-voicemailHandler';
 import { CompositeSipMessageHandler } from '../../sip/src/compositeSipMessageHandler';
 import { decodeSrtpOptions, encodeSrtpOptions, SrtpOptions } from '../../ring/src/srtp-utils'
-import { sleep } from '@scrypted/common/src/sleep';
 import { SipHelper } from './sip-helper';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
@@ -22,7 +22,7 @@ import { SipManager, SipRequest } from '../../sip/src/sip-manager';
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
 
-export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor {
+export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler {
     private session: SipCallSession
     private remoteRtpDescription: RtpDescription
     private audioOutForwarder: dgram.Socket
@@ -39,11 +39,16 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     private keyAndSalt : string = "/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X"
     private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
     private persistentSipManager : PersistentSipManager
+    public webhookUrl : string
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
         this.requestHandlers.add( this.voicemailHandler ).add( this.inviteHandler )
-        this.persistentSipManager = new PersistentSipManager( this )
+        this.persistentSipManager = new PersistentSipManager( this );
+        (async() => {
+            this.webhookUrl = await this.getMotionDetectedWebhookUrl()
+        })();
+        
     }
 
     sipUnlock(): Promise<void> {
@@ -339,4 +344,25 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
     }    
+
+    private async getMotionDetectedWebhookUrl(): Promise<string> {
+        let webhookUrl = await sdk.endpointManager.getLocalEndpoint(this.nativeId, { insecure: false });
+        webhookUrl += "doorbellDetected";
+        this.console.log( webhookUrl )
+        return `${webhookUrl}`;
+    }
+
+    public async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        if (request.url.endsWith('/motionDetected')) {
+            this.binaryState = true;
+
+            response.send('Success', {
+                code: 200,
+            });
+        } else {
+            response.send('Unsupported operation', {
+                code: 400,
+            });
+        }
+    }     
 }
