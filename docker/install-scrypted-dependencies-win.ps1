@@ -29,6 +29,9 @@ $SCRYPTED_HOME = $env:USERPROFILE + '\.scrypted'
 $SCRYPTED_HOME_ESCAPED_PATH = $SCRYPTED_HOME.replace('\', '\\')
 npm install --prefix $SCRYPTED_HOME node-windows@1.0.0-beta.8 --save
 
+$NPX_PATH = (Get-Command npx).Path
+$NPX_PATH_ESCAPED = $NPX_PATH.replace('\', '\\')
+
 $SERVICE_JS = @"
 const fs = require('fs');
 try {
@@ -37,7 +40,7 @@ try {
 catch (e) {
 }
 const child_process = require('child_process');
-child_process.spawn('npx.cmd', ['-y', 'scrypted', 'serve'], {
+child_process.spawn('$($NPX_PATH_ESCAPED)', ['-y', 'scrypted', 'serve'], {
     stdio: 'inherit',
 });
 "@
