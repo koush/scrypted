@@ -368,7 +368,7 @@ export class PluginHost {
             // for 1 stats report before starting the watchdog.
             if (!lastStats)
                 return;
-            if (!pluginDebug && lastStats + 60000 < Date.now()) {
+            if (!pluginDebug && (lastStats + 60000 < Date.now())) {
                 const logger = await this.api.getLogger(undefined);
                 logger.log('e', 'plugin is unresponsive. restarting.');
                 this.api.requestRestart();
