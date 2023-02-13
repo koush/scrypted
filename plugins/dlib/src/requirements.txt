@@ -1,0 +1,9 @@
+# plugin
+Pillow>=5.4.1
+PyGObject>=3.30.4
+face-recognition
+
+# sort_oh
+scipy
+filterpy
+numpy
