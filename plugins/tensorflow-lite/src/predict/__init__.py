@@ -8,9 +8,9 @@ from typing import Any, List, Tuple, Mapping
 import asyncio
 import time
 import sys
+from .rectangle import Rectangle, intersect_area, intersect_rect, to_bounding_box, from_bounding_box, combine_rect
 
 from detect import DetectionSession, DetectPlugin
-from collections import namedtuple
 
 from .sort_oh import tracker
 import numpy as np
@@ -19,14 +19,6 @@ try:
     from gi.repository import Gst
 except:
     pass
-
-Rectangle = namedtuple('Rectangle', 'xmin ymin xmax ymax')
-
-def intersect_area(a: Rectangle, b: Rectangle):  # returns None if rectangles don't intersect
-    dx = min(a.xmax, b.xmax) - max(a.xmin, b.xmin)
-    dy = min(a.ymax, b.ymax) - max(a.ymin, b.ymin)
-    if (dx>=0) and (dy>=0):
-        return dx*dy
 
 class PredictSession(DetectionSession):
     image: Image.Image
@@ -58,15 +50,9 @@ class RawImage:
         self.image = image
         self.jpegMediaObject = None
 
-def is_same_detection(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
-    if d1['className'] != d2['className']:
-        return False, None
-    
-    bb1 = d1['boundingBox']
-    bb2 = d2['boundingBox']
-
-    r1 = Rectangle(bb1[0], bb1[1], bb1[0] + bb1[2], bb1[1] + bb1[3])
-    r2 = Rectangle(bb2[0], bb2[1], bb2[0] + bb2[2], bb2[1] + bb2[3])
+def is_same_box(bb1, bb2, threshold = .8):
+    r1 = from_bounding_box(bb1)
+    r2 = from_bounding_box(bb2)
     ia = intersect_area(r1, r2)
 
     if not ia:
@@ -76,7 +62,7 @@ def is_same_detection(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
     a2 = bb2[2] * bb2[3]
 
     # if area intersect area is too small, these are different boxes
-    if ia / a1 < .4 and ia / a2 < .4:
+    if ia / a1 < threshold and ia / a2 < threshold:
         return False, None
 
     l = min(bb1[0], bb2[0])
@@ -88,6 +74,35 @@ def is_same_detection(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
     h = b - t
 
     return True, (l, t, w, h)
+
+def is_same_detection(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
+    if d1['className'] != d2['className']:
+        return False, None
+
+    return is_same_box(d1['boundingBox'], d2['boundingBox'])
+
+def dedupe_detections(input: List[ObjectDetectionResult], is_same_detection = is_same_detection):
+    input = input.copy()
+    detections = []
+    while len(input):
+        d = input.pop()
+        found = False
+        for c in detections:
+            same, box = is_same_detection(d, c)
+            if same:
+                # encompass this box and score
+                d['boundingBox'] = box
+                d['score'] = max(d['score'], c['score'])
+                # remove from current detections list
+                detections = list(filter(lambda r: r != c, detections))
+                # run dedupe again with this new larger item
+                input.append(d)
+                found = True
+                break
+
+        if not found:
+            detections.append(d)
+    return detections
 
 class Prediction:
     def __init__(self, id: int, score: float, bbox: Tuple[float, float, float, float]):
@@ -249,7 +264,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def get_input_size(self) -> Tuple[float, float]:
         pass
 
-    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
+    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> List[ObjectDetectionResult]:
         pass
 
     def run_detection_image(self, detection_session: PredictSession, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, multipass_crop: Tuple[float, float, float, float] = None):
@@ -325,11 +340,13 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         else:
             scaled = image.resize((int(round(s * iw)), int(round(s * ih))), Image.ANTIALIAS)
 
-        first = scaled.crop((0, 0, w, h))
+        first_crop = (0, 0, w, h)
+        first = scaled.crop(first_crop)
         (sx, sy) = scaled.size
         ow = sx - w
         oh = sy - h
-        second = scaled.crop((ow, oh, ow + w, oh + h))
+        second_crop = (ow, oh, ow + w, oh + h)
+        second = scaled.crop(second_crop)
         if scaled is not image:
             scaled.close()
 
@@ -351,39 +368,40 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             detection_session.processed = detection_session.processed + 1
         second.close()
 
+        two_intersect = intersect_rect(Rectangle(*first_crop), Rectangle(*second_crop))
+        two_intersect = Rectangle(two_intersect.xmin / s, two_intersect.ymin / s, two_intersect.xmax / s, two_intersect.ymax / s)
+
+        def is_same_detection_middle(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
+            same, ret = is_same_detection(d1, d2)
+            if same:
+                return same, ret
+
+            if d1['className'] != d2['className']:
+                return False, None
+
+            r1 = from_bounding_box(d1['boundingBox'])
+            m1 = intersect_rect(two_intersect, r1)
+            if not m1:
+                return False, None
+
+            r2 = from_bounding_box(d2['boundingBox'])
+            m2 = intersect_rect(two_intersect, r2)
+            if not m2:
+                return False, None
+
+            same, ret = is_same_box(to_bounding_box(m1), to_bounding_box(m2))
+            if not same:
+                return False, None
+            c = to_bounding_box(combine_rect(r1, r2))
+            return True, c
+
         ret = ret1
-        ret['detections'] = ret1['detections'] + ret2['detections']
+        ret['detections'] = dedupe_detections(ret1['detections'] + ret2['detections'], is_same_detection=is_same_detection_middle)
 
         if not len(ret['detections']):
             return ret, RawImage(image)
 
-        detections: List[ObjectDetectionResult]
-
-        def dedupe_detections():
-            nonlocal detections
-            detections = []
-            while len(ret['detections']):
-                d = ret['detections'].pop()
-                found = False
-                for c in detections:
-                    same, box = is_same_detection(d, c)
-                    if same:
-                        # encompass this box and score
-                        d['boundingBox'] = box
-                        d['score'] = max(d['score'], c['score'])
-                        # remove from current detections list
-                        detections = list(filter(lambda r: r != c, detections))
-                        # run dedupe again with this new larger item
-                        ret['detections'].append(d)
-                        found = True
-                        break
-
-                if not found:
-                    detections.append(d)
-
-        dedupe_detections()
-
-        ret['detections'] = detections
+        detections = dedupe_detections(ret['detections'])
 
         if not multipass_crop and detection_session:
             sort_input = []
