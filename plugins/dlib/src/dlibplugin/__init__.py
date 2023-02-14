@@ -10,6 +10,7 @@ import numpy as np
 from typing import Any, List, Tuple, Mapping
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 from predict import PredictSession
+import threading
 
 MIME_TYPE = 'x-scrypted-dlib/x-raw-image'
 
@@ -22,6 +23,7 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
         }
 
         self.known_faces = []
+        self.mutex = threading.Lock()
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
@@ -36,19 +38,20 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         nparray = np.array(input.resize((int(input.width / 4), int(input.height / 4))))
 
-        face_locations = face_recognition.face_locations(nparray)
+        with self.mutex:
+            face_locations = face_recognition.face_locations(nparray)
 
-        scaled = []
-        for idx, face in enumerate(face_locations):
-            t, r, b, l = face
-            t *= 4
-            r *= 4
-            b *= 4
-            l *= 4
-            face_locations[idx] = (t, r, b, l)
+            scaled = []
+            for idx, face in enumerate(face_locations):
+                t, r, b, l = face
+                t *= 4
+                r *= 4
+                b *= 4
+                l *= 4
+                face_locations[idx] = (t, r, b, l)
 
-        nparray = np.array(input)
-        face_encodings = face_recognition.face_encodings(nparray, face_locations, model = 'small')
+            nparray = np.array(input)
+            face_encodings = face_recognition.face_encodings(nparray, face_locations, model = 'small')
 
         m = {}
         for idx, fe in enumerate(face_encodings):
