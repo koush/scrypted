@@ -48,7 +48,7 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
             face_locations[idx] = (t, r, b, l)
 
         nparray = np.array(input)
-        face_encodings = face_recognition.face_encodings(nparray, face_locations, model = 'large')
+        face_encodings = face_recognition.face_encodings(nparray, face_locations, model = 'small')
 
         m = {}
         for idx, fe in enumerate(face_encodings):
