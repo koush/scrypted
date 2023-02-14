@@ -954,7 +954,16 @@ export interface DeviceDiscovery {
  * Battery retrieves the battery level of battery powered devices.
  */
 export interface Battery {
+  /**
+   * The current battery level of the device, from 0% to 100%.
+   */
   batteryLevel?: number;
+
+  /** 
+   * Set this to true if this battery-powered device is currently using an external power source (e.g. AC, solar).
+   * This will allow for prebuffering on devices that contain a battery.
+   */
+  externallyPowered?: boolean;
 }
 /**
  * Refresh indicates that this device has properties that are not automatically updated, and must be periodically refreshed via polling. Device implementations should never implement their own underlying polling algorithm, and instead implement Refresh to allow Scrypted to manage polling intelligently.
