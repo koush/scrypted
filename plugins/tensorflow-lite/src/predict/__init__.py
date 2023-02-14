@@ -129,6 +129,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def getClasses(self) -> list[str]:
         return list(self.labels.values())
 
+    def getTriggerClasses(self) -> list[str]:
+        return ['motion']
+
     async def createMedia(self, data: RawImage) -> scrypted_sdk.MediaObject:
         mo = await scrypted_sdk.mediaManager.createMediaObject(data, self.fromMimeType)
         return mo
@@ -176,11 +179,12 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def get_input_details(self) -> Tuple[int, int, int]:
         pass
 
-    def getModelSettings(self) -> list[Setting]:
+    def getModelSettings(self, settings: Any = None) -> list[Setting]:
         allowList: Setting = {
-            'title': 'Allow List',
-            'description': 'The detection classes that will be reported. If none are specified, all detections will be reported.',
-            'choices': list(self.labels.values()),
+            'title': 'Detections Types',
+            # 'subgroup': 'Advanced',
+            'description': 'The detections that will be reported. If none are specified, all detections will be reported. Select only detection types of interest for optimal performance.',
+            'choices': self.getClasses(),
             'multiple': True,
             'key': 'allowList',
             'value': [
@@ -196,6 +200,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         trackerWindow: Setting = {
             'title': 'Tracker Window',
+            'subgroup': 'Advanced',
             'description': 'Internal Setting. Do not change.',
             'key': 'trackerWindow',
             'value': 3,
@@ -204,6 +209,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         trackerCertainty: Setting = {
             'title': 'Tracker Certainty',
+            'subgroup': 'Advanced',
             'description': 'Internal Setting. Do not change.',
             'key': 'trackerCertainty',
             'value': .2,
@@ -264,11 +270,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def get_input_size(self) -> Tuple[float, float]:
         pass
 
-    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> List[ObjectDetectionResult]:
+    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         pass
 
     def run_detection_image(self, detection_session: PredictSession, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, multipass_crop: Tuple[float, float, float, float] = None):
-        (w, h) = self.get_input_size()
+        (w, h) = self.get_input_size() or image.size
         (iw, ih) = image.size
 
         if detection_session and not detection_session.tracker:
@@ -336,67 +342,73 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         hs = h / ih
         s = max(ws, hs)
         if ws == 1 and hs == 1:
-            scaled = image
+            def cvss(point, normalize=False):
+                converted = convert_to_src_size(point, normalize) if convert_to_src_size else (point[0], point[1], True)
+                return converted
+
+            ret = self.detect_once(image, settings, src_size, cvss)
+            if detection_session:
+                detection_session.processed = detection_session.processed + 1
         else:
             scaled = image.resize((int(round(s * iw)), int(round(s * ih))), Image.ANTIALIAS)
 
-        first_crop = (0, 0, w, h)
-        first = scaled.crop(first_crop)
-        (sx, sy) = scaled.size
-        ow = sx - w
-        oh = sy - h
-        second_crop = (ow, oh, ow + w, oh + h)
-        second = scaled.crop(second_crop)
-        if scaled is not image:
-            scaled.close()
+            first_crop = (0, 0, w, h)
+            first = scaled.crop(first_crop)
+            (sx, sy) = scaled.size
+            ow = sx - w
+            oh = sy - h
+            second_crop = (ow, oh, ow + w, oh + h)
+            second = scaled.crop(second_crop)
+            if scaled is not image:
+                scaled.close()
 
-        def cvss1(point, normalize=False):
-            unscaled = (point[0] / s, point[1] / s)
-            converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
-            return converted
-        def cvss2(point, normalize=False):
-            unscaled = ((point[0] + ow) / s, (point[1] + oh) / s)
-            converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
-            return converted
-     
-        ret1 = self.detect_once(first, settings, src_size, cvss1)
-        first.close()
-        if detection_session:
-            detection_session.processed = detection_session.processed + 1
-        ret2 = self.detect_once(second, settings, src_size, cvss2)
-        if detection_session:
-            detection_session.processed = detection_session.processed + 1
-        second.close()
+            def cvss1(point, normalize=False):
+                unscaled = (point[0] / s, point[1] / s)
+                converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
+                return converted
+            def cvss2(point, normalize=False):
+                unscaled = ((point[0] + ow) / s, (point[1] + oh) / s)
+                converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
+                return converted
 
-        two_intersect = intersect_rect(Rectangle(*first_crop), Rectangle(*second_crop))
-        two_intersect = Rectangle(two_intersect.xmin / s, two_intersect.ymin / s, two_intersect.xmax / s, two_intersect.ymax / s)
+            ret1 = self.detect_once(first, settings, src_size, cvss1)
+            first.close()
+            if detection_session:
+                detection_session.processed = detection_session.processed + 1
+            ret2 = self.detect_once(second, settings, src_size, cvss2)
+            if detection_session:
+                detection_session.processed = detection_session.processed + 1
+            second.close()
 
-        def is_same_detection_middle(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
-            same, ret = is_same_detection(d1, d2)
-            if same:
-                return same, ret
+            two_intersect = intersect_rect(Rectangle(*first_crop), Rectangle(*second_crop))
+            two_intersect = Rectangle(two_intersect.xmin / s, two_intersect.ymin / s, two_intersect.xmax / s, two_intersect.ymax / s)
 
-            if d1['className'] != d2['className']:
-                return False, None
+            def is_same_detection_middle(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
+                same, ret = is_same_detection(d1, d2)
+                if same:
+                    return same, ret
 
-            r1 = from_bounding_box(d1['boundingBox'])
-            m1 = intersect_rect(two_intersect, r1)
-            if not m1:
-                return False, None
+                if d1['className'] != d2['className']:
+                    return False, None
 
-            r2 = from_bounding_box(d2['boundingBox'])
-            m2 = intersect_rect(two_intersect, r2)
-            if not m2:
-                return False, None
+                r1 = from_bounding_box(d1['boundingBox'])
+                m1 = intersect_rect(two_intersect, r1)
+                if not m1:
+                    return False, None
 
-            same, ret = is_same_box(to_bounding_box(m1), to_bounding_box(m2))
-            if not same:
-                return False, None
-            c = to_bounding_box(combine_rect(r1, r2))
-            return True, c
+                r2 = from_bounding_box(d2['boundingBox'])
+                m2 = intersect_rect(two_intersect, r2)
+                if not m2:
+                    return False, None
 
-        ret = ret1
-        ret['detections'] = dedupe_detections(ret1['detections'] + ret2['detections'], is_same_detection=is_same_detection_middle)
+                same, ret = is_same_box(to_bounding_box(m1), to_bounding_box(m2))
+                if not same:
+                    return False, None
+                c = to_bounding_box(combine_rect(r1, r2))
+                return True, c
+
+            ret = ret1
+            ret['detections'] = dedupe_detections(ret1['detections'] + ret2['detections'], is_same_detection=is_same_detection_middle)
 
         if not len(ret['detections']):
             return ret, RawImage(image)

@@ -27,8 +27,11 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
     def get_input_size(self) -> Tuple[float, float]:
         pass
 
+    def getTriggerClasses(self) -> list[str]:
+        return ['person']
+
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
-        nparray = np.array(input)
+        nparray = np.array(input.resize((int(input.width / 4), int(input.height / 4))))
 
         face_landmarks_list = face_recognition.face_landmarks(nparray)
 
@@ -62,6 +65,12 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
             ))
             objs.append(obj)
 
-        ret = self.create_detection_result(objs, src_size, ['face'], cvss)
+
+        def rescale(point, normalized = False):
+            point = (point[0] * 4, point[1] * 4)
+            if not cvss:
+                return point, True
+            return cvss(point, normalized)
+        ret = self.create_detection_result(objs, src_size, ['face'], rescale)
 
         return ret

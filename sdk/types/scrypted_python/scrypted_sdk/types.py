@@ -453,6 +453,7 @@ class ObjectDetectionModel(TypedDict):
     inputSize: list[float]
     name: str
     settings: list[Setting]
+    triggerClasses: list[str]
     pass
 
 class ObjectDetectionSession(TypedDict):
