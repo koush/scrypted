@@ -23,9 +23,9 @@ services:
         volumes:
             - ~/.scrypted/volume:/server/volume
             # modify and add the additional volume for Scrypted NVR
-            # the following example would mount the /media/external path on the host
+            # the following example would mount the /mnt/sda/video path on the host
             # to the /nvr path inside the docker container.
-            # - /media/external:/nvr
+            # - /mnt/sda/video:/nvr
         # logging is noisy and will unnecessarily wear on flash storage.
         # scrypted has per device in memory logging that is preferred.
         logging:
