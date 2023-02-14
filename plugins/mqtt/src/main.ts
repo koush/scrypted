@@ -187,7 +187,9 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
                 if (typeof str === 'object')
                     str = JSON.stringify(str);
 
-                this.client.publish(`${this.pathname}/${property}`, str?.toString() || '');
+                this.client.publish(`${this.pathname}/${property}`, str?.toString() || '', {
+                    retain: true,
+                });
             }
             else {
                 let str = eventData;
