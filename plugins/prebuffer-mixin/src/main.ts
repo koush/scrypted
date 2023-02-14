@@ -1469,7 +1469,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       }
     }
 
-    const isBatteryPowered = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery) && !this?.externallyPowered;
+    const isBatteryPowered = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery) && !this.externallyPowered;
 
     if (!enabledIds.length)
       this.online = true;
