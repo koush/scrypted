@@ -5,7 +5,7 @@ import { Settings, Setting, DeviceProvider, ScryptedDeviceBase, ScryptedInterfac
 import sdk from '@scrypted/sdk';
 import { monacoEvalDefaults } from './monaco';
 import { scryptedEval } from './scrypted-eval';
-import { MqttClient, MqttSubscriptions } from './api/mqtt-client';
+import { MqttClient, MqttClientPublishOptions, MqttSubscriptions } from './api/mqtt-client';
 import aedes, { AedesOptions } from 'aedes';
 import net from 'net';
 import ws from 'websocket-stream';
@@ -134,12 +134,12 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
                         });
                     }
                 },
-                publish: async (topic: string, value: any) => {
+                publish: async (topic: string, value: any, options?: MqttClientPublishOptions) => {
                     if (typeof value === 'object')
                         value = JSON.stringify(value);
                     if (value.constructor.name !== Buffer.name)
                         value = value.toString();
-                    this.client.publish(this.pathname + topic, value);
+                    this.client.publish(this.pathname + topic, value, options);
                 },
                 ...sd
             }
