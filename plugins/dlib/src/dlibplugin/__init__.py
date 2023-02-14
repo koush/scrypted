@@ -9,6 +9,7 @@ import face_recognition
 import numpy as np
 from typing import Any, List, Tuple, Mapping
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
+from predict import PredictSession
 
 MIME_TYPE = 'x-scrypted-dlib/x-raw-image'
 
@@ -19,6 +20,8 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
         self.labels = {
            0: 'face'
         }
+
+        self.known_faces = []
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
@@ -33,44 +36,54 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         nparray = np.array(input.resize((int(input.width / 4), int(input.height / 4))))
 
-        face_landmarks_list = face_recognition.face_landmarks(nparray)
+        face_locations = face_recognition.face_locations(nparray)
+
+        scaled = []
+        for idx, face in enumerate(face_locations):
+            t, r, b, l = face
+            t *= 4
+            r *= 4
+            b *= 4
+            l *= 4
+            face_locations[idx] = (t, r, b, l)
+
+        nparray = np.array(input)
+        face_encodings = face_recognition.face_encodings(nparray, face_locations, model = 'large')
+
+        m = {}
+        for idx, fe in enumerate(face_encodings):
+            results = face_recognition.compare_faces(self.known_faces, fe)
+            found = False
+            for i, r in enumerate(results):
+                if r:
+                    found = True
+                    m[idx] = str(i)
+                    break
+
+            if not found:
+                self.known_faces.append(fe)
+
+        # return
 
         objs = []
 
-        for face in face_landmarks_list:
-            xmin: int = None
-            xmax: int = None
-            ymin: int = None
-            ymax: int = None
-            for feature in face:
-                for point in face[feature]:
-                    if xmin == None:
-                        xmin = point[0]
-                        ymin = point[1]
-                        xmax = point[0]
-                        ymax = point[1]
-                    else:
-                        xmin = min(xmin, point[0])
-                        ymin = min(ymin, point[1])
-                        xmax = max(xmax, point[0])
-                        ymax = max(ymax, point[1])
-
-
-
+        for face in face_locations:
+            t, r, b, l = face
             obj = Prediction(0, 1, Rectangle(
-                xmin,
-                ymin,
-                xmax,
-                ymax
+                l,
+                t,
+                r,
+                b
             ))
             objs.append(obj)
 
+        ret = self.create_detection_result(objs, src_size, ['face'], cvss)
 
-        def rescale(point, normalized = False):
-            point = (point[0] * 4, point[1] * 4)
-            if not cvss:
-                return point, True
-            return cvss(point, normalized)
-        ret = self.create_detection_result(objs, src_size, ['face'], rescale)
+        for idx, d in enumerate(ret['detections']):
+            d['id'] = m.get(idx)
 
         return ret
+
+    def track(self, detection_session: PredictSession, ret: ObjectsDetected):
+        pass
+

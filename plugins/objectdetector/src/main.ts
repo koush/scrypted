@@ -45,7 +45,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   detectorListener: EventListenerRegister;
   motionMixinListener: EventListenerRegister;
   detections = new Map<string, MediaObject>();
-  cameraDevice: ScryptedDevice & Camera & VideoCamera & MotionSensor;
+  cameraDevice: ScryptedDevice & Camera & VideoCamera & MotionSensor & ObjectDetector;
   detectSnapshotsOnly = this.storage.getItem('detectionMode');
   detectionTimeout = parseInt(this.storage.getItem('detectionTimeout')) || defaultDetectionTimeout;
   detectionDuration = parseInt(this.storage.getItem('detectionDuration')) || defaultDetectionDuration;
@@ -72,7 +72,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       mixinStorageSuffix: objectDetection.id,
     });
 
-    this.cameraDevice = systemManager.getDeviceById<Camera & VideoCamera & MotionSensor>(this.id);
+    this.cameraDevice = systemManager.getDeviceById<Camera & VideoCamera & MotionSensor & ObjectDetector>(this.id);
     this.detectionId = modelName + '-' + this.cameraDevice.id;
 
     this.bindObjectDetection();
@@ -202,7 +202,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
               continue;
 
             if (set.has(trigger)) {
-              await this.startVideoDetection();
+              const jpeg = await this.cameraDevice.getDetectionInput(data.detectionId, data.eventId);
+              const found = await this.objectDetection.detectObjects(jpeg);
+              this.console.log('found', found);
               return;
             }
           }

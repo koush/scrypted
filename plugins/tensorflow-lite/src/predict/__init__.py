@@ -413,54 +413,57 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         if not len(ret['detections']):
             return ret, RawImage(image)
 
-        detections = dedupe_detections(ret['detections'])
-
-        if not multipass_crop and detection_session:
-            sort_input = []
-            for d in ret['detections']:
-                r: ObjectDetectionResult = d
-                l, t, w, h = r['boundingBox']
-                sort_input.append([l, t, l + w, t + h, r['score']])
-            trackers, unmatched_trckr, unmatched_gts = detection_session.tracker.update(np.array(sort_input), [])
-
-            for td in trackers:
-                x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
-                ), td[2].item(), td[3].item(), td[4].item()
-                slop = sys.maxsize
-                obj: ObjectDetectionResult = None
-                ta = (x1 - x0) * (y1 - y0)
-                box = Rectangle(x0, y0, x1, y1)
-                for d in detections:
-                    if d.get('id'):
-                        continue
-                    ob: ObjectDetectionResult = d
-                    dx0, dy0, dw, dh = ob['boundingBox']
-                    dx1 = dx0 + dw
-                    dy1 = dy0 + dh
-                    da = dw * dh
-                    area = intersect_area(Rectangle(dx0, dy0, dx1, dy1), box)
-                    if not area:
-                        continue
-                    dslop = ta + da - area * 2
-                    if (dslop < slop):
-                        slop = dslop
-                        obj = ob
-
-                if obj:
-                    obj['id'] = str(trackID)
-                # this may happen if tracker predicts something is still in the scene
-                # but was not detected
-                # else:
-                #     print('unresolved tracker')
-
-            for d in detections:
-                if not d.get('id'):
-                    # this happens if the tracker is not confident in a new detection yet due
-                    # to low score or has not been found in enough frames
-                    if d['className'] == 'person':
-                        print('untracked %s: %s' % (d['className'], d['score']))
+        if detection_session:
+            self.track(detection_session, ret)
 
         return ret, RawImage(image)
+
+    def track(self, detection_session: PredictSession, ret: ObjectsDetected):
+        detections = ret['detections']
+
+        sort_input = []
+        for d in ret['detections']:
+            r: ObjectDetectionResult = d
+            l, t, w, h = r['boundingBox']
+            sort_input.append([l, t, l + w, t + h, r['score']])
+        trackers, unmatched_trckr, unmatched_gts = detection_session.tracker.update(np.array(sort_input), [])
+
+        for td in trackers:
+            x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
+            ), td[2].item(), td[3].item(), td[4].item()
+            slop = sys.maxsize
+            obj: ObjectDetectionResult = None
+            ta = (x1 - x0) * (y1 - y0)
+            box = Rectangle(x0, y0, x1, y1)
+            for d in detections:
+                if d.get('id'):
+                    continue
+                ob: ObjectDetectionResult = d
+                dx0, dy0, dw, dh = ob['boundingBox']
+                dx1 = dx0 + dw
+                dy1 = dy0 + dh
+                da = dw * dh
+                area = intersect_area(Rectangle(dx0, dy0, dx1, dy1), box)
+                if not area:
+                    continue
+                dslop = ta + da - area * 2
+                if (dslop < slop):
+                    slop = dslop
+                    obj = ob
+
+            if obj:
+                obj['id'] = str(trackID)
+            # this may happen if tracker predicts something is still in the scene
+            # but was not detected
+            # else:
+            #     print('unresolved tracker')
+
+        # for d in detections:
+        #     if not d.get('id'):
+        #         # this happens if the tracker is not confident in a new detection yet due
+        #         # to low score or has not been found in enough frames
+        #         if d['className'] == 'person':
+        #             print('untracked %s: %s' % (d['className'], d['score']))
 
     def run_detection_crop(self, detection_session: DetectionSession, sample: RawImage, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
         (ret, _) = self.run_detection_image(detection_session, sample.image, settings, src_size, convert_to_src_size, bounding_box)
