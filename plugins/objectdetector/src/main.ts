@@ -204,7 +204,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
             if (set.has(trigger)) {
               const jpeg = await this.cameraDevice.getDetectionInput(data.detectionId, data.eventId);
               const found = await this.objectDetection.detectObjects(jpeg);
-              this.console.log('found', found);
+              this.reportObjectDetections(found);
               return;
             }
           }
