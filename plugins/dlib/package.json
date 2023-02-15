@@ -33,6 +33,7 @@
       "runtime": "python",
       "type": "API",
       "interfaces": [
+         "DeviceProvider",
          "Settings",
          "BufferConverter",
          "ObjectDetection"
