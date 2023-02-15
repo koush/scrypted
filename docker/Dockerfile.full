@@ -29,6 +29,7 @@ RUN apt-get -y upgrade
 # base development stuff
 RUN apt-get -y install \
     build-essential \
+    cmake \
     gcc \
     gir1.2-gtk-3.0 \
     libcairo2-dev \
@@ -63,6 +64,7 @@ RUN apt-get -y install \
 # python pip
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install aiofiles debugpy typing_extensions typing psutil
+RUN python3 -m pip install dlib
 
 ################################################################
 # End section generated from template/Dockerfile.full.header
