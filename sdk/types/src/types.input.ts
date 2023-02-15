@@ -549,6 +549,13 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
   oobCodecParameters?: boolean;
 
   destinations?: MediaStreamDestination[];
+
+  /**
+   * Set this to true to allow for prebuffering even if the device implements the Battery interface.
+   * Handy if you have a device that can continuously prebuffer when on mains power, but you still 
+   * want battery status reported.
+   */
+  allowBatteryPrebuffer?: boolean;
 }
 
 export type MediaStreamDestination = "local" | "remote" | "medium-resolution" | "low-resolution" | "local-recorder" | "remote-recorder";
