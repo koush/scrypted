@@ -193,6 +193,7 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
                     'type': 'button',
                 }
             )
+            break
 
         if not len(ret):
             ret.append(
@@ -222,9 +223,12 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
 
     async def putSetting(self, key: str, value: str) -> None:
         if key == 'known':
-            return
-
-        if value or key == 'delete':
+            n = {}
+            for k in value:
+                n[k] = self.known_faces[k]
+            self.known_faces = n
+            self.save_known_faces()
+        elif value or key == 'delete':
             volume = os.environ['SCRYPTED_PLUGIN_VOLUME']
             people = os.path.join(volume, 'unknown')
             os.makedirs(people, exist_ok=True)
@@ -236,7 +240,7 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
                     strs = []
                     for e in encoded:
                         strs.append(base64.encodebytes(e.tobytes()).decode())
-                    if not self.known_faces[value]:
+                    if not self.known_faces.get(value):
                         self.known_faces[value] = []
                     self.known_faces[value] += strs
                     self.save_known_faces()
