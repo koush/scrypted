@@ -1496,11 +1496,11 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       }
       const name = mso?.name;
       const enabled = enabledIds.includes(id);
-      const stopInactive = isBatteryPowered || !enabled;
+      const stopInactive = (isBatteryPowered && !mso.allowBatteryPrebuffer) || !enabled;
       session = new PrebufferSession(this, mso, stopInactive);
       this.sessions.set(id, session);
 
-      if (isBatteryPowered) {
+      if (isBatteryPowered && !mso.allowBatteryPrebuffer) {
         this.console.log('camera is battery powered, prebuffering and rebroadcasting will only work on demand.');
         continue;
       }

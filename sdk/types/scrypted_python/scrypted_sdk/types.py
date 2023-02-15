@@ -553,6 +553,7 @@ class RequestRecordingStreamOptions(TypedDict):
     pass
 
 class ResponseMediaStreamOptions(TypedDict):
+    allowBatteryPrebuffer: bool
     audio: AudioStreamOptions
     container: str
     destinations: list[MediaStreamDestination]
