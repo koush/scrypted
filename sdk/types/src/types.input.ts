@@ -1154,8 +1154,18 @@ export interface BoundingBoxResult {
   history?: ObjectDetectionHistory;
 }
 export interface ObjectDetectionResult extends BoundingBoxResult {
+  /**
+   * The id of the tracked object.
+   */
   id?: string;
+  /**
+   * The detection class of the object.
+   */
   className: ObjectDetectionClass;
+  /**
+   * The name of the object, if it was recognized as a familiar object (person, pet, etc).
+   */
+  name?: string;
   score: number;
   resources?: VideoResource;
 }

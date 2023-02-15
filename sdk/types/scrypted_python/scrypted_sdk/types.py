@@ -229,6 +229,7 @@ class ObjectDetectionResult(TypedDict):
     className: str
     history: ObjectDetectionHistory
     id: str
+    name: str
     resources: VideoResource
     score: float
     zoneHistory: Any
