@@ -1,6 +1,6 @@
 export class Deferred<T> {
     finished = false;
-    resolve!: (value: T) => void;
+    resolve!: (value: T|PromiseLike<T>) => void;
     reject!: (error: Error) => void;
     promise: Promise<T> = new Promise((resolve, reject) => {
         this.resolve = v => {

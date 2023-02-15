@@ -127,6 +127,7 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
             else:
                 id = all_ids[minpos]
                 print('has face %s' % id)
+                m[idx] = id
 
         # return
 
@@ -146,6 +147,7 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
 
         for idx, d in enumerate(ret['detections']):
             d['id'] = m.get(idx)
+            d['name'] = m.get(idx)
 
         return ret
 
