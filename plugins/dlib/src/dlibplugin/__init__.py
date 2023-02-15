@@ -12,11 +12,13 @@ from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, Obje
 from predict import PredictSession
 import threading
 import asyncio
-from .unknown import UnknownPeople
 import base64
 import json
 import random
 import string
+from scrypted_sdk import RequestPictureOptions, MediaObject, Setting
+import os
+import json
 
 def random_string():
     letters = string.ascii_lowercase
@@ -25,7 +27,7 @@ def random_string():
 
 MIME_TYPE = 'x-scrypted-dlib/x-raw-image'
 
-class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings, scrypted_sdk.DeviceProvider):
+class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     def __init__(self, nativeId: str | None = None):
         super().__init__(MIME_TYPE, nativeId=nativeId)
 
@@ -36,23 +38,13 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
         self.mutex = threading.Lock()
         self.known_faces = {}
         self.encoded_faces = {}
-        asyncio.ensure_future(self.load_known_faces())
+        self.load_known_faces()
 
-        asyncio.ensure_future(scrypted_sdk.deviceManager.onDeviceDiscovered({
-            'nativeId': 'unknown',
-            'name': 'Unknown People',
-            'type': scrypted_sdk.ScryptedDeviceType.Builtin.value,
-            'interfaces': [
-                scrypted_sdk.ScryptedInterface.Camera.value,
-                scrypted_sdk.ScryptedInterface.Settings.value,
-            ]
-        }))
+    def save_known_faces(self):
+        j = json.dumps(self.known_faces)
+        self.storage.setItem('known', j)
 
-    async def save_known_faces(self):
-
-        pass
-
-    async def load_known_faces(self):
+    def load_known_faces(self):
         self.known_faces = {}
         self.encoded_faces = {}
 
@@ -61,22 +53,17 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
         except:
             pass
 
-
         for known in self.known_faces:
             encoded = []
             self.encoded_faces[known] = encoded
             encodings = self.known_faces[known]
             for str in encodings:
                 try:
-                        parsed = base64.decodebytes(str)
+                        parsed = base64.decodebytes(bytes(str, 'utf-8'))
                         encoding = np.frombuffer(parsed, dtype=np.float64)
                         encoded.append(encoding)
                 except:
                     pass
-
-    async def getDevice(self, nativeId: str) -> Any:
-        if nativeId == 'unknown':
-            return UnknownPeople('unknown')
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
@@ -123,7 +110,7 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
                 minpos = results.index(best)
 
             if best > .6:
-                id = random_string()
+                id = random_string() + '.jpg'
                 print('top face %s' % best)
                 print('new face %s' % id)
                 encoded = [fe]
@@ -135,7 +122,7 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
                 os.makedirs(people, exist_ok=True)
                 t, r, b, l = face_locations[idx]
                 cropped = input.crop((l, t, r, b))
-                fp = os.path.join(people, id + '.jpg')
+                fp = os.path.join(people, id)
                 cropped.save(fp)
             else:
                 id = all_ids[minpos]
@@ -165,3 +152,95 @@ class DlibPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Setti
     def track(self, detection_session: PredictSession, ret: ObjectsDetected):
         pass
 
+
+    async def takePicture(self, options: RequestPictureOptions = None) -> MediaObject:
+        volume = os.environ['SCRYPTED_PLUGIN_VOLUME']
+        people = os.path.join(volume, 'unknown')
+        os.makedirs(people, exist_ok=True)
+        for unknown in os.listdir(people):
+            fp = os.path.join(people, unknown)
+            ret = scrypted_sdk.mediaManager.createMediaObjectFromUrl('file:/' + fp)
+            return await ret
+
+        black = os.path.join(volume, 'zip', 'unzipped', 'fs', 'black.jpg')
+        ret = scrypted_sdk.mediaManager.createMediaObjectFromUrl('file:/' + black)
+        return await ret
+
+    async def getSettings(self) -> list[Setting]:
+        ret = []
+
+        volume = os.environ['SCRYPTED_PLUGIN_VOLUME']
+        people = os.path.join(volume, 'unknown')
+        os.makedirs(people, exist_ok=True)
+
+        choices = list(self.known_faces.keys())
+
+        for unknown in os.listdir(people):
+            ret.append(
+                {
+                    'key': unknown,
+                    'title': 'Name',
+                    'description': 'Associate this thumbnail with an existing person or identify a new person.',
+                    'choices': choices,
+                    'combobox': True,
+                }
+            )
+            ret.append(
+                {
+                    'key': 'delete',
+                    'title': 'Delete',
+                    'description': 'Delete this face.',
+                    'type': 'button',
+                }
+            )
+
+        if not len(ret):
+            ret.append(
+                {
+                    'key': 'unknown',
+                    'title': 'Unknown People',
+                    'value': 'Waiting for unknown person...',
+                    'description': 'There are no more people that need to be identified.',
+                    'readonly': True,
+                }
+            )
+
+
+        ret.append(
+            {
+                'key': 'known',
+                'group': 'People',
+                'title': 'Familiar People',
+                'description': 'The people known to this plugin.',
+                'choices': choices,
+                'multiple': True,
+                'value': choices,
+            }
+        )
+
+        return ret
+
+    async def putSetting(self, key: str, value: str) -> None:
+        if key == 'known':
+            return
+
+        if value or key == 'delete':
+            volume = os.environ['SCRYPTED_PLUGIN_VOLUME']
+            people = os.path.join(volume, 'unknown')
+            os.makedirs(people, exist_ok=True)
+            for unknown in os.listdir(people):
+                fp = os.path.join(people, unknown)
+                os.remove(fp)
+                if key != 'delete':
+                    encoded = self.encoded_faces[key]
+                    strs = []
+                    for e in encoded:
+                        strs.append(base64.encodebytes(e.tobytes()).decode())
+                    if not self.known_faces[value]:
+                        self.known_faces[value] = []
+                    self.known_faces[value] += strs
+                    self.save_known_faces()
+                break
+
+        await self.onDeviceEvent(scrypted_sdk.ScryptedInterface.Settings.value, None)
+        await self.onDeviceEvent(scrypted_sdk.ScryptedInterface.Camera.value, None)
