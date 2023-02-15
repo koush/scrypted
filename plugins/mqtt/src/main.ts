@@ -36,8 +36,6 @@ const { log, deviceManager, systemManager } = sdk;
 class MqttDevice extends MqttDeviceBase implements Scriptable {
     constructor(nativeId: string) {
         super(nativeId);
-
-        this.bind();
     }
 
     async saveScript(source: ScriptSource): Promise<void> {
@@ -496,7 +494,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
         return;
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         let ret = this.devices.get(nativeId);
         if (!ret) {
             if (nativeId.startsWith('autodiscovery:')) {
@@ -504,6 +502,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
             }
             else if (nativeId.startsWith('0.')) {
                 ret = new MqttDevice(nativeId);
+                await ret.bind();
             }
             if (ret)
                 this.devices.set(nativeId, ret);
