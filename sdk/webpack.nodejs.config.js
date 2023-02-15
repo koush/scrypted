@@ -121,15 +121,17 @@ module.exports = {
     optimization: {
         minimize: isProduction,
         minimizer: [
-            new TerserPlugin({
-                terserOptions: {
-                    mangle: {
-                        properties: {
-                            regex: /^[\$_]/
-                        }
-                    },
-                },
-            }),
+            new TerserPlugin(
+                // {
+                //     terserOptions: {
+                //         mangle: {
+                //             properties: {
+                //                 regex: /^[\$_]/
+                //             }
+                //         },
+                //     },
+                // }
+            ),
         ],
     },
 
