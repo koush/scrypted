@@ -174,7 +174,7 @@ export async function ffmpegFilterImageInternal(cp: ChildProcess, options: FFmpe
 
     const [exitCode] = await once(cp, 'exit');
     clearTimeout(to);
-    if (exitCode)
+    if (exitCode && !buffers.length)
         throw new Error(`ffmpeg stream to image conversion failed with exit code: ${exitCode}`);
 
     return Buffer.concat(buffers);

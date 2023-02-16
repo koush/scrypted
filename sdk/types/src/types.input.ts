@@ -549,6 +549,13 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
   oobCodecParameters?: boolean;
 
   destinations?: MediaStreamDestination[];
+
+  /**
+   * Set this to true to allow for prebuffering even if the device implements the Battery interface.
+   * Handy if you have a device that can continuously prebuffer when on mains power, but you still 
+   * want battery status reported.
+   */
+  allowBatteryPrebuffer?: boolean;
 }
 
 export type MediaStreamDestination = "local" | "remote" | "medium-resolution" | "low-resolution" | "local-recorder" | "remote-recorder";
@@ -1154,8 +1161,18 @@ export interface BoundingBoxResult {
   history?: ObjectDetectionHistory;
 }
 export interface ObjectDetectionResult extends BoundingBoxResult {
+  /**
+   * The id of the tracked object.
+   */
   id?: string;
+  /**
+   * The detection class of the object.
+   */
   className: ObjectDetectionClass;
+  /**
+   * The name of the object, if it was recognized as a familiar object (person, pet, etc).
+   */
+  name?: string;
   score: number;
   resources?: VideoResource;
 }
@@ -1207,6 +1224,7 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;
   inputSize?: number[];
   settings: Setting[];
+  triggerClasses?: string[];
 }
 export interface ObjectDetectionCallbacks {
   onDetection(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject): Promise<boolean>;

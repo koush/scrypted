@@ -18,9 +18,6 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
-def list_to_dict(list1):
-    return {i: list1[i] for i in range(len(list1))}
-
 
 MIME_TYPE = 'x-scrypted-coreml/x-raw-image'
 
@@ -36,15 +33,9 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         self.inputheight = self.inputdesc.type.imageType.height
         self.inputwidth = self.inputdesc.type.imageType.width
 
-        #If .MLModel contains NMSLabels, fetch it from here instead. 
-        try:
-            stringvector = self.modelspec.pipeline.models[1].nonMaximumSuppression.stringClassLabels.vector
-        except Exception as e:
-            print(e)
-            labels_contents = scrypted_sdk.zip.open('fs/coco_labels.txt').read().decode('utf8')
-            self.labels = parse_label_contents(labels_contents)
-        else:
-            self.labels = list_to_dict(stringvector)
+        labels_contents = scrypted_sdk.zip.open(
+            'fs/coco_labels.txt').read().decode('utf8')
+        self.labels = parse_label_contents(labels_contents)
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
@@ -56,11 +47,11 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         out_dict = self.model.predict({'image': input, 'confidenceThreshold': .2 })
 
-        coordinatesList = out_dict['coordinates'].astype(float)
+        coordinatesList = out_dict['coordinates']
 
         objs = []
 
-        for index, confidenceList in enumerate(out_dict['confidence'].astype(float)):
+        for index, confidenceList in enumerate(out_dict['confidence']):
             values = confidenceList
             maxConfidenceIndex = max(range(len(values)), key=values.__getitem__)
             maxConfidence = confidenceList[maxConfidenceIndex]

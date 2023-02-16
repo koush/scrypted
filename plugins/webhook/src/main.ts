@@ -112,7 +112,16 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
                 }
                 
                 const result = await device[methodOrProperty](...parameters);
-                this.maybeSendMediaObject(response, result, methodOrProperty);
+                if (request.headers['accept']?.includes('application/json')) {
+                    response?.send(JSON.stringify({ result }), {
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                }
+                else {
+                    this.maybeSendMediaObject(response, result, methodOrProperty);
+                }
             }
             catch (e) {
                 this.console.error('webhook action error', e);
@@ -123,7 +132,7 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
         }
         else if (allInterfaceProperties.includes(methodOrProperty)) {
             const value = device[methodOrProperty];
-            if (request.headers['accept'] && request.headers['accept'].indexOf('application/json') !== -1) {
+            if (request.headers['accept']?.includes('application/json')) {
                 response?.send(JSON.stringify({ value }), {
                     headers: {
                         'Content-Type': 'application/json',

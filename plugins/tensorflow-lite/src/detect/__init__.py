@@ -113,16 +113,20 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def getClasses(self) -> list[str]:
         pass
 
+    def getTriggerClasses(self) -> list[str]:
+        pass
+
     def get_input_details(self) -> Tuple[int, int, int]:
         pass
 
-    def getModelSettings(self) -> list[Setting]:
+    def getModelSettings(self, settings: Any = None) -> list[Setting]:
         return []
 
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         d: ObjectDetectionModel = {
             'name': self.pluginId,
             'classes': self.getClasses(),
+            'triggerClasses': self.getTriggerClasses(),
             'inputSize': self.get_input_details(),
             'settings': [],
         }
@@ -148,7 +152,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 decoderSetting['choices'].append('libav')
 
             d['settings'].append(decoderSetting)
-            d['settings'] += self.getModelSettings()
+            d['settings'] += self.getModelSettings(settings)
 
         return d
 
@@ -278,7 +282,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         return (True, detection_session, None)
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
-        is_image = mediaObject and mediaObject.mimeType.startswith('image/')
+        is_image = mediaObject and (mediaObject.mimeType.startswith('image/') or mediaObject.mimeType.endswith('/x-raw-image'))
 
         settings = None
         duration = None

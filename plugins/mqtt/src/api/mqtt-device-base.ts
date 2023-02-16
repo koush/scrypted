@@ -1,4 +1,4 @@
-import { Settings, Setting, ScryptedDeviceBase } from '@scrypted/sdk';
+import { Settings, Setting, ScryptedDeviceBase, ScryptedInterface } from '@scrypted/sdk';
 import { connect, Client } from 'mqtt';
 import { ScriptableDeviceBase } from '../scrypted-eval';
 
@@ -46,6 +46,7 @@ export class MqttDeviceBase extends ScriptableDeviceBase implements Settings {
         else {
             this.storage.setItem(key, value.toString());
         }
+        this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
     connectClient() {

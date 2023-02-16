@@ -18,7 +18,14 @@ export const requiredAudioCodecs = [
         mimeType: "audio/opus",
         clockRate: 48000,
         channels: 2,
+        payloadType: 111,
     }),
+    // new RTCRtpCodecParameters({
+    //     mimeType: "audio/G722",
+    //     clockRate: 8000,
+    //     channels: 1,
+    //     payloadType: 9,
+    // }),
     new RTCRtpCodecParameters({
         mimeType: "audio/PCMU",
         clockRate: 8000,
@@ -29,6 +36,7 @@ export const requiredAudioCodecs = [
         mimeType: "audio/PCMA",
         clockRate: 8000,
         channels: 1,
+        payloadType: 8,
     }),
 ];
 

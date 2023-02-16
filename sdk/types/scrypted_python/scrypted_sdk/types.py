@@ -229,6 +229,7 @@ class ObjectDetectionResult(TypedDict):
     className: str
     history: ObjectDetectionHistory
     id: str
+    name: str
     resources: VideoResource
     score: float
     zoneHistory: Any
@@ -453,6 +454,7 @@ class ObjectDetectionModel(TypedDict):
     inputSize: list[float]
     name: str
     settings: list[Setting]
+    triggerClasses: list[str]
     pass
 
 class ObjectDetectionSession(TypedDict):
@@ -552,6 +554,7 @@ class RequestRecordingStreamOptions(TypedDict):
     pass
 
 class ResponseMediaStreamOptions(TypedDict):
+    allowBatteryPrebuffer: bool
     audio: AudioStreamOptions
     container: str
     destinations: list[MediaStreamDestination]

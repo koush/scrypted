@@ -1,5 +1,17 @@
 {
-   "name": "@scrypted/mqtt",
+   "name": "@scrypted/dlib",
+   "description": "Scrypted Face Recognition",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "dlib",
+      "face",
+      "detect",
+      "detection",
+      "recognition",
+      "people",
+      "person"
+   ],
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -13,33 +25,22 @@
       "scrypted-readme": "scrypted-readme",
       "scrypted-package-json": "scrypted-package-json"
    },
-   "keywords": [
-      "scrypted",
-      "plugin",
-      "mqtt"
-   ],
    "scrypted": {
-      "name": "MQTT",
-      "type": "DeviceProvider",
+      "name": "Dlib Face Recognition",
+      "pluginDependencies": [
+         "@scrypted/objectdetector"
+      ],
+      "runtime": "python",
+      "type": "API",
       "interfaces": [
-         "MixinProvider",
-         "DeviceProvider",
-         "DeviceCreator",
-         "Settings"
+         "Camera",
+         "Settings",
+         "BufferConverter",
+         "ObjectDetection"
       ]
    },
-   "dependencies": {
-      "@types/node": "^16.6.1",
-      "aedes": "^0.46.1",
-      "axios": "^0.23.0",
-      "mqtt": "^4.2.8",
-      "nunjucks": "^3.2.3",
-      "websocket-stream": "^5.5.2"
-   },
    "devDependencies": {
-      "@scrypted/sdk": "file:../../sdk",
-      "@scrypted/common": "file:../../common",
-      "@types/nunjucks": "^3.2.0"
+      "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.66"
+   "version": "0.0.1"
 }

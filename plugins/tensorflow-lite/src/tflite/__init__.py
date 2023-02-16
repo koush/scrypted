@@ -47,15 +47,23 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
             if not len(edge_tpus):
                 raise Exception('no edge tpu found')
             self.edge_tpu_found = str(edge_tpus)
+            # todo co-compile
+            # https://coral.ai/docs/edgetpu/compiler/#co-compiling-multiple-models
             model = scrypted_sdk.zip.open(
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite').read()
+            # face_model = scrypted_sdk.zip.open(
+            #     'fs/mobilenet_ssd_v2_face_quant_postprocess.tflite').read()
             self.interpreter = make_interpreter(model)
+            # self.face_interpreter = make_interpreter(face_model)
         except Exception as e:
             print('unable to use Coral Edge TPU', e)
             self.edge_tpu_found = 'Edge TPU not found'
             model = scrypted_sdk.zip.open(
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess.tflite').read()
+            # face_model = scrypted_sdk.zip.open(
+            #     'fs/mobilenet_ssd_v2_face_quant_postprocess.tflite').read()
             self.interpreter = tflite.Interpreter(model_content=model)
+            # self.face_interpreter = make_interpreter(face_model)
         self.interpreter.allocate_tensors()
         self.mutex = threading.Lock()
 

@@ -88,7 +88,7 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-        const username = ('user:'.length);
+        const username = nativeId.substring('user:'.length);
         const usersService = await sdk.systemManager.getComponent('users');
         await usersService.removeUser(username);
     }

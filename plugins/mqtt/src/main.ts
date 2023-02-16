@@ -5,7 +5,7 @@ import { Settings, Setting, DeviceProvider, ScryptedDeviceBase, ScryptedInterfac
 import sdk from '@scrypted/sdk';
 import { monacoEvalDefaults } from './monaco';
 import { scryptedEval } from './scrypted-eval';
-import { MqttClient, MqttSubscriptions } from './api/mqtt-client';
+import { MqttClient, MqttClientPublishOptions, MqttSubscriptions } from './api/mqtt-client';
 import aedes, { AedesOptions } from 'aedes';
 import net from 'net';
 import ws from 'websocket-stream';
@@ -36,8 +36,6 @@ const { log, deviceManager, systemManager } = sdk;
 class MqttDevice extends MqttDeviceBase implements Scriptable {
     constructor(nativeId: string) {
         super(nativeId);
-
-        this.bind();
     }
 
     async saveScript(source: ScriptSource): Promise<void> {
@@ -134,12 +132,12 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
                         });
                     }
                 },
-                publish: async (topic: string, value: any) => {
+                publish: async (topic: string, value: any, options?: MqttClientPublishOptions) => {
                     if (typeof value === 'object')
                         value = JSON.stringify(value);
                     if (value.constructor.name !== Buffer.name)
                         value = value.toString();
-                    this.client.publish(this.pathname + topic, value);
+                    this.client.publish(this.pathname + topic, value, options);
                 },
                 ...sd
             }
@@ -187,7 +185,9 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
                 if (typeof str === 'object')
                     str = JSON.stringify(str);
 
-                this.client.publish(`${this.pathname}/${property}`, str?.toString() || '');
+                this.client.publish(`${this.pathname}/${property}`, str?.toString() || '', {
+                    retain: true,
+                });
             }
             else {
                 let str = eventData;
@@ -494,7 +494,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
         return;
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         let ret = this.devices.get(nativeId);
         if (!ret) {
             if (nativeId.startsWith('autodiscovery:')) {
@@ -502,6 +502,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
             }
             else if (nativeId.startsWith('0.')) {
                 ret = new MqttDevice(nativeId);
+                await ret.bind();
             }
             if (ret)
                 this.devices.set(nativeId, ret);
