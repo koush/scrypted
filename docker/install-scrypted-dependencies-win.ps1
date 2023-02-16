@@ -27,7 +27,7 @@ npx -y scrypted@latest install-server
 $USER_HOME_ESCAPED = $env:USERPROFILE.replace('\', '\\')
 $SCRYPTED_HOME = $env:USERPROFILE + '\.scrypted'
 $SCRYPTED_HOME_ESCAPED_PATH = $SCRYPTED_HOME.replace('\', '\\')
-npm install --prefix $SCRYPTED_HOME node-windows@1.0.0-beta.8 --save
+npm install --prefix $SCRYPTED_HOME @koush/node-windows --save
 
 $NPX_PATH = (Get-Command npx).Path
 $NPX_PATH_ESCAPED = $NPX_PATH.replace('\', '\\')
@@ -50,7 +50,7 @@ $SERVICE_JS_ESCAPED_PATH = $SERVICE_JS_PATH.replace('\', '\\')
 $SERVICE_JS | Out-File -Encoding ASCII -FilePath $SERVICE_JS_PATH
 
 $INSTALL_SERVICE_JS = @"
-const Service = require('node-windows').Service;
+const Service = require('@koush/node-windows').Service;
 const svc = new Service({
   name: 'Scrypted',
   description: 'Scrypted Home Automation',
