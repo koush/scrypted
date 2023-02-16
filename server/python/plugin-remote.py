@@ -23,6 +23,7 @@ from typing import Any, List, Optional, Set, Tuple
 
 import aiofiles
 import scrypted_python.scrypted_sdk.types
+from scrypted_python.scrypted_sdk import ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 EventDetails,
                                                 ScryptedInterfaceProperty,
@@ -341,12 +342,25 @@ class PluginRemote:
                 python_prefix, 'Lib', 'site-packages')
         print('site-packages: %s' % site_packages)
         sys.path.insert(0, site_packages)
-        from scrypted_sdk import sdk_init  # type: ignore
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
         self.mediaManager = MediaManager(await self.api.getMediaManager())
-        sdk_init(zip, self, self.systemManager,
-                 self.deviceManager, self.mediaManager)
+
+        try:
+            from scrypted_sdk import sdk_init2  # type: ignore
+
+            sdk = ScryptedStatic()
+            sdk.systemManager = self.systemManager
+            sdk.deviceManager = self.deviceManager
+            sdk.mediaManager = self.mediaManager
+            sdk.remote = self
+            sdk.api = self.api
+            sdk.zip = zip
+            sdk_init2(sdk)
+        except:
+            from scrypted_sdk import sdk_init  # type: ignore
+            sdk_init(zip, self, self.systemManager,
+                    self.deviceManager, self.mediaManager)
         try:
             from main import create_scrypted_plugin  # type: ignore
         except:

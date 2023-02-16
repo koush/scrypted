@@ -2,13 +2,34 @@ from __future__ import annotations
 from .types import *
 from typing import Optional
 from zipfile import ZipFile
-import sys
+from asyncio import Future
+from multiprocessing import Process
+from typing import Callable
+
+class PluginFork:
+    result: Future
+    worker: Process
 
 deviceManager: DeviceManager = None
 systemManager: SystemManager = None
 mediaManager: MediaManager = None
 zip: ZipFile = None
 remote: Any = None
+api: Any
+sdk: ScryptedStatic
+
+def fork() -> PluginFork:
+    pass
+
+class ScryptedStatic:
+    def __init__(self) -> None:
+        self.systemManager: SystemManager = None
+        self.deviceManager: SystemManager = None
+        self.mediaManager: MediaManager = None
+        self.zip: ZipFile = None
+        self.remote: Any = None
+        self.api: Any = None
+        self.fork: Callable[[], PluginFork]
 
 def sdk_init(z: ZipFile, r, sm: DeviceManager, dm: SystemManager, mm: MediaManager):
     global zip
@@ -21,6 +42,24 @@ def sdk_init(z: ZipFile, r, sm: DeviceManager, dm: SystemManager, mm: MediaManag
     mediaManager = mm
     zip = z
     remote = r
+
+def sdk_init2(scryptedStatic: ScryptedStatic):
+    global zip
+    global remote
+    global systemManager
+    global deviceManager
+    global mediaManager
+    global sdk
+    global api
+    global fork
+    sdk  = scryptedStatic
+    systemManager = sdk.systemManager
+    deviceManager = sdk.deviceManager
+    mediaManager = sdk.mediaManager
+    zip = sdk.zip
+    remote = sdk.remote
+    api = sdk.api
+    fork = sdk.fork
 
 class ScryptedDeviceBase(DeviceState):
     nativeId: str | None
