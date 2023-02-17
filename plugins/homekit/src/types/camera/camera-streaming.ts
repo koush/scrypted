@@ -14,10 +14,9 @@ import { once } from 'events';
 import os from 'os';
 import { getAddressOverride } from '../../address-override';
 import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
-import type { HomeKitPlugin } from "../../main";
-import { createReturnAudioSdp } from './camera-return-audio';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
 import { getDebugMode } from './camera-debug-mode-storage';
+import { createReturnAudioSdp } from './camera-return-audio';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
 import { CameraStreamingSession } from './camera-streaming-session';
 import { getStreamingConfiguration } from './camera-utils';
@@ -35,13 +34,12 @@ async function getPort(socketType: SocketType, address: string): Promise<{ socke
 
 export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & Intercom,
     console: Console,
-    storage: Storage,
-    homekitPlugin: HomeKitPlugin) {
+    storage: Storage) {
     const sessions = new Map<string, CameraStreamingSession>();
     const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
 
     const delegate: CameraStreamingDelegate = {
-        handleSnapshotRequest: createSnapshotHandler(device, storage, homekitPlugin, console),
+        handleSnapshotRequest: createSnapshotHandler(device, console),
         async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback) {
             // console.log('prepareStream', Object.assign({}, request, { connection: request.connection.remoteAddress }));
 
@@ -217,40 +215,17 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             session.startRequest = request as StartStreamRequest;
 
             let forceSlowConnection = false;
-            try {
-                for (const address of homekitPlugin.storageSettings.values.slowConnections) {
-                    if (address.includes(session.prepareRequest.targetAddress))
-                        forceSlowConnection = true;
-                }
-            }
-            catch (e) {
-            }
-            if (forceSlowConnection) {
-                console.log('Streaming request is coming from a device in the slow mode connection list. Medium resolution stream will be selected.');
-            }
-            else {
-                // ios is seemingly forcing all connections through the home hub on ios 15.5. this is test code to force low bandwidth.
-                // remote wifi connections request the same audio packet time as local wifi connections.
-                // so there's no way to differentiate between remote and local wifi. with low bandwidth forcing off,
-                // it will always select the local stream. with it on, it always selects the remote stream.
-                forceSlowConnection = homekitPlugin.storageSettings.values.slowConnections?.includes(session.prepareRequest.targetAddress);
-                if (forceSlowConnection)
-                    console.log('Streaming request is coming from the active HomeHub. Medium resolution stream will be selected in case this is a remote wifi connection or a wireless HomeHub. Using Accessory Mode is recommended if not already in use.');
-            }
-
             const {
                 destination,
                 isLowBandwidth,
                 isWatch,
             } = await getStreamingConfiguration(device, forceSlowConnection, storage, request)
 
-            const hasHomeHub = !!homekitPlugin.storageSettings.values.lastKnownHomeHub;
-            const waitRtcp = forceSlowConnection || isLowBandwidth || !hasHomeHub;
+            const waitRtcp = isLowBandwidth;
             if (waitRtcp) {
                 console.log('Will wait for initial RTCP packet.', {
                     isHomeHub: forceSlowConnection,
                     isLowBandwidth,
-                    hasHomeHub,
                 });
             }
 

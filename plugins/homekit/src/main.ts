@@ -19,14 +19,31 @@ const { systemManager, deviceManager } = sdk;
 initializeHapStorage();
 const includeToken = 4;
 
+async function getAdvertiserInterfaceBind(bind: string) {
+    if (bind === 'All Addresses')
+        bind = undefined;
+    else if (!bind || bind === 'Default' || bind === 'Server Address')
+        bind = await getAddressOverride();
+    return bind;
+}
+
+async function publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories, port: number, bind: string, advertiser: MDNSAdvertiser) {
+    await accessory.publish({
+        username,
+        port,
+        pincode,
+        category,
+        addIdentifyingMaterial: false,
+        advertiser,
+        bind,
+    });
+}
+
 export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, Settings, DeviceProvider {
-    seenConnections = new Set<string>();
     bridge = new Bridge('Scrypted', getHAPUUID(this.storage));
     snapshotThrottles = new Map<string, SnapshotThrottle>();
-    standalones = new Map<string, Accessory>();
     videoClips: VideoClipsMixinProvider;
     videoClipsId: string;
-    cameraMixins = new Map<string, CameraMixin>();
     storageSettings = new StorageSettings(this, {
         ...createHAPUsernameStorageSettingsDict(this, undefined),
         portOverride: {
@@ -55,19 +72,6 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                 'All Addresses',
             ],
             defaultValue: 'Default',
-        },
-        slowConnections: {
-            group: 'Network',
-            title: 'Slow Mode Addresses',
-            description: 'The addressess of Home Hubs and iOS clients that will always be served remote/medium streams.',
-            type: 'string',
-            multiple: true,
-            combobox: true,
-            onGet: async () => {
-                return {
-                    choices: [...this.seenConnections],
-                }
-            }
         },
         lastKnownHomeHub: {
             hide: true,
@@ -173,7 +177,14 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
             this.console.log('adding', device.name);
 
-            const accessory = await supportedType.getAccessory(device, this);
+            const mixinStorage = deviceManager.getMixinStorage(device.id, this.nativeId);
+            const standalone = device.type === ScryptedDeviceType.Camera || device.type === ScryptedDeviceType.Doorbell ? mixinStorage.getItem('standalone') !== 'false' : mixinStorage.getItem('standalone') === 'true';
+            if (!mixinStorage.getItem('standalone'))
+                mixinStorage.setItem('standalone', standalone.toString());
+            if (standalone)
+                continue;
+
+            const accessory = await supportedType.getAccessory(device);
             if (accessory) {
                 accessoryIds.add(id);
 
@@ -194,94 +205,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         info.updateCharacteristic(Characteristic.HardwareRevision, deviceInfo.version);
                 }
 
-                const mixinStorage = deviceManager.getMixinStorage(device.id, this.nativeId);
-                const standalone = device.type === ScryptedDeviceType.Camera || device.type === ScryptedDeviceType.Doorbell ? mixinStorage.getItem('standalone') !== 'false' : mixinStorage.getItem('standalone') === 'true';
-                if (!mixinStorage.getItem('standalone'))
-                    mixinStorage.setItem('standalone', standalone.toString());
-                const standaloneCategory = typeToCategory(device.type);
-                if (standalone && standaloneCategory) {
-                    this.standalones.set(device.id, accessory);
-
-                    const storageSettings = new StorageSettings({
-                        storage: mixinStorage,
-                        onDeviceEvent: async () => {
-                        }
-                    }, createHAPUsernameStorageSettingsDict({
-                        storage: mixinStorage,
-                        get name() {
-                            return device.name
-                        }
-                    },
-                        undefined, 'Pairing'));
-                    storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
-
-                    const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
-
-                    let published = false;
-                    let hasPublished = false;
-                    const publish = async () => {
-                        try {
-                            published = true;
-                            mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
-
-                            await this.publishAccessory(accessory, storageSettings.values.mac, storageSettings.values.pincode, standaloneCategory, storageSettings.values.portOverride);
-                            if (!hasPublished) {
-                                hasPublished = true;
-                                storageSettings.values.qrCode = accessory.setupURI();
-                                logConnections(mixinConsole, accessory, this.seenConnections);
-                            }
-                        }
-                        catch (e) {
-                            mixinConsole.error('There was an error publishing the standalone accessory', e);
-                        }
-                    }
-
-                    const unpublish = () => {
-                        mixinConsole.warn('Device is in accessory mode and is offline. HomeKit services are being unpublished. ')
-                        published = false;
-                        // hack to allow republishing.
-                        accessory.controllerStorage = new ControllerStorage(accessory);
-                        accessory.unpublish();
-                    }
-
-                    const updateDeviceAdvertisement = () => {
-                        const isOnline = !device.interfaces.includes(ScryptedInterface.Online) || device.online;
-                        if (isOnline && !published) {
-                            publish();
-                        }
-                        else if (!isOnline && published) {
-                            unpublish();
-                        }
-                    }
-
-                    try {
-                        if (true) {
-                            publish();
-                        }
-                        else {
-                            updateDeviceAdvertisement();
-                            if (!published)
-                                mixinConsole.warn('Device is in accessory mode and was offline during HomeKit startup. Device will not be started until it comes back online. Disable accessory mode if this is in error.');
-
-                            // throttle this in case the device comes back online very quickly.
-                            device.listen(ScryptedInterface.Online, () => {
-                                const isOnline = !device.interfaces.includes(ScryptedInterface.Online) || device.online;
-                                if (isOnline)
-                                    updateDeviceAdvertisement();
-                                else
-                                    setTimeout(updateDeviceAdvertisement, 30000);
-                            });
-                        }
-                    }
-                    catch (e) {
-                        mixinConsole.error('There was an error publishing the standalone accessory', e);
-                    }
-                }
-                else {
-                    if (standalone)
-                        this.console.warn('Could not find standalone category mapping for accessory', device.name, device.type);
-                    this.bridge.addBridgedAccessory(accessory);
-                }
+                this.bridge.addBridgedAccessory(accessory);
             }
         }
 
@@ -294,7 +218,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         info.updateCharacteristic(Characteristic.SerialNumber, username);
         info.updateCharacteristic(Characteristic.FirmwareRevision, packageJson.version);
 
-        const bind = await this.getAdvertiserInterfaceBind();
+        const bind = await getAdvertiserInterfaceBind(this.storageSettings.values.advertiserAddresses);
         this.console.log('mdns bind address', bind);
 
         const publishInfo: PublishInfo = {
@@ -309,7 +233,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
         this.bridge.publish(publishInfo, true);
         this.storageSettings.values.qrCode = this.bridge.setupURI();
-        logConnections(this.console, this.bridge, this.seenConnections);
+        logConnections(this.console, this.bridge);
 
         systemManager.listen(async (eventSource, eventDetails, eventData) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)
@@ -356,48 +280,22 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         return ret;
     }
 
-    async getAdvertiserInterfaceBind() {
-        let bind: string = this.storageSettings.values.advertiserAddresses;
-        if (bind === 'All Addresses')
-            bind = undefined;
-        else if (!bind || bind === 'Default' || bind === 'Server Address')
-            bind = await getAddressOverride();
-        return bind;
-    }
-
-    async publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories, port: number) {
-        const bind = await this.getAdvertiserInterfaceBind();
-
-        await accessory.publish({
-            username,
-            port,
-            pincode,
-            category,
-            addIdentifyingMaterial: false,
-            advertiser: this.getAdvertiser(),
-            bind,
-        });
-    }
-
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
-        const options: SettingsMixinDeviceOptions<any> = {
-            mixinProviderNativeId: this.nativeId,
-            mixinDeviceInterfaces,
-            group: "HomeKit",
-            groupKey: "homekit",
-            mixinDevice, mixinDeviceState,
-        };
-        let ret: CameraMixin | HomekitMixin<any>;
+        const device = systemManager.getDeviceById<Online>(mixinDeviceState.id);
+        const mixinStorage = deviceManager.getMixinStorage(device.id, this.nativeId);
+        const standalone = device.type === ScryptedDeviceType.Camera || device.type === ScryptedDeviceType.Doorbell ? mixinStorage.getItem('standalone') !== 'false' : mixinStorage.getItem('standalone') === 'true';
+        if (!mixinStorage.getItem('standalone'))
+            mixinStorage.setItem('standalone', standalone.toString());
 
-        if (canCameraMixin(mixinDeviceState.type, mixinDeviceInterfaces)) {
-            ret = new CameraMixin(options);
-            this.cameraMixins.set(ret.id, ret as any);
-        }
-        else {
-            ret = new HomekitMixin(options);
-        }
+        const bind = await getAdvertiserInterfaceBind(this.storageSettings.values.advertiserAddresses);
 
-        ret.storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
+        if (!standalone)
+            return createMixin(this.nativeId, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, standalone, bind, this.getAdvertiser());
+
+        const forked = sdk.fork<ReturnType<typeof fork>>();
+        const { createMixin: cm } = await forked.result;
+
+        const ret = await cm(this.nativeId, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, standalone, bind, this.getAdvertiser());
         return ret;
     }
 
@@ -412,4 +310,62 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     }
 }
 
-export default new HomeKitPlugin();
+async function createMixin(mixinProviderNativeId: string, mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, standalone: boolean, bind: string, advertiser: MDNSAdvertiser) {
+    const options: SettingsMixinDeviceOptions<any> = {
+        mixinProviderNativeId: mixinProviderNativeId,
+        mixinDeviceInterfaces,
+        group: "HomeKit",
+        groupKey: "homekit",
+        mixinDevice, mixinDeviceState,
+    };
+
+    let ret: CameraMixin | HomekitMixin<any>;
+    if (canCameraMixin(mixinDeviceState.type, mixinDeviceInterfaces)) {
+        ret = new CameraMixin(options);
+    }
+    else {
+        ret = new HomekitMixin(options);
+    }
+
+    ret.storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
+
+    if (!standalone)
+        return ret;
+
+    const device = systemManager.getDeviceById<Online>(ret.id);
+    const supportedType = supportedTypes[device.type];
+    if (!supportedType?.probe(device)) {
+        ret.console.error('Accessory mode device is no longer HomeKit compatible.')
+        return ret;
+    }
+
+    const accessory = await supportedType.getAccessory(device);
+
+    const standaloneCategory = typeToCategory(device.type);
+    if (!standaloneCategory) {
+        ret.console.warn('Unable to publish accessory mode device. Could not find standalone category mapping for accessory', device.name, device.type);
+        return ret;
+    }
+
+    const publish = async () => {
+        try {
+            ret.console.log('Device is in accessory mode and is online. HomeKit services are being published.');
+
+            await publishAccessory(accessory, ret.storageSettings.values.mac, ret.storageSettings.values.pincode, standaloneCategory, ret.storageSettings.values.portOverride, bind, advertiser);
+            ret.storageSettings.values.qrCode = accessory.setupURI();
+            logConnections(ret.console, accessory);
+        }
+        catch (e) {
+            ret.console.error('There was an error publishing the standalone accessory', e);
+        }
+    }
+    publish();
+}
+
+export async function fork() {
+    return {
+        createMixin,
+    }
+}
+
+export default HomeKitPlugin;
