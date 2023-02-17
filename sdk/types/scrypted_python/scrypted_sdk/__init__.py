@@ -5,9 +5,10 @@ from zipfile import ZipFile
 from asyncio import Future
 from multiprocessing import Process
 from typing import Callable
+import asyncio
 
 class PluginFork:
-    result: Future
+    result: asyncio.Task
     worker: Process
 
 deviceManager: DeviceManager = None
