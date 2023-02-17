@@ -10,18 +10,18 @@ addSupportedType({
     probe(device: DummyDevice): boolean {
         return device.interfaces.includes(ScryptedInterface.BinarySensor);
     },
-    getAccessory: async (device: ScryptedDevice & BinarySensor) => {
+    getAccessory: async (device: ScryptedDevice & BinarySensor, homekitPlugin: HomeKitPlugin) => {
         const faux: DummyDevice = {
             interfaces: device.interfaces,
             type: device.type,
         };
         faux.type = ScryptedDeviceType.Camera;
         const cameraCheck = supportedTypes[ScryptedInterface.Camera];
-        const accessory = cameraCheck.probe(faux) ? await cameraCheck.getAccessory(device) : makeAccessory(device);
+        const accessory = cameraCheck.probe(faux) ? await cameraCheck.getAccessory(device, homekitPlugin) : makeAccessory(device, homekitPlugin);
 
         const service = accessory.addService(Service.Doorbell);
 
-        const storage = sdk.deviceManager.getMixinStorage(device.id);
+        const storage = sdk.deviceManager.getMixinStorage(device.id, homekitPlugin.nativeId);
         const cameraStorage = createCameraStorageSettings({ storage, onDeviceEvent: undefined });
 
         const stateless = cameraStorage.values.doorbellAutomationButton ? new StatelessProgrammableSwitch(device.name, undefined) : undefined;

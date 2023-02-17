@@ -9,14 +9,15 @@ import child_process from "child_process";
 import fs from 'fs';
 import mkdirp from 'mkdirp';
 import net from 'net';
-import path from 'path';
 import { Duplex, Readable, Writable } from 'stream';
 import { } from '../../common';
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration, DataStreamConnection } from '../../hap';
-import { getDebugMode } from "./camera-debug-mode-storage";
+import type { HomeKitPlugin } from "../../main";
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
 import { NAL_TYPE_DELIMITER, NAL_TYPE_FU_A, NAL_TYPE_IDR, NAL_TYPE_PPS, NAL_TYPE_SEI, NAL_TYPE_SPS, NAL_TYPE_STAP_A } from "./h264-packetizer";
+import path from 'path';
+import { getDebugMode } from "./camera-debug-mode-storage";
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -90,7 +91,9 @@ async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
 }
 
 export async function* handleFragmentsRequests(connection: DataStreamConnection, device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
-    configuration: CameraRecordingConfiguration, console: Console): AsyncGenerator<Buffer, void, unknown> {
+    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin): AsyncGenerator<Buffer, void, unknown> {
+
+    homekitPlugin.storageSettings.values.lastKnownHomeHub = connection.remoteAddress;
 
     console.log(device.name, 'recording session starting', connection.remoteAddress, configuration);
 
@@ -339,6 +342,7 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
         recordingFile?.end();
         recordingFile?.destroy();
         if (saveRecordings) {
+            homekitPlugin.cameraMixins.get(device.id)?.onDeviceEvent(ScryptedInterface.VideoClips, undefined);
             deviceManager.onDeviceEvent(VIDEO_CLIPS_NATIVE_ID, ScryptedInterface.VideoClips, undefined);
         }
     }

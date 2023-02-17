@@ -15,7 +15,7 @@ export interface SnapshotThrottle {
 interface SupportedType {
     type: ScryptedDeviceType;
     probe(device: DummyDevice): boolean;
-    getAccessory: (device: ScryptedDevice & any) => Promise<Accessory>;
+    getAccessory: (device: ScryptedDevice & any, homekitPlugin: HomeKitPlugin) => Promise<Accessory>;
 }
 
 export const supportedTypes: { [type: string]: SupportedType } = {};

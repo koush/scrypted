@@ -1,6 +1,8 @@
+import { sleep } from "@scrypted/common/src/sleep";
 import sdk, { AudioSensor, Camera, Intercom, Logger, MotionSensor, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import throttle from "lodash/throttle";
 import { SnapshotRequest, SnapshotRequestCallback } from "../../hap";
+import type { HomeKitPlugin } from "../../main";
 
 const { systemManager, mediaManager } = sdk;
 
@@ -11,7 +13,7 @@ function recommendSnapshotPlugin(console: Console, log: Logger, message: string)
     log.a(message);
 }
 
-export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, console: Console) {
+export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, storage: Storage, homekitPlugin: HomeKitPlugin, console: Console) {
     let pendingPicture: Promise<Buffer>;
 
     const takePicture = (request: SnapshotRequest) => {
@@ -43,6 +45,13 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
         leading: true,
         trailing: true,
     });
+    function snapshotAll(request: SnapshotRequest) {
+        for (const snapshotThrottle of homekitPlugin.snapshotThrottles.values()) {
+            snapshotThrottle(request);
+        }
+    }
+
+    homekitPlugin.snapshotThrottles.set(device.id, takePicture);
 
     async function handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
         try {
@@ -63,11 +72,15 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             // this call is not a bug, to force lodash to take a picture on the trailing edge,
             // throttle must be called twice.
 
+            // no longer necessary in accessory mode?
+            snapshotAll(request);
+            snapshotAll(request);
+
             callback(null, await throttledTakePicture(request));
         }
         catch (e) {
             console.error('snapshot error', e);
-            recommendSnapshotPlugin(console, sdk.log, `${device.name} encountered an error while retrieving a new snapshot. Consider installing the Snapshot Plugin to show the most recent snapshot. origin:/#/component/plugin/install/@scrypted/snapshot}`);
+            recommendSnapshotPlugin(console, homekitPlugin.log, `${device.name} encountered an error while retrieving a new snapshot. Consider installing the Snapshot Plugin to show the most recent snapshot. origin:/#/component/plugin/install/@scrypted/snapshot}`);
             callback(e);
         }
     }

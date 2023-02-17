@@ -156,11 +156,12 @@ export function createHAPUsernameStorageSettingsDict(device: { storage: Storage,
     }
 }
 
-export function logConnections(console: Console, accessory: any) {
+export function logConnections(console: Console, accessory: any, seenConnections: Set<string>) {
     const server: EventedHTTPServer = accessory._server.httpServer;
     server.on('connection-opened', connection => {
         connection.on('authenticated', () => {
             console.log('HomeKit Connection', connection.remoteAddress);
+            seenConnections.add(connection.remoteAddress);
         });
     });
 }

@@ -17,7 +17,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
-    async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom & OnOff) {
+    async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom & OnOff, homekitPlugin: HomeKitPlugin) {
         const console = deviceManager.getMixinConsole(device.id, undefined);
         const storage = deviceManager.getMixinStorage(device.id, undefined);
         const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
@@ -93,7 +93,7 @@ addSupportedType({
         let recordingDelegate: CameraRecordingDelegate | undefined;
         let recordingOptions: CameraRecordingOptions | undefined;
 
-        const accessory = makeAccessory(device);
+        const accessory = makeAccessory(device, homekitPlugin);
 
         const detectAudio = storage.getItem('detectAudio') === 'true';
         const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
@@ -105,7 +105,7 @@ addSupportedType({
             recordingDelegate = {
                 handleFragmentsRequests(connection: DataStreamConnection): AsyncGenerator<Buffer, void, unknown> {
                     const configuration = RecordingManagement.parseSelectedConfiguration(storage.getItem(storageKeySelectedRecordingConfiguration))
-                    return handleFragmentsRequests(connection, device, configuration, console)
+                    return handleFragmentsRequests(connection, device, configuration, console, homekitPlugin)
                 }
             };
 
@@ -177,7 +177,7 @@ addSupportedType({
             };
         }
 
-        const delegate = createCameraStreamingDelegate(device, console, storage);
+        const delegate = createCameraStreamingDelegate(device, console, storage, homekitPlugin);
 
         const controller = new CameraController({
             cameraStreamCount: 8,
