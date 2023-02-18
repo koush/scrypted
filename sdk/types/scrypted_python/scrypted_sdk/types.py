@@ -723,7 +723,9 @@ class DeviceCreator:
     pass
 
 class DeviceDiscovery:
-    async def discoverDevices(self, duration: float) -> None:
+    async def adoptDevice(self, nativeId: str) -> str:
+        pass
+    async def discoverDevices(self, scan: bool = None) -> DeviceManifest:
         pass
     pass
 
@@ -2003,6 +2005,7 @@ ScryptedInterfaceDescriptors = {
   "DeviceDiscovery": {
     "name": "DeviceDiscovery",
     "methods": [
+      "adoptDevice",
       "discoverDevices"
     ],
     "properties": []

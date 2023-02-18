@@ -462,9 +462,14 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         }
 
         if (method === 'createDevice') {
-            const nativeId = await this.applyMixin(method, argArray);
-            const newDevice = this.scrypted.findPluginDevice(pluginDevice.pluginId, nativeId);
-            return newDevice._id;
+            const idOrNativeId = await this.applyMixin(method, argArray);
+            // TODO: 2/17/2023 deprecate this old code path
+            let newDevice = this.scrypted.findPluginDevice(pluginDevice.pluginId, idOrNativeId);
+            if (newDevice) {
+                console.warn(`${pluginDevice.pluginId} is returning legacy nativeId value from createDevice.`);
+                return newDevice._id;
+            }
+            return idOrNativeId;
         }
 
         return this.applyMixin(method, argArray);

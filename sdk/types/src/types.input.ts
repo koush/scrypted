@@ -941,8 +941,7 @@ export interface DeviceCreatorSettings {
 export interface DeviceCreator {
   getCreateDeviceSettings(): Promise<Setting[]>;
   /**
-   * Implementation should return the native id of the created device.
-   * Callers will receive the id of the created device.
+   * Return the id of the created device.
    */
   createDevice(settings: DeviceCreatorSettings): Promise<string>;
 }
@@ -953,9 +952,12 @@ export interface DeviceCreator {
  */
 export interface DeviceDiscovery {
   /**
-   * Perform device discovery for the specified duration in seconds.
+   * Perform device discovery, scanning if requested.
+   * If no scan is requested, the current list of discovered devices
+   * is returned.
    */
-  discoverDevices(duration: number): Promise<void>;
+  discoverDevices(scan?: boolean): Promise<DeviceManifest>;
+  adoptDevice(nativeId: string): Promise<string>;
 }
 /**
  * Battery retrieves the battery level of battery powered devices.
