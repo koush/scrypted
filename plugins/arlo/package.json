@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/arlo",
-   "version": "0.6.4",
+   "version": "0.6.5",
    "description": "Arlo Plugin for Scrypted",
    "keywords": [
       "scrypted",
@@ -27,8 +27,7 @@
       "type": "DeviceProvider",
       "interfaces": [
          "Settings",
-         "DeviceProvider",
-         "DeviceDiscovery"
+         "DeviceProvider"
       ],
       "pluginDependencies": [
          "@scrypted/snapshot",
