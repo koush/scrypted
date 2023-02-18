@@ -18,7 +18,7 @@ export class TranscodeMixinProvider extends ScryptedDeviceBase implements MixinP
     }
 
     getSettings(): Promise<Setting[]> {
-            return this.plugin.transcodeStorageSettings.getSettings();
+        return this.plugin.transcodeStorageSettings.getSettings();
     }
 
     putSetting(key: string, value: SettingValue): Promise<void> {
@@ -34,9 +34,11 @@ export class TranscodeMixinProvider extends ScryptedDeviceBase implements MixinP
     }
 
     invalidateSettings(id: string) {
-        process.nextTick(async () =>{
-            const mixin = await this.plugin.currentMixins.get(id)?.mixin;
-            mixin?.onDeviceEvent(ScryptedInterface.Settings, undefined)
+        process.nextTick(async () => {
+            for (const [mixin, v] of this.plugin.currentMixins.entries()) {
+                if (v.id === id)
+                    mixin?.onDeviceEvent(ScryptedInterface.Settings, undefined)
+            }
         });
     }
 
