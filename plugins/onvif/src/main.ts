@@ -1,4 +1,4 @@
-import sdk, { Device, DeviceCreatorSettings, DeviceDiscovery, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DiscoveredDevice, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import onvif from 'onvif';
 import { Stream } from "stream";
 import xml2js from 'xml2js';
@@ -392,7 +392,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
                     this.console.log('Discovery Reply from ' + rinfo.address + ' (' + name + ') (' + xaddrs + ') (' + urn + ')');
 
-                    if (deviceManager.getNativeIds().includes(urn))
+                    if (deviceManager.getNativeIds().includes(urn) || this.discoveredDevices.has(urn))
                         return;
 
                     const device: Device = {
@@ -411,6 +411,8 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                             this.discoveredDevices.delete(urn);
                         }, 5 * 60 * 1000),
                     });
+
+                    this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, await this.discoverDevices());
 
                     // const device = await this.getDevice(urn) as OnvifCamera;
                     // device.setIPAddress(rinfo.address);
@@ -433,7 +435,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         return new OnvifCamera(nativeId, this);
     }
 
-    async createDevice(settings: DeviceCreatorSettings): Promise<string> {
+    async createDevice(settings: DeviceCreatorSettings, nativeId?: ScryptedNativeId): Promise<string> {
         const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
 
 
@@ -448,14 +450,13 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                 settings.newCamera = info.model;
             }
             catch (e) {
-                sdk.log.a('There was an error adding the ONVIF camera. Check the log for details. Or select "Ignore Creation Errors" to add anyways.');
                 this.console.error('Error adding ONVIF camera', e);
                 throw e;
             }
         }
         settings.newCamera ||= 'ONVIF Camera';
 
-        const nativeId = await super.createDevice(settings);
+        nativeId = await super.createDevice(settings, nativeId);
 
         if (!skipValidate) {
             const device = await this.getDevice(nativeId) as OnvifCamera;
@@ -492,29 +493,43 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
             {
                 key: 'skipValidate',
                 title: 'Skip Validation',
-                description: 'Add the device without checking to see if the credentials and network settings are correct.',
+                description: 'Add the device without verifying the credentials and network settings.',
                 type: 'boolean',
             }
         ]
     }
 
-    async discoverDevices(scan?: boolean) {
+    async discoverDevices(scan?: boolean): Promise<DiscoveredDevice[]> {
         if (scan)
             onvif.Discovery.probe();
-        return {
-            devices: [...this.discoveredDevices.values()].map(d => d.device),
-        };
+        return [...this.discoveredDevices.values()].map(d => ({
+            ...d.device,
+            description: d.host,
+            settings: [
+                {
+                    key: 'username',
+                    title: 'Username',
+                },
+                {
+                    key: 'password',
+                    title: 'Password',
+                    type: 'password',
+                },
+            ]
+        }));
     }
 
-    async adoptDevice(nativeId: string): Promise<string> {
-        const entry = this.discoveredDevices.get(nativeId);
+    async adoptDevice(adopt: AdoptDevice): Promise<string> {
+        const entry = this.discoveredDevices.get(adopt.nativeId);
+        this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, await this.discoverDevices());
         if (!entry)
             throw new Error('device not found');
-        const id = await deviceManager.onDeviceDiscovered(entry.device);
-        const device = await this.getDevice(nativeId) as OnvifCamera;
-        device.setIPAddress(entry.host);
-        device.setHttpPortOverride(entry.port);
-        return id;
+        adopt.settings.ip = entry.host;
+        adopt.settings.httpPort = entry.port;
+        await this.createDevice(adopt.settings, adopt.nativeId);
+        this.discoveredDevices.delete(adopt.nativeId);
+        const device = await this.getDevice(adopt.nativeId) as OnvifCamera;
+        return device.id;
     }
 }
 

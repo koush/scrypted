@@ -4,7 +4,7 @@
       device.interfaces.includes('DeviceCreator') ||
       device.interfaces.includes('DeviceDiscovery')
     ">
-      <v-dialog max-width="600px" v-model="showCreateDeviceSettings">
+      <v-dialog max-width="600px" v-model="showCreateDeviceSettings" v-if="showCreateDeviceSettings">
         <Settings v-model="createDeviceSettings" custom-title="Add New" class="pa-2">
           <template v-slot:prepend>
             <v-alert v-if="createError" type="error">{{ createError }}</v-alert>
@@ -17,32 +17,38 @@
           </template>
         </Settings>
       </v-dialog>
-      <v-btn v-if="device.interfaces.includes('DeviceCreator')" text color="primary" @click="openDeviceCreationDialog">Add
+      <v-btn v-if="device.interfaces.includes('DeviceCreator')" text color="primary"
+        @click="openDeviceCreationDialog()">Add
         New</v-btn>
-      <!-- <v-btn
-          v-if="device.interfaces.includes('DeviceDiscovery')"
-          text
-          color="primary"
-          >Discover Devices</v-btn
-        > -->
+      <v-btn v-if="device.interfaces.includes('DeviceDiscovery')" @click="discoverDevices" text color="primary">Discover
+        Devices</v-btn>
     </v-card-actions>
 
     <v-card-text>These things were created by {{ device.name }}.</v-card-text>
-    <v-text-field v-if="managedDevices.devices.length > 10" v-model="search" append-icon="search" label="Search"
-      single-line hide-details></v-text-field>
-    <v-data-table v-if="managedDevices.devices.length > 10" :headers="headers" :items="managedDevices.devices"
-      :items-per-page="10" :search="search">
+    <v-text-field v-model="search" append-icon="search" label="Search" single-line hide-details></v-text-field>
+    <v-data-table :headers="headers" :items="providerDevices.devices" :items-per-page="10" :search="search">
       <template v-slot:[`item.icon`]="{ item }">
-        <v-icon x-small color="grey">
+        <v-icon v-if="!item.nativeId" x-small color="grey">
           {{ typeToIcon(item.type) }}
         </v-icon>
+
+        <v-tooltip bottom v-else>
+          <template v-slot:activator="{ on }">
+            <v-btn x-small outlined fab v-on="on" color="info" @click="openDeviceAdoptionDialog(item)"><v-icon>fa-solid
+                fa-plus</v-icon></v-btn>
+          </template>
+          <span>Add Discovered Device</span>
+        </v-tooltip>
+
       </template>
       <template v-slot:[`item.name`]="{ item }">
-        <a link :href="'#' + getDeviceViewPath(item.id)">{{ item.name }}</a>
+        <a v-if="!item.nativeId" link :href="'#' + getDeviceViewPath(item.id)">{{ item.name }}</a>
+        <div v-else>{{ item.name }}</div>
+        <div v-if="item.description">{{ item.description }}</div>
       </template>
     </v-data-table>
 
-    <DeviceGroup v-else :deviceGroup="managedDevices"></DeviceGroup>
+    <!-- <DeviceGroup v-else :deviceGroup="providerDevices"></DeviceGroup> -->
   </v-flex>
 </template>
 <script>
@@ -50,11 +56,15 @@ import RPCInterface from "./RPCInterface.vue";
 import Settings from "./Settings.vue";
 import DeviceGroup from "../common/DeviceTable.vue";
 import { typeToIcon, getDeviceViewPath } from "../components/helpers";
+import { ScryptedInterface } from "@scrypted/types";
 
 export default {
   mixins: [RPCInterface],
   data() {
     return {
+      adopting: false,
+      discoveredDevices: [],
+      adoptListener: null,
       createError: '',
       showCreateDeviceSettings: false,
       showCreateDevice: false,
@@ -66,26 +76,48 @@ export default {
     Settings,
     DeviceGroup,
   },
+  mounted() {
+    this.adoptListener = this.device.listen(ScryptedInterface.DeviceDiscovery, (s, e, d) => {
+      this.discoveredDevices = d;
+    })
+  },
+  unmounted() {
+    this.adoptListener.removeListener();
+  },
   methods: {
     typeToIcon,
     getDeviceViewPath,
 
+    async openDeviceAdoptionDialog(d) {
+      this.openDeviceCreationDialog(d);
+      this.adopting = d.nativeId;
+    },
     async createDevice() {
       const settings = {};
       for (const setting of this.createDeviceSettings.settings) {
         settings[setting.key] = setting.value;
       }
       try {
-        const id = await this.device.createDevice(settings);
-        this.$router.push(getDeviceViewPath(id));
+        if (this.adopting) {
+          const id = await this.device.adoptDevice({
+            nativeId: this.adopting,
+            settings,
+          });
+          this.$router.push(getDeviceViewPath(id));
+        }
+        else {
+          const id = await this.device.createDevice(settings);
+          this.$router.push(getDeviceViewPath(id));
+        }
       }
       catch (e) {
         this.createError = e.message;
       }
     },
-    async openDeviceCreationDialog() {
-      const settings = await this.device.getCreateDeviceSettings();
-      if (settings) {
+    async openDeviceCreationDialog(d) {
+      this.adopting = undefined;
+      const settings = d ? (d.settings || []) : await this.device.getCreateDeviceSettings();
+      if (settings?.length) {
         for (const setting of settings) {
           setting.value = setting.value || null;
         }
@@ -95,7 +127,19 @@ export default {
         };
         this.showCreateDeviceSettings = true;
       }
+      else {
+        try {
+          const id = await this.device.createDevice([]);
+          this.$router.push(getDeviceViewPath(id));
+        }
+        catch (e) {
+          this.createError = e.message;
+        }
+      }
     },
+    async discoverDevices() {
+      this.discoveredDevices = await this.rpc().discoverDevices(true);
+    }
   },
   computed: {
     headers() {
@@ -123,8 +167,8 @@ export default {
       });
       return ret;
     },
-    managedDevices() {
-      const devices = this.$store.state.scrypted.devices
+    providerDevices() {
+      const currentDevices = this.$store.state.scrypted.devices
         .filter(
           (id) =>
             this.$store.state.systemState[id].providerId.value ===
@@ -137,7 +181,7 @@ export default {
         }));
 
       return {
-        devices,
+        devices: [...this.discoveredDevices || [], ...currentDevices],
       };
     },
   },
