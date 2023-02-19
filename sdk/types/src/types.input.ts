@@ -945,6 +945,18 @@ export interface DeviceCreator {
    */
   createDevice(settings: DeviceCreatorSettings): Promise<string>;
 }
+export interface DiscoveredDevice {
+  name: string;
+  nativeId: ScryptedNativeId;
+  type: ScryptedDeviceType;
+  interfaces?: string[];
+  info?: DeviceInformation;
+  settings?: DeviceCreatorSettings;
+}
+export interface AdoptDevice {
+  nativeId: ScryptedNativeId;
+  settings: DeviceCreatorSettings;
+}
 /**
  * A DeviceProvider that has a device discovery mechanism.
  * 
@@ -956,8 +968,8 @@ export interface DeviceDiscovery {
    * If no scan is requested, the current list of discovered devices
    * is returned.
    */
-  discoverDevices(scan?: boolean): Promise<DeviceManifest>;
-  adoptDevice(nativeId: string): Promise<string>;
+  discoverDevices(scan?: boolean): Promise<DiscoveredDevice[]>;
+  adoptDevice(device: AdoptDevice): Promise<string>;
 }
 /**
  * Battery retrieves the battery level of battery powered devices.
@@ -1424,8 +1436,6 @@ export interface Device {
    */
   providerNativeId?: ScryptedNativeId;
   room?: string;
-
-  internal?: boolean;
 }
 
 export interface EndpointAccessControlAllowOrigin {

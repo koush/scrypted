@@ -277,6 +277,11 @@ class MediaStreamSource(TypedDict):
 class MediaStreamTool(TypedDict):
     pass
 
+class AdoptDevice(TypedDict):
+    nativeId: str
+    settings: DeviceCreatorSettings
+    pass
+
 class BufferConvertorOptions(TypedDict):
     sourceId: str
     pass
@@ -296,7 +301,6 @@ class ColorRgb(TypedDict):
 class Device(TypedDict):
     info: DeviceInformation
     interfaces: list[str]
-    internal: bool
     name: str
     nativeId: str
     providerNativeId: str
@@ -321,6 +325,15 @@ class DeviceInformation(TypedDict):
 class DeviceManifest(TypedDict):
     devices: list[Device]
     providerNativeId: str
+    pass
+
+class DiscoveredDevice(TypedDict):
+    info: DeviceInformation
+    interfaces: list[str]
+    name: str
+    nativeId: str
+    settings: DeviceCreatorSettings
+    type: ScryptedDeviceType
     pass
 
 class EndpointAccessControlAllowOrigin(TypedDict):
@@ -723,9 +736,9 @@ class DeviceCreator:
     pass
 
 class DeviceDiscovery:
-    async def adoptDevice(self, nativeId: str) -> str:
+    async def adoptDevice(self, device: AdoptDevice) -> str:
         pass
-    async def discoverDevices(self, scan: bool = None) -> DeviceManifest:
+    async def discoverDevices(self, scan: bool = None) -> list[DiscoveredDevice]:
         pass
     pass
 
