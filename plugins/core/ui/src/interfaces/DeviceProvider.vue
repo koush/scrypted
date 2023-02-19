@@ -1,13 +1,14 @@
 <template>
   <v-flex xs12>
-    <v-card-actions
-      v-if="
-        device.interfaces.includes('DeviceCreator') ||
-        device.interfaces.includes('DeviceDiscovery')
-      "
-    >
+    <v-card-actions v-if="
+      device.interfaces.includes('DeviceCreator') ||
+      device.interfaces.includes('DeviceDiscovery')
+    ">
       <v-dialog max-width="600px" v-model="showCreateDeviceSettings">
-        <Settings v-model="createDeviceSettings" :noTitle="true" class="pa-2">
+        <Settings v-model="createDeviceSettings" custom-title="Add New" class="pa-2">
+          <template v-slot:prepend>
+            <v-alert v-if="createError" type="error">{{ createError }}</v-alert>
+          </template>
           <template v-slot:append>
             <v-card-actions>
               <v-spacer></v-spacer>
@@ -16,37 +17,21 @@
           </template>
         </Settings>
       </v-dialog>
-      <v-btn
-        v-if="device.interfaces.includes('DeviceCreator')"
-        text
-        color="primary"
-        @click="openDeviceCreationDialog"
-        >Add New</v-btn
-      >
+      <v-btn v-if="device.interfaces.includes('DeviceCreator')" text color="primary" @click="openDeviceCreationDialog">Add
+        New</v-btn>
       <!-- <v-btn
-        v-if="device.interfaces.includes('DeviceDiscovery')"
-        text
-        color="primary"
-        >Discover Devices</v-btn
-      > -->
+          v-if="device.interfaces.includes('DeviceDiscovery')"
+          text
+          color="primary"
+          >Discover Devices</v-btn
+        > -->
     </v-card-actions>
 
     <v-card-text>These things were created by {{ device.name }}.</v-card-text>
-    <v-text-field
-      v-if="managedDevices.devices.length > 10"
-      v-model="search"
-      append-icon="search"
-      label="Search"
-      single-line
-      hide-details
-    ></v-text-field>
-    <v-data-table
-      v-if="managedDevices.devices.length > 10"
-      :headers="headers"
-      :items="managedDevices.devices"
-      :items-per-page="10"
-      :search="search"
-    >
+    <v-text-field v-if="managedDevices.devices.length > 10" v-model="search" append-icon="search" label="Search"
+      single-line hide-details></v-text-field>
+    <v-data-table v-if="managedDevices.devices.length > 10" :headers="headers" :items="managedDevices.devices"
+      :items-per-page="10" :search="search">
       <template v-slot:[`item.icon`]="{ item }">
         <v-icon x-small color="grey">
           {{ typeToIcon(item.type) }}
@@ -70,6 +55,7 @@ export default {
   mixins: [RPCInterface],
   data() {
     return {
+      createError: '',
       showCreateDeviceSettings: false,
       showCreateDevice: false,
       createDeviceSettings: null,
@@ -89,8 +75,13 @@ export default {
       for (const setting of this.createDeviceSettings.settings) {
         settings[setting.key] = setting.value;
       }
-      const id = await this.device.createDevice(settings);
-      this.$router.push(getDeviceViewPath(id));
+      try {
+        const id = await this.device.createDevice(settings);
+        this.$router.push(getDeviceViewPath(id));
+      }
+      catch (e) {
+        this.createError = e.message;
+      }
     },
     async openDeviceCreationDialog() {
       const settings = await this.device.getCreateDeviceSettings();
@@ -137,7 +128,7 @@ export default {
         .filter(
           (id) =>
             this.$store.state.systemState[id].providerId.value ===
-              this.device.id && this.device.id !== id
+            this.device.id && this.device.id !== id
         )
         .map((id) => ({
           id,

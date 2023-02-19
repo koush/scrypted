@@ -1,6 +1,8 @@
 <template>
   <v-card>
-    <CardTitle v-if="!noTitle">Settings</CardTitle>
+    <v-card-title class="pl-0 pt-0" v-if="customTitle">{{ customTitle }}</v-card-title>
+    <CardTitle v-else>Settings</CardTitle>
+    <slot name="prepend"></slot>
     <v-flex xs12 v-if="showChips">
       <v-chip-group class="pt-0" mandatory active-class="deep-purple accent-4 white--text" column
         v-model="settingsGroupName">
@@ -75,7 +77,7 @@ export default {
     AvailableMixins,
   },
   mixins: [RPCInterface, Mixin],
-  props: ["noTitle"],
+  props: ["customTitle"],
   data() {
     return {
       rawSettingsSubgroupName: undefined,
