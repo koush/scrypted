@@ -328,11 +328,12 @@ class DeviceManifest(TypedDict):
     pass
 
 class DiscoveredDevice(TypedDict):
+    description: str
     info: DeviceInformation
     interfaces: list[str]
     name: str
     nativeId: str
-    settings: DeviceCreatorSettings
+    settings: list[Setting]
     type: ScryptedDeviceType
     pass
 

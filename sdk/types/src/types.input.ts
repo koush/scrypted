@@ -947,11 +947,15 @@ export interface DeviceCreator {
 }
 export interface DiscoveredDevice {
   name: string;
+  /**
+   * Identifying information such as IP Address or Serial Number.
+   */
+  description: string;
   nativeId: ScryptedNativeId;
   type: ScryptedDeviceType;
   interfaces?: string[];
   info?: DeviceInformation;
-  settings?: DeviceCreatorSettings;
+  settings?: Setting[];
 }
 export interface AdoptDevice {
   nativeId: ScryptedNativeId;
@@ -969,6 +973,10 @@ export interface DeviceDiscovery {
    * is returned.
    */
   discoverDevices(scan?: boolean): Promise<DiscoveredDevice[]>;
+  /**
+   * Returns the id of the newly adopted device.
+   * @param device
+   */
   adoptDevice(device: AdoptDevice): Promise<string>;
 }
 /**
