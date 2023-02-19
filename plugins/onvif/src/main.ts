@@ -1,4 +1,4 @@
-import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DiscoveredDevice, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import onvif from 'onvif';
 import { Stream } from "stream";
 import xml2js from 'xml2js';
@@ -28,7 +28,7 @@ function convertAudioCodec(codec: string) {
     return codec?.toLowerCase();
 }
 
-class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
+class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, VideoCameraConfiguration {
     eventStream: Stream;
     client: OnvifCameraAPI;
     rtspMediaStreamOptions: Promise<UrlMediaStreamOptions[]>;
@@ -38,6 +38,60 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
         super(nativeId, provider);
 
         this.updateManagementUrl();
+        this.updateDevice();
+    }
+
+    async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
+        const client = await this.getClient();
+        const profiles: any[] = await client.getProfiles();
+        const profile = profiles.find(profile => profile.$.token === options.id);
+        const configuration = profile.videoEncoderConfiguration;
+
+        const videoOptions = options.video;
+
+        switch (videoOptions.codec) {
+            case 'h264':
+                configuration.encoding = 'H264';
+
+                if (videoOptions.idrIntervalMillis && videoOptions.fps) {
+                    configuration.H264 ||= {};
+                    configuration.H264.govLength = Math.floor(videoOptions.fps * videoOptions.idrIntervalMillis / 1000);
+                }
+                if (videoOptions.keyframeInterval) {
+                    configuration.H264 ||= {};
+                    configuration.H264.govLength = videoOptions.keyframeInterval;
+                }
+                if (videoOptions.profile) {
+                    configuration.H264 ||= {};
+                    configuration.H264.profile = videoOptions.profile;
+                }
+                break;
+        }
+
+        if (videoOptions.width && videoOptions.height) {
+            configuration.resolution ||= {};
+            configuration.resolution.width = videoOptions.width;
+            configuration.resolution.height = videoOptions.height;
+        }
+
+        if (videoOptions?.bitrate) {
+            configuration.rateControl ||= {};
+            configuration.rateControl.bitrateLimit = Math.floor(videoOptions.bitrate / 1000);
+        }
+        if (videoOptions.fps) {
+            configuration.rateControl ||= {};
+            configuration.rateControl.frameRateLimit = videoOptions.fps;
+            configuration.rateControl.encodingInterval = 1;
+        }
+
+        return new Promise((r, f) => {
+            client.cam.setVideoEncoderConfiguration(configuration, (e: Error, result: any) => {
+                if (e)
+                    return f(e);
+
+                r();
+            })
+        });
     }
 
     updateManagementUrl() {
@@ -121,6 +175,10 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
                         try {
                             ret.push({
                                 id: $.token,
+                                metadata: {
+                                    videoId: videoEncoderConfiguration.$.token,
+                                    audioId: audioEncoderConfiguration.$.token,
+                                },
                                 name: name,
                                 container: 'rtsp',
                                 url: await client.getStreamUrl($.token),
@@ -428,6 +486,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
             ScryptedInterface.Camera,
             ScryptedInterface.AudioSensor,
             ScryptedInterface.MotionSensor,
+            ScryptedInterface.VideoCameraConfiguration,
         ];
     }
 
