@@ -109,6 +109,7 @@ class ScryptedInterface(Enum):
     OauthClient = "OauthClient"
     ObjectDetection = "ObjectDetection"
     ObjectDetector = "ObjectDetector"
+    ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
     OnOff = "OnOff"
     Online = "Online"
@@ -890,6 +891,11 @@ class ObjectDetector:
     async def getDetectionInput(self, detectionId: str, eventId: Any = None) -> MediaObject:
         pass
     async def getObjectTypes(self) -> ObjectDetectionTypes:
+        pass
+    pass
+
+class ObjectTracker:
+    async def trackObjects(self, detection: ObjectsDetected) -> ObjectsDetected:
         pass
     pass
 
@@ -2270,6 +2276,13 @@ ScryptedInterfaceDescriptors = {
       "eval",
       "loadScripts",
       "saveScript"
+    ],
+    "properties": []
+  },
+  "ObjectTracker": {
+    "name": "ObjectTracker",
+    "methods": [
+      "trackObjects"
     ],
     "properties": []
   },
