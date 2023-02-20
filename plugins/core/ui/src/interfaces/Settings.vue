@@ -32,7 +32,7 @@
 
     <v-divider v-if="settingsSubgroups"></v-divider>
 
-    <CardTitle v-if="settingsSubgroups">Settings > {{ settingsGroupName }} >  {{ settingsSubgroupName }}</CardTitle>
+    <!-- <CardTitle v-if="settingsSubgroups">Settings > {{ settingsGroupName }} >  {{ settingsSubgroupName }}</CardTitle> -->
 
     <v-flex xs12 v-if="settingsGroupName !== 'extensions' || !showChips">
 
