@@ -239,7 +239,6 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             interfaces: [
                 ScryptedInterface.BufferConverter,
             ],
-            internal: true,
         })
             .then(() => this.bridge = new WebRTCBridge(this, RTC_BRIDGE_NATIVE_ID));
     }
