@@ -424,6 +424,8 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
 
         if (method === QueryInterfaceSymbol) {
             const iface = argArray[0];
+            if (iface === ScryptedInterface.ScryptedDevice)
+                return this.id;
             const found = await this.findMixin(iface);
             if (found?.entry.interfaces.has(iface)) {
                 return found.mixin.mixinProviderId || this.id;
