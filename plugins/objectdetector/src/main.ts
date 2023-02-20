@@ -352,7 +352,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
             retainImage = true;
           }
           else if (secondPassScore > d.bestSecondPassScore * 1.1) {
-            this.console.log('improved', d.id, d.bestSecondPassScore, d.score);
+            this.console.log('improved', d.id, secondPassScore, d.score);
             better = true;
             retainImage = true;
           }
