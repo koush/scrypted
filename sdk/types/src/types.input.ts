@@ -1227,6 +1227,12 @@ export interface ObjectDetectionTypes {
   classes?: ObjectDetectionClass[];
 }
 /**
+ * Given object detections with bounding boxes, return a similar list with tracker ids.
+ */
+export interface ObjectTracker {
+    trackObjects(detection: ObjectsDetected): Promise<ObjectsDetected>;
+}
+/**
  * ObjectDetector is found on Cameras that have smart detection capabilities.
  */
 export interface ObjectDetector {
