@@ -53,7 +53,7 @@ class OpenCVPlugin(DetectPlugin):
     def getClasses(self) -> list[str]:
         return ['motion']
 
-    def getModelSettings(self) -> list[Setting]:
+    def getModelSettings(self, settings: Any = None) -> list[Setting]:
         settings = [
             {
                 'title': "Motion Area",
@@ -87,21 +87,6 @@ class OpenCVPlugin(DetectPlugin):
                 'placeholder': defaultInterval,
                 'type': 'number',
             },
-            {
-                'title': "Decoder",
-                'description': "The gstreamer element used to decode the stream",
-                'combobox': True,
-                'value': 'decodebin',
-                'placeholder': 'decodebin',
-                'key': 'decoder',
-                'choices': [
-                    'Default',
-                    'decodebin',
-                    'parsebin ! vtdec_hw',
-                    'parsebin ! h264parse ! nvh264dec',
-                    'rtph264depay ! h264parse ! nvh264dec',
-                ],
-            }
         ]
 
         return settings
