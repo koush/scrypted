@@ -176,8 +176,8 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
                             ret.push({
                                 id: $.token,
                                 metadata: {
-                                    videoId: videoEncoderConfiguration.$.token,
-                                    audioId: audioEncoderConfiguration.$.token,
+                                    videoId: videoEncoderConfiguration?.$?.token,
+                                    audioId: audioEncoderConfiguration?.$?.token,
                                 },
                                 name: name,
                                 container: 'rtsp',
