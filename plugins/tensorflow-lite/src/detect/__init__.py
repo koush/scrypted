@@ -19,6 +19,7 @@ import platform
 from .corohelper import run_coro_threadsafe
 from PIL import Image
 import math
+import io
 
 Gst = None
 try:
@@ -56,6 +57,7 @@ class DetectionSession:
     running: bool
     plugin: DetectPlugin
     callbacks: ObjectDetectionCallbacks
+    user_callback: Any
 
     def __init__(self) -> None:
         self.timerHandle = None
@@ -63,6 +65,7 @@ class DetectionSession:
         self.running = False
         self.mutex = threading.Lock()
         self.last_sample = time.time()
+        self.user_callback = None
 
     def clearTimeoutLocked(self):
         if self.timerHandle:
@@ -294,7 +297,21 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             detection_session.callbacks = callbacks
 
         if is_image:
-            return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
+            stream = io.BytesIO(bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')))
+            image = Image.open(stream)
+            if not detection_session.user_callback:
+                detection_session.user_callback = self.create_user_callback(self.run_detection_image, detection_session, duration)
+            def convert_to_src_size(point, normalize = False):
+                x, y = point
+                return (int(math.ceil(x)), int(math.ceil(y)), True)
+
+            detection_session.running = True
+            try:
+                return await detection_session.user_callback(image, image.size, convert_to_src_size)
+            finally:
+                detection_session.running = False
+
+            # return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
 
         if not create:
             # a detection session may have been created, but not started
@@ -491,6 +508,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 if not detection_session or duration == None:
                     safe_set_result(detection_session.loop,
                                     detection_session.future)
+
+                return detection_result
             finally:
                 pass
 
