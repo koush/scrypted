@@ -19,7 +19,20 @@ mkdir -p $SCRYPTED_HOME
 set -e
 cd $SCRYPTED_HOME
 
-if [ -z "$SKIP_DOCKER_INSTALL" ]
+function readyn() {
+    while true; do
+        read -p "$1? (y/n) " yn
+        case $yn in
+            [Yy]* ) break;;
+            [Nn]* ) break;;
+            * ) echo "Please answer yes or no. (y/n)";;
+        esac
+    done
+}
+
+readyn "Install Docker?"
+
+if [ "$yn" == "y" ]
 then
     curl -fsSL https://get.docker.com -o get-docker.sh
     sh get-docker.sh
@@ -33,6 +46,14 @@ curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/docker-comp
 
 echo "Setting permissions on $SCRYPTED_HOME"
 chown -R $SERVICE_USER $SCRYPTED_HOME
+
+echo "Optional:"
+readyn "Edit docker-compose.yml to add volume for Scrypted NVR?"
+
+if [ "$yn" == "y" ]
+then
+    nano $DOCKER_COMPOSE_YML
+fi
 
 set +e
 
