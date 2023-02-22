@@ -690,6 +690,18 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
             }
         }
         location.onLocationMode.subscribe(updateLocationMode);
+        
+        // if the location has a base station, updates when arming/disarming are not sent to the `onLocationMode` subscription
+        // instead we subscribe to the security panel, which is updated during arming actions
+        location.getSecurityPanel().then(panel => {
+            panel.onData.subscribe(_ => { 
+                location.getLocationMode().then(response => {
+                    updateLocationMode(response.mode);
+                });
+            });
+        }).catch(_ => {
+            this.console.warn(`no security panel found, updates will not be recieved on this subscription`)
+        });
 
         if (location.hasAlarmBaseStation) {
             location.getLocationMode().then(response => {
