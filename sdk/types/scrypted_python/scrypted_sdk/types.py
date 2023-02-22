@@ -60,6 +60,7 @@ class ScryptedDeviceType(Enum):
     Scene = "Scene"
     SecuritySystem = "SecuritySystem"
     Sensor = "Sensor"
+    Siren = "Siren"
     SmartDisplay = "SmartDisplay"
     SmartSpeaker = "SmartSpeaker"
     Speaker = "Speaker"
@@ -68,6 +69,7 @@ class ScryptedDeviceType(Enum):
     Unknown = "Unknown"
     Vacuum = "Vacuum"
     Valve = "Valve"
+    WindowCovering = "WindowCovering"
 
 class ScryptedInterface(Enum):
     AirQualitySensor = "AirQualitySensor"
@@ -109,6 +111,7 @@ class ScryptedInterface(Enum):
     OauthClient = "OauthClient"
     ObjectDetection = "ObjectDetection"
     ObjectDetector = "ObjectDetector"
+    ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
     OnOff = "OnOff"
     Online = "Online"
@@ -591,6 +594,7 @@ class ResponsePictureOptions(TypedDict):
     id: str
     name: str
     picture: PictureDimensions
+    staleDuration: float
     pass
 
 class ScriptSource(TypedDict):
@@ -890,6 +894,11 @@ class ObjectDetector:
     async def getDetectionInput(self, detectionId: str, eventId: Any = None) -> MediaObject:
         pass
     async def getObjectTypes(self) -> ObjectDetectionTypes:
+        pass
+    pass
+
+class ObjectTracker:
+    async def trackObjects(self, detection: ObjectsDetected) -> ObjectsDetected:
         pass
     pass
 
@@ -2270,6 +2279,13 @@ ScryptedInterfaceDescriptors = {
       "eval",
       "loadScripts",
       "saveScript"
+    ],
+    "properties": []
+  },
+  "ObjectTracker": {
+    "name": "ObjectTracker",
+    "methods": [
+      "trackObjects"
     ],
     "properties": []
   },

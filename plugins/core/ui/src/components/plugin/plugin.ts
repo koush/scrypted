@@ -76,7 +76,7 @@ export function getNpmPath(npmPackage: string) {
 }
 
 export function getIdForNativeId(systemManager: SystemManager, pluginId: string, nativeId: string) {
-    const found = getAllDevices(systemManager).find(device => device.pluginId === pluginId && device, nativeId === nativeId);
+    const found = getAllDevices(systemManager).find(device => device.pluginId === pluginId && device.nativeId === nativeId);
     return found?.id;
 }
 

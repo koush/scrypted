@@ -127,6 +127,8 @@ export enum ScryptedDeviceType {
   Valve = "Valve",
   Person = "Person",
   SecuritySystem = "SecuritySystem",
+  WindowCovering = "WindowCovering",
+  Siren = "Siren",
   Unknown = "Unknown",
 }
 /**
@@ -429,6 +431,10 @@ export interface ResponsePictureOptions extends PictureOptions {
    * Flag that indicates that the request supports resizing to custom dimensions.
    */
   canResize?: boolean;
+  /**
+   * Flag that indicates the camera will return a stale/cached image.
+   */
+  staleDuration?: number;
 }
 export interface RequestPictureOptions extends PictureOptions {
   reason?: 'user' | 'event';
@@ -1227,6 +1233,12 @@ export interface ObjectDetectionTypes {
   classes?: ObjectDetectionClass[];
 }
 /**
+ * Given object detections with bounding boxes, return a similar list with tracker ids.
+ */
+export interface ObjectTracker {
+    trackObjects(detection: ObjectsDetected): Promise<ObjectsDetected>;
+}
+/**
  * ObjectDetector is found on Cameras that have smart detection capabilities.
  */
 export interface ObjectDetector {
@@ -1806,6 +1818,7 @@ export enum ScryptedInterface {
   PushHandler = "PushHandler",
   Program = "Program",
   Scriptable = "Scriptable",
+  ObjectTracker = "ObjectTracker",
   ObjectDetector = "ObjectDetector",
   ObjectDetection = "ObjectDetection",
   HumiditySetting = "HumiditySetting",
