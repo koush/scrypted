@@ -127,6 +127,8 @@ export enum ScryptedDeviceType {
   Valve = "Valve",
   Person = "Person",
   SecuritySystem = "SecuritySystem",
+  WindowCovering = "WindowCovering",
+  Siren = "Siren",
   Unknown = "Unknown",
 }
 /**
@@ -429,6 +431,10 @@ export interface ResponsePictureOptions extends PictureOptions {
    * Flag that indicates that the request supports resizing to custom dimensions.
    */
   canResize?: boolean;
+  /**
+   * Flag that indicates the camera will return a stale/cached image.
+   */
+  staleDuration?: number;
 }
 export interface RequestPictureOptions extends PictureOptions {
   reason?: 'user' | 'event';

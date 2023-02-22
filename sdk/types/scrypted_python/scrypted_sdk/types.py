@@ -60,6 +60,7 @@ class ScryptedDeviceType(Enum):
     Scene = "Scene"
     SecuritySystem = "SecuritySystem"
     Sensor = "Sensor"
+    Siren = "Siren"
     SmartDisplay = "SmartDisplay"
     SmartSpeaker = "SmartSpeaker"
     Speaker = "Speaker"
@@ -68,6 +69,7 @@ class ScryptedDeviceType(Enum):
     Unknown = "Unknown"
     Vacuum = "Vacuum"
     Valve = "Valve"
+    WindowCovering = "WindowCovering"
 
 class ScryptedInterface(Enum):
     AirQualitySensor = "AirQualitySensor"
@@ -592,6 +594,7 @@ class ResponsePictureOptions(TypedDict):
     id: str
     name: str
     picture: PictureDimensions
+    staleDuration: float
     pass
 
 class ScriptSource(TypedDict):
