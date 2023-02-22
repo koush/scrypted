@@ -52,6 +52,7 @@ readyn "Edit docker-compose.yml to add external storage for Scrypted NVR?"
 
 if [ "$yn" == "y" ]
 then
+    apt install nano
     nano $DOCKER_COMPOSE_YML
 fi
 
