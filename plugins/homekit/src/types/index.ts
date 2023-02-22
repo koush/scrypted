@@ -13,3 +13,4 @@ import './thermostat';
 import './vacuum';
 import './outlet';
 import './notifier';
+import './windowcovering'
