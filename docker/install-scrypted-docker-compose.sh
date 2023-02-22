@@ -21,7 +21,7 @@ cd $SCRYPTED_HOME
 
 function readyn() {
     while true; do
-        read -p "$1? (y/n) " yn
+        read -p "$1 (y/n) " yn
         case $yn in
             [Yy]* ) break;;
             [Nn]* ) break;;
