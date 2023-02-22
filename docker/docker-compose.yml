@@ -27,7 +27,7 @@ services:
             # nvidia support
             # - NVIDIA_VISIBLE_DEVICES=all
             # - NVIDIA_DRIVER_CAPABILITIES=all
-#         runtime: nvidia
+        # runtime: nvidia
         container_name: scrypted
         restart: unless-stopped
         network_mode: host
