@@ -1014,7 +1014,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                             },
                             nativeId: nativeId + '-siren',
                             name: camera.name + ' Siren',
-                            type: ScryptedDeviceType.Switch,
+                            type: ScryptedDeviceType.Siren,
                             interfaces: [ScryptedInterface.OnOff],
                         };
                         devices.push(device);
