@@ -48,7 +48,7 @@ echo "Setting permissions on $SCRYPTED_HOME"
 chown -R $SERVICE_USER $SCRYPTED_HOME
 
 echo "Optional:"
-readyn "Edit docker-compose.yml to add volume for Scrypted NVR?"
+readyn "Edit docker-compose.yml to add external storage for Scrypted NVR?"
 
 if [ "$yn" == "y" ]
 then
