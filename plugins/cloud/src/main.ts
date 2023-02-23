@@ -373,51 +373,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async updateCors() {
         try {
-            if (endpointManager.setAccessControlAllowOrigin) {
-                endpointManager.setAccessControlAllowOrigin({
-                    origins: [
-                        'http://home.scrypted.app',
-                        'https://home.scrypted.app',
-                        // chromecast receiver. move this into google home and chromecast plugins?
-                        'https://koush.github.io',
-                    ],
-                });
-            }
-            else {
-                // TODO: delete this
-                // 1/25/2023
-                const corsControl = await systemManager.getComponent('cors') as CORSControlLegacy;
-                let cors = await corsControl.getCORS();
-                cors = cors.filter(entry => entry.tag !== '@scrypted/cloud');
-                cors.push(
-                    {
-                        tag: '@scrypted/cloud',
-                        server: 'https://home.scrypted.app',
-                    },
-                    {
-                        tag: '@scrypted/cloud',
-                        server: 'http://home.scrypted.app',
-                    },
-                    {
-                        tag: '@scrypted/cloud',
-                        server: 'https://koush.github.io',
-                    },
-                );
-                const { hostname } = this.storageSettings.values;
-                if (hostname) {
-                    cors.push(
-                        {
-                            tag: '@scrypted/cloud',
-                            server: `https://${hostname}`,
-                        },
-                        {
-                            tag: '@scrypted/cloud',
-                            server: `http://${hostname}`,
-                        },
-                    );
-                }
-                await corsControl.setCORS(cors);
-            }
+            endpointManager.setAccessControlAllowOrigin({
+                origins: [
+                    `http://${SCRYPTED_SERVER}`,
+                    `https://${SCRYPTED_SERVER}`,
+                    // chromecast receiver. move this into google home and chromecast plugins?
+                    'https://koush.github.io',
+                ],
+            });
         }
         catch (e) {
             this.console.error('error updating cors, is your scrypted server up to date?', e);
@@ -555,6 +518,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             hostname: os.hostname(),
             registration_id: await this.manager.registrationId,
             sender_id: DEFAULT_SENDER_ID,
+            redirect_uri: `https://${SCRYPTED_SERVER}/web/oauth/callback`,
         })
         return `https://${SCRYPTED_SERVER}/_punch/login?${args}`;
         // this is disabled because we can't assume that custom domains will implement this oauth endpoint.
