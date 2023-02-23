@@ -2,7 +2,6 @@
   "name": "ui",
   "private": true,
   "scripts": {
-    "preinstall": "pushd ../../../packages/client && npm install && popd",
     "dev": "concurrently --names 'server,client' --prefix-colors 'gray,white.bold' --prefix '{time} ({name})\t' --timestamp-format 'HH:mm:ss.SSS' --kill-others npm:serve-server npm:serve",
     "serve": "vue-cli-service serve --open",
     "serve-server": "cd ../../../server && npm run serve",
