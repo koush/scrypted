@@ -92,7 +92,6 @@ export default {
             pluginInfo = await plugins.getPluginInfo(pluginId);
           }
           catch (e) {
-            console.warn(e);
           }
           const { packageJson, pid, stats, rpcObjects, pendingResults } = pluginInfo || {};
           const npmPackageVersion = packageJson?.version;
