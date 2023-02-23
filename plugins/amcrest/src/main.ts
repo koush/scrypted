@@ -560,7 +560,7 @@ class AmcrestProvider extends RtspProvider {
                 info.serialNumber = deviceInfo.serialNumber;
             }
             catch (e) {
-                this.console.error('Error adding Hikvision camera', e);
+                this.console.error('Error adding Amcrest camera', e);
                 throw e;
             }
         }
