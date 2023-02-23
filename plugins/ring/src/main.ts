@@ -699,8 +699,9 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
                     updateLocationMode(response.mode);
                 });
             });
-        }).catch(_ => {
-            this.console.warn(`no security panel found, updates will not be recieved on this subscription`)
+        }).catch(error => {
+            // could not find a security panel for location
+            // not logging this error as it is a valid case to not have a security panel
         });
 
         if (location.hasAlarmBaseStation) {
