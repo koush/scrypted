@@ -1,12 +1,18 @@
-import { sleep } from "@scrypted/common/src/sleep";
+import axios from 'axios';
 import AxiosDigestAuth from "@koush/axios-digest-auth/dist";
-import crypto from 'crypto';
+import https from 'https';
 
 export class ReolinkCameraClient {
     digestAuth: AxiosDigestAuth;
+    axios = axios.create({
+        httpsAgent: new https.Agent({
+            rejectUnauthorized: false,
+        })
+    });
 
     constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console) {
         this.digestAuth = new AxiosDigestAuth({
+            axios: this.axios,
             password,
             username,
         });

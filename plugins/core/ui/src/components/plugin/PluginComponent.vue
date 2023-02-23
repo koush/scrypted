@@ -16,7 +16,8 @@ export default {
       return `https://www.npmjs.com/package/${device.pluginId}`;
     },
     async openAutoupdater() {
-      const id = getIdForNativeId(systemManager, '@scrypted/core', 'scriptcore');
+      const { systemManager } = this.$scrypted;
+      const id = getIdForNativeId(systemManager, '@scrypted/core', 'automation:update-plugins');
       this.$router.push(getDeviceViewPath(id));
     },
     async snapshotCurrentPlugins() {

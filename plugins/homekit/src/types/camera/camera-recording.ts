@@ -277,7 +277,6 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
     let pending: Buffer[] = [];
     try {
         let i = 0;
-        console.time('mp4 recording');
         // if ffmpeg is being used to parse a prebuffered stream that is NOT mp4 (despite our request),
         // it seems that ffmpeg may output a bad first fragment. it may be missing various codec informations or
         // it may start on a non keyframe. HAP requires every fragment start on a keyframe.
@@ -339,7 +338,6 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
     }
     finally {
         clearTimeout(videoTimeout);
-        console.timeEnd('mp4 recording');
         cleanupPipes();
         recordingFile?.end();
         recordingFile?.destroy();

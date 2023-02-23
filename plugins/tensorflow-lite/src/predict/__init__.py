@@ -50,7 +50,7 @@ class RawImage:
         self.image = image
         self.jpegMediaObject = None
 
-def is_same_box(bb1, bb2, threshold = .8):
+def is_same_box(bb1, bb2, threshold = .7):
     r1 = from_bounding_box(bb1)
     r2 = from_bounding_box(bb2)
     ia = intersect_area(r1, r2)
@@ -62,7 +62,7 @@ def is_same_box(bb1, bb2, threshold = .8):
     a2 = bb2[2] * bb2[3]
 
     # if area intersect area is too small, these are different boxes
-    if ia / a1 < threshold and ia / a2 < threshold:
+    if ia / a1 < threshold or ia / a2 < threshold:
         return False, None
 
     l = min(bb1[0], bb2[0])
@@ -431,7 +431,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         for td in trackers:
             x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
             ), td[2].item(), td[3].item(), td[4].item()
-            slop = sys.maxsize
+            slop = 0
             obj: ObjectDetectionResult = None
             ta = (x1 - x0) * (y1 - y0)
             box = Rectangle(x0, y0, x1, y1)
@@ -446,8 +446,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 area = intersect_area(Rectangle(dx0, dy0, dx1, dy1), box)
                 if not area:
                     continue
-                dslop = ta + da - area * 2
-                if (dslop < slop):
+                # intersect area always gonna be smaller than
+                # the detection or tracker area.
+                # greater numbers, ie approaching 2, is better.
+                dslop = area / ta + area / da
+                if (dslop > slop):
                     slop = dslop
                     obj = ob
 

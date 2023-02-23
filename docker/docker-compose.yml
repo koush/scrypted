@@ -3,12 +3,31 @@ version: "3.5"
 # The Scrypted docker-compose.yml file typically resides at:
 # ~/.scrypted/docker-compose.yml
 
+# Example volumes SMB (CIFS) and NFS.
+# Uncomment only one.
+
+# volumes:
+#     nvr:
+#         driver_opts:
+#             type: cifs
+#             o: username=[username],password=[password],vers=3.0,file_mode=0777,dir_mode=0777 
+#             device: //[ip-address]/[path-to-directory]
+#     nvr:
+#         driver_opts:
+#             type: "nfs"
+#             o: "addr=[ip-address],nolock,soft,rw"
+#             device: ":[path-to-directory]"
+
 services:
     scrypted:
+        image: koush/scrypted
         environment:
             - SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION=Bearer SET_THIS_TO_SOME_RANDOM_TEXT
             - SCRYPTED_WEBHOOK_UPDATE=http://localhost:10444/v1/update
-        image: koush/scrypted
+            # nvidia support
+            # - NVIDIA_VISIBLE_DEVICES=all
+            # - NVIDIA_DRIVER_CAPABILITIES=all
+        # runtime: nvidia
         container_name: scrypted
         restart: unless-stopped
         network_mode: host
@@ -26,6 +45,13 @@ services:
             # the following example would mount the /mnt/sda/video path on the host
             # to the /nvr path inside the docker container.
             # - /mnt/sda/video:/nvr
+
+            # or use a network mount from one of the examples above
+            # - type: volume
+            #   source: nvr
+            #   target: /nvr
+            #   volume:
+            #     nocopy: true
         # logging is noisy and will unnecessarily wear on flash storage.
         # scrypted has per device in memory logging that is preferred.
         logging:

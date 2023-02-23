@@ -2,7 +2,7 @@ export { RingBaseApi } from '@koush/ring-client-api/api/api';
 export { Location } from '@koush/ring-client-api/api/location';
 export { clientApi, RingRestClient } from '@koush/ring-client-api/api/rest-client';
 export { RingCamera } from '@koush/ring-client-api/api/ring-camera';
-export { CameraData } from '@koush/ring-client-api/api/ring-types';
+export { CameraData, LocationMode } from '@koush/ring-client-api/api/ring-types';
 export { isStunMessage, RtpDescription } from '@koush/ring-client-api/api/rtp-utils';
 export { SipSession } from '@koush/ring-client-api/api/sip-session';
 export { BasicPeerConnection } from '@koush/ring-client-api/api/streaming/peer-connection';

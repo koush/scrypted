@@ -9,6 +9,7 @@ import { SnapshotThrottle, supportedTypes } from './common';
 import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
 import { createHAPUsernameStorageSettingsDict, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, logConnections, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
+import { addAccessoryDeviceInfo } from './info';
 import { randomPinCode } from './pincode';
 import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
@@ -178,21 +179,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                 accessoryIds.add(id);
 
                 maybeAddBatteryService(device, accessory);
-
-                const deviceInfo = device.info;
-                if (deviceInfo) {
-                    const info = accessory.getService(Service.AccessoryInformation)!;
-                    if (deviceInfo.manufacturer)
-                        info.updateCharacteristic(Characteristic.Manufacturer, deviceInfo.manufacturer);
-                    if (deviceInfo.model)
-                        info.updateCharacteristic(Characteristic.Model, deviceInfo.model);
-                    if (deviceInfo.serialNumber)
-                        info.updateCharacteristic(Characteristic.SerialNumber, deviceInfo.serialNumber);
-                    if (deviceInfo.firmware)
-                        info.updateCharacteristic(Characteristic.FirmwareRevision, deviceInfo.firmware);
-                    if (deviceInfo.version)
-                        info.updateCharacteristic(Characteristic.HardwareRevision, deviceInfo.version);
-                }
+                addAccessoryDeviceInfo(device, accessory);
 
                 const mixinStorage = deviceManager.getMixinStorage(device.id, this.nativeId);
                 const standalone = device.type === ScryptedDeviceType.Camera || device.type === ScryptedDeviceType.Doorbell ? mixinStorage.getItem('standalone') !== 'false' : mixinStorage.getItem('standalone') === 'true';
@@ -412,4 +399,4 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     }
 }
 
-export default new HomeKitPlugin();
+export default HomeKitPlugin;

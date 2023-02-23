@@ -28,7 +28,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             )
         }
         args.push(
-            path.join(__dirname, '../../../python', 'plugin-remote.py'),
+            path.join(__dirname, '../../../python', 'plugin_remote.py'),
         )
 
         const gstEnv: NodeJS.ProcessEnv = {};

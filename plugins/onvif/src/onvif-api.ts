@@ -266,6 +266,12 @@ export class OnvifCameraAPI {
 
         return Buffer.from(response.data);
     }
+
+    getDeviceInformation(): Promise<any> {
+        return promisify(cb => {
+            this.cam.getDeviceInformation(cb);
+        })
+    }
 }
 
 export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console, binaryStateEvent: string) {

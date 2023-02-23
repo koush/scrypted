@@ -14,11 +14,11 @@ cd $(dirname $0)
 git submodule init
 git submodule update
 
-for directory in sdk common server
+for directory in sdk common server packages/client
 do
-    echo "$directory > npm ci"
+    echo "$directory > npm install"
     pushd $directory
-    npm ci
+    npm install
     popd
 done
 
@@ -28,8 +28,8 @@ npm run build
 popd
 
 pushd external/HAP-NodeJS
-echo "external/HAP-NodeJS > npm ci"
-npm ci
+echo "external/HAP-NodeJS > npm install"
+npm install
 echo "external/HAP-NodeJS > npm run build"
 npm run build
 popd
@@ -41,8 +41,8 @@ popd
 
 for directory in ffmpeg-camera rtsp amcrest onvif hikvision unifi-protect webrtc homekit
 do
-    echo "$directory > npm ci"
+    echo "$directory > npm install"
     pushd plugins/$directory
-    npm ci
+    npm install
     popd
 done

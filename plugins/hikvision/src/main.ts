@@ -1,12 +1,12 @@
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
-import sdk, { Camera, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoStreamOptions } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoStreamOptions } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable } from "stream";
 import { sleep } from "../../../common/src/sleep";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { getChannel, HikVisionCameraAPI, HikVisionCameraEvent, hikvisionHttpsAgent } from "./hikvision-camera-api";
+import { getChannel, HikvisionCameraAPI, HikvisionCameraEvent, hikvisionHttpsAgent } from "./hikvision-camera-api";
 import xml2js from 'xml2js';
 
 const { mediaManager } = sdk;
@@ -17,9 +17,9 @@ function channelToCameraNumber(channel: string) {
     return channel.substring(0, channel.length - 2);
 }
 
-class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
+class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
-    client: HikVisionCameraAPI;
+    client: HikvisionCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
     cp: ChildProcess;
 
@@ -43,18 +43,18 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
 
     async listenEvents() {
         let motionTimeout: NodeJS.Timeout;
-        const api = (this.provider as HikVisionProvider).createSharedClient(this.getHttpAddress(), this.getUsername(), this.getPassword());
+        const api = (this.provider as HikvisionProvider).createSharedClient(this.getHttpAddress(), this.getUsername(), this.getPassword());
         const events = await api.listenEvents();
 
         let ignoreCameraNumber: boolean;
 
         let motionPingsNeeded = parseInt(this.storage.getItem('motionPings')) || 1;
-        const motionTimeoutDuration = (parseInt(this.storage.getItem('motionTimeout') )|| 10) * 1000;
+        const motionTimeoutDuration = (parseInt(this.storage.getItem('motionTimeout')) || 10) * 1000;
         let motionPings = 0;
-        events.on('event', async (event: HikVisionCameraEvent, cameraNumber: string, inactive: boolean) => {
-            if (event === HikVisionCameraEvent.MotionDetected
-                || event === HikVisionCameraEvent.LineDetection
-                || event === HikVisionCameraEvent.FieldDetection) {
+        events.on('event', async (event: HikvisionCameraEvent, cameraNumber: string, inactive: boolean) => {
+            if (event === HikvisionCameraEvent.MotionDetected
+                || event === HikvisionCameraEvent.LineDetection
+                || event === HikvisionCameraEvent.FieldDetection) {
 
                 // check if the camera+channel field is in use, and filter events.
                 if (this.getRtspChannel()) {
@@ -86,7 +86,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                         return;
                     }
                 }
-                
+
                 motionPings++;
                 // this.console.log(this.name, 'motion pings', motionPings);
 
@@ -105,7 +105,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
     }
 
     createClient() {
-        return new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
+        return new HikvisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
     }
 
     getClient() {
@@ -488,8 +488,8 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
     }
 }
 
-class HikVisionProvider extends RtspProvider {
-    clients: Map<string, HikVisionCameraAPI>;
+class HikvisionProvider extends RtspProvider {
+    clients: Map<string, HikvisionCameraAPI>;
 
     constructor() {
         super();
@@ -510,14 +510,82 @@ class HikVisionProvider extends RtspProvider {
         const check = this.clients.get(key);
         if (check)
             return check;
-        const client = new HikVisionCameraAPI(address, username, password, this.console);
+        const client = new HikvisionCameraAPI(address, username, password, this.console);
         this.clients.set(key, client);
         return client;
     }
 
     createCamera(nativeId: string) {
-        return new HikVisionCamera(nativeId, this);
+        return new HikvisionCamera(nativeId, this);
+    }
+
+    async createDevice(settings: DeviceCreatorSettings, nativeId?: string): Promise<string> {
+        const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
+        let info: DeviceInformation = {};
+
+        const username = settings.username?.toString();
+        const password = settings.password?.toString();
+        const skipValidate = settings.skipValidate === 'true';
+        if (!skipValidate) {
+            try {
+                const api = new HikvisionCameraAPI(httpAddress, username, password, this.console);
+                const deviceInfo = await api.getDeviceInfo();
+
+                settings.newCamera = deviceInfo.deviceName;
+                info.model = deviceInfo.deviceModel;
+                // info.manufacturer = 'Hikvision';
+                info.mac = deviceInfo.macAddress;
+                info.firmware = deviceInfo.firmwareVersion;
+                info.serialNumber = deviceInfo.serialNumber;
+            }
+            catch (e) {
+                this.console.error('Error adding Hikvision camera', e);
+                throw e;
+            }
+        }
+        settings.newCamera ||= 'Hikvision Camera';
+
+        nativeId = await super.createDevice(settings, nativeId);
+
+        const device = await this.getDevice(nativeId) as HikvisionCamera;
+        device.info = info;
+        device.putSetting('username', username);
+        device.putSetting('password', password);
+        device.setIPAddress(settings.ip?.toString());
+        device.setHttpPortOverride(settings.httpPort?.toString());
+        return nativeId;
+    }
+
+    async getCreateDeviceSettings(): Promise<Setting[]> {
+        return [
+            {
+                key: 'username',
+                title: 'Username',
+            },
+            {
+                key: 'password',
+                title: 'Password',
+                type: 'password',
+            },
+            {
+                key: 'ip',
+                title: 'IP Address',
+                placeholder: '192.168.2.222',
+            },
+            {
+                key: 'httpPort',
+                title: 'HTTP Port',
+                description: 'Optional: Override the HTTP Port from the default value of 80',
+                placeholder: '80',
+            },
+            {
+                key: 'skipValidate',
+                title: 'Skip Validation',
+                description: 'Add the device without verifying the credentials and network settings.',
+                type: 'boolean',
+            }
+        ]
     }
 }
 
-export default new HikVisionProvider();
+export default new HikvisionProvider();

@@ -46,7 +46,8 @@ There are many topics covered in the [Scrypted Wiki](https://github.com/koush/sc
  * Amazon Alexa
 
 Supported accessories: 
- * https://github.com/koush/scrypted/tree/main/plugins
+ * Camera and Core Plugins: https://github.com/koush/scrypted/tree/main/plugins
+ * Community Plugins: https://github.com/orgs/scryptedapp/repositories
 
 
 ## Development

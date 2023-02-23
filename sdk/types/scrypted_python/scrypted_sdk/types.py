@@ -60,6 +60,7 @@ class ScryptedDeviceType(Enum):
     Scene = "Scene"
     SecuritySystem = "SecuritySystem"
     Sensor = "Sensor"
+    Siren = "Siren"
     SmartDisplay = "SmartDisplay"
     SmartSpeaker = "SmartSpeaker"
     Speaker = "Speaker"
@@ -68,6 +69,7 @@ class ScryptedDeviceType(Enum):
     Unknown = "Unknown"
     Vacuum = "Vacuum"
     Valve = "Valve"
+    WindowCovering = "WindowCovering"
 
 class ScryptedInterface(Enum):
     AirQualitySensor = "AirQualitySensor"
@@ -109,6 +111,7 @@ class ScryptedInterface(Enum):
     OauthClient = "OauthClient"
     ObjectDetection = "ObjectDetection"
     ObjectDetector = "ObjectDetector"
+    ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
     OnOff = "OnOff"
     Online = "Online"
@@ -277,6 +280,11 @@ class MediaStreamSource(TypedDict):
 class MediaStreamTool(TypedDict):
     pass
 
+class AdoptDevice(TypedDict):
+    nativeId: str
+    settings: DeviceCreatorSettings
+    pass
+
 class BufferConvertorOptions(TypedDict):
     sourceId: str
     pass
@@ -296,7 +304,6 @@ class ColorRgb(TypedDict):
 class Device(TypedDict):
     info: DeviceInformation
     interfaces: list[str]
-    internal: bool
     name: str
     nativeId: str
     providerNativeId: str
@@ -321,6 +328,16 @@ class DeviceInformation(TypedDict):
 class DeviceManifest(TypedDict):
     devices: list[Device]
     providerNativeId: str
+    pass
+
+class DiscoveredDevice(TypedDict):
+    description: str
+    info: DeviceInformation
+    interfaces: list[str]
+    name: str
+    nativeId: str
+    settings: list[Setting]
+    type: ScryptedDeviceType
     pass
 
 class EndpointAccessControlAllowOrigin(TypedDict):
@@ -577,6 +594,7 @@ class ResponsePictureOptions(TypedDict):
     id: str
     name: str
     picture: PictureDimensions
+    staleDuration: float
     pass
 
 class ScriptSource(TypedDict):
@@ -723,7 +741,9 @@ class DeviceCreator:
     pass
 
 class DeviceDiscovery:
-    async def discoverDevices(self, duration: float) -> None:
+    async def adoptDevice(self, device: AdoptDevice) -> str:
+        pass
+    async def discoverDevices(self, scan: bool = None) -> list[DiscoveredDevice]:
         pass
     pass
 
@@ -874,6 +894,11 @@ class ObjectDetector:
     async def getDetectionInput(self, detectionId: str, eventId: Any = None) -> MediaObject:
         pass
     async def getObjectTypes(self) -> ObjectDetectionTypes:
+        pass
+    pass
+
+class ObjectTracker:
+    async def trackObjects(self, detection: ObjectsDetected) -> ObjectsDetected:
         pass
     pass
 
@@ -2003,6 +2028,7 @@ ScryptedInterfaceDescriptors = {
   "DeviceDiscovery": {
     "name": "DeviceDiscovery",
     "methods": [
+      "adoptDevice",
       "discoverDevices"
     ],
     "properties": []
@@ -2253,6 +2279,13 @@ ScryptedInterfaceDescriptors = {
       "eval",
       "loadScripts",
       "saveScript"
+    ],
+    "properties": []
+  },
+  "ObjectTracker": {
+    "name": "ObjectTracker",
+    "methods": [
+      "trackObjects"
     ],
     "properties": []
   },

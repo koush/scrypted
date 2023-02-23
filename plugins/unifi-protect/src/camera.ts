@@ -365,6 +365,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return [
             {
                 canResize: true,
+                staleDuration: 10000,
             }
         ];
     }

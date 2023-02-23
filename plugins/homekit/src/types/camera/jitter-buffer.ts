@@ -10,6 +10,7 @@ export interface RtpPacket {
         sequenceNumber: number;
     };
     clone(): RtpPacket;
+    serialize(): Buffer;
 }
 
 export function sequenceNumberDistance(s1: number, s2: number): number {

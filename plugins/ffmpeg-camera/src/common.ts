@@ -1,5 +1,5 @@
 import AxiosDigestAuth from '@koush/axios-digest-auth';
-import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, MediaObject, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, MediaObject, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { randomBytes } from "crypto";
 import https from 'https';
 
@@ -106,7 +106,7 @@ export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends S
     }
 
     async getSettings(): Promise<Setting[]> {
-        const ret:Setting[] = [
+        const ret: Setting[] = [
             {
                 key: 'username',
                 title: 'Username',
@@ -172,8 +172,8 @@ export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> e
         }
     }
 
-    async createDevice(settings: DeviceCreatorSettings): Promise<string> {
-        const nativeId = randomBytes(4).toString('hex');
+    async createDevice(settings: DeviceCreatorSettings, nativeId?: ScryptedNativeId): Promise<string> {
+        nativeId ||= randomBytes(4).toString('hex');
         const name = settings.newCamera.toString();
         await this.updateDevice(nativeId, name, this.getInterfaces());
         return nativeId;
@@ -195,8 +195,11 @@ export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> e
     }
 
     getInterfaces() {
-        return [ScryptedInterface.VideoCamera,
-        ScryptedInterface.Settings, ...this.getAdditionalInterfaces()];
+        return [
+            ScryptedInterface.VideoCamera,
+            ScryptedInterface.Settings,
+            ...this.getAdditionalInterfaces()
+        ];
     }
 
     updateDevice(nativeId: string, name: string, interfaces: string[], type?: ScryptedDeviceType) {
@@ -221,6 +224,6 @@ export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> e
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-        
+        this.devices.delete(nativeId);
     }
 }

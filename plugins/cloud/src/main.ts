@@ -1,4 +1,4 @@
-import sdk, { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
+import sdk, { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios from 'axios';
 import bpmux from 'bpmux';
@@ -594,6 +594,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     res.end();
                     return;
                 }
+                else {
+                    this.oauthCallback(req, res);
+                    return;
+                }
             }
             else if (url.path === '/web/') {
                 if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
@@ -702,6 +706,65 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
         });
     }
+
+
+
+    async oauthCallback(req: http.IncomingMessage, res: http.ServerResponse) {
+        const reqUrl = new URL(req.url, 'https://localhost');
+
+        try {
+            const callback_url = reqUrl.searchParams.get('callback_url');
+            if (!callback_url) {
+                const html =
+                    "<head>\n" +
+                    "    <script>\n" +
+                    "        window.location = '/web/oauth/callback?callback_url=' + encodeURIComponent(window.location.toString());\n" +
+                    "    </script>\n" +
+                    "</head>\n" +
+                    "</head>\n" +
+                    "</html>"
+                res.end(html);
+                return;
+            }
+
+            const url = new URL(callback_url as string);
+            if (url.search) {
+                const state = url.searchParams.get('state');
+                if (state) {
+                    const { s, d, r } = JSON.parse(state);
+                    url.searchParams.set('state', s);
+                    const oauthClient = systemManager.getDeviceById<OauthClient>(d);
+                    await oauthClient.onOauthCallback(url.toString()).catch();
+                    res.statusCode = 302;
+                    res.setHeader('Location', r);
+                    res.end();
+                    return;
+                }
+            }
+            if (url.hash) {
+                const hash = new URLSearchParams(url.hash.substring(1));
+                const state = hash.get('state');
+                if (state) {
+                    const { s, d, r } = JSON.parse(state);
+                    hash.set('state', s);
+                    url.hash = '#' + hash.toString();
+                    const oauthClient = systemManager.getDeviceById<OauthClient>(d);
+                    await oauthClient.onOauthCallback(url.toString());
+                    res.statusCode = 302;
+                    res.setHeader('Location', r);
+                    res.end();
+                    return;
+                }
+            }
+
+            throw new Error('no state object found in query or hash');
+        }
+        catch (e) {
+            res.statusCode = 500;
+            res.end();
+        }
+    }
+
 }
 
 export default ScryptedCloud;

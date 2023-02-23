@@ -90,10 +90,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
         this.addMiddleware();
 
-        app.get('/web/oauth/callback', (req, res) => {
-            this.oauthCallback(req, res);
-        });
-
         app.all('/engine.io/shell', (req, res) => {
             if (res.locals.aclId) {
                 res.writeHead(401);
@@ -200,56 +196,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
     getDeviceLogger(device: PluginDevice): Logger {
         return this.devicesLogger.getLogger(device._id, getState(device, ScryptedInterfaceProperty.name));
-    }
-
-    async oauthCallback(req: Request, res: Response) {
-        try {
-            const { callback_url } = req.query;
-            if (!callback_url) {
-                const html =
-                    "<head>\n" +
-                    "    <script>\n" +
-                    "        window.location = '/web/oauth/callback?callback_url=' + encodeURIComponent(window.location.toString());\n" +
-                    "    </script>\n" +
-                    "</head>\n" +
-                    "</head>\n" +
-                    "</html>"
-                res.send(html);
-                return;
-            }
-
-            const url = new URL(callback_url as string);
-            if (url.search) {
-                const state = url.searchParams.get('state');
-                if (state) {
-                    const { s, d, r } = JSON.parse(state);
-                    url.searchParams.set('state', s);
-                    const oauthClient: ScryptedDevice & OauthClient = this.getDevice(d);
-                    await oauthClient.onOauthCallback(url.toString()).catch();
-                    res.redirect(r);
-                    return;
-                }
-            }
-            if (url.hash) {
-                const hash = new URLSearchParams(url.hash.substring(1));
-                const state = hash.get('state');
-                if (state) {
-                    const { s, d, r } = JSON.parse(state);
-                    hash.set('state', s);
-                    url.hash = '#' + hash.toString();
-                    const oauthClient: ScryptedDevice & OauthClient = this.getDevice(d);
-                    await oauthClient.onOauthCallback(url.toString());
-                    res.redirect(r);
-                    return;
-                }
-            }
-
-            throw new Error('no state object found in query or hash');
-        }
-        catch (e) {
-            res.status(500);
-            res.send();
-        }
     }
 
     async getPluginForEndpoint(endpoint: string): Promise<HttpPluginData> {

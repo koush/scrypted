@@ -1,4 +1,4 @@
-import sdk, { DeviceDiscovery, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import onvif from 'onvif';
 import { Stream } from "stream";
 import xml2js from 'xml2js';
@@ -28,7 +28,7 @@ function convertAudioCodec(codec: string) {
     return codec?.toLowerCase();
 }
 
-class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
+class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, VideoCameraConfiguration {
     eventStream: Stream;
     client: OnvifCameraAPI;
     rtspMediaStreamOptions: Promise<UrlMediaStreamOptions[]>;
@@ -38,6 +38,60 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
         super(nativeId, provider);
 
         this.updateManagementUrl();
+        this.updateDevice();
+    }
+
+    async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
+        const client = await this.getClient();
+        const profiles: any[] = await client.getProfiles();
+        const profile = profiles.find(profile => profile.$.token === options.id);
+        const configuration = profile.videoEncoderConfiguration;
+
+        const videoOptions = options.video;
+
+        switch (videoOptions.codec) {
+            case 'h264':
+                configuration.encoding = 'H264';
+
+                if (videoOptions.idrIntervalMillis && videoOptions.fps) {
+                    configuration.H264 ||= {};
+                    configuration.H264.govLength = Math.floor(videoOptions.fps * videoOptions.idrIntervalMillis / 1000);
+                }
+                if (videoOptions.keyframeInterval) {
+                    configuration.H264 ||= {};
+                    configuration.H264.govLength = videoOptions.keyframeInterval;
+                }
+                if (videoOptions.profile) {
+                    configuration.H264 ||= {};
+                    configuration.H264.profile = videoOptions.profile;
+                }
+                break;
+        }
+
+        if (videoOptions.width && videoOptions.height) {
+            configuration.resolution ||= {};
+            configuration.resolution.width = videoOptions.width;
+            configuration.resolution.height = videoOptions.height;
+        }
+
+        if (videoOptions?.bitrate) {
+            configuration.rateControl ||= {};
+            configuration.rateControl.bitrateLimit = Math.floor(videoOptions.bitrate / 1000);
+        }
+        if (videoOptions.fps) {
+            configuration.rateControl ||= {};
+            configuration.rateControl.frameRateLimit = videoOptions.fps;
+            configuration.rateControl.encodingInterval = 1;
+        }
+
+        return new Promise((r, f) => {
+            client.cam.setVideoEncoderConfiguration(configuration, (e: Error, result: any) => {
+                if (e)
+                    return f(e);
+
+                r();
+            })
+        });
     }
 
     updateManagementUrl() {
@@ -121,6 +175,10 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
                         try {
                             ret.push({
                                 id: $.token,
+                                metadata: {
+                                    videoId: videoEncoderConfiguration?.$?.token,
+                                    audioId: audioEncoderConfiguration?.$?.token,
+                                },
                                 name: name,
                                 container: 'rtsp',
                                 url: await client.getStreamUrl($.token),
@@ -345,11 +403,16 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
     }
 }
 
-class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
+class OnvifProvider extends RtspProvider implements DeviceDiscovery {
+    discoveredDevices = new Map<string, {
+        device: Device;
+        host: string;
+        port: string;
+        timeout: NodeJS.Timeout;
+    }>();
+
     constructor(nativeId?: string) {
         super(nativeId);
-
-        this.discoverDevices(10000);
 
         onvif.Discovery.on('device', (cam: any, rinfo: any, xml: any) => {
             // Function will be called as soon as the NVT responses
@@ -377,7 +440,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
                     try {
                         let scopes = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['Scopes'][0].payload;
                         scopes = scopes.split(" ");
-    
+
                         for (let i = 0; i < scopes.length; i++) {
                             if (scopes[i].includes('onvif://www.onvif.org/name')) { name = decodeURI(scopes[i].substring(27)); }
                         }
@@ -387,44 +450,35 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
 
                     this.console.log('Discovery Reply from ' + rinfo.address + ' (' + name + ') (' + xaddrs + ') (' + urn + ')');
 
-                    const isNew = !deviceManager.getNativeIds().includes(urn);
-                    if (!isNew)
+                    if (deviceManager.getNativeIds().includes(urn) || this.discoveredDevices.has(urn))
                         return;
 
-                    await deviceManager.onDeviceDiscovered({
+                    const device: Device = {
                         name,
                         nativeId: urn,
                         type: ScryptedDeviceType.Camera,
                         interfaces: this.getInterfaces(),
+                    };
+                    const onvifUrl = new URL(xaddrs);
+                    clearTimeout(this.discoveredDevices.get(urn)?.timeout);
+                    this.discoveredDevices.set(urn, {
+                        device,
+                        host: rinfo.address,
+                        port: onvifUrl.port,
+                        timeout: setTimeout(() => {
+                            this.discoveredDevices.delete(urn);
+                        }, 5 * 60 * 1000),
                     });
-                    const device = await this.getDevice(urn) as OnvifCamera;
-                    const onvifUrl = new URL(xaddrs)
-                    device.setIPAddress(rinfo.address);
-                    device.setHttpPortOverride(onvifUrl.port);
-                    this.log.a('Discovered ONVIF Camera. Complete setup by providing login credentials.');
+
+                    this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, await this.discoverDevices());
+
+                    // const device = await this.getDevice(urn) as OnvifCamera;
+                    // device.setIPAddress(rinfo.address);
+                    // device.setHttpPortOverride(onvifUrl.port);
+                    // this.log.a('Discovered ONVIF Camera. Complete setup by providing login credentials.');
                 }
             );
         })
-    }
-
-    async putSetting(key: string, value: SettingValue): Promise<void> {
-        if (key === 'autodiscovery') {
-            this.storage.setItem(key, value.toString());
-            this.onDeviceEvent(ScryptedInterface.Settings, undefined);
-            return;
-        }
-    }
-
-    async getSettings(): Promise<Setting[]> {
-        return [
-            {
-                title: 'Autodiscovery',
-                description: 'Autodiscover ONVIF devices on the network',
-                key: 'autodiscovery',
-                type: 'boolean',
-                value: this.storage.getItem('autodiscovery') === 'true',
-            }
-        ]
     }
 
     getAdditionalInterfaces() {
@@ -432,6 +486,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
             ScryptedInterface.Camera,
             ScryptedInterface.AudioSensor,
             ScryptedInterface.MotionSensor,
+            ScryptedInterface.VideoCameraConfiguration,
         ];
     }
 
@@ -439,13 +494,99 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
         return new OnvifCamera(nativeId, this);
     }
 
-    async discoverDevices(duration: number) {
-        const autodiscovery = this.storage.getItem('autodiscovery') === "true";
-        if (!autodiscovery)
-            return;
+    async createDevice(settings: DeviceCreatorSettings, nativeId?: ScryptedNativeId): Promise<string> {
+        const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
 
-        onvif.Discovery.probe();
+        const username = settings.username?.toString();
+        const password = settings.password?.toString();
+        const skipValidate = settings.skipValidate === 'true';
+        if (!skipValidate) {
+            try {
+                const api = await connectCameraAPI(httpAddress, username, password, this.console, undefined);
+                const info = await api.getDeviceInformation();
+
+                settings.newCamera = info.model;
+            }
+            catch (e) {
+                this.console.error('Error adding ONVIF camera', e);
+                throw e;
+            }
+        }
+        settings.newCamera ||= 'ONVIF Camera';
+
+        nativeId = await super.createDevice(settings, nativeId);
+
+        const device = await this.getDevice(nativeId) as OnvifCamera;
+        device.putSetting('username', username);
+        device.putSetting('password', password);
+        device.setIPAddress(settings.ip?.toString());
+        device.setHttpPortOverride(settings.httpPort?.toString());
+        return nativeId;
+    }
+
+    async getCreateDeviceSettings(): Promise<Setting[]> {
+        return [
+            {
+                key: 'username',
+                title: 'Username',
+            },
+            {
+                key: 'password',
+                title: 'Password',
+                type: 'password',
+            },
+            {
+                key: 'ip',
+                title: 'IP Address',
+                placeholder: '192.168.2.222',
+            },
+            {
+                key: 'httpPort',
+                title: 'HTTP Port',
+                description: 'Optional: Override the HTTP Port from the default value of 80',
+                placeholder: '80',
+            },
+            {
+                key: 'skipValidate',
+                title: 'Skip Validation',
+                description: 'Add the device without verifying the credentials and network settings.',
+                type: 'boolean',
+            }
+        ]
+    }
+
+    async discoverDevices(scan?: boolean): Promise<DiscoveredDevice[]> {
+        if (scan)
+            onvif.Discovery.probe();
+        return [...this.discoveredDevices.values()].map(d => ({
+            ...d.device,
+            description: d.host,
+            settings: [
+                {
+                    key: 'username',
+                    title: 'Username',
+                },
+                {
+                    key: 'password',
+                    title: 'Password',
+                    type: 'password',
+                },
+            ]
+        }));
+    }
+
+    async adoptDevice(adopt: AdoptDevice): Promise<string> {
+        const entry = this.discoveredDevices.get(adopt.nativeId);
+        this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, await this.discoverDevices());
+        if (!entry)
+            throw new Error('device not found');
+        adopt.settings.ip = entry.host;
+        adopt.settings.httpPort = entry.port;
+        await this.createDevice(adopt.settings, adopt.nativeId);
+        this.discoveredDevices.delete(adopt.nativeId);
+        const device = await this.getDevice(adopt.nativeId) as OnvifCamera;
+        return device.id;
     }
 }
 
-export default new OnvifProvider();
+export default OnvifProvider;
