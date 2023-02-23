@@ -19,6 +19,7 @@
     "@scrypted/common": "file:../../../common",
     "@scrypted/sdk": "file:../../../sdk",
     "@scrypted/types": "file:../../../sdk/types",
+    "@scrypted/client": "file:../../../packages/client",
     "apexcharts": "^3.28.3",
     "axios": "^0.19.2",
     "bn.js": "^5.2.1",

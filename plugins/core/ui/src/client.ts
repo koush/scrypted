@@ -1,5 +1,5 @@
 import Vue from "vue";
-import { checkScryptedClientLogin, connectScryptedClient, loginScryptedClient, redirectScryptedLogin } from '../../../../packages/client/src/index';
+import { checkScryptedClientLogin, connectScryptedClient, loginScryptedClient, redirectScryptedLogin } from '@scrypted/client/src/index';
 import store from './store';
 
 function hasValue(state: any, property: string) {
