@@ -14,7 +14,7 @@ cd $(dirname $0)
 git submodule init
 git submodule update
 
-for directory in sdk common server
+for directory in sdk common server packages/client
 do
     echo "$directory > npm install"
     pushd $directory
