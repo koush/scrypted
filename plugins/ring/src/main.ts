@@ -13,7 +13,7 @@ import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/p
 import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
 import { Location, isStunMessage, RtpDescription, SipSession, BasicPeerConnection, CameraData, clientApi, generateUuid, RingBaseApi, RingCamera, RingRestClient, rxjs, SimpleWebRtcSession, StreamingSession } from './ring-client-api';
 import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
-import { LocationMode } from '@koush/ring-client-api';
+import { LocationMode } from './ring-client-api';
 
 const STREAM_TIMEOUT = 120000;
 const { deviceManager, mediaManager, systemManager } = sdk;
@@ -739,7 +739,7 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
     }
 }
 
-class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
+class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings {
     loginClient: RingRestClient;
     api: RingBaseApi;
     devices = new Map<string, RingLocationDevice>();
@@ -1014,7 +1014,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                             },
                             nativeId: nativeId + '-siren',
                             name: camera.name + ' Siren',
-                            type: ScryptedDeviceType.Switch,
+                            type: ScryptedDeviceType.Siren,
                             interfaces: [ScryptedInterface.OnOff],
                         };
                         devices.push(device);
@@ -1050,4 +1050,4 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
     }
 }
 
-export default new RingPlugin();
+export default RingPlugin;
