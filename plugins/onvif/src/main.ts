@@ -497,7 +497,6 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
     async createDevice(settings: DeviceCreatorSettings, nativeId?: ScryptedNativeId): Promise<string> {
         const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
 
-
         const username = settings.username?.toString();
         const password = settings.password?.toString();
         const skipValidate = settings.skipValidate === 'true';
@@ -517,13 +516,11 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
         nativeId = await super.createDevice(settings, nativeId);
 
-        if (!skipValidate) {
-            const device = await this.getDevice(nativeId) as OnvifCamera;
-            device.putSetting('username', username);
-            device.putSetting('password', password);
-            device.setIPAddress(settings.ip?.toString());
-            device.setHttpPortOverride(settings.httpPort?.toString());
-        }
+        const device = await this.getDevice(nativeId) as OnvifCamera;
+        device.putSetting('username', username);
+        device.putSetting('password', password);
+        device.setIPAddress(settings.ip?.toString());
+        device.setHttpPortOverride(settings.httpPort?.toString());
         return nativeId;
     }
 

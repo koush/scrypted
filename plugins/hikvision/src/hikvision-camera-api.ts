@@ -10,7 +10,7 @@ export function getChannel(channel: string) {
     return channel || '101';
 }
 
-export enum HikVisionCameraEvent {
+export enum HikvisionCameraEvent {
     MotionDetected = "<eventType>VMD</eventType>",
     VideoLoss = "<eventType>videoloss</eventType>",
     // <eventType>linedetection</eventType>
@@ -26,12 +26,12 @@ export enum HikVisionCameraEvent {
 }
 
 
-export interface HikVisionCameraStreamSetup {
+export interface HikvisionCameraStreamSetup {
     videoCodecType: string;
     audioCodecType: string;
 }
 
-export class HikVisionCameraAPI {
+export class HikvisionCameraAPI {
     digestAuth: AxiosDigestAuth;
     deviceModel: Promise<string>;
     listenerPromise: Promise<IncomingMessage>;
@@ -43,22 +43,38 @@ export class HikVisionCameraAPI {
         });
     }
 
+    async getDeviceInfo() {
+        try {
+            const response = await this.digestAuth.request({
+                httpsAgent: hikvisionHttpsAgent,
+                method: "GET",
+                responseType: 'text',
+                url: `http://${this.ip}/ISAPI/System/deviceInfo`,
+            });
+            const deviceModel = response.data.match(/>(.*?)<\/model>/)?.[1];
+            const deviceName = response.data.match(/>(.*?)<\/deviceName>/)?.[1];
+            const serialNumber = response.data.match(/>(.*?)<\/serialNumber>/)?.[1];
+            const macAddress = response.data.match(/>(.*?)<\/macAddress>/)?.[1];
+            const firmwareVersion = response.data.match(/>(.*?)<\/firmwareVersion>/)?.[1];
+            return {
+                deviceModel,
+                deviceName,
+                serialNumber,
+                macAddress,
+                firmwareVersion,
+            };
+        }
+        catch (e) {
+            if (e?.response?.data?.includes('notActivated'))
+                throw new Error(`Camera must be first be activated at http://${this.ip}.`)
+            throw e;
+        }
+    }
+
     async checkDeviceModel(): Promise<string> {
         if (!this.deviceModel) {
-            this.deviceModel = new Promise(async (resolve, reject) => {
-                try {
-                    const response = await this.digestAuth.request({
-                        httpsAgent: hikvisionHttpsAgent,
-                        method: "GET",
-                        responseType: 'text',
-                        url: `http://${this.ip}/ISAPI/System/deviceInfo`,
-                    });
-                    const deviceModel = response.data.match(/>(.*?)<\/model>/)?.[1];
-                    resolve(deviceModel);
-                } catch (e) {
-                    this.console.error('error checking NVR model', e);
-                    resolve(undefined);
-                }
+            this.deviceModel = this.getDeviceInfo().then(d => d.deviceModel).catch(e => {
+                this.console.error('error checking NVR model', e);
             });
         }
         return await this.deviceModel;
@@ -72,7 +88,7 @@ export class HikVisionCameraAPI {
         return !!model?.match(/DS-7608NI-E2/);
     }
 
-    async checkStreamSetup(channel: string, isOld: boolean): Promise<HikVisionCameraStreamSetup> {
+    async checkStreamSetup(channel: string, isOld: boolean): Promise<HikvisionCameraStreamSetup> {
         if (isOld) {
             this.console.error('NVR is old version.  Defaulting camera capabilities to H.264/AAC');
             return {
@@ -128,7 +144,7 @@ export class HikVisionCameraAPI {
 
                 stream.on('data', (buffer: Buffer) => {
                     const data = buffer.toString();
-                    for (const event of Object.values(HikVisionCameraEvent)) {
+                    for (const event of Object.values(HikvisionCameraEvent)) {
                         if (data.indexOf(event) !== -1) {
                             const cameraNumber = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
                             const inactive = data.indexOf('<eventState>inactive</eventState>') !== -1;

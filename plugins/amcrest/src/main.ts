@@ -1,6 +1,6 @@
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, PictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, PictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
@@ -110,7 +110,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
     async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
         if (!options.id?.startsWith('channel'))
-        throw new Error('invalid id');
+            throw new Error('invalid id');
         const channel = parseInt(this.getRtspChannel()) || 1;
         const formatNumber = parseInt(options.id?.substring('channel'.length)) - 1;
         const format = options.id === 'channel0' ? 'MainFormat' : 'ExtraFormat';
@@ -255,13 +255,14 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 description: 'Amcrest cameras may support both Amcrest and ONVIF two way audio protocols. ONVIF generally performs better when supported.',
                 choices,
             },
-            {
-                title: 'Continuous Recording',
-                key: 'continuousRecording',
-                description: 'Continuously record onto the Camera SD Card.',
-                type: 'boolean',
-                value: (this.storage.getItem('continuousRecording') === 'true').toString(),
-            },
+            // sdcard write causes jitter.
+            // {
+            //     title: 'Continuous Recording',
+            //     key: 'continuousRecording',
+            //     description: 'Continuously record onto the Camera SD Card.',
+            //     type: 'boolean',
+            //     value: (this.storage.getItem('continuousRecording') === 'true').toString(),
+            // },
         );
 
         return ret;
@@ -426,7 +427,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             || this.storage.getItem('twoWayAudio') === 'ONVIF'
             || this.storage.getItem('twoWayAudio') === 'Amcrest';
 
-        const interfaces = provider.getInterfaces();
+        const interfaces = this.provider.getInterfaces();
         let type: ScryptedDeviceType = undefined;
         if (isDoorbell) {
             type = ScryptedDeviceType.Doorbell;
@@ -438,7 +439,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         const continuousRecording = this.storage.getItem('continuousRecording') === 'true';
         if (continuousRecording)
             interfaces.push(ScryptedInterface.VideoRecorder);
-        provider.updateDevice(this.nativeId, this.name, interfaces, type);
+        this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
 
         this.updateManagementUrl();
     }
@@ -541,11 +542,75 @@ class AmcrestProvider extends RtspProvider {
         ];
     }
 
+
+    async createDevice(settings: DeviceCreatorSettings, nativeId?: string): Promise<string> {
+        const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
+        let info: DeviceInformation = {};
+
+        const username = settings.username?.toString();
+        const password = settings.password?.toString();
+        const skipValidate = settings.skipValidate === 'true';
+        if (!skipValidate) {
+            try {
+                const api = new AmcrestCameraClient(httpAddress, username, password, this.console);
+                const deviceInfo = await api.getDeviceInfo();
+
+                settings.newCamera = deviceInfo.deviceType;
+                info.model = deviceInfo.deviceType;
+                info.serialNumber = deviceInfo.serialNumber;
+            }
+            catch (e) {
+                this.console.error('Error adding Hikvision camera', e);
+                throw e;
+            }
+        }
+        settings.newCamera ||= 'Hikvision Camera';
+
+        nativeId = await super.createDevice(settings, nativeId);
+
+        const device = await this.getDevice(nativeId) as AmcrestCamera;
+        device.info = info;
+        device.putSetting('username', username);
+        device.putSetting('password', password);
+        device.setIPAddress(settings.ip?.toString());
+        device.setHttpPortOverride(settings.httpPort?.toString());
+        return nativeId;
+    }
+
+    async getCreateDeviceSettings(): Promise<Setting[]> {
+        return [
+            {
+                key: 'username',
+                title: 'Username',
+            },
+            {
+                key: 'password',
+                title: 'Password',
+                type: 'password',
+            },
+            {
+                key: 'ip',
+                title: 'IP Address',
+                placeholder: '192.168.2.222',
+            },
+            {
+                key: 'httpPort',
+                title: 'HTTP Port',
+                description: 'Optional: Override the HTTP Port from the default value of 80',
+                placeholder: '80',
+            },
+            {
+                key: 'skipValidate',
+                title: 'Skip Validation',
+                description: 'Add the device without verifying the credentials and network settings.',
+                type: 'boolean',
+            }
+        ]
+    }
+
     createCamera(nativeId: string) {
         return new AmcrestCamera(nativeId, this);
     }
 }
 
-const provider = new AmcrestProvider();
-
-export default provider;
+export default AmcrestProvider;
