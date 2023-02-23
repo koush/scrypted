@@ -75,7 +75,9 @@ export class SipCallSession extends Subscribed {
     ))
 
     this.addSubscriptions(
-      call.onEndedByRemote.subscribe(() => this.callEnded(false))
+      call.onEndedByRemote.subscribe(() => {
+        this.callEnded(false)
+      } )
     )
 
     return this.sipManager
@@ -173,12 +175,12 @@ export class SipCallSession extends Subscribed {
     if (this.hasCallEnded) {
       return
     }
+    
     this.hasCallEnded = true
-
     if (sendBye) {
       await this.sipManager.sendBye().catch(this.console.error)
     }
-
+    
     // clean up
     this.console.log("sip-call-session callEnded")
     this.onCallEndedSubject.next(null)

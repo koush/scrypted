@@ -229,7 +229,7 @@ export class SipManager {
                   m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + contactId + "@");
                   // Also a bug in SIP.js ? append the transport for the contact if the transport is udp (according to RFC)
                   if( remote.protocol != 'udp' && m.headers.contact[0].uri.indexOf( "transport=" ) < 0 ) {
-                    m.headers.contact[0].uri = m.headers.contact[0].uri + ":" + remote.port + ";transport=" + remote.protocol
+                    m.headers.contact[0].uri = m.headers.contact[0].uri + ";transport=" + remote.protocol
                   }
                 }
               }
@@ -237,7 +237,13 @@ export class SipManager {
 
             if( sipOptions.debugSip ) {
               console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-              console.log(stringify( m ));
+              if( m.uri ) {
+                console.log(stringify( m ));
+              } else {
+                m.uri = '';
+                console.log( stringify( m ) )
+              }
+              
               console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
             }
           },
@@ -249,7 +255,7 @@ export class SipManager {
             this.sipStack.send(this.sipStack.makeResponse(request, 200, 'Ok'))
 
             if (this.destroyed) {
-              this.onEndedByRemote.next(null)
+            this.onEndedByRemote.next(null)
             }
           } else if( request.method === 'MESSAGE'  && sipOptions.sipRequestHandler ) {
             sipOptions.sipRequestHandler.handle( request )
@@ -394,9 +400,10 @@ export class SipManager {
           .filter((l) => l)
           .join('\r\n')) + '\r\n'
       } )
-      callResponse.headers["record-route"] = '<' + stringifyUri( incomingCallRequest.headers["record-route"] ) + '>'
+      if( incomingCallRequest.headers["record-route"] )
+        callResponse.headers["record-route"] = incomingCallRequest.headers["record-route"];
       callResponse.headers.to.params.tag = '2pAx2dBB' //whatever, just some value
-      callResponse.headers.contact = [{ uri: incomingCallRequest.headers.to.uri }]
+      callResponse.headers.contact = [{ uri: from }]
       await this.sipStack.send(callResponse)
 
       return parseRtpDescription(this.console, incomingCallRequest)
@@ -436,7 +443,7 @@ export class SipManager {
   */
   async register() : Promise<void> {
     const { from } = this.sipOptions;
-    await timeoutPromise( 1000,
+    await timeoutPromise( 2500,
       this.request({
       method: 'REGISTER',
       headers: {

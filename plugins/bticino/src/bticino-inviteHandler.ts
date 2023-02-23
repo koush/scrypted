@@ -11,7 +11,7 @@ export class InviteHandler extends SipRequestHandler {
         //TODO: restrict this to call from:c300x@ AND to:alluser@ ?
         if( request.method == 'CANCEL' ) {
             this.sipCamera.console.log('CANCEL voice call from: ' + stringifyUri( request.headers.from.uri ) + ' to: ' + stringifyUri( request.headers.to.uri ) )
-            this.reset()
+            this.sipCamera?.reset()
         }
         if( request.method === 'INVITE' ) {
             this.sipCamera.console.log("INCOMING voice call from: " + stringifyUri( request.headers.from.uri ) + ' to: ' + stringifyUri( request.headers.to.uri ) )
@@ -21,14 +21,10 @@ export class InviteHandler extends SipRequestHandler {
 
             setTimeout( () => {
                 // Assumption that flexisip only holds this call active for 20 seconds ... might be revised
-                this.reset()
+                this.sipCamera?.reset()
             }, 20 * 1000 )
         }
     }
 
-    reset() {
-        this.sipCamera.console.log("Reset the incoming call request")
-        this.sipCamera.incomingCallRequest = undefined
-        this.sipCamera.binaryState = false
-    }
+
 }

@@ -32,11 +32,10 @@ export class PersistentSipManager {
         let now = Date.now()
         try {
             let sipOptions : SipOptions = SipHelper.sipOptions( this.camera )
-                if( Number.isNaN( sipOptions.expire ) ||  sipOptions.expire <= 0 || sipOptions.expire > 3600 ) {
+            if( Number.isNaN( sipOptions.expire ) ||  sipOptions.expire <= 0 || sipOptions.expire > 3600 ) {
+                sipOptions.expire = 300
+            }
             if( this.expireInterval == 0 ) {
-                    // Safe guard just in case
-                    sipOptions.expire = 300
-                }                
                 this.expireInterval = (sipOptions.expire * 1000) - 10000
             }
 

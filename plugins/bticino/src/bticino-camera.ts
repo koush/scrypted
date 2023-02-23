@@ -46,9 +46,8 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         this.requestHandlers.add( this.voicemailHandler ).add( this.inviteHandler )
         this.persistentSipManager = new PersistentSipManager( this );
         (async() => {
-            this.webhookUrl = await this.getMotionDetectedWebhookUrl()
+            this.webhookUrl = await this.buttonPressedDetectedWebhookUrl()
         })();
-        
     }
 
     sipUnlock(): Promise<void> {
@@ -238,8 +237,12 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
                 rtsp = new RtspServer(client, sdp, true);
                 const parsedSdp = parseSdp(rtsp.sdp);
-                const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control
-                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control
+                const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video')?.control
+                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio')?.control
+
+                if( !videoTrack || !audioTrack )
+                    throw new Error("Video track and/or audio track not found")
+
                 if( sipOptions.debugSip ) {
                     rtsp.console = this.console
                 }
@@ -295,6 +298,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 }
             }
             catch (e) {
+                this.console.error(e)
                 sip?.stop()
                 throw e;
             }
@@ -345,16 +349,28 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     async releaseDevice(id: string, nativeId: string): Promise<void> {
     }    
 
-    private async getMotionDetectedWebhookUrl(): Promise<string> {
+    reset() {
+        this.console.log("Reset the incoming call request")
+        this.incomingCallRequest = undefined
+        this.binaryState = false
+    }    
+
+    private async buttonPressedDetectedWebhookUrl(): Promise<string> {
         let webhookUrl = await sdk.endpointManager.getLocalEndpoint(this.nativeId, { insecure: false });
-        webhookUrl += "doorbellDetected";
+        webhookUrl += "buttonPressed";
         this.console.log( webhookUrl )
         return `${webhookUrl}`;
     }
 
     public async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
-        if (request.url.endsWith('/motionDetected')) {
+        if (request.url.endsWith('/buttonPressed')) {
             this.binaryState = true;
+
+            setTimeout( () => {
+                // Remove duplicate code
+                // Assumption that flexisip only holds this call active for 20 seconds ... might be revised
+                this.reset()
+            }, 20 * 1000 )
 
             response.send('Success', {
                 code: 200,
