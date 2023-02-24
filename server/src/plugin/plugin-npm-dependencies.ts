@@ -47,6 +47,7 @@ export async function installOptionalDependencies(console: Console, packageJson:
         reduced.dependencies = reduced.optionalDependencies;
         delete reduced.optionalDependencies;
         delete reduced.devDependencies;
+        delete reduced.scripts;
 
         mkdirp.sync(nodePrefix);
         fs.writeFileSync(packageJsonPath, JSON.stringify(reduced));
