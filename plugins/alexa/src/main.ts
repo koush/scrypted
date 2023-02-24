@@ -1,5 +1,5 @@
 import axios from 'axios';
-import sdk, { HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from '@scrypted/sdk';
+import sdk, { HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { isSupported } from './types';
@@ -12,22 +12,16 @@ const { systemManager, deviceManager } = sdk;
 const client_id = "amzn1.application-oa2-client.3283807e04d8408eb44a698c10f9dd13";
 const client_secret = "bed445e2b26730acd818b90e175b275f6b67b18ff8645e571c5b3e311fa75ee9";
 
-class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler, MixinProvider, Settings {
+class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler, MixinProvider {
     storageSettings = new StorageSettings(this, {
         tokenInfo: {
             hide: true,
-            json: true
+            json: true,
         },
         syncedDevices: {
             multiple: true,
-            hide: true
+            hide: true,
         },
-        apiEndpoint: {
-            title: 'Alexa Endpoint',
-            description: 'This is the endpoint Alexa will use to send events to. This is set after you login.',
-            type: 'string',
-            readonly: true
-        }
     });
 
     handlers = new Map<string, AlexaHandler>();
@@ -91,13 +85,6 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
         });
     }
 
-    getSettings(): Promise<Setting[]> {
-        return this.storageSettings.getSettings();
-    }
-    putSetting(key: string, value: SettingValue): Promise<void> {
-        return this.storageSettings.putSetting(key, value);
-    }
-
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
         return mixinDevice;
     }
@@ -112,41 +99,11 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
         deviceManager.requestRestart();
     }
 
-    readonly endpoints: string[] = [
-        'api.amazonalexa.com',
-        'api.eu.amazonalexa.com',
-        'api.fe.amazonalexa.com'
-    ];
-
-    async getAlexaEndpoint() : Promise<string> {
-        if (this.storageSettings.values.apiEndpoint)
-            return this.storageSettings.values.apiEndpoint;
-
-        try {
-            const accessToken = await this.getAccessToken();
-            const response = await axios.get(`https://${this.endpoints[0]}/v1/alexaApiEndpoint`, {
-                headers: {
-                    'Authorization': 'Bearer ' + accessToken,
-                }
-            });
-
-            const endpoint: string = response.data.endpoints[0];
-            this.storageSettings.values.apiEndpoint = endpoint;
-            return endpoint;
-        } catch (err) {
-            this.console.error(err);
-
-            // default to NA/RoW endpoint if we can't get the endpoint.
-            return this.endpoints[0];
-        }
-    }
-
     async postEvent(data: any) {
         const accessToken = await this.getAccessToken();
-        const endpoint = await this.getAlexaEndpoint();
         const self = this;
 
-        return axios.post(`https://${endpoint}/v3/events`, data, {
+        return axios.post('https://api.amazonalexa.com/v3/events', data, {
             headers: {
                 'Authorization': 'Bearer ' + accessToken,
             }
@@ -310,7 +267,6 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
         const json = JSON.parse(request.body);
         const { grant } = json.directive.payload;
         this.storageSettings.values.tokenInfo = grant;
-        this.storageSettings.values.apiEndpoint = undefined;
         this.accessToken = undefined;
         
         const self = this;
@@ -318,7 +274,6 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
             self.console.error(`Failed to handle the AcceptGrant directive because ${reason}`);
 
             this.storageSettings.values.tokenInfo = undefined;
-            this.storageSettings.values.apiEndpoint = undefined;
             this.accessToken = undefined;
 
             response.send(JSON.stringify({
@@ -356,7 +311,6 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
                 this.console.error(`AcceptGrant.Response failed because ${error}`);
 
                 this.storageSettings.values.tokenInfo = undefined;
-                this.storageSettings.values.apiEndpoint = undefined;
                 this.accessToken = undefined;
                 throw error;
             }
@@ -501,7 +455,7 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
             catch (e) {
                 this.console.error(`request failed due to invalid authorization`, e);
                 response.send(e.message, {
-                    code: 500
+                    code: 500,
                 });
                 return;
             }

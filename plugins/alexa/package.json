@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/alexa",
-   "version": "0.1.0",
+   "version": "0.0.20",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -35,7 +35,7 @@
    "dependencies": {
       "@types/node": "^16.6.1",
       "alexa-smarthome-ts": "^0.0.1",
-      "axios": "^1.3.4",
+      "axios": "^0.24.0",
       "uuid": "^9.0.0"
    },
    "devDependencies": {
