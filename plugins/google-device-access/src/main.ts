@@ -366,7 +366,10 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
             this.console.log('executeCommandSetCelsius', command);
             return this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, command);
         }
-    }, 12000)
+    }, 12000, {
+        leading: false,
+        trailing: true,
+    })
 
     constructor(provider: GoogleSmartDeviceAccess, device: any) {
         super(device.name.split('/').pop());
@@ -375,6 +378,7 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
 
         this.reload();
     }
+
     setTemperature(command: TemperatureCommand): Promise<void> {
         throw new Error('Method not implemented.');
     }
@@ -405,25 +409,36 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
         const heat = device.traits?.['sdm.devices.traits.ThermostatTemperatureSetpoint']?.heatCelsius;
         const cool = device.traits?.['sdm.devices.traits.ThermostatTemperatureSetpoint']?.coolCelsius;
 
+        let setpoint: number|[number,number];
         if (this.thermostatMode === ThermostatMode.Heat) {
             this.thermostatSetpoint = heat;
             this.thermostatSetpointHigh = undefined;
             this.thermostatSetpointLow = undefined;
+            setpoint = heat;
         }
         else if (this.thermostatMode === ThermostatMode.Cool) {
             this.thermostatSetpoint = cool;
             this.thermostatSetpointHigh = undefined;
             this.thermostatSetpointLow = undefined;
+            setpoint = cool;
         }
         else if (this.thermostatMode === ThermostatMode.HeatCool) {
             this.thermostatSetpoint = undefined;
             this.thermostatSetpointHigh = heat;
             this.thermostatSetpointLow = cool;
+            setpoint = [cool, heat];
         }
         else {
             this.thermostatSetpoint = undefined;
             this.thermostatSetpointHigh = undefined;
             this.thermostatSetpointLow = undefined;
+        }
+
+        this.temperatureSetting = {
+            activeMode: this.thermostatActiveMode,
+            mode: this.thermostatMode,
+            setpoint,
+            availableModes: modes,
         }
     }
 
