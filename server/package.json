@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.6.19",
+  "version": "0.6.20",
   "description": "",
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
@@ -68,7 +68,8 @@
     "prebuild": "rimraf dist",
     "build": "tsc --outDir dist",
     "postbuild": "node test/check-build-output.js",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm version patch && git add package.json && npm run build && git commit -m prepublish",
+    "postpublish": "git push origin v$npm_package_version",
     "docker": "scripts/github-workflow-publish-docker.sh"
   },
   "author": "",

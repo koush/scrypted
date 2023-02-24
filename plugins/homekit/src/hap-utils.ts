@@ -76,6 +76,8 @@ export function typeToCategory(type: ScryptedDeviceType): Categories {
             return Categories.SENSOR;
         case ScryptedDeviceType.Switch:
             return Categories.SWITCH;
+        case ScryptedDeviceType.Siren:
+            return Categories.SWITCH;
         case ScryptedDeviceType.Thermostat:
             return Categories.THERMOSTAT;
         case ScryptedDeviceType.Vacuum:

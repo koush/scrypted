@@ -28,9 +28,6 @@ addSupportedType({
         let targetState = !!device.entryOpen ? 100 : 0;
         service.getCharacteristic(Characteristic.TargetPosition)
             .setProps(props)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, targetState);
-            })
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 callback();
                 if (value === 100) {

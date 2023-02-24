@@ -1,4 +1,4 @@
-import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import onvif from 'onvif';
 import { Stream } from "stream";
 import xml2js from 'xml2js';
@@ -496,6 +496,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
     async createDevice(settings: DeviceCreatorSettings, nativeId?: ScryptedNativeId): Promise<string> {
         const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
+        let info: DeviceInformation;;
 
         const username = settings.username?.toString();
         const password = settings.password?.toString();
@@ -503,7 +504,15 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         if (!skipValidate) {
             try {
                 const api = await connectCameraAPI(httpAddress, username, password, this.console, undefined);
-                const info = await api.getDeviceInformation();
+                const onvifInfo = await api.getDeviceInformation();
+
+                info = {
+                    serialNumber: onvifInfo.serialNumber,
+                    manufacturer: onvifInfo.manufacturer,
+                    firmware: onvifInfo.firmwareVersion,
+                    model: onvifInfo.model,
+                    managementUrl: `http://${httpAddress}`,
+                }
 
                 settings.newCamera = info.model;
             }
@@ -517,6 +526,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         nativeId = await super.createDevice(settings, nativeId);
 
         const device = await this.getDevice(nativeId) as OnvifCamera;
+        device.info = info;
         device.putSetting('username', username);
         device.putSetting('password', password);
         device.setIPAddress(settings.ip?.toString());

@@ -50,6 +50,7 @@ export function typeToIcon(type) {
         case ScryptedDeviceType.Person: return "fa-user";
         case ScryptedDeviceType.SecuritySystem: return "fa-shield-alt";
         case ScryptedDeviceType.Builtin: return "fa-server";
+        case ScryptedDeviceType.Siren: return "fa-siren";
 
     }
     return "fa-toggle-on";
