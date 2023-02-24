@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFmpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSessionControl, RTCSignalingSession, ResponseMediaStreamOptions, RTCSignalingOptions, RTCSignalingSendIceCandidate, ScryptedMimeTypes, MediaStreamUrl } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFmpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSessionControl, RTCSignalingSession, ResponseMediaStreamOptions, RTCSignalingOptions, RTCSignalingSendIceCandidate, ScryptedMimeTypes, MediaStreamUrl, TemperatureCommand } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -99,6 +99,10 @@ class NestRTCSessionControl implements RTCSessionControl {
     refreshAt = Date.now() + 4 * 60 * 1000;
 
     constructor(public camera: NestCamera, public options: { streamExtensionToken: string, mediaSessionId: string }) {
+    }
+
+    async setPlayback(options: { audio: boolean; video: boolean; }): Promise<void> {
+        
     }
 
     async getRefreshAt(): Promise<number> {
@@ -371,6 +375,9 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
 
         this.reload();
     }
+    setTemperature(command: TemperatureCommand): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
 
     async setTemperatureUnit(temperatureUnit: TemperatureUnit): Promise<void> {
         // not supported by API. throw?
@@ -559,6 +566,8 @@ export class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements Oauth
                 }
             }
         })();
+    }
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
