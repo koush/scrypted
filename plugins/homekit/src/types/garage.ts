@@ -22,9 +22,6 @@ addSupportedType({
 
         let targetState = !!device.entryOpen ? Characteristic.TargetDoorState.OPEN : Characteristic.TargetDoorState.CLOSED;
         service.getCharacteristic(Characteristic.TargetDoorState)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, targetState);
-            })
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 callback();
                 if (value === Characteristic.TargetDoorState.OPEN) {

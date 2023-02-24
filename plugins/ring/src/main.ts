@@ -683,15 +683,20 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
             else
                 mode = SecuritySystemMode.Disarmed;
 
+            let supportedModes = [
+                SecuritySystemMode.Disarmed,
+                SecuritySystemMode.AwayArmed,
+                SecuritySystemMode.HomeArmed
+            ]
+            if (plugin.settingsStorage.values.nightModeBypassAlarmState !== 'Disabled') {
+                supportedModes.push(SecuritySystemMode.NightArmed)
+            }
+
             this.securitySystemState = {
                 mode,
                 // how to get this?
                 triggered: false,
-                supportedModes: [
-                    SecuritySystemMode.Disarmed,
-                    SecuritySystemMode.AwayArmed,
-                    SecuritySystemMode.HomeArmed,
-                ]
+                supportedModes
             }
         }
         location.onLocationMode.subscribe(updateLocationMode);
@@ -729,7 +734,15 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
             await location.armHome();
         }
         else if (mode === SecuritySystemMode.NightArmed) {
-            await location.armHome();
+            const bypassContactSensors = (await location.getDevices()).filter(device => {
+                return ((device.deviceType === RingDeviceType.ContactSensor || device.deviceType === RingDeviceType.RetrofitZone) && device.data.faulted)
+            }).map(sensor => sensor.id);
+        
+            if (this.plugin.settingsStorage.values.nightModeBypassAlarmState === 'Away') {
+                await location.armAway(bypassContactSensors);
+            } else {
+                await location.armHome(bypassContactSensors);
+            }
         }
         else if (mode === SecuritySystemMode.Disarmed) {
             await location.disarm();
@@ -807,6 +820,16 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             type: 'number',
             description: 'Optional: Change the default polling interval for motion and doorbell events.',
             defaultValue: 5,
+        },
+        nightModeBypassAlarmState: {
+            title: 'Night Mode Bypass Alarm State',
+            description: 'Set this to enable the "Night" option on the alarm panel. When arming in "Night" mode, all open sensors will be bypassed and the alarm will be armed to the selected option.',
+            choices: [
+                'Disabled',
+                'Home',
+                'Away'
+            ],
+            defaultValue: 'Disabled',
         },
     });
 
@@ -1002,7 +1025,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             }
 
             const sensors = (await location.getDevices()).filter(x => {
-                return x.data.status != 'disabled' && (x.data.deviceType === RingDeviceType.ContactSensor || x.data.deviceType === RingDeviceType.RetrofitZone)
+                return x.data.status !== 'disabled' && (x.data.deviceType === RingDeviceType.ContactSensor || x.data.deviceType === RingDeviceType.RetrofitZone)
             });
             for (const sensor of sensors) {
                 const nativeId = sensor.id.toString() + '-sensor';
