@@ -1,5 +1,5 @@
 import axios from 'axios';
-import sdk, { HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import sdk, { HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { isSupported } from './types';
@@ -12,18 +12,21 @@ const { systemManager, deviceManager } = sdk;
 const client_id = "amzn1.application-oa2-client.3283807e04d8408eb44a698c10f9dd13";
 const client_secret = "bed445e2b26730acd818b90e175b275f6b67b18ff8645e571c5b3e311fa75ee9";
 
-class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler, MixinProvider {
+class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler, MixinProvider, Settings {
     storageSettings = new StorageSettings(this, {
         tokenInfo: {
             hide: true,
-            json: true,
+            json: true
         },
         syncedDevices: {
             multiple: true,
-            hide: true,
+            hide: true
         },
         apiEndpoint: {
-            hide: true,
+            title: 'Alexa Endpoint',
+            description: 'This is the endpoint Alexa will use to send events to. This is set after you login.',
+            type: 'string',
+            readonly: true
         }
     });
 
@@ -86,6 +89,13 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
 
             await this.postEvent(data);
         });
+    }
+
+    getSettings(): Promise<Setting[]> {
+        return this.storageSettings.getSettings();
+    }
+    putSetting(key: string, value: SettingValue): Promise<void> {
+        return this.storageSettings.putSetting(key, value);
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
