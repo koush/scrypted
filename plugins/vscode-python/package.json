@@ -21,9 +21,8 @@
          "DeviceProvider"
       ]
    },
-   "dependencies": {},
    "devDependencies": {
-      "@scrypted/sdk": "file:../../sdk"
+      "@scrypted/sdk": "^0.2.59"
    },
    "version": "0.0.15"
 }
