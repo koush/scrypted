@@ -113,6 +113,7 @@ export class AlexaSignalingSession implements RTCSignalingSession {
             // this could be a low resolution screen, no way of knowing, so never send a
             // 1080p+ stream.
             screen: {
+                devicePixelRatio: 1, // TODO: get this from the device
                 width: 1280,
                 height: 720,
             }
