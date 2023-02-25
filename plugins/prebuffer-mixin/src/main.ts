@@ -1115,9 +1115,14 @@ class PrebufferSession {
       }
 
       const client = await listenZeroSingleClient();
+      const rtspServerPath = '/' + crypto.randomBytes(8).toString('hex');
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
-        server = new FileRtspServer(socket, sdp);
+        server = new FileRtspServer(socket, sdp, async (method, url, headers, rawMessage) => {
+          server.checkRequest = undefined;
+          const u = new URL(url);
+          return u.pathname === rtspServerPath;
+        });
         server.writeConsole = this.console;
         if (session.parserSpecific) {
           const parserSpecific = session.parserSpecific as RtspSessionParserSpecific;
@@ -1142,7 +1147,7 @@ class PrebufferSession {
         interleavePassthrough = session.parserSpecific && serverPortMap.size === 0;
         return socket;
       })
-      url = client.url.replace('tcp://', 'rtsp://');
+      url = client.url.replace('tcp://', 'rtsp://') + rtspServerPath;
     }
     else {
       const client = await listenZeroSingleClient();
@@ -1252,7 +1257,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         const u = new URL(url);
 
         for (const session of this.sessions.values()) {
-          if (u.pathname.endsWith(session.rtspServerPath)) {
+          if (u.pathname === '/' + session.rtspServerPath) {
             server.console = session.console;
             prebufferSession = session;
             prebufferSession.ensurePrebufferSession();
@@ -1260,7 +1265,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             server.sdp = await prebufferSession.sdp;
             return true;
           }
-          if (u.pathname.endsWith(session.rtspServerMutedPath)) {
+          if (u.pathname === '/' + session.rtspServerMutedPath) {
             server.console = session.console;
             prebufferSession = session;
             prebufferSession.ensurePrebufferSession();
@@ -1326,7 +1331,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
-    if (options?.directMediaStream)
+    if (options?.route === 'direct')
       return this.mixinDevice.getVideoStream(options);
 
     await this.ensurePrebufferSessions();
