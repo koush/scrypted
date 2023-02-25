@@ -10,6 +10,7 @@ function newDeviceProxy(id: string, systemManager: SystemManagerImpl) {
 }
 
 class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
+    customProperties: Map<string | number | symbol, any>;
     device: Promise<ScryptedDevice>;
     constructor(public id: string, public systemManager: SystemManagerImpl) {
     }
@@ -43,9 +44,33 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
         }
     }
 
+    deleteProperty(target: any, p: string | symbol): boolean {
+        const prop = p.toString();
+        if (Object.keys(ScryptedInterfaceProperty).includes(prop))
+            return false;
+
+        this.customProperties ||= new Map();
+        this.customProperties.set(p, undefined);
+        return true;
+    }
+
+    set(target: any, p: string | symbol, newValue: any, receiver: any): boolean {
+        const prop = p.toString();
+        if (Object.keys(ScryptedInterfaceProperty).includes(prop))
+            return false;
+
+        this.customProperties ||= new Map();
+        this.customProperties.set(p, newValue);
+
+        return true;
+    }
+
     get(target: any, p: PropertyKey, receiver: any): any {
         if (p === 'id')
             return this.id;
+
+        if (this.customProperties?.has(p))
+            return this.customProperties.get(p);
 
         const handled = RpcPeer.handleFunctionInvocations(this, target, p, receiver);
         if (handled)
