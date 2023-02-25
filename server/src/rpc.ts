@@ -171,7 +171,7 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
 // todo: error constructor adds a "cause" variable in Chrome 93, Node v??
 export class RPCResultError extends Error {
     constructor(peer: RpcPeer, message: string, public cause?: Error, options?: { name: string, stack: string | undefined }) {
-        super(`${peer.selfName}:${peer.peerName}: ${message}`);
+        super(`${message}\n${peer.selfName}:${peer.peerName}`);
 
         if (options?.name) {
             this.name = options?.name;
