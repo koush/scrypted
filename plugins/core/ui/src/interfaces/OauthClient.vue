@@ -17,6 +17,8 @@ export default {
       }
     },
     onClick: function () {
+      // https://stackoverflow.com/a/39387533
+      const windowReference = this.isIFrame() ? window.open(undefined, '_blank') : undefined;
       this.rpc()
         .getOauthUrl()
         .then(data => {
@@ -47,8 +49,10 @@ export default {
             r: window.location.toString(),
           });
           url.search = qs.stringify(querystring);
-          const target = this.isIFrame() ? '_blank' : undefined;
-          window.open(url.toString(), target);
+          if (windowReference)
+            windowReference.location = url.toString();
+          else
+            window.location = url.toString();
         });
     }
   }
