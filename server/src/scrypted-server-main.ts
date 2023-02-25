@@ -194,6 +194,12 @@ async function start() {
         // lack of login from cookie auth.
 
         const checkToken = (token: string) => {
+            if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_TOKEN === token) {
+                res.locals.username = process.env.SCRYPTED_ADMIN_USERNAME;
+                res.locals.aclId = process.env.SCRYPTED_ADMIN_TOKEN;
+                return;
+            }
+
             const [checkHash, ...tokenParts] = token.split('#');
             const tokenPart = tokenParts?.join('#');
             if (checkHash && tokenPart) {
