@@ -196,7 +196,7 @@ async function start() {
         const checkToken = (token: string) => {
             if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_TOKEN === token) {
                 res.locals.username = process.env.SCRYPTED_ADMIN_USERNAME;
-                res.locals.aclId = process.env.SCRYPTED_ADMIN_TOKEN;
+                res.locals.aclId = undefined;
                 return;
             }
 
@@ -550,8 +550,31 @@ async function start() {
         await checkResetLogin();
 
         const hostname = os.hostname()?.split('.')?.[0];
-
         const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true)).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
+
+        // env/header based admin login
+        if (res.locals.username && res.locals.username === process.env.SCRYPTED_ADMIN_USERNAME) {
+            res.send({
+                username: res.locals.username,
+                token: process.env.SCRYPTED_ADMIN_TOKEN,
+                addresses,
+                hostname,
+            });
+            return;
+        }
+
+        // env based anon admin login
+        if (process.env.SCRYPTED_DISABLE_AUTHENTICATION === 'true') {
+            res.send({
+                expiration: ONE_DAY_MILLISECONDS,
+                username: 'anonymous',
+                addresses,
+                hostname,
+            })
+            return;
+        }
+
+        // basic auth
         if (req.protocol === 'https' && req.headers.authorization) {
             const username = await new Promise(resolve => {
                 const basicChecker = basicAuth.check((req) => {
@@ -576,16 +599,7 @@ async function start() {
             return;
         }
 
-        if (process.env.SCRYPTED_DISABLE_AUTHENTICATION === 'true') {
-            res.send({
-                expiration: ONE_DAY_MILLISECONDS,
-                username: 'anonymous',
-                addresses,
-                hostname,
-            })
-            return;
-        }
-
+        // cookie auth
         try {
             const login_user_token = getSignedLoginUserTokenRawValue(req);
             if (!login_user_token)
