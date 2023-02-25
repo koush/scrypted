@@ -1114,7 +1114,8 @@ class PrebufferSession {
         return chunk;
       }
 
-      const client = await listenZeroSingleClient();
+      const hostname = options?.route === 'external' ? '0.0.0.0' : undefined;
+      const client = await listenZeroSingleClient(hostname);
       const rtspServerPath = '/' + crypto.randomBytes(8).toString('hex');
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
@@ -1148,6 +1149,19 @@ class PrebufferSession {
         return socket;
       })
       url = client.url.replace('tcp://', 'rtsp://') + rtspServerPath;
+      if (hostname) {
+        try {
+          const addresses = await sdk.endpointManager.getLocalAddresses();
+          const [address] = addresses;
+          if (address) {
+            const u = new URL(url);
+            u.hostname = address;
+            url = u.toString();
+          }
+        }
+        catch (e) {
+        }
+      }
     }
     else {
       const client = await listenZeroSingleClient();
