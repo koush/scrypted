@@ -2,13 +2,20 @@
   <v-btn text color="primary" @click="onClick">Login</v-btn>
 </template>
 <script>
-import RPCInterface from "./RPCInterface.vue";
 import qs from 'query-string';
+import RPCInterface from "./RPCInterface.vue";
 
 export default {
   mixins: [RPCInterface],
   methods: {
     onChange() { },
+    isIFrame() {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true;
+      }
+    },
     onClick: function () {
       this.rpc()
         .getOauthUrl()
@@ -40,7 +47,8 @@ export default {
             r: window.location.toString(),
           });
           url.search = qs.stringify(querystring);
-          window.location = url.toString();
+          const target = this.isIFrame() ? '_blank' : undefined;
+          window.open(url.toString(), target);
         });
     }
   }
