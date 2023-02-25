@@ -31,7 +31,9 @@ export default {
               u = new URL(redirect_uri);
             }
             catch (e) {
-              u = new URL(redirect_uri, window.location.href);
+              const baseURI = new URL(document.baseURI);
+              const scryptedRootURI = new URL('../../../../', baseURI);
+              u = new URL('.' + redirect_uri, scryptedRootURI);
               u.hostname = 'localhost';
             }
             if (u.hostname === 'localhost') {
