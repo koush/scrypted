@@ -46,6 +46,7 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
         // only permit the following device types through
         const allowedTypes = [
             ScryptedDeviceType.Camera,
+            ScryptedDeviceType.Doorbell,
             ScryptedDeviceType.DeviceProvider,
             ScryptedDeviceType.API,
         ]
@@ -53,9 +54,8 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
             return null;
         }
 
-        // only permit the following interfaces through
+        // only permit the following functional interfaces through
         const allowedInterfaces = [
-            ScryptedInterface.Readme,
             ScryptedInterface.VideoCamera,
             ScryptedInterface.Camera,
             ScryptedInterface.RTCSignalingChannel,
@@ -69,8 +69,19 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
         if (intersection.length == 0) {
             return null;
         }
-        device.interfaces = intersection;
 
+        // explicitly drop plugins if all they do is provide devices
+        if (device.interfaces.includes(ScryptedInterface.ScryptedPlugin) && intersection.length == 1 && intersection[0] == ScryptedInterface.DeviceProvider) {
+            return null;
+        }
+
+        // some extra interfaces that are nice to expose, but not needed
+        const nonessentialInterfaces = [
+            ScryptedInterface.Readme,
+        ];
+        const nonessentialIntersection = nonessentialInterfaces.filter(i => device.interfaces.includes(i));
+
+        device.interfaces = intersection.concat(nonessentialIntersection);
         return device;
     }
 
@@ -175,6 +186,7 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
             return
         }
 
+        // construct initial (flat) list of devices from the remote server
         const state = this.client.systemManager.getSystemState();
         const devices = <Device[]>[];
         for (const id in state) {
@@ -201,6 +213,15 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
             devices.push(device)
         }
 
+        // it may be that a parent device was filtered out, so reparent these child devices to
+        // the top level
+        devices.map(device => {
+            if (!this.devices.has(device.providerNativeId)) {
+                device.providerNativeId = this.nativeId;
+            }
+        });
+
+        // group devices by parent provider id
         const providerDeviceMap = new Map<string, Device[]>();
         devices.map(device => {
             // group devices by parent provider id
@@ -211,8 +232,10 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
             }
         })
 
+        // first register the top level devices, then register the remaining
+        // devices by provider id
         await deviceManager.onDevicesChanged(<DeviceManifest>{
-            devices: providerDeviceMap.get(this.nativeId), // first register the top level devices
+            devices: providerDeviceMap.get(this.nativeId),
             providerNativeId: this.nativeId,
         });
         for (let [providerNativeId, devices] of providerDeviceMap) {
@@ -222,6 +245,7 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
             });
         }
 
+        // setup relevant proxies and monkeypatches for all devices
         devices.map(device => this.setupProxies(device, this.devices.get(device.nativeId)));
         this.console.log(`Discovered ${devices.length} devices`);
     }
