@@ -37,7 +37,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
-        this.updateManagementUrl();
+        this.updateDeviceInfo();
         this.updateDevice();
     }
 
@@ -94,16 +94,29 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         });
     }
 
-    updateManagementUrl() {
+    async updateDeviceInfo() {
         const ip = this.storage.getItem('ip');
         if (!ip)
             return;
-        const info = this.info || {};
+        const client = await this.getClient();
+        const onvifInfo = await client.getDeviceInformation().catch(() => {});
+
         const managementUrl = `http://${ip}`;
-        if (info.managementUrl !== managementUrl) {
-            info.managementUrl = managementUrl;
-            this.info = info;
+        let info = {
+            ...this.info,
+            managementUrl,
+        };
+        if (onvifInfo) {
+            info = {
+                ...info,
+                serialNumber: onvifInfo.serialNumber,
+                manufacturer: onvifInfo.manufacturer,
+                firmware: onvifInfo.firmwareVersion,
+                model: onvifInfo.model,
+            }
         }
+
+        this.info = info;
     }
 
     getDetectionInput(detectionId: any, eventId?: any): Promise<MediaObject> {
@@ -382,7 +395,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         this.client = undefined;
         this.rtspMediaStreamOptions = undefined;
 
-        this.updateManagementUrl();
+        this.updateDeviceInfo();
 
         if (key !== 'onvifDoorbell' && key !== 'onvifTwoWay')
             return super.putSetting(key, value);

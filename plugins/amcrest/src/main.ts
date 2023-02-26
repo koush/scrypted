@@ -37,19 +37,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
 
         this.updateDeviceInfo();
-        this.updateManagementUrl();
-    }
-
-    updateManagementUrl() {
-        const ip = this.storage.getItem('ip');
-        if (!ip)
-            return;
-        const info = this.info || {};
-        const managementUrl = `http://${ip}`;
-        if (info.managementUrl !== managementUrl) {
-            info.managementUrl = managementUrl;
-            this.info = info;
-        }
     }
 
     getRecordingStreamCurrentTime(recordingStream: MediaObject): Promise<number> {
@@ -80,9 +67,15 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async updateDeviceInfo(): Promise<void> {
-        if (this.info)
+        const ip = this.storage.getItem('ip');
+        if (!ip)
             return;
-        const deviceInfo = {};
+
+        const managementUrl = `http://${ip}`;
+        const deviceInfo: DeviceInformation = {
+            ...this.info,
+            managementUrl,
+        };
 
         const deviceParameters = [
             { action: "getVendor", replace: "vendor=", parameter: "manufacturer" },
@@ -441,7 +434,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             interfaces.push(ScryptedInterface.VideoRecorder);
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
 
-        this.updateManagementUrl();
+        this.updateDeviceInfo();
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
