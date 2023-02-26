@@ -34,9 +34,11 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
         if (!ip)
             return;
         const managementUrl = `http://${ip}`;
-        const info = {
+        const info: DeviceInformation = {
             ...this.info,
             managementUrl,
+            ip,
+            manufacturer: 'Hikvision', 
         };
         const client = this.getClient();
         const deviceInfo = await client.getDeviceInfo().catch(() => { });

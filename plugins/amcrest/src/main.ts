@@ -74,6 +74,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         const managementUrl = `http://${ip}`;
         const deviceInfo: DeviceInformation = {
             ...this.info,
+            ip,
             managementUrl,
         };
 

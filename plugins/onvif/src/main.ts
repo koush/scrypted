@@ -1,4 +1,5 @@
 import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import { AddressInfo } from "net";
 import onvif from 'onvif';
 import { Stream } from "stream";
 import xml2js from 'xml2js';
@@ -99,12 +100,13 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         if (!ip)
             return;
         const client = await this.getClient();
-        const onvifInfo = await client.getDeviceInformation().catch(() => {});
+        const onvifInfo = await client.getDeviceInformation().catch(() => { });
 
         const managementUrl = `http://${ip}`;
         let info = {
             ...this.info,
             managementUrl,
+            ip,
         };
         if (onvifInfo) {
             info = {
@@ -427,7 +429,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
     constructor(nativeId?: string) {
         super(nativeId);
 
-        onvif.Discovery.on('device', (cam: any, rinfo: any, xml: any) => {
+        onvif.Discovery.on('device', (cam: any, rinfo: AddressInfo, xml: any) => {
             // Function will be called as soon as the NVT responses
 
             // Parsing of Discovery responses taken from my ONVIF-Audit project, part of the 2018 ONVIF Open Source Challenge
@@ -448,19 +450,29 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                     }
                     const urn = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['EndpointReference'][0]['Address'][0].payload;
                     const xaddrs = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['XAddrs'][0].payload;
-                    let name: string;
+                    const knownScopes = {
+                        'onvif://www.onvif.org/name/': '',
+                        'onvif://www.onvif.org/MAC/': '',
+                        'onvif://www.onvif.org/hardware/': '',
+                    };
 
+                    this.console.log('discovered device payload', xml);
                     try {
                         let scopes = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['Scopes'][0].payload;
-                        scopes = scopes.split(" ");
+                        const splitScopes = scopes.split(" ") as string[];
 
-                        for (let i = 0; i < scopes.length; i++) {
-                            if (scopes[i].includes('onvif://www.onvif.org/name')) { name = decodeURI(scopes[i].substring(27)); }
+                        for (const scope of splitScopes) {
+                            for (const known of Object.keys(knownScopes)) {
+                                if (scope.startsWith(known)) {
+                                    knownScopes[known] = scope.substring(known.length);
+                                }
+                            }
                         }
                     }
                     catch (e) {
                     }
 
+                    const name = knownScopes["onvif://www.onvif.org/name/"] || 'ONVIF Camera';
                     this.console.log('Discovery Reply from ' + rinfo.address + ' (' + name + ') (' + xaddrs + ') (' + urn + ')');
 
                     if (deviceManager.getNativeIds().includes(urn) || this.discoveredDevices.has(urn))
@@ -468,6 +480,11 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
                     const device: Device = {
                         name,
+                        info: {
+                            ip: rinfo.address,
+                            mac: knownScopes["onvif://www.onvif.org/MAC/"] || undefined,
+                            model: knownScopes['onvif://www.onvif.org/hardware/'] || undefined,
+                        },
                         nativeId: urn,
                         type: ScryptedDeviceType.Camera,
                         interfaces: this.getInterfaces(),
