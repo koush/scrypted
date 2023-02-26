@@ -47,6 +47,7 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
         const allowedTypes = [
             ScryptedDeviceType.Camera,
             ScryptedDeviceType.DeviceProvider,
+            ScryptedDeviceType.API,
         ]
         if (!allowedTypes.includes(device.type)) {
             return null;
@@ -62,7 +63,7 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
             ScryptedInterface.MotionSensor,
             ScryptedInterface.AudioSensor,
             ScryptedInterface.DeviceProvider,
-            ScryptedInterface.ObjectDetector,
+            ScryptedInterface.ObjectDetection,
         ];
         const intersection = allowedInterfaces.filter(i => device.interfaces.includes(i));
         if (intersection.length == 0) {
