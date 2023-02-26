@@ -435,6 +435,7 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
     async turnOff(): Promise<void> {
         // You can't turn the fan off when the HVAC unit is currently running.
         if (this.thermostatActiveMode !== ThermostatMode.Off) {
+            this.on = false;
             await this.refresh(null, true); // Refresh the state to turn the fan switch back to active.
             return;
         }
