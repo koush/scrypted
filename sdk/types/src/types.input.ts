@@ -1434,6 +1434,7 @@ export interface DeviceInformation {
   version?: string;
   firmware?: string;
   serialNumber?: string;
+  ip?: string;
   mac?: string;
   metadata?: any;
   managementUrl?: string;

@@ -316,6 +316,7 @@ class DeviceCreatorSettings(TypedDict):
 
 class DeviceInformation(TypedDict):
     firmware: str
+    ip: str
     mac: str
     managementUrl: str
     manufacturer: str
