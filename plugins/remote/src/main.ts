@@ -103,28 +103,25 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
         // address for video streams
         if (device.interfaces.includes(ScryptedInterface.VideoCamera)) {
             const remoteGetVideoStream = (<VideoCamera><any>remoteDevice).getVideoStream;
-            async function newGetVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
+            (<VideoCamera><any>remoteDevice).getVideoStream = async (options?: RequestMediaStreamOptions): Promise<MediaObject> => {
                 if (!options) {
                     options = {};
                 }
                 (<any>options).route = "external";
                 return await remoteGetVideoStream(options);
             }
-            (<VideoCamera><any>remoteDevice).getVideoStream = newGetVideoStream;
         }
 
         // for device providers, we need to translate the nativeId
         if (device.interfaces.includes(ScryptedInterface.DeviceProvider)) {
             const plugin = this;
-            async function newGetDevice(nativeId: string): Promise<Device> {
+            (<DeviceProvider><any>remoteDevice).getDevice = async (nativeId: string): Promise<Device> => {
                 return <Device>plugin.devices.get(nativeId);
             }
-            async function newReleaseDevice(id: string, nativeId: string): Promise<any> {
+            (<DeviceProvider><any>remoteDevice).releaseDevice = async (id: string, nativeId: string): Promise<any> => {
                 // don't delete the device from the remote
                 plugin.releaseDevice(id, nativeId);
             }
-            (<DeviceProvider><any>remoteDevice).getDevice = newGetDevice;
-            (<DeviceProvider><any>remoteDevice).releaseDevice = newReleaseDevice;
         }
     }
 
