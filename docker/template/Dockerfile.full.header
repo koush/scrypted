@@ -15,9 +15,9 @@ RUN apt-get install -y nodejs
 # Coral Edge TPU
 # https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
 RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+# RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 RUN apt-get -y update
-RUN apt-get -y install libedgetpu1-std
+# RUN apt-get -y install libedgetpu1-std
 
 RUN apt-get -y install software-properties-common apt-utils
 RUN apt-get -y update
