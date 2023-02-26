@@ -17,6 +17,7 @@ export enum AmcrestEvent {
     PhoneCallDetectStop = "Code=PhoneCallDetect;action=Stop",
     DahuaTalkInvite = "Code=CallNoAnswered;action=Start",
     DahuaTalkHangup = "Code=PassiveHungup;action=Start",
+    DahuaCallDeny = "Code=HungupPhone;action=Pulse",
     DahuaTalkPulse = "Code=_CallNoAnswer_;action=Pulse",
 }
 
