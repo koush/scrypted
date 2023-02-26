@@ -187,11 +187,21 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 || event === AmcrestEvent.PhoneCallDetectStart
                 || event === AmcrestEvent.AlarmIPCStart
                 || event === AmcrestEvent.DahuaTalkInvite) {
-                this.binaryState = true;
+                if (event === AmcrestEvent.DahuaTalkInvite && payload && multipleCallIds)
+                {
+                    if (payload.includes(callerId))
+                    {
+                        this.binaryState = true;
+                    }
+                } else if (event != AmcrestEvent.DahuaTalkInvite)
+                {
+                    this.binaryState = true;
+                }
             }
             else if (event === AmcrestEvent.TalkHangup
                 || event === AmcrestEvent.PhoneCallDetectStop
                 || event === AmcrestEvent.AlarmIPCStop
+                || event === AmcrestEvent.DahuaCallDeny
                 || event === AmcrestEvent.DahuaTalkHangup) {
                 this.binaryState = false;
             }
@@ -246,6 +256,36 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         if (!twoWayAudio)
             twoWayAudio = isDoorbell ? 'Amcrest' : 'None';
+        
+        
+        if (doorbellType == DAHUA_DOORBELL_TYPE)
+        {
+            ret.push(
+               {
+                title: 'Multiple Call Buttons',
+                key: 'multipleCallIds',
+                description: 'Some Dahua Doorbells integrate multiple Call Buttons for appartment buildings.',
+                type: 'boolean',
+                value: (this.storage.getItem('multipleCallIds') === 'true').toString(),
+               } 
+            );
+        }
+
+        const multipleCallIds = this.storage.getItem('multipleCallIds');
+
+        if (multipleCallIds)
+        {
+            ret.push(
+                {
+                    title: 'Caller ID',
+                    key: 'callerID',
+                    description: 'Caller ID',
+                    type: 'number',
+                    value: this.storage.getItem('callerID'),
+                }
+            )
+        }
+        
 
         ret.push(
             {
@@ -266,7 +306,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         );
 
         return ret;
+        
     }
+    
+    
+    
 
     async takeSmartCameraPicture(option?: PictureOptions): Promise<MediaObject> {
         return this.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
