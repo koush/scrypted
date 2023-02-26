@@ -1,12 +1,12 @@
+import sdk, { ScryptedDeviceBase, DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, BinarySensor, DeviceInformation, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFmpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSessionControl, RTCSignalingSession, ResponseMediaStreamOptions, RTCSignalingSendIceCandidate, ScryptedMimeTypes, MediaStreamUrl, TemperatureCommand, OnOff } from '@scrypted/sdk';
 import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { BinarySensor, Camera, DeviceInformation, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MediaStreamUrl, MotionSensor, OauthClient, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, Readme, Refresh, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, TemperatureCommand, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera } from '@scrypted/sdk';
 import axios from 'axios';
 import ClientOAuth2 from 'client-oauth2';
 import { randomBytes } from 'crypto';
 import fs from 'fs';
 import throttle from 'lodash/throttle';
-import qs from 'query-string';
+import querystring from "querystring";
 import { URL } from 'url';
 
 const { deviceManager, mediaManager, endpointManager, systemManager } = sdk;
@@ -334,11 +334,12 @@ for (const [k, v] of setpointMap.entries()) {
     setpointReverseMap.set(v, k);
 }
 
-class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Thermometer, TemperatureSetting, Settings, Refresh {
+class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Thermometer, TemperatureSetting, Settings, Refresh, OnOff {
     device: any;
     provider: GoogleSmartDeviceAccess;
     executeCommandSetMode: any = undefined;
     executeCommandSetCelsius: any = undefined;
+    executeCommandSetTimer: any = undefined;
 
     executeThrottle = throttle(async () => {
         if (this.executeCommandSetCelsius) {
@@ -363,6 +364,12 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
             const command = this.executeCommandSetCelsius;
             this.executeCommandSetCelsius = undefined;
             this.console.log('executeCommandSetCelsius', command);
+            return this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, command);
+        }
+        if (this.executeCommandSetTimer) {
+            const command = this.executeCommandSetTimer;
+            this.executeCommandSetTimer = undefined;
+            this.console.log('executeCommandSetTimer', command);
             return this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, command);
         }
     }, 12000)
@@ -425,6 +432,33 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
         // not supported by API. throw?
     }
 
+    async turnOff(): Promise<void> {
+        // You can't turn the fan off when the HVAC unit is currently running.
+        if (this.thermostatActiveMode !== ThermostatMode.Off) {
+            this.on = false;
+            await this.refresh(null, true); // Refresh the state to turn the fan switch back to active.
+            return;
+        }
+        this.executeCommandSetTimer = {
+            command: 'sdm.devices.commands.Fan.SetTimer',
+            params: {
+                timerMode: 'OFF',
+            },
+        }
+        await this.executeThrottle();
+        await this.refresh(null, true);
+    }
+    async turnOn(): Promise<void> {
+        this.executeCommandSetTimer = {
+            command: 'sdm.devices.commands.Fan.SetTimer',
+            params: {
+                timerMode: 'ON',
+            },
+        }
+        await this.executeThrottle();
+        await this.refresh(null, true);
+    }
+
     reload() {
         const device = this.device;
 
@@ -478,6 +512,9 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
             setpoint,
             availableModes: modes,
         }
+
+        // Set Fan Status
+        this.on = this.thermostatActiveMode !== ThermostatMode.Off || device.traits?.['sdm.devices.traits.Fan']?.timerMode === "ON";
     }
 
     async refresh(refreshInterface: string, userInitiated: boolean): Promise<void> {
@@ -764,7 +801,7 @@ export class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements Oauth
             response_type: 'code',
             scope: 'https://www.googleapis.com/auth/sdm.service',
         }
-        return `${this.authorizationUri}?${qs.stringify(params)}`;
+        return `${this.authorizationUri}?${querystring.stringify(params)}`;
     }
     async onOauthCallback(callbackUrl: string) {
         const cb = new URL(callbackUrl);
@@ -833,6 +870,7 @@ export class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements Oauth
                         ScryptedInterface.HumiditySensor,
                         ScryptedInterface.Thermometer,
                         ScryptedInterface.Settings,
+                        ScryptedInterface.OnOff
                     ],
                     info,
                 })
