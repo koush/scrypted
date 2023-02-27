@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "ES2021",
+        "resolveJsonModule": true,
+        "moduleResolution": "Node16",
+        "esModuleInterop": true,
+        "sourceMap": true
+    },
+    "include": [
+        "src/**/*"
+    ]
+}

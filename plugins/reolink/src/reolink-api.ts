@@ -1,18 +1,13 @@
 import axios from 'axios';
-import AxiosDigestAuth from "@koush/axios-digest-auth/dist";
+import AxiosDigestAuth from "@koush/axios-digest-auth";
 import https from 'https';
+import { getMotionState, reolinkHttpsAgent } from './probe';
 
 export class ReolinkCameraClient {
     digestAuth: AxiosDigestAuth;
-    axios = axios.create({
-        httpsAgent: new https.Agent({
-            rejectUnauthorized: false,
-        })
-    });
 
     constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console) {
         this.digestAuth = new AxiosDigestAuth({
-            axios: this.axios,
             password,
             username,
         });
@@ -28,19 +23,7 @@ export class ReolinkCameraClient {
     //     }
     //  ]
     async getMotionState() {
-        const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
-        const params = url.searchParams;
-        params.set('cmd', 'GetMdState');
-        params.set('channel', this.channelId.toString());
-        params.set('user', this.username);
-        params.set('password', this.password);
-        const response = await this.digestAuth.request({
-            url: url.toString(),
-        });
-        return {
-            value: !!response.data?.[0]?.value?.state,
-            data: response.data,
-        };
+        return getMotionState(this.digestAuth, this.username, this.password, this.host, this.channelId);
     }
 
     async jpegSnapshot() {
@@ -54,7 +37,8 @@ export class ReolinkCameraClient {
 
         const response = await this.digestAuth.request({
             url: url.toString(),
-            responseType: 'arraybuffer'
+            responseType: 'arraybuffer',
+            httpsAgent: reolinkHttpsAgent,
         });
 
         return Buffer.from(response.data);

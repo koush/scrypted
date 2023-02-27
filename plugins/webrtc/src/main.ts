@@ -419,12 +419,13 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             }
         }
 
+        const iceServers = this.storageSettings.values.useTurnServer
+            ? [weriftStunServer, weriftTurnServer]
+            : [weriftStunServer];
+
         return {
             iceUseIpv6: false,
-            iceServers: [
-                weriftStunServer,
-                weriftTurnServer,
-            ],
+            iceServers,
             ...ret,
         };
     }

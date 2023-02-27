@@ -1,15 +1,15 @@
 import { once } from 'events';
 import net from 'net';
 
-export async function listenZero(server: net.Server) {
-    server.listen(0);
+export async function listenZero(server: net.Server, hostname?: string) {
+    server.listen(0, hostname);
     await once(server, 'listening');
     return (server.address() as net.AddressInfo).port;
 }
 
-export async function listenZeroSingleClient() {
+export async function listenZeroSingleClient(hostname?: string) {
     const server = new net.Server();
-    const port = await listenZero(server);
+    const port = await listenZero(server, hostname);
 
     const clientPromise = new Promise<net.Socket>((resolve, reject) => {
         const timeout = setTimeout(() => {
@@ -24,7 +24,7 @@ export async function listenZeroSingleClient() {
         });
     });
 
-    clientPromise.catch(() => {});
+    clientPromise.catch(() => { });
 
     return {
         server,

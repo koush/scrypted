@@ -1,7 +1,6 @@
 {
    "name": "@scrypted/ring",
    "scripts": {
-      "preinstall": "pushd ../../external/push-receiver && npm install && popd && pushd ../../external/ring-client-api && npm install && popd",
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
       "build": "scrypted-webpack",
@@ -45,5 +44,5 @@
       "got": "11.8.2",
       "socket.io-client": "^2.4.0"
    },
-   "version": "0.0.92"
+   "version": "0.0.95"
 }

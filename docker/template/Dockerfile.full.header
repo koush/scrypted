@@ -26,6 +26,7 @@ RUN apt-get -y upgrade
 # base development stuff
 RUN apt-get -y install \
     build-essential \
+    cmake \
     gcc \
     gir1.2-gtk-3.0 \
     libcairo2-dev \

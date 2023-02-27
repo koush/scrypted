@@ -28,8 +28,6 @@ addSupportedType({
 
             return modes;
         }
-        service.getCharacteristic(Characteristic.SecuritySystemTargetState)
-        .setProps({validValues: systemStates(device.securitySystemState?.supportedModes)});
 
         function toCurrentState(mode: SecuritySystemMode, triggered: boolean) {
             if (!!triggered)
@@ -78,6 +76,7 @@ addSupportedType({
             () => toTargetState(device.securitySystemState?.mode));
 
         service.getCharacteristic(Characteristic.SecuritySystemTargetState)
+        .setProps({validValues: systemStates(device.securitySystemState?.supportedModes)})
         .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
             callback();
             const targetValue = fromTargetState(value as number);

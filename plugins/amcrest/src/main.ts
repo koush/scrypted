@@ -5,7 +5,8 @@ import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
+import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
+import { amcrestHttpsAgent } from './probe';
 
 const { mediaManager } = sdk;
 
@@ -37,19 +38,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
 
         this.updateDeviceInfo();
-        this.updateManagementUrl();
-    }
-
-    updateManagementUrl() {
-        const ip = this.storage.getItem('ip');
-        if (!ip)
-            return;
-        const info = this.info || {};
-        const managementUrl = `http://${ip}`;
-        if (info.managementUrl !== managementUrl) {
-            info.managementUrl = managementUrl;
-            this.info = info;
-        }
     }
 
     getRecordingStreamCurrentTime(recordingStream: MediaObject): Promise<number> {
@@ -80,9 +68,16 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async updateDeviceInfo(): Promise<void> {
-        if (this.info)
+        const ip = this.storage.getItem('ip');
+        if (!ip)
             return;
-        const deviceInfo = {};
+
+        const managementUrl = `http://${ip}`;
+        const deviceInfo: DeviceInformation = {
+            ...this.info,
+            ip,
+            managementUrl,
+        };
 
         const deviceParameters = [
             { action: "getVendor", replace: "vendor=", parameter: "manufacturer" },
@@ -441,7 +436,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             interfaces.push(ScryptedInterface.VideoRecorder);
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
 
-        this.updateManagementUrl();
+        this.updateDeviceInfo();
     }
 
     async startIntercom(media: MediaObject): Promise<void> {

@@ -316,6 +316,7 @@ class DeviceCreatorSettings(TypedDict):
 
 class DeviceInformation(TypedDict):
     firmware: str
+    ip: str
     mac: str
     managementUrl: str
     manufacturer: str
@@ -530,13 +531,13 @@ class RequestMediaStreamOptions(TypedDict):
     container: str
     destination: MediaStreamDestination
     destinationId: str
-    directMediaStream: bool
     id: str
     metadata: Any
     name: str
     prebuffer: float
     prebufferBytes: float
     refresh: bool
+    route: Any | Any
     tool: MediaStreamTool
     video: VideoStreamOptions
     pass
@@ -555,7 +556,6 @@ class RequestRecordingStreamOptions(TypedDict):
     container: str
     destination: MediaStreamDestination
     destinationId: str
-    directMediaStream: bool
     duration: float
     id: str
     loop: bool
@@ -565,6 +565,7 @@ class RequestRecordingStreamOptions(TypedDict):
     prebuffer: float
     prebufferBytes: float
     refresh: bool
+    route: Any | Any
     startTime: float
     tool: MediaStreamTool
     video: VideoStreamOptions

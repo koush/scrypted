@@ -6,8 +6,9 @@ import { PassThrough, Readable } from "stream";
 import { sleep } from "../../../common/src/sleep";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { getChannel, HikvisionCameraAPI, HikvisionCameraEvent, hikvisionHttpsAgent } from "./hikvision-camera-api";
+import { getChannel, HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 import xml2js from 'xml2js';
+import { hikvisionHttpsAgent } from './probe';
 
 const { mediaManager } = sdk;
 
@@ -26,19 +27,29 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
-        this.updateManagementUrl();
+        this.updateDeviceInfo();
     }
 
-    updateManagementUrl() {
+    async updateDeviceInfo() {
         const ip = this.storage.getItem('ip');
         if (!ip)
             return;
-        const info = this.info || {};
         const managementUrl = `http://${ip}`;
-        if (info.managementUrl !== managementUrl) {
-            info.managementUrl = managementUrl;
-            this.info = info;
+        const info: DeviceInformation = {
+            ...this.info,
+            managementUrl,
+            ip,
+            manufacturer: 'Hikvision', 
+        };
+        const client = this.getClient();
+        const deviceInfo = await client.getDeviceInfo().catch(() => { });
+        if (deviceInfo) {
+            info.model = deviceInfo.deviceModel;
+            info.mac = deviceInfo.macAddress;
+            info.firmware = deviceInfo.firmwareVersion;
+            info.serialNumber = deviceInfo.serialNumber;
         }
+        this.info = info;
     }
 
     async listenEvents() {
@@ -284,7 +295,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
 
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
 
-        this.updateManagementUrl();
+        this.updateDeviceInfo();
     }
 
     async getOtherSettings(): Promise<Setting[]> {

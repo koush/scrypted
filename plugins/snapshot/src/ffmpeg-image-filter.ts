@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { sleep } from '@scrypted/common/src/sleep';
@@ -115,7 +116,11 @@ export async function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpeg
     input.write(inputJpeg);
     input.end();
 
-    return ffmpegFilterImageInternal(cp, options);
+    return ffmpegFilterImageInternal(cp, options)
+    .catch(e => {
+        fs.writeFileSync("/tmp/test.jpg", inputJpeg);
+        throw e;
+    })
 }
 
 export async function ffmpegFilterImage(inputArguments: string[], options: FFmpegImageFilterOptions) {
@@ -168,14 +173,16 @@ export async function ffmpegFilterImageInternal(cp: ChildProcess, options: FFmpe
     cp.stdio[3].on('data', data => buffers.push(data));
 
     const to = options.timeout ? setTimeout(() => {
-        console.log('ffmpeg stream to image conversion timed out.');
+        console.log('ffmpeg input to image conversion timed out.');
         safeKillFFmpeg(cp);
     }, 10000) : undefined;
 
-    const [exitCode] = await once(cp, 'exit');
+    const exit = once(cp, 'exit');
+    await once(cp.stdio[3], 'end').catch(() => {});
+    const [exitCode] = await exit;
     clearTimeout(to);
     if (exitCode && !buffers.length)
-        throw new Error(`ffmpeg stream to image conversion failed with exit code: ${exitCode}`);
+        throw new Error(`ffmpeg input to image conversion failed with exit code: ${exitCode}, ${cp.spawnargs.join(' ')}`);
 
     return Buffer.concat(buffers);
 }
@@ -207,7 +214,7 @@ export async function ffmpegFilterImageStream(cp: ChildProcess, options: FFmpegI
             if (last)
                 resolve(last);
             else
-                reject(new Error(`ffmpeg stream to image conversion failed with exit code: ${exitCode}`));
+                reject(new Error(`ffmpeg stream to image conversion failed with exit code: ${exitCode}, ${cp.spawnargs.join(' ')}`));
         })
     });
 
