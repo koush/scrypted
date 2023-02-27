@@ -464,7 +464,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                         for (const scope of splitScopes) {
                             for (const known of Object.keys(knownScopes)) {
                                 if (scope.startsWith(known)) {
-                                    knownScopes[known] = scope.substring(known.length);
+                                    knownScopes[known] = decodeURIComponent(scope.substring(known.length));
                                 }
                             }
                         }
