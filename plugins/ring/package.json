@@ -44,5 +44,5 @@
       "got": "11.8.6",
       "socket.io-client": "^2.5.0"
    },
-   "version": "0.0.95"
+   "version": "0.0.96"
 }
