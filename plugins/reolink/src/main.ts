@@ -22,11 +22,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
         const info = this.info || {};
         info.ip = ip;
         info.manufacturer = 'Reolink';
-        const managementUrl = `http://${ip}`;
-        if (info.managementUrl !== managementUrl) {
-            info.managementUrl = managementUrl;
-            this.info = info;
-        }
+        info.managementUrl = `http://${ip}`;
+        this.info = info;
     }
 
     getClient() {
