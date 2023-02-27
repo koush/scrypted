@@ -32,6 +32,16 @@ export class AmcrestCameraClient {
         });
     }
 
+    async checkTwoWayAudio() {
+        const response = await this.digestAuth.request({
+            httpsAgent: amcrestHttpsAgent,
+            method: "GET",
+            responseType: 'text',
+            url: `http://${this.ip}/cgi-bin/devAudioOutput.cgi?action=getCollect`,
+        });
+        return (response.data as string).includes('result=1');
+    }
+
     // appAutoStart=true
     // deviceType=IP4M-1041B
     // hardwareVersion=1.00

@@ -208,6 +208,7 @@ export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> e
             name,
             interfaces,
             type: type || ScryptedDeviceType.Camera,
+            info: deviceManager.getNativeIds().includes(nativeId) ? deviceManager.getDeviceState(nativeId)?.info : undefined,
         });
     }
 

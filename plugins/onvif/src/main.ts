@@ -561,6 +561,21 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         device.putSetting('password', password);
         device.setIPAddress(settings.ip?.toString());
         device.setHttpPortOverride(settings.httpPort?.toString());
+
+        const intercom = new OnvifIntercom(device);
+        try {
+            intercom.url = (await device.getConstructedVideoStreamOptions())[0].url;
+            if (await intercom.checkIntercom()) {
+                device.putSetting('onvifTwoWay', 'true');
+            }
+        }
+        catch (e) {
+            this.console.warn("error while probing intercom", e);
+        }
+        finally {
+            intercom.intercomClient?.client.destroy();
+        }
+
         return nativeId;
     }
 

@@ -545,9 +545,10 @@ class AmcrestProvider extends RtspProvider {
         const username = settings.username?.toString();
         const password = settings.password?.toString();
         const skipValidate = settings.skipValidate === 'true';
+        let twoWayAudio: string;
         if (!skipValidate) {
+            const api = new AmcrestCameraClient(httpAddress, username, password, this.console);
             try {
-                const api = new AmcrestCameraClient(httpAddress, username, password, this.console);
                 const deviceInfo = await api.getDeviceInfo();
 
                 settings.newCamera = deviceInfo.deviceType;
@@ -557,6 +558,16 @@ class AmcrestProvider extends RtspProvider {
             catch (e) {
                 this.console.error('Error adding Amcrest camera', e);
                 throw e;
+            }
+
+            try {
+                if (await api.checkTwoWayAudio()) {
+                    // onvif seems to work better than Amcrest, except for AD110.
+                    twoWayAudio = 'ONVIF';
+                }
+            }
+            catch (e) {
+                this.console.warn('Error probing two way audio', e);
             }
         }
         settings.newCamera ||= 'Hikvision Camera';
@@ -569,6 +580,8 @@ class AmcrestProvider extends RtspProvider {
         device.putSetting('password', password);
         device.setIPAddress(settings.ip?.toString());
         device.setHttpPortOverride(settings.httpPort?.toString());
+        if (twoWayAudio)
+            device.putSetting('twoWayAudio', twoWayAudio);
         return nativeId;
     }
 
