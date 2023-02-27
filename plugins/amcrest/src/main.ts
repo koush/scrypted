@@ -5,7 +5,8 @@ import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
+import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
+import { amcrestHttpsAgent } from './probe';
 
 const { mediaManager } = sdk;
 

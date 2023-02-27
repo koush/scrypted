@@ -6,8 +6,9 @@ import { PassThrough, Readable } from "stream";
 import { sleep } from "../../../common/src/sleep";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { getChannel, HikvisionCameraAPI, HikvisionCameraEvent, hikvisionHttpsAgent } from "./hikvision-camera-api";
+import { getChannel, HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 import xml2js from 'xml2js';
+import { hikvisionHttpsAgent } from './probe';
 
 const { mediaManager } = sdk;
 

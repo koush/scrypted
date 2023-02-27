@@ -2,6 +2,7 @@ import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { Readable } from 'stream';
 import https from 'https';
 import { IncomingMessage } from 'http';
+import { amcrestHttpsAgent, getDeviceInfo } from './probe';
 
 export enum AmcrestEvent {
     MotionStart = "Code=VideoMotion;action=Start",
@@ -20,9 +21,6 @@ export enum AmcrestEvent {
     DahuaTalkPulse = "Code=_CallNoAnswer_;action=Pulse",
 }
 
-export const amcrestHttpsAgent = new https.Agent({
-    rejectUnauthorized: false,
-});
 
 export class AmcrestCameraClient {
     digestAuth: AxiosDigestAuth;
@@ -42,30 +40,7 @@ export class AmcrestCameraClient {
     // updateSerial=IPC-AW46WN-S2
     // updateSerialCloudUpgrade=IPC-AW46WN-.....
     async getDeviceInfo() {
-        const response = await this.digestAuth.request({
-            httpsAgent: amcrestHttpsAgent,
-            method: "GET",
-            responseType: 'text',
-            url: `http://${this.ip}/cgi-bin/magicBox.cgi?action=getSystemInfo`,
-        });
-        const lines = (response.data as string).split('\n');
-        const vals: {
-            [key: string]: string,
-        } = {};
-        for (const line of lines) {
-            let index = line.indexOf('=');
-            if (index === -1)
-                index = line.length;
-            const k = line.substring(0, index);
-            const v = line.substring(index + 1);
-            vals[k] = v.trim();
-        }
-
-        return {
-            deviceType: vals.deviceType,
-            hardwareVersion: vals.hardwareVersion,
-            serialNumber: vals.serialNumber,
-        }
+        return getDeviceInfo(this.digestAuth, this.ip);
     }
 
     async jpegSnapshot(): Promise<Buffer> {
