@@ -261,7 +261,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                {
                 title: 'Multiple Call Buttons',
                 key: 'multipleCallIds',
-                description: 'Some Dahua Doorbells integrate multiple Call Buttons for appartment buildings.',
+                description: 'Some Dahua Doorbells integrate multiple Call Buttons for apartment buildings.',
                 type: 'boolean',
                 value: (this.storage.getItem('multipleCallIds') === 'true').toString(),
                } 
