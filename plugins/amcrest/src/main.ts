@@ -161,6 +161,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         const client = new AmcrestCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
         const events = await client.listenEvents();
         const doorbellType = this.storage.getItem('doorbellType');
+        const callerId = this.storage.getItem('callerID');
+        const multipleCallIds = this.storage.getItem('multipleCallIds') === 'true';
 
         let pulseTimeout: NodeJS.Timeout;
 
@@ -193,7 +195,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                     {
                         this.binaryState = true;
                     }
-                } else if (event != AmcrestEvent.DahuaTalkInvite)
+                } else 
                 {
                     this.binaryState = true;
                 }
