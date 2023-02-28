@@ -38,6 +38,8 @@ services:
         #   - /dev/ttyACM0:/dev/ttyACM0
         # all usb devices, such as coral tpu
         #   - /dev/bus/usb:/dev/bus/usb
+        # intel hardware accelerated video decoding
+        #   - /dev/dri:/dev/dri
 
         volumes:
             - ~/.scrypted/volume:/server/volume
