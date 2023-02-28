@@ -1157,7 +1157,7 @@ class PrebufferSession {
         try {
           const addresses = await sdk.endpointManager.getLocalAddresses();
           const [address] = addresses;
-          if (address && options?.route === 'external') {
+          if (address) {
             const u = new URL(url);
             u.hostname = address;
             url = u.toString();
