@@ -49,6 +49,7 @@ export interface ScryptedClientStatic extends ScryptedStatic {
     connectionType: ScryptedClientConnectionType;
     authorization?: string;
     queryToken?: { [parameter: string]: string };
+    rpcPeer: RpcPeer,
 }
 
 export interface ScryptedConnectionOptions {
@@ -587,6 +588,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             browserSignalingSession,
             authorization,
             queryToken,
+            rpcPeer,
         }
 
         socket.on('close', () => {
