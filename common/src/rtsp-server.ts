@@ -7,7 +7,7 @@ import net from 'net';
 import { Duplex, Readable } from 'stream';
 import tls from 'tls';
 import { Deferred } from './deferred';
-import { closeQuiet, createBindUdp, createBindZero } from './listen-cluster';
+import { closeQuiet, createBindUdp, createBindZero, listenZeroSingleClient } from './listen-cluster';
 import { timeoutPromise } from './promise-utils';
 import { readLength, readLine } from './read-stream';
 import { MSection, parseSdp } from './sdp-utils';
@@ -1051,5 +1051,35 @@ export class RtspServer {
             closeQuiet(track.rtp);
             closeQuiet(track.rtcp);
         }
+    }
+}
+
+export async function listenSingleRtspClient<T extends RtspServer>(options?: {
+    hostname?: string,
+    pathToken?: string,
+    createServer?(duplex: Duplex): T,
+}) {
+    const pathToken = options?.pathToken || crypto.randomBytes(8).toString('hex');
+    let { url, clientPromise, server } = await listenZeroSingleClient(options?.hostname);
+
+    const rtspServerPath = '/' + pathToken;
+    url = url.replace('tcp:', 'rtsp:') + rtspServerPath;
+
+    const rtspServerPromise = clientPromise.then(client => {
+        const createServer = options?.createServer || (duplex => new RtspServer(duplex));
+
+        const rtspServer = createServer(client);
+        rtspServer.checkRequest = async (method, url, headers, message) => {
+            rtspServer.checkRequest = undefined;
+            const u = new URL(url);
+            return u.pathname === rtspServerPath;
+        };
+        return rtspServer as T;
+    });
+
+    return {
+        url,
+        rtspServerPromise,
+        server,
     }
 }

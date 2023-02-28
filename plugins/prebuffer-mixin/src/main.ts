@@ -5,7 +5,7 @@ import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, listenSingleRtspClient, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
@@ -1115,16 +1115,18 @@ class PrebufferSession {
       }
 
       const hostname = options?.route === 'external' ? '0.0.0.0' : undefined;
-      const client = await listenZeroSingleClient(hostname);
-      const rtspServerPath = '/' + crypto.randomBytes(8).toString('hex');
-      socketPromise = client.clientPromise.then(async (socket) => {
-        sdp = addTrackControls(sdp);
-        server = new FileRtspServer(socket, sdp, async (method, url, headers, rawMessage) => {
-          server.checkRequest = undefined;
-          const u = new URL(url);
-          return u.pathname === rtspServerPath;
-        });
-        server.writeConsole = this.console;
+
+      const clientPromise = await listenSingleRtspClient({
+        hostname,
+        createServer: duplex => {
+          sdp = addTrackControls(sdp);
+          server = new FileRtspServer(duplex, sdp);
+          server.writeConsole = this.console;
+          return server;
+        }
+      });
+
+      socketPromise = clientPromise.rtspServerPromise.then(async server => {
         if (session.parserSpecific) {
           const parserSpecific = session.parserSpecific as RtspSessionParserSpecific;
           server.resolveInterleaved = msection => {
@@ -1134,7 +1136,7 @@ class PrebufferSession {
         }
         // server.console = this.console;
         await server.handlePlayback();
-        server.handleTeardown().finally(() => socket.destroy());
+        server.handleTeardown().finally(() => server.client.destroy());
         for (const track of Object.values(server.setupTracks)) {
           if (track.protocol === 'udp') {
             serverPortMap.set(track.codec, track);
@@ -1146,9 +1148,10 @@ class PrebufferSession {
         }
 
         interleavePassthrough = session.parserSpecific && serverPortMap.size === 0;
-        return socket;
+        return server.client;
       })
-      url = client.url.replace('tcp://', 'rtsp://') + rtspServerPath;
+
+      url = clientPromise.url;
       if (hostname) {
         try {
           const addresses = await sdk.endpointManager.getLocalAddresses();
