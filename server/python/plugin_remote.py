@@ -47,7 +47,7 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
         return await self.api.getComponent(id)
 
 
-class MediaObjectRemote(scrypted_python.scrypted_sdk.types.MediaObject):
+class MediaObject(scrypted_python.scrypted_sdk.types.MediaObject):
     def __init__(self, data, mimeType, sourceId):
         self.mimeType = mimeType
         self.data = data
@@ -93,7 +93,7 @@ class MediaManager:
 
     async def createMediaObject(self, data: Any, mimeType: str, options: scrypted_python.scrypted_sdk.types.MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
         # return await self.createMediaObject(data, mimetypes, options)
-        return MediaObjectRemote(data, mimeType, options.get('sourceId', None) if options else None)
+        return MediaObject(data, mimeType, options.get('sourceId', None) if options else None)
 
     async def createMediaObjectFromUrl(self, data: str, options: scrypted_python.scrypted_sdk.types. MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
         return await self.mediaManager.createMediaObjectFromUrl(data, options)

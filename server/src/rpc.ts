@@ -237,9 +237,10 @@ export class RpcPeer {
     // @ts-ignore
     finalizers = new FinalizationRegistry(entry => this.finalize(entry as LocalProxiedEntry));
     nameDeserializerMap = new Map<string, RpcSerializer>();
+    onSerialization = new Map<string, (value: any) => void>();
     constructorSerializerMap = new Map<any, string>();
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
-    killed: Promise<void>;
+    killed: Promise<string>;
     killedDeferred: Deferred;
     tags: any = {};
 
@@ -298,10 +299,9 @@ export class RpcPeer {
     ]);
 
     constructor(public selfName: string, public peerName: string, public send: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
-        this.killed = new Promise((resolve, reject) => {
+        this.killed = new Promise<string>((resolve, reject) => {
             this.killedDeferred = { resolve, reject };
-        });
-        this.killed.catch(() => { });
+        }).catch(e => e.message || 'Unknown Error');
     }
 
     createPendingResult(cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
@@ -322,6 +322,8 @@ export class RpcPeer {
     }
 
     kill(message?: string) {
+        if (Object.isFrozen(this.pendingResults))
+            return;
         const error = new RPCResultError(this, message || 'peer was killed');
         this.killedDeferred.reject(error);
         for (const result of Object.values(this.pendingResults)) {
@@ -444,6 +446,7 @@ export class RpcPeer {
         }
 
         let __remote_constructor_name = value.__proxy_constructor || value.constructor?.name?.toString();
+        this.onSerialization.get(__remote_constructor_name)?.(value);
 
         let proxiedEntry = this.localProxied.get(value);
         if (proxiedEntry) {
