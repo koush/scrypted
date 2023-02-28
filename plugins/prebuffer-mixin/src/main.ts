@@ -1063,6 +1063,7 @@ class PrebufferSession {
 
     let socketPromise: Promise<Duplex>;
     let url: string;
+    let urls: string[];
     let filter: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk;
     let interleavePassthrough = false;
     const interleavedMap = new Map<string, number>();
@@ -1114,7 +1115,7 @@ class PrebufferSession {
         return chunk;
       }
 
-      const hostname = options?.route === 'external' ? '0.0.0.0' : undefined;
+      const hostname = options?.route === 'internal' ? undefined : '0.0.0.0';
 
       const clientPromise = await listenSingleRtspClient({
         hostname,
@@ -1156,13 +1157,19 @@ class PrebufferSession {
         try {
           const addresses = await sdk.endpointManager.getLocalAddresses();
           const [address] = addresses;
-          if (address) {
+          if (address && options?.route === 'external') {
             const u = new URL(url);
             u.hostname = address;
             url = u.toString();
           }
+          urls = addresses.map(address => {
+            const u = new URL(url);
+            u.hostname = address;
+            return u.toString();
+          })
         }
         catch (e) {
+          this.console.warn('Error determining external addresses. Is Scrypted Server Address configured?');
         }
       }
     }
@@ -1229,6 +1236,7 @@ class PrebufferSession {
 
     const ffmpegInput: FFmpegInput = {
       url,
+      urls,
       container,
       inputArguments: [
         ...inputArguments,
