@@ -38,16 +38,10 @@
       "@koush/axios-digest-auth": "^0.8.5",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "@types/highland": "^2.12.14",
-      "@types/lodash": "^4.14.172",
-      "@types/multiparty": "^0.0.33",
       "@types/node": "^16.9.1",
       "@types/xml2js": "^0.4.9",
       "axios": "^0.23.0",
-      "highland": "^2.13.5",
       "lodash": "^4.17.21",
-      "multiparty": "^4.2.2",
-      "net-keepalive": "^3.0.0",
       "xml2js": "^0.4.23"
    }
 }
