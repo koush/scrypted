@@ -1169,7 +1169,7 @@ class PrebufferSession {
           })
         }
         catch (e) {
-          this.console.warn('Error determining external addresses. Is Scrypted Server Address configured?');
+          this.console.warn('Error determining external addresses. Is Scrypted Server Address configured?', e);
         }
       }
     }
