@@ -369,6 +369,7 @@ class FFmpegInput(TypedDict):
     inputArguments: list[str]
     mediaStreamOptions: ResponseMediaStreamOptions
     url: str
+    urls: list[str]
     videoDecoderArguments: list[str]
     pass
 
@@ -537,7 +538,7 @@ class RequestMediaStreamOptions(TypedDict):
     prebuffer: float
     prebufferBytes: float
     refresh: bool
-    route: Any | Any
+    route: Any | Any | Any
     tool: MediaStreamTool
     video: VideoStreamOptions
     pass
@@ -565,7 +566,7 @@ class RequestRecordingStreamOptions(TypedDict):
     prebuffer: float
     prebufferBytes: float
     refresh: bool
-    route: Any | Any
+    route: Any | Any | Any
     startTime: float
     tool: MediaStreamTool
     video: VideoStreamOptions

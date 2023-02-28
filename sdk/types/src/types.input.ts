@@ -574,7 +574,7 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
    * such as an NVR or restreamers.
    * An external route will request that that provided route is exposed to the local network.
    */
-  route?: 'external' | 'direct';
+  route?: 'external' | 'direct' | 'internal';
 
   /**
    * Specify the stream refresh behavior when this stream is requested.
@@ -1416,12 +1416,22 @@ export interface MediaManager {
    */
   getFilesPath(): Promise<string>;
 }
-export interface MediaStreamUrl {
-  url: string;
+export interface MediaContainer {
   container?: string;
   mediaStreamOptions?: ResponseMediaStreamOptions;
 }
-export interface FFmpegInput extends MediaStreamUrl {
+export interface MediaStreamUrl extends MediaContainer {
+  url: string;
+}
+export interface FFmpegInput extends MediaContainer {
+  /**
+   * The media url for this FFmpegInput.
+   */
+  url?: string;
+  /**
+   * Alternate media urls for this FFmpegInput.
+   */
+  urls?: string[];
   inputArguments?: string[];
   destinationVideoBitrate?: number;
   h264EncoderArguments?: string[];
