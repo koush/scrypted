@@ -28,20 +28,15 @@ RUN apt-get -y install \
     build-essential \
     cmake \
     gcc \
-    gir1.2-gtk-3.0 \
-    libcairo2-dev \
     libgirepository1.0-dev \
     libglib2.0-dev \
-    libjpeg-dev \
-    libgif-dev \
-    libopenjp2-7 \
-    libpango1.0-dev \
-    librsvg2-dev \
     pkg-config
 
 # gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
 RUN apt-get -y install \
     gstreamer1.0-tools libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-alsa
+
+RUN bash -c 'if [ $(uname -m) == "x86_64" ]; then apt-get -y install gstreamer1.0-vaapi; fi'
 
 # python native
 RUN apt-get -y install \
