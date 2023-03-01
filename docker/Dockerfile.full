@@ -38,13 +38,11 @@ RUN apt-get -y install \
 # ffmpeg
 RUN apt-get -y install \
     ffmpeg
-ENV SCRYPTED_FFMPEG_PATH=ffmpeg
 
 # gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
 RUN apt-get -y install \
-    gstreamer1.0-tools libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-alsa
-
-RUN bash -c 'if [ $(uname -m) == "x86_64" ]; then apt-get -y install gstreamer1.0-vaapi; fi'
+    gstreamer1.0-tools libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-alsa \
+    gstreamer1.0-vaapi
 
 # python native
 RUN apt-get -y install \
