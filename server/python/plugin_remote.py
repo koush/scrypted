@@ -531,8 +531,6 @@ def main(readFd: int, writeFd: int):
     loop.run_until_complete(plugin_async_main(loop, readFd, writeFd))
     loop.close()
 
-print('running')
-
 def plugin_main(readFd: int, writeFd: int):
     try:
         import gi
