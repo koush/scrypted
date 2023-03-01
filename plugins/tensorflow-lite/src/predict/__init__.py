@@ -479,36 +479,27 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         return ret
 
     def run_detection_gstsample(self, detection_session: PredictSession, gstsample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Image.Image]:
-        if False:
-            # pycoral supports fast path with gst sample directly which can be used if detection snapshots
-            # are not needed.
-            with self.mutex:
-                gst_buffer = gstsample.get_buffer()
-                run_inference(self.interpreter, gst_buffer)
-                objs = detect.get_objects(
-                    self.interpreter, score_threshold=score_threshold)
-        else:
-            caps = gstsample.get_caps()
-            # can't trust the width value, compute the stride
-            height = caps.get_structure(0).get_value('height')
-            width = caps.get_structure(0).get_value('width')
-            gst_buffer = gstsample.get_buffer()
-            result, info = gst_buffer.map(Gst.MapFlags.READ)
-            if not result:
-                return
-            try:
-                image = detection_session.image
-                detection_session.image = None
+        caps = gstsample.get_caps()
+        # can't trust the width value, compute the stride
+        height = caps.get_structure(0).get_value('height')
+        width = caps.get_structure(0).get_value('width')
+        gst_buffer = gstsample.get_buffer()
+        result, info = gst_buffer.map(Gst.MapFlags.READ)
+        if not result:
+            return
+        try:
+            image = detection_session.image
+            detection_session.image = None
 
-                if image and (image.width != width or image.height != height):
-                    image.close()
-                    image = None
-                if image:
-                    image.frombytes(bytes(info.data))
-                else:
-                    image = Image.frombuffer('RGB', (width, height), bytes(info.data))
-            finally:
-                gst_buffer.unmap(info)
+            if image and (image.width != width or image.height != height):
+                image.close()
+                image = None
+            if image:
+                image.frombytes(bytes(info.data))
+            else:
+                image = Image.frombuffer('RGB', (width, height), bytes(info.data))
+        finally:
+            gst_buffer.unmap(info)
 
         return self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size)
 
