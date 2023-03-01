@@ -1,4 +1,4 @@
-import { Device, DeviceProvider, DeviceCreator, DeviceCreatorSettings, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, Battery, VideoCamera, SettingValue, RequestMediaStreamOptions, MediaObject, DeviceManifest} from '@scrypted/sdk';
+import { Device, DeviceProvider, DeviceCreator, DeviceCreatorSettings, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, Battery, SettingValue, DeviceManifest} from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { connectScryptedClient, ScryptedClientStatic } from '@scrypted/client';
@@ -111,28 +111,15 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
             deviceManager.getDeviceState(device.nativeId).batteryLevel = (<Battery>remoteDevice).batteryLevel;
         }
 
-        // since the remote may be using rebroadcast, explicitly request the external
-        // address for video streams
-        if (device.interfaces.includes(ScryptedInterface.VideoCamera)) {
-            const remoteGetVideoStream = (<VideoCamera><any>remoteDevice).getVideoStream;
-            (<VideoCamera><any>remoteDevice).getVideoStream = async (options?: RequestMediaStreamOptions): Promise<MediaObject> => {
-                if (!options) {
-                    options = {};
-                }
-                (<any>options).route = "external";
-                return await remoteGetVideoStream(options);
-            }
-        }
-
-        // for device providers, we need to translate the nativeId
+        // for device providers, we intercept calls to load device representations
+        // stored within this plugin instance, instead of directly from the remote
         if (device.interfaces.includes(ScryptedInterface.DeviceProvider)) {
-            const plugin = this;
             (<DeviceProvider><any>remoteDevice).getDevice = async (nativeId: string): Promise<Device> => {
-                return <Device>plugin.devices.get(nativeId);
+                return <Device>this.devices.get(nativeId);
             }
             (<DeviceProvider><any>remoteDevice).releaseDevice = async (id: string, nativeId: string): Promise<any> => {
                 // don't delete the device from the remote
-                plugin.releaseDevice(id, nativeId);
+                this.releaseDevice(id, nativeId);
             }
         }
     }
