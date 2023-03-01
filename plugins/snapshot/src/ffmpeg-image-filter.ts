@@ -116,11 +116,7 @@ export async function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpeg
     input.write(inputJpeg);
     input.end();
 
-    return ffmpegFilterImageInternal(cp, options)
-    .catch(e => {
-        fs.writeFileSync("/tmp/test.jpg", inputJpeg);
-        throw e;
-    })
+    return ffmpegFilterImageInternal(cp, options);
 }
 
 export async function ffmpegFilterImage(inputArguments: string[], options: FFmpegImageFilterOptions) {
