@@ -22,7 +22,8 @@
             "args": [
                 "ffplay",
                 "Kitchen",
-                "getVideoStream"
+                "getRecordingStream",
+                "{\"startTime\":1677699495709}"
             ],
             "sourceMaps": true,
             "resolveSourceMapLocations": [

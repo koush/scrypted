@@ -126,7 +126,7 @@ async function runCommand() {
     if (!device)
         throw new Error('device not found: ' + idOrName);
     const method = process.argv[4];
-    const args = process.argv.slice(5).map(arg => () => {
+    const args = process.argv.slice(5).map(arg => {
         try {
             return JSON.parse(arg);
         }
