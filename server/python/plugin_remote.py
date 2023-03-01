@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import gc
-import json
 import sys
 import os
 import platform
@@ -21,7 +20,6 @@ from io import StringIO
 from os import sys
 from typing import Any, List, Optional, Set, Tuple
 
-import aiofiles
 import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk import ScryptedStatic, PluginFork
 from scrypted_python.scrypted_sdk.types import Device, DeviceManifest, EventDetails, ScryptedInterfaceProperty, Storage
@@ -330,6 +328,9 @@ class PluginRemote:
                     pass
 
                 if need_pip:
+                    shutil.rmtree(python_prefix)
+                    os.makedirs(python_prefix)
+
                     print('requirements.txt (outdated)')
                     print(str_requirements)
 
