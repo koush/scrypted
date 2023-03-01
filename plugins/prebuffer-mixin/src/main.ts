@@ -19,6 +19,7 @@ import semver from 'semver';
 import { Duplex } from 'stream';
 import { Worker } from 'worker_threads';
 import { FileRtspServer } from './file-rtsp-server';
+import { getUrlLocalAdresses } from './local-addresses';
 import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
@@ -1154,25 +1155,7 @@ class PrebufferSession {
 
       url = clientPromise.url;
       if (hostname) {
-        try {
-          const addresses = await sdk.endpointManager.getLocalAddresses();
-          if (addresses) {
-            const [address] = addresses;
-            if (address) {
-              const u = new URL(url);
-              u.hostname = address;
-              url = u.toString();
-            }
-            urls = addresses.map(address => {
-              const u = new URL(url);
-              u.hostname = address;
-              return u.toString();
-            });
-          }
-        }
-        catch (e) {
-          this.console.warn('Error determining external addresses. Is Scrypted Server Address configured?', e);
-        }
+        urls = await getUrlLocalAdresses(this.console, url);
       }
     }
     else {
