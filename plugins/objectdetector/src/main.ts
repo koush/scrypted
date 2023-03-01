@@ -782,14 +782,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       );
     }
 
-    settings.push(...await this.storageSettings.getSettings());
-
     this.storageSettings.settings.motionSensorSupplementation.hide = !this.hasMotionType || !this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor);
     this.storageSettings.settings.captureMode.hide = this.hasMotionType;
     this.storageSettings.settings.detectionDuration.hide = this.hasMotionType;
     this.storageSettings.settings.detectionTimeout.hide = this.hasMotionType;
     this.storageSettings.settings.motionDuration.hide = !this.hasMotionType;
     this.storageSettings.settings.motionAsObjects.hide = !this.hasMotionType;
+
+    settings.push(...await this.storageSettings.getSettings());
 
     let hideThreshold = true;
     if (!this.hasMotionType) {
