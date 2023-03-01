@@ -38,6 +38,7 @@ RUN apt-get -y install \
 # ffmpeg
 RUN apt-get -y install \
     ffmpeg
+ENV SCRYPTED_FFMPEG_PATH=ffmpeg
 
 # gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
 RUN apt-get -y install \
