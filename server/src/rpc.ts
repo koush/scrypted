@@ -188,10 +188,10 @@ function compileFunction(code: string, params?: ReadonlyArray<string>, options?:
     return eval(f);
 }
 
-declare class WeakRef {
-    target: any;
+declare class WeakRef<T> {
+    target: T;
     constructor(target: any);
-    deref(): any;
+    deref(): T;
 }
 
 try {
