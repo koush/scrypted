@@ -1,4 +1,4 @@
-import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import cloneDeep from 'lodash/cloneDeep';
@@ -347,7 +347,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           }
           // retain passing the second pass threshold for first time.
           if (d.bestSecondPassScore < this.secondScoreThreshold && secondPassScore >= this.secondScoreThreshold) {
-            this.console.log('improved', d.id, d.bestSecondPassScore, d.score);
+            this.console.log('improved', d.id, secondPassScore, d.score);
             better = true;
             retainImage = true;
           }
@@ -436,6 +436,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       return;
 
     this.detectorRunning = true;
+    this.analyzeStop = Date.now() + this.getDetectionDuration();
+
     while (this.detectorRunning) {
       const now = Date.now();
       if (now > this.analyzeStop)
@@ -445,12 +447,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           reason: 'event',
         });
         const found = await this.objectDetection.detectObjects(mo, {
+          detectionId: this.detectionId,
+          duration: this.getDetectionDuration(),
           settings: this.getCurrentSettings(),
-        });
-        found.running = this.detectorRunning;
-        this.handleDetectionEvent(found, undefined, mo);
+        }, this);
       }
       catch (e) {
+        this.console.error('snapshot detection error', e);
       }
       // cameras tend to only refresh every 1s at best.
       // maybe get this value from somewhere? or sha the jpeg?
@@ -458,13 +461,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (diff > 0)
         await sleep(diff);
     }
-    this.detectorRunning = false;
-    this.handleDetectionEvent({
-      detectionId: this.detectionId,
-      running: false,
-      detections: [],
-      timestamp: Date.now(),
-    }, undefined, undefined);
+    this.endObjectDetection();
   }
 
   async startStreamAnalysis() {
@@ -545,7 +542,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   applyZones(detection: ObjectsDetected) {
     // determine zones of the objects, if configured.
     if (!detection.detections)
-      return;
+      return [];
     let copy = detection.detections.slice();
     for (const o of detection.detections) {
       if (!o.boundingBox)
@@ -829,7 +826,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       settings.push({
         subgroup,
         key: `zone-${name}`,
-        title: `Edit Zone`,
+        title: `Open Zone Editor`,
         type: 'clippath',
         value: JSON.stringify(value),
       });
@@ -987,6 +984,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 }
 
 class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements MixinProvider {
+  currentMixins = new Set<ObjectDetectionMixin>();
+
   constructor(mixinDevice: ObjectDetection, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, mixinProviderNativeId: ScryptedNativeId, public model: ObjectDetectionModel) {
     super({ mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId });
 
@@ -1036,17 +1035,51 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
     const hasMotionType = this.model.classes.includes('motion');
     const settings = this.model.settings;
 
-    return new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.model.name, group, hasMotionType, settings);
+    const ret = new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.model.name, group, hasMotionType, settings);
+    this.currentMixins.add(ret);
+    return ret;
   }
 
   async releaseMixin(id: string, mixinDevice: any) {
+    this.currentMixins.delete(mixinDevice);
     return mixinDevice.release();
   }
 }
 
-class ObjectDetectionPlugin extends AutoenableMixinProvider {
+class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings {
+  currentMixins = new Set<ObjectDetectorMixin>();
+
+  storageSettings = new StorageSettings(this, {
+    activeMotionDetections: {
+      title: 'Active Motion Detection Sessions',
+      readonly: true,
+      mapGet: () => {
+        return [...this.currentMixins.values()]
+          .reduce((c1, v1) => c1 + [...v1.currentMixins.values()]
+            .reduce((c2, v2) => c2 + (v2.hasMotionType && v2.detectorRunning ? 1 : 0), 0), 0);
+      }
+    },
+    activeObjectDetections: {
+      title: 'Active Object Detection Sessions',
+      readonly: true,
+      mapGet: () => {
+        return [...this.currentMixins.values()]
+          .reduce((c1, v1) => c1 + [...v1.currentMixins.values()]
+            .reduce((c2, v2) => c2 + (!v2.hasMotionType && v2.detectorRunning ? 1 : 0), 0), 0);
+      }
+    }
+  })
+
   constructor(nativeId?: ScryptedNativeId) {
     super(nativeId);
+  }
+
+  getSettings(): Promise<Setting[]> {
+    return this.storageSettings.getSettings();
+  }
+
+  putSetting(key: string, value: SettingValue): Promise<void> {
+    return this.storageSettings.putSetting(key, value);
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
@@ -1057,12 +1090,15 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider {
 
   async getMixin(mixinDevice: ObjectDetection, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
     const model = await mixinDevice.getDetectionModel();
-    return new ObjectDetectorMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId, model);
+    const ret = new ObjectDetectorMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId, model);
+    this.currentMixins.add(ret);
+    return ret;
   }
 
   async releaseMixin(id: string, mixinDevice: any): Promise<void> {
     // what does this mean to make a mixin provider no longer available?
     // just ignore it until reboot?
+    this.currentMixins.delete(mixinDevice);
   }
 }
 
