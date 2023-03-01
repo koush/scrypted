@@ -304,6 +304,16 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             else:
                 dx = dy / h * w
 
+            if dx > image.width:
+                s = image.width / dx
+                dx = image.width
+                dy *= s
+
+            if dy > image.height:
+                s = image.height / dy
+                dy = image.height
+                dx *= s
+
             # crop size to fit input size
             if dx < w:
                 dx = w
@@ -321,15 +331,13 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             if t + dy > ih:
                 t = ih - dy
             crop_box = (l, t, l + dx, t + dy)
-            input = image.crop(crop_box)
-            (cw, ch) = input.size
-            if cw != w or h != ch:
-                input_resized = input.resize((w, h), Image.ANTIALIAS)
-                input.close()
-                input = input_resized
+            if dx == w and dy == h:
+                input = image.crop(crop_box)
+            else:
+                input = image.resize((w, h), Image.ANTIALIAS, crop_box)
 
             def cvss(point, normalize=False):
-                unscaled = ((point[0] / w) * cw + l, (point[1] / h) * ch + t)
+                unscaled = ((point[0] / w) * dx + l, (point[1] / h) * dy + t)
                 converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
                 return converted
 
@@ -350,17 +358,15 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             if detection_session:
                 detection_session.processed = detection_session.processed + 1
         else:
-            scaled = image.resize((int(round(s * iw)), int(round(s * ih))), Image.ANTIALIAS)
+            ss = (int(round(s * iw)), int(round(s * ih)))
+            sx, sy = ss
 
             first_crop = (0, 0, w, h)
-            first = scaled.crop(first_crop)
-            (sx, sy) = scaled.size
+            first = image.resize((w, h), Image.ANTIALIAS, (0, 0, int(w / s), int(h / s)))
             ow = sx - w
             oh = sy - h
             second_crop = (ow, oh, ow + w, oh + h)
-            second = scaled.crop(second_crop)
-            if scaled is not image:
-                scaled.close()
+            second = image.resize((w, h), Image.ANTIALIAS, (int(ow / s), int(oh / s), int((ow + w)) / s, int((oh + h) / s)))
 
             def cvss1(point, normalize=False):
                 unscaled = (point[0] / s, point[1] / s)
