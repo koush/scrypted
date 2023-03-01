@@ -8,7 +8,7 @@ import https from 'https';
 import mkdirp from 'mkdirp';
 import { installServe, serveMain } from './service';
 import { connectScryptedClient } from '../../client/src/index';
-import { ScryptedMimeTypes, FFmpegInput } from '../../../sdk/types/src/types.input';
+import { ScryptedMimeTypes, FFmpegInput } from '@scrypted/types';
 import semver from 'semver';
 import child_process from 'child_process';
 
