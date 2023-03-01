@@ -1156,17 +1156,19 @@ class PrebufferSession {
       if (hostname) {
         try {
           const addresses = await sdk.endpointManager.getLocalAddresses();
-          const [address] = addresses;
-          if (address) {
-            const u = new URL(url);
-            u.hostname = address;
-            url = u.toString();
+          if (addresses) {
+            const [address] = addresses;
+            if (address) {
+              const u = new URL(url);
+              u.hostname = address;
+              url = u.toString();
+            }
+            urls = addresses.map(address => {
+              const u = new URL(url);
+              u.hostname = address;
+              return u.toString();
+            });
           }
-          urls = addresses.map(address => {
-            const u = new URL(url);
-            u.hostname = address;
-            return u.toString();
-          })
         }
         catch (e) {
           this.console.warn('Error determining external addresses. Is Scrypted Server Address configured?', e);
