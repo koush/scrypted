@@ -1,4 +1,4 @@
-import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ObjectTracker, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import cloneDeep from 'lodash/cloneDeep';
@@ -67,6 +67,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         'Snapshot',
       ],
       defaultValue: 'Default',
+    },
+    tracker: {
+      title: 'Object Tracker',
+      type: 'device',
+      deviceFilter: `interfaces.includes('${ScryptedInterface.ObjectTracker}')`,
     },
     detectionDuration: {
       title: 'Detection Duration',
@@ -192,11 +197,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
   async snapshotDetection() {
     const picture = await this.cameraDevice.takePicture();
-    const detections = await this.objectDetection.detectObjects(picture, {
+    let detections = await this.objectDetection.detectObjects(picture, {
       detectionId: this.detectionId,
       settings: this.getCurrentSettings(),
     });
-    this.trackObjects(detections, true);
+    detections = await this.trackObjects(detections, true);
     this.reportObjectDetections(detections);
   }
 
@@ -308,8 +313,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   async handleDetectionEvent(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject) {
     this.detectorRunning = detection.running;
 
-    // track the objects on a pre-zoned set.
-    this.trackObjects(detection);
+    detection = await this.trackObjects(detection);
 
     // apply the zones to the detections and get a shallow copy list of detections after
     // exclusion zones have applied
@@ -638,15 +642,25 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
   }
 
-  trackObjects(detectionResult: ObjectsDetected, showAll?: boolean) {
+  async trackObjects(detectionResult: ObjectsDetected, showAll?: boolean) {
     // do not denoise
     if (this.hasMotionType) {
-      return;
+      return detectionResult;
     }
 
     if (!detectionResult?.detections) {
       // detection session ended.
-      return;
+      return detectionResult;
+    }
+
+    // track the objects on a pre-zoned set.
+    const tracker = this.storageSettings.values.tracker as ObjectTracker;
+    if (tracker) {
+      // apply a detectionId for the tracker, but remove it until certain the
+      // detection input needs to be saved.
+      detectionResult.detectionId = this.detectionId;
+      detectionResult = await tracker.trackObjects(detectionResult);
+      delete detectionResult.detectionId;
     }
 
     const { detections } = detectionResult;
@@ -716,6 +730,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (found.length || showAll) {
       this.console.log('current detections:', this.detectionState.previousDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.boundingBox?.join(', ')})`).join(', '));
     }
+
+    return detectionResult;
   }
 
   setDetection(detection: ObjectsDetected, detectionInput: MediaObject) {
@@ -784,6 +800,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     this.storageSettings.settings.motionSensorSupplementation.hide = !this.hasMotionType || !this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor);
     this.storageSettings.settings.captureMode.hide = this.hasMotionType;
+    this.storageSettings.settings.tracker.hide = this.hasMotionType;
     this.storageSettings.settings.detectionDuration.hide = this.hasMotionType;
     this.storageSettings.settings.detectionTimeout.hide = this.hasMotionType;
     this.storageSettings.settings.motionDuration.hide = !this.hasMotionType;

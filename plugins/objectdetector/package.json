@@ -43,9 +43,7 @@
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "jpeg-js": "^0.4.3",
       "lodash": "^4.17.21",
-      "node-moving-things-tracker": "file:./node-moving-things-tracker",
       "point-inside-polygon": "^1.0.3",
       "polygon-overlap": "^1.0.5",
       "semver": "^7.3.8"

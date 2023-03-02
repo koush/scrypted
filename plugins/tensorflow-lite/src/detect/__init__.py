@@ -136,11 +136,12 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         decoderSetting: Setting = {
             'title': "Decoder",
-            'description': "The tool used to decode the stream. The may be libav or the gstreamer element.",
+            'description': "The tool used to decode the stream. The may be libav or a gstreamer element.",
             'combobox': True,
             'value': 'Default',
             'placeholder': 'Default',
             'key': 'decoder',
+            'subgroup': 'Advanced',
             'choices': [
                 'Default',
                 'libav',
@@ -151,8 +152,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             ],
         }
 
-        d['settings'].append(decoderSetting)
         d['settings'] += self.getModelSettings(settings)
+        d['settings'].append(decoderSetting)
 
         return d
 

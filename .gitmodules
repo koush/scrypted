@@ -37,11 +37,8 @@
 [submodule "plugins/sample-cameraprovider"]
 	path = plugins/sample-cameraprovider
 	url = ../../koush/scrypted-sample-cameraprovider
-[submodule "plugins/objectdetector/node-moving-things-tracker"]
-	path = plugins/objectdetector/node-moving-things-tracker
-	url = ../../koush/node-moving-things-tracker.git
 [submodule "plugins/tensorflow-lite/sort_oh"]
-	path = plugins/tensorflow-lite/sort_oh
+	path = plugins/sort-tracker/sort_oh
 	url = ../../koush/sort_oh.git
 [submodule "plugins/cloud/node-nat-upnp"]
 	path = plugins/cloud/node-nat-upnp

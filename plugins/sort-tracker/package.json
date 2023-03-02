@@ -1,11 +1,13 @@
 {
-   "name": "@scrypted/coreml",
-   "description": "Scrypted CoreML Object Detection",
+   "name": "@scrypted/sort-tracker",
+   "description": "Scrypted SORT Object Tracker",
    "keywords": [
       "scrypted",
       "plugin",
-      "coreml",
-      "neural",
+      "coral",
+      "tpu",
+      "edge",
+      "motion",
       "object",
       "detect",
       "detection",
@@ -26,7 +28,7 @@
       "scrypted-package-json": "scrypted-package-json"
    },
    "scrypted": {
-      "name": "CoreML Object Detection",
+      "name": "SORT Object Tracker",
       "pluginDependencies": [
          "@scrypted/objectdetector"
       ],
@@ -34,12 +36,11 @@
       "type": "API",
       "interfaces": [
          "Settings",
-         "BufferConverter",
-         "ObjectDetection"
+         "ObjectTracker"
       ]
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.23"
+   "version": "0.0.1"
 }
