@@ -200,11 +200,17 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             await input.promise;
         }
         const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/events/${detectionId}/thumbnail`;
-        const response = await this.protect.api.fetch(url);
-        if (!response) {
-            throw new Error('Event snapshot unavailable.');
-        }
-        const data = await response.arrayBuffer();
+
+        const abort = new AbortController();
+        const timeout = setTimeout(() => abort.abort('Unifi Protect Snapshot timed out after 10 seconds. Aborted.'), 10000);
+        const response = await this.protect.loginFetch(url, {
+            signal: abort.signal,
+            responseType: 'arraybuffer',
+        });
+        clearTimeout(timeout);
+        if (!response)
+            throw new Error('event snapshot unavailable.');
+        const data = Buffer.from(response.data);
         return this.createMediaObject(Buffer.from(data), 'image/jpeg');
     }
 
