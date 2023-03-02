@@ -1,3 +1,3 @@
 # SORT Object Tracker for Scrypted
 
-This plugin adds object tracking capabilities to any camera in Scrypted.
+This provides object tracking capabilities for the Video Analysis plugin.

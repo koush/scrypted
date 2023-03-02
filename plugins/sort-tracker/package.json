@@ -29,9 +29,6 @@
    },
    "scrypted": {
       "name": "SORT Object Tracker",
-      "pluginDependencies": [
-         "@scrypted/objectdetector"
-      ],
       "runtime": "python",
       "type": "API",
       "interfaces": [
@@ -42,5 +39,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.1"
+   "version": "0.0.2"
 }
