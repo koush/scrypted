@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import gc
 import sys
 import os
@@ -18,7 +17,7 @@ from asyncio.streams import StreamReader, StreamWriter
 from collections.abc import Mapping
 from io import StringIO
 from os import sys
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any, Optional, Set, Tuple
 
 import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk import ScryptedStatic, PluginFork
@@ -201,30 +200,6 @@ class DeviceManager(scrypted_python.scrypted_sdk.types.DeviceManager):
 
     def getDeviceStorage(self, nativeId: str = None) -> Storage:
         return self.nativeIds.get(nativeId, None)
-
-
-class BufferSerializer(rpc.RpcSerializer):
-    def serialize(self, value, serializationContext):
-        return base64.b64encode(value).decode('utf8')
-
-    def deserialize(self, value, serializationContext):
-        return base64.b64decode(value)
-
-
-class SidebandBufferSerializer(rpc.RpcSerializer):
-    def serialize(self, value, serializationContext):
-        buffers = serializationContext.get('buffers', None)
-        if not buffers:
-            buffers = []
-            serializationContext['buffers'] = buffers
-        buffers.append(value)
-        return len(buffers) - 1
-
-    def deserialize(self, value, serializationContext):
-        buffers: List = serializationContext.get('buffers', None)
-        buffer = buffers.pop()
-        return buffer
-
 
 class PluginRemote:
     systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}

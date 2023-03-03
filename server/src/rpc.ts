@@ -91,6 +91,12 @@ export interface PrimitiveProxyHandler<T extends object> extends ProxyHandler<T>
 }
 
 class RpcProxy implements PrimitiveProxyHandler<any> {
+    static iteratorMethods = new Set([
+        'next',
+        'throw',
+        'return',
+    ]);
+
     constructor(public peer: RpcPeer,
         public entry: LocalProxiedEntry,
         public constructorName: string,
@@ -108,12 +114,13 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
             if (!this.proxyProps?.[Symbol.asyncIterator.toString()])
                 return;
             return () => {
-                return {
-                    next: async () => {
-                        return this.apply(() => 'next', undefined)
-                    }
-                }
+                return new Proxy(() => { }, this);
             };
+        }
+        if (RpcProxy.iteratorMethods.has(p?.toString())) {
+            const asyncIteratorMethod = this.proxyProps?.[Symbol.asyncIterator.toString()]?.[p];
+            if (asyncIteratorMethod)
+                return new Proxy(() => asyncIteratorMethod, this);
         }
         if (p === RpcPeer.PROPERTY_PROXY_ID)
             return this.entry.id;
@@ -182,10 +189,31 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
             return Promise.resolve();
         }
 
-        return this.peer.createPendingResult((id, reject) => {
+        const pendingResult = this.peer.createPendingResult((id, reject) => {
             rpcApply.id = id;
             this.peer.send(rpcApply, reject, serializationContext);
-        })
+        });
+
+        const asyncIterator = this.proxyProps?.[Symbol.asyncIterator.toString()];
+        if (!asyncIterator || method !== asyncIterator.next)
+            return pendingResult;
+
+        return pendingResult
+            .then(value => {
+                return ({
+                    value,
+                    done: false,
+                });
+            })
+            .catch(e => {
+                if (e.name === 'StopAsyncIteration') {
+                    return {
+                        done: true,
+                        value: undefined,
+                    }
+                }
+                throw e;
+            })
     }
 }
 
@@ -252,6 +280,12 @@ interface LocalProxiedEntry {
     finalizerId: string | undefined;
 }
 
+interface ErrorType {
+    name: string;
+    message: string;
+    stack?: string;
+}
+
 export class RpcPeer {
     idCounter = 1;
     params: { [name: string]: any } = {};
@@ -311,10 +345,13 @@ export class RpcPeer {
     static getProxyProperies(value: any) {
         if (!value[Symbol.asyncIterator])
             return value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES];
-        return {
-            [Symbol.asyncIterator.toString()]: true,
-            ...value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES],
-        }
+        const props = value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES] || {};
+        props[Symbol.asyncIterator.toString()] = {
+            next: 'next',
+            throw: 'throw',
+            return: 'return',
+        };
+        return props;
     }
 
     static readonly RPC_RESULT_ERROR_NAME = 'RPCResultError';
@@ -425,7 +462,7 @@ export class RpcPeer {
      * @param result
      * @param e
      */
-    createErrorResult(result: RpcResult, e: Error) {
+    createErrorResult(result: RpcResult, e: ErrorType) {
         result.result = this.serializeError(e);
         result.throw = true;
         result.message = (e as Error).message || 'no message';
@@ -483,7 +520,7 @@ export class RpcPeer {
         return new RPCResultError(this, message, undefined, { name, stack });
     }
 
-    serializeError(e: Error): RpcRemoteProxyValue {
+    serializeError(e: ErrorType): RpcRemoteProxyValue {
         const __serialized_value: SerialiedRpcResultError = {
             stack: e.stack || '[no stack]',
             name: e.name || '[no name]',
@@ -646,6 +683,19 @@ export class RpcPeer {
                             if (!method)
                                 throw new Error(`target ${target?.constructor?.name} does not have method ${rpcApply.method}`);
                             value = await target[rpcApply.method](...args);
+
+                            if (target[Symbol.asyncIterator] && rpcApply.method === 'next') {
+                                if (value.done) {
+                                    const errorType: ErrorType = {
+                                        name: 'StopAsyncIteration',
+                                        message: undefined,
+                                    };
+                                    throw errorType;
+                                }
+                                else {
+                                    value = value.value;
+                                }
+                            }
                         }
                         else {
                             value = await target(...args);
@@ -663,12 +713,13 @@ export class RpcPeer {
                     break;
                 }
                 case 'result': {
+                    // console.log(message)
                     const rpcResult = message as RpcResult;
                     const deferred = this.pendingResults[rpcResult.id];
                     delete this.pendingResults[rpcResult.id];
                     if (!deferred)
                         throw new Error(`unknown result ${rpcResult.id}`);
-                    if (rpcResult.message || rpcResult.stack) {
+                    if ((rpcResult.message || rpcResult.stack) && !rpcResult.throw) {
                         const e = new RPCResultError(this, rpcResult.message || 'no message', undefined, {
                             name: rpcResult.result,
                             stack: rpcResult.stack,
