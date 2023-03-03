@@ -48,8 +48,18 @@ interface RpcApply extends RpcMessage {
 
 interface RpcResult extends RpcMessage {
     id: string;
+    // TODO 3/2/2023
+    // deprecate these properties from rpc protocol. treat error results like any other result
+    // and auto serialize them.
+    /**
+     * @deprecated
+     */
     stack?: string;
+    /**
+     * @deprecated
+     */
     message?: string;
+    throw?: boolean;
     result?: any;
 }
 
@@ -179,6 +189,12 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
     }
 }
 
+interface SerialiedRpcResultError {
+    name: string;
+    stack: string;
+    message: string;
+}
+
 // todo: error constructor adds a "cause" variable in Chrome 93, Node v??
 export class RPCResultError extends Error {
     constructor(peer: RpcPeer, message: string, public cause?: Error, options?: { name: string, stack: string | undefined }) {
@@ -188,7 +204,7 @@ export class RPCResultError extends Error {
             this.name = options?.name;
         }
         if (options?.stack) {
-            this.stack = `${peer.peerName}:${peer.selfName}\n${cause?.stack || options.stack}`;
+            this.stack = `${cause?.stack || options.stack}\n${peer.peerName}:${peer.selfName}`;
         }
     }
 }
@@ -301,6 +317,7 @@ export class RpcPeer {
         }
     }
 
+    static readonly RPC_RESULT_ERROR_NAME = 'RPCResultError';
     static readonly PROPERTY_PROXY_ID = '__proxy_id';
     static readonly PROPERTY_PROXY_ONEWAY_METHODS = '__proxy_oneway_methods';
     static readonly PROPERTY_JSON_DISABLE_SERIALIZATION = '__json_disable_serialization';
@@ -403,10 +420,16 @@ export class RpcPeer {
         return value;
     }
 
-    createErrorResult(result: RpcResult, e: any) {
-        result.stack = e.stack || 'no stack';
-        result.result = (e as Error).name || 'no name';
+    /**
+     * @deprecated
+     * @param result
+     * @param e
+     */
+    createErrorResult(result: RpcResult, e: Error) {
+        result.result = this.serializeError(e);
+        result.throw = true;
         result.message = (e as Error).message || 'no message';
+        result.stack = e.stack || 'no stack';
     }
 
     deserialize(value: any, deserializationContext: any): any {
@@ -423,6 +446,9 @@ export class RpcPeer {
         }
 
         const { __remote_proxy_id, __remote_proxy_finalizer_id, __local_proxy_id, __remote_constructor_name, __serialized_value, __remote_proxy_props, __remote_proxy_oneway_methods } = value;
+        if (__remote_constructor_name === RpcPeer.RPC_RESULT_ERROR_NAME)
+            return this.deserializeError(__serialized_value);
+
         if (__remote_proxy_id) {
             let proxy = this.remoteWeakProxies[__remote_proxy_id]?.deref();
             if (!proxy)
@@ -452,6 +478,28 @@ export class RpcPeer {
         return value;
     }
 
+    deserializeError(e: SerialiedRpcResultError): RPCResultError {
+        const { name, stack, message } = e;
+        return new RPCResultError(this, message, undefined, { name, stack });
+    }
+
+    serializeError(e: Error): RpcRemoteProxyValue {
+        const __serialized_value: SerialiedRpcResultError = {
+            stack: e.stack || '[no stack]',
+            name: e.name || '[no name]',
+            message: e.message || '[no message]',
+        }
+        return {
+            // probably not safe to use constructor.name
+            __remote_constructor_name: RpcPeer.RPC_RESULT_ERROR_NAME,
+            __remote_proxy_id: undefined,
+            __remote_proxy_finalizer_id: undefined,
+            __remote_proxy_oneway_methods: undefined,
+            __remote_proxy_props: undefined,
+            __serialized_value,
+        };
+    }
+
     serialize(value: any, serializationContext: any): any {
         if (value?.[RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN] === true) {
             const ret: any = {};
@@ -467,6 +515,9 @@ export class RpcPeer {
 
         let __remote_constructor_name = value.__proxy_constructor || value.constructor?.name?.toString();
         this.onSerialization.get(__remote_constructor_name)?.(value);
+
+        if (value instanceof Error)
+            return this.serializeError(value);
 
         let proxiedEntry = this.localProxied.get(value);
         if (proxiedEntry) {
@@ -625,7 +676,11 @@ export class RpcPeer {
                         deferred.reject(e);
                         return;
                     }
-                    deferred.resolve(this.deserialize(rpcResult.result, deserializationContext));
+                    const deserialized = this.deserialize(rpcResult.result, deserializationContext);
+                    if (rpcResult.throw)
+                        deferred.reject(deserialized);
+                    else
+                        deferred.resolve(deserialized);
                     break;
                 }
                 case 'finalize': {
