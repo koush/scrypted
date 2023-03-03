@@ -285,10 +285,6 @@ class AdoptDevice(TypedDict):
     settings: DeviceCreatorSettings
     pass
 
-class BufferConvertorOptions(TypedDict):
-    sourceId: str
-    pass
-
 class ColorHsv(TypedDict):
     h: float
     s: float
@@ -423,6 +419,7 @@ class LauncherApplicationInfo(TypedDict):
     pass
 
 class MediaObjectOptions(TypedDict):
+    metadata: Any
     sourceId: str
     pass
 
@@ -698,7 +695,7 @@ class Brightness:
 class BufferConverter:
     fromMimeType: str
     toMimeType: str
-    async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: BufferConvertorOptions = None) -> Any:
+    async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: MediaObjectOptions = None) -> Any:
         pass
     pass
 
@@ -782,7 +779,7 @@ class Entry:
     pass
 
 class EntrySensor:
-    entryOpen: bool
+    entryOpen: bool | Any
     pass
 
 class EventRecorder:
@@ -1559,10 +1556,10 @@ class DeviceState:
         self.setScryptedProperty("lockState", value)
 
     @property
-    def entryOpen(self) -> bool:
+    def entryOpen(self) -> bool | Any:
         return self.getScryptedProperty("entryOpen")
     @entryOpen.setter
-    def entryOpen(self, value: bool):
+    def entryOpen(self, value: bool | Any):
         self.setScryptedProperty("entryOpen", value)
 
     @property

@@ -827,7 +827,7 @@ export interface Entry {
 
 }
 export interface EntrySensor {
-  entryOpen?: boolean;
+  entryOpen?: boolean | 'jammed';
 }
 /**
  * DeviceManager is the interface used by DeviceProvider to report new devices, device states, and device events to Scrypted.
@@ -1054,16 +1054,12 @@ export interface Scriptable {
   eval(source: ScriptSource, variables?: { [name: string]: any }): Promise<any>;
 }
 
-export interface BufferConvertorOptions {
-  sourceId?: string;
-}
-
 /**
  * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type.
  * May optionally accept string urls if accept-url is a fromMimeType parameter.
  */
 export interface BufferConverter {
-  convert(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<MediaObject | Buffer | any>;
+  convert(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<MediaObject | Buffer | any>;
 
   fromMimeType?: string;
   toMimeType?: string;
@@ -1347,6 +1343,7 @@ export interface MediaObjectOptions {
    * The device id of the source of the MediaObject.
    */
   sourceId?: string;
+  metadata?: any;
 }
 
 /**
@@ -2088,4 +2085,11 @@ export interface ScryptedStatic {
    * @param options
    */
   connect?(socket: NodeNetSocket, options?: ConnectOptions): void;
+  /**
+   * Attempt to retrieve an IPC object by directly connecting to the plugin
+   * that owns the object. All operations on this object will bypass routing
+   * through the Scrypted Server which typically manages plugin communication.
+   * This is ideal for sending large amounts of data via IPC.
+   */
+  ipcObject?<T>(value: T): Promise<T>; 
 }
