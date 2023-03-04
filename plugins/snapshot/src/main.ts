@@ -2,7 +2,7 @@ import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
 import { createMapPromiseDebouncer, RefreshPromise, singletonPromise, TimeoutError } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, BufferConvertorOptions, Camera, FFmpegInput, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, MediaObjectOptions, Camera, FFmpegInput, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios, { AxiosInstance } from "axios";
 import https from 'https';
@@ -530,7 +530,7 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
             return this.console;
     }
 
-    async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<any> {
+    async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
         const mime = new MimeType(toMimeType);
 
         const ffmpegInput = JSON.parse(data.toString()) as FFmpegInput;
