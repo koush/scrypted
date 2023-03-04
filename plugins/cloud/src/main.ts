@@ -546,11 +546,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             'X-Forwarded-Proto': 'https',
         };
 
-        const handlerLog = throttle((req: http.IncomingMessage) => {
-            this.console.log('Cloud connection:', req.socket?.remoteAddress);
-        }, 10000)
         const handler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
-            handlerLog(req);
+            this.console.log('Cloud connection:', req.socket?.remoteAddress, req.url);
 
             const url = Url.parse(req.url);
             if (url.path.startsWith('/web/oauth/callback') && url.query) {
@@ -625,7 +622,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
         this.proxy.on('error', () => { });
         this.proxy.on('proxyRes', (res, req) => {
-            res.headers['X-Scrypted-Cloud'] = 'true';
+            res.headers['X-Scrypted-Cloud'] = req.headers['x-scrypted-cloud'];
             res.headers['X-Scrypted-Direct-Address'] = req.headers['x-scrypted-direct-address'];
             res.headers['Access-Control-Expose-Headers'] = 'X-Scrypted-Cloud, X-Scrypted-Direct-Address';
         });
