@@ -1,23 +1,23 @@
-import sdk, { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
+import sdk, { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios from 'axios';
 import bpmux from 'bpmux';
 import crypto from 'crypto';
 import { once } from 'events';
 import http from 'http';
-import https from 'https';
 import HttpProxy from 'http-proxy';
+import https from 'https';
+import throttle from "lodash/throttle";
 import upnp from 'nat-upnp';
-import net from 'net';
+import net, { AddressInfo } from 'net';
 import os from 'os';
 import path from 'path';
 import qs from 'query-string';
 import { Duplex } from 'stream';
+import tls from 'tls';
 import Url from 'url';
-import type { CORSControlLegacy } from '../../../server/src/services/cors';
 import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { PushManager } from './push';
-import tls from 'tls';
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -546,7 +546,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             'X-Forwarded-Proto': 'https',
         };
 
+        const handlerLog = throttle((req: http.IncomingMessage) => {
+            this.console.log('Cloud connection:', req.socket?.remoteAddress);
+        }, 10000)
         const handler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
+            handlerLog(req);
+
             const url = Url.parse(req.url);
             if (url.path.startsWith('/web/oauth/callback') && url.query) {
                 const query = qs.parse(url.query);
