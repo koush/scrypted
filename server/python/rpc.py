@@ -100,6 +100,7 @@ class RpcPeer:
         self.pendingResults: Mapping[str, Future] = {}
         self.remoteWeakProxies: Mapping[str, any] = {}
         self.nameDeserializerMap: Mapping[str, RpcSerializer] = {}
+        self.onProxySerialization: Callable[[Any, str], Any] = None
 
     def __apply__(self, proxyId: str, oneWayMethods: List[str], method: str, args: list):
         serializationContext: Dict = {}
@@ -165,7 +166,13 @@ class RpcPeer:
             '__serialized_value': serialized,
         }
     
-    def getProxyProperties(self, value):
+    def getProxyProperties(value):
+        return getattr(value, '__proxy_props', None)
+
+    def setProxyProperties(value, properties):
+        setattr(value, '__proxy_props', properties)
+
+    def prepareProxyProperties(value):
         if not hasattr(value, '__aiter__') or not hasattr(value, '__anext__'):
             return getattr(value, '__proxy_props', None)
 
@@ -195,7 +202,7 @@ class RpcPeer:
                 '__remote_proxy_id': proxiedEntry['id'],
                 '__remote_proxy_finalizer_id': proxiedEntry['finalizerId'],
                 '__remote_constructor_name': __remote_constructor_name,
-                '__remote_proxy_props': self.getProxyProperties(value),
+                '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
                 '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
             }
             return ret
@@ -218,7 +225,7 @@ class RpcPeer:
                 '__remote_proxy_id': None,
                 '__remote_proxy_finalizer_id': None,
                 '__remote_constructor_name': __remote_constructor_name,
-                '__remote_proxy_props': self.getProxyProperties(value),
+                '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
                 '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
                 '__serialized_value': serialized,
             }
@@ -233,11 +240,14 @@ class RpcPeer:
         self.localProxied[value] = proxiedEntry
         self.localProxyMap[proxyId] = value
 
+        if self.onProxySerialization:
+            self.onProxySerialization(value, proxyId)
+
         ret = {
             '__remote_proxy_id': proxyId,
             '__remote_proxy_finalizer_id': proxyId,
             '__remote_constructor_name': __remote_constructor_name,
-            '__remote_proxy_props': self.getProxyProperties(value),
+            '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
             '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
         }
 

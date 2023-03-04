@@ -2086,10 +2086,10 @@ export interface ScryptedStatic {
    */
   connect?(socket: NodeNetSocket, options?: ConnectOptions): void;
   /**
-   * Attempt to retrieve an IPC object by directly connecting to the plugin
-   * that owns the object. All operations on this object will bypass routing
+   * Attempt to retrieve an RPC object by directly connecting to the plugin
+   * that created the object. All operations on this object will bypass routing
    * through the Scrypted Server which typically manages plugin communication.
-   * This is ideal for sending large amounts of data via IPC.
+   * This is ideal for sending large amounts of data.
    */
-  ipcObject?<T>(value: T): Promise<T>; 
+  connectRPCObject?<T>(value: T): Promise<T>; 
 }

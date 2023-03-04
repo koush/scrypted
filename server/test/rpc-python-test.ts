@@ -3,8 +3,14 @@ import path from 'path';
 import type { Readable, Writable } from "stream";
 import { createDuplexRpcPeer } from '../src/rpc-serializer';
 import assert from 'assert';
+import net from 'net';
 
 async function main() {
+    const server = net.createServer(client => {
+        console.log('got client');
+        client.on('data', b => console.log('data', b.toString()));
+    });
+    server.listen(6666);
 
     const cp = child_process.spawn('python3', [path.join(__dirname, '../python/rpc-iterator-test.py')], {
         stdio: ['pipe', 'inherit', 'inherit', 'pipe', 'pipe'],

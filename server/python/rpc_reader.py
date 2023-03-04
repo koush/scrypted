@@ -36,38 +36,51 @@ class SidebandBufferSerializer(rpc.RpcSerializer):
         buffer = buffers.pop()
         return buffer
 
-async def readLoop(loop, peer: rpc.RpcPeer, reader):
+async def readLoop(loop, peer: rpc.RpcPeer, reader: asyncio.StreamReader):
     deserializationContext = {
         'buffers': []
     }
 
     while True:
-        try:
-            lengthBytes = await reader.read(4)
-            typeBytes = await reader.read(1)
-            type = typeBytes[0]
-            length = int.from_bytes(lengthBytes, 'big')
-            data = await reader.read(length - 1)
+        lengthBytes = await reader.read(4)
+        typeBytes = await reader.read(1)
+        type = typeBytes[0]
+        length = int.from_bytes(lengthBytes, 'big')
+        data = await reader.read(length - 1)
 
-            if type == 1:
-                deserializationContext['buffers'].append(data)
-                continue
+        if type == 1:
+            deserializationContext['buffers'].append(data)
+            continue
 
-            message = json.loads(data)
-            asyncio.run_coroutine_threadsafe(
-                peer.handleMessage(message, deserializationContext), loop)
+        message = json.loads(data)
+        asyncio.run_coroutine_threadsafe(
+            peer.handleMessage(message, deserializationContext), loop)
 
-            deserializationContext = {
-                'buffers': []
-            }
-        except Exception as e:
-            print('read loop error: ' + peer.peerName, e)
-            sys.exit()
+        deserializationContext = {
+            'buffers': []
+        }
 
-async def prepare_peer_readloop(loop: AbstractEventLoop, readFd: int, writeFd: int):
-    reader = await aiofiles.open(readFd, mode='rb')
+async def prepare_peer_readloop(loop: AbstractEventLoop, readFd: int = None, writeFd: int = None, reader: asyncio.StreamReader = None, writer: asyncio.StreamWriter = None):
+    reader = reader or await aiofiles.open(readFd, mode='rb')
 
     mutex = threading.Lock()
+
+    if writer:
+        def write(buffers, reject):
+            try:
+                for b in buffers:
+                    writer.write(b)
+            except Exception as e:
+                if reject:
+                    reject(e)
+    else:
+        def write(buffers, reject):
+            try:
+                for b in buffers:
+                    os.write(writeFd, b)
+            except Exception as e:
+                if reject:
+                    reject(e)
 
     def send(message, reject=None, serializationContext=None):
         with mutex:
@@ -78,27 +91,14 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, readFd: int, writeFd: i
                         length = len(buffer) + 1
                         lb = length.to_bytes(4, 'big')
                         type = 1
-                        try:
-                            os.write(writeFd, lb)
-                            os.write(writeFd, bytes([type]))
-                            os.write(writeFd, buffer)
-                        except Exception as e:
-                            if reject:
-                                reject(e)
-                            return
+                        write([lb, bytes([type]), buffer], reject)
 
             jsonString = json.dumps(message)
             b = bytes(jsonString, 'utf8')
             length = len(b) + 1
             lb = length.to_bytes(4, 'big')
             type = 0
-            try:
-                os.write(writeFd, lb)
-                os.write(writeFd, bytes([type]))
-                os.write(writeFd, b)
-            except Exception as e:
-                if reject:
-                    reject(e)
+            write([lb, bytes([type]), b], reject)
 
     peer = rpc.RpcPeer(send)
     peer.nameDeserializerMap['Buffer'] = SidebandBufferSerializer()

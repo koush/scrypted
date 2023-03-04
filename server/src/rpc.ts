@@ -347,10 +347,15 @@ export class RpcPeer {
         value[RpcPeer.PROPERTY_PROXY_PROPERTIES] = properties;
     }
 
-    static getProxyProperies(value: any) {
+    static getProxyProperties(value: any) {
+        return value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES];
+    }
+
+    static prepareProxyProperties(value: any) {
+        let props = value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES];
         if (!value[Symbol.asyncIterator])
-            return value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES];
-        const props = value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES] || {};
+            return props;
+        props ||= {};
         props[Symbol.asyncIterator.toString()] = {
             next: 'next',
             throw: 'throw',
@@ -568,7 +573,7 @@ export class RpcPeer {
                 __remote_proxy_id: proxiedEntry.id,
                 __remote_proxy_finalizer_id,
                 __remote_constructor_name,
-                __remote_proxy_props: RpcPeer.getProxyProperies(value),
+                __remote_proxy_props: RpcPeer.prepareProxyProperties(value),
                 __remote_proxy_oneway_methods: value?.[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS],
             }
             return ret;
@@ -595,7 +600,7 @@ export class RpcPeer {
                 __remote_proxy_id: undefined,
                 __remote_proxy_finalizer_id: undefined,
                 __remote_constructor_name,
-                __remote_proxy_props: RpcPeer.getProxyProperies(value),
+                __remote_proxy_props: RpcPeer.prepareProxyProperties(value),
                 __remote_proxy_oneway_methods: value?.[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS],
                 __serialized_value: serialized,
             }
@@ -616,7 +621,7 @@ export class RpcPeer {
             __remote_proxy_id,
             __remote_proxy_finalizer_id: __remote_proxy_id,
             __remote_constructor_name,
-            __remote_proxy_props: RpcPeer.getProxyProperies(value),
+            __remote_proxy_props: RpcPeer.prepareProxyProperties(value),
             __remote_proxy_oneway_methods: value?.[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS],
         }
 

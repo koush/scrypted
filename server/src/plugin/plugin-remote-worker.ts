@@ -17,6 +17,7 @@ import { attachPluginRemote, DeviceManagerImpl, PluginReader, setupPluginRemote 
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
+import crypto from 'crypto';
 const { link } = require('linkfs');
 
 const serverVersion = require('../../package.json').version;
@@ -79,13 +80,11 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
         async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions: PluginRemoteLoadZipOptions) {
             const { clusterId, clusterSecret } = zipOptions;
             const clusterRpcServer = net.createServer(client => {
-                console.error('connecting', peer.selfName)
                 const clusterPeer = createDuplexRpcPeer(peer.selfName, 'cluster-client', client, client);
-                clusterPeer.params['ipcObject'] = async (id: string, secret: string) => {
-                    if (secret !== clusterSecret)
+                const portSecret = crypto.createHash('sha256').update(`${clusterPort}${clusterSecret}`).digest().toString('hex');
+                clusterPeer.params['connectRPCObject'] = async (id: string, secret: string) => {
+                    if (secret !== portSecret)
                         throw new Error('secret incorrect');
-                    // console.error('lmap', peer.localProxyMap)
-                    // console.error('rmap', peer.remoteWeakProxies)
                     return peer.localProxyMap[id];
                 }
                 client.on('close', () => clusterPeer.kill('cluster socket closed'));
@@ -97,20 +96,21 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             };
 
             peer.onProxySerialization = (value, proxyId) => {
-                const properties = RpcPeer.getProxyProperies(value);
-                if (!properties?.__cluster)
+                const properties = RpcPeer.getProxyProperties(value);
+                if (!properties?.__cluster) {
                     RpcPeer.setProxyProperties(value, Object.assign(properties || {}, {
                         __cluster: {
                             ...clusterEntry,
                             proxyId,
                         }
                     }));
+                }
             }
 
             const clusterPeers = new Map<number, Promise<RpcPeer>>();
-            scrypted.ipcObject = async (value: any) => {
+            scrypted.connectRPCObject = async (value: any) => {
                 const clusterObject = value?.__cluster;
-                if (clusterObject?.id !== zipOptions.clusterId)
+                if (clusterObject?.id !== clusterId)
                     return value;
                 const { port, proxyId } = clusterObject;
 
@@ -135,8 +135,9 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
 
                 try {
                     const clusterPeer = await clusterPeerPromise;
-                    const ipcObject = await clusterPeer.getParam('ipcObject');
-                    const newValue = await ipcObject(proxyId, clusterSecret);
+                    const connectRPCObject = await clusterPeer.getParam('connectRPCObject');
+                    const portSecret = crypto.createHash('sha256').update(`${port}${clusterSecret}`).digest().toString('hex');
+                    const newValue = await connectRPCObject(proxyId, portSecret);
                     if (!newValue)
                         throw new Error('ipc object not found?');
                     return newValue;

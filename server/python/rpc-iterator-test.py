@@ -6,6 +6,11 @@ async def main():
     peer, peerReadLoop = await prepare_peer_readloop(loop, 4, 3)
     peer.params['foo'] = 3
 
+    reader, writer = await asyncio.open_connection(
+        '127.0.0.1', 6666)
+    
+    writer.write(bytes('abcd', 'utf8'))
+
     async def ticker(delay, to):
         for i in range(to):
             # print(i)

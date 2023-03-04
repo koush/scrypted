@@ -27,6 +27,7 @@ import rpc
 import rpc_reader
 import multiprocessing
 import multiprocessing.connection
+import hashlib
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
@@ -210,7 +211,8 @@ class PluginRemote:
     loop: AbstractEventLoop
     consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
 
-    def __init__(self, api, pluginId, hostInfo, loop: AbstractEventLoop):
+    def __init__(self, peer: rpc.RpcPeer, api, pluginId, hostInfo, loop: AbstractEventLoop):
+        self.peer = peer
         self.api = api
         self.pluginId = pluginId
         self.hostInfo = hostInfo
@@ -255,6 +257,87 @@ class PluginRemote:
             nativeId, *values, sep=sep, end=end, flush=flush), self.loop)
 
     async def loadZip(self, packageJson, zipData, options: dict=None):
+        sdk = ScryptedStatic()
+
+        clusterId = options['clusterId']
+        clusterSecret = options['clusterSecret']
+
+        async def handleClusterClient(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+            peer: rpc.RpcPeer
+            peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, reader = reader, writer = writer)
+            async def connectRPCObject(id: str, secret: str):
+                m = hashlib.sha256()
+                m.update(bytes('%s%s' % (clusterPort, clusterSecret), 'utf8'))
+                portSecret = m.hexdigest()
+                if secret != portSecret:
+                    raise Exception('secret incorrect')
+                return self.peer.localProxyMap.get(id, None)
+
+            peer.params['connectRPCObject'] = connectRPCObject
+            try:
+                await peerReadLoop()
+            except:
+                writer.close()
+
+        clusterRpcServer = await asyncio.start_server(handleClusterClient, '127.0.0.1')
+        clusterPort = clusterRpcServer.sockets[0].getsockname()[1]
+
+        clusterPeers: Mapping[int, asyncio.Future[rpc.RpcPeer]] = {}
+        async def connectRPCObject(value):
+            clusterObject = getattr(value, '__cluster')
+            if not clusterObject:
+                return value
+
+            if clusterObject.get('id', None) != clusterId:
+                return value
+            
+            port = clusterObject['port']
+            proxyId = clusterObject['proxyId']
+
+            clusterPeerPromise = clusterPeers.get(port)
+            if not clusterPeerPromise:
+                async def connectClusterPeer():
+                    reader, writer = await asyncio.open_connection(
+                        '127.0.0.1', port)
+                    peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, reader = reader, writer = writer)
+                    async def run_loop():
+                        try:
+                            await peerReadLoop()
+                        except:
+                            clusterPeers.pop(port)
+                    asyncio.run_coroutine_threadsafe(run_loop(), self.loop)
+                    return peer
+                clusterPeerPromise = self.loop.create_task(connectClusterPeer())
+                clusterPeers[port] = clusterPeerPromise
+
+            try:
+                clusterPeer = await clusterPeerPromise
+                c = await clusterPeer.getParam('connectRPCObject')
+                m = hashlib.sha256()
+                m.update(bytes('%s%s' % (port, clusterSecret), 'utf8'))
+                portSecret = m.hexdigest()
+                newValue = await c(proxyId, portSecret)
+                if not newValue:
+                    raise Exception('ipc object not found?')
+                return newValue
+            except Exception as e:
+                return value
+
+        sdk.connectRPCObject = connectRPCObject
+
+        def onProxySerialization(value: Any, proxyId: str):
+            properties: dict = rpc.RpcPeer.getProxyProperties(value)
+            if not properties or not properties.get('__cluster', None):
+                properties = properties or {}
+                properties['__cluster'] = {
+                    'clusterId': clusterId,
+                    'proxyId': proxyId,
+                    'port': clusterPort,
+                }
+                rpc.RpcPeer.setProxyProperties(value, properties)
+
+        self.peer.onProxySerialization = onProxySerialization
+
         forkMain = options and options.get('fork')
 
         if not forkMain:
@@ -352,7 +435,6 @@ class PluginRemote:
         try:
             from scrypted_sdk import sdk_init2  # type: ignore
 
-            sdk = ScryptedStatic()
             sdk.systemManager = self.systemManager
             sdk.deviceManager = self.deviceManager
             sdk.mediaManager = self.mediaManager
@@ -367,10 +449,10 @@ class PluginRemote:
                 pluginFork.worker.start()
                 async def getFork():
                     fd = os.dup(parent_conn.fileno())
-                    peer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, fd, fd)
-                    peer.peerName = 'thread'
+                    forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, fd, fd)
+                    forkPeer.peerName = 'thread'
                     asyncio.run_coroutine_threadsafe(readLoop(), loop=self.loop)
-                    getRemote = await peer.getParam('getRemote')
+                    getRemote = await forkPeer.getParam('getRemote')
                     remote: PluginRemote = await getRemote(self.api, self.pluginId, self.hostInfo)
                     await remote.setSystemState(self.systemManager.getSystemState())
                     for nativeId, ds in self.nativeIds.items():
@@ -379,12 +461,12 @@ class PluginRemote:
                     forkOptions['fork'] = True
                     forkOptions['filename'] = zipPath
                     return await remote.loadZip(packageJson, zipData, forkOptions)
-                    
 
                 pluginFork.result = asyncio.create_task(getFork())
                 return pluginFork
 
             sdk.fork = host_fork
+            # sdk.
 
             sdk_init2(sdk)
         except:
@@ -457,8 +539,7 @@ class PluginRemote:
 async def plugin_async_main(loop: AbstractEventLoop, readFd: int, writeFd: int):
     peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, readFd, writeFd)
     peer.params['print'] = print
-    peer.params['getRemote'] = lambda api, pluginId, hostInfo: PluginRemote(
-        api, pluginId, hostInfo, loop)
+    peer.params['getRemote'] = lambda api, pluginId, hostInfo: PluginRemote(peer, api, pluginId, hostInfo, loop)
 
     async def get_update_stats():
         update_stats = await peer.getParam('updateStats')
