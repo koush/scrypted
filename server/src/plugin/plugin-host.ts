@@ -242,6 +242,8 @@ export class PluginHost {
             try {
                 const isPython = runtime === 'python';
                 const loadZipOptions: PluginRemoteLoadZipOptions = {
+                    clusterId: scrypted.clusterId,
+                    clusterSecret: scrypted.clusterSecret,
                     // if debugging, use a normalized path for sourcemap resolution, otherwise
                     // prefix with module path.
                     filename: isPython

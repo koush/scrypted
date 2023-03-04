@@ -61,7 +61,7 @@ export function getConsole(hook: (stdout: PassThrough, stderr: PassThrough) => P
     return ret;
 }
 
-export function prepareConsoles(consoleName: string, systemManager: () => SystemManager, deviceManager: () => DeviceManager, getPlugins: () => Promise<any>) {
+export function prepareConsoles(getConsoleName: () => string, systemManager: () => SystemManager, deviceManager: () => DeviceManager, getPlugins: () => Promise<any>) {
     const deviceConsoles = new Map<string, Console>();
     function getDeviceConsole (nativeId?: ScryptedNativeId) {
         // the the plugin console is simply the default console
@@ -76,7 +76,7 @@ export function prepareConsoles(consoleName: string, systemManager: () => System
         ret = getConsole(async (stdout, stderr) => {
             const connect = async () => {
                 const plugins = await getPlugins();
-                const port = await plugins.getRemoteServicePort(consoleName, 'console-writer');
+                const port = await plugins.getRemoteServicePort(getConsoleName(), 'console-writer');
                 const socket = net.connect(port);
                 socket.write(nativeId + '\n');
                 const writer = (data: Buffer) => {

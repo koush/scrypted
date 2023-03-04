@@ -452,7 +452,7 @@ export interface PluginRemoteAttachOptions {
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
-    onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) => Promise<any>;
+    onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions: PluginRemoteLoadZipOptions) => Promise<any>;
     onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<void>;
 }
 

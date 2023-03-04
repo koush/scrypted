@@ -298,7 +298,8 @@ export class RpcPeer {
     // @ts-ignore
     finalizers = new FinalizationRegistry(entry => this.finalize(entry as LocalProxiedEntry));
     nameDeserializerMap = new Map<string, RpcSerializer>();
-    onSerialization = new Map<string, (value: any) => void>();
+    onProxyTypeSerialization = new Map<string, (value: any) => void>();
+    onProxySerialization: (value: any, proxyId: string) => void;
     constructorSerializerMap = new Map<any, string>();
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
     killed: Promise<string>;
@@ -340,6 +341,10 @@ export class RpcPeer {
                 return thiz.toPrimitive();
             }
         }
+    }
+
+    static setProxyProperties(value: any, properties: any) {
+        value[RpcPeer.PROPERTY_PROXY_PROPERTIES] = properties;
     }
 
     static getProxyProperies(value: any) {
@@ -551,7 +556,6 @@ export class RpcPeer {
         }
 
         let __remote_constructor_name = value.__proxy_constructor || value.constructor?.name?.toString();
-        this.onSerialization.get(__remote_constructor_name)?.(value);
 
         if (value instanceof Error)
             return this.serializeError(value);
@@ -578,6 +582,8 @@ export class RpcPeer {
             return ret;
         }
 
+        this.onProxyTypeSerialization.get(__remote_constructor_name)?.(value);
+
         const serializerMapName = this.constructorSerializerMap.get(value.constructor);
         if (serializerMapName) {
             __remote_constructor_name = serializerMapName;
@@ -603,6 +609,8 @@ export class RpcPeer {
         };
         this.localProxied.set(value, proxiedEntry);
         this.localProxyMap[__remote_proxy_id] = value;
+
+        this.onProxySerialization?.(value, __remote_proxy_id);
 
         const ret: RpcRemoteProxyValue = {
             __remote_proxy_id,

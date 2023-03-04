@@ -1,10 +1,14 @@
 import { ScryptedStatic, SystemManager } from '@scrypted/types';
 import AdmZip from 'adm-zip';
+import { once } from 'events';
 import fs from 'fs';
 import { Volume } from 'memfs';
+import net from 'net';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
+import { listenZero } from '../listen-zero';
 import { RpcMessage, RpcPeer } from '../rpc';
+import { createDuplexRpcPeer } from '../rpc-serializer';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { prepareConsoles } from './plugin-console';
@@ -32,7 +36,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
         return pluginsPromise;
     }
 
-    const { getDeviceConsole, getMixinConsole } = prepareConsoles(peer.selfName, () => systemManager, () => deviceManager, getPlugins);
+    const { getDeviceConsole, getMixinConsole } = prepareConsoles(() => peer.selfName, () => systemManager, () => deviceManager, getPlugins);
 
     // process.cpuUsage is for the entire process.
     // process.memoryUsage is per thread.
@@ -72,7 +76,77 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             }
             throw new Error(`unknown service ${name}`);
         },
-        async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) {
+        async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions: PluginRemoteLoadZipOptions) {
+            const { clusterId, clusterSecret } = zipOptions;
+            const clusterRpcServer = net.createServer(client => {
+                console.error('connecting', peer.selfName)
+                const clusterPeer = createDuplexRpcPeer(peer.selfName, 'cluster-client', client, client);
+                clusterPeer.params['ipcObject'] = async (id: string, secret: string) => {
+                    if (secret !== clusterSecret)
+                        throw new Error('secret incorrect');
+                    // console.error('lmap', peer.localProxyMap)
+                    // console.error('rmap', peer.remoteWeakProxies)
+                    return peer.localProxyMap[id];
+                }
+                client.on('close', () => clusterPeer.kill('cluster socket closed'));
+            })
+            const clusterPort = await listenZero(clusterRpcServer);
+            const clusterEntry = {
+                id: clusterId,
+                port: clusterPort,
+            };
+
+            peer.onProxySerialization = (value, proxyId) => {
+                const properties = RpcPeer.getProxyProperies(value);
+                if (!properties?.__cluster)
+                    RpcPeer.setProxyProperties(value, Object.assign(properties || {}, {
+                        __cluster: {
+                            ...clusterEntry,
+                            proxyId,
+                        }
+                    }));
+            }
+
+            const clusterPeers = new Map<number, Promise<RpcPeer>>();
+            scrypted.ipcObject = async (value: any) => {
+                const clusterObject = value?.__cluster;
+                if (clusterObject?.id !== zipOptions.clusterId)
+                    return value;
+                const { port, proxyId } = clusterObject;
+
+                let clusterPeerPromise = clusterPeers.get(port);
+                if (!clusterPeerPromise) {
+                    clusterPeerPromise = (async () => {
+                        const socket = net.connect(port);
+                        socket.on('close', () => clusterPeers.delete(port));
+
+                        try {
+                            await once(socket, 'connect');
+                            const ret = createDuplexRpcPeer(peer.selfName, 'cluster-server', socket, socket);
+                            return ret;
+                        }
+                        catch (e) {
+                            console.error('failure ipc connect', e);
+                            socket.destroy();
+                            throw e;
+                        }
+                    })();
+                }
+
+                try {
+                    const clusterPeer = await clusterPeerPromise;
+                    const ipcObject = await clusterPeer.getParam('ipcObject');
+                    const newValue = await ipcObject(proxyId, clusterSecret);
+                    if (!newValue)
+                        throw new Error('ipc object not found?');
+                    return newValue;
+                }
+                catch (e) {
+                    console.error('failure ipc', e);
+                    return value;
+                }
+            }
+
             let volume: any;
             let pluginReader: PluginReader;
             if (zipOptions?.unzippedPath && fs.existsSync(zipOptions?.unzippedPath)) {

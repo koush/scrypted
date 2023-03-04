@@ -39,6 +39,7 @@ import { PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
+import crypto from 'crypto';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -54,6 +55,8 @@ interface HttpPluginData {
 }
 
 export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
+    clusterId = crypto.randomBytes(3).toString('hex');
+    clusterSecret = crypto.randomBytes(16).toString('hex');
     datastore: Level;
     plugins: { [id: string]: PluginHost } = {};
     pluginDevices: { [id: string]: PluginDevice } = {};
