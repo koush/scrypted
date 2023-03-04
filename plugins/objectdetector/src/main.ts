@@ -7,7 +7,7 @@ import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } from './denoise';
 import { serverSupportsMixinEventMasking } from './server-version';
 import { sleep } from './sleep';
-import { safeParseJson } from './util';
+import { getAllDevices, safeParseJson } from './util';
 
 const polygonOverlap = require('polygon-overlap');
 const insidePolygon = require('point-inside-polygon');
@@ -72,6 +72,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       title: 'Object Tracker',
       type: 'device',
       deviceFilter: `interfaces.includes('${ScryptedInterface.ObjectTracker}')`,
+      defaultValue: getAllDevices().find(d => d.interfaces?.includes(ScryptedInterface.ObjectTracker))?.id,
     },
     detectionDuration: {
       title: 'Detection Duration',
