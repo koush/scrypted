@@ -1,21 +1,22 @@
-import { defaultPeerConfig, MediaStreamTrack, PeerConfig, RTCPeerConnection } from './werift';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { BufferConverter, BufferConvertorOptions, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
+import ip from 'ip';
 import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
-import { createRTCPeerConnectionSink, createTrackForwarder, parseOptions, RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement } from "./ffmpeg-to-wrtc";
+import { createRTCPeerConnectionSink, createTrackForwarder, RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement } from "./ffmpeg-to-wrtc";
 import { stunServer, turnServer, weriftStunServer, weriftTurnServer } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
+import { defaultPeerConfig, InterfaceAddresses, MediaStreamTrack, PeerConfig, RTCPeerConnection } from './werift';
+import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 import { createZygote } from './zygote';
-import { WeriftSignalingSession } from './werift-signaling-session';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -63,7 +64,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
                 media,
                 this.plugin.storageSettings.values.maximumCompatibilityMode,
                 this.plugin.getRTCConfiguration(),
-                this.plugin.getWeriftConfiguration(),
+                await this.plugin.getWeriftConfiguration(),
             );
             return;
         }
@@ -135,7 +136,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
             mo,
             this.plugin.storageSettings.values.maximumCompatibilityMode,
             this.plugin.getRTCConfiguration(),
-            this.plugin.getWeriftConfiguration(),
+            await this.plugin.getWeriftConfiguration(),
         );
     }
 
@@ -188,6 +189,16 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             description: 'Enables maximum compatibility with WebRTC clients by using the most conservative transcode options.',
             defaultValue: false,
             type: 'boolean',
+        },
+        iceInterfaceAddresses: {
+            title: 'ICE Interface Addresses',
+            description: 'The ICE interface addresses to bind and share with the peer.',
+            choices: [
+                'Default',
+                'Scrypted Server Address',
+                'All Addresses',
+            ],
+            defaultValue: 'Default',
         },
         useTurnServer: {
             title: 'Use TURN Servers',
@@ -251,7 +262,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return this.storageSettings.putSetting(key, value);
     }
 
-    async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<RTCSignalingChannel> {
+    async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<RTCSignalingChannel> {
         const plugin = this;
 
         const console = deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
@@ -267,7 +278,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                         mo,
                         plugin.storageSettings.values.maximumCompatibilityMode,
                         plugin.getRTCConfiguration(),
-                        plugin.getWeriftConfiguration(),
+                        await plugin.getWeriftConfiguration(),
                     );
                 }
             }
@@ -284,7 +295,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                         mo,
                         plugin.storageSettings.values.maximumCompatibilityMode,
                         plugin.getRTCConfiguration(),
-                        plugin.getWeriftConfiguration(),
+                        await plugin.getWeriftConfiguration(),
                     );
                 }
             }
@@ -408,7 +419,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         };
     }
 
-    getWeriftConfiguration(): Partial<PeerConfig> {
+    async getWeriftConfiguration(): Promise<Partial<PeerConfig>> {
         let ret: Partial<PeerConfig>;
         if (this.storageSettings.values.weriftConfiguration) {
             try {
@@ -423,9 +434,28 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             ? [weriftStunServer, weriftTurnServer]
             : [weriftStunServer];
 
+        let iceInterfaceAddresses: InterfaceAddresses;
+        if (this.storageSettings.values.iceInterfaceAddresses !== 'All Addresses') {
+            try {
+                for (const address of await sdk.endpointManager.getLocalAddresses()) {
+                    if (ip.isV4Format(address)) {
+                        iceInterfaceAddresses ||= {};
+                        iceInterfaceAddresses.udp4 = address;
+                    }
+                    else if (ip.isV6Format(address)) {
+                        iceInterfaceAddresses ||= {};
+                        iceInterfaceAddresses.udp6 = address;
+                    }
+                }
+            }
+            catch (e) {
+            }
+        }
+
         return {
             iceUseIpv6: false,
             iceServers,
+            iceInterfaceAddresses,
             ...ret,
         };
     }
@@ -498,7 +528,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const connection = await createConnection(message, client.port, session,
                 this.storageSettings.values.maximumCompatibilityMode, clientOptions, {
                 configuration: this.getRTCConfiguration(),
-                weriftConfiguration: this.getWeriftConfiguration(),
+                weriftConfiguration: await this.getWeriftConfiguration(),
             });
             cleanup.promise.finally(() => connection.close().catch(() => { }));
             connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
@@ -578,7 +608,7 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
         this.toMimeType = ScryptedMimeTypes.RTCConnectionManagement;
     }
 
-    async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<any> {
+    async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
         const session = data as RTCSignalingSession;
         const maximumCompatibilityMode = !!this.plugin.storageSettings.values.maximumCompatibilityMode;
         const clientOptions = await session.getOptions();
@@ -602,7 +632,7 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
             clientOptions,
             {
                 configuration: this.plugin.getRTCConfiguration(),
-                weriftConfiguration: this.plugin.getWeriftConfiguration(),
+                weriftConfiguration: await this.plugin.getWeriftConfiguration(),
             }
         );
         cleanup.promise.finally(() => connection.close().catch(() => { }));
