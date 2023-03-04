@@ -56,6 +56,8 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             pythonPath ||= 'python3';
         }
 
+        args.push(pluginId);
+
         this.worker = child_process.spawn(pythonPath, args, {
             // stdin, stdout, stderr, peer in, peer out
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
