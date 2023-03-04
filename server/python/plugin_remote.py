@@ -279,7 +279,7 @@ class PluginRemote:
             except:
                 writer.close()
 
-        clusterRpcServer = await asyncio.start_server(handleClusterClient, '127.0.0.1')
+        clusterRpcServer = await asyncio.start_server(handleClusterClient, '127.0.0.1', 0)
         clusterPort = clusterRpcServer.sockets[0].getsockname()[1]
 
         clusterPeers: Mapping[int, asyncio.Future[rpc.RpcPeer]] = {}
@@ -330,7 +330,7 @@ class PluginRemote:
             if not properties or not properties.get('__cluster', None):
                 properties = properties or {}
                 properties['__cluster'] = {
-                    'clusterId': clusterId,
+                    'id': clusterId,
                     'proxyId': proxyId,
                     'port': clusterPort,
                 }
