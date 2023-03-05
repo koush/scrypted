@@ -428,6 +428,8 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             ...options.weriftConfiguration,
         });
         logConnectionState(console, this.pc);
+        waitConnected(this.pc)
+            .then(() => logIsPrivateIceTransport(this.console, this.pc)).catch(() => {});
 
         this.pc.signalingStateChange.subscribe(() => {
             this.console.log('sig change', this.pc.signalingState);
