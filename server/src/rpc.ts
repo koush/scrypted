@@ -159,13 +159,18 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
     }
 
     apply(target: any, thisArg: any, argArray?: any): any {
-        if (Object.isFrozen(this.peer.pendingResults))
-            return Promise.reject(new RPCResultError(this.peer, 'RpcPeer has been killed'));
+        const method = target() || null;
+        const oneway = this.proxyOneWayMethods?.includes?.(method);
+
+        if (Object.isFrozen(this.peer.pendingResults)) {
+            if (oneway)
+                return Promise.resolve();
+            return Promise.reject(new RPCResultError(this.peer, 'RpcPeer has been killed (apply) ' + target()));
+        }
 
         // rpc objects can be functions. if the function is a oneway method,
         // it will have a null in the oneway method list. this is because
         // undefined is not JSON serializable.
-        const method = target() || null;
         const args: any[] = [];
         const serializationContext: any = {};
         for (const arg of (argArray || [])) {
@@ -180,7 +185,7 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
             method,
         };
 
-        if (this.proxyOneWayMethods?.includes?.(method)) {
+        if (oneway) {
             rpcApply.oneway = true;
             // a oneway callable object doesn't need to be in the JSON payload.
             if (method === null)
@@ -390,7 +395,7 @@ export class RpcPeer {
 
     createPendingResult(cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
         if (Object.isFrozen(this.pendingResults))
-            return Promise.reject(new RPCResultError(this, 'RpcPeer has been killed'));
+            return Promise.reject(new RPCResultError(this, 'RpcPeer has been killed (createPendingResult)'));
 
         const promise = new Promise((resolve, reject) => {
             const id = (this.idCounter++).toString();
