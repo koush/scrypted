@@ -2,14 +2,15 @@ import type { TranspileOptions } from "typescript";
 import sdk, { ScryptedDeviceBase, MixinDeviceBase, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
 import vm from "vm";
 import fs from 'fs';
-import { newThread } from '@scrypted/server/src/threading';
 import { ScriptDevice } from "./monaco/script-device";
 import { ScryptedInterfaceDescriptors } from "@scrypted/sdk";
 import fetch from 'node-fetch-commonjs';
+import { PluginAPIProxy } from '../../../server/src/plugin/plugin-api';
+import { SystemManagerImpl } from '../../../server/src/plugin/system';
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
-function tsCompile(source: string, options: TranspileOptions = null): string {
+export async function tsCompile(source: string, options: TranspileOptions = null): Promise<string> {
     const ts = require("typescript");
     const { ScriptTarget } = ts;
 
@@ -23,27 +24,6 @@ function tsCompile(source: string, options: TranspileOptions = null): string {
         };
     }
     return ts.transpileModule(source, options).outputText;
-}
-
-async function tsCompileThread(source: string, options: TranspileOptions = null): Promise<string> {
-    return newThread({
-        source, options,
-        customRequire: '__webpack_require__',
-    }, ({ source, options }) => {
-        const ts = global.require("typescript");
-        const { ScriptTarget } = ts;
-
-        // Default options -- you could also perform a merge, or use the project tsconfig.json
-        if (null === options) {
-            options = {
-                compilerOptions: {
-                    target: ScriptTarget.ESNext,
-                    module: ts.ModuleKind.CommonJS
-                }
-            };
-        }
-        return ts.transpileModule(source, options).outputText;
-    });
 }
 
 function getTypeDefs() {
@@ -61,14 +41,27 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
     }, extraLibs);
     const allScripts = Object.values(libs).join('\n').toString() + script;
     let compiled: string;
+    const worker = sdk.fork<{
+        tsCompile: typeof tsCompile,
+    }>();
+    worker.worker.on('error', () => { })
     try {
-        compiled = await tsCompileThread(allScripts);
+        const result = await worker.result;
+        compiled = await result.tsCompile(allScripts);
     }
     catch (e) {
         device.log.e('Error compiling typescript.');
         device.console.error(e);
         throw e;
     }
+    finally {
+        worker.worker.terminate();
+    }
+
+    const smProxy = new SystemManagerImpl();
+    smProxy.state = systemManager.getSystemState();
+    const apiProxy = new PluginAPIProxy(sdk.pluginHostAPI);
+    smProxy.api = apiProxy;
 
     const allParams = Object.assign({}, params, {
         sdk,
@@ -76,7 +69,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         fetch,
         ScryptedDeviceBase,
         MixinDeviceBase,
-        systemManager,
+        systemManager: smProxy,
         deviceManager,
         endpointManager,
         mediaManager,
@@ -111,6 +104,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         return {
             value,
             defaultExport,
+            apiProxy,
         };
     }
     catch (e) {
