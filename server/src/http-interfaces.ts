@@ -61,7 +61,11 @@ export function createResponseInterface(res: Response, unzippedDir: string, file
                     }
                 }
             }
-            res.sendFile(filePath);
+
+            // prefer etag
+            res.sendFile(filePath, {
+                cacheControl: false,
+            });
         }
 
         sendSocket(socket: net.Socket, options: HttpResponseOptions) {
