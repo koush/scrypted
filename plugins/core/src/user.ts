@@ -3,7 +3,7 @@ import { addAccessControlsForInterface } from "@scrypted/sdk/acl";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 export const UsersNativeId = 'users';
 
-type DBUser = { username: string, aclId: string };
+type DBUser = { username: string, admin: boolean };
 
 export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
     storageSettings = new StorageSettings(this, {
@@ -79,7 +79,19 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
         const user = users.find(user => user.username === this.username);
         if (!user)
             return;
-        await usersService.addUser(user.username, value.toString(), user.aclId);
+        const { username, admin } = user;
+        const nativeId = `user:${username}`;
+        const aclId = await sdk.deviceManager.onDeviceDiscovered({
+            providerNativeId: this.nativeId,
+            name: username.toString(),
+            nativeId,
+            interfaces: [
+                ScryptedInterface.ScryptedUser,
+                ScryptedInterface.Settings,
+            ],
+            type: ScryptedDeviceType.Person,
+        })
+        await usersService.addUser(user.username, value.toString(), admin ? undefined : aclId);
     }
 }
 
