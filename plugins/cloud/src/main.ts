@@ -547,7 +547,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         };
 
         const handler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
-            this.console.log('Cloud connection:', req.socket?.remoteAddress, req.url);
+            this.console.log(req.socket?.remoteAddress, req.url);
 
             const url = Url.parse(req.url);
             if (url.path.startsWith('/web/oauth/callback') && url.query) {
