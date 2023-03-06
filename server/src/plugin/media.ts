@@ -9,15 +9,22 @@ import Graph from 'node-dijkstra';
 import os from 'os';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
+import { RpcPeer } from "../rpc";
 import { MediaObjectRemote } from "./plugin-api";
 
 class MediaObject implements MediaObjectRemote {
     __proxy_props: any;
 
-    constructor(public mimeType: string, public sourceId: string, public data: any) {
+    constructor(public mimeType: string, public data: any, options: MediaObjectOptions) {
         this.__proxy_props = {
             mimeType,
-            sourceId,
+        }
+        if (options) {
+            for (const [key, value] of Object.entries(options)) {
+                if (RpcPeer.isTransportSafe(key))
+                    this.__proxy_props[key] = value;
+                (this as any)[key] = value;
+            }
         }
     }
 
@@ -283,7 +290,7 @@ export abstract class MediaManagerBase implements MediaManager {
         return url.data.toString();
     }
 
-    createMediaObjectRemote(data: any | Buffer | Promise<string | Buffer>, mimeType: string, options?: MediaObjectOptions): MediaObjectRemote {
+    createMediaObjectRemote<T extends MediaObjectOptions>(data: any | Buffer | Promise<string | Buffer>, mimeType: string, options?: T): MediaObjectRemote & T {
         if (typeof data === 'string')
             throw new Error('string is not a valid type. if you intended to send a url, use createMediaObjectFromUrl.');
         if (!mimeType)
@@ -296,7 +303,7 @@ export abstract class MediaManagerBase implements MediaManager {
 
         const sourceId = typeof options?.sourceId === 'string' ? options?.sourceId : this.getPluginDeviceId();
 
-        return new MediaObject(mimeType, sourceId, data);
+        return new MediaObject(mimeType, data, options) as MediaObject & T;
     }
 
     async createFFmpegMediaObject(ffMpegInput: FFmpegInput, options?: MediaObjectOptions): Promise<MediaObjectInterface> {
@@ -324,7 +331,7 @@ export abstract class MediaManagerBase implements MediaManager {
         return new MediaObjectImpl();
     }
 
-    async createMediaObject(data: any, mimeType: string, options?: MediaObjectOptions): Promise<MediaObjectInterface> {
+    async createMediaObject<T extends MediaObjectOptions>(data: any, mimeType: string, options?: T): Promise<MediaObjectInterface & T> {
         return this.createMediaObjectRemote(data, mimeType, options);
     }
 

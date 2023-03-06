@@ -393,6 +393,14 @@ export class RpcPeer {
         }).catch(e => e.message || 'Unknown Error');
     }
 
+    static isTransportSafe(value: any) {
+        return !value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.getDefaultTransportSafeArgumentTypes().has(value.constructor?.name));
+    }
+
+    isTransportSafe(value: any) {
+        return !value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.transportSafeArgumentTypes.has(value.constructor?.name));
+    }
+
     createPendingResult(cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
         if (Object.isFrozen(this.pendingResults))
             return Promise.reject(new RPCResultError(this, 'RpcPeer has been killed (createPendingResult)'));
@@ -561,7 +569,7 @@ export class RpcPeer {
             return ret;
         }
 
-        if (!value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.transportSafeArgumentTypes.has(value.constructor?.name))) {
+        if (this.isTransportSafe(value)) {
             return value;
         }
 
