@@ -27,7 +27,7 @@ from .request import Request
 from .mqtt_stream_async import MQTTStream
 from .sse_stream_async import EventStream
 from .logging import logger
-    
+
 # Import all of the other stuff.
 from datetime import datetime
 
@@ -227,7 +227,7 @@ class Arlo(object):
         when subsequent calls to /notify are made.
         """
         async def heartbeat(self, basestations, interval=30):
-            while self.event_stream and self.event_stream.connected:
+            while self.event_stream and self.event_stream.active:
                 for basestation in basestations:
                     try:
                         self.Ping(basestation)
@@ -378,7 +378,9 @@ class Arlo(object):
                 return None
             return stop
 
-        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(
+            self.HandleEvents(basestation, resource, [('is', 'motionDetected')], callbackwrapper)
+        )
 
     def SubscribeToBatteryEvents(self, basestation, camera, callback):
         """
@@ -403,7 +405,9 @@ class Arlo(object):
                 return None
             return stop
 
-        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(
+            self.HandleEvents(basestation, resource, [('is', 'batteryLevel')], callbackwrapper)
+        )
 
     def SubscribeToDoorbellEvents(self, basestation, doorbell, callback):
         """
@@ -437,7 +441,9 @@ class Arlo(object):
                 return None
             return stop
 
-        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(
+            self.HandleEvents(basestation, resource, [('is', 'buttonPressed')], callbackwrapper)
+        )
 
     def SubscribeToSDPAnswers(self, basestation, camera, callback):
         """
@@ -456,14 +462,16 @@ class Arlo(object):
 
         def callbackwrapper(self, event):
             properties = event.get("properties", {})
-            stop = None 
+            stop = None
             if properties.get("type") == "answerSdp":
                 stop = callback(properties.get("data"))
             if not stop:
                 return None
             return stop
 
-        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(
+            self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper)
+        )
 
     def SubscribeToCandidateAnswers(self, basestation, camera, callback):
         """
@@ -482,14 +490,16 @@ class Arlo(object):
 
         def callbackwrapper(self, event):
             properties = event.get("properties", {})
-            stop = None 
+            stop = None
             if properties.get("type") == "answerCandidate":
                 stop = callback(properties.get("data"))
             if not stop:
                 return None
             return stop
 
-        return asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper))
+        return asyncio.get_event_loop().create_task(
+            self.HandleEvents(basestation, resource, ['pushToTalk'], callbackwrapper)
+        )
 
     async def HandleEvents(self, basestation, resource, actions, callback):
         """
@@ -502,9 +512,17 @@ class Arlo(object):
         await self.Subscribe()
 
         async def loop_action_listener(action):
+            # in this function, action can either be a tuple or a string
+            # if it is a tuple, we expect there to be a property key in the tuple
+            property = None
+            if isinstance(action, tuple):
+                action, property = action
+            if not isinstance(action, str):
+                raise Exception('Actions must be either a tuple or a str')
+
             seen_events = {}
             while self.event_stream.active:
-                event, _ = await self.event_stream.get(resource, [action], seen_events)
+                event, _ = await self.event_stream.get(resource, action, property, seen_events)
 
                 if event is None or self.event_stream is None \
                     or self.event_stream.event_stream_stop_event.is_set():
@@ -514,7 +532,7 @@ class Arlo(object):
                 response = callback(self, event.item)
 
                 # always requeue so other listeners can see the event too
-                self.event_stream.requeue(event, resource, action)
+                self.event_stream.requeue(event, resource, action, property)
 
                 if response is not None:
                     return response
@@ -606,7 +624,13 @@ class Arlo(object):
                 return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
             return None
 
-        return await self.TriggerAndHandleEvent(basestation, resource, ["is"], trigger, callback)
+        return await self.TriggerAndHandleEvent(
+            basestation,
+            resource,
+            [("is", "activityState")],
+            trigger,
+            callback,
+        )
 
     def StartPushToTalk(self, basestation, camera):
         url = f'https://{self.BASE_URL}/hmsweb/users/devices/{self.user_id}_{camera.get("deviceId")}/pushtotalk'
@@ -644,8 +668,6 @@ class Arlo(object):
     async def TriggerFullFrameSnapshot(self, basestation, camera):
         """
         This function causes the camera to record a fullframe snapshot.
-        The presignedFullFrameSnapshotUrl url is returned.
-        Use DownloadSnapshot() to download the actual image file.
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
@@ -676,4 +698,14 @@ class Arlo(object):
                 return url
             return None
 
-        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "lastImageSnapshotAvailable", "is"], trigger, callback)
+        return await self.TriggerAndHandleEvent(
+            basestation,
+            resource,
+            [
+                (action, property)
+                for action in ["fullFrameSnapshotAvailable", "lastImageSnapshotAvailable", "is"]
+                for property in ["presignedFullFrameSnapshotUrl", "presignedLastImageUrl"]
+            ],
+            trigger,
+            callback,
+        )
