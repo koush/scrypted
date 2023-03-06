@@ -24,6 +24,8 @@ const defaultSecondScoreThreshold = .7;
 const BUILTIN_MOTION_SENSOR_ASSIST = 'Assist';
 const BUILTIN_MOTION_SENSOR_REPLACE = 'Replace';
 
+const objectDetectionPrefix = `${ScryptedInterface.ObjectDetection}:`;
+
 type ClipPath = [number, number][];
 type Zones = { [zone: string]: ClipPath };
 interface ZoneInfo {
@@ -187,6 +189,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         || setting.value;
     }
 
+    if (this.hasMotionType)
+      ret['motionAsObjects'] = this.storageSettings.values.motionAsObjects;
+
     return ret;
   }
 
@@ -212,6 +217,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.detectorRunning = false;
     this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
+      settings: this.getCurrentSettings(),
     });
   }
 
@@ -483,6 +489,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         await this.objectDetection?.detectObjects(undefined, {
           detectionId: this.detectionId,
           duration: this.getDetectionDuration(),
+          settings: this.getCurrentSettings(),
         }, this);
       }
       catch (e) {
@@ -774,7 +781,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     const settings: Setting[] = [];
 
     try {
-      this.settings = (await this.objectDetection.getDetectionModel(this.settings)).settings;
+      this.settings = (await this.objectDetection.getDetectionModel(this.getCurrentSettings())).settings;
     }
     catch (e) {
     }
@@ -1006,40 +1013,39 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
-    // filter out 
-    for (const iface of interfaces) {
-      if (iface.startsWith(`${ScryptedInterface.ObjectDetection}:`)) {
-        const deviceMatch = this.mixinDeviceInterfaces.find(miface => miface.startsWith(iface));
-        if (deviceMatch)
-          continue;
-        return null;
-      }
-    }
+    const hasMotionType = this.model.classes.includes('motion');
+    const prefix = `${objectDetectionPrefix}${hasMotionType}`;
+    const thisPrefix = `${prefix}:${this.id}`;
+
+    const found = interfaces.find(iface => iface.startsWith(prefix) && iface !== thisPrefix);
+    if (found)
+      return;
+    // this.console.log('found', found);
 
     if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell) && (interfaces.includes(ScryptedInterface.VideoCamera) || interfaces.includes(ScryptedInterface.Camera))) {
-      const ret: string[] = [ScryptedInterface.ObjectDetector, ScryptedInterface.Settings];
+      const ret: string[] = [
+        ScryptedInterface.ObjectDetector,
+        ScryptedInterface.Settings,
+        thisPrefix,
+      ];
       const model = await this.mixinDevice.getDetectionModel();
-      if (model.classes?.includes('motion')) {
-        // const vamotion = 'mixin:@scrypted/objectdetector:motion';
-        // if (interfaces.includes(vamotion))
-        //   return;
 
+      if (model.classes?.includes('motion')) {
         ret.push(
           ScryptedInterface.MotionSensor,
-          // vamotion,
         );
       }
-      return ret;
 
+      return ret;
     }
-    return null;
   }
 
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
     let objectDetection = systemManager.getDeviceById<ObjectDetection>(this.id);
-    const group = objectDetection.name.replace('Plugin', '').trim();
-
     const hasMotionType = this.model.classes.includes('motion');
+    const group = hasMotionType ? 'Motion Detection' : 'Object Detection';
+    // const group = objectDetection.name.replace('Plugin', '').trim();
+
     const settings = this.model.settings;
 
     const ret = new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.model.name, group, hasMotionType, settings);
