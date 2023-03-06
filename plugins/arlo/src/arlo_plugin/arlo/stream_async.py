@@ -114,6 +114,9 @@ class Stream:
                 if num_dropped > 0:
                     logger.debug(f"Cleaned {num_dropped} events from queue {key}")
 
+                # cleanup is not urgent, so give other tasks a chance
+                await asyncio.sleep(0.1)
+
             await asyncio.sleep(interval)
 
     async def get(self, resource, action, property=None, skip_uuids={}):
