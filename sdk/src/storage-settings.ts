@@ -29,7 +29,7 @@ function parseValue(value: string, setting: StorageSetting, readDefaultValue: ()
     if (type === 'device') {
         if (rawDevice)
             return value;
-        return systemManager.getDeviceById(value);
+        return systemManager.getDeviceById(value) || systemManager.getDeviceById(readDefaultValue());
     }
 
     // string type, so check if it is json.
