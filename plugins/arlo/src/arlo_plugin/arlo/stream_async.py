@@ -87,7 +87,12 @@ class Stream:
 
         await asyncio.sleep(interval)
         while not self.event_stream_stop_event.is_set():
-            for key, q in self.queues.items():
+            # since we interrupt the cleanup loop after every queue, there's
+            # a chance the self.queues dict is modified during iteration.
+            # so, we first make a copy of all the items of the dict and any
+            # new queues will be processed on the next loop through
+            queue_items = [i for i in self.queues.items()]
+            for key, q in queue_items:
                 if q.empty():
                     continue
 
