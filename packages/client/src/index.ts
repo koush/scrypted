@@ -1,4 +1,4 @@
-import { RTCConnectionManagement, RTCSignalingSession, ScryptedStatic } from "@scrypted/types";
+import { MediaObjectOptions, RTCConnectionManagement, RTCSignalingSession, ScryptedStatic } from "@scrypted/types";
 import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
@@ -504,7 +504,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         } = scrypted;
         console.log('api attached', Date.now() - start);
 
-        mediaManager.createMediaObject = async (data, mimeType, options) => {
+        mediaManager.createMediaObject = async<T extends MediaObjectOptions>(data: any, mimeType: string, options: T) => {
             const mo: MediaObjectRemote & {
                 [RpcPeer.PROPERTY_PROXY_PROPERTIES]: any,
                 [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
@@ -520,7 +520,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     return data;
                 },
             };
-            return mo;
+            return mo as any;
         }
 
         const { browserSignalingSession, connectionManagementId, updateSessionId } = rpcPeer.params;
