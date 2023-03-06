@@ -26,10 +26,11 @@ class SortOHTracker(scrypted_sdk.ObjectTracker):
             self.trackers[id] = detectionTracker
 
         sort_input = []
-        for d in ret['detections']:
+        for d in detections:
             r: ObjectDetectionResult = d
             l, t, w, h = r['boundingBox']
             sort_input.append([l, t, l + w, t + h, r['score']])
+
         trackers, unmatched_trckr, unmatched_gts = detectionTracker.update(
             np.array(sort_input), [])
 
