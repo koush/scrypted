@@ -13,6 +13,7 @@ from detect import DetectionSession, DetectPlugin
 
 from .sort_oh import tracker
 import numpy as np
+import traceback
 
 try:
     from gi.repository import Gst
@@ -492,7 +493,12 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         finally:
             gst_buffer.unmap(info)
 
-        return self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size)
+        try:
+            return self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size)
+        except:
+            image.close()
+            traceback.print_exc()
+            raise
 
     def create_detection_session(self):
         return PredictSession(start_time=time.time())

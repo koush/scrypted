@@ -92,15 +92,20 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
         return input_size(self.interpreter)
 
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        with self.mutex:
-            common.set_input(
-                self.interpreter, input)
-            scale = (1, 1)
-            # _, scale = common.set_resized_input(
-            #     self.interpreter, cropped.size, lambda size: cropped.resize(size, Image.ANTIALIAS))
-            self.interpreter.invoke()
-            objs = detect.get_objects(
-                self.interpreter, score_threshold=.2, image_scale=scale)
+        try:
+            with self.mutex:
+                common.set_input(
+                    self.interpreter, input)
+                scale = (1, 1)
+                # _, scale = common.set_resized_input(
+                #     self.interpreter, cropped.size, lambda size: cropped.resize(size, Image.ANTIALIAS))
+                self.interpreter.invoke()
+                objs = detect.get_objects(
+                    self.interpreter, score_threshold=.2, image_scale=scale)
+        except:
+            print('tensorflow-lite encountered an error while detecting. requesting plugin restart.')
+            self.requestRestart()
+            raise e
 
         allowList = settings.get('allowList', None) if settings else None
         ret = self.create_detection_result(objs, src_size, allowList, cvss)
