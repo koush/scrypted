@@ -98,7 +98,7 @@ export default {
       get() {
         if (this.rawSettingsGroupName)
           return this.rawSettingsGroupName;
-        return Object.values(this.settingsGroups)?.[0] || 'extensions';
+        return Object.keys(this.settingsGroups)?.[0] || 'extensions';
       },
       set(value) {
         this.rawSettingsGroupName = value;
