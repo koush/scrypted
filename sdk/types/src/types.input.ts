@@ -20,6 +20,8 @@ export interface ScryptedDevice {
 
   setType(type: ScryptedDeviceType): Promise<void>;
 
+  setMixins(mixins: string[]): Promise<void>;
+
   /**
    * Probes the device, ensuring creation of it and any mixins.
    */
@@ -1269,6 +1271,25 @@ export interface ObjectDetection {
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
+export interface VideoFrameOptions {
+  resize?: {
+    width: number,
+    height: number,
+  };
+  format?: string;
+}
+export interface VideoFrame extends MediaObject {
+  timestamp: number;
+  width: number;
+  height: number;
+  format: string;
+  read(options?: VideoFrameOptions): Promise<Buffer>;
+}
+export interface VideoFrameGeneratorOptions extends VideoFrameOptions {
+}
+export interface VideoFrameGenerator {
+  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame>>;
+}
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
  */
@@ -1337,13 +1358,15 @@ export interface OauthClient {
   onOauthCallback(callbackUrl: string): Promise<void>;
 
 }
+export type SerializableType = null | undefined | number | string | { [key: string]: SerializableType } | SerializableType[];
+export type TopLevelSerializableType = Function | Buffer | SerializableType;
 
 export interface MediaObjectOptions {
   /**
    * The device id of the source of the MediaObject.
    */
   sourceId?: string;
-  metadata?: any;
+  [key: string]: TopLevelSerializableType;
 }
 
 /**
@@ -1394,14 +1417,14 @@ export interface MediaManager {
   /**
    * Create a MediaObject from an URL. The mime type will be determined dynamically while resolving the url.
    */
-  createMediaObjectFromUrl(data: string, options?: MediaObjectOptions): Promise<MediaObject>;
+  createMediaObjectFromUrl<T extends MediaObjectOptions>(data: string, options?: T): Promise<MediaObject>;
 
   /**
    * Create a MediaObject.
    * If the data is a buffer, JSON object, or primitive type, it will be serialized.
    * All other objects will be objects will become RPC objects.
    */
-  createMediaObject(data: any | Buffer, mimeType: string, options?: MediaObjectOptions): Promise<MediaObject>;
+  createMediaObject<T extends MediaObjectOptions>(data: any | Buffer, mimeType: string, options?: T): Promise<MediaObject & T>;
 
   /**
    * Get the path to ffmpeg on the host system.

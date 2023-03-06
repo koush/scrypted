@@ -419,7 +419,6 @@ class LauncherApplicationInfo(TypedDict):
     pass
 
 class MediaObjectOptions(TypedDict):
-    metadata: Any
     sourceId: str
     pass
 
@@ -1015,6 +1014,8 @@ class ScryptedDevice:
         pass
     async def probe(self) -> bool:
         pass
+    async def setMixins(self, mixins: list[str]) -> None:
+        pass
     async def setName(self, name: str) -> None:
         pass
     async def setRoom(self, room: str) -> None:
@@ -1219,9 +1220,9 @@ class MediaManager:
         pass
     async def createFFmpegMediaObject(self, ffmpegInput: FFmpegInput, options: MediaObjectOptions = None) -> MediaObject:
         pass
-    async def createMediaObject(self, data: Any, mimeType: str, options: MediaObjectOptions = None) -> MediaObject:
+    async def createMediaObject(self, data: Any, mimeType: str, options: Any = None) -> Any:
         pass
-    async def createMediaObjectFromUrl(self, data: str, options: MediaObjectOptions = None) -> MediaObject:
+    async def createMediaObjectFromUrl(self, data: str, options: Any = None) -> MediaObject:
         pass
     async def getFFmpegPath(self) -> str:
         pass
@@ -1743,6 +1744,7 @@ ScryptedInterfaceDescriptors = {
     "methods": [
       "listen",
       "probe",
+      "setMixins",
       "setName",
       "setRoom",
       "setType"
