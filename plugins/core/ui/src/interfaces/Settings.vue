@@ -98,10 +98,11 @@ export default {
       get() {
         if (this.rawSettingsGroupName)
           return this.rawSettingsGroupName;
-        return Object.keys(this.settingsGroups)?.[0] || 'extensions';
+        return Object.values(this.settingsGroups)?.[0] || 'extensions';
       },
       set(value) {
         this.rawSettingsGroupName = value;
+        this.rawSettingsSubgroupName = undefined;
       },
     },
     settingsSubgroupName: {
@@ -110,7 +111,7 @@ export default {
           return;
         if (this.settingsSubgroups.findIndex(sg => sg === this.rawSettingsSubgroupName) !== -1)
           return this.rawSettingsSubgroupName;
-        return Object.keys(this.settingsSubgroups)?.[0];
+        return Object.values(this.settingsSubgroups)?.[0];
       },
       set(value) {
         this.rawSettingsSubgroupName = value;

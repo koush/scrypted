@@ -24,6 +24,9 @@ export function createSystemSettingsDevice(systemManager: SystemManager): Scrypt
         async probe() {
             return true;
         },
+        async setMixins() {
+
+        },
         listen(event, callback) {
             let listeners = systemSettings.map(d => d.listen(event, callback));
             return {
