@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import time
 
 import scrypted_arlo_go
 
@@ -172,7 +173,20 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
     async def getVideoStream(self, options=None):
         self.logger.debug("Entered getVideoStream")
         rtsp_url = await self._getVideoStreamURL()
-        return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)
+
+        mso = (await self.getVideoStreamOptions())[0]
+        mso['refreshAt'] = round(time.time() * 1000) + 30 * 60 * 1000
+
+        ffmpeg_input = {
+            'url': rtsp_url,
+            'container': 'rtsp',
+            'mediaStreamOptions': mso,
+            'inputArguments': [
+                '-f', 'rtsp',
+                '-i', rtsp_url,
+            ]
+        }
+        return await scrypted_sdk.mediaManager.createFFmpegMediaObject(ffmpeg_input)
 
     async def startRTCSignalingSession(self, scrypted_session):
         try:
@@ -330,7 +344,7 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
             self.logger.info("Initializing push to talk")
 
             session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
-            self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}") 
+            self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
 
             cfg = scrypted_arlo_go.WebRTCConfiguration(
                 ICEServers=scrypted_arlo_go.Slice_webrtc_ICEServer([
@@ -372,7 +386,7 @@ class ArloCameraRTCSignalingSession(BackgroundTaskMixin):
                 self.logger.debug("Starting audio track forwarder")
                 self.scrypted_pc.ForwardAudioTo(self.arlo_pc)
                 self.logger.debug("Started audio track forwarder")
-            
+
             self.sdp_answered = False
 
             offer = self.arlo_pc.CreateOffer()
