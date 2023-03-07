@@ -24,22 +24,45 @@
         Devices</v-btn>
     </v-card-actions>
 
+    <v-simple-table v-if="discoveredDevices && discoveredDevices.length">
+      <thead>
+        <tr>
+          <th style="width: 10px;"></th>
+          <th>Discovered</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody v-if="discoveredDevices.length">
+        <tr v-for="device in discoveredDevices" :key="device.id">
+          <td>
+            <v-btn x-small outlined fab color="info" @click="openDeviceAdoptionDialog(device)">
+              <v-icon>fa-solid
+                fa-plus</v-icon>
+            </v-btn>
+          </td>
+          <td>
+            {{ device.name }}
+          </td>
+          <td> {{ device.description }}</td>
+        </tr>
+      </tbody>
+      <tbody v-else>
+        <td></td>
+        <td>None found.</td>
+        <td></td>
+      </tbody>
+    </v-simple-table>
+
+
     <v-card-text>These things were created by {{ device.name }}.</v-card-text>
-    <v-text-field v-model="search" append-icon="search" label="Search" single-line hide-details></v-text-field>
-    <v-data-table :headers="headers" :items="providerDevices.devices" :items-per-page="10" :search="search">
+    <v-text-field v-if="managedDevices.devices.length > 10" v-model="search" append-icon="search" label="Search"
+      single-line hide-details></v-text-field>
+    <v-data-table v-if="managedDevices.devices.length > 10" :headers="headers" :items="managedDevices.devices"
+      :items-per-page="10" :search="search">
       <template v-slot:[`item.icon`]="{ item }">
-        <v-icon v-if="!item.nativeId" x-small color="grey">
+        <v-icon x-small color="grey">
           {{ typeToIcon(item.type) }}
         </v-icon>
-
-        <v-tooltip bottom v-else>
-          <template v-slot:activator="{ on }">
-            <v-btn x-small outlined fab v-on="on" color="info" @click="openDeviceAdoptionDialog(item)"><v-icon>fa-solid
-                fa-plus</v-icon></v-btn>
-          </template>
-          <span>Add Discovered Device</span>
-        </v-tooltip>
-
       </template>
       <template v-slot:[`item.name`]="{ item }">
         <a v-if="!item.nativeId" link :href="'#' + getDeviceViewPath(item.id)">{{ item.name }}</a>
@@ -48,7 +71,7 @@
       </template>
     </v-data-table>
 
-    <!-- <DeviceGroup v-else :deviceGroup="providerDevices"></DeviceGroup> -->
+    <DeviceGroup v-else :deviceGroup="managedDevices"></DeviceGroup>
   </v-flex>
 </template>
 <script>
@@ -167,8 +190,8 @@ export default {
       });
       return ret;
     },
-    providerDevices() {
-      const currentDevices = this.$store.state.scrypted.devices
+    managedDevices() {
+      const devices = this.$store.state.scrypted.devices
         .filter(
           (id) =>
             this.$store.state.systemState[id].providerId.value ===
@@ -181,7 +204,7 @@ export default {
         }));
 
       return {
-        devices: [...this.discoveredDevices || [], ...currentDevices],
+        devices,
       };
     },
   },

@@ -1,4 +1,4 @@
-import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PanTiltZoom, PanTiltZoomCommand, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import { AddressInfo } from "net";
 import onvif from 'onvif';
 import { Stream } from "stream";
@@ -29,7 +29,7 @@ function convertAudioCodec(codec: string) {
     return codec?.toLowerCase();
 }
 
-class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, VideoCameraConfiguration {
+class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, VideoCameraConfiguration, PanTiltZoom {
     eventStream: Stream;
     client: OnvifCameraAPI;
     rtspMediaStreamOptions: Promise<UrlMediaStreamOptions[]>;
@@ -338,6 +338,15 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         return false;
     }
 
+    getPtz() {
+        try {
+            return JSON.parse(this.storage.getItem('ptz'));
+        }
+        catch (e) {
+            return [];
+        }
+    }
+
     async getOtherSettings(): Promise<Setting[]> {
         const isDoorbell = !!this.providedInterfaces?.includes(ScryptedInterface.BinarySensor);
 
@@ -358,6 +367,18 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
                 value: this.storage.getItem('onvifDoorbellEvent'),
                 placeholder: 'EventName'
             },
+            {
+                key: 'ptz',
+                title: 'Pan/Tilt/Zoom',
+                type: 'string',
+                multiple: true,
+                choices: [
+                    'Pan',
+                    'Tilt',
+                    'Zoom',
+                ],
+                value: this.getPtz(),
+            }
         ];
 
         if (!isDoorbell) {
@@ -389,21 +410,53 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         if (twoWay || doorbell)
             interfaces.push(ScryptedInterface.Intercom);
 
+        const ptzString = this.storage.getItem('ptz');
+        try {
+            const ptz = JSON.parse(ptzString) as string[];
+            this.ptzCapabilities = {
+                pan: ptz.includes('Pan'),
+                tilt: ptz.includes('Tilt'),
+                zoom: ptz.includes('Zoom'),
+            }
+            interfaces.push(ScryptedInterface.PanTiltZoom);
+        }
+        catch (e) {
+            this.ptzCapabilities = undefined;
+        }
+
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
-    async putSetting(key: string, value: string) {
+    async putSetting(key: string, value: any) {
         this.client = undefined;
         this.rtspMediaStreamOptions = undefined;
 
         this.updateDeviceInfo();
 
-        if (key !== 'onvifDoorbell' && key !== 'onvifTwoWay')
+        if (key !== 'onvifDoorbell' && key !== 'onvifTwoWay' && key !== 'ptz')
             return super.putSetting(key, value);
+
+        if (key === 'ptz')
+            value = JSON.stringify(value);
 
         this.storage.setItem(key, value);
         this.updateDevice();
+    }
+
+    async ptzCommand(command: PanTiltZoomCommand) {
+        const client = await this.getClient();
+        return new Promise<void>((r, f) => {
+            client.cam.relativeMove({
+                x: command.pan,
+                y: command.tilt,
+                zoom: command.zoom,
+            }, (e, result, xml) => {
+                if (e)
+                    return f(e);
+                r();
+            })
+        })
     }
 
     async startIntercom(media: MediaObject) {
@@ -531,6 +584,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         const username = settings.username?.toString();
         const password = settings.password?.toString();
         const skipValidate = settings.skipValidate === 'true';
+        let ptzCapabilities: string[];
         if (!skipValidate) {
             try {
                 const api = await connectCameraAPI(httpAddress, username, password, this.console, undefined);
@@ -545,6 +599,12 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                 }
 
                 settings.newCamera = info.model;
+
+                api.cam.services.find((s: any) => s.namespace === 'http://www.onvif.org/ver20/ptz/wsdl');
+                ptzCapabilities = [
+                    'Pan',
+                    'Tilt',
+                ];
             }
             catch (e) {
                 this.console.error('Error adding ONVIF camera', e);
@@ -575,6 +635,9 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         finally {
             intercom.intercomClient?.client.destroy();
         }
+
+        if (ptzCapabilities)
+            device.putSetting('ptz', ptzCapabilities);
 
         return nativeId;
     }
