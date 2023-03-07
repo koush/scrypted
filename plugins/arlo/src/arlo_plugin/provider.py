@@ -16,7 +16,7 @@ from .arlo.arlo_async import change_stream_class
 from .arlo.logging import logger as arlo_lib_logger
 from .camera import ArloCamera
 from .doorbell import ArloDoorbell
-from .logging import ScryptedDeviceLoggerMixin 
+from .logging import ScryptedDeviceLoggerMixin
 from .util import BackgroundTaskMixin
 
 
@@ -136,7 +136,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     def imap_mfa_interval(self):
         interval = self.storage.getItem("imap_mfa_interval")
         if interval is None:
-            interval = 7 
+            interval = 7
             self.storage.setItem("imap_mfa_interval", interval)
         return int(interval)
 
@@ -149,7 +149,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
                 self.logger.info("Completing Arlo MFA...")
                 self._arlo_mfa_complete_auth(self._arlo_mfa_code)
-                self._arlo_mfa_complete_auth = None 
+                self._arlo_mfa_complete_auth = None
                 self._arlo_mfa_code = None
                 self.logger.info("Arlo MFA done")
 
@@ -162,7 +162,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
         if not self.arlo_username or not self.arlo_password:
             return None
-            
+
         self.logger.info("Trying to initialize Arlo client...")
         try:
             self._arlo = Arlo(self.arlo_username, self.arlo_password)
@@ -245,7 +245,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             res, _ = self.imap.select(mailbox="INBOX", readonly=True)
             if res.lower() != "ok":
                 raise Exception(f"IMAP failed to fetch INBOX: {res}")
-            
+
             # fetch existing arlo emails so we skip them going forward
             res, self.imap_skip_emails = self.imap.search(None, "FROM", "do_not_reply@arlo.com")
             if res.lower() != "ok":
@@ -447,7 +447,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                     "value": self.imap_mfa_interval,
                 }
             ])
-        
+
         results.extend([
             {
                 "group": "General",
@@ -587,7 +587,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             device = {
                 "info": {
-                    "model": f"{camera['properties']['modelId']} ({camera['properties'].get('hwVersion', '')})".strip(),
+                    "model": f"{camera['modelId']} ({camera['properties'].get('hwVersion', '')})".strip(),
                     "manufacturer": "Arlo",
                     "firmware": camera.get("firmwareVersion"),
                     "serialNumber": camera["deviceId"],
