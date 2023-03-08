@@ -6,7 +6,7 @@ import { getAddressOverride } from "./address-override";
 import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
-import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
+import { HAPStorage, Accessory, Bridge, Categories, Characteristic, ControllerStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
 import { createHAPUsernameStorageSettingsDict, getHAPUUID, getRandomPort as createRandomPort, logConnections, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { addAccessoryDeviceInfo } from './info';
@@ -14,6 +14,41 @@ import { randomPinCode } from './pincode';
 import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { VideoClipsMixinProvider } from './video-clips-provider';
+
+const hapStorage: Storage = {
+    get length() {
+        return localStorage.length;
+    },
+    clear: function (): void {
+        return localStorage.clear();
+    },
+    key: function (index: number): string {
+        return localStorage.key(index);
+    },
+    removeItem: function (key: string): void {
+        return localStorage.removeItem(key);
+    },
+    getItem(key: string): any {
+        const data = localStorage.getItem(key);
+        if (!data)
+            return;
+        return JSON.parse(data);
+    },
+    setItem(key: string, value: any) {
+        localStorage.setItem(key, JSON.stringify(value));
+    },
+    setItemSync(key: string, value: any) {
+        localStorage.setItem(key, JSON.stringify(value));
+    },
+    removeItemSync(key: string) {
+        localStorage.removeItem(key);
+    },
+    persistSync() {
+    }
+}
+HAPStorage.storage = () => {
+    return hapStorage;
+}
 
 const { systemManager, deviceManager } = sdk;
 

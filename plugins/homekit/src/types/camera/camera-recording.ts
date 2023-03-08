@@ -11,7 +11,7 @@ import mkdirp from 'mkdirp';
 import net from 'net';
 import { Duplex, Readable, Writable } from 'stream';
 import { } from '../../common';
-import { AudioRecordingCodecType, CameraRecordingConfiguration, DataStreamConnection } from '../../hap';
+import { AudioRecordingCodecType, CameraRecordingConfiguration, DataStreamConnection, RecordingPacket } from '../../hap';
 import type { HomeKitPlugin } from "../../main";
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
@@ -98,12 +98,12 @@ async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
     }
 }
 
-export async function* handleFragmentsRequests(connection: DataStreamConnection, device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
-    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin): AsyncGenerator<Buffer, void, unknown> {
+export async function* handleFragmentsRequests(streamId: number, device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
+    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin): AsyncGenerator<RecordingPacket> {
 
-    homekitPlugin.storageSettings.values.lastKnownHomeHub = connection.remoteAddress;
+    // homekitPlugin.storageSettings.values.lastKnownHomeHub = connection.remoteAddress;
 
-    console.log(device.name, 'recording session starting', connection.remoteAddress, configuration);
+    // console.log(device.name, 'recording session starting', connection.remoteAddress, configuration);
 
     const storage = deviceManager.getMixinStorage(device.id, undefined);
     const debugMode = getDebugMode(storage);
@@ -275,11 +275,13 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
         safeKillFFmpeg(cp);
     }
 
+    let isLast = false;
     console.log(`motion recording started`);
     const { socket, cp, generator } = session;
     const videoTimeout = setTimeout(() => {
         console.error('homekit secure video max duration reached');
-        cleanupPipes();
+        isLast = true;
+        setTimeout(cleanupPipes, 10000);
     }, maxVideoDuration);
 
     let pending: Buffer[] = [];
@@ -336,7 +338,14 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
                 saveFragment(i, fragment);
                 pending = [];
                 console.log(`motion fragment #${++i} sent. size:`, fragment.length);
-                yield fragment;
+                const wasLast = isLast;
+                const recordingPacket: RecordingPacket = {
+                    data: fragment,
+                    isLast,
+                }
+                yield recordingPacket;
+                if (wasLast)
+                    break;
             }
         }
         console.log(`motion recording finished`);

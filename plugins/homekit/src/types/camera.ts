@@ -1,12 +1,13 @@
 import sdk, { AudioSensor, Camera, Intercom, MotionSensor, ObjectsDetected, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, DataStreamConnection, H264Level, H264Profile, MediaContainerType, OccupancySensor, RecordingManagement, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, DataStreamConnection, H264Level, H264Profile, MediaContainerType, OccupancySensor, RecordingManagement, RecordingPacket, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
 import { FORCE_OPUS } from './camera/camera-utils';
 import { makeAccessory } from './common';
 import type { HomeKitPlugin } from '../main';
+import { Deferred } from '@scrypted/common/src/deferred';
 
 const { deviceManager, systemManager } = sdk;
 
@@ -100,12 +101,24 @@ addSupportedType({
 
         const storageKeySelectedRecordingConfiguration = 'selectedRecordingConfiguration';
 
+        let configuration: CameraRecordingConfiguration;
+        const openRecordingStreams = new Map<number, Deferred<any>>();
         if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
-                handleFragmentsRequests(connection: DataStreamConnection): AsyncGenerator<Buffer, void, unknown> {
-                    const configuration = RecordingManagement.parseSelectedConfiguration(storage.getItem(storageKeySelectedRecordingConfiguration))
-                    return handleFragmentsRequests(connection, device, configuration, console, homekitPlugin)
-                }
+                updateRecordingConfiguration(newConfiguration: CameraRecordingConfiguration ) {
+                    configuration = newConfiguration;
+                },
+                handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
+                    const d = new Deferred<any>();
+                    d.promise.finally(() => openRecordingStreams.delete(streamId));
+                    openRecordingStreams.set(streamId, d);
+                    return handleFragmentsRequests(streamId, device, configuration, console, homekitPlugin)
+                },
+                closeRecordingStream(streamId, reason) {
+                    openRecordingStreams.get(streamId)?.resolve(undefined);
+                },
+                updateRecordingActive(active) {
+                },
             };
 
             const recordingCodecs: AudioRecordingCodec[] = [];
