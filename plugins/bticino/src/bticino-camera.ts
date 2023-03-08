@@ -17,12 +17,14 @@ import { BticinoSipLock } from './bticino-lock';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { PersistentSipManager } from './persistent-sip-manager';
 import { InviteHandler } from './bticino-inviteHandler';
-import { SipManager, SipRequest } from '../../sip/src/sip-manager';
+import { SipRequest } from '../../sip/src/sip-manager';
+import crypto from 'crypto';
 
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
 
-export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler {
+export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor {
+
     private session: SipCallSession
     private remoteRtpDescription: RtpDescription
     private audioOutForwarder: dgram.Socket
@@ -40,9 +42,11 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
     private persistentSipManager : PersistentSipManager
     public webhookUrl : string
+    private md5
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
+        this.md5 = crypto.createHash('md5').update( nativeId ).digest("hex")
         this.requestHandlers.add( this.voicemailHandler ).add( this.inviteHandler )
         this.persistentSipManager = new PersistentSipManager( this );
         (async() => {
@@ -224,10 +228,15 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                         'a=recvonly'                        
                     ]
                 }, this.incomingCallRequest );
+
+                this.incomingCallRequest = undefined
+
                 if( sipOptions.debugSip )
                     this.log.d('SIP: Received remote SDP:\n' + this.remoteRtpDescription.sdp)
 
                 let sdp: string = replacePorts(this.remoteRtpDescription.sdp, 0, 0 )
+                //sdp = sdp.replaceAll(/a=crypto\:1.*/g, '')
+                //sdp = sdp.replaceAll('\r\n\r\n', '\r\n')
                 sdp = addTrackControls(sdp)
                 sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n')
                 if( sipOptions.debugSip )
@@ -360,6 +369,10 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         webhookUrl += "buttonPressed";
         this.console.log( webhookUrl )
         return `${webhookUrl}`;
+    }
+
+    getGruuInstanceId(): string {
+        return this.md5.substring(0, 8) + '-' + this.md5.substring(8, 12) + '-' + this.md5.substring(12,16) + '-' + this.md5.substring(16, 32);
     }
 
     public async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {

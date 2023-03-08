@@ -1,11 +1,11 @@
 {
    "name": "@scrypted/bticino",
-   "version": "0.0.6-beta.6",
+   "version": "0.0.6-beta.7",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
       "build": "scrypted-webpack",
-      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prepublishOnly": "cross-env NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
       "scrypted-vscode-launch": "scrypted-deploy-debug",
       "scrypted-deploy-debug": "scrypted-deploy-debug",
@@ -33,8 +33,8 @@
       ]
    },
    "dependencies": {
+      "@slyoldfox/sip": "^0.0.6-1",
       "sdp": "^3.0.3",
-      "sip": "0.0.6",
       "stun": "^2.1.0",
       "uuid": "^8.3.2"
    },
@@ -43,6 +43,7 @@
       "@scrypted/sdk": "file:../../sdk",
       "@types/node": "^16.9.6",
       "@types/uuid": "^8.3.4",
+      "cross-env": "^7.0.3",
       "ts-node": "^10.9.1"
    }
 }

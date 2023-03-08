@@ -27,6 +27,12 @@ export class SipCallSession extends Subscribed {
     private sipManager: SipManager
   ) {
     super()
+    //TODO: make this more clean
+    this.addSubscriptions( this.sipManager.onEndedByRemote.subscribe(() => {
+      this.callEnded(false)
+    } ))
+    
+    sipManager.sipOptions = sipOptions
   }
 
   static async createCallSession(console: Console, cameraName: string, sipOptions: SipOptions, sipManager?: SipManager ) {

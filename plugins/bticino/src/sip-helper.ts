@@ -32,8 +32,9 @@ export class SipHelper {
             localPort,
             shouldRegister: true,
             debugSip: sipdebug,
+            gruuInstanceId: camera.getGruuInstanceId(),
             useTcp: true,
             sipRequestHandler: camera.requestHandlers
          } 
-    }
+    }    
 }

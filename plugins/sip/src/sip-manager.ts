@@ -2,10 +2,11 @@ import { noop, Subject } from 'rxjs'
 import { randomInteger, randomString } from './util'
 import { RtpDescription, RtpOptions, RtpStreamDescription } from './rtp-utils'
 import { decodeSrtpOptions } from '../../ring/src/srtp-utils'
-import { stringify, stringifyUri } from 'sip/sip'
+import { stringify, stringifyUri } from '@slyoldfox/sip'
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
+import sdp from 'sdp'
 
-const sip = require('sip'), sdp = require('sdp')
+const sip = require('@slyoldfox/sip')
 
 export interface SipOptions {
   to: string
@@ -16,6 +17,7 @@ export interface SipOptions {
   localPort: number
   debugSip?: boolean
   useTcp?: boolean
+  gruuInstanceId?: string
   sipRequestHandler?: SipRequestHandler
   shouldRegister?: boolean
 }
@@ -159,13 +161,11 @@ export class SipManager {
 
   constructor(
     console: Console,
-    private sipOptions: SipOptions,
+    public sipOptions: SipOptions,
   ) {
     this.console = console;
-
     const host = this.sipOptions.localIp,
-    port = this.sipOptions.localPort,
-    contactId = randomInteger()
+    port = this.sipOptions.localPort
 
     this.sipStack = {
       makeResponse: sip.makeResponse,
@@ -183,7 +183,7 @@ export class SipManager {
         ws: false,
         logger: {
           recv:  function(m, remote) {
-            if( m.status == '200' && m.reason =='Ok' && m.headers.contact ) {
+            if( (m.status == '200' || m.method === 'INVITE' ) && m.headers && m.headers.cseq && m.headers.cseq.method === 'INVITE' && m.headers.contact && m.headers.contact[0] ) {
               // ACK for INVITE and BYE must use the registrar contact uri
               this.registrarContact = m.headers.contact[0].uri;
             }
@@ -193,6 +193,19 @@ export class SipManager {
               console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
             }
           },
+          appendGruu: function( contact, gruuUrn ) {
+            if( sipOptions.gruuInstanceId ) {
+              if( contact && contact[0] ) {
+                if( !contact[0].params ) {
+                 contact[0].params = {}
+                }
+                contact[0].params['+sip.instance'] = '"<urn:uuid:' + sipOptions.gruuInstanceId + '>"'
+                if( gruuUrn ) {
+                  contact[0].uri = contact[0].uri + ';gr=urn:uuid:' + sipOptions.gruuInstanceId
+                }
+              }
+            }            
+          },
           send:  function(m, remote) {
             /*
             Some door bells run an embedded SIP server with an unresolvable public domain
@@ -200,14 +213,15 @@ export class SipManager {
             just before they get sent to the SIP server.
             */
            if( sipOptions.domain && sipOptions.domain.length > 0 ) {
-            // Bticino CX300 specific: runs on an internet 2048362.bs.iotleg.com domain
-            // While underlying UDP socket is bound to the IP, the header is rewritten to match the domain
-            let toWithDomain: string = (sipOptions.to.split('@')[0] + '@' + sipOptions.domain).trim()
-            let fromWithDomain: string = (sipOptions.from.split('@')[0] + '@' + sipOptions.domain).trim()
+              // Bticino CX300 specific: runs on an internet 2048362.bs.iotleg.com domain
+              // While underlying UDP socket is bound to the IP, the header is rewritten to match the domain
+              let toWithDomain: string = (sipOptions.to.split('@')[0] + '@' + sipOptions.domain).trim()
+              let fromWithDomain: string = (sipOptions.from.split('@')[0] + '@' + sipOptions.domain).trim()
 
               if( m.method == 'REGISTER' ) {
                 m.uri = "sip:" + sipOptions.domain
                 m.headers.to.uri = fromWithDomain
+                this.appendGruu( m.headers.contact )
               } else if( m.method == 'INVITE' || m.method == 'MESSAGE' ) {
                 m.uri = toWithDomain
                 m.headers.to.uri = toWithDomain
@@ -218,6 +232,11 @@ export class SipManager {
                 m.headers.to.uri = toWithDomain
                 m.uri = this.registrarContact
               } else if( (m.method == undefined && m.status) && m.headers.cseq ) {
+                if( m.status == '200' ) {
+                  // Response on invite
+                  this.appendGruu( m.headers.contact, true )
+                }
+                
                 // 183, 200, OK, CSeq: INVITE
               } else {
                 console.error("Error: Method construct for uri not implemented: " + m.method)
@@ -226,7 +245,6 @@ export class SipManager {
               if( m.method ) {
                 m.headers.from.uri = fromWithDomain
                 if( m.headers.contact && m.headers.contact[0].uri.split('@')[0].lastIndexOf('-') < 0 ) {
-                  m.headers.contact[0].uri = m.headers.contact[0].uri.replace("@", "-" + contactId + "@");
                   // Also a bug in SIP.js ? append the transport for the contact if the transport is udp (according to RFC)
                   if( remote.protocol != 'udp' && m.headers.contact[0].uri.indexOf( "transport=" ) < 0 ) {
                     m.headers.contact[0].uri = m.headers.contact[0].uri + ";transport=" + remote.protocol
@@ -254,19 +272,27 @@ export class SipManager {
             this.console.info('received BYE from remote end')
             this.sipStack.send(this.sipStack.makeResponse(request, 200, 'Ok'))
 
-            if (this.destroyed) {
-            this.onEndedByRemote.next(null)
+            if (!this.destroyed) {
+              this.onEndedByRemote.next(null)
             }
           } else if( request.method === 'MESSAGE'  && sipOptions.sipRequestHandler ) {
             sipOptions.sipRequestHandler.handle( request )
             this.sipStack.send(this.sipStack.makeResponse(request, 200, 'Ok'))
           } else if( request.method === 'INVITE' && sipOptions.sipRequestHandler ) {
-            let ringResponse = this.sipStack.makeResponse(request, 180, 'Ringing')
-            ringResponse.headers["Supported"] = "replaces, outbound, gruu"
-            ringResponse.headers.to.params.tag = '2pAx2dBB'
-            this.sipStack.send(ringResponse)
-            sipOptions.sipRequestHandler.handle( request )
-          } else if( request.method === 'CANCEL' ) {
+            //let tryingResponse = this.sipStack.makeResponse( request, 100, 'Trying' )
+            //this.sipStack.send(tryingResponse)            
+              //TODO: sporadic re-INVITEs are possible and should reply with 486 Busy here if already being handled
+              let ringResponse = this.sipStack.makeResponse(request, 180, 'Ringing')
+              this.toParams.tag = getRandomId()
+              ringResponse.headers.to.params.tag = this.toParams.tag
+              ringResponse.headers["record-route"] = request.headers["record-route"];
+              ringResponse.headers["supported"] = "replaces, outbound, gruu"
+              // Can include SDP and could send 183 here for early media
+              this.sipStack.send(ringResponse)
+  
+              sipOptions.sipRequestHandler.handle( request )
+           // }, 100 )
+          } else if( request.method === 'CANCEL' || request.method === 'ACK' ) {
             sipOptions.sipRequestHandler.handle( request )
           } else {
             if( sipOptions.debugSip ) {
@@ -322,6 +348,10 @@ export class SipManager {
           if (response.headers.to.params && response.headers.to.params.tag) {
             this.toParams.tag = response.headers.to.params.tag
           }
+          
+          if (response.headers.from.params && response.headers.from.params.tag) {
+            this.fromParams.tag = response.headers.from.params.tag
+          } 
 
           if (response.status >= 300) {
             if (response.status !== 408 || method !== 'BYE') {
@@ -383,7 +413,7 @@ export class SipManager {
     if( incomingCallRequest ) {
       let callResponse = this.sipStack.makeResponse(incomingCallRequest, 200, 'Ok', {
         headers: {
-          supported: 'replaces, outbound',
+          supported: 'replaces, outbound, gruu',
           allow:
             'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
           'content-type': 'application/sdp',
@@ -402,8 +432,14 @@ export class SipManager {
       } )
       if( incomingCallRequest.headers["record-route"] )
         callResponse.headers["record-route"] = incomingCallRequest.headers["record-route"];
-      callResponse.headers.to.params.tag = '2pAx2dBB' //whatever, just some value
-      callResponse.headers.contact = [{ uri: from }]
+      let fromWithDomain: string = (from.split('@')[0] + '@' + this.sipOptions.domain).trim()
+      callResponse.headers.contact = [{ uri: fromWithDomain }]
+
+      // Invert the params if the request comes from the server
+      this.fromParams.tag = incomingCallRequest.headers.to.params.tag
+      this.toParams.tag = incomingCallRequest.headers.from.params.tag
+      this.callId = incomingCallRequest.headers["call-id"]
+      
       await this.sipStack.send(callResponse)
 
       return parseRtpDescription(this.console, incomingCallRequest)
@@ -411,11 +447,11 @@ export class SipManager {
       if( this.sipOptions.to.toLocaleLowerCase().indexOf('c300x') >= 0 ) {
         // Needed for bt_answering_machine (bticino specific)
         audio.unshift('a=DEVADDR:20')
-    }
+      }
       let inviteResponse = await this.request({
         method: 'INVITE',
         headers: {
-          supported: 'replaces, outbound',
+          supported: 'replaces, outbound, gruu',
           allow:
             'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
           'content-type': 'application/sdp',
@@ -447,10 +483,11 @@ export class SipManager {
       this.request({
       method: 'REGISTER',
       headers: {
-        //supported: 'replaces, outbound',
+        supported: 'replaces, outbound, gruu',
         allow:
           'INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, MESSAGE, SUBSCRIBE, INFO, UPDATE',
-        contact: [{ uri: from, params: { expires: this.sipOptions.expire } }],
+        contact: [{ uri: from }],
+        expires: this.sipOptions.expire // as seen in tcpdump for Door Entry app
       },
       }).catch(noop));
   }
@@ -488,3 +525,5 @@ export class SipManager {
     this.console.debug("detroying sip-manager: done")
   }
 }
+
+

@@ -1,10 +1,11 @@
 import { SipRequestHandler, SipRequest } from "../../sip/src/sip-manager"
 import { BticinoSipCamera } from "./bticino-camera"
-import { stringifyUri } from 'sip/sip'
+import { stringifyUri } from '@slyoldfox/sip'
 
 export class InviteHandler extends SipRequestHandler {
     constructor( private sipCamera : BticinoSipCamera ) {
         super()
+        this.sipCamera.binaryState = false
     }
 
     handle(request: SipRequest) {
