@@ -4,7 +4,7 @@ import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import sdk, { BinarySensor, Camera, Device, DeviceProvider, EntrySensor, FFmpegInput, MediaObject, MediaStreamUrl, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, SecuritySystem, SecuritySystemMode, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { Battery, BinarySensor, Camera, Device, DeviceProvider, EntrySensor, FFmpegInput, FloodSensor, MediaObject, MediaStreamUrl, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, SecuritySystem, SecuritySystemMode, Setting, Settings, SettingValue, TamperSensor, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
@@ -661,9 +661,13 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
     }
 }
 
-class RingContactSensor extends ScryptedDeviceBase implements EntrySensor {
+class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, EntrySensor, MotionSensor, FloodSensor {
     updateState(data: RingDeviceData) {
-        this.entryOpen = data.faulted
+        this.tampered = data.tamperStatus === 'tamper';
+        this.batteryLevel = data.batteryLevel;
+        this.entryOpen = data.faulted;
+        this.motionDetected = data.faulted;
+        this.flooded = data.flood?.faulted || data.faulted;
     }
 }
 
@@ -761,7 +765,7 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
     async getDevice(nativeId: string) {
         if (!this.devices.has(nativeId)) {
             if (nativeId.endsWith('-sensor')) {
-                const sensor = new RingContactSensor(nativeId);
+                const sensor = new RingSensor(nativeId);
                 this.devices.set(nativeId, sensor);
             } else {
                 const camera = new RingCameraDevice(this.plugin, this, nativeId);
@@ -1025,31 +1029,61 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             }
 
             const sensors = (await location.getDevices()).filter(x => {
-                return x.data.status !== 'disabled' && (x.data.deviceType === RingDeviceType.ContactSensor || x.data.deviceType === RingDeviceType.RetrofitZone)
+                const supportedSensors = [
+                    RingDeviceType.ContactSensor, 
+                    RingDeviceType.RetrofitZone,
+                    RingDeviceType.TiltSensor, 
+                    RingDeviceType.MotionSensor,
+                    RingDeviceType.FloodFreezeSensor,
+                    RingDeviceType.WaterSensor,
+                ]
+                return x.data.status !== 'disabled' && (supportedSensors.includes(x.data.deviceType))
             });
             for (const sensor of sensors) {
                 const nativeId = sensor.id.toString() + '-sensor';
+                const data: RingDeviceData = sensor.data;
+
+                const interfaces = [ScryptedInterface.TamperSensor];
+                switch (data.deviceType){
+                    case RingDeviceType.ContactSensor:
+                    case RingDeviceType.RetrofitZone: 
+                    case RingDeviceType.TiltSensor:
+                        interfaces.push(ScryptedInterface.EntrySensor);
+                        break;
+                    case RingDeviceType.MotionSensor:
+                        interfaces.push(ScryptedInterface.MotionSensor);
+                        break;
+                    case RingDeviceType.FloodFreezeSensor:
+                    case RingDeviceType.WaterSensor:
+                        interfaces.push(ScryptedInterface.FloodSensor);
+                        break;
+                    default: break;
+                }
+                
+                if (data.batteryStatus !== 'none')
+                    interfaces.push(ScryptedInterface.Battery);
+                
                 const device: Device = {
                     info: {
-                        model: sensor.data.deviceType,
+                        model: data.deviceType,
                         manufacturer: 'Ring',
-                        serialNumber: sensor.data.serialNumber ?? 'Unknown'
+                        serialNumber: data.serialNumber ?? 'Unknown'
                     },
                     providerNativeId: location.id,
                     nativeId: nativeId,
                     name: sensor.name,
                     type: ScryptedDeviceType.Sensor,
-                    interfaces: [ScryptedInterface.EntrySensor],
+                    interfaces,
                 };
                 devices.push(device);
 
                 const getScryptedDevice = async () => {
                     const locationDevice = await this.getDevice(location.id);
                     const scryptedDevice = await locationDevice?.getDevice(nativeId);
-                    return scryptedDevice as RingContactSensor;
+                    return scryptedDevice as RingSensor;
                 }
 
-                sensor.onData.subscribe(async data => {
+                sensor.onData.subscribe(async (data: RingDeviceData) => {
                     const scryptedDevice = await getScryptedDevice();
                     scryptedDevice?.updateState(data)
                 });

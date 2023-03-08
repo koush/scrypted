@@ -18,6 +18,7 @@ export enum AmcrestEvent {
     PhoneCallDetectStop = "Code=PhoneCallDetect;action=Stop",
     DahuaTalkInvite = "Code=CallNoAnswered;action=Start",
     DahuaTalkHangup = "Code=PassiveHungup;action=Start",
+    DahuaCallDeny = "Code=HungupPhone;action=Pulse",
     DahuaTalkPulse = "Code=_CallNoAnswer_;action=Pulse",
 }
 
@@ -30,6 +31,16 @@ export class AmcrestCameraClient {
             username,
             password,
         });
+    }
+
+    async checkTwoWayAudio() {
+        const response = await this.digestAuth.request({
+            httpsAgent: amcrestHttpsAgent,
+            method: "GET",
+            responseType: 'text',
+            url: `http://${this.ip}/cgi-bin/devAudioOutput.cgi?action=getCollect`,
+        });
+        return (response.data as string).includes('result=1');
     }
 
     // appAutoStart=true

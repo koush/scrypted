@@ -4,10 +4,10 @@ import { once } from 'events';
 import { BASIC } from 'http-auth-utils/dist/index';
 import { parseHTTPHeadersQuotedKeyValueSet } from 'http-auth-utils/dist/utils';
 import net from 'net';
-import { Duplex, Readable } from 'stream';
+import { Duplex, Readable, Writable } from 'stream';
 import tls from 'tls';
 import { Deferred } from './deferred';
-import { closeQuiet, createBindUdp, createBindZero } from './listen-cluster';
+import { closeQuiet, createBindUdp, createBindZero, listenZeroSingleClient } from './listen-cluster';
 import { timeoutPromise } from './promise-utils';
 import { readLength, readLine } from './read-stream';
 import { MSection, parseSdp } from './sdp-utils';
@@ -45,6 +45,29 @@ export async function readMessage(client: Readable): Promise<string[]> {
             return currentHeaders;
         currentHeaders.push(line);
     }
+}
+
+
+export async function readBody(client: Readable, response: Headers) {
+    const cl = parseInt(response['content-length']);
+    if (cl)
+        return readLength(client, cl)
+}
+
+
+export function writeMessage(client: Writable, messageLine: string, body: Buffer, headers: Headers, console?: Console) {
+    let message = messageLine !== undefined ? `${messageLine}\r\n` : '';
+    if (body)
+        headers['Content-Length'] = body.length.toString();
+    for (const [key, value] of Object.entries(headers)) {
+        message += `${key}: ${value}\r\n`;
+    }
+    message += '\r\n';
+    client.write(message);
+    console?.log('rtsp outgoing message\n', message);
+    console?.log();
+    if (body)
+        client.write(body);
 }
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
@@ -284,18 +307,7 @@ export class RtspBase {
     }
 
     write(messageLine: string, headers: Headers, body?: Buffer) {
-        let message = `${messageLine}\r\n`;
-        if (body)
-            headers['Content-Length'] = body.length.toString();
-        for (const [key, value] of Object.entries(headers)) {
-            message += `${key}: ${value}\r\n`;
-        }
-        message += '\r\n';
-        this.client.write(message);
-        this.console?.log('rtsp outgoing message\n', message);
-        this.console?.log();
-        if (body)
-            this.client.write(body);
+        writeMessage(this.client, messageLine, body, headers, this.console);
     }
 
     async readMessage(): Promise<string[]> {
@@ -590,9 +602,7 @@ export class RtspClient extends RtspBase {
     }
 
     async readBody(response: Headers) {
-        const cl = parseInt(response['content-length']);
-        if (cl)
-            return readLength(this.client, cl)
+        return readBody(this.client, response);
     }
 
     async request(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean): Promise<RtspServerResponse> {
@@ -1051,5 +1061,35 @@ export class RtspServer {
             closeQuiet(track.rtp);
             closeQuiet(track.rtcp);
         }
+    }
+}
+
+export async function listenSingleRtspClient<T extends RtspServer>(options?: {
+    hostname?: string,
+    pathToken?: string,
+    createServer?(duplex: Duplex): T,
+}) {
+    const pathToken = options?.pathToken || crypto.randomBytes(8).toString('hex');
+    let { url, clientPromise, server } = await listenZeroSingleClient(options?.hostname);
+
+    const rtspServerPath = '/' + pathToken;
+    url = url.replace('tcp:', 'rtsp:') + rtspServerPath;
+
+    const rtspServerPromise = clientPromise.then(client => {
+        const createServer = options?.createServer || (duplex => new RtspServer(duplex));
+
+        const rtspServer = createServer(client);
+        rtspServer.checkRequest = async (method, url, headers, message) => {
+            rtspServer.checkRequest = undefined;
+            const u = new URL(url);
+            return u.pathname === rtspServerPath;
+        };
+        return rtspServer as T;
+    });
+
+    return {
+        url,
+        rtspServerPromise,
+        server,
     }
 }

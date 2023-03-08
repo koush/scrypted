@@ -352,6 +352,9 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         this.scrypted.stateManager.setPluginDeviceState(device, ScryptedInterfaceProperty.type, type);
         this.scrypted.stateManager.updateDescriptor(device);
     }
+    async setMixins(mixins: string[]): Promise<void> {
+
+    }
 
     async probe(): Promise<boolean> {
         try {

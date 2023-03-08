@@ -1,4 +1,4 @@
-import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
+import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject as MediaObjectInterface, MediaObjectOptions, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import axios from 'axios';
 import pathToFfmpeg from 'ffmpeg-static';
 import fs from 'fs';
@@ -9,7 +9,29 @@ import Graph from 'node-dijkstra';
 import os from 'os';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
+import { RpcPeer } from "../rpc";
 import { MediaObjectRemote } from "./plugin-api";
+
+class MediaObject implements MediaObjectRemote {
+    __proxy_props: any;
+
+    constructor(public mimeType: string, public data: any, options: MediaObjectOptions) {
+        this.__proxy_props = {
+            mimeType,
+        }
+        if (options) {
+            for (const [key, value] of Object.entries(options)) {
+                if (RpcPeer.isTransportSafe(key))
+                    this.__proxy_props[key] = value;
+                (this as any)[key] = value;
+            }
+        }
+    }
+
+    async getData(): Promise<Buffer | string> {
+        return Promise.resolve(this.data);
+    }
+}
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything
@@ -164,7 +186,7 @@ export abstract class MediaManagerBase implements MediaManager {
         this.extraConverters = [];
     }
 
-    async convertMediaObjectToJSON<T>(mediaObject: MediaObject, toMimeType: string): Promise<T> {
+    async convertMediaObjectToJSON<T>(mediaObject: MediaObjectInterface, toMimeType: string): Promise<T> {
         const buffer = await this.convertMediaObjectToBuffer(mediaObject, toMimeType);
         return JSON.parse(buffer.toString());
     }
@@ -231,7 +253,7 @@ export abstract class MediaManagerBase implements MediaManager {
         return converters;
     }
 
-    ensureMediaObjectRemote(mediaObject: string | MediaObject): MediaObjectRemote {
+    ensureMediaObjectRemote(mediaObject: string | MediaObjectInterface): MediaObjectRemote {
         if (typeof mediaObject === 'string') {
             const mime = mimeType.getType(mediaObject);
             return this.createMediaObjectRemote(mediaObject, mime);
@@ -239,36 +261,36 @@ export abstract class MediaManagerBase implements MediaManager {
         return mediaObject as MediaObjectRemote;
     }
 
-    async convertMediaObject<T>(mediaObject: MediaObject, toMimeType: string): Promise<T> {
+    async convertMediaObject<T>(mediaObject: MediaObjectInterface, toMimeType: string): Promise<T> {
         const converted = await this.convert(this.getConverters(), this.ensureMediaObjectRemote(mediaObject), toMimeType);
         return converted.data;
     }
 
-    async convertMediaObjectToInsecureLocalUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string> {
+    async convertMediaObjectToInsecureLocalUrl(mediaObject: string | MediaObjectInterface, toMimeType: string): Promise<string> {
         const intermediate = await this.convert(this.getConverters(), this.ensureMediaObjectRemote(mediaObject), toMimeType);
         const converted = this.createMediaObjectRemote(intermediate.data, intermediate.mimeType);
         const url = await this.convert(this.getConverters(), converted, ScryptedMimeTypes.InsecureLocalUrl);
         return url.data.toString();
     }
 
-    async convertMediaObjectToBuffer(mediaObject: MediaObject, toMimeType: string): Promise<Buffer> {
+    async convertMediaObjectToBuffer(mediaObject: MediaObjectInterface, toMimeType: string): Promise<Buffer> {
         const intermediate = await this.convert(this.getConverters(), this.ensureMediaObjectRemote(mediaObject), toMimeType);
         return intermediate.data as Buffer;
     }
-    async convertMediaObjectToLocalUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string> {
+    async convertMediaObjectToLocalUrl(mediaObject: string | MediaObjectInterface, toMimeType: string): Promise<string> {
         const intermediate = await this.convert(this.getConverters(), this.ensureMediaObjectRemote(mediaObject), toMimeType);
         const converted = this.createMediaObjectRemote(intermediate.data, intermediate.mimeType);
         const url = await this.convert(this.getConverters(), converted, ScryptedMimeTypes.LocalUrl);
         return url.data.toString();
     }
-    async convertMediaObjectToUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string> {
+    async convertMediaObjectToUrl(mediaObject: string | MediaObjectInterface, toMimeType: string): Promise<string> {
         const intermediate = await this.convert(this.getConverters(), this.ensureMediaObjectRemote(mediaObject), toMimeType);
         const converted = this.createMediaObjectRemote(intermediate.data, intermediate.mimeType);
         const url = await this.convert(this.getConverters(), converted, ScryptedMimeTypes.Url);
         return url.data.toString();
     }
 
-    createMediaObjectRemote(data: any | Buffer | Promise<string | Buffer>, mimeType: string, options?: MediaObjectOptions): MediaObjectRemote {
+    createMediaObjectRemote<T extends MediaObjectOptions>(data: any | Buffer | Promise<string | Buffer>, mimeType: string, options?: T): MediaObjectRemote & T {
         if (typeof data === 'string')
             throw new Error('string is not a valid type. if you intended to send a url, use createMediaObjectFromUrl.');
         if (!mimeType)
@@ -280,26 +302,15 @@ export abstract class MediaManagerBase implements MediaManager {
             data = Buffer.from(JSON.stringify(data));
 
         const sourceId = typeof options?.sourceId === 'string' ? options?.sourceId : this.getPluginDeviceId();
-        class MediaObjectImpl implements MediaObjectRemote {
-            __proxy_props = {
-                mimeType,
-                sourceId,
-            }
 
-            mimeType = mimeType;
-            sourceId = sourceId;
-            async getData(): Promise<Buffer | string> {
-                return Promise.resolve(data);
-            }
-        }
-        return new MediaObjectImpl();
+        return new MediaObject(mimeType, data, options) as MediaObject & T;
     }
 
-    async createFFmpegMediaObject(ffMpegInput: FFmpegInput, options?: MediaObjectOptions): Promise<MediaObject> {
+    async createFFmpegMediaObject(ffMpegInput: FFmpegInput, options?: MediaObjectOptions): Promise<MediaObjectInterface> {
         return this.createMediaObjectRemote(Buffer.from(JSON.stringify(ffMpegInput)), ScryptedMimeTypes.FFmpegInput, options);
     }
 
-    async createMediaObjectFromUrl(data: string, options?: MediaObjectOptions): Promise<MediaObject> {
+    async createMediaObjectFromUrl(data: string, options?: MediaObjectOptions): Promise<MediaObjectInterface> {
         const url = new URL(data);
         const scheme = url.protocol.slice(0, -1);
         const mimeType = ScryptedMimeTypes.SchemePrefix + scheme;
@@ -320,7 +331,7 @@ export abstract class MediaManagerBase implements MediaManager {
         return new MediaObjectImpl();
     }
 
-    async createMediaObject(data: any, mimeType: string, options?: MediaObjectOptions): Promise<MediaObject> {
+    async createMediaObject<T extends MediaObjectOptions>(data: any, mimeType: string, options?: T): Promise<MediaObjectInterface & T> {
         return this.createMediaObjectRemote(data, mimeType, options);
     }
 
@@ -423,7 +434,7 @@ export abstract class MediaManagerBase implements MediaManager {
             }
 
             if (converter.toMimeType === ScryptedMimeTypes.MediaObject) {
-                const mo = await converter.convert(value, valueMime.essence, toMimeType, { sourceId }) as MediaObject;
+                const mo = await converter.convert(value, valueMime.essence, toMimeType, { sourceId }) as MediaObjectInterface;
                 const found = await this.convertMediaObject(mo, toMimeType);
                 return {
                     data: found,

@@ -1,26 +1,24 @@
-import { DeviceManager, ScryptedNativeId, ScryptedStatic, SystemManager } from '@scrypted/types';
+import { ScryptedStatic, SystemManager } from '@scrypted/types';
 import AdmZip from 'adm-zip';
-import { Console } from 'console';
+import { once } from 'events';
 import fs from 'fs';
 import { Volume } from 'memfs';
 import net from 'net';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
-import { PassThrough } from 'stream';
+import { listenZero } from '../listen-zero';
 import { RpcMessage, RpcPeer } from '../rpc';
+import { createDuplexRpcPeer } from '../rpc-serializer';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
+import { prepareConsoles } from './plugin-console';
 import { installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, DeviceManagerImpl, PluginReader, setupPluginRemote } from './plugin-remote';
+import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
+import crypto from 'crypto';
 const { link } = require('linkfs');
-
-interface PluginStats {
-    type: 'stats',
-    cpu: NodeJS.CpuUsage;
-    memoryUsage: NodeJS.MemoryUsage;
-}
 
 const serverVersion = require('../../package.json').version;
 
@@ -31,47 +29,6 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
     let deviceManager: DeviceManagerImpl;
     let api: PluginAPI;
 
-    const getConsole = (hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>,
-        also?: Console, alsoPrefix?: string) => {
-
-        const stdout = new PassThrough();
-        const stderr = new PassThrough();
-
-        hook(stdout, stderr);
-
-        const ret = new Console(stdout, stderr);
-
-        const methods = [
-            'log', 'warn',
-            'dir', 'timeLog',
-            'trace', 'assert',
-            'clear', 'count',
-            'countReset', 'group',
-            'groupEnd', 'table',
-            'debug', 'info',
-            'dirxml', 'error',
-            'groupCollapsed',
-        ];
-
-        const printers = ['log', 'info', 'debug', 'trace', 'warn', 'error'];
-        for (const m of methods) {
-            const old = (ret as any)[m].bind(ret);
-            (ret as any)[m] = (...args: any[]) => {
-                // prefer the mixin version for local/remote console dump.
-                if (also && alsoPrefix && printers.includes(m)) {
-                    (also as any)[m](alsoPrefix, ...args);
-                }
-                else {
-                    (console as any)[m](...args);
-                }
-                // call through to old method to ensure it gets written
-                // to log buffer.
-                old(...args);
-            }
-        }
-
-        return ret;
-    }
 
     let pluginsPromise: Promise<any>;
     function getPlugins() {
@@ -80,138 +37,13 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
         return pluginsPromise;
     }
 
-    const deviceConsoles = new Map<string, Console>();
-    const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
-        // the the plugin console is simply the default console
-        // and gets read from stderr/stdout.
-        if (!nativeId)
-            return console;
-
-        let ret = deviceConsoles.get(nativeId);
-        if (ret)
-            return ret;
-
-        ret = getConsole(async (stdout, stderr) => {
-            const connect = async () => {
-                const plugins = await getPlugins();
-                const port = await plugins.getRemoteServicePort(peer.selfName, 'console-writer');
-                const socket = net.connect(port);
-                socket.write(nativeId + '\n');
-                const writer = (data: Buffer) => {
-                    socket.write(data);
-                };
-                stdout.on('data', writer);
-                stderr.on('data', writer);
-                socket.on('error', () => {
-                    stdout.removeAllListeners();
-                    stderr.removeAllListeners();
-                    stdout.pause();
-                    stderr.pause();
-                    setTimeout(connect, 10000);
-                });
-            };
-            connect();
-        }, undefined, undefined);
-
-        deviceConsoles.set(nativeId, ret);
-        return ret;
-    }
-
-    const mixinConsoles = new Map<string, Map<string, Console>>();
-
-    const getMixinConsole = (mixinId: string, nativeId: ScryptedNativeId) => {
-        let nativeIdConsoles = mixinConsoles.get(nativeId);
-        if (!nativeIdConsoles) {
-            nativeIdConsoles = new Map();
-            mixinConsoles.set(nativeId, nativeIdConsoles);
-        }
-
-        let ret = nativeIdConsoles.get(mixinId);
-        if (ret)
-            return ret;
-
-        ret = getConsole(async (stdout, stderr) => {
-            if (!mixinId) {
-                return;
-            }
-            const reconnect = () => {
-                stdout.removeAllListeners();
-                stderr.removeAllListeners();
-                stdout.pause();
-                stderr.pause();
-                setTimeout(tryConnect, 10000);
-            };
-
-            const connect = async () => {
-                const ds = deviceManager.getDeviceState(nativeId);
-                if (!ds) {
-                    // deleted?
-                    return;
-                }
-
-                const plugins = await getPlugins();
-                const { pluginId, nativeId: mixinNativeId } = await plugins.getDeviceInfo(mixinId);
-                const port = await plugins.getRemoteServicePort(pluginId, 'console-writer');
-                const socket = net.connect(port);
-                socket.write(mixinNativeId + '\n');
-                const writer = (data: Buffer) => {
-                    let str = data.toString().trim();
-                    str = str.replaceAll('\n', `\n[${ds.name}]: `);
-                    str = `[${ds.name}]: ` + str + '\n';
-                    socket.write(str);
-                };
-                stdout.on('data', writer);
-                stderr.on('data', writer);
-                socket.on('close', reconnect);
-            };
-
-            const tryConnect = async () => {
-                try {
-                    await connect();
-                }
-                catch (e) {
-                    reconnect();
-                }
-            }
-            tryConnect();
-        }, getDeviceConsole(nativeId), `[${systemManager.getDeviceById(mixinId)?.name}]`);
-
-        nativeIdConsoles.set(mixinId, ret);
-        return ret;
-    }
+    const { getDeviceConsole, getMixinConsole } = prepareConsoles(() => peer.selfName, () => systemManager, () => deviceManager, getPlugins);
 
     // process.cpuUsage is for the entire process.
     // process.memoryUsage is per thread.
     const allMemoryStats = new Map<NodeThreadWorker, NodeJS.MemoryUsage>();
 
-    peer.getParam('updateStats').then((updateStats: (stats: PluginStats) => void) => {
-        setInterval(() => {
-            const cpuUsage = process.cpuUsage();
-            allMemoryStats.set(undefined, process.memoryUsage());
-
-            const memoryUsage: NodeJS.MemoryUsage = {
-                rss: 0,
-                heapTotal: 0,
-                heapUsed: 0,
-                external: 0,
-                arrayBuffers: 0,
-            }
-
-            for (const mu of allMemoryStats.values()) {
-                memoryUsage.rss += mu.rss;
-                memoryUsage.heapTotal += mu.heapTotal;
-                memoryUsage.heapUsed += mu.heapUsed;
-                memoryUsage.external += mu.external;
-                memoryUsage.arrayBuffers += mu.arrayBuffers;
-            }
-
-            updateStats({
-                type: 'stats',
-                cpu: cpuUsage,
-                memoryUsage,
-            });
-        }, 10000);
-    });
+    peer.getParam('updateStats').then(updateStats => startStatsUpdater(allMemoryStats, updateStats));
 
     let replPort: Promise<number>;
 
@@ -245,7 +77,77 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             }
             throw new Error(`unknown service ${name}`);
         },
-        async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) {
+        async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions: PluginRemoteLoadZipOptions) {
+            const { clusterId, clusterSecret } = zipOptions;
+            const clusterRpcServer = net.createServer(client => {
+                const clusterPeer = createDuplexRpcPeer(peer.selfName, 'cluster-client', client, client);
+                const portSecret = crypto.createHash('sha256').update(`${clusterPort}${clusterSecret}`).digest().toString('hex');
+                clusterPeer.params['connectRPCObject'] = async (id: string, secret: string) => {
+                    if (secret !== portSecret)
+                        throw new Error('secret incorrect');
+                    return peer.localProxyMap[id];
+                }
+                client.on('close', () => clusterPeer.kill('cluster socket closed'));
+            })
+            const clusterPort = await listenZero(clusterRpcServer);
+            const clusterEntry = {
+                id: clusterId,
+                port: clusterPort,
+            };
+
+            peer.onProxySerialization = (value, proxyId) => {
+                const properties = RpcPeer.getProxyProperties(value);
+                if (!properties?.__cluster) {
+                    RpcPeer.setProxyProperties(value, Object.assign(properties || {}, {
+                        __cluster: {
+                            ...clusterEntry,
+                            proxyId,
+                        }
+                    }));
+                }
+            }
+
+            const clusterPeers = new Map<number, Promise<RpcPeer>>();
+            scrypted.connectRPCObject = async (value: any) => {
+                const clusterObject = value?.__cluster;
+                if (clusterObject?.id !== clusterId)
+                    return value;
+                const { port, proxyId } = clusterObject;
+
+                let clusterPeerPromise = clusterPeers.get(port);
+                if (!clusterPeerPromise) {
+                    clusterPeerPromise = (async () => {
+                        const socket = net.connect(port);
+                        socket.on('close', () => clusterPeers.delete(port));
+
+                        try {
+                            await once(socket, 'connect');
+                            const ret = createDuplexRpcPeer(peer.selfName, 'cluster-server', socket, socket);
+                            return ret;
+                        }
+                        catch (e) {
+                            console.error('failure ipc connect', e);
+                            socket.destroy();
+                            throw e;
+                        }
+                    })();
+                }
+
+                try {
+                    const clusterPeer = await clusterPeerPromise;
+                    const connectRPCObject = await clusterPeer.getParam('connectRPCObject');
+                    const portSecret = crypto.createHash('sha256').update(`${port}${clusterSecret}`).digest().toString('hex');
+                    const newValue = await connectRPCObject(proxyId, portSecret);
+                    if (!newValue)
+                        throw new Error('ipc object not found?');
+                    return newValue;
+                }
+                catch (e) {
+                    console.error('failure ipc', e);
+                    return value;
+                }
+            }
+
             let volume: any;
             let pluginReader: PluginReader;
             if (zipOptions?.unzippedPath && fs.existsSync(zipOptions?.unzippedPath)) {

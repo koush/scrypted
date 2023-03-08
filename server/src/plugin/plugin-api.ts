@@ -168,10 +168,13 @@ export interface PluginRemoteLoadZipOptions {
      */
     unzippedPath?: string;
     fork?: boolean;
+
+    clusterId: string;
+    clusterSecret: string;
 }
 
 export interface PluginRemote {
-    loadZip(packageJson: any, zipData: Buffer | string, options?: PluginRemoteLoadZipOptions): Promise<any>;
+    loadZip(packageJson: any, zipData: Buffer | string, options: PluginRemoteLoadZipOptions): Promise<any>;
     setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState } }): Promise<void>;
     setNativeId(nativeId: ScryptedNativeId, id: string, storage: { [key: string]: any }): Promise<void>;
     updateDeviceState(id: string, state: { [property: string]: SystemDeviceState }): Promise<void>;

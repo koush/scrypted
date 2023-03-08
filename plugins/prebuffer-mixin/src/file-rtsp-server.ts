@@ -1,6 +1,6 @@
 import { Headers, RtspServer } from "@scrypted/common/src/rtsp-server";
 import fs from 'fs';
-import net from 'net';
+import { Duplex } from "stream";
 
 // non standard extension that dumps the rtp payload to a file.
 export class FileRtspServer extends RtspServer {
@@ -8,7 +8,7 @@ export class FileRtspServer extends RtspServer {
     segmentBytesWritten = 0;
     writeConsole: Console;
 
-    constructor(client: net.Socket, sdp?: string, checkRequest?: (method: string, url: string, headers: Headers, rawMessage: string[]) => Promise<boolean>) {
+    constructor(client: Duplex, sdp?: string, checkRequest?: (method: string, url: string, headers: Headers, rawMessage: string[]) => Promise<boolean>) {
         super(client, sdp, undefined, checkRequest);
 
         this.client.on('close', () => {

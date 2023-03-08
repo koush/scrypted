@@ -26,10 +26,14 @@ export async function listenZeroSingleClient(hostname?: string) {
 
     clientPromise.catch(() => { });
 
+    let host = hostname;
+    if (!host || host === '0.0.0.0')
+        host = '127.0.0.1';
+
     return {
         server,
-        url: `tcp://127.0.0.1:${port}`,
-        host: '127.0.0.1',
+        url: `tcp://${host}:${port}`,
+        host,
         port,
         clientPromise,
     }

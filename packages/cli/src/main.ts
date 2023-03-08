@@ -7,10 +7,14 @@ import readline from 'readline-sync';
 import https from 'https';
 import mkdirp from 'mkdirp';
 import { installServe, serveMain } from './service';
-import { connectScryptedClient } from '../../client/src/index';
-import { ScryptedMimeTypes, FFMpegInput } from '@scrypted/types';
+import { connectScryptedClient } from '@scrypted/client';
+import { ScryptedMimeTypes, FFmpegInput } from '@scrypted/types';
 import semver from 'semver';
 import child_process from 'child_process';
+
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false,
+});
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -57,6 +61,7 @@ async function doLogin(host: string) {
             password,
         },
         url,
+        httpsAgent,
     }, axiosConfig));
 
     mkdirp.sync(scryptedHome);
@@ -112,13 +117,16 @@ async function runCommand() {
         pluginId: '@scrypted/core',
         username: login.username,
         password: login.token,
+        axiosConfig: {
+            httpsAgent,
+        }
     });
 
     const device: any = sdk.systemManager.getDeviceById(idOrName) || sdk.systemManager.getDeviceByName(idOrName);
     if (!device)
         throw new Error('device not found: ' + idOrName);
     const method = process.argv[4];
-    const args = process.argv.slice(5).map(arg => () => {
+    const args = process.argv.slice(5).map(arg => {
         try {
             return JSON.parse(arg);
         }
@@ -157,9 +165,15 @@ async function main() {
     }
     else if (process.argv[2] === 'ffplay') {
         const { sdk, pendingResult } = await runCommand();
-        const ffinput = await sdk.mediaManager.convertMediaObjectToJSON<FFMpegInput>(await pendingResult, ScryptedMimeTypes.FFmpegInput);
-        console.log(ffinput);
-        child_process.spawn('ffplay', ffinput.inputArguments, {
+        const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await pendingResult, ScryptedMimeTypes.FFmpegInput);
+        if (ffmpegInput.url && ffmpegInput.urls?.[0]) {
+            const url = new URL(ffmpegInput.url);
+            if (url.hostname === '127.0.0.1' && ffmpegInput.urls?.[0]) {
+                ffmpegInput.inputArguments = ffmpegInput.inputArguments.map(i => i === ffmpegInput.url ? ffmpegInput.urls?.[0] : i);
+            }
+        }
+        console.log('ffplay', ...ffmpegInput.inputArguments);
+        child_process.spawn('ffplay', ffmpegInput.inputArguments, {
             stdio: 'inherit',
         });
         sdk.disconnect();

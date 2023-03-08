@@ -186,7 +186,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
                 let detections: ObjectDetectionResult[] = [];
 
-                if (payload.type === 'smartDetectZone') {
+                if (payload.type === 'smartDetectZone' || payload.type === 'smartDetectLine') {
                     unifiCamera.resetDetectionTimeout();
 
                     detections = payload.smartDetectTypes.map(type => ({

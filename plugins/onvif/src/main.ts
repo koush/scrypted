@@ -1,4 +1,4 @@
-import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PanTiltZoom, PanTiltZoomCommand, PictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import { AddressInfo } from "net";
 import onvif from 'onvif';
 import { Stream } from "stream";
@@ -6,6 +6,7 @@ import xml2js from 'xml2js';
 import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
 import { OnvifIntercom } from "./onvif-intercom";
+import { OnvifPTZMixinProvider } from "./onvif-ptz";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -393,7 +394,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
-    async putSetting(key: string, value: string) {
+    async putSetting(key: string, value: any) {
         this.client = undefined;
         this.rtspMediaStreamOptions = undefined;
 
@@ -428,6 +429,17 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
     constructor(nativeId?: string) {
         super(nativeId);
+
+        process.nextTick(() => {
+            deviceManager.onDeviceDiscovered({
+                name: 'ONVIF PTZ',
+                type: ScryptedDeviceType.Builtin,
+                nativeId: 'ptz',
+                interfaces: [
+                    ScryptedInterface.MixinProvider,
+                ]
+            })
+        })
 
         onvif.Discovery.on('device', (cam: any, rinfo: AddressInfo, xml: any) => {
             // Function will be called as soon as the NVT responses
@@ -511,6 +523,12 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         })
     }
 
+    async getDevice(nativeId: string) {
+        if (nativeId === 'ptz')
+            return new OnvifPTZMixinProvider('ptz');
+        return super.getDevice(nativeId);
+    }
+
     getAdditionalInterfaces() {
         return [
             ScryptedInterface.Camera,
@@ -531,6 +549,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         const username = settings.username?.toString();
         const password = settings.password?.toString();
         const skipValidate = settings.skipValidate === 'true';
+        let ptzCapabilities: string[];
         if (!skipValidate) {
             try {
                 const api = await connectCameraAPI(httpAddress, username, password, this.console, undefined);
@@ -545,6 +564,12 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                 }
 
                 settings.newCamera = info.model;
+
+                api.cam.services.find((s: any) => s.namespace === 'http://www.onvif.org/ver20/ptz/wsdl');
+                ptzCapabilities = [
+                    'Pan',
+                    'Tilt',
+                ];
             }
             catch (e) {
                 this.console.error('Error adding ONVIF camera', e);
@@ -561,6 +586,31 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         device.putSetting('password', password);
         device.setIPAddress(settings.ip?.toString());
         device.setHttpPortOverride(settings.httpPort?.toString());
+
+        const intercom = new OnvifIntercom(device);
+        try {
+            intercom.url = (await device.getConstructedVideoStreamOptions())[0].url;
+            if (await intercom.checkIntercom()) {
+                device.putSetting('onvifTwoWay', 'true');
+            }
+        }
+        catch (e) {
+            this.console.warn("error while probing intercom", e);
+        }
+        finally {
+            intercom.intercomClient?.client.destroy();
+        }
+
+        if (ptzCapabilities) {
+            try {
+                const rd = sdk.systemManager.getDeviceById(device.id);
+                const ptz = await this.getDevice('ptz');
+                rd.setMixins([...(rd.mixins || []), ptz.id]);
+            }
+            catch (e) {
+            }
+        }
+
         return nativeId;
     }
 

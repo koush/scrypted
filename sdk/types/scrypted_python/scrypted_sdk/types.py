@@ -285,10 +285,6 @@ class AdoptDevice(TypedDict):
     settings: DeviceCreatorSettings
     pass
 
-class BufferConvertorOptions(TypedDict):
-    sourceId: str
-    pass
-
 class ColorHsv(TypedDict):
     h: float
     s: float
@@ -369,6 +365,7 @@ class FFmpegInput(TypedDict):
     inputArguments: list[str]
     mediaStreamOptions: ResponseMediaStreamOptions
     url: str
+    urls: list[str]
     videoDecoderArguments: list[str]
     pass
 
@@ -537,7 +534,7 @@ class RequestMediaStreamOptions(TypedDict):
     prebuffer: float
     prebufferBytes: float
     refresh: bool
-    route: Any | Any
+    route: Any | Any | Any
     tool: MediaStreamTool
     video: VideoStreamOptions
     pass
@@ -565,7 +562,7 @@ class RequestRecordingStreamOptions(TypedDict):
     prebuffer: float
     prebufferBytes: float
     refresh: bool
-    route: Any | Any
+    route: Any | Any | Any
     startTime: float
     tool: MediaStreamTool
     video: VideoStreamOptions
@@ -697,7 +694,7 @@ class Brightness:
 class BufferConverter:
     fromMimeType: str
     toMimeType: str
-    async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: BufferConvertorOptions = None) -> Any:
+    async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: MediaObjectOptions = None) -> Any:
         pass
     pass
 
@@ -781,7 +778,7 @@ class Entry:
     pass
 
 class EntrySensor:
-    entryOpen: bool
+    entryOpen: bool | Any
     pass
 
 class EventRecorder:
@@ -1017,6 +1014,8 @@ class ScryptedDevice:
         pass
     async def probe(self) -> bool:
         pass
+    async def setMixins(self, mixins: list[str]) -> None:
+        pass
     async def setName(self, name: str) -> None:
         pass
     async def setRoom(self, room: str) -> None:
@@ -1221,9 +1220,9 @@ class MediaManager:
         pass
     async def createFFmpegMediaObject(self, ffmpegInput: FFmpegInput, options: MediaObjectOptions = None) -> MediaObject:
         pass
-    async def createMediaObject(self, data: Any, mimeType: str, options: MediaObjectOptions = None) -> MediaObject:
+    async def createMediaObject(self, data: Any, mimeType: str, options: Any = None) -> Any:
         pass
-    async def createMediaObjectFromUrl(self, data: str, options: MediaObjectOptions = None) -> MediaObject:
+    async def createMediaObjectFromUrl(self, data: str, options: Any = None) -> MediaObject:
         pass
     async def getFFmpegPath(self) -> str:
         pass
@@ -1558,10 +1557,10 @@ class DeviceState:
         self.setScryptedProperty("lockState", value)
 
     @property
-    def entryOpen(self) -> bool:
+    def entryOpen(self) -> bool | Any:
         return self.getScryptedProperty("entryOpen")
     @entryOpen.setter
-    def entryOpen(self, value: bool):
+    def entryOpen(self, value: bool | Any):
         self.setScryptedProperty("entryOpen", value)
 
     @property
@@ -1745,6 +1744,7 @@ ScryptedInterfaceDescriptors = {
     "methods": [
       "listen",
       "probe",
+      "setMixins",
       "setName",
       "setRoom",
       "setType"

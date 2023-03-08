@@ -1,10 +1,10 @@
 {
   "name": "scrypted",
-  "version": "1.0.57",
+  "version": "1.0.67",
   "description": "",
-  "main": "./dist/packages/cli/src/main.js",
+  "main": "./dist/main.js",
   "bin": {
-    "scrypted": "./dist/packages/cli/src/main.js"
+    "scrypted": "./dist/main.js"
   },
   "scripts": {
     "prebuild": "rimraf dist",
@@ -16,25 +16,25 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@scrypted/types": "^0.0.6",
-    "adm-zip": "^0.5.9",
+    "@scrypted/client": "^1.1.43",
+    "@scrypted/types": "^0.2.66",
+    "adm-zip": "^0.5.10",
     "axios": "^0.21.4",
     "engine.io-client": "^5.2.0",
     "ip": "^1.1.8",
-    "linkfs": "^2.1.0",
-    "memfs": "^3.4.1",
     "mkdirp": "^1.0.4",
     "readline-sync": "^1.4.10",
     "rimraf": "^3.0.2",
-    "semver": "^7.3.5",
-    "tslib": "^2.3.1"
+    "semver": "^7.3.8",
+    "tslib": "^2.5.0"
   },
   "devDependencies": {
     "@types/mkdirp": "^1.0.2",
+    "@types/node": "^18.14.2",
     "@types/readline-sync": "^1.4.4",
     "@types/rimraf": "^3.0.2",
-    "@types/semver": "^7.3.9",
-    "ts-node": "^10.2.1",
-    "typescript": "^4.8.2"
+    "@types/semver": "^7.3.13",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.5"
   }
 }

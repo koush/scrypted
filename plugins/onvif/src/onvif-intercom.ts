@@ -65,6 +65,8 @@ function* parseCodecs(audioSection: string): Generator<CodecMatch> {
     }
 }
 
+const Require = 'www.onvif.org/ver20/backchannel';
+
 export class OnvifIntercom implements Intercom {
     intercomClient: RtspClient;
     url: string;
@@ -72,9 +74,7 @@ export class OnvifIntercom implements Intercom {
     constructor(public camera: RtspSmartCamera) {
     }
 
-    async startIntercom(media: MediaObject) {
-        await this.stopIntercom();
-
+    async checkIntercom() {
         const username = this.camera.storage.getItem("username");
         const password = this.camera.storage.getItem("password");
         const url = new URL(this.url);
@@ -83,7 +83,6 @@ export class OnvifIntercom implements Intercom {
         this.intercomClient = new RtspClient(url.toString());
         this.intercomClient.console = this.camera.console;
         await this.intercomClient.options();
-        const Require = 'www.onvif.org/ver20/backchannel';
 
         const describe = await this.intercomClient.describe({
             Require,
@@ -92,6 +91,16 @@ export class OnvifIntercom implements Intercom {
         this.camera.console.log(describe.body?.toString());
         const parsedSdp = parseSdp(describe.body.toString());
         const audioBackchannel = parsedSdp.msections.find(msection => msection.type === 'audio' && msection.direction === 'sendonly');
+        if (!audioBackchannel)
+            throw new Error('ONVIF audio backchannel not found');
+
+        return audioBackchannel;
+    }
+
+    async startIntercom(media: MediaObject) {
+        await this.stopIntercom();
+
+        const audioBackchannel = await this.checkIntercom();
         if (!audioBackchannel)
             throw new Error('ONVIF audio backchannel not found');
 

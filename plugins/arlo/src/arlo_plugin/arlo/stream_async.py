@@ -28,7 +28,7 @@ from .logging import logger
 
 class Stream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=10):
+    def __init__(self, arlo, expire=5):
         self.event_stream = None
         self.initializing = True
         self.connected = False
@@ -43,7 +43,7 @@ class Stream:
         self.event_loop = asyncio.get_event_loop()
         self.event_loop.create_task(self._clean_queues())
         self.event_loop.create_task(self._refresh_interval())
- 
+
     def __del__(self):
         self.disconnect()
 
@@ -83,11 +83,16 @@ class Stream:
         self.refresh_loop_signal.put_nowait(object())
 
     async def _clean_queues(self):
-        interval = self.expire * 2
+        interval = self.expire * 4
 
         await asyncio.sleep(interval)
         while not self.event_stream_stop_event.is_set():
-            for key, q in self.queues.items():
+            # since we interrupt the cleanup loop after every queue, there's
+            # a chance the self.queues dict is modified during iteration.
+            # so, we first make a copy of all the items of the dict and any
+            # new queues will be processed on the next loop through
+            queue_items = [i for i in self.queues.items()]
+            for key, q in queue_items:
                 if q.empty():
                     continue
 
@@ -114,81 +119,47 @@ class Stream:
                 if num_dropped > 0:
                     logger.debug(f"Cleaned {num_dropped} events from queue {key}")
 
+                # cleanup is not urgent, so give other tasks a chance
+                await asyncio.sleep(0.1)
+
             await asyncio.sleep(interval)
 
-    async def get(self, resource, actions, skip_uuids={}):
-        if len(actions) == 1:
-            action = actions[0]
+    async def get(self, resource, action, property=None, skip_uuids={}):
+        if not property:
             key = f"{resource}/{action}"
-
-            if key not in self.queues:
-                q = self.queues[key] = asyncio.Queue()
-            else:
-                q = self.queues[key]
-
-            first_requeued = None
-            while True:
-                event = await q.get()
-                q.task_done()
-
-                if not event:
-                    # exit signal received
-                    return None, action
-
-                if first_requeued is not None and first_requeued is event:
-                    # if we reach here, we've cycled through the whole queue
-                    # and found nothing for us, so sleep and give the next
-                    # subscriber a chance
-                    q.put_nowait(event)
-                    await asyncio.sleep(random.uniform(0, 0.01))
-                    continue
-
-                if event.expired:
-                    continue
-                elif event.uuid in skip_uuids:
-                    q.put_nowait(event)
-                    if first_requeued is None:
-                        first_requeued = event
-                else:
-                    return event, action
         else:
-            while True:
-                for action in actions:
-                    key = f"{resource}/{action}"
+            key = f"{resource}/{action}/{property}"
 
-                    if key not in self.queues:
-                        q = self.queues[key] = asyncio.Queue()
-                    else:
-                        q = self.queues[key]
+        if key not in self.queues:
+            q = self.queues[key] = asyncio.Queue()
+        else:
+            q = self.queues[key]
 
-                    if q.empty():
-                        continue
+        first_requeued = None
+        while True:
+            event = await q.get()
+            q.task_done()
 
-                    first_requeued = None
-                    while not q.empty():
-                        event = q.get_nowait()
-                        q.task_done()
+            if not event:
+                # exit signal received
+                return None, action
 
-                        if not event:
-                            # exit signal received
-                            return None, action
-
-                        if first_requeued is not None and first_requeued is event:
-                            # if we reach here, we've cycled through the whole queue
-                            # and found nothing for us, so go to the next queue
-                            q.put_nowait(event)
-                            break
-
-                        if event.expired:
-                            continue
-                        elif event.uuid in skip_uuids:
-                            q.put_nowait(event)
-
-                            if first_requeued is None:
-                                first_requeued = event
-                        else:
-                            return event, action
+            if first_requeued is not None and first_requeued is event:
+                # if we reach here, we've cycled through the whole queue
+                # and found nothing for us, so sleep and give the next
+                # subscriber a chance
+                q.put_nowait(event)
                 await asyncio.sleep(random.uniform(0, 0.01))
+                continue
+
+            if event.expired:
+                continue
+            elif event.uuid in skip_uuids:
+                q.put_nowait(event)
+                if first_requeued is None:
+                    first_requeued = event
+            else:
+                return event, action
 
     async def start(self):
         raise NotImplementedError()
@@ -203,15 +174,31 @@ class Stream:
         resource = response.get('resource')
         action = response.get('action')
         key = f"{resource}/{action}"
+
+        now = time.time()
+        event = StreamEvent(response, now, now + self.expire)
+
         if key not in self.queues:
             q = self.queues[key] = asyncio.Queue()
         else:
             q = self.queues[key]
-        now = time.time()
-        q.put_nowait(StreamEvent(response, now, now + self.expire))
+        q.put_nowait(event)
 
-    def requeue(self, event, resource, action):
-        key = f"{resource}/{action}"
+        # for optimized lookups, notify listeners of individual properties
+        properties = response.get('properties', {})
+        for property in properties.keys():
+            key = f"{resource}/{action}/{property}"
+            if key not in self.queues:
+                q = self.queues[key] = asyncio.Queue()
+            else:
+                q = self.queues[key]
+            q.put_nowait(event)
+
+    def requeue(self, event, resource, action, property=None):
+        if not property:
+            key = f"{resource}/{action}"
+        else:
+            key = f"{resource}/{action}/{property}"
         self.queues[key].put_nowait(event)
 
     def disconnect(self):

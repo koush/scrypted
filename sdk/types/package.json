@@ -1,13 +1,13 @@
 {
   "name": "@scrypted/types",
-  "version": "0.2.65",
+  "version": "0.2.74",
   "description": "",
   "main": "dist/index.js",
   "author": "",
   "license": "ISC",
   "scripts": {
     "prepublishOnly": "npm run build",
-    "build": "rimraf dist gen && typedoc && ts-node ./src/build.ts && tsc && npm link"
+    "build": "rimraf dist gen && typedoc && ts-node ./src/build.ts && tsc"
   },
   "devDependencies": {
     "@types/rimraf": "^3.0.2",

@@ -1,3 +1,5 @@
+// WARNING: threading.ts does not work because RpcPeer transpilation does not include readonly static properties in the class definition
+
 import worker_threads from 'worker_threads';
 import { getEvalSource, RpcPeer } from './rpc';
 import v8 from 'v8';

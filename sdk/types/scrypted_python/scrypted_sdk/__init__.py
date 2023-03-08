@@ -2,7 +2,6 @@ from __future__ import annotations
 from .types import *
 from typing import Optional
 from zipfile import ZipFile
-from asyncio import Future
 from multiprocessing import Process
 from typing import Callable
 import asyncio
@@ -31,6 +30,7 @@ class ScryptedStatic:
         self.remote: Any = None
         self.api: Any = None
         self.fork: Callable[[], PluginFork]
+        self.connectRPCObject: Callable[[Any], asyncio.Task[Any]]
 
 def sdk_init(z: ZipFile, r, sm: DeviceManager, dm: SystemManager, mm: MediaManager):
     global zip

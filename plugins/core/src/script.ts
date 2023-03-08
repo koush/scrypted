@@ -3,10 +3,13 @@ import { scryptedEval } from "./scrypted-eval";
 import { monacoEvalDefaults } from "./monaco";
 import { createScriptDevice, ScriptDeviceImpl } from "@scrypted/common/src/eval/scrypted-eval";
 import { ScriptCoreNativeId } from "./script-core";
+import { PluginAPIProxy } from "../../../server/src/plugin/plugin-api";
 
 const { log, deviceManager, systemManager } = sdk;
 
 export class Script extends ScryptedDeviceBase implements Scriptable, Program, ScriptDeviceImpl {
+    apiProxy: PluginAPIProxy;
+
     constructor(nativeId: string) {
         super(nativeId);
     }
@@ -67,6 +70,8 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
     }
 
     prepareScript() {
+        this.apiProxy?.removeListeners();
+
         Object.assign(this, createScriptDevice([
             ScryptedInterface.Scriptable,
             ScryptedInterface.Program,
@@ -79,9 +84,11 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         try {
             const data = JSON.parse(this.storage.getItem('data'));
 
-            const { value, defaultExport } = await scryptedEval(this, data['script.ts'], Object.assign({
+            const { value, defaultExport, apiProxy } = await scryptedEval(this, data['script.ts'], Object.assign({
                 device: this,
             }, variables));
+
+            this.apiProxy = apiProxy;
 
             await this.postRunScript(defaultExport);
             return value;
@@ -95,9 +102,11 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
     async eval(source: ScriptSource, variables?: { [name: string]: any }) {
         this.prepareScript();
 
-        const { value, defaultExport } = await scryptedEval(this, source.script, Object.assign({
+        const { value, defaultExport, apiProxy } = await scryptedEval(this, source.script, Object.assign({
             device: this,
         }, variables));
+
+        this.apiProxy = apiProxy;
 
         await this.postRunScript(defaultExport);
         return value;

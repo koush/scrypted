@@ -136,11 +136,12 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         decoderSetting: Setting = {
             'title': "Decoder",
-            'description': "The tool used to decode the stream. The may be libav or the gstreamer element.",
+            'description': "The tool used to decode the stream. The may be libav or a gstreamer element.",
             'combobox': True,
             'value': 'Default',
             'placeholder': 'Default',
             'key': 'decoder',
+            'subgroup': 'Advanced',
             'choices': [
                 'Default',
                 'libav',
@@ -151,8 +152,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             ],
         }
 
-        d['settings'].append(decoderSetting)
         d['settings'] += self.getModelSettings(settings)
+        d['settings'].append(decoderSetting)
 
         return d
 
@@ -299,19 +300,20 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if is_image:
             stream = io.BytesIO(bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')))
             image = Image.open(stream)
-            if not detection_session.user_callback:
-                detection_session.user_callback = self.create_user_callback(self.run_detection_image, detection_session, duration)
-            def convert_to_src_size(point, normalize = False):
-                x, y = point
-                return (int(math.ceil(x)), int(math.ceil(y)), True)
+            if detection_session:
+                if not detection_session.user_callback:
+                    detection_session.user_callback = self.create_user_callback(self.run_detection_image, detection_session, duration)
+                def convert_to_src_size(point, normalize = False):
+                    x, y = point
+                    return (int(math.ceil(x)), int(math.ceil(y)), True)
 
-            detection_session.running = True
-            try:
-                return await detection_session.user_callback(image, image.size, convert_to_src_size)
-            finally:
-                detection_session.running = False
-
-            # return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
+                detection_session.running = True
+                try:
+                    return await detection_session.user_callback(image, image.size, convert_to_src_size)
+                finally:
+                    detection_session.running = False
+            else:
+                return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
 
         if not create:
             # a detection session may have been created, but not started

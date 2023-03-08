@@ -1,19 +1,19 @@
 from __future__ import annotations
-from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
+from scrypted_sdk.types import ObjectDetectionResult, ObjectsDetected, Setting
 import io
 from PIL import Image
 import re
 import scrypted_sdk
-from typing import Any, List, Tuple, Mapping
+from typing import Any, List, Tuple
 import asyncio
 import time
-import sys
 from .rectangle import Rectangle, intersect_area, intersect_rect, to_bounding_box, from_bounding_box, combine_rect
 
 from detect import DetectionSession, DetectPlugin
 
 from .sort_oh import tracker
 import numpy as np
+import traceback
 
 try:
     from gi.repository import Gst
@@ -206,7 +206,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             'value': 3,
             'type': 'number',
         }
-
         trackerCertainty: Setting = {
             'title': 'Tracker Certainty',
             'subgroup': 'Advanced',
@@ -215,9 +214,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             'value': .2,
             'type': 'number',
         }
-
         return [allowList, trackerWindow, trackerCertainty]
-
 
     def create_detection_result(self, objs: List[Prediction], size, allowList, convert_to_src_size=None) -> ObjectsDetected:
         detections: List[ObjectDetectionResult] = []
@@ -304,6 +301,16 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             else:
                 dx = dy / h * w
 
+            if dx > image.width:
+                s = image.width / dx
+                dx = image.width
+                dy *= s
+
+            if dy > image.height:
+                s = image.height / dy
+                dy = image.height
+                dx *= s
+
             # crop size to fit input size
             if dx < w:
                 dx = w
@@ -321,15 +328,13 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             if t + dy > ih:
                 t = ih - dy
             crop_box = (l, t, l + dx, t + dy)
-            input = image.crop(crop_box)
-            (cw, ch) = input.size
-            if cw != w or h != ch:
-                input_resized = input.resize((w, h), Image.ANTIALIAS)
-                input.close()
-                input = input_resized
+            if dx == w and dy == h:
+                input = image.crop(crop_box)
+            else:
+                input = image.resize((w, h), Image.ANTIALIAS, crop_box)
 
             def cvss(point, normalize=False):
-                unscaled = ((point[0] / w) * cw + l, (point[1] / h) * ch + t)
+                unscaled = ((point[0] / w) * dx + l, (point[1] / h) * dy + t)
                 converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
                 return converted
 
@@ -350,24 +355,21 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             if detection_session:
                 detection_session.processed = detection_session.processed + 1
         else:
-            scaled = image.resize((int(round(s * iw)), int(round(s * ih))), Image.ANTIALIAS)
-
-            first_crop = (0, 0, w, h)
-            first = scaled.crop(first_crop)
-            (sx, sy) = scaled.size
-            ow = sx - w
-            oh = sy - h
-            second_crop = (ow, oh, ow + w, oh + h)
-            second = scaled.crop(second_crop)
-            if scaled is not image:
-                scaled.close()
+            sw = int(w / s)
+            sh = int(h / s)
+            first_crop = (0, 0, sw, sh)
+            first = image.resize((w, h), Image.ANTIALIAS, first_crop)
+            ow = iw - sw
+            oh = ih - sh
+            second_crop = (ow, oh, ow + sw, oh + sh)
+            second = image.resize((w, h), Image.ANTIALIAS, second_crop)
 
             def cvss1(point, normalize=False):
                 unscaled = (point[0] / s, point[1] / s)
                 converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
                 return converted
             def cvss2(point, normalize=False):
-                unscaled = ((point[0] + ow) / s, (point[1] + oh) / s)
+                unscaled = (point[0] / s + ow, point[1] / s + oh)
                 converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
                 return converted
 
@@ -381,7 +383,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             second.close()
 
             two_intersect = intersect_rect(Rectangle(*first_crop), Rectangle(*second_crop))
-            two_intersect = Rectangle(two_intersect.xmin / s, two_intersect.ymin / s, two_intersect.xmax / s, two_intersect.ymax / s)
 
             def is_same_detection_middle(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
                 same, ret = is_same_detection(d1, d2)
@@ -410,24 +411,22 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             ret = ret1
             ret['detections'] = dedupe_detections(ret1['detections'] + ret2['detections'], is_same_detection=is_same_detection_middle)
 
-        if not len(ret['detections']):
-            return ret, RawImage(image)
-
         if detection_session:
             self.track(detection_session, ret)
 
-        return ret, RawImage(image)
+        if not len(ret['detections']):
+            return ret, RawImage(image)
 
+        return ret, RawImage(image)
+    
     def track(self, detection_session: PredictSession, ret: ObjectsDetected):
         detections = ret['detections']
-
         sort_input = []
         for d in ret['detections']:
             r: ObjectDetectionResult = d
             l, t, w, h = r['boundingBox']
             sort_input.append([l, t, l + w, t + h, r['score']])
         trackers, unmatched_trckr, unmatched_gts = detection_session.tracker.update(np.array(sort_input), [])
-
         for td in trackers:
             x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
             ), td[2].item(), td[3].item(), td[4].item()
@@ -453,14 +452,12 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 if (dslop > slop):
                     slop = dslop
                     obj = ob
-
             if obj:
                 obj['id'] = str(trackID)
             # this may happen if tracker predicts something is still in the scene
             # but was not detected
             # else:
             #     print('unresolved tracker')
-
         # for d in detections:
         #     if not d.get('id'):
         #         # this happens if the tracker is not confident in a new detection yet due
@@ -468,43 +465,40 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         #         if d['className'] == 'person':
         #             print('untracked %s: %s' % (d['className'], d['score']))
 
+
     def run_detection_crop(self, detection_session: DetectionSession, sample: RawImage, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
         (ret, _) = self.run_detection_image(detection_session, sample.image, settings, src_size, convert_to_src_size, bounding_box)
         return ret
 
     def run_detection_gstsample(self, detection_session: PredictSession, gstsample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Image.Image]:
-        if False:
-            # pycoral supports fast path with gst sample directly which can be used if detection snapshots
-            # are not needed.
-            with self.mutex:
-                gst_buffer = gstsample.get_buffer()
-                run_inference(self.interpreter, gst_buffer)
-                objs = detect.get_objects(
-                    self.interpreter, score_threshold=score_threshold)
-        else:
-            caps = gstsample.get_caps()
-            # can't trust the width value, compute the stride
-            height = caps.get_structure(0).get_value('height')
-            width = caps.get_structure(0).get_value('width')
-            gst_buffer = gstsample.get_buffer()
-            result, info = gst_buffer.map(Gst.MapFlags.READ)
-            if not result:
-                return
-            try:
-                image = detection_session.image
-                detection_session.image = None
+        caps = gstsample.get_caps()
+        # can't trust the width value, compute the stride
+        height = caps.get_structure(0).get_value('height')
+        width = caps.get_structure(0).get_value('width')
+        gst_buffer = gstsample.get_buffer()
+        result, info = gst_buffer.map(Gst.MapFlags.READ)
+        if not result:
+            return
+        try:
+            image = detection_session.image
+            detection_session.image = None
 
-                if image and (image.width != width or image.height != height):
-                    image.close()
-                    image = None
-                if image:
-                    image.frombytes(bytes(info.data))
-                else:
-                    image = Image.frombuffer('RGB', (width, height), bytes(info.data))
-            finally:
-                gst_buffer.unmap(info)
+            if image and (image.width != width or image.height != height):
+                image.close()
+                image = None
+            if image:
+                image.frombytes(bytes(info.data))
+            else:
+                image = Image.frombuffer('RGB', (width, height), bytes(info.data))
+        finally:
+            gst_buffer.unmap(info)
 
-        return self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size)
+        try:
+            return self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size)
+        except:
+            image.close()
+            traceback.print_exc()
+            raise
 
     def create_detection_session(self):
         return PredictSession(start_time=time.time())

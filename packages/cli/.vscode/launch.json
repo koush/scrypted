@@ -6,7 +6,7 @@
     "configurations": [
         {
             "console": "integratedTerminal",
-            "type": "pwa-node",
+            "type": "node",
             "request": "launch",
             "name": "Launch Program",
             "skipFiles": [
@@ -20,8 +20,10 @@
                 "ts-node/register"
             ],
             "args": [
-                "install",
-                "@scrypted/google-device-access"
+                "ffplay",
+                "Kitchen",
+                "getRecordingStream",
+                "{\"startTime\":1677699495709}"
             ],
             "sourceMaps": true,
             "resolveSourceMapLocations": [

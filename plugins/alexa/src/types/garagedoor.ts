@@ -1,14 +1,13 @@
-import { BinarySensor, Entry, EntrySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
-import { getCameraCapabilities } from "./camera";
-import { addSupportedType, EventReport, StateReport } from "./common";
-import { DisplayCategory } from "alexa-smarthome-ts";
+import { Entry, EntrySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import { DiscoveryEndpoint, DiscoveryCapability, ChangeReport, Report } from "../alexa";
+import { supportedTypes } from ".";
 
-addSupportedType(ScryptedDeviceType.Garage, {
-    probe(device) {
-        if (!device.interfaces.includes(ScryptedInterface.EntrySensor))
+supportedTypes.set(ScryptedDeviceType.Garage, {
+  async discover(device: ScryptedDevice): Promise<Partial<DiscoveryEndpoint>> {
+    if (!device.interfaces.includes(ScryptedInterface.EntrySensor))
             return;
 
-        const capabilities = getCameraCapabilities(device);
+        const capabilities: DiscoveryCapability[] = [];
         capabilities.push(
             {
                 "type": "AlexaInterface",
@@ -115,19 +114,16 @@ addSupportedType(ScryptedDeviceType.Garage, {
                     }  
                   ]
                 }
-              } as any,
+              },
         );
 
         return {
-            displayCategories: ['GARAGE_DOOR'] as any,
+            displayCategories: ['GARAGE_DOOR'],
             capabilities
         }
     },
-    async reportState(eventSource: ScryptedDevice & EntrySensor): Promise<StateReport> {
+    async sendReport(eventSource: ScryptedDevice & EntrySensor): Promise<Partial<Report>> {
         return {
-            type: 'state',
-            namespace: 'Alexa',
-            name: 'StateReport',
             context: {
                 "properties": [
                     {
@@ -142,14 +138,12 @@ addSupportedType(ScryptedDeviceType.Garage, {
             }
         };
     },
-    async sendEvent(eventSource: ScryptedDevice & EntrySensor, eventDetails, eventData): Promise<EventReport> {      
+    async sendEvent(eventSource: ScryptedDevice & Entry & EntrySensor, eventDetails, eventData): Promise<Partial<Report>> {      
       if (eventDetails.eventInterface !== ScryptedInterface.EntrySensor)
         return undefined;
 
       return {
-          type: 'event',
-          namespace: 'Alexa',
-          name: 'ChangeReport',
+        event: {
           payload: {
               change: {
                   cause: {
@@ -167,6 +161,30 @@ addSupportedType(ScryptedDeviceType.Garage, {
                   ]
               }
           },
-  };
-  }
+        }
+      } as Partial<ChangeReport>;
+    },
+    async setState(eventSource: ScryptedDevice & Entry & EntrySensor, payload: any): Promise<Partial<Report>> {
+      if (payload.mode === 'Position.Up') {
+        await eventSource.openEntry();
+      }
+      else if (payload.mode === 'Position.Down') {
+        await eventSource.closeEntry();
+      }
+
+      return {
+          context: {
+              "properties": [
+                  {
+                      "namespace": "Alexa.ModeController",
+                      "instance": "GarageDoor.Position",
+                      "name": "mode",
+                      "value": payload.mode,
+                      "timeOfSample": new Date().toISOString(),
+                      "uncertaintyInMilliseconds": 0
+                  }
+              ]
+          }
+        };
+    }
 });

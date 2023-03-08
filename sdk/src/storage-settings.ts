@@ -2,7 +2,7 @@ import sdk, { ScryptedInterface, Setting, Settings, SettingValue } from ".";
 
 const { systemManager } = sdk;
 
-function parseValue(value: string, setting: StorageSetting, readDefaultValue: () => any) {
+function parseValue(value: string, setting: StorageSetting, readDefaultValue: () => any, rawDevice?: boolean) {
     const type = setting.multiple ? 'array' : setting.type;
 
     if (type === 'boolean') {
@@ -27,7 +27,9 @@ function parseValue(value: string, setting: StorageSetting, readDefaultValue: ()
         }
     }
     if (type === 'device') {
-        return systemManager.getDeviceById(value);
+        if (rawDevice)
+            return value;
+        return systemManager.getDeviceById(value) || systemManager.getDeviceById(readDefaultValue());
     }
 
     // string type, so check if it is json.
@@ -125,7 +127,7 @@ export class StorageSettings<T extends string> implements Settings {
             if (s.hide || await this.options?.hide?.[key as T]?.())
                 continue;
             s.key = key;
-            s.value = this.getItemInternal(key as T, s);
+            s.value = this.getItemInternal(key as T, s, true);
             ret.push(s);
             delete s.onPut;
             delete s.onGet;
@@ -156,7 +158,7 @@ export class StorageSettings<T extends string> implements Settings {
         this.device.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
-    private getItemInternal(key: T, setting: StorageSetting): any {
+    private getItemInternal(key: T, setting: StorageSetting, rawDevice?: boolean): any {
         if (!setting)
             return this.device.storage.getItem(key);
         const readDefaultValue = () => {
@@ -166,7 +168,7 @@ export class StorageSettings<T extends string> implements Settings {
             }
             return setting.defaultValue;
         };
-        const ret = parseValue(this.device.storage.getItem(key), setting, readDefaultValue);
+        const ret = parseValue(this.device.storage.getItem(key), setting, readDefaultValue, rawDevice);
         return setting.mapGet ? setting.mapGet(ret) : ret;
     }
 

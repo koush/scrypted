@@ -1,4 +1,4 @@
-import { FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import { ObjectDetectionResult, FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "../../../common/src/media-helpers";
 
@@ -121,22 +121,42 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
 
         const p2p = new P2P();
         const pamDiff = new PD({
-            difference: 9,
-            percent: 75,
-            response: 'percent',
+            difference: session.settings?.difference || defaultDifference,
+            percent: session.settings?.percent || defaultPercentage,
+            response: session?.settings?.motionAsObjects ? 'blobs' : 'percent',
         });
 
         pamDiff.on('diff', async (data: any) => {
+            const trigger = data.trigger[0];
+            // console.log(trigger.blobs.length);
+            const { blobs } = trigger;
+
+            const detections: ObjectDetectionResult[] = [];
+            if (blobs?.length) {
+                for (const blob of blobs) {
+                    detections.push(
+                        {
+                            className: 'motion',
+                            score: trigger.percent / 100,
+                            boundingBox: [blob.minX, blob.minY, blob.maxX - blob.minX, blob.maxY - blob.minY],
+                        }
+                    )
+                }
+            }
+            else {
+                detections.push(
+                    {
+                        className: 'motion',
+                        score: trigger.percent / 100,
+                    }
+                )
+            }
             const event: ObjectsDetected = {
                 timestamp: Date.now(),
                 running: true,
                 detectionId: pds.id,
-                detections: [
-                    {
-                        className: 'motion',
-                        score: data.trigger[0].percent / 100,
-                    }
-                ]
+                inputDimensions: [640, 360],
+                detections,
             }
             if (pds.callbacks) {
                 pds.callbacks.onDetection(event);
@@ -149,10 +169,13 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
         const console = sdk.deviceManager.getMixinConsole(mediaObject.sourceId, this.nativeId);
 
         pds.pamDiff = pamDiff;
-        pds.pamDiff.setDifference(session.settings?.difference || defaultDifference).setPercent(session.settings?.percent || defaultPercentage);
+        pds.pamDiff
+            .setDifference(session.settings?.difference || defaultDifference)
+            .setPercent(session.settings?.percent || defaultPercentage)
+            .setResponse(session?.settings?.motionAsObjects ? 'blobs' : 'percent');;
         safePrintFFmpegArguments(console, args);
         pds.cp = child_process.spawn(ffmpeg, args, {
-            stdio:[ 'inherit', 'pipe', 'pipe', 'pipe']
+            stdio: ['inherit', 'pipe', 'pipe', 'pipe']
         });
         let pamTimeout: NodeJS.Timeout;
         const resetTimeout = () => {

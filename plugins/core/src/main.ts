@@ -1,3 +1,4 @@
+import { tsCompile } from '@scrypted/common/src/eval/scrypted-eval';
 import sdk, { DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import fs from 'fs';
@@ -237,3 +238,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
 }
 
 export default ScryptedCore;
+
+export async function fork() {
+    return {
+        tsCompile,
+    }
+}

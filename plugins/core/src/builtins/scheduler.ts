@@ -47,12 +47,11 @@ export class Scheduler {
             throw new Error('sunrise/sunset clock not supported');
         }
 
-
-
         const ret: ScryptedDevice = {
             async setName() { },
             async setType() { },
             async setRoom() { },
+            async setMixins() { },
             async probe() { return true },
             listen(event: EventListenerOptions, callback, source?: ScryptedDeviceBase) {
                 function reschedule(): Date {

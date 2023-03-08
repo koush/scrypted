@@ -43,6 +43,17 @@ export class HikvisionCameraAPI {
         return getDeviceInfo(this.digestAuth, this.ip);
     }
 
+    async checkTwoWayAudio() {
+        const response = await this.digestAuth.request({
+            httpsAgent: hikvisionHttpsAgent,
+            method: "GET",
+            responseType: 'text',
+            url: `http://${this.ip}/ISAPI/System/TwoWayAudio/channels`,
+        });
+
+        return (response.data as string).includes('Speaker');
+    }
+
     async checkDeviceModel(): Promise<string> {
         if (!this.deviceModel) {
             this.deviceModel = this.getDeviceInfo().then(d => d.deviceModel).catch(e => {

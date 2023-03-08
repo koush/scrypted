@@ -1,8 +1,7 @@
-import { BufferConverter, BufferConvertorOptions, HttpRequest, HttpRequestHandler, HttpResponse, HttpResponseOptions, MediaObject, RequestMediaObject, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
-import sdk from "@scrypted/sdk";
+import sdk, { BufferConverter, HttpRequest, HttpRequestHandler, HttpResponse, HttpResponseOptions, MediaObject, RequestMediaObject, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
+import crypto from 'crypto';
 import mime from "mime/lite";
 import path from 'path';
-import crypto from 'crypto';
 
 const { endpointManager } = sdk;
 

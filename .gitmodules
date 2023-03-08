@@ -19,6 +19,7 @@
 [submodule "external/ring-client-api"]
 	path = external/ring-client-api
 	url = ../../koush/ring
+	branch = fork
 [submodule "plugins/vscode-typescript"]
 	path = plugins/vscode-typescript
 	url = ../../koush/scrypted-vscode-typescript/
@@ -28,20 +29,14 @@
 [submodule "plugins/zwave/file-stream-rotator"]
 	path = plugins/zwave/file-stream-rotator
 	url = ../../koush/file-stream-rotator.git
-[submodule "external/push-receiver"]
-	path = external/push-receiver
-	url = ../../koush/push-receiver.git
 [submodule "sdk/developer.scrypted.app"]
 	path = sdk/developer.scrypted.app
 	url = ../../koush/developer.scrypted.app
 [submodule "plugins/sample-cameraprovider"]
 	path = plugins/sample-cameraprovider
 	url = ../../koush/scrypted-sample-cameraprovider
-[submodule "plugins/objectdetector/node-moving-things-tracker"]
-	path = plugins/objectdetector/node-moving-things-tracker
-	url = ../../koush/node-moving-things-tracker.git
 [submodule "plugins/tensorflow-lite/sort_oh"]
-	path = plugins/tensorflow-lite/sort_oh
+	path = plugins/sort-tracker/sort_oh
 	url = ../../koush/sort_oh.git
 [submodule "plugins/cloud/node-nat-upnp"]
 	path = plugins/cloud/node-nat-upnp

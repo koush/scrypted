@@ -174,7 +174,7 @@ export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> e
 
     async createDevice(settings: DeviceCreatorSettings, nativeId?: ScryptedNativeId): Promise<string> {
         nativeId ||= randomBytes(4).toString('hex');
-        const name = settings.newCamera.toString();
+        const name = settings.newCamera?.toString() || 'New Camera';
         await this.updateDevice(nativeId, name, this.getInterfaces());
         return nativeId;
     }
@@ -208,6 +208,7 @@ export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> e
             name,
             interfaces,
             type: type || ScryptedDeviceType.Camera,
+            info: deviceManager.getNativeIds().includes(nativeId) ? deviceManager.getDeviceState(nativeId)?.info : undefined,
         });
     }
 
