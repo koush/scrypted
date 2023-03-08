@@ -22,6 +22,12 @@ class TapoIntercomMixin extends SettingsMixinDeviceBase<VideoCamera & Settings> 
         const ip = settings.find(s => s.key === 'ip')?.value?.toString();
         await this.stopIntercom();
 
+        if (!this.storageSettings.values.cloudPassword) {
+            const error = 'Two Way Audio failed. Tapo Cloud password is unconfigured on ' + this.name;
+            sdk.log.a(error);
+            throw error;
+        }
+
         this.client = TapoAPI.connect({
             address: `${ip}:8800`,
             cloudPassword: this.storageSettings.values.cloudPassword,
