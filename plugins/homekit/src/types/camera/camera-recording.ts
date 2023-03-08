@@ -11,7 +11,7 @@ import mkdirp from 'mkdirp';
 import net from 'net';
 import { Duplex, Readable, Writable } from 'stream';
 import { } from '../../common';
-import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration, DataStreamConnection } from '../../hap';
+import { AudioRecordingCodecType, CameraRecordingConfiguration, DataStreamConnection } from '../../hap';
 import type { HomeKitPlugin } from "../../main";
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
@@ -33,6 +33,14 @@ const allowedNaluTypes = [
     NAL_TYPE_DELIMITER,
 ];
 
+const AudioRecordingSamplerateValues = {
+    0: 8,
+    1: 16,
+    2: 24,
+    3: 32,
+    4: 44.1,
+    5: 48,
+};
 
 async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), [
@@ -102,7 +110,7 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
     const saveRecordings = debugMode.recording;
 
     // request more than needed, and determine what to do with the fragments after receiving them.
-    const prebuffer = configuration.mediaContainerConfiguration.prebufferLength * 2.5;
+    const prebuffer = configuration.prebufferLength * 2.5;
 
     const media = await device.getVideoStream({
         destination: 'remote-recorder',
@@ -153,7 +161,7 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
                 width: configuration.videoCodec.resolution[0],
                 height: configuration.videoCodec.resolution[1],
                 fps: configuration.videoCodec.resolution[2],
-                max_bit_rate: configuration.videoCodec.bitrate,
+                max_bit_rate: configuration.videoCodec.parameters.bitRate,
             }
         }
 
@@ -210,7 +218,7 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
             const videoRecordingFilter = `scale=w='min(${configuration.videoCodec.resolution[0]},iw)':h=-2`;
             addVideoFilterArguments(videoArgs, videoRecordingFilter);
             videoArgs.push(
-                '-b:v', `${configuration.videoCodec.bitrate}k`,
+                '-b:v', `${configuration.videoCodec.parameters.bitRate}k`,
                 "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
                 "-maxrate", request.video.max_bit_rate.toString() + "k",
                 // used to use this but switched to group of picture (gop) instead.

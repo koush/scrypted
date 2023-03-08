@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/homekit",
-   "version": "1.2.13",
+   "version": "1.2.14",
    "description": "HomeKit Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -36,7 +36,7 @@
    "dependencies": {
       "@koush/werift-src": "file:../../external/werift",
       "check-disk-space": "^3.3.0",
-      "hap-nodejs": "file:../../external/HAP-NodeJS",
+      "hap-nodejs": "^0.11.0",
       "lodash": "^4.17.21",
       "mkdirp": "^1.0.4"
    },
