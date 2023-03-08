@@ -1,4 +1,3 @@
-import { RtpPacket } from "./werift";
 import { Deferred } from "@scrypted/common/src/deferred";
 import { closeQuiet, createBindZero, listenZeroSingleClient, reserveUdpPort } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
@@ -233,6 +232,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         // if the rtsp client is over tcp, then the restream server must also be tcp, as
                         // the rtp packets (which can be a max of 64k) may be too large for udp.
                         const clientIsTcp = await setupRtspClient(console, rtspClient, channel, audioSection, false, rtp => {
+                            const payload = rtp.subarray(12);
+
                             // live555 sends rtp aac packets without AU header followed by ADTS packets (which contain codec info)
                             // which ffmpeg can not handle.
                             // the solution is to demux the adts and send that to ffmpeg raw.
@@ -240,10 +241,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                             if (firstPacket) {
                                 firstPacket = false;
                                 if (audioSection.codec === 'aac') {
-                                    const packet = RtpPacket.deSerialize(rtp);
-                                    const buf = packet.payload;
                                     // adts header is 12 bits of 1s
-                                    if (buf[0] == 0xff && (buf[1] & 0xf0) == 0xf0) {
+                                    if (payload[0] == 0xff && (payload[1] & 0xf0) == 0xf0) {
                                         adts = true;
                                         allowAudioTranscoderExit = true;
                                         const ffmpegArgs = [
@@ -271,8 +270,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                                 rtspServer?.sendTrack(audioControl, rtp, false);
                             }
                             else {
-                                const packet = RtpPacket.deSerialize(rtp);
-                                audioPipe?.write(packet.payload);
+                                audioPipe?.write(payload);
                             }
                         });
 

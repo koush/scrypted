@@ -4,7 +4,7 @@ import { once } from 'events';
 import { BASIC } from 'http-auth-utils/dist/index';
 import { parseHTTPHeadersQuotedKeyValueSet } from 'http-auth-utils/dist/utils';
 import net from 'net';
-import { Duplex, Readable } from 'stream';
+import { Duplex, Readable, Writable } from 'stream';
 import tls from 'tls';
 import { Deferred } from './deferred';
 import { closeQuiet, createBindUdp, createBindZero, listenZeroSingleClient } from './listen-cluster';
@@ -45,6 +45,29 @@ export async function readMessage(client: Readable): Promise<string[]> {
             return currentHeaders;
         currentHeaders.push(line);
     }
+}
+
+
+export async function readBody(client: Readable, response: Headers) {
+    const cl = parseInt(response['content-length']);
+    if (cl)
+        return readLength(client, cl)
+}
+
+
+export function writeMessage(client: Writable, messageLine: string, body: Buffer, headers: Headers, console?: Console) {
+    let message = messageLine !== undefined ? `${messageLine}\r\n` : '';
+    if (body)
+        headers['Content-Length'] = body.length.toString();
+    for (const [key, value] of Object.entries(headers)) {
+        message += `${key}: ${value}\r\n`;
+    }
+    message += '\r\n';
+    client.write(message);
+    console?.log('rtsp outgoing message\n', message);
+    console?.log();
+    if (body)
+        client.write(body);
 }
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
@@ -284,18 +307,7 @@ export class RtspBase {
     }
 
     write(messageLine: string, headers: Headers, body?: Buffer) {
-        let message = `${messageLine}\r\n`;
-        if (body)
-            headers['Content-Length'] = body.length.toString();
-        for (const [key, value] of Object.entries(headers)) {
-            message += `${key}: ${value}\r\n`;
-        }
-        message += '\r\n';
-        this.client.write(message);
-        this.console?.log('rtsp outgoing message\n', message);
-        this.console?.log();
-        if (body)
-            this.client.write(body);
+        writeMessage(this.client, messageLine, body, headers, this.console);
     }
 
     async readMessage(): Promise<string[]> {
@@ -590,9 +602,7 @@ export class RtspClient extends RtspBase {
     }
 
     async readBody(response: Headers) {
-        const cl = parseInt(response['content-length']);
-        if (cl)
-            return readLength(this.client, cl)
+        return readBody(this.client, response);
     }
 
     async request(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean): Promise<RtspServerResponse> {

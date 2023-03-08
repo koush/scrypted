@@ -1,81 +1,57 @@
-import { BinarySensor, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
-import { getCameraCapabilities } from "./camera";
-import { addSupportedType, EventReport, StateReport } from "./common";
-import { DisplayCategory } from "alexa-smarthome-ts";
+import { MotionSensor, ObjectDetector, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import { getCameraCapabilities, reportCameraState, sendCameraEvent } from "./camera/capabilities";
+import { DiscoveryEndpoint, DisplayCategory, Report, DoorbellPressEvent } from "../alexa";
+import { supportedTypes } from ".";
 
-addSupportedType(ScryptedDeviceType.Doorbell, {
-    probe(device) {
-        if (!device.interfaces.includes(ScryptedInterface.RTCSignalingChannel) || !device.interfaces.includes(ScryptedInterface.BinarySensor))
-            return;
+supportedTypes.set(ScryptedDeviceType.Doorbell, {
+    async discover(device: ScryptedDevice): Promise<Partial<DiscoveryEndpoint>> {
+        let capabilities: any[] = [];
+        let category: DisplayCategory = 'DOORBELL';
 
-        const capabilities = getCameraCapabilities(device);
-        capabilities.push(
-            {
-                "type": "AlexaInterface",
-                "interface": "Alexa.DoorbellEventSource",
-                "version": "3",
-                "proactivelyReported": true
-            } as any,
-        );
-
-        return {
-            displayCategories: ['CAMERA'],
-            capabilities
+        if (device.interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
+            capabilities = await getCameraCapabilities(device);
+            category = 'CAMERA';
         }
-    },
-    async reportState(device: ScryptedDevice & MotionSensor): Promise<StateReport>{
+
+        if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
+            capabilities.push(
+                {
+                    "type": "AlexaInterface",
+                    "interface": "Alexa.DoorbellEventSource",
+                    "version": "3",
+                    "proactivelyReported": true
+                } as any,
+            );
+        }
+
         return {
-            type: 'state',
-            namespace: 'Alexa',
-            name: 'StateReport',
-            context: {
-                "properties": [
-                    {
-                        "namespace": "Alexa.MotionSensor",
-                        "name": "detectionState",
-                        "value": device.motionDetected ? "DETECTED" : "NOT_DETECTED",
-                        "timeOfSample": new Date().toISOString(),
-                        "uncertaintyInMilliseconds": 0
-                    }
-                ]
-            }
+            displayCategories: [category],
+            capabilities
         };
     },
-    async sendEvent(eventSource: ScryptedDevice, eventDetails, eventData): Promise<EventReport> {
-        if (eventDetails.eventInterface === ScryptedInterface.MotionSensor)
-            return {
-                type: 'event',
-                namespace: 'Alexa',
-                name: 'ChangeReport',
-                payload: {
-                    change: {
-                        cause: {
-                            type: "PHYSICAL_INTERACTION"
-                        },
-                        properties: [
-                            {
-                                "namespace": "Alexa.MotionSensor",
-                                "name": "detectionState",
-                                "value": eventData ? "DETECTED" : "NOT_DETECTED",
-                                "timeOfSample": new Date().toISOString(),
-                                "uncertaintyInMilliseconds": 0
-                            }
-                        ]
-                    }
-                },
-            };
+    sendReport(device: ScryptedDevice & MotionSensor & ObjectDetector): Promise<Partial<Report>>{
+        return reportCameraState(device);
+    },
+    async sendEvent(eventSource: ScryptedDevice & MotionSensor & ObjectDetector, eventDetails, eventData): Promise<Partial<Report>> {
+        let response = await sendCameraEvent(eventSource, eventDetails, eventData);
+
+        if (response)
+            return response;
         
         if (eventDetails.eventInterface === ScryptedInterface.BinarySensor && eventData === true)
             return {
-                type: 'event',
-                namespace: 'Alexa.DoorbellEventSource',
-                name: 'DoorbellPress',
-                payload: {
-                    "cause": {
-                        "type": "PHYSICAL_INTERACTION"
+                event: {
+                    header: {
+                        namespace: 'Alexa.DoorbellEventSource',
+                        name: 'DoorbellPress'
                     },
-                    "timestamp": new Date().toISOString(),
-                }
-            };
+                    payload: {
+                        "cause": {
+                            "type": "PHYSICAL_INTERACTION"
+                        },
+                        "timestamp": new Date(eventDetails.eventTime).toISOString(),
+                    }
+            }
+         } as Partial<DoorbellPressEvent>;
     }
 });
