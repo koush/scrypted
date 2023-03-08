@@ -37,7 +37,7 @@
       ]
    },
    "dependencies": {
-      "@eneris/push-receiver": "../../external/push-receiver",
+      "@eneris/push-receiver": "^3.1.4",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "axios": "^0.25.0",
