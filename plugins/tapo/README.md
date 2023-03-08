@@ -7,3 +7,4 @@ This plugin adds two way audio support for Tapo cameras. This plugin does not im
 1. Add the Tapo Camera using the ONVIF Plugin.
 2. Enable ONVIF Two Way Audio on the camera.
 3. Enable the Tapo Two Way Audio extension.
+4. Enter your Tapo Cloud password into the Tapo Two Way Audio Settings.
