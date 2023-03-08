@@ -109,13 +109,17 @@ addSupportedType({
                     configuration = newConfiguration;
                 },
                 handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
+                    const ret = handleFragmentsRequests(streamId, device, configuration, console, homekitPlugin);
                     const d = new Deferred<any>();
-                    d.promise.finally(() => openRecordingStreams.delete(streamId));
+                    d.promise.then(reason => {
+                        ret.throw(new Error(reason.toString()));
+                        openRecordingStreams.delete(streamId);
+                    });
                     openRecordingStreams.set(streamId, d);
-                    return handleFragmentsRequests(streamId, device, configuration, console, homekitPlugin)
+                    return ret;
                 },
                 closeRecordingStream(streamId, reason) {
-                    openRecordingStreams.get(streamId)?.resolve(undefined);
+                    openRecordingStreams.get(streamId)?.resolve(reason);
                 },
                 updateRecordingActive(active) {
                 },
