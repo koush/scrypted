@@ -7,7 +7,7 @@ import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
 import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
-import { createHAPUsernameStorageSettingsDict, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, logConnections, typeToCategory } from './hap-utils';
+import { createHAPUsernameStorageSettingsDict, getHAPUUID, getRandomPort as createRandomPort, logConnections, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { addAccessoryDeviceInfo } from './info';
 import { randomPinCode } from './pincode';
@@ -17,7 +17,6 @@ import { VideoClipsMixinProvider } from './video-clips-provider';
 
 const { systemManager, deviceManager } = sdk;
 
-initializeHapStorage();
 const includeToken = 4;
 
 export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, Settings, DeviceProvider {
