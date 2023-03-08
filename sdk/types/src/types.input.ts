@@ -760,12 +760,27 @@ export interface Intercom {
 }
 
 export interface PanTiltZoomCommand {
-  horizontal?: 'left' | 'right';
-  vertical?: 'up' | 'down';
+  /**
+   * Ranges between -1 and 1.
+   */
+  pan?: number;
+  /**
+   * Ranges between -1 and 1.
+   */
+  tilt?: number;
+  /**
+   * Ranges between 0 and 1 for max zoom.
+   */
+  zoom?: number;
 }
 
+export interface PanTiltZoomCapabilities {
+  pan?: boolean;
+  tilt?: boolean;
+  zoom?: boolean;
+}
 export interface PanTiltZoom {
-  ptzCapabilities: any;
+  ptzCapabilities?: PanTiltZoomCapabilities;
 
   ptzCommand(command: PanTiltZoomCommand): Promise<void>;
 }
@@ -1235,7 +1250,7 @@ export interface ObjectDetectionTypes {
  * Given object detections with bounding boxes, return a similar list with tracker ids.
  */
 export interface ObjectTracker {
-    trackObjects(detection: ObjectsDetected): Promise<ObjectsDetected>;
+  trackObjects(detection: ObjectsDetected): Promise<ObjectsDetected>;
 }
 /**
  * ObjectDetector is found on Cameras that have smart detection capabilities.
@@ -1248,10 +1263,12 @@ export interface ObjectDetector {
   getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject>;
   getObjectTypes(): Promise<ObjectDetectionTypes>;
 }
-export interface ObjectDetectionSession {
+export interface ObjectDetectionGeneratorSession {
+  settings?: { [key: string]: any };
+}
+export interface ObjectDetectionSession extends ObjectDetectionGeneratorSession {
   detectionId?: string;
   duration?: number;
-  settings?: { [key: string]: any };
 }
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;
@@ -1268,24 +1285,28 @@ export interface ObjectDetectionCallbacks {
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
+  generateObjectDetections<T>(videoFrames: AsyncGenerator<VideoFrame>, session: ObjectDetectionGeneratorSession, callback: (videoFrame: VideoFrame, detected: ObjectsDetected) => Promise<T>): Promise<AsyncGenerator<T>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
-export interface VideoFrameOptions {
+export interface ImageOptions {
   resize?: {
     width: number,
     height: number,
   };
   format?: string;
 }
-export interface VideoFrame extends MediaObject {
+export interface Image extends MediaObject {
   timestamp: number;
   width: number;
   height: number;
   format: string;
-  read(options?: VideoFrameOptions): Promise<Buffer>;
+  read(options?: ImageOptions): Promise<Buffer>;
 }
-export interface VideoFrameGeneratorOptions extends VideoFrameOptions {
+export interface VideoFrame extends Image {
+  timestamp: number;
+}
+export interface VideoFrameGeneratorOptions extends ImageOptions {
 }
 export interface VideoFrameGenerator {
   generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame>>;
@@ -2114,5 +2135,5 @@ export interface ScryptedStatic {
    * through the Scrypted Server which typically manages plugin communication.
    * This is ideal for sending large amounts of data.
    */
-  connectRPCObject?<T>(value: T): Promise<T>; 
+  connectRPCObject?<T>(value: T): Promise<T>;
 }

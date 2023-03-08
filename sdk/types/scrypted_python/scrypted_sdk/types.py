@@ -227,6 +227,11 @@ class HttpResponseOptions(TypedDict):
     headers: object
     pass
 
+class ImageOptions(TypedDict):
+    format: str
+    resize: Any
+    pass
+
 class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     className: str
@@ -464,6 +469,10 @@ class NotifierOptions(TypedDict):
     vibrate: VibratePattern
     pass
 
+class ObjectDetectionGeneratorSession(TypedDict):
+    settings: Any
+    pass
+
 class ObjectDetectionModel(TypedDict):
     classes: list[str]
     inputSize: list[float]
@@ -492,9 +501,16 @@ class ObjectsDetected(TypedDict):
     timestamp: float
     pass
 
+class PanTiltZoomCapabilities(TypedDict):
+    pan: bool
+    tilt: bool
+    zoom: bool
+    pass
+
 class PanTiltZoomCommand(TypedDict):
-    horizontal: Any | Any
-    vertical: Any | Any
+    pan: float
+    tilt: float
+    zoom: float
     pass
 
 class Position(TypedDict):
@@ -884,6 +900,8 @@ class OauthClient:
 class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         pass
+    async def generateObjectDetections(self, videoFrames: VideoFrame, session: ObjectDetectionGeneratorSession, callback: Any) -> Any:
+        pass
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         pass
     pass
@@ -925,7 +943,7 @@ class PM25Sensor:
     pass
 
 class PanTiltZoom:
-    ptzCapabilities: Any
+    ptzCapabilities: PanTiltZoomCapabilities
     async def ptzCommand(self, command: PanTiltZoomCommand) -> None:
         pass
     pass
@@ -1543,10 +1561,10 @@ class DeviceState:
         self.setScryptedProperty("humidity", value)
 
     @property
-    def ptzCapabilities(self) -> Any:
+    def ptzCapabilities(self) -> PanTiltZoomCapabilities:
         return self.getScryptedProperty("ptzCapabilities")
     @ptzCapabilities.setter
-    def ptzCapabilities(self, value: Any):
+    def ptzCapabilities(self, value: PanTiltZoomCapabilities):
         self.setScryptedProperty("ptzCapabilities", value)
 
     @property
@@ -2302,6 +2320,7 @@ ScryptedInterfaceDescriptors = {
     "name": "ObjectDetection",
     "methods": [
       "detectObjects",
+      "generateObjectDetections",
       "getDetectionModel"
     ],
     "properties": []
@@ -2372,6 +2391,17 @@ class ObjectDetectionCallbacks:
     async def onDetection(self, detection: ObjectsDetected, redetect: Any = None, mediaObject: MediaObject = None) -> bool:
         pass
     async def onDetectionEnded(self, detection: ObjectsDetected) -> None:
+        pass
+    pass
+
+class VideoFrame:
+    format: str
+    height: float
+    mimeType: str
+    sourceId: str
+    timestamp: float
+    width: float
+    async def read(self, options: ImageOptions = None) -> bytearray:
         pass
     pass
 
