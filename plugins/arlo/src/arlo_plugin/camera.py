@@ -175,7 +175,7 @@ class ArloCamera(ScryptedDeviceBase, Settings, Camera, VideoCamera, MotionSensor
         rtsp_url = await self._getVideoStreamURL()
 
         mso = (await self.getVideoStreamOptions())[0]
-        mso['refreshAt'] = round(time.time() * 1000) + 30 * 60 * 1000
+        mso['refreshAt'] = round(time.time() * 1000) + 20 * 60 * 1000
 
         ffmpeg_input = {
             'url': rtsp_url,
