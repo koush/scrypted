@@ -19,6 +19,7 @@
 [submodule "external/ring-client-api"]
 	path = external/ring-client-api
 	url = ../../koush/ring
+	branch = fork
 [submodule "plugins/vscode-typescript"]
 	path = plugins/vscode-typescript
 	url = ../../koush/scrypted-vscode-typescript/
@@ -28,9 +29,6 @@
 [submodule "plugins/zwave/file-stream-rotator"]
 	path = plugins/zwave/file-stream-rotator
 	url = ../../koush/file-stream-rotator.git
-[submodule "external/push-receiver"]
-	path = external/push-receiver
-	url = ../../koush/push-receiver.git
 [submodule "sdk/developer.scrypted.app"]
 	path = sdk/developer.scrypted.app
 	url = ../../koush/developer.scrypted.app
