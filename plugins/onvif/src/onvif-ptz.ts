@@ -45,17 +45,44 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
 
     async ptzCommand(command: PanTiltZoomCommand) {
         const client = await this.getClient();
-        return new Promise<void>((r, f) => {
-            client.cam.relativeMove({
-                x: command.pan,
-                y: command.tilt,
-                zoom: command.zoom,
-            }, (e, result, xml) => {
-                if (e)
-                    return f(e);
-                r();
+        const speed = undefined
+
+        if (command.speed) {
+            speed = {
+                x: command.speed.pan,
+                y: command.speed.tilt,
+                zoom: command.speed.zoom
+            };
+        }
+
+        if (command.movement === PanTiltZoomMovement.Relative) {
+            return new Promise<void>((r, f) => {
+                client.cam.relativeMove({
+                    x: command.pan,
+                    y: command.tilt,
+                    zoom: command.zoom,
+                    speed: speed
+                }, (e, result, xml) => {
+                    if (e)
+                        return f(e);
+                    r();
+                })
             })
-        })
+        }
+        else if (command.movement === PanTiltZoomMovement.Absolute) {
+            return new Promise<void>((r, f) => {
+                client.cam.absoluteMove({
+                    x: command.pan,
+                    y: command.tilt,
+                    zoom: command.zoom,
+                    speed: speed
+                }, (e, result, xml) => {
+                    if (e)
+                        return f(e);
+                    r();
+                })
+            })
+        }
     }
 
     async getClient() {

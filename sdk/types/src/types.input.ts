@@ -759,7 +759,13 @@ export interface Intercom {
   stopIntercom(): Promise<void>;
 }
 
+export enum PanTiltZoomMovement {
+  Absolute = "Absolute",
+  Relative = "Relative"
+}
+
 export interface PanTiltZoomCommand {
+  movement: PanTiltZoomMovement;
   /**
    * Ranges between -1 and 1.
    */
@@ -772,6 +778,23 @@ export interface PanTiltZoomCommand {
    * Ranges between 0 and 1 for max zoom.
    */
   zoom?: number;
+  /**
+   * The speed of the movement.
+   */
+  speed?: {
+    /**
+     * Ranges between 0 and 1 for max zoom.
+     */
+    pan?: number;
+    /**
+     * Ranges between 0 and 1 for max zoom.
+     */
+    tilt?: number;
+    /**
+     * Ranges between 0 and 1 for max zoom.
+     */
+    zoom?: number;
+  }
 }
 
 export interface PanTiltZoomCapabilities {
