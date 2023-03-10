@@ -93,7 +93,7 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
         '-acodec', 'copy',
         '-vcodec', 'copy',
         '-f', 'mpegts',
-        '-i', mpegts.url,
+        mpegts.url,
       ],
       mediaStreamOptions: options,
     };
