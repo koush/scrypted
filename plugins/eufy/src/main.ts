@@ -1,22 +1,20 @@
 import sdk, { Battery, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, RequestPictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import eufy, { EufySecurity } from 'eufy-security-client';
-import { LocalLivestreamManager } from './stream';
+import eufy, { EufySecurity, Station, StreamMetadata } from 'eufy-security-client';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { Readable } from 'stream';
 
 const { deviceManager, mediaManager } = sdk;
 
 class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Battery {
   client: EufySecurity;
   device: eufy.Camera;
-  livestreamManager: LocalLivestreamManager
 
   constructor(nativeId: string, client: EufySecurity, device: eufy.Camera) {
     super(nativeId);
     this.client = client;
     this.device = device;
-    this.livestreamManager = new LocalLivestreamManager(this.client, this.device, false, this.console);
-    
+
     // this.batteryLevel = this.device.getBatteryValue() as number;
   }
 
@@ -50,11 +48,14 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
 
   async createVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
     const tcp = await listenZeroSingleClient();
-    const proxyStream = await this.livestreamManager.getLocalLivestream();
-    tcp.clientPromise.then(socket => {
-      proxyStream.videostream.pipe(socket);
+    this.client.startStationLivestream(this.device.getSerial());
+    this.client.on('station livestream start', (station: Station, device: eufy.Device, metadata: StreamMetadata, videostream: Readable, audiostream: Readable) => {
+      videostream.on('data', (data) => {
+        tcp.clientPromise.then(socket => {
+          socket.write(data);
+        });
+      });
     });
-
 
     const input: FFmpegInput = {
         url: undefined,
