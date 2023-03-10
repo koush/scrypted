@@ -3,6 +3,9 @@ import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import eufy, { EufySecurity } from 'eufy-security-client';
 import { LocalLivestreamManager } from './stream';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import child_process from 'child_process';
+import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
+
 
 const { deviceManager, mediaManager } = sdk;
 
@@ -16,7 +19,7 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
     this.client = client;
     this.device = device;
     this.livestreamManager = new LocalLivestreamManager(this.client, this.device, false, this.console);
-    
+
     // this.batteryLevel = this.device.getBatteryValue() as number;
   }
 
@@ -32,14 +35,14 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
   getVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
     return this.createVideoStream(options);
   }
-  
+
   async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
     return [
       {
         id: 'p2p',
         name: 'P2P',
         video: {
-            codec: 'h264',
+          codec: 'h264',
         },
         audio: {
           codec: 'aac',
@@ -63,15 +66,34 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
       proxyStream.videostream.pipe(h264);
     })();
 
+    const inputArguments = [
+      '-f', 'aac',
+      '-i', adtsServer.url,
+      '-f', 'h264',
+      '-i', h264Server.url
+    ];
+
+    const mpegts = await listenZeroSingleClient();
+
+    mpegts.clientPromise.then(async client => {
+      const cp = child_process.spawn(await mediaManager.getFFmpegPath(), [
+        ...inputArguments,
+        '-f', 'mpegts',
+        'pipe:3',
+      ], {
+        stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+      });
+
+      cp.stdio[3].pipe(client);
+    });
+
     const input: FFmpegInput = {
-        url: undefined,
-        inputArguments:[
-          '-f', 'aac',
-          '-i', adtsServer.url,
-          '-f', 'h264',
-          '-i', h264Server.url
-        ],
-        mediaStreamOptions: options,
+      url: undefined,
+      inputArguments: [
+        '-f', 'mpegts',
+        '-i', mpegts.url,
+      ],
+      mediaStreamOptions: options,
     };
 
     return mediaManager.createFFmpegMediaObject(input);
@@ -105,18 +127,18 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
       noStore: true,
     },
   });
-  
+
   constructor() {
     super();
     this.tryLogin()
   }
 
   getSettings(): Promise<Setting[]> {
-      return this.storageSettings.getSettings();
+    return this.storageSettings.getSettings();
   }
 
   putSetting(key: string, value: SettingValue): Promise<void> {
-      return this.storageSettings.putSetting(key, value);
+    return this.storageSettings.putSetting(key, value);
   }
 
   async tryLogin(twoFactorCode?: string) {
@@ -130,7 +152,7 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
     await this.initializeClient();
 
     try {
-      await this.client.connect({verifyCode: twoFactorCode, force: false});
+      await this.client.connect({ verifyCode: twoFactorCode, force: false });
       this.console.debug(`[${this.name}] (${new Date().toLocaleString()}) Client connected.`);
     } catch (e) {
       this.log.a('Login failed: if you have 2FA enabled, check your email or texts for your code, then enter it into the Two Factor Code setting to conplete login.');
@@ -166,22 +188,22 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
       return;
     }
     this.console.info(`[${this.name}] (${new Date().toLocaleString()}) Device discovered: `, eufyDevice.getName(), eufyDevice.getModel());
-    
+
     const nativeId = eufyDevice.getSerial();
-    
+
     const interfaces = [
-        ScryptedInterface.Camera,
-        ScryptedInterface.VideoCamera
+      ScryptedInterface.Camera,
+      ScryptedInterface.VideoCamera
     ];
     if (eufyDevice.hasBattery())
-        interfaces.push(ScryptedInterface.Battery);
-    
+      interfaces.push(ScryptedInterface.Battery);
+
     const device: Device = {
       info: {
-          model: eufyDevice.getModel(),
-          manufacturer: 'Eufy',
-          firmware: eufyDevice.getSoftwareVersion(),
-          serialNumber: nativeId
+        model: eufyDevice.getModel(),
+        manufacturer: 'Eufy',
+        firmware: eufyDevice.getSoftwareVersion(),
+        serialNumber: nativeId
       },
       nativeId,
       name: eufyDevice.getName(),
