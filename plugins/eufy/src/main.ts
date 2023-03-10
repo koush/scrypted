@@ -63,7 +63,7 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
     this.device = device;
     this.livestreamManager = new LocalLivestreamManager(this.client, this.device, true, this.console);
 
-    // this.batteryLevel = this.device.getBatteryValue() as number;
+    this.batteryLevel = this.device.getBatteryValue() as number;
   }
 
   takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
@@ -222,15 +222,18 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
     country: {
       title: 'Country',
       defaultValue: 'US',
+      group: "General",
     },
     email: {
       title: 'Email',
       onPut: async () => this.tryLogin(),
+      group: "General",
     },
     password: {
       title: 'Password',
       type: 'password',
       onPut: async () => this.tryLogin(),
+      group: "General",
     },
     twoFactorCode: {
       title: 'Two Factor Code',
@@ -239,6 +242,7 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
         await this.tryLogin(newValue);
       },
       noStore: true,
+      group: "General",
     },
     captcha: {
       title: 'Captcha',
@@ -247,11 +251,23 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
         await this.tryLogin(undefined, newValue);
       },
       noStore: true,
+      group: "General",
     },
     captchaId: {
       title: 'Captcha Id',
       hide: true,
-    }
+      group: "General",
+    },
+    maxLivestreamSeconds: {
+      title: 'Max Livestream Seconds',
+      description: 'Maximum number of seconds to livestream cameras before timing out.',
+      type: 'number',
+      defaultValue: 120,
+      onPut(oldValue, newValue) {
+        this.setCameraMaxLivestreamDuration(newValue);
+      },
+      group: "Camera",
+    },
   });
 
   constructor() {
@@ -300,9 +316,10 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
       eventDurationSeconds: 10
     }
     this.client = await EufySecurity.initialize(config);
+    this.setCameraMaxLivestreamDuration(this.storageSettings.values.maxLivestreamSeconds)
+;
     this.client.on('device added', this.deviceAdded.bind(this));
     this.client.on('station added', this.stationAdded.bind(this));
-
     this.client.on('tfa request', () => {
       this.log.a('Login failed: 2FA is enabled, check your email or texts for your code, then enter it into the Two Factor Code setting to conplete login.');
     });
@@ -320,6 +337,10 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
     this.client.on('push close', () => {
       this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Push Closed.`);
     });
+  }
+
+  private setCameraMaxLivestreamDuration(duration: number) {
+    this.client?.setCameraMaxLivestreamDuration(duration);
   }
 
   private async deviceAdded(eufyDevice: eufy.Device) {
