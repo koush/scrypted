@@ -9,28 +9,35 @@ import { LocalLivestreamManager } from './stream';
 
 const { deviceManager, mediaManager } = sdk;
 
-let sdp = `v=0
-o=- 0 0 IN IP4 127.0.0.1
-t=0 0
-m=video 0 RTP/AVP 96
-c=IN IP4 0.0.0.0
-a=recvonly
-a=rtpmap:96 H264/90000
-m=audio 0 RTP/AVP 97
-c=IN IP4 0.0.0.0
-a=recvonly
-a=rtpmap:97 mpeg4-generic/16000/1
-a=fmtp:104 profile-level-id=15; streamtype=5; mode=AAC-hbr; config=1408;SizeLength=13; IndexLength=3; IndexDeltaLength=3; Profile=1;
-`;
+let sdp: string;
+if (true) {
+  sdp = `v=0
+  o=- 0 0 IN IP4 127.0.0.1
+  t=0 0
+  m=video 0 RTP/AVP 96
+  c=IN IP4 0.0.0.0
+  a=recvonly
+  a=rtpmap:96 H264/90000
+  m=audio 0 RTP/AVP 97
+  c=IN IP4 0.0.0.0
+  a=recvonly
+  a=rtpmap:97 mpeg4-generic/16000/1
+  a=fmtp:104 profile-level-id=15; streamtype=5; mode=AAC-hbr; config=1408;SizeLength=13; IndexLength=3; IndexDeltaLength=3; Profile=1;
+  `;
 
-// let sdp = `v=0
-// o=- 0 0 IN IP4 127.0.0.1
-// t=0 0
-// m=video 0 RTP/AVP 96
-// c=IN IP4 0.0.0.0
-// a=recvonly
-// a=rtpmap:96 H264/90000
-// `;
+}
+else {
+
+  sdp = `v=0
+  o=- 0 0 IN IP4 127.0.0.1
+  t=0 0
+  m=video 0 RTP/AVP 96
+  c=IN IP4 0.0.0.0
+  a=recvonly
+  a=rtpmap:96 H264/90000
+  `;
+}
+
 
 sdp = addTrackControls(sdp);
 const parsedSdp = parseSdp(sdp);
@@ -122,18 +129,20 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
           }
         });
 
-        proxyStream.audiostream.on('readable', () => {
-          const allData: Buffer = proxyStream.audiostream.read();
-          const timestamp = Math.floor(((lastAudioTimestamp - firstTimestamp) / 1000) * 16000);
-          const header = new RtpHeader({
-            sequenceNumber: audioSequenceNumber++,
-            timestamp: timestamp,
-            payloadType: 97,
+        if (audioTrack) {
+          proxyStream.audiostream.on('readable', () => {
+            const allData: Buffer = proxyStream.audiostream.read();
+            const timestamp = Math.floor(((lastAudioTimestamp - firstTimestamp) / 1000) * 16000);
+            const header = new RtpHeader({
+              sequenceNumber: audioSequenceNumber++,
+              timestamp: timestamp,
+              payloadType: 97,
+            });
+            const rtp = new RtpPacket(header, allData);
+            rtsp.sendTrack(audioTrack.control, rtp.serialize(), false);
+            lastAudioTimestamp = Date.now();
           });
-          const rtp = new RtpPacket(header, allData);
-          rtsp.sendTrack(audioTrack.control, rtp.serialize(), false);
-          lastAudioTimestamp = Date.now();
-        });
+        }
       }
       catch (e) {
         rtsp.client.destroy();
