@@ -90,6 +90,8 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
     const input: FFmpegInput = {
       url: undefined,
       inputArguments: [
+        '-acodec', 'copy',
+        '-vcodec', 'copy',
         '-f', 'mpegts',
         '-i', mpegts.url,
       ],
