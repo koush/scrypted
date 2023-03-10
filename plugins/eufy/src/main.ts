@@ -40,13 +40,11 @@ const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio
 class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Battery {
   client: EufySecurity;
   device: eufy.Camera;
-  livestreamManager: LocalLivestreamManager
 
   constructor(nativeId: string, client: EufySecurity, device: eufy.Camera) {
     super(nativeId);
     this.client = client;
     this.device = device;
-    this.livestreamManager = new LocalLivestreamManager(this.client, this.device, false, this.console);
 
     // this.batteryLevel = this.device.getBatteryValue() as number;
   }
@@ -91,9 +89,10 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
       const firstTimestamp = Date.now();
       let lastTimestamp = firstTimestamp;
       try {
-        const proxyStream = await this.livestreamManager.getLocalLivestream();
+        const livestreamManager = new LocalLivestreamManager(this.client, this.device, false, this.console);
+        const proxyStream = await livestreamManager.getLocalLivestream();
         proxyStream.videostream.on('close', () => rtsp.client.destroy());
-        rtsp.client.on('close', () => this.livestreamManager.stopLocalLiveStream());
+        rtsp.client.on('close', () => livestreamManager.stopLocalLiveStream());
         proxyStream.videostream.on('readable', () => {
           const allData: Buffer = proxyStream.videostream.read();
           const splits = splitH264NaluStartCode(allData);
