@@ -1,6 +1,6 @@
 import sdk, { Battery, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, RequestPictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import eufy, { EufySecurity } from 'eufy-security-client';
+import eufy, { CaptchaOptions, EufySecurity } from 'eufy-security-client';
 import { LocalLivestreamManager } from './stream';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import child_process from 'child_process';
@@ -18,7 +18,7 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
     super(nativeId);
     this.client = client;
     this.device = device;
-    this.livestreamManager = new LocalLivestreamManager(this.client, this.device, false, this.console);
+    this.livestreamManager = new LocalLivestreamManager(this.client, this.device, true, this.console);
 
     // this.batteryLevel = this.device.getBatteryValue() as number;
   }
@@ -134,6 +134,18 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
       },
       noStore: true,
     },
+    captcha: {
+      title: 'Captcha',
+      description: 'Optional: If a captcha request is recieved, enter the code in the image.',
+      onPut: async (oldValue, newValue) => {
+        await this.tryLogin(undefined, newValue);
+      },
+      noStore: true,
+    },
+    captchaId: {
+      title: 'Captcha Id',
+      hide: true,
+    }
   });
 
   constructor() {
@@ -149,7 +161,7 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
     return this.storageSettings.putSetting(key, value);
   }
 
-  async tryLogin(twoFactorCode?: string) {
+  async tryLogin(twoFactorCode?: string, captchaCode?: string) {
     this.log.clearAlerts();
 
     if (!this.storageSettings.values.email || !this.storageSettings.values.email) {
@@ -159,13 +171,16 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
 
     await this.initializeClient();
 
-    try {
-      await this.client.connect({ verifyCode: twoFactorCode, force: false });
-      this.console.debug(`[${this.name}] (${new Date().toLocaleString()}) Client connected.`);
-    } catch (e) {
-      this.log.a('Login failed: if you have 2FA enabled, check your email or texts for your code, then enter it into the Two Factor Code setting to conplete login.');
-      this.console.error(`[${this.name}] (${new Date().toLocaleString()}) Client failed to connect.`, e);
+    var captchaOptions: CaptchaOptions = undefined
+    if (captchaCode) {
+      captchaOptions = {
+        captchaCode: captchaCode,
+        captchaId: this.storageSettings.values.captchaId,
+      }
+
     }
+
+    await this.client.connect({ verifyCode: twoFactorCode, captcha: captchaOptions, force: false });
   }
 
   private async initializeClient() {
@@ -182,6 +197,17 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
     this.client.on('device added', this.deviceAdded.bind(this));
     this.client.on('station added', this.stationAdded.bind(this));
 
+    this.client.on('tfa request', () => {
+      this.log.a('Login failed: 2FA is enabled, check your email or texts for your code, then enter it into the Two Factor Code setting to conplete login.');
+    });
+    this.client.on('captcha request', (id, captcha) => {
+      this.log.a(`Login failed: Captcha was requested, fill out the Captcha setting to conplete login. </br> <img src="${captcha}" />`);
+      this.storageSettings.putSetting('captchaId', id);
+    });
+    this.client.on('connect', () => {
+      this.console.debug(`[${this.name}] (${new Date().toLocaleString()}) Client connected.`);
+      this.log.clearAlerts();
+    });
     this.client.on('push connect', () => {
       this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Push Connected.`);
     });
