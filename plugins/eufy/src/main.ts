@@ -10,7 +10,7 @@ import { LocalLivestreamManager } from './stream';
 const { deviceManager, mediaManager } = sdk;
 
 let sdp: string;
-if (true) {
+if (false) {
   sdp = `v=0
   o=- 0 0 IN IP4 127.0.0.1
   t=0 0
