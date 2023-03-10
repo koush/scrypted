@@ -1,56 +1,15 @@
-import { getNaluTypesInNalu, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
+import { listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
-import { H264Repacketizer, NAL_TYPE_IDR, NAL_TYPE_NON_IDR, splitH264NaluStartCode } from '@scrypted/h264-repacketizer/src/index';
-import sdk, { Battery, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, MediaStreamUrl, RequestPictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { Battery, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, RequestPictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import eufy, { CaptchaOptions, EufySecurity } from 'eufy-security-client';
-import { LocalLivestreamManager } from './stream';
-import { createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import child_process from 'child_process';
-import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
+import { LocalLivestreamManager } from './stream';
 
-import { RtpHeader, RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { Writable } from 'stream';
 import { Deferred } from '@scrypted/common/src/deferred';
-import { closeQuiet } from '@scrypted/common/src/listen-cluster';
-
+import { Writable } from 'stream';
 
 const { deviceManager, mediaManager } = sdk;
-
-let sdp: string;
-if (true) {
-  sdp = `v=0
-  o=- 0 0 IN IP4 127.0.0.1
-  t=0 0
-  m=video 0 RTP/AVP 96
-  c=IN IP4 0.0.0.0
-  a=recvonly
-  a=rtpmap:96 H264/90000
-  m=audio 0 RTP/AVP 97
-  c=IN IP4 0.0.0.0
-  a=recvonly
-  a=rtpmap:97 MP4A-LATM/16000/1
-  a=fmtp:97 profile-level-id=40;cpresent=0;config=400028103fc0
-`;
-
-}
-else {
-  sdp = `v=0
-  o=- 0 0 IN IP4 127.0.0.1
-  t=0 0
-  m=video 0 RTP/AVP 96
-  c=IN IP4 0.0.0.0
-  a=recvonly
-  a=rtpmap:96 H264/90000
-  `;
-}
-
-
-sdp = addTrackControls(sdp);
-const parsedSdp = parseSdp(sdp);
-const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video');
-const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio');
 
 class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Battery {
   client: EufySecurity;
@@ -90,9 +49,9 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
         video: {
           codec: 'h264',
         },
-        audio: audioTrack ? {
+        audio: {
           codec: 'aac',
-        } : null,
+        },
         tool: 'scrypted',
         userConfigurable: false,
       }
@@ -107,95 +66,52 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
     rtspServer.rtspServerPromise.then(async rtsp => {
       kill.promise.finally(() => rtsp.client.destroy());
       rtsp.client.on('close', () => kill.resolve());
-
-      rtsp.sdp = sdp;
-      await rtsp.handlePlayback();
-
-      const h264Packetizer = new H264Repacketizer(this.console, 64000, undefined);
-      let videoSequenceNumber = 1;
-      const firstTimestamp = Date.now();
-      let lastVideoTimestamp = firstTimestamp;
       try {
-        const ffmpeg = await mediaManager.getFFmpegPath();
-        const audioUdp = await createBindZero();
-        const videoUdp = await createBindZero();
-        kill.promise.finally(() => closeQuiet(audioUdp.server))
-        kill.promise.finally(() => closeQuiet(videoUdp.server))
+        const process = await startRtpForwarderProcess(this.console, {
+          inputArguments: [
+            '-f', 'h264', '-i', 'pipe:4',
+            '-f', 'aac', '-i', 'pipe:5',
+          ]
+        }, {
+          video: {
+            onRtp: rtp => {
+              if (videoTrack)
+                rtsp.sendTrack(videoTrack.control, rtp, false);
+            },
+            encoderArguments: [
+              '-vcodec', 'copy',
+            ]
+          },
+          audio: {
+            onRtp: rtp => {
+              if (audioTrack)
+                rtsp.sendTrack(audioTrack.control, rtp, false);
+            },
+            encoderArguments: [
+              '-acodec', 'copy',
+              '-rtpflags', 'latm',
+            ]
+          }
+        });
+
+        process.killPromise.finally(() => kill.resolve());
+        kill.promise.finally(() => process.kill());
+
+        let parsedSdp: ReturnType<typeof parseSdp>;
+        let videoTrack: typeof parsedSdp.msections[0]
+        let audioTrack: typeof parsedSdp.msections[0]
+        process.sdpContents.then(async sdp => {
+          sdp = addTrackControls(sdp);
+          rtsp.sdp = sdp;
+          parsedSdp = parseSdp(sdp);
+          videoTrack = parsedSdp.msections.find(msection => msection.type === 'video');
+          audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio');
+          await rtsp.handlePlayback();
+        });
 
         const proxyStream = await this.livestreamManager.getLocalLivestream();
-        if (false) {
-          proxyStream.videostream.on('close', () => rtsp.client.destroy());
-          proxyStream.videostream.on('readable', () => {
-            const allData: Buffer = proxyStream.videostream.read();
-            const splits = splitH264NaluStartCode(allData);
-            if (!splits.length)
-              throw new Error('expected nalu start code');
-  
-            for (const nalu of splits) {
-              const timestamp = Math.floor(((lastVideoTimestamp - firstTimestamp) / 1000) * 90000);
-              const naluTypes = getNaluTypesInNalu(nalu);
-              const header = new RtpHeader({
-                sequenceNumber: videoSequenceNumber++,
-                timestamp: timestamp,
-                payloadType: 96,
-              });
-              const rtp = new RtpPacket(header, nalu);
-  
-              const packets = h264Packetizer.repacketize(rtp);
-              for (const packet of packets) {
-                rtsp.sendTrack(videoTrack.control, packet.serialize(), false);
-              }
-  
-              if (naluTypes.has(NAL_TYPE_NON_IDR) || naluTypes.has(NAL_TYPE_IDR)) {
-                lastVideoTimestamp = Date.now();
-              }
-            }
-          });
-        }
-        else {
-          const args = [
-            '-hide_banner', '-y',
-            '-f', 'h264',
-            '-i', 'pipe:3',
-            '-vcodec', 'copy',
-            '-payload_type', '96',
-            '-f', 'rtp',
-            videoUdp.url.replace('udp:', 'rtp:'),
-          ];
-          safePrintFFmpegArguments(this.console, args);
-          const cp = child_process.spawn(ffmpeg, args, {
-            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-          });
-          kill.promise.finally(() => safeKillFFmpeg(cp));
-          cp.on('exit', () => kill.resolve());
-          proxyStream.videostream.pipe(cp.stdio[3] as Writable);
-          videoUdp.server.on('message', message => {
-            rtsp.sendTrack(videoTrack.control, message, false);
-          });
-        }
-
-        if (audioTrack) {
-          const args = [
-            '-hide_banner', '-y',
-            '-f', 'aac',
-            '-i', 'pipe:3',
-            '-acodec', 'copy',
-            '-rtpflags', 'latm',
-            '-payload_type', '97',
-            '-f', 'rtp',
-            audioUdp.url.replace('udp:', 'rtp:'),
-          ];
-          safePrintFFmpegArguments(this.console, args);
-          const cp = child_process.spawn(ffmpeg, args, {
-            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-          });
-          kill.promise.finally(() => safeKillFFmpeg(cp));
-          cp.on('exit', () => kill.resolve());
-          proxyStream.audiostream.pipe(cp.stdio[3] as Writable);
-          audioUdp.server.on('message', message => {
-            rtsp.sendTrack(audioTrack.control, message, false);
-          });
-        }
+        proxyStream.videostream.pipe(process.cp.stdio[4] as Writable);
+        proxyStream.audiostream.pipe((process.cp.stdio as any)[5] as Writable);
       }
       catch (e) {
         rtsp.client.destroy();
