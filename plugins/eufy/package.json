@@ -31,6 +31,7 @@
    "dependencies": {
       "@scrypted/sdk": "file:../../sdk",
       "@scrypted/common": "file:../../common",
+      "@scrypted/h264-repacketizer": "file:../../packages/h264-repacketizer ",
       "@types/node": "^18.14.6"
    },
    "optionalDependencies": {
