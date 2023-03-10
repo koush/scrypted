@@ -53,18 +53,20 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
   async createVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
     const h264Server = await listenZeroSingleClient();
     const adtsServer = await listenZeroSingleClient();
+    const proxyStream = await this.livestreamManager.getLocalLivestream();
+    (async () => {
+      const adts = await adtsServer.clientPromise;
+      proxyStream.audiostream.pipe(adts);
+    })();
     (async () => {
       const h264 = await h264Server.clientPromise;
-      const adts = await adtsServer.clientPromise;
-      const proxyStream = await this.livestreamManager.getLocalLivestream();
       proxyStream.videostream.pipe(h264);
-      proxyStream.audiostream.pipe(adts);
     })();
 
     const input: FFmpegInput = {
         url: undefined,
         inputArguments:[
-          '-f', 'adts',
+          '-f', 'aac',
           '-i', adtsServer.url,
           '-f', 'h264',
           '-i', h264Server.url
