@@ -81,6 +81,7 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
           codec: 'aac',
         },
         userConfigurable: false,
+        tool: 'scrypted',
       }
     ];
   }
