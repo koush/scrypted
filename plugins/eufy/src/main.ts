@@ -1,58 +1,22 @@
-import { getNaluTypesInNalu, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
-import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
-import { H264Repacketizer, NAL_TYPE_IDR, NAL_TYPE_NON_IDR, splitH264NaluStartCode } from '@scrypted/h264-repacketizer/src/index';
-import sdk, { Battery, Camera, Device, DeviceProvider, MediaObject, MediaStreamUrl, RequestPictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { Battery, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, RequestPictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import eufy, { EufySecurity } from 'eufy-security-client';
-import { RtpHeader, RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { LocalLivestreamManager } from './stream';
+import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 
 const { deviceManager, mediaManager } = sdk;
-
-let sdp: string;
-if (false) {
-  sdp = `v=0
-  o=- 0 0 IN IP4 127.0.0.1
-  t=0 0
-  m=video 0 RTP/AVP 96
-  c=IN IP4 0.0.0.0
-  a=recvonly
-  a=rtpmap:96 H264/90000
-  m=audio 0 RTP/AVP 97
-  c=IN IP4 0.0.0.0
-  a=recvonly
-  a=rtpmap:97 mpeg4-generic/16000/1
-  a=fmtp:104 profile-level-id=15; streamtype=5; mode=AAC-hbr; config=1408;SizeLength=13; IndexLength=3; IndexDeltaLength=3; Profile=1;
-  `;
-
-}
-else {
-
-  sdp = `v=0
-  o=- 0 0 IN IP4 127.0.0.1
-  t=0 0
-  m=video 0 RTP/AVP 96
-  c=IN IP4 0.0.0.0
-  a=recvonly
-  a=rtpmap:96 H264/90000
-  `;
-}
-
-
-sdp = addTrackControls(sdp);
-const parsedSdp = parseSdp(sdp);
-const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video');
-const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio');
 
 class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Battery {
   client: EufySecurity;
   device: eufy.Camera;
+  livestreamManager: LocalLivestreamManager
 
   constructor(nativeId: string, client: EufySecurity, device: eufy.Camera) {
     super(nativeId);
     this.client = client;
     this.device = device;
-
+    this.livestreamManager = new LocalLivestreamManager(this.client, this.device, false, this.console);
+    
     // this.batteryLevel = this.device.getBatteryValue() as number;
   }
 
@@ -68,94 +32,42 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
   getVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
     return this.createVideoStream(options);
   }
-
+  
   async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
     return [
       {
         id: 'p2p',
         name: 'P2P',
         video: {
-          codec: 'h264',
+            codec: 'h264',
         },
-        audio: {
-          codec: 'aac',
-        },
+        source: 'cloud',
+        tool: 'ffmpeg',
         userConfigurable: false,
-        tool: 'scrypted',
       }
     ];
   }
 
   async createVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
-    const rtspServer = await listenSingleRtspClient();
-    rtspServer.rtspServerPromise.then(async rtsp => {
-      rtsp.sdp = sdp;
-      await rtsp.handlePlayback();
-
-      const h264Packetizer = new H264Repacketizer(this.console, 65535, undefined);
-      let videoSequenceNumber = 1;
-      let audioSequenceNumber = 1;
-      const firstTimestamp = Date.now();
-      let lastVideoTimestamp = firstTimestamp;
-      let lastAudioTimestamp = firstTimestamp;
-      try {
-        const livestreamManager = new LocalLivestreamManager(this.client, this.device, false, this.console);
-        const proxyStream = await livestreamManager.getLocalLivestream();
-        proxyStream.videostream.on('close', () => rtsp.client.destroy());
-        rtsp.client.on('close', () => livestreamManager.stopLocalLiveStream());
-        proxyStream.videostream.on('readable', () => {
-          const allData: Buffer = proxyStream.videostream.read();
-          const splits = splitH264NaluStartCode(allData);
-          if (!splits.length)
-            throw new Error('expected nalu start code');
-
-          for (const nalu of splits) {
-            const timestamp = Math.floor(((lastVideoTimestamp - firstTimestamp) / 1000) * 90000);
-            const naluTypes = getNaluTypesInNalu(nalu);
-            const header = new RtpHeader({
-              sequenceNumber: videoSequenceNumber++,
-              timestamp: timestamp,
-              payloadType: 96,
-            });
-            const rtp = new RtpPacket(header, nalu);
-
-            const packets = h264Packetizer.repacketize(rtp);
-            for (const packet of packets) {
-              rtsp.sendTrack(videoTrack.control, packet.serialize(), false);
-            }
-
-            if (naluTypes.has(NAL_TYPE_NON_IDR) || naluTypes.has(NAL_TYPE_IDR)) {
-              lastVideoTimestamp = Date.now();
-            }
-          }
-        });
-
-        if (audioTrack) {
-          proxyStream.audiostream.on('readable', () => {
-            const allData: Buffer = proxyStream.audiostream.read();
-            const timestamp = Math.floor(((lastAudioTimestamp - firstTimestamp) / 1000) * 16000);
-            const header = new RtpHeader({
-              sequenceNumber: audioSequenceNumber++,
-              timestamp: timestamp,
-              payloadType: 97,
-            });
-            const rtp = new RtpPacket(header, allData);
-            rtsp.sendTrack(audioTrack.control, rtp.serialize(), false);
-            lastAudioTimestamp = Date.now();
-          });
-        }
-      }
-      catch (e) {
-        rtsp.client.destroy();
-      }
+    const tcp = await listenZeroSingleClient();
+    const proxyStream = await this.livestreamManager.getLocalLivestream();
+    tcp.clientPromise.then(socket => {
+      proxyStream.videostream.pipe(socket);
     });
 
-    const input: MediaStreamUrl = {
-      url: rtspServer.url,
-      mediaStreamOptions: options,
+
+    const input: FFmpegInput = {
+        url: undefined,
+        inputArguments:[
+          '-f',
+          'h264',
+          '-i',
+          tcp.url
+        ],
+        mediaStreamOptions: options,
     };
 
-    return mediaManager.createMediaObject(input, ScryptedMimeTypes.MediaStreamUrl);
+    return mediaManager.createFFmpegMediaObject(input);
   }
 }
 
@@ -186,18 +98,18 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
       noStore: true,
     },
   });
-
+  
   constructor() {
     super();
     this.tryLogin()
   }
 
   getSettings(): Promise<Setting[]> {
-    return this.storageSettings.getSettings();
+      return this.storageSettings.getSettings();
   }
 
   putSetting(key: string, value: SettingValue): Promise<void> {
-    return this.storageSettings.putSetting(key, value);
+      return this.storageSettings.putSetting(key, value);
   }
 
   async tryLogin(twoFactorCode?: string) {
@@ -211,7 +123,7 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
     await this.initializeClient();
 
     try {
-      await this.client.connect({ verifyCode: twoFactorCode, force: false });
+      await this.client.connect({verifyCode: twoFactorCode, force: false});
       this.console.debug(`[${this.name}] (${new Date().toLocaleString()}) Client connected.`);
     } catch (e) {
       this.log.a('Login failed: if you have 2FA enabled, check your email or texts for your code, then enter it into the Two Factor Code setting to conplete login.');
@@ -247,22 +159,22 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
       return;
     }
     this.console.info(`[${this.name}] (${new Date().toLocaleString()}) Device discovered: `, eufyDevice.getName(), eufyDevice.getModel());
-
+    
     const nativeId = eufyDevice.getSerial();
-
+    
     const interfaces = [
-      ScryptedInterface.Camera,
-      ScryptedInterface.VideoCamera
+        ScryptedInterface.Camera,
+        ScryptedInterface.VideoCamera
     ];
     if (eufyDevice.hasBattery())
-      interfaces.push(ScryptedInterface.Battery);
-
+        interfaces.push(ScryptedInterface.Battery);
+    
     const device: Device = {
       info: {
-        model: eufyDevice.getModel(),
-        manufacturer: 'Eufy',
-        firmware: eufyDevice.getSoftwareVersion(),
-        serialNumber: nativeId
+          model: eufyDevice.getModel(),
+          manufacturer: 'Eufy',
+          firmware: eufyDevice.getSoftwareVersion(),
+          serialNumber: nativeId
       },
       nativeId,
       name: eufyDevice.getName(),
