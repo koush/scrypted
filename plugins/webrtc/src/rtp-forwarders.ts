@@ -331,8 +331,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     const rtspServerDeferred = new Deferred<RtspServer>();
 
     // will no op if there's no tracks
+    let cp: ChildProcess;
     if (Object.keys(rtpTracks).length) {
-        let cp: ChildProcess;
         if (useRtp) {
             rtspServerDeferred.resolve(undefined);
 
@@ -445,7 +445,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         safePrintFFmpegArguments(console, args);
 
         cp = child_process.spawn(ffmpegPath, args, {
-            stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+            stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
         });
         killDeferred.promise.finally(() => safeKillFFmpeg(cp));
         cp.on('exit', () => {
@@ -480,6 +480,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     }
 
     return {
+        cp,
         rtspServer: rtspServerDeferred.promise,
         sdpContents: sdpDeferred.promise,
         videoSection: videoSectionDeferred.promise,
