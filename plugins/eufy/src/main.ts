@@ -41,7 +41,9 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
         video: {
             codec: 'h264',
         },
-        source: 'cloud',
+        audio: {
+          codec: 'aac',
+        },
         tool: 'ffmpeg',
         userConfigurable: false,
       }
@@ -49,20 +51,23 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
   }
 
   async createVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
-    const tcp = await listenZeroSingleClient();
-    const proxyStream = await this.livestreamManager.getLocalLivestream();
-    tcp.clientPromise.then(socket => {
-      proxyStream.videostream.pipe(socket);
-    });
-
+    const h264Server = await listenZeroSingleClient();
+    const adtsServer = await listenZeroSingleClient();
+    (async () => {
+      const h264 = await h264Server.clientPromise;
+      const adts = await adtsServer.clientPromise;
+      const proxyStream = await this.livestreamManager.getLocalLivestream();
+      proxyStream.videostream.pipe(h264);
+      proxyStream.audiostream.pipe(adts);
+    })();
 
     const input: FFmpegInput = {
         url: undefined,
         inputArguments:[
-          '-f',
-          'h264',
-          '-i',
-          tcp.url
+          '-f', 'adts',
+          '-i', adtsServer.url,
+          '-f', 'h264',
+          '-i', h264Server.url
         ],
         mediaStreamOptions: options,
     };
