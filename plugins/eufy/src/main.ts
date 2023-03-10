@@ -100,8 +100,6 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
           const splits = splitH264NaluStartCode(allData);
           if (!splits.length)
             throw new Error('expected nalu start code');
-          else if (splits.length !== 1)
-            this.console.warn('found more than 1 nalu in the payload.');
 
           for (const nalu of splits) {
             const timestamp = Math.floor(((lastVideoTimestamp - firstTimestamp) / 1000) * 90000);
@@ -125,7 +123,7 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
         });
 
         proxyStream.audiostream.on('readable', () => {
-          const allData: Buffer = proxyStream.videostream.read();
+          const allData: Buffer = proxyStream.audiostream.read();
           const timestamp = Math.floor(((lastAudioTimestamp - firstTimestamp) / 1000) * 16000);
           const header = new RtpHeader({
             sequenceNumber: audioSequenceNumber++,
