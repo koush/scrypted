@@ -4,7 +4,7 @@ import eufy, { EufySecurity } from 'eufy-security-client';
 import { LocalLivestreamManager } from './stream';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import child_process from 'child_process';
-import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 
 
 const { deviceManager, mediaManager } = sdk;
@@ -70,7 +70,7 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
     const mpegts = await listenZeroSingleClient();
 
     mpegts.clientPromise.then(async client => {
-      const cp = child_process.spawn(await mediaManager.getFFmpegPath(), [
+      const args = [
         '-f', 'aac',
         '-i', adtsServer.url,
         '-f', 'h264',
@@ -83,11 +83,16 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
         '-vcodec', 'copy',
         '-f', 'mpegts',
         'pipe:3',
-      ], {
-        stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+      ];
+      safePrintFFmpegArguments(this.console, args);
+
+      const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
+        stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
       });
 
       cp.stdio[3].pipe(client);
+
+      ffmpegLogInitialOutput(this.console, cp);
     });
 
     const input: FFmpegInput = {
