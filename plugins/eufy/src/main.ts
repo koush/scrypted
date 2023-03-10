@@ -66,18 +66,21 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
       proxyStream.videostream.pipe(h264);
     })();
 
-    const inputArguments = [
-      '-f', 'aac',
-      '-i', adtsServer.url,
-      '-f', 'h264',
-      '-i', h264Server.url
-    ];
 
     const mpegts = await listenZeroSingleClient();
 
     mpegts.clientPromise.then(async client => {
       const cp = child_process.spawn(await mediaManager.getFFmpegPath(), [
-        ...inputArguments,
+        '-f', 'aac',
+        '-i', adtsServer.url,
+        '-f', 'h264',
+        '-i', h264Server.url,
+
+        '-acodec', 'copy',
+        // try testing with and without this audio filter
+        // '-bsf:a', 'aac_adtstoasc',
+
+        '-vcodec', 'copy',
         '-f', 'mpegts',
         'pipe:3',
       ], {
@@ -90,8 +93,6 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
     const input: FFmpegInput = {
       url: undefined,
       inputArguments: [
-        '-acodec', 'copy',
-        '-vcodec', 'copy',
         '-f', 'mpegts',
         mpegts.url,
       ],
