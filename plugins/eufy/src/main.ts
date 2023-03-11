@@ -1,17 +1,17 @@
 import { listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
-import sdk, { Battery, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, RequestPictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { Battery, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, MotionSensor, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import eufy, { CaptchaOptions, EufySecurity } from 'eufy-security-client';
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
-import { LocalLivestreamManager } from './stream';
 
 import { Deferred } from '@scrypted/common/src/deferred';
 import { Writable } from 'stream';
+import { LocalLivestreamManager } from './stream';
 
-const { deviceManager, mediaManager } = sdk;
+const { deviceManager, mediaManager, systemManager } = sdk;
 
-class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Battery {
+class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Battery, MotionSensor {
   client: EufySecurity;
   device: eufy.Camera;
   livestreamManager: LocalLivestreamManager
@@ -20,16 +20,42 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
     super(nativeId);
     this.client = client;
     this.device = device;
-    this.livestreamManager = new LocalLivestreamManager(this.client, this.device, true, this.console);
-
-    // this.batteryLevel = this.device.getBatteryValue() as number;
+    this.livestreamManager = new LocalLivestreamManager(this.client, this.device, this.console);
+    this.batteryLevel = this.device.getBatteryValue() as number;
+    this.setupMotionDetection();
   }
 
-  takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
+  setupMotionDetection() {
+    const handle = (device: eufy.Device, state: boolean) => {
+      this.motionDetected = state;
+    };
+    this.device.on('motion detected', handle);
+    this.device.on('person detected', handle);
+    this.device.on('pet detected', handle);
+    this.device.on('vehicle detected', handle);
+    this.device.on('dog detected', handle);
+    this.device.on('radar motion detected', handle);
+  }
+
+  async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
+    // if this stream is prebuffered, its safe to use the prebuffer to generate an image
+    const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+    try {
+        const msos = await realDevice.getVideoStreamOptions();
+        const prebuffered: RequestMediaStreamOptions = msos.find(mso => mso.prebuffer);
+        if (prebuffered) {
+            prebuffered.refresh = false;
+            return realDevice.getVideoStream(prebuffered);
+        }
+    } catch (e) {}
+
+    // try to fetch the cloud image if one exists
     const url = this.device.getLastCameraImageURL();
-    if (!url)
-      throw new Error("snapshot unavailable");
-    return mediaManager.createMediaObjectFromUrl(url.toString());
+    if (url) {
+      return mediaManager.createMediaObjectFromUrl(url.toString());
+    }
+
+    throw new Error("snapshot unavailable");
   }
 
   getPictureOptions(): Promise<ResponsePictureOptions[]> {
@@ -60,7 +86,10 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
 
   async createVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
     const kill = new Deferred<void>();
-    kill.promise.finally(() => this.console.log('video stream proxy exited'));
+    kill.promise.finally(() => {
+      this.console.log('video stream exited');
+      this.livestreamManager.stopLocalLiveStream();
+    });
 
     const rtspServer = await listenSingleRtspClient();
     rtspServer.rtspServerPromise.then(async rtsp => {
@@ -253,6 +282,8 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
     ];
     if (eufyDevice.hasBattery())
       interfaces.push(ScryptedInterface.Battery);
+    if (eufyDevice.hasProperty('motionDetection'))
+      interfaces.push(ScryptedInterface.MotionSensor);
 
     const device: Device = {
       info: {
