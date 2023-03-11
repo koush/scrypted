@@ -278,8 +278,14 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             t = self.trackers.get(detection_session.id)
             if not t:
                 t = tracker.Sort_OH(scene=np.array([iw, ih]))
-                t.conf_three_frame_certainty = (settings.get('trackerCertainty') or .2) * 3
-                t.conf_unmatched_history_size = settings.get('trackerWindow') or 3
+                trackerCertainty = settings.get('trackerCertainty')
+                if not isinstance(trackerCertainty, int):
+                    trackerCertainty = .2
+                t.conf_three_frame_certainty = trackerCertainty * 3
+                trackerWindow = settings.get('trackerWindow')
+                if not isinstance(trackerWindow, int):
+                    trackerWindow = 3
+                t.conf_unmatched_history_size = trackerWindow
                 self.trackers[detection_session.id] = t
             detection_session.tracker = t
             # conf_trgt = 0.35
