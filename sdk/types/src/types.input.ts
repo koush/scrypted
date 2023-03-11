@@ -1317,14 +1317,19 @@ export interface ImageOptions {
     width: number,
     height: number,
   };
+  crop?: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
   format?: string;
 }
 export interface Image extends MediaObject {
-  timestamp: number;
   width: number;
   height: number;
   format: string;
-  read(options?: ImageOptions): Promise<Buffer>;
+  toBuffer(options?: ImageOptions): Promise<Buffer>;
 }
 export interface VideoFrame extends Image {
   timestamp: number;
@@ -2041,8 +2046,6 @@ export enum ScryptedMimeTypes {
   RequestMediaObject = 'x-scrypted/x-scrypted-request-media-object',
   RequestMediaStream = 'x-scrypted/x-scrypted-request-stream',
   MediaStreamFeedback = 'x-scrypted/x-media-stream-feedback',
-  ScryptedDevice = 'x-scrypted/x-scrypted-device',
-  ScryptedDeviceId = 'x-scrypted/x-scrypted-device-id',
 
   FFmpegInput = 'x-scrypted/x-ffmpeg-input',
   FFmpegTranscodeStream = 'x-scrypted/x-ffmpeg-transcode-stream',
@@ -2050,6 +2053,8 @@ export enum ScryptedMimeTypes {
   RTCSignalingChannel = 'x-scrypted/x-scrypted-rtc-signaling-channel',
   RTCSignalingSession = 'x-scrypted/x-scrypted-rtc-signaling-session',
   RTCConnectionManagement = 'x-scrypted/x-scrypted-rtc-connection-management',
+
+  Image = 'x-scrypted/x-scrypted-image',
 }
 
 export type RequestMediaObject = () => Promise<MediaObject>;

@@ -36,6 +36,10 @@ class MediaPlayerState(Enum):
     Paused = "Paused"
     Playing = "Playing"
 
+class PanTiltZoomMovement(Enum):
+    Absolute = "Absolute"
+    Relative = "Relative"
+
 class ScryptedDeviceType(Enum):
     API = "API"
     Automation = "Automation"
@@ -149,6 +153,7 @@ class ScryptedInterface(Enum):
 class ScryptedMimeTypes(Enum):
     FFmpegInput = "x-scrypted/x-ffmpeg-input"
     FFmpegTranscodeStream = "x-scrypted/x-ffmpeg-transcode-stream"
+    Image = "x-scrypted/x-scrypted-image"
     InsecureLocalUrl = "text/x-insecure-local-uri"
     LocalUrl = "text/x-local-uri"
     MediaObject = "x-scrypted/x-scrypted-media-object"
@@ -161,8 +166,6 @@ class ScryptedMimeTypes(Enum):
     RequestMediaObject = "x-scrypted/x-scrypted-request-media-object"
     RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
-    ScryptedDevice = "x-scrypted/x-scrypted-device"
-    ScryptedDeviceId = "x-scrypted/x-scrypted-device-id"
     Url = "text/x-uri"
 
 class SecuritySystemMode(Enum):
@@ -228,6 +231,7 @@ class HttpResponseOptions(TypedDict):
     pass
 
 class ImageOptions(TypedDict):
+    crop: Any
     format: str
     resize: Any
     pass
@@ -508,7 +512,9 @@ class PanTiltZoomCapabilities(TypedDict):
     pass
 
 class PanTiltZoomCommand(TypedDict):
+    movement: PanTiltZoomMovement
     pan: float
+    speed: Any
     tilt: float
     zoom: float
     pass
@@ -2401,7 +2407,7 @@ class VideoFrame:
     sourceId: str
     timestamp: float
     width: float
-    async def read(self, options: ImageOptions = None) -> bytearray:
+    async def toBuffer(self, options: ImageOptions = None) -> bytearray:
         pass
     pass
 
