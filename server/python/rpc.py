@@ -106,7 +106,7 @@ class RpcPeer:
         serializationContext: Dict = {}
         serializedArgs = []
         for arg in args:
-            serializedArgs.append(self.serialize(arg, False, serializationContext))
+            serializedArgs.append(self.serialize(arg, serializationContext))
 
         rpcApply = {
             'type': 'apply',
@@ -184,8 +184,11 @@ class RpcPeer:
         }
         return props
 
-    def serialize(self, value, requireProxy, serializationContext: Dict):
-        if (not value or (not requireProxy and type(value) in jsonSerializable)):
+    def isTransportSafe(value: any):
+        return not value or (type(value) in jsonSerializable)
+
+    def serialize(self, value, serializationContext: Dict):
+        if (RpcPeer.isTransportSafe(value)):
             return value
 
         __remote_constructor_name = 'Function' if callable(value) else value.__proxy_constructor if hasattr(
@@ -332,8 +335,7 @@ class RpcPeer:
                 try:
                     value = self.params.get(message['param'], None)
                     value = await maybe_await(value)
-                    result['result'] = self.serialize(
-                        value, message.get('requireProxy', None), serializationContext)
+                    result['result'] = self.serialize(value, serializationContext)
                 except Exception as e:
                     tb = traceback.format_exc()
                     self.createErrorResult(
@@ -370,7 +372,7 @@ class RpcPeer:
                     else:
                         value = await maybe_await(target(*args))
 
-                    result['result'] = self.serialize(value, False, serializationContext)
+                    result['result'] = self.serialize(value, serializationContext)
                 except StopAsyncIteration as e:
                     self.createErrorResult(result, e)
                 except Exception as e:
