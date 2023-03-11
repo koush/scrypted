@@ -26,16 +26,6 @@ defaultPeerConfig.headerExtensions = {
     audio: [],
 };
 
-mediaManager.addConverter({
-    fromMimeType: ScryptedMimeTypes.ScryptedDevice,
-    toMimeType: ScryptedMimeTypes.RequestMediaStream,
-    async convert(data, fromMimeType, toMimeType, options) {
-        const device = data as VideoCamera;
-        const requestMediaStream: RequestMediaStream = async options => device.getVideoStream(options);
-        return requestMediaStream;
-    }
-});
-
 const zygote = createZygote<ReturnType<typeof fork>>();
 
 class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
