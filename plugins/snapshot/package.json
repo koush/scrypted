@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/snapshot",
-   "version": "0.0.46",
+   "version": "0.0.48",
    "description": "Snapshot Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -26,16 +26,19 @@
       "name": "Snapshot Plugin",
       "type": "API",
       "interfaces": [
+         "DeviceProvider",
          "Settings",
          "MixinProvider",
          "BufferConverter"
       ]
    },
+   "optionalDependencies": {
+      "sharp": "^0.31.3"
+   },
    "dependencies": {
       "@koush/axios-digest-auth": "^0.8.5",
       "@types/node": "^16.6.1",
       "axios": "^0.24.0",
-      "sharp": "^0.31.3",
       "whatwg-mimetype": "^3.0.0"
    },
    "devDependencies": {

@@ -4,10 +4,10 @@ export interface SharpImageFilterOptions {
     console?: Console,
     blur?: boolean;
     brightness?: number;
-    // text?: {
-    //     text: string;
-    //     fontFile: string;
-    // };
+    text?: {
+        text: string;
+        fontFile: string;
+    };
 
     resize?: {
         fractional?: boolean;
@@ -28,7 +28,9 @@ export interface SharpImageFilterOptions {
 
 
 export async function sharpFilterImage(inputJpeg: Buffer | string, options: SharpImageFilterOptions) {
-    let image = sharp(inputJpeg);
+    let image = sharp(inputJpeg, {
+        failOnError: false,
+    });
     const metadata = await image.metadata();
     if (options?.crop) {
         let { left, top, width, height, fractional } = options.crop;
@@ -59,7 +61,7 @@ export async function sharpFilterImage(inputJpeg: Buffer | string, options: Shar
 
     if (options?.brightness) {
         image = image.modulate({
-            lightness: options.brightness  * 100,
+            lightness: options.brightness * 100,
         });
     }
 
@@ -67,9 +69,22 @@ export async function sharpFilterImage(inputJpeg: Buffer | string, options: Shar
         image = image.blur(25);
     }
 
-    // if (options?.text) {
-    // }
-
+    if (options?.text) {
+        image = image.composite([
+            {
+                input: {
+                    text: {
+                        rgba: true,
+                        text: `<span foreground="white">${options.text.text}</span>`,
+                        // this is not working?
+                        // font: 'Lato',
+                        // fontfile: options?.text.fontFile,
+                        dpi: metadata.height,
+                    },
+                },
+            }
+        ])
+    }
 
     image = image.toFormat(options?.format || 'jpg');
 
