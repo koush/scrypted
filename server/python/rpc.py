@@ -166,22 +166,23 @@ class RpcPeer:
             '__serialized_value': serialized,
         }
     
-    def getProxyProperties(value):
-        return getattr(value, '__proxy_props', None)
+    # def getProxyProperties(value):
+    #     return getattr(value, '__proxy_props', None)
 
-    def setProxyProperties(value, properties):
-        setattr(value, '__proxy_props', properties)
+    # def setProxyProperties(value, properties):
+    #     setattr(value, '__proxy_props', properties)
 
     def prepareProxyProperties(value):
         if not hasattr(value, '__aiter__') or not hasattr(value, '__anext__'):
             return getattr(value, '__proxy_props', None)
 
         props = getattr(value, '__proxy_props', None) or {}
-        props['Symbol(Symbol.asyncIterator)'] = {
-            'next': '__anext__',
-            'throw': 'athrow',
-            'return': 'asend',
-        }
+        if not props.get('Symbol(Symbol.asyncIterator)'):
+            props['Symbol(Symbol.asyncIterator)'] = {
+                'next': '__anext__',
+                'throw': 'athrow',
+                'return': 'asend',
+            }
         return props
 
     def isTransportSafe(value: any):
@@ -244,13 +245,15 @@ class RpcPeer:
         self.localProxyMap[proxyId] = value
 
         if self.onProxySerialization:
-            self.onProxySerialization(value, proxyId)
+            __remote_proxy_props = self.onProxySerialization(value, proxyId)
+        else:
+            __remote_proxy_props = RpcPeer.prepareProxyProperties(value)
 
         ret = {
             '__remote_proxy_id': proxyId,
             '__remote_proxy_finalizer_id': proxyId,
             '__remote_constructor_name': __remote_constructor_name,
-            '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
+            '__remote_proxy_props': __remote_proxy_props,
             '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
         }
 

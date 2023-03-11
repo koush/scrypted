@@ -326,15 +326,13 @@ class PluginRemote:
         sdk.connectRPCObject = connectRPCObject
 
         def onProxySerialization(value: Any, proxyId: str):
-            properties: dict = rpc.RpcPeer.getProxyProperties(value)
-            if not properties or not properties.get('__cluster', None):
-                properties = properties or {}
-                properties['__cluster'] = {
-                    'id': clusterId,
-                    'proxyId': proxyId,
-                    'port': clusterPort,
-                }
-                rpc.RpcPeer.setProxyProperties(value, properties)
+            properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
+            properties['__cluster'] = {
+                'id': clusterId,
+                'proxyId': proxyId,
+                'port': clusterPort,
+            }
+            return properties
 
         self.peer.onProxySerialization = onProxySerialization
 

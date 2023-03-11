@@ -304,7 +304,7 @@ export class RpcPeer {
     finalizers = new FinalizationRegistry(entry => this.finalize(entry as LocalProxiedEntry));
     nameDeserializerMap = new Map<string, RpcSerializer>();
     onProxyTypeSerialization = new Map<string, (value: any) => void>();
-    onProxySerialization: (value: any, proxyId: string) => void;
+    onProxySerialization: (value: any, proxyId: string) => any;
     constructorSerializerMap = new Map<any, string>();
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
     killed: Promise<string>;
@@ -348,24 +348,26 @@ export class RpcPeer {
         }
     }
 
-    static setProxyProperties(value: any, properties: any) {
-        value[RpcPeer.PROPERTY_PROXY_PROPERTIES] = properties;
-    }
+    // static setProxyProperties(value: any, properties: any) {
+    //     value[RpcPeer.PROPERTY_PROXY_PROPERTIES] = properties;
+    // }
 
-    static getProxyProperties(value: any) {
-        return value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES];
-    }
+    // static getProxyProperties(value: any) {
+    //     return value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES];
+    // }
 
     static prepareProxyProperties(value: any) {
         let props = value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES];
         if (!value[Symbol.asyncIterator])
             return props;
         props ||= {};
-        props[Symbol.asyncIterator.toString()] = {
-            next: 'next',
-            throw: 'throw',
-            return: 'return',
-        };
+        if (!props[Symbol.asyncIterator.toString()]) {
+            props[Symbol.asyncIterator.toString()] = {
+                next: 'next',
+                throw: 'throw',
+                return: 'return',
+            };
+        }
         return props;
     }
 
@@ -628,13 +630,13 @@ export class RpcPeer {
         this.localProxied.set(value, proxiedEntry);
         this.localProxyMap[__remote_proxy_id] = value;
 
-        this.onProxySerialization?.(value, __remote_proxy_id);
+        const __remote_proxy_props = this.onProxySerialization ? this.onProxySerialization(value, __remote_proxy_id) : RpcPeer.prepareProxyProperties(value);
 
         const ret: RpcRemoteProxyValue = {
             __remote_proxy_id,
             __remote_proxy_finalizer_id: __remote_proxy_id,
             __remote_constructor_name,
-            __remote_proxy_props: RpcPeer.prepareProxyProperties(value),
+            __remote_proxy_props,
             __remote_proxy_oneway_methods: value?.[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS],
         }
 
