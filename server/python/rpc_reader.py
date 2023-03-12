@@ -104,6 +104,7 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, readFd: int = None, wri
     peer.nameDeserializerMap['Buffer'] = SidebandBufferSerializer()
     peer.constructorSerializerMap[bytes] = 'Buffer'
     peer.constructorSerializerMap[bytearray] = 'Buffer'
+    peer.constructorSerializerMap[memoryview] = 'Buffer'
 
     async def peerReadLoop():
         await readLoop(loop, peer, reader)

@@ -85,7 +85,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
                 clusterPeer.params['connectRPCObject'] = async (id: string, secret: string) => {
                     if (secret !== portSecret)
                         throw new Error('secret incorrect');
-                    return peer.localProxyMap[id];
+                    return peer.localProxyMap.get(id);
                 }
                 client.on('close', () => clusterPeer.kill('cluster socket closed'));
             })

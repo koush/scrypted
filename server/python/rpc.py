@@ -59,7 +59,7 @@ class RpcProxy(object):
         self.__dict__['__proxy_entry'] = entry
         self.__dict__['__proxy_constructor'] = proxyConstructorName
         self.__dict__['__proxy_peer'] = peer
-        self.__dict__['__proxy_props'] = proxyProps
+        self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES] = proxyProps
         self.__dict__['__proxy_oneway_methods'] = proxyOneWayMethods
 
     def __getattr__(self, name):
@@ -67,8 +67,8 @@ class RpcProxy(object):
             return self.dict['__proxy_entry']['finalizerId']
         if name in self.__dict__:
             return self.__dict__[name]
-        if self.__dict__['__proxy_props'] and name in self.__dict__['__proxy_props']:
-            return self.__dict__['__proxy_props'][name]
+        if self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES] and name in self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES]:
+            return self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES][name]
         return RpcProxyMethod(self, name)
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -87,6 +87,7 @@ class RpcProxy(object):
 
 class RpcPeer:
     RPC_RESULT_ERROR_NAME = 'RPCResultError'
+    PROPERTY_PROXY_PROPERTIES = '__proxy_props'
 
     def __init__(self, send: Callable[[object, Callable[[Exception], None], Dict], None]) -> None:
         self.send = send
@@ -167,16 +168,16 @@ class RpcPeer:
         }
     
     # def getProxyProperties(value):
-    #     return getattr(value, '__proxy_props', None)
+    #     return getattr(value, RpcPeer.PROPERTY_PROXY_PROPERTIES, None)
 
     # def setProxyProperties(value, properties):
-    #     setattr(value, '__proxy_props', properties)
+    #     setattr(value, RpcPeer.PROPERTY_PROXY_PROPERTIES, properties)
 
     def prepareProxyProperties(value):
         if not hasattr(value, '__aiter__') or not hasattr(value, '__anext__'):
-            return getattr(value, '__proxy_props', None)
+            return getattr(value, RpcPeer.PROPERTY_PROXY_PROPERTIES, None)
 
-        props = getattr(value, '__proxy_props', None) or {}
+        props = getattr(value, RpcPeer.PROPERTY_PROXY_PROPERTIES, None) or {}
         if not props.get('Symbol(Symbol.asyncIterator)'):
             props['Symbol(Symbol.asyncIterator)'] = {
                 'next': '__anext__',
@@ -198,6 +199,22 @@ class RpcPeer:
         if isinstance(value, Exception):
             return self.serializeError(value)
 
+        serializerMapName = self.constructorSerializerMap.get(
+            type(value), None)
+        if serializerMapName:
+            __remote_constructor_name = serializerMapName
+            serializer = self.nameDeserializerMap.get(serializerMapName, None)
+            serialized = serializer.serialize(value, serializationContext)
+            ret = {
+                '__remote_proxy_id': None,
+                '__remote_proxy_finalizer_id': None,
+                '__remote_constructor_name': __remote_constructor_name,
+                '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
+                '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
+                '__serialized_value': serialized,
+            }
+            return ret
+
         proxiedEntry = self.localProxied.get(value, None)
         if proxiedEntry:
             proxiedEntry['finalizerId'] = str(self.proxyCounter)
@@ -216,22 +233,6 @@ class RpcPeer:
         if __proxy_id and __proxy_peer == self:
             ret = {
                 '__local_proxy_id': __proxy_id,
-            }
-            return ret
-
-        serializerMapName = self.constructorSerializerMap.get(
-            type(value), None)
-        if serializerMapName:
-            __remote_constructor_name = serializerMapName
-            serializer = self.nameDeserializerMap.get(serializerMapName, None)
-            serialized = serializer.serialize(value, serializationContext)
-            ret = {
-                '__remote_proxy_id': None,
-                '__remote_proxy_finalizer_id': None,
-                '__remote_constructor_name': __remote_constructor_name,
-                '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
-                '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
-                '__serialized_value': serialized,
             }
             return ret
 

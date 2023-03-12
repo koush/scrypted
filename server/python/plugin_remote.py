@@ -46,13 +46,19 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
 
 
 class MediaObject(scrypted_python.scrypted_sdk.types.MediaObject):
-    def __init__(self, data, mimeType, sourceId):
-        self.mimeType = mimeType
+    def __init__(self, data, mimeType, options):
         self.data = data
-        setattr(self, '__proxy_props', {
-            'mimeType': mimeType,
-            'sourceId': sourceId,
-        })
+
+        proxyProps = {}
+        setattr(self, rpc.RpcPeer.PROPERTY_PROXY_PROPERTIES, proxyProps)
+
+        options = options or {}
+        options['mimeType'] = mimeType
+
+        for key, value in options.items():
+            if rpc.RpcPeer.isTransportSafe(value):
+                proxyProps[key] = value
+            setattr(self, key, value)
 
     async def getData(self):
         return self.data
@@ -91,9 +97,9 @@ class MediaManager:
 
     async def createMediaObject(self, data: Any, mimeType: str, options: scrypted_python.scrypted_sdk.types.MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
         # return await self.createMediaObject(data, mimetypes, options)
-        return MediaObject(data, mimeType, options.get('sourceId', None) if options else None)
+        return MediaObject(data, mimeType, options)
 
-    async def createMediaObjectFromUrl(self, data: str, options: scrypted_python.scrypted_sdk.types. MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
+    async def createMediaObjectFromUrl(self, data: str, options: scrypted_python.scrypted_sdk.types.MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
         return await self.mediaManager.createMediaObjectFromUrl(data, options)
 
     async def getFFmpegPath(self) -> str:
