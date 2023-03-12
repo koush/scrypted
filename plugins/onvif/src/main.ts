@@ -565,11 +565,12 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
                 settings.newCamera = info.model;
 
-                api.cam.services.find((s: any) => s.namespace === 'http://www.onvif.org/ver20/ptz/wsdl');
-                ptzCapabilities = [
-                    'Pan',
-                    'Tilt',
-                ];
+                if (api.cam?.services?.find((s: any) => s.namespace === 'http://www.onvif.org/ver20/ptz/wsdl')) {
+                    ptzCapabilities = [
+                        'Pan',
+                        'Tilt',
+                    ];
+                }
             }
             catch (e) {
                 this.console.error('Error adding ONVIF camera', e);

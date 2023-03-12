@@ -1,4 +1,4 @@
-import { DeviceState, MixinDeviceBase, MixinDeviceOptions, MixinProvider, PanTiltZoom, PanTiltZoomCommand, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import { DeviceState, MixinDeviceBase, MixinDeviceOptions, MixinProvider, PanTiltZoom, PanTiltZoomCommand, PanTiltZoomMovement, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { connectCameraAPI } from "./onvif-api";
 import {SettingsMixinDeviceBase, SettingsMixinDeviceOptions} from '../../../common/src/settings-mixin';
@@ -45,7 +45,7 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
 
     async ptzCommand(command: PanTiltZoomCommand) {
         const client = await this.getClient();
-        const speed = undefined
+        let speed: any;
 
         if (command.speed) {
             speed = {
