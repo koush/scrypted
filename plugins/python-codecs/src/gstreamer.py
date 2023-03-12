@@ -21,6 +21,7 @@ class Callback:
 
 def createPipelineIterator(pipeline: str):
     pipeline = '{pipeline} ! appsink name=appsink emit-signals=true sync=false'.format(pipeline=pipeline)
+    print(pipeline)
     gst = Gst.parse_launch(pipeline)
     bus = gst.get_bus()
 
