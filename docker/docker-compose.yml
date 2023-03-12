@@ -54,6 +54,11 @@ services:
             #   target: /nvr
             #   volume:
             #     nocopy: true
+
+            # uncomment the following lines to expose Avahi, an mDNS advertiser.
+            # make sure Avahi is running on the host machine, otherwise this will not work.
+            # - /var/run/dbus:/var/run/dbus
+            # - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
         # logging is noisy and will unnecessarily wear on flash storage.
         # scrypted has per device in memory logging that is preferred.
         logging:

@@ -49,3 +49,36 @@ This is always a issue with the network setup.
 This almost always due to your camera bitrate being too high for remote streaming through Apple's servers. Workarounds:
 1) Use a lower bitrate substream for Remote Streaming.
 2) Enable Transcoding on Remote Streaming.
+
+
+### mDNS Advertiser Options
+
+Scypted uses mDNS-based to make your accessories discoverable by Apple devices.
+There are 3 mDNS Advertisers that Scrypted can interface with to advertise itself on the local network.
+
+
+#### Ciao
+
+Ciao is the default advertiser that scypted uses.
+
+For non-Linux users, `ciao` should provide the best experience. It fixes a lot of the deficiencies of the `bonjour` advertiser. However, you might experience issues in the following two scenarios.
+
+##### Network Interface Selection
+Ciao tries to be aware of multiple network interfaces. 
+On startup, it tries to evaluate which network interfaces to advertise on by default.
+In certain circumstances, ciao is unable to properly determine the set of valid network interfaces (e.g., when dealing with virtual network interfaces on containerised environments).
+
+##### Multiple Advertisers
+On some systems, there is already a mDNS advertiser stack running (e.g. avahi on linux). There might be issues running multiple mDNS advertisers on the same host.
+
+#### Bonjour
+
+Bonjour is a legacy advertiser. It is not as efficient in terms of system resource usage and network traffic when compared to the other options.
+
+#### Avahi (Linux Only)
+Avahi is a mDNS advertiser that is installed by default on many linux distributions.
+
+For Linux users, Avahi should provide the best experience.
+Note that your system must have the `avahi-daemon` and `dbus` services installed and running for this option to work.
+
+If using Scypted through `docker compose`, be sure to uncomment the volume mounts to expose Avahi to the container.

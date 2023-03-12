@@ -328,9 +328,10 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             bind,
         };
 
-        this.bridge.publish(publishInfo, true);
-        this.storageSettings.values.qrCode = this.bridge.setupURI();
-        logConnections(this.console, this.bridge, this.seenConnections);
+        this.bridge.publish(publishInfo, true).then(() => {
+            this.storageSettings.values.qrCode = this.bridge.setupURI();
+            logConnections(this.console, this.bridge, this.seenConnections);
+        });
 
         systemManager.listen(async (eventSource, eventDetails, eventData) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)
