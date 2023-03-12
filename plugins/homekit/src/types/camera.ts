@@ -227,6 +227,7 @@ addSupportedType({
                 const property = `characteristic-v2-${characteristic.UUID}`
                 service.getCharacteristic(characteristic)
                     .on(CharacteristicEventTypes.GET, callback => callback(null, storage.getItem(property) === 'true' ? 1 : 0))
+                    .removeOnSet()
                     .on(CharacteristicEventTypes.SET, (value, callback) => {
                         callback();
                         storage.setItem(property, (!!value).toString());
@@ -265,9 +266,11 @@ addSupportedType({
             }
 
             recordingManagement.recordingManagementService.getCharacteristic(Characteristic.SelectedCameraRecordingConfiguration)
+                .removeOnGet()
                 .on(CharacteristicEventTypes.GET, callback => {
                     callback(null, storage.getItem(storageKeySelectedRecordingConfiguration) || '');
                 })
+                .removeOnSet()
                 .on(CharacteristicEventTypes.SET, (value, callback) => {
                     // prepare recording here if necessary.
                     storage.setItem(storageKeySelectedRecordingConfiguration, value.toString());
