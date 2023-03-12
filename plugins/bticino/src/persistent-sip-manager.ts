@@ -17,7 +17,7 @@ export class PersistentSipManager {
 
     constructor( private camera : BticinoSipCamera ) {
         // Give it a second and run in seperate thread to avoid failure on creation for from/to/domain check
-        setTimeout( () => this.register(), CHECK_INTERVAL )
+        setTimeout( () => this.enable() , CHECK_INTERVAL )
     }
 
     async enable() : Promise<SipManager> {
@@ -39,7 +39,7 @@ export class PersistentSipManager {
                 this.expireInterval = (sipOptions.expire * 1000) - 10000
             }
 
-            if( now - this.lastRegistration >= this.expireInterval )  {
+            if( !this.camera.hasActiveCall() && now - this.lastRegistration >= this.expireInterval )  {
                 let sipOptions : SipOptions = SipHelper.sipOptions( this.camera )
 
                 this.sipManager?.destroy()
@@ -61,6 +61,11 @@ export class PersistentSipManager {
     }
 
     async session( sipOptions: SipOptions ) : Promise<SipCallSession> {
-        return SipCallSession.createCallSession(this.camera.console, "Bticino", sipOptions, this.sipManager )
+        let sm = await this.enable()
+        return SipCallSession.createCallSession(this.camera.console, "Bticino", sipOptions, sm )
+    }
+
+    reloadSipOptions() {
+        this.sipManager?.setSipOptions( null )
     }
 }

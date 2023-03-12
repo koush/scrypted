@@ -23,7 +23,7 @@ import crypto from 'crypto';
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
 
-export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor {
+export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler {
 
     private session: SipCallSession
     private remoteRtpDescription: RtpDescription
@@ -41,7 +41,8 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     private keyAndSalt : string = "/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X"
     private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
     private persistentSipManager : PersistentSipManager
-    public webhookUrl : string
+    public doorbellWebhookUrl : string
+    public doorbellLockWebhookUrl : string
     private md5
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
@@ -50,7 +51,8 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         this.requestHandlers.add( this.voicemailHandler ).add( this.inviteHandler )
         this.persistentSipManager = new PersistentSipManager( this );
         (async() => {
-            this.webhookUrl = await this.buttonPressedDetectedWebhookUrl()
+            this.doorbellWebhookUrl = await this.doorbellWebhookEndpoint()
+            this.doorbellLockWebhookUrl = await this.doorbellLockWebhookEndpoint()
         })();
     }
 
@@ -144,6 +146,10 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         this.refreshTimeout = setTimeout(() => this.stopSession(), STREAM_TIMEOUT)
     }
 
+    hasActiveCall() {
+        return this.session;
+    }
+
     stopSession() {
         if (this.session) {
             this.log.d('ending sip session')
@@ -201,9 +207,6 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
                 let sipOptions = SipHelper.sipOptions( this )
 
-                // A normal call session doesn't require registering
-                sipOptions.shouldRegister = false
-
                 sip = await this.persistentSipManager.session( sipOptions );
                 // Validate this sooner
                 if( !sip ) return Promise.reject("Cannot create session")
@@ -214,19 +217,27 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 this.remoteRtpDescription = await sip.callOrAcceptInvite(
                     ( audio ) => {
                     return [
-
+                        //TODO: Payload types are hardcoded
                         `m=audio ${audio.port} RTP/SAVP 97`,
                         `a=rtpmap:97 speex/8000`,
                         `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
                     ]
                 }, ( video ) => {
-                    return [
-                        `m=video ${video.port} RTP/SAVP 97`,
-                        `a=rtpmap:97 H264/90000`,
-                        `a=fmtp:97 profile-level-id=42801F`,
-                        `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
-                        'a=recvonly'                        
-                    ]
+                    if( false ) {
+                        //TODO: implement later
+                        return [
+                            `m=video 0 RTP/SAVP 0`
+                        ]
+                    } else {
+                        return [
+                            //TODO: Payload types are hardcoded
+                            `m=video ${video.port} RTP/SAVP 97`,
+                            `a=rtpmap:97 H264/90000`,
+                            `a=fmtp:97 profile-level-id=42801F`,
+                            `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
+                            'a=recvonly'                        
+                        ]
+                    }
                 }, this.incomingCallRequest );
 
                 this.incomingCallRequest = undefined
@@ -235,7 +246,9 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                     this.log.d('SIP: Received remote SDP:\n' + this.remoteRtpDescription.sdp)
 
                 let sdp: string = replacePorts(this.remoteRtpDescription.sdp, 0, 0 )
+
                 //sdp = sdp.replaceAll(/a=crypto\:1.*/g, '')
+                //sdp = sdp.replaceAll(/RTP\/SAVP/g, 'RTP\/AVP')
                 //sdp = sdp.replaceAll('\r\n\r\n', '\r\n')
                 sdp = addTrackControls(sdp)
                 sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n')
@@ -364,27 +377,13 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         this.binaryState = false
     }    
 
-    private async buttonPressedDetectedWebhookUrl(): Promise<string> {
-        let webhookUrl = await sdk.endpointManager.getLocalEndpoint(this.nativeId, { insecure: false });
-        webhookUrl += "buttonPressed";
-        this.console.log( webhookUrl )
-        return `${webhookUrl}`;
-    }
-
-    getGruuInstanceId(): string {
-        return this.md5.substring(0, 8) + '-' + this.md5.substring(8, 12) + '-' + this.md5.substring(12,16) + '-' + this.md5.substring(16, 32);
-    }
-
     public async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
-        if (request.url.endsWith('/buttonPressed')) {
-            this.binaryState = true;
-
+        if (request.url.endsWith('/pressed')) {
+            this.binaryState = true
             setTimeout( () => {
-                // Remove duplicate code
                 // Assumption that flexisip only holds this call active for 20 seconds ... might be revised
                 this.reset()
-            }, 20 * 1000 )
-
+            }, 20 * 1000 )            
             response.send('Success', {
                 code: 200,
             });
@@ -393,5 +392,25 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 code: 400,
             });
         }
-    }     
+    }        
+
+    private async doorbellWebhookEndpoint(): Promise<string> {
+        let webhookUrl = await sdk.endpointManager.getLocalEndpoint( this.nativeId, { insecure: false, public: true });
+        let endpoints = ["/pressed"]
+        this.console.log( webhookUrl + " , endpoints: " + endpoints.join(' - ') )
+        return `${webhookUrl}`;
+    }
+
+    private async doorbellLockWebhookEndpoint(): Promise<string> {
+        let webhookUrl = await sdk.endpointManager.getLocalEndpoint(this.nativeId + '-lock', { insecure: false, public: true });
+        let endpoints = ["/lock", "/unlock", "/unlocked", "/locked"]
+        this.console.log( webhookUrl + " -> endpoints: " + endpoints.join(' - ') )
+        return `${webhookUrl}`;
+    }  
+
+
+
+    getGruuInstanceId(): string {
+        return this.md5.substring(0, 8) + '-' + this.md5.substring(8, 12) + '-' + this.md5.substring(12,16) + '-' + this.md5.substring(16, 32);
+    }
 }

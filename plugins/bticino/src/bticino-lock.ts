@@ -1,7 +1,7 @@
-import { ScryptedDeviceBase, Lock, LockState } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, Lock, LockState, HttpRequest, HttpResponse, HttpRequestHandler } from "@scrypted/sdk";
 import { BticinoSipCamera } from "./bticino-camera";
 
-export class BticinoSipLock extends ScryptedDeviceBase implements Lock {
+export class BticinoSipLock extends ScryptedDeviceBase implements Lock, HttpRequestHandler {
     private timeout : NodeJS.Timeout
 
     constructor(public camera: BticinoSipCamera) {
@@ -25,4 +25,32 @@ export class BticinoSipLock extends ScryptedDeviceBase implements Lock {
         this.lock()
         return this.camera.sipUnlock()
     }
+
+    public async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        if (request.url.endsWith('/unlocked')) {
+            this.lockState = LockState.Unlocked
+            response.send('Success', {
+                code: 200,
+            });
+        } else if( request.url.endsWith('/locked') ) {
+            this.lockState = LockState.Locked
+            response.send('Success', {
+                code: 200,
+            });
+        } else if( request.url.endsWith('/lock') ) {
+            this.lock();
+            response.send('Success', {
+                code: 200,
+            });
+        } else if( request.url.endsWith('/unlock') ) {
+            this.unlock();
+            response.send('Success', {
+                code: 200,
+            });                        
+        } else {
+            response.send('Unsupported operation', {
+                code: 400,
+            });
+        }
+    }    
 }

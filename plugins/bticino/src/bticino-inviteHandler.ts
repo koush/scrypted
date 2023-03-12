@@ -11,7 +11,8 @@ export class InviteHandler extends SipRequestHandler {
     handle(request: SipRequest) {
         //TODO: restrict this to call from:c300x@ AND to:alluser@ ?
         if( request.method == 'CANCEL' ) {
-            this.sipCamera.console.log('CANCEL voice call from: ' + stringifyUri( request.headers.from.uri ) + ' to: ' + stringifyUri( request.headers.to.uri ) )
+            let reason = request.headers["reason"] ? ( ' - ' + request.headers["reason"] ) : ''
+            this.sipCamera.console.log('CANCEL voice call from: ' + stringifyUri( request.headers.from.uri ) + ' to: ' + stringifyUri( request.headers.to.uri ) + reason )
             this.sipCamera?.reset()
         }
         if( request.method === 'INVITE' ) {

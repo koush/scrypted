@@ -27,15 +27,18 @@ export class SipCallSession extends Subscribed {
     private sipManager: SipManager
   ) {
     super()
+    if( !sipManager ) {
+      this.sipManager = this.createSipManager( sipOptions )
+    }
     //TODO: make this more clean
     this.addSubscriptions( this.sipManager.onEndedByRemote.subscribe(() => {
       this.callEnded(false)
     } ))
     
-    sipManager.sipOptions = sipOptions
+    sipManager.setSipOptions( sipOptions )
   }
 
-  static async createCallSession(console: Console, cameraName: string, sipOptions: SipOptions, sipManager?: SipManager ) {
+  static async createCallSession(console: Console, cameraName: string, sipOptions: SipOptions, sipManager: SipManager ) {
     const audioSplitter = await createBindZero(),
     audioRtcpSplitter = await createBindUdp(audioSplitter.port + 1),
     videoSplitter = await createBindZero(),
@@ -106,8 +109,6 @@ export class SipCallSession extends Subscribed {
     }
 
     try {
-      if( this.sipOptions.shouldRegister )
-        await this.sipManager.register()
       const rtpDescription : RtpDescription = await this.sipManager.invite( this.rtpOptions, audioSection, videoSection, incomingCallRequest ),
         sendStunRequests = () => {
           sendStunBindingRequest({

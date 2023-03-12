@@ -19,7 +19,6 @@ export interface SipOptions {
   useTcp?: boolean
   gruuInstanceId?: string
   sipRequestHandler?: SipRequestHandler
-  shouldRegister?: boolean
 }
 
 /**
@@ -161,7 +160,7 @@ export class SipManager {
 
   constructor(
     console: Console,
-    public sipOptions: SipOptions,
+    private sipOptions: SipOptions,
   ) {
     this.console = console;
     const host = this.sipOptions.localIp,
@@ -390,6 +389,10 @@ export class SipManager {
     }).catch(noop)
   }
 
+  public setSipOptions( sipOptions : SipOptions ) {
+    this.sipOptions = sipOptions
+  }
+
   sendDtmf(key: string) {
     return this.request({
       method: 'INFO',
@@ -479,7 +482,7 @@ export class SipManager {
   */
   async register() : Promise<void> {
     const { from } = this.sipOptions;
-    await timeoutPromise( 2500,
+    await timeoutPromise( 3000,
       this.request({
       method: 'REGISTER',
       headers: {

@@ -34,7 +34,7 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
             nativeId: nativeId + '-lock',
             name: name + ' Lock',
             type: ScryptedDeviceType.Lock,
-            interfaces: [ScryptedInterface.Lock],
+            interfaces: [ScryptedInterface.Lock, ScryptedInterface.HttpRequestHandler],
         }
 
         const ret = await deviceManager.onDevicesChanged({

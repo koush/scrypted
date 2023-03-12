@@ -30,7 +30,6 @@ export class SipHelper {
             expire: Number.parseInt( expiration ),
             localIp,
             localPort,
-            shouldRegister: true,
             debugSip: sipdebug,
             gruuInstanceId: camera.getGruuInstanceId(),
             useTcp: true,

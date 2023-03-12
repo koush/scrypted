@@ -47,17 +47,24 @@ export class BticinoStorageSettings {
                 description: 'Enable voicemail alerts',
                 placeholder: 'true or false',
             },   
-            /*           
             doorbellWebhookUrl: {
                 title: 'Doorbell Sensor Webhook',
                 type: 'string',
                 readonly: true,
                 mapGet: () => {
-                    return camera.webhookUrl;
+                    return camera.doorbellWebhookUrl;
                 },
                 description: 'Incoming doorbell sensor webhook url.',
-            } 
-            */           
+            },
+            doorbellLockWebhookUrl: {
+                title: 'Doorbell Lock Webhook',
+                type: 'string',
+                readonly: true,
+                mapGet: () => {
+                    return camera.doorbellLockWebhookUrl;
+                },
+                description: 'Incoming doorbell sensor webhook url.',
+            }            
         });
     }
 
