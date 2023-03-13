@@ -1,4 +1,4 @@
-import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { VideoFrameGenerator, Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import cloneDeep from 'lodash/cloneDeep';
@@ -7,7 +7,7 @@ import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } from './denoise';
 import { serverSupportsMixinEventMasking } from './server-version';
 import { sleep } from './sleep';
-import { safeParseJson } from './util';
+import { getAllDevices, safeParseJson } from './util';
 
 const polygonOverlap = require('polygon-overlap');
 const insidePolygon = require('point-inside-polygon');
@@ -50,6 +50,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   detections = new Map<string, MediaObject>();
   cameraDevice: ScryptedDevice & Camera & VideoCamera & MotionSensor & ObjectDetector;
   storageSettings = new StorageSettings(this, {
+    newPipeline: {
+      title: 'New Video Pipeline',
+      description: 'Use the new video pipeline. Leave blank to use the legacy pipeline.',
+      type: 'device',
+      deviceFilter: `interfaces.includes('${ScryptedInterface.VideoFrameGenerator}')`,
+    },
     motionSensorSupplementation: {
       title: 'Built-In Motion Sensor',
       description: `This camera has a built in motion sensor. Using ${this.objectDetection.name} may be unnecessary and will use additional CPU. Replace will ignore the built in motion sensor. Filter will verify the motion sent by built in motion sensor. The Default is ${BUILTIN_MOTION_SENSOR_REPLACE}.`,
@@ -469,8 +475,65 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.endObjectDetection();
   }
 
+  async startPipelineAnalysis() {
+    if (this.detectorRunning)
+      return;
+
+    const stream = await this.cameraDevice.getVideoStream({
+      destination: 'local-recorder',
+      // ask rebroadcast to mute audio, not needed.
+      audio: null,
+    });
+
+    this.detectorRunning = true;
+    this.analyzeStop = Date.now() + this.getDetectionDuration();
+
+    const videoFrameGenerator = this.storageSettings.values.newPipeline as VideoFrameGenerator;
+
+    const start = Date.now();
+    let detections = 0;
+    for await (const detected
+      of await this.objectDetection.generateObjectDetections(await videoFrameGenerator.generateVideoFrames(stream), {
+        settings: this.getCurrentSettings(),
+      })) {
+      if (!this.detectorRunning) {
+        break;
+      }
+      const now = Date.now();
+      if (now > this.analyzeStop) {
+        break;
+      }
+      
+      this.reportObjectDetections(detected.detected);
+      detections++;
+      this.console.warn('dps', detections / (Date.now() - start) * 1000);
+
+      // this.handleDetectionEvent(detected.detected);
+      // this.console.log(detected);
+      // try {
+      //   const found = await this.objectDetection.detectObjects(mo, {
+      //     detectionId: this.detectionId,
+      //     duration: this.getDetectionDuration(),
+      //     settings: this.getCurrentSettings(),
+      //   }, this);
+      // }
+      // catch (e) {
+      //   this.console.error('snapshot detection error', e);
+      // }
+      // cameras tend to only refresh every 1s at best.
+      // maybe get this value from somewhere? or sha the jpeg?
+      // const diff = now + 1100 - Date.now();
+      // if (diff > 0)
+      //   await sleep(diff);
+    }
+    this.endObjectDetection();
+  }
+
   async startStreamAnalysis() {
-    if (!this.hasMotionType && this.storageSettings.values.captureMode === 'Snapshot') {
+    if (this.storageSettings.values.newPipeline) {
+      await this.startPipelineAnalysis();
+    }
+    else if (!this.hasMotionType && this.storageSettings.values.captureMode === 'Snapshot') {
       await this.startSnapshotAnalysis();
     }
     else {
@@ -797,7 +860,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     this.storageSettings.settings.motionSensorSupplementation.hide = !this.hasMotionType || !this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor);
-    this.storageSettings.settings.captureMode.hide = this.hasMotionType;
+    this.storageSettings.settings.captureMode.hide = this.hasMotionType || !!this.storageSettings.values.newPipeline;
     this.storageSettings.settings.detectionDuration.hide = this.hasMotionType;
     this.storageSettings.settings.detectionTimeout.hide = this.hasMotionType;
     this.storageSettings.settings.motionDuration.hide = !this.hasMotionType;
