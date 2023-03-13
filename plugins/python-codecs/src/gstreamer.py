@@ -57,7 +57,7 @@ def createPipelineIterator(pipeline: str):
     bus.add_signal_watch()
 
     finished = concurrent.futures.Future()
-    finished.add_done_callback(lambda _: stopGst())
+    finished.add_done_callback(lambda _: threading.Thread(target=stopGst).start())
     hasFinished = False
 
     appsink = gst.get_by_name('appsink')
@@ -76,11 +76,15 @@ def createPipelineIterator(pipeline: str):
                 callbackQueue.put(Callback(asyncCallback))
                 sample = await asyncFuture
                 if not sample:
+                    yieldFuture.set_result(None)
                     break
-                yield sample
-                yieldFuture.set_result(None)
+                try:
+                    yield sample
+                finally:
+                    yieldFuture.set_result(None)
         finally:
             finish()
+            print('finished')
 
 
     def on_new_sample(sink, preroll):
@@ -92,11 +96,15 @@ def createPipelineIterator(pipeline: str):
         if not callback.callback or hasFinished:
             hasFinished = True
             if callback.callback:
+                print('erpasd')
                 asyncio.run_coroutine_threadsafe(callback.callback(None), loop = callback.loop)
             return Gst.FlowReturn.OK
 
         future = asyncio.run_coroutine_threadsafe(callback.callback(sample), loop = callback.loop)
-        future.result()
+        try:
+            future.result()
+        except:
+            pass
         return Gst.FlowReturn.OK
 
     appsink.connect('new-preroll', on_new_sample, True)

@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import urlparse
 import pyvips
 import threading
+import traceback
 
 try:
     import gi
@@ -16,16 +17,8 @@ try:
 except:
     pass
 
-def future(l):
-    f = asyncio.Future()
-    def wrap():
-        try:
-            f.set_result(l())
-        except Exception as e:
-            f.set_exception(e)
-
-    threading.Thread(target=wrap).start()
-    return f
+async def to_thread(f):
+    return await asyncio.to_thread(f)
 
 class VipsImage(scrypted_sdk.VideoFrame):
     def __init__(self, vipsImage: pyvips.Image) -> None:
@@ -35,21 +28,38 @@ class VipsImage(scrypted_sdk.VideoFrame):
         self.height = vipsImage.height
 
     async def toBuffer(self, options: scrypted_sdk.ImageOptions = None) -> bytearray:
-        vipsImage = await self.toVipsImage(options)
-        return memoryview(vipsImage.vipsImage.write_to_memory())
+        vipsImage: VipsImage = await self.toVipsImage(options)
+
+        if not options or not options.get('format', None):
+            def format():
+                return memoryview(vipsImage.vipsImage.write_to_memory())
+            return await to_thread(format)
+        elif options['format'] == 'rgb':
+            def format():
+                if vipsImage.vipsImage.hasalpha():
+                    rgb = vipsImage.vipsImage.extract_band(0, vipsImage.vipsImage.bands - 1)
+                else:
+                    rgb = vipsImage.vipsImage
+                mem = memoryview(rgb.write_to_memory())
+                return mem
+            return await to_thread(format)
+
+        return await to_thread(lambda: vipsImage.vipsImage.write_to_buffer('.' + options['format']))
 
     async def toVipsImage(self, options: scrypted_sdk.ImageOptions = None):
-       return await future(lambda: toVipsImage(self.vipsImage, options))
+       return await to_thread(lambda: toVipsImage(self.vipsImage, options))
 
     async def toImage(self, options: scrypted_sdk.ImageOptions = None) -> Any:
+        if options and options['format']:
+            raise Exception('format can only be used with toBuffer')
         newVipsImage = await self.toVipsImage(options)
         return await createVipsMediaObject(newVipsImage)
 
-def toVipsImage(vipsImage: pyvips.Image, options: scrypted_sdk.ImageOptions = None):
+def toVipsImage(vipsImage: pyvips.Image, options: scrypted_sdk.ImageOptions = None) -> VipsImage:
     options = options or {}
     crop = options.get('crop')
     if crop:
-        vipsImage = vipsImage.crop(int(crop['left']), int(crop['right']), int(crop['width']), int(crop['height']))
+        vipsImage = vipsImage.crop(int(crop['left']), int(crop['top']), int(crop['width']), int(crop['height']))
         
     resize = options.get('resize')
     if resize:
@@ -69,13 +79,6 @@ def toVipsImage(vipsImage: pyvips.Image, options: scrypted_sdk.ImageOptions = No
         yscale = yscale or xscale
         vipsImage = vipsImage.resize(xscale, vscale=yscale, kernel='linear')
 
-        # width = int(vipsImage.width * scale)
-        # height = int(vipsImage.height * scale)
-        # vipsImage = vipsImage.thumbnail_image(width, height=height)
-
-    format = options.get('format')
-    if format == 'rgb' and vipsImage.hasalpha():
-        vipsImage = vipsImage.extract_band(0, vipsImage.bands - 1)
     return VipsImage(vipsImage)
 
 async def createVipsMediaObject(image: VipsImage):
@@ -132,6 +135,8 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGener
                     yield vipsImage
                 finally:
                     gst_buffer.unmap(info)
+        except:
+            traceback.print_exc()
         finally:
             print('done!')
 
