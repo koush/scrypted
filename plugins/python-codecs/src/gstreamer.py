@@ -20,7 +20,7 @@ class Callback:
         self.callback = callback
 
 def createPipelineIterator(pipeline: str):
-    pipeline = '{pipeline} ! appsink name=appsink emit-signals=true sync=false'.format(pipeline=pipeline)
+    pipeline = '{pipeline} ! queue leaky=downstream max-size-buffers=0 ! appsink name=appsink emit-signals=true sync=false max-buffers=-1 drop=true'.format(pipeline=pipeline)
     print(pipeline)
     gst = Gst.parse_launch(pipeline)
     bus = gst.get_bus()

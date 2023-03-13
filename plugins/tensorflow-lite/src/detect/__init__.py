@@ -291,7 +291,9 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             async for videoFrame in videoFrames:
                detected = await self.run_detection_videoframe(videoFrame, session and session.get('settings'))
                yield {
+                   '__json_copy_serialize_children': True,
                    'detected': detected,
+                   'videoFrame': videoFrame,
                }
         except:
             raise

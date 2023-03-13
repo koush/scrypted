@@ -115,7 +115,7 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGener
             if videoCodec == 'h264':
                 videosrc += ' ! rtph264depay ! h264parse'
 
-        videosrc += ' ! decodebin ! videoconvert ! video/x-raw,format=RGB'
+        videosrc += ' ! decodebin ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! video/x-raw,format=RGB'
 
         try:
             gst, gen = createPipelineIterator(videosrc)

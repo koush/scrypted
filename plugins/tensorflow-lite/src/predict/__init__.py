@@ -4,7 +4,7 @@ import io
 from PIL import Image
 import re
 import scrypted_sdk
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Mapping
 import asyncio
 import time
 from .rectangle import Rectangle, intersect_area, intersect_rect, to_bounding_box, from_bounding_box, combine_rect
