@@ -9,7 +9,7 @@ import https from 'https';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
 import { ffmpegFilterImage } from './ffmpeg-image-filter';
-import { ImageReader } from './image-reader';
+import { ImageReader, ImageWriter } from './image-reader';
 import { sharpFilterImage } from './sharp-image-filter';
 
 const { mediaManager, systemManager } = sdk;
@@ -270,15 +270,15 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                         options.picture = undefined;
 
                     return internalTakePicture()
-                    .catch(async e => {
-                        // the camera snapshot failed, try to fallback to prebuffer snapshot.
-                        if (usePrebufferSnapshots === false)
-                            throw e;
-                        const fallback = await preparePrebufferSnapshot();
-                        if (!fallback)
-                            throw e;
-                        return fallback();
-                    })
+                        .catch(async e => {
+                            // the camera snapshot failed, try to fallback to prebuffer snapshot.
+                            if (usePrebufferSnapshots === false)
+                                throw e;
+                            const fallback = await preparePrebufferSnapshot();
+                            if (!fallback)
+                                throw e;
+                            return fallback();
+                        })
                 };
             }
             else if (usePrebufferSnapshots) {
@@ -522,6 +522,14 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
                         interfaces: [
                             ScryptedInterface.BufferConverter,
                         ]
+                    },
+                    {
+                        name: 'Image Writer',
+                        type: ScryptedDeviceType.Builtin,
+                        nativeId: 'writer',
+                        interfaces: [
+                            ScryptedInterface.BufferConverter,
+                        ]
                     }
                 ]
             })
@@ -529,7 +537,10 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
     }
 
     async getDevice(nativeId: string): Promise<any> {
-        return new ImageReader('reader')
+        if (nativeId === 'reader')
+            return new ImageReader('reader')
+        if (nativeId === 'writer')
+            return new ImageWriter('writer')
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
