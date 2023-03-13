@@ -148,6 +148,7 @@ class ScryptedInterface(Enum):
     VideoCamera = "VideoCamera"
     VideoCameraConfiguration = "VideoCameraConfiguration"
     VideoClips = "VideoClips"
+    VideoFrameGenerator = "VideoFrameGenerator"
     VideoRecorder = "VideoRecorder"
 
 class ScryptedMimeTypes(Enum):
@@ -232,7 +233,7 @@ class HttpResponseOptions(TypedDict):
 
 class ImageOptions(TypedDict):
     crop: Any
-    format: str
+    format: Any | Any | Any
     resize: Any
     pass
 
@@ -473,6 +474,12 @@ class NotifierOptions(TypedDict):
     vibrate: VibratePattern
     pass
 
+class ObjectDetectionGeneratorResult(TypedDict):
+    __json_copy_serialize_children: Any
+    detected: ObjectsDetected
+    videoFrame: VideoFrame
+    pass
+
 class ObjectDetectionGeneratorSession(TypedDict):
     settings: Any
     pass
@@ -682,6 +689,12 @@ class VideoClipOptions(TypedDict):
     reverseOrder: bool
     startId: str
     startTime: float
+    pass
+
+class VideoFrameGeneratorOptions(TypedDict):
+    crop: Any
+    format: Any | Any | Any
+    resize: Any
     pass
 
 class TamperState(TypedDict):
@@ -906,7 +919,7 @@ class OauthClient:
 class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         pass
-    async def generateObjectDetections(self, videoFrames: VideoFrame, session: ObjectDetectionGeneratorSession, callback: Any) -> Any:
+    async def generateObjectDetections(self, videoFrames: VideoFrame, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
         pass
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         pass
@@ -1140,6 +1153,11 @@ class VideoClips:
     async def getVideoClips(self, options: VideoClipOptions = None) -> list[VideoClip]:
         pass
     async def removeVideoClips(self, videoClipIds: list[str]) -> None:
+        pass
+    pass
+
+class VideoFrameGenerator:
+    async def generateVideoFrames(self, mediaObject: MediaObject, options: VideoFrameGeneratorOptions = None, filter: Any = None) -> AsyncGenerator:
         pass
     pass
 
@@ -2376,6 +2394,13 @@ ScryptedInterfaceDescriptors = {
       "getScryptedUserAccessControl"
     ],
     "properties": []
+  },
+  "VideoFrameGenerator": {
+    "name": "VideoFrameGenerator",
+    "methods": [
+      "generateVideoFrames"
+    ],
+    "properties": []
   }
 }
 
@@ -2401,13 +2426,12 @@ class ObjectDetectionCallbacks:
     pass
 
 class VideoFrame:
-    format: str
     height: float
-    mimeType: str
-    sourceId: str
     timestamp: float
     width: float
     async def toBuffer(self, options: ImageOptions = None) -> bytearray:
+        pass
+    async def toImage(self, options: ImageOptions = None) -> Any:
         pass
     pass
 

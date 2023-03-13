@@ -1303,33 +1303,38 @@ export interface ObjectDetectionCallbacks {
   onDetection(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject): Promise<boolean>;
   onDetectionEnded(detection: ObjectsDetected): Promise<void>;
 }
+export interface ObjectDetectionGeneratorResult {
+  __json_copy_serialize_children: true,
+  videoFrame: VideoFrame;
+  detected: ObjectsDetected;
+}
 /**
  * ObjectDetection can run classifications or analysis on arbitrary media sources.
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
-  generateObjectDetections<T>(videoFrames: AsyncGenerator<VideoFrame>, session: ObjectDetectionGeneratorSession, callback: (videoFrame: VideoFrame, detected: ObjectsDetected) => Promise<T>): Promise<AsyncGenerator<T>>;
+  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
 export interface ImageOptions {
-  resize?: {
-    width: number,
-    height: number,
-  };
   crop?: {
     left: number;
     top: number;
     width: number;
     height: number;
   };
-  format?: string;
+  resize?: {
+    width?: number,
+    height?: number,
+  };
+  format?: 'rgba' | 'rgb' | 'jpg';
 }
-export interface Image extends MediaObject {
+export interface Image {
   width: number;
   height: number;
-  format: string;
   toBuffer(options?: ImageOptions): Promise<Buffer>;
+  toImage(options?: ImageOptions): Promise<Image & MediaObject>;
 }
 export interface VideoFrame extends Image {
   timestamp: number;
@@ -1337,7 +1342,7 @@ export interface VideoFrame extends Image {
 export interface VideoFrameGeneratorOptions extends ImageOptions {
 }
 export interface VideoFrameGenerator {
-  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame>>;
+  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame & MediaObject) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame & MediaObject>>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -1908,6 +1913,7 @@ export enum ScryptedInterface {
   RTCSignalingClient = "RTCSignalingClient",
   LauncherApplication = "LauncherApplication",
   ScryptedUser = "ScryptedUser",
+  VideoFrameGenerator = 'VideoFrameGenerator',
 }
 
 /**
