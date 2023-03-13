@@ -52,7 +52,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   storageSettings = new StorageSettings(this, {
     newPipeline: {
       title: 'New Video Pipeline',
-      description: 'Use the new video pipeline. Leave blank to use the legacy pipeline.',
+      description: 'WARNING! DO NOT ENABLE: Use the new video pipeline. Leave blank to use the legacy pipeline.',
       type: 'device',
       deviceFilter: `interfaces.includes('${ScryptedInterface.VideoFrameGenerator}')`,
     },
