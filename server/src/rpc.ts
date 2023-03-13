@@ -200,11 +200,17 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
         });
 
         const asyncIterator = this.proxyProps?.[Symbol.asyncIterator.toString()];
-        if (!asyncIterator || method !== asyncIterator.next)
+        if (!asyncIterator || (method !== asyncIterator.next && method !== asyncIterator.return))
             return pendingResult;
 
         return pendingResult
             .then(value => {
+                if (method === asyncIterator.return) {
+                    return {
+                        done: true,
+                        value: undefined,
+                    }
+                }
                 return ({
                     value,
                     done: false,
@@ -686,11 +692,19 @@ export class RpcPeer {
                 case 'param': {
                     const rpcParam = message as RpcParam;
                     const serializationContext: any = {};
-                    const result: RpcResult = {
-                        type: 'result',
-                        id: rpcParam.id,
-                        result: this.serialize(this.params[rpcParam.param], serializationContext)
-                    };
+                    let result: RpcResult;
+                    try {
+                        result = {
+                            type: 'result',
+                            id: rpcParam.id,
+                            result: this.serialize(this.params[rpcParam.param], serializationContext)
+                        };
+                    }
+                    catch (e) {
+                        // console.error('failure', rpcApply.method, e);
+                        this.createErrorResult(result, e);
+                    }
+
                     this.send(result, undefined, serializationContext);
                     break;
                 }
