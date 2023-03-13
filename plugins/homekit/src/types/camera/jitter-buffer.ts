@@ -32,6 +32,11 @@ export function nextSequenceNumber(current: number, increment = 1) {
     return (current + increment + 0x10000) % 0x10000;
 }
 
+const maxRtpTimestamp = BigInt(0xFFFFFFFF);
+export function addRtpTimestamp(current: number, adjust: number) {
+    return Number(maxRtpTimestamp & (BigInt(current) + BigInt(adjust)));
+}
+
 export function isNextSequenceNumber(current: number, next: number) {
     return nextSequenceNumber(current) === next;
 }
