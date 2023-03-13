@@ -34,7 +34,7 @@ try:
 except:
     pass
 
-from scrypted_sdk.types import ObjectDetectionModel, Setting, FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
+from scrypted_sdk.types import ObjectDetectionGeneratorSession, ObjectDetectionModel, Setting, FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
 def optional_chain(root, *keys):
     result = root
@@ -206,6 +206,9 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pass
 
+    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame) -> ObjectsDetected:
+        pass
+
     def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pil: Image.Image = avframe.to_image()
         return self.run_detection_image(detection_session, pil, settings, src_size, convert_to_src_size)
@@ -281,6 +284,19 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             return (False, detection_session, self.create_detection_result_status(detection_id, detection_session.running))
 
         return (True, detection_session, None)
+    
+    async def generateObjectDetections(self, videoFrames: Any, session: ObjectDetectionGeneratorSession = None) -> Any:
+        try:
+            videoFrames = await scrypted_sdk.sdk.connectRPCObject(videoFrames)
+            async for videoFrame in videoFrames:
+               detected = await self.run_detection_videoframe(videoFrame, session and session.get('settings'))
+               yield {
+                   'detected': detected,
+               }
+        except:
+            raise
+        finally:
+            await videoFrames.aclose()
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         is_image = mediaObject and (mediaObject.mimeType.startswith('image/') or mediaObject.mimeType.endswith('/x-raw-image'))
