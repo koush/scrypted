@@ -16,7 +16,7 @@ except:
 
 class Callback:
     def __init__(self, callback) -> None:
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.get_running_loop()
         self.callback = callback
 
 def createPipelineIterator(pipeline: str):
@@ -27,7 +27,7 @@ def createPipelineIterator(pipeline: str):
 
     def on_bus_message(bus, message):
         t = str(message.type)
-        print(t)
+        # print(t)
         if t == str(Gst.MessageType.EOS):
             finish()
         elif t == str(Gst.MessageType.WARNING):
@@ -57,7 +57,7 @@ def createPipelineIterator(pipeline: str):
     bus.add_signal_watch()
 
     finished = concurrent.futures.Future()
-    finished.add_done_callback(lambda _: threading.Thread(target=stopGst).start())
+    finished.add_done_callback(lambda _: threading.Thread(target=stopGst, name="StopGst").start())
     hasFinished = False
 
     appsink = gst.get_by_name('appsink')
@@ -84,7 +84,7 @@ def createPipelineIterator(pipeline: str):
                     yieldFuture.set_result(None)
         finally:
             finish()
-            print('finished')
+            print('gstreamer finished')
 
 
     def on_new_sample(sink, preroll):
@@ -96,7 +96,6 @@ def createPipelineIterator(pipeline: str):
         if not callback.callback or hasFinished:
             hasFinished = True
             if callback.callback:
-                print('erpasd')
                 asyncio.run_coroutine_threadsafe(callback.callback(None), loop = callback.loop)
             return Gst.FlowReturn.OK
 
