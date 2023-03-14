@@ -118,6 +118,7 @@ class RpcPeer:
         self.remoteWeakProxies: Mapping[str, any] = {}
         self.nameDeserializerMap: Mapping[str, RpcSerializer] = {}
         self.onProxySerialization: Callable[[Any, str], Any] = None
+        self.killed = False
 
     def __apply__(self, proxyId: str, oneWayMethods: List[str], method: str, args: list):
         serializationContext: Dict = {}
@@ -145,8 +146,22 @@ class RpcPeer:
             self.send(rpcApply, reject, serializationContext)
         return self.createPendingResult(send)
 
-    def kill(self):
+    def kill(self, message: str = None):
+        # not thread safe..
+        if self.killed:
+            return
         self.killed = True
+
+        error = RPCResultError(None, message or 'peer was killed')
+        # this.killedDeferred.reject(error);
+        for str, future in self.pendingResults.items():
+            future.set_exception(error)
+
+        self.pendingResults = None
+        self.params = None
+        self.remoteWeakProxies = None
+        self.localProxyMap = None
+        self.localProxied = None
 
     def createErrorResult(self, result: Any, e: Exception):
         s = self.serializeError(e)
@@ -283,6 +298,8 @@ class RpcPeer:
         return ret
 
     def finalize(self, localProxiedEntry: LocalProxiedEntry):
+        if self.killed:
+            return
         id = localProxiedEntry['id']
         self.remoteWeakProxies.pop(id, None)
         rpcFinalize = {

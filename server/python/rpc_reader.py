@@ -116,6 +116,10 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, readFd: int = None, wri
     peer.constructorSerializerMap[memoryview] = 'Buffer'
 
     async def peerReadLoop():
-        await readLoop(loop, peer, reader)
+        try:
+            await readLoop(loop, peer, reader)
+        except:
+            peer.kill()
+            raise
 
     return peer, peerReadLoop

@@ -310,6 +310,8 @@ class PluginRemote:
                         try:
                             await peerReadLoop()
                         except:
+                            pass
+                        finally:
                             clusterPeers.pop(port)
                     asyncio.run_coroutine_threadsafe(run_loop(), self.loop)
                     return peer
