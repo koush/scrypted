@@ -310,6 +310,10 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             duration = session.get('duration', None)
             settings = session.get('settings', None)
 
+        if mediaObject and mediaObject.mimeType == ScryptedMimeTypes.Image.value:
+            vf: scrypted_sdk.VideoFrame = mediaObject
+            return await self.run_detection_videoframe(vf, settings)
+
         create, detection_session, objects_detected = self.ensure_session(
             mediaObject and mediaObject.mimeType, session)
         if detection_session:
