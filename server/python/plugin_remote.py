@@ -601,10 +601,11 @@ def plugin_main(readFd: int, writeFd: int):
         from gi.repository import GLib, Gst
         Gst.init(None)
 
-        worker = threading.Thread(target=main, args=(readFd, writeFd))
+        loop = GLib.MainLoop()
+
+        worker = threading.Thread(target=main, args=(readFd, writeFd), name="asyncio-main")
         worker.start()
 
-        loop = GLib.MainLoop()
         loop.run()
     except:
         main(readFd, writeFd)
