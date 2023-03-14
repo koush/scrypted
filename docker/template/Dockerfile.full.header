@@ -30,7 +30,8 @@ RUN apt-get -y install \
     gcc \
     libgirepository1.0-dev \
     libglib2.0-dev \
-    pkg-config
+    pkg-config \
+    libvips
 
 # ffmpeg
 RUN apt-get -y install \

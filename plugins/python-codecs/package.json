@@ -1,6 +1,7 @@
 {
    "name": "@scrypted/python-codecs",
-   "description": "Scrypted Python Codecs",
+   "version": "0.1.2",
+   "description": "Python Codecs for Scrypted",
    "keywords": [
       "scrypted",
       "plugin",
@@ -29,6 +30,5 @@
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
-   },
-   "version": "0.0.23"
+   }
 }
