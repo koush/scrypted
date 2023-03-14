@@ -253,6 +253,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def run_detection_jpeg(self, detection_session: PredictSession, image_bytes: bytes, settings: Any) -> ObjectsDetected:
         stream = io.BytesIO(image_bytes)
         image = Image.open(stream)
+        if image.mode == 'RGBA':
+            image = image.convert('RGB')
 
         detections, _ = self.run_detection_image(detection_session, image, settings, image.size)
         return detections
