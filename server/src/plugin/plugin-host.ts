@@ -41,6 +41,9 @@ export class PluginHost {
     scrypted: ScryptedRuntime;
     remote: PluginRemote;
     io: IOServer = new io.Server({
+        // object detection drag drop 4k can be massive.
+        // streaming support somehow?
+        maxHttpBufferSize: 20000000,
         pingTimeout: 120000,
         perMessageDeflate: true,
         cors: (req, callback) => {
