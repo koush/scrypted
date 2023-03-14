@@ -451,13 +451,31 @@ class PluginRemote:
             def host_fork() -> PluginFork:
                 parent_conn, child_conn = multiprocessing.Pipe()
                 pluginFork = PluginFork()
+                print('new fork')
                 pluginFork.worker = multiprocessing.Process(target=plugin_fork, args=(child_conn,), daemon=True)
                 pluginFork.worker.start()
+
+                def schedule_exit_check():
+                    def exit_check():
+                        if pluginFork.worker.exitcode != None:
+                            pluginFork.worker.join()
+                        else:
+                            schedule_exit_check()
+                    self.loop.call_later(2, exit_check)
+
+                schedule_exit_check()
+
                 async def getFork():
                     fd = os.dup(parent_conn.fileno())
                     forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, fd, fd)
                     forkPeer.peerName = 'thread'
-                    asyncio.run_coroutine_threadsafe(readLoop(), loop=self.loop)
+                    async def forkReadLoop():
+                        try:
+                            await readLoop()
+                        except:
+                            print('fork read loop exited')
+                            pass
+                    asyncio.run_coroutine_threadsafe(forkReadLoop(), loop=self.loop)
                     getRemote = await forkPeer.getParam('getRemote')
                     remote: PluginRemote = await getRemote(self.api, self.pluginId, self.hostInfo)
                     await remote.setSystemState(self.systemManager.getSystemState())
@@ -495,7 +513,10 @@ class PluginRemote:
             print('fork failed to start')
             traceback.print_exc()
             raise
-        return await rpc.maybe_await(fork())
+        forked = await rpc.maybe_await(fork())
+        if type(forked) == dict:
+            forked[rpc.RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN] = True
+        return forked
 
     async def setSystemState(self, state):
         self.systemState = state
