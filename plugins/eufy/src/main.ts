@@ -2,7 +2,7 @@ import { listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, { Battery, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, MotionSensor, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import eufy, { CaptchaOptions, EufySecurity } from 'eufy-security-client';
+import eufy, { CaptchaOptions, EufySecurity, P2PClientProtocol, P2PConnectionType } from 'eufy-security-client';
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 
 import { Deferred } from '@scrypted/common/src/deferred';
@@ -11,17 +11,14 @@ import { LocalLivestreamManager } from './stream';
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
-class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Battery, MotionSensor {
+class EufyCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor {
   client: EufySecurity;
   device: eufy.Camera;
-  livestreamManager: LocalLivestreamManager
 
   constructor(nativeId: string, client: EufySecurity, device: eufy.Camera) {
     super(nativeId);
     this.client = client;
     this.device = device;
-    this.livestreamManager = new LocalLivestreamManager(this.client, this.device, this.console);
-    this.batteryLevel = this.device.getBatteryValue() as number;
     this.setupMotionDetection();
   }
 
@@ -35,31 +32,6 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
     this.device.on('vehicle detected', handle);
     this.device.on('dog detected', handle);
     this.device.on('radar motion detected', handle);
-  }
-
-  async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
-    // if this stream is prebuffered, its safe to use the prebuffer to generate an image
-    const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
-    try {
-        const msos = await realDevice.getVideoStreamOptions();
-        const prebuffered: RequestMediaStreamOptions = msos.find(mso => mso.prebuffer);
-        if (prebuffered) {
-            prebuffered.refresh = false;
-            return realDevice.getVideoStream(prebuffered);
-        }
-    } catch (e) {}
-
-    // try to fetch the cloud image if one exists
-    const url = this.device.getLastCameraImageURL();
-    if (url) {
-      return mediaManager.createMediaObjectFromUrl(url.toString());
-    }
-
-    throw new Error("snapshot unavailable");
-  }
-
-  getPictureOptions(): Promise<ResponsePictureOptions[]> {
-    return;
   }
 
   getVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
@@ -80,15 +52,32 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
         },
         tool: 'scrypted',
         userConfigurable: false,
-      }
+      },
+      {
+        container: 'rtsp',
+        id: 'p2p-low',
+        name: 'P2P (Low Resolution)',
+        video: {
+          codec: 'h264',
+          width: 1280,
+          height: 720,
+        },
+        audio: {
+          codec: 'aac',
+        },
+        tool: 'scrypted',
+        userConfigurable: false,
+      },
     ];
   }
 
   async createVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
+    const livestreamManager = new LocalLivestreamManager(options.id, this.client, this.device, this.console);
+
     const kill = new Deferred<void>();
     kill.promise.finally(() => {
       this.console.log('video stream exited');
-      this.livestreamManager.stopLocalLiveStream();
+      livestreamManager.stopLocalLiveStream();
     });
 
     const rtspServer = await listenSingleRtspClient();
@@ -138,7 +127,7 @@ class EufyCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Batt
           await rtsp.handlePlayback();
         });
 
-        const proxyStream = await this.livestreamManager.getLocalLivestream();
+        const proxyStream = await livestreamManager.getLocalLivestream();
         proxyStream.videostream.pipe(process.cp.stdio[4] as Writable);
         proxyStream.audiostream.pipe((process.cp.stdio as any)[5] as Writable);
       }
@@ -240,14 +229,13 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
       password: this.storageSettings.values.password,
       country: this.storageSettings.values.country,
       language: 'en',
-      p2pConnectionSetup: 2,
+      p2pConnectionSetup: P2PConnectionType.QUICKEST,
       pollingIntervalMinutes: 10,
       eventDurationSeconds: 10
     }
     this.client = await EufySecurity.initialize(config);
     this.client.on('device added', this.deviceAdded.bind(this));
     this.client.on('station added', this.stationAdded.bind(this));
-
     this.client.on('tfa request', () => {
       this.log.a('Login failed: 2FA is enabled, check your email or texts for your code, then enter it into the Two Factor Code setting to conplete login.');
     });
@@ -277,7 +265,6 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
     const nativeId = eufyDevice.getSerial();
 
     const interfaces = [
-      ScryptedInterface.Camera,
       ScryptedInterface.VideoCamera
     ];
     if (eufyDevice.hasBattery())
