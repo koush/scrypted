@@ -88,8 +88,9 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
                 0]['shape']
             return int(width), int(height), int(channels)
 
-    def get_input_size(self) -> Tuple[float, float]:
-        return input_size(self.interpreter)
+    def get_input_size(self) -> Tuple[int, int]:
+        w, h = input_size(self.interpreter)
+        return int(w), int(h)
 
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         try:

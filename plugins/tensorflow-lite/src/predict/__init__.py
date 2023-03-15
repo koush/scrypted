@@ -266,7 +266,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         # this is useful for high quality thumbnails.
         return (None, None)
 
-    def get_input_size(self) -> Tuple[float, float]:
+    def get_input_size(self) -> Tuple[int, int]:
         pass
 
     def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
