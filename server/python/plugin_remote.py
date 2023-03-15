@@ -490,7 +490,7 @@ class PluginRemote:
                         try:
                             await readLoop()
                         except:
-                            traceback.print_exc()
+                            # traceback.print_exc()
                             print('fork read loop exited')
                         finally:
                             reader.executor.shutdown()
