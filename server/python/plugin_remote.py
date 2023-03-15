@@ -45,7 +45,10 @@ class StreamPipeReader:
         b = bytes(0)
         while len(b) < n:
             self.conn.poll()
-            b += os.read(self.conn.fileno(), n - len(b))
+            add = os.read(self.conn.fileno(), n - len(b))
+            if not len(add):
+                raise Exception('unable to read requested bytes')
+            b += add
         return b
 
     async def read(self, n):
@@ -482,9 +485,8 @@ class PluginRemote:
                 schedule_exit_check()
 
                 async def getFork():
-                    fd = os.dup(parent_conn.fileno())
                     reader = StreamPipeReader(parent_conn)
-                    forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, reader = reader, writeFd = fd)
+                    forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, reader = reader, writeFd = parent_conn.fileno())
                     forkPeer.peerName = 'thread'
                     async def forkReadLoop():
                         try:
@@ -493,6 +495,7 @@ class PluginRemote:
                             # traceback.print_exc()
                             print('fork read loop exited')
                         finally:
+                            parent_conn.close()
                             reader.executor.shutdown()
                     asyncio.run_coroutine_threadsafe(forkReadLoop(), loop=self.loop)
                     getRemote = await forkPeer.getParam('getRemote')
