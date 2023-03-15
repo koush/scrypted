@@ -759,13 +759,51 @@ export interface Intercom {
   stopIntercom(): Promise<void>;
 }
 
-export interface PanTiltZoomCommand {
-  horizontal?: 'left' | 'right';
-  vertical?: 'up' | 'down';
+export enum PanTiltZoomMovement {
+  Absolute = "Absolute",
+  Relative = "Relative"
 }
 
+export interface PanTiltZoomCommand {
+  movement: PanTiltZoomMovement;
+  /**
+   * Ranges between -1 and 1.
+   */
+  pan?: number;
+  /**
+   * Ranges between -1 and 1.
+   */
+  tilt?: number;
+  /**
+   * Ranges between 0 and 1 for max zoom.
+   */
+  zoom?: number;
+  /**
+   * The speed of the movement.
+   */
+  speed?: {
+    /**
+     * Ranges between 0 and 1 for max zoom.
+     */
+    pan?: number;
+    /**
+     * Ranges between 0 and 1 for max zoom.
+     */
+    tilt?: number;
+    /**
+     * Ranges between 0 and 1 for max zoom.
+     */
+    zoom?: number;
+  }
+}
+
+export interface PanTiltZoomCapabilities {
+  pan?: boolean;
+  tilt?: boolean;
+  zoom?: boolean;
+}
 export interface PanTiltZoom {
-  ptzCapabilities: any;
+  ptzCapabilities?: PanTiltZoomCapabilities;
 
   ptzCommand(command: PanTiltZoomCommand): Promise<void>;
 }
@@ -1235,7 +1273,7 @@ export interface ObjectDetectionTypes {
  * Given object detections with bounding boxes, return a similar list with tracker ids.
  */
 export interface ObjectTracker {
-    trackObjects(detection: ObjectsDetected): Promise<ObjectsDetected>;
+  trackObjects(detection: ObjectsDetected): Promise<ObjectsDetected>;
 }
 /**
  * ObjectDetector is found on Cameras that have smart detection capabilities.
@@ -1248,10 +1286,12 @@ export interface ObjectDetector {
   getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject>;
   getObjectTypes(): Promise<ObjectDetectionTypes>;
 }
-export interface ObjectDetectionSession {
+export interface ObjectDetectionGeneratorSession {
+  settings?: { [key: string]: any };
+}
+export interface ObjectDetectionSession extends ObjectDetectionGeneratorSession {
   detectionId?: string;
   duration?: number;
-  settings?: { [key: string]: any };
 }
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;
@@ -1263,32 +1303,46 @@ export interface ObjectDetectionCallbacks {
   onDetection(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject): Promise<boolean>;
   onDetectionEnded(detection: ObjectsDetected): Promise<void>;
 }
+export interface ObjectDetectionGeneratorResult {
+  __json_copy_serialize_children: true,
+  videoFrame: VideoFrame;
+  detected: ObjectsDetected;
+}
 /**
  * ObjectDetection can run classifications or analysis on arbitrary media sources.
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
+  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
-export interface VideoFrameOptions {
-  resize?: {
-    width: number,
-    height: number,
+export interface ImageOptions {
+  crop?: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
   };
-  format?: string;
+  resize?: {
+    width?: number,
+    height?: number,
+  };
+  format?: 'rgba' | 'rgb' | 'jpg';
 }
-export interface VideoFrame extends MediaObject {
-  timestamp: number;
+export interface Image {
   width: number;
   height: number;
-  format: string;
-  read(options?: VideoFrameOptions): Promise<Buffer>;
+  toBuffer(options?: ImageOptions): Promise<Buffer>;
+  toImage(options?: ImageOptions): Promise<Image & MediaObject>;
 }
-export interface VideoFrameGeneratorOptions extends VideoFrameOptions {
+export interface VideoFrame extends Image {
+  timestamp: number;
+}
+export interface VideoFrameGeneratorOptions extends ImageOptions {
 }
 export interface VideoFrameGenerator {
-  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame>>;
+  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame & MediaObject) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame & MediaObject>>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -1859,6 +1913,7 @@ export enum ScryptedInterface {
   RTCSignalingClient = "RTCSignalingClient",
   LauncherApplication = "LauncherApplication",
   ScryptedUser = "ScryptedUser",
+  VideoFrameGenerator = 'VideoFrameGenerator',
 }
 
 /**
@@ -1997,8 +2052,6 @@ export enum ScryptedMimeTypes {
   RequestMediaObject = 'x-scrypted/x-scrypted-request-media-object',
   RequestMediaStream = 'x-scrypted/x-scrypted-request-stream',
   MediaStreamFeedback = 'x-scrypted/x-media-stream-feedback',
-  ScryptedDevice = 'x-scrypted/x-scrypted-device',
-  ScryptedDeviceId = 'x-scrypted/x-scrypted-device-id',
 
   FFmpegInput = 'x-scrypted/x-ffmpeg-input',
   FFmpegTranscodeStream = 'x-scrypted/x-ffmpeg-transcode-stream',
@@ -2006,6 +2059,8 @@ export enum ScryptedMimeTypes {
   RTCSignalingChannel = 'x-scrypted/x-scrypted-rtc-signaling-channel',
   RTCSignalingSession = 'x-scrypted/x-scrypted-rtc-signaling-session',
   RTCConnectionManagement = 'x-scrypted/x-scrypted-rtc-connection-management',
+
+  Image = 'x-scrypted/x-scrypted-image',
 }
 
 export type RequestMediaObject = () => Promise<MediaObject>;
@@ -2114,5 +2169,5 @@ export interface ScryptedStatic {
    * through the Scrypted Server which typically manages plugin communication.
    * This is ideal for sending large amounts of data.
    */
-  connectRPCObject?<T>(value: T): Promise<T>; 
+  connectRPCObject?<T>(value: T): Promise<T>;
 }

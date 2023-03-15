@@ -1,0 +1,40 @@
+{
+   "name": "@scrypted/eufy",
+   "description": "Eufy Plugin for Scrypted",
+   "version": "0.0.1",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "eufy",
+      "camera"
+   ],
+   "scripts": {
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "scrypted": {
+      "name": "Eufy",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider",
+         "Settings"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@scrypted/common": "file:../../common",
+      "@scrypted/h264-repacketizer": "file:../../packages/h264-repacketizer ",
+      "@types/node": "^18.14.6"
+   },
+   "optionalDependencies": {
+      "eufy-security-client": "^2.4.2"
+   }
+}

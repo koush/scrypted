@@ -85,7 +85,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
                 clusterPeer.params['connectRPCObject'] = async (id: string, secret: string) => {
                     if (secret !== portSecret)
                         throw new Error('secret incorrect');
-                    return peer.localProxyMap[id];
+                    return peer.localProxyMap.get(id);
                 }
                 client.on('close', () => clusterPeer.kill('cluster socket closed'));
             })
@@ -96,15 +96,12 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             };
 
             peer.onProxySerialization = (value, proxyId) => {
-                const properties = RpcPeer.getProxyProperties(value);
-                if (!properties?.__cluster) {
-                    RpcPeer.setProxyProperties(value, Object.assign(properties || {}, {
-                        __cluster: {
-                            ...clusterEntry,
-                            proxyId,
-                        }
-                    }));
+                const properties = RpcPeer.prepareProxyProperties(value) || {};
+                properties.__cluster = {
+                    ...clusterEntry,
+                    proxyId,
                 }
+                return properties;
             }
 
             const clusterPeers = new Map<number, Promise<RpcPeer>>();

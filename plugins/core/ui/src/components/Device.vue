@@ -5,7 +5,7 @@
         color="primary" icon="mdi-vuetify" border="left">
         <template v-slot:prepend>
           <v-icon class="white--text mr-3" size="sm" color="#a9afbb">{{
-          getAlertIcon(alert)
+            getAlertIcon(alert)
           }}</v-icon>
         </template>
         <div class="caption">{{ alert.title }}</div>
@@ -185,7 +185,8 @@
           <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
         </v-flex>
 
-        <v-flex xs12 v-if="!device.interfaces.includes(ScryptedInterface.Settings) && (availableMixins.length || deviceIsEditable(device))">
+        <v-flex xs12
+          v-if="!device.interfaces.includes(ScryptedInterface.Settings) && (availableMixins.length || deviceIsEditable(device))">
           <Settings :device="device"></Settings>
         </v-flex>
       </v-layout>
@@ -240,6 +241,7 @@ import Scene from "../interfaces/Scene.vue";
 import TemperatureSetting from "../interfaces/TemperatureSetting.vue";
 import PositionSensor from "../interfaces/sensors/PositionSensor.vue";
 import DeviceProvider from "../interfaces/DeviceProvider.vue";
+import ObjectDetection from "../interfaces/ObjectDetection.vue";
 import MixinProvider from "../interfaces/MixinProvider.vue";
 import Readme from "../interfaces/Readme.vue";
 import Scriptable from "../interfaces/automation/Scriptable.vue";
@@ -286,7 +288,9 @@ const leftInterfaces = [
   ScryptedInterface.DeviceProvider,
   ScryptedInterface.Readme,
 ];
-const leftAboveInterfaces = [ScryptedInterface.Camera];
+const leftAboveInterfaces = [
+  ScryptedInterface.Camera,
+];
 
 const noCardInterfaces = [
   ScryptedInterface.Camera,
@@ -294,7 +298,10 @@ const noCardInterfaces = [
   ScryptedInterface.Scriptable,
 ];
 
-const aboveInterfaces = [ScryptedInterface.Scriptable];
+const aboveInterfaces = [
+  ScryptedInterface.ObjectDetection,
+  ScryptedInterface.Scriptable
+];
 
 const cardActionInterfaces = [
   ScryptedInterface.OauthClient,
@@ -379,6 +386,8 @@ export default {
     Automation,
     Program,
     Scriptable,
+
+    ObjectDetection,
   },
   mixins: [Mixin],
   data() {

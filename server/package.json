@@ -1,10 +1,10 @@
 {
   "name": "@scrypted/server",
-  "version": "0.6.26",
+  "version": "0.7.9",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.10",
-    "@scrypted/types": "^0.2.74",
+    "@scrypted/types": "^0.2.77",
     "adm-zip": "^0.5.9",
     "axios": "^0.21.4",
     "body-parser": "^1.19.0",

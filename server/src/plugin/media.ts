@@ -16,15 +16,13 @@ class MediaObject implements MediaObjectRemote {
     __proxy_props: any;
 
     constructor(public mimeType: string, public data: any, options: MediaObjectOptions) {
-        this.__proxy_props = {
-            mimeType,
-        }
-        if (options) {
-            for (const [key, value] of Object.entries(options)) {
-                if (RpcPeer.isTransportSafe(key))
-                    this.__proxy_props[key] = value;
-                (this as any)[key] = value;
-            }
+        this.__proxy_props = {}
+        options ||= {};
+        options.mimeType = mimeType;
+        for (const [key, value] of Object.entries(options)) {
+            if (RpcPeer.isTransportSafe(value))
+                this.__proxy_props[key] = value;
+            (this as any)[key] = value;
         }
     }
 
@@ -302,6 +300,10 @@ export abstract class MediaManagerBase implements MediaManager {
             data = Buffer.from(JSON.stringify(data));
 
         const sourceId = typeof options?.sourceId === 'string' ? options?.sourceId : this.getPluginDeviceId();
+        if (sourceId) {
+            options ||= {} as T;
+            options.sourceId = sourceId;
+        }
 
         return new MediaObject(mimeType, data, options) as MediaObject & T;
     }
@@ -383,7 +385,7 @@ export abstract class MediaManagerBase implements MediaManager {
                         node[candidateId] = inputWeight + outputWeight;
                     }
                     catch (e) {
-                        console.warn(converter.name, 'skipping converter due to error', e)
+                        console.warn(candidate.name, 'skipping converter due to error', e)
                     }
                 }
 
@@ -456,16 +458,6 @@ export abstract class MediaManagerBase implements MediaManager {
 export class MediaManagerImpl extends MediaManagerBase {
     constructor(public systemManager: SystemManager, public deviceManager: DeviceManager) {
         super();
-
-        this.builtinConverters.push({
-            id: getBuiltinId(this.builtinConverters.length),
-            name: 'ScryptedDeviceId to ScryptedDevice Converter',
-            fromMimeType: ScryptedMimeTypes.ScryptedDeviceId,
-            toMimeType: ScryptedMimeTypes.ScryptedDevice,
-            convert: async (data, fromMimeType, toMimeType) => {
-                return this.getDeviceById(data.toString());
-            }
-        });
     }
 
     getSystemState(): { [id: string]: { [property: string]: SystemDeviceState; }; } {
