@@ -1942,7 +1942,14 @@ export interface RTCSignalingOptions {
    */
   offer?: RTCSessionDescriptionInit;
   requiresOffer?: boolean;
+  /**
+   * Disables trickle ICE. All candidates must be sent in the initial offer/answer sdp.
+   */
   disableTrickle?: boolean;
+  /**
+   * Disables usage of TURN servers, if this client exposes public addresses or provides its own.
+   */
+  disableTurn?: boolean;
   /**
    * Hint to proxy the feed, as the target client may be inflexible.
    */
