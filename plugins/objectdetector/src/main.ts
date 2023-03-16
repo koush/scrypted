@@ -53,11 +53,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     newPipeline: {
       title: 'Video Pipeline',
       description: 'Configure how frames are provided to the video analysis pipeline.',
-      choices: [
-        'Default',
-        'Snapshot',
-        ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
-      ],
+      async onGet() {
+        return {
+          choices: [
+            'Default',
+            'Snapshot',
+            ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
+          ],
+        }
+      },
       defaultValue: 'Default',
     },
     motionSensorSupplementation: {
