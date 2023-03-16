@@ -1,4 +1,4 @@
-import sdk, { VideoFrameGenerator, Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { ScryptedMimeTypes, Image, VideoFrame, VideoFrameGenerator, Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import cloneDeep from 'lodash/cloneDeep';
@@ -50,6 +50,16 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   detections = new Map<string, MediaObject>();
   cameraDevice: ScryptedDevice & Camera & VideoCamera & MotionSensor & ObjectDetector;
   storageSettings = new StorageSettings(this, {
+    newPipeline: {
+      title: 'Video Pipeline',
+      description: 'Configure how frames are provided to the video analysis pipeline.',
+      choices: [
+        'Default',
+        'Snapshot',
+        ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
+      ],
+      defaultValue: 'Default',
+    },
     motionSensorSupplementation: {
       title: 'Built-In Motion Sensor',
       description: `This camera has a built in motion sensor. Using ${this.objectDetection.name} may be unnecessary and will use additional CPU. Replace will ignore the built in motion sensor. Filter will verify the motion sent by built in motion sensor. The Default is ${BUILTIN_MOTION_SENSOR_REPLACE}.`,
@@ -473,22 +483,57 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (this.detectorRunning)
       return;
 
-    const stream = await this.cameraDevice.getVideoStream({
-      destination: 'local-recorder',
-      // ask rebroadcast to mute audio, not needed.
-      audio: null,
-    });
-
     this.detectorRunning = true;
     this.analyzeStop = Date.now() + this.getDetectionDuration();
 
-    const videoFrameGenerator = this.newPipeline as VideoFrameGenerator;
+    const newPipeline = this.newPipeline;
+    let generator: AsyncGenerator<VideoFrame & MediaObject>;
+    if (newPipeline === 'Snapshot') {
+      const self = this;
+      generator = (async function* gen() {
+        while (true) {
+          const now = Date.now();
+          const sleeper = async () => {
+            const diff = now + 1100 - Date.now();
+            if (diff > 0)
+              await sleep(diff);
+          };
+          let image: MediaObject & VideoFrame;
+          try {
+            const mo = await self.cameraDevice.takePicture({
+              reason: 'event',
+            });
+            image = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.Image);
+          }
+          catch (e) {
+            self.console.error('Video analysis snapshot failed. Will retry in a moment.');
+            await sleeper();
+            continue;
+          }
+
+          yield image;
+          await sleeper();
+        }
+      })();
+    }
+    else {
+      const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(newPipeline);
+      if (!videoFrameGenerator)
+        throw new Error('invalid VideoFrameGenerator');
+      const stream = await this.cameraDevice.getVideoStream({
+        destination: 'local-recorder',
+        // ask rebroadcast to mute audio, not needed.
+        audio: null,
+      });
+
+      generator = await videoFrameGenerator.generateVideoFrames(stream);
+    }
 
     try {
       const start = Date.now();
       let detections = 0;
       for await (const detected
-        of await this.objectDetection.generateObjectDetections(await videoFrameGenerator.generateVideoFrames(stream), {
+        of await this.objectDetection.generateObjectDetections(generator, {
           settings: this.getCurrentSettings(),
         })) {
         if (!this.detectorRunning) {
@@ -849,8 +894,18 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   get newPipeline() {
-    return this.plugin.storageSettings.values.newPipeline;
-  } 
+    if (!this.plugin.storageSettings.values.newPipeline)
+      return;
+
+    const newPipeline = this.storageSettings.values.newPipeline;
+    if (!newPipeline)
+      return newPipeline;
+    if (newPipeline === 'Snapshot')
+      return newPipeline;
+    const pipelines = getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator));
+    const found = pipelines.find(p => p.name === newPipeline);
+    return found?.id || pipelines[0]?.id;
+  }
 
   async getMixinSettings(): Promise<Setting[]> {
     const settings: Setting[] = [];
@@ -872,7 +927,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     this.storageSettings.settings.motionSensorSupplementation.hide = !this.hasMotionType || !this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor);
-    this.storageSettings.settings.captureMode.hide = this.hasMotionType || !!this.newPipeline;
+    this.storageSettings.settings.captureMode.hide = this.hasMotionType || !!this.plugin.storageSettings.values.newPipeline;
+    this.storageSettings.settings.newPipeline.hide = this.hasMotionType || !this.plugin.storageSettings.values.newPipeline;
     this.storageSettings.settings.detectionDuration.hide = this.hasMotionType;
     this.storageSettings.settings.detectionTimeout.hide = this.hasMotionType;
     this.storageSettings.settings.motionDuration.hide = !this.hasMotionType;
@@ -1141,8 +1197,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings 
     newPipeline: {
       title: 'New Video Pipeline',
       description: 'WARNING! DO NOT ENABLE: Use the new video pipeline. Leave blank to use the legacy pipeline.',
-      type: 'device',
-      deviceFilter: `interfaces.includes('${ScryptedInterface.VideoFrameGenerator}')`,
+      type: 'boolean',
     },
     activeMotionDetections: {
       title: 'Active Motion Detection Sessions',
