@@ -2,7 +2,7 @@ import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/co
 import { sleep } from '@scrypted/common/src/sleep';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
-import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
 import { SipCallSession } from '../../sip/src/sip-call-session';
 import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType, RtpDescription } from '../../sip/src/rtp-utils';
 import { VoicemailHandler } from './bticino-voicemailHandler';
@@ -11,6 +11,7 @@ import { decodeSrtpOptions, encodeSrtpOptions, SrtpOptions } from '../../ring/sr
 import { SipHelper } from './sip-helper';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
+import fs from 'fs'
 import { BticinoStorageSettings } from './storage-settings';
 import { BticinoSipPlugin } from './main';
 import { BticinoSipLock } from './bticino-lock';
@@ -19,11 +20,12 @@ import { PersistentSipManager } from './persistent-sip-manager';
 import { InviteHandler } from './bticino-inviteHandler';
 import { SipRequest } from '../../sip/src/sip-manager';
 import crypto from 'crypto';
+import { get } from 'http'
 
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
 
-export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler {
+export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler, VideoClips {
 
     private session: SipCallSession
     private remoteRtpDescription: RtpDescription
@@ -54,6 +56,51 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             this.doorbellWebhookUrl = await this.doorbellWebhookEndpoint()
             this.doorbellLockWebhookUrl = await this.doorbellLockWebhookEndpoint()
         })();
+    }
+    getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
+       return new Promise<VideoClip[]>(  (resolve,reject ) => {
+            let c300x = SipHelper.sipOptions(this).deviceIp
+            get(`http://${c300x}:8080/videoclips?raw=true&startTime=${options.startTime/1000}&endTime=${options.endTime/1000}`, (res) => {
+            let rawData = '';
+            res.on('data', (chunk) => { rawData += chunk; });
+            res.on('end', () => {
+                try {
+                    const parsedData : [] = JSON.parse(rawData);
+                    let videoClips : VideoClip[] = []
+                    parsedData.forEach( (item) => {
+                        let videoClip : VideoClip = {
+                            id: item['file'],
+                            startTime: parseInt(item['info']['UnixTime']) * 1000,
+                            duration: item['info']['Duration'] * 1000,
+                            //description: item['info']['Date'],
+                            thumbnailId: item['file']
+
+                        }
+                        videoClips.push( videoClip )
+                    } )
+                    return  resolve(videoClips)
+                } catch (e) {
+                    reject(e.message)
+                    console.error(e.message);
+                }
+                })
+            });                    
+        });
+    }
+
+    getVideoClip(videoId: string): Promise<MediaObject> {
+        let c300x = SipHelper.sipOptions(this).deviceIp
+        const url = `http://${c300x}:8080/voicemail?msg=${videoId}/aswm.avi&raw=true`;
+        return mediaManager.createMediaObjectFromUrl(url);        
+    }
+    getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject> {
+        let c300x = SipHelper.sipOptions(this).deviceIp
+        const url = `http://${c300x}:8080/voicemail?msg=${thumbnailId}/aswm.jpg&raw=true`;
+        return mediaManager.createMediaObjectFromUrl(url);        
+    }
+    removeVideoClips(...videoClipIds: string[]): Promise<void> {
+        //TODO
+        throw new Error('Method not implemented.')
     }
 
     sipUnlock(): Promise<void> {
@@ -97,12 +144,11 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
         const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
 
-        const rtpOptions = this.remoteRtpDescription
         const audioOutForwarder = await createBindZero()
         this.audioOutForwarder = audioOutForwarder.server
         audioOutForwarder.server.on('message', message => {
             if( this.session )
-                this.session.audioSplitter.send(message, rtpOptions.audio.port, rtpOptions.address)
+                this.session.audioSplitter.send(message, 40004, this.remoteRtpDescription.address)
             return null
         });
 
@@ -114,9 +160,9 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             '-ac', '1',
             '-ar', '8k',
             '-f', 'rtp',
-            '-srtp_out_suite', 'AES_CM_128_HMAC_SHA1_80',
-            '-srtp_out_params', encodeSrtpOptions(this.decodedSrtpOptions),
-            `srtp://127.0.0.1:${audioOutForwarder.port}?pkt_size=188`,
+            //'-srtp_out_suite', 'AES_CM_128_HMAC_SHA1_80',
+            //'-srtp_out_params', encodeSrtpOptions(this.decodedSrtpOptions),
+            `rtp://127.0.0.1:${audioOutForwarder.port}?pkt_size=188`,
         );
 
         this.console.log("===========================================")
@@ -182,7 +228,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
         const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient()
 
-        const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`
+        const playbackUrl = clientUrl
 
         playbackPromise.then(async (client) => {
             client.setKeepAlive(true, 10000)
@@ -218,8 +264,8 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                     ( audio ) => {
                     return [
                         //TODO: Payload types are hardcoded
-                        `m=audio ${audio.port} RTP/SAVP 97`,
-                        `a=rtpmap:97 speex/8000`,
+                        `m=audio 65000 RTP/SAVP 110`,
+                        `a=rtpmap:110 speex/8000`,
                         `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
                     ]
                 }, ( video ) => {
@@ -231,9 +277,9 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                     } else {
                         return [
                             //TODO: Payload types are hardcoded
-                            `m=video ${video.port} RTP/SAVP 97`,
-                            `a=rtpmap:97 H264/90000`,
-                            `a=fmtp:97 profile-level-id=42801F`,
+                            `m=video 65002 RTP/SAVP 96`,
+                            `a=rtpmap:96 H264/90000`,
+                            `a=fmtp:96 profile-level-id=42801F`,
                             `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
                             'a=recvonly'                        
                         ]
@@ -242,11 +288,16 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
                 this.incomingCallRequest = undefined
 
-                if( sipOptions.debugSip )
-                    this.log.d('SIP: Received remote SDP:\n' + this.remoteRtpDescription.sdp)
-
-                let sdp: string = replacePorts(this.remoteRtpDescription.sdp, 0, 0 )
-
+                //let sdp: string = replacePorts(this.remoteRtpDescription.sdp, 0, 0 )
+                let sdp : string = [ 
+                    "v=0",
+                    "m=audio 5000 RTP/AVP 110",
+                    "c=IN IP4 172.21.0.134",
+                    "a=rtpmap:110 speex/8000/1",
+                    "m=video 5002 RTP/AVP 96",
+                    "c=IN IP4 172.21.0.134",
+                    "a=rtpmap:96 H264/90000",
+                ].join('\r\n')
                 //sdp = sdp.replaceAll(/a=crypto\:1.*/g, '')
                 //sdp = sdp.replaceAll(/RTP\/SAVP/g, 'RTP\/AVP')
                 //sdp = sdp.replaceAll('\r\n\r\n', '\r\n')
@@ -255,69 +306,10 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 if( sipOptions.debugSip )
                     this.log.d('SIP: Updated SDP:\n' + sdp);
 
-                let vseq = 0, vseen = 0, vlost = 0, aseq = 0, aseen = 0, alost = 0;  
-
-                rtsp = new RtspServer(client, sdp, true);
-                const parsedSdp = parseSdp(rtsp.sdp);
-                const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video')?.control
-                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio')?.control
-
-                if( !videoTrack || !audioTrack )
-                    throw new Error("Video track and/or audio track not found")
-
-                if( sipOptions.debugSip ) {
-                    rtsp.console = this.console
-                }
-                
-                await rtsp.handlePlayback();
-                sip.videoSplitter.on('message', message => {
-                    if (!isStunMessage(message)) {
-                        const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message))
-                        if (!isRtpMessage)
-                            return
-                        vseen++;
-                        rtsp.sendTrack(videoTrack, message, !isRtpMessage)
-                        const seq = getSequenceNumber(message)
-                        if (seq !== (vseq + 1) % 0x0FFFF)
-                            vlost++
-                        vseq = seq
-                    }
-                });
-
-                sip.videoRtcpSplitter.on('message', message => {
-                    rtsp.sendTrack(videoTrack, message, true)
-                });
-                
-                sip.audioSplitter.on('message', message => {
-                    if (!isStunMessage(message)) {
-                        const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message))
-                        if (!isRtpMessage)
-                            return;
-                        aseen++;
-                        rtsp.sendTrack(audioTrack, message, !isRtpMessage)
-                        const seq = getSequenceNumber(message)
-                        if (seq !== (aseq + 1) % 0x0FFFF)
-                            alost++;
-                        aseq = seq
-                    }
-                });
-
-                sip.audioRtcpSplitter.on('message', message => {
-                    rtsp.sendTrack(audioTrack, message, true)
-                });
+                client.write(sdp)
+                client.end()
 
                 this.session = sip
-
-                try {
-                    await rtsp.handleTeardown()
-                    this.log.d('rtsp client ended')
-                }
-                catch (e) {
-                    this.log.e('rtsp client ended ungracefully' + e);
-                }
-                finally {
-                    cleanup()
-                }
             }
             catch (e) {
                 this.console.error(e)
@@ -332,14 +324,19 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             refreshAt: Date.now() + STREAM_TIMEOUT,
         });
 
-        const mediaStreamUrl: MediaStreamUrl = {
-            url: playbackUrl,
+        const ffmpegInput: FFmpegInput = {
+            url: undefined,
+            container: 'sdp',
             mediaStreamOptions,
+            inputArguments: [
+                '-f', 'sdp',
+                '-i', playbackUrl,
+            ],
         };
-        this.currentMedia = mediaStreamUrl;
-        this.currentMediaMimeType = ScryptedMimeTypes.MediaStreamUrl;
+        this.currentMedia = ffmpegInput;
+        this.currentMediaMimeType = ScryptedMimeTypes.FFmpegInput;
 
-        return mediaManager.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
+        return mediaManager.createFFmpegMediaObject(ffmpegInput);
     }
 
     getSipMediaStreamOptions(): ResponseMediaStreamOptions {

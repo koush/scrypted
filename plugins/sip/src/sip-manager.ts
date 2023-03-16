@@ -19,6 +19,7 @@ export interface SipOptions {
   useTcp?: boolean
   gruuInstanceId?: string
   sipRequestHandler?: SipRequestHandler
+  deviceIp: string
 }
 
 /**

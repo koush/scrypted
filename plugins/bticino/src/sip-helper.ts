@@ -10,6 +10,7 @@ export class SipHelper {
         const from = camera.storage.getItem('sipfrom')?.trim()
         const to = camera.storage.getItem('sipto')?.trim()
         const localIp = from?.split(':')[0].split('@')[1]
+        const deviceIp = to.split('@')[1]
         // Although this might not occur directly, each camera should run on its own port
         // Might need to use a random free port here (?)
         const localPort = parseInt(from?.split(':')[1]) || 5060
@@ -23,6 +24,7 @@ export class SipHelper {
         }        
 
         return { 
+            deviceIp: deviceIp,
             from: "sip:" + from,
             //TCP is more reliable for large messages, also see useTcp=true below
             to: "sip:" + to + ";transport=tcp",
@@ -34,6 +36,7 @@ export class SipHelper {
             gruuInstanceId: camera.getGruuInstanceId(),
             useTcp: true,
             sipRequestHandler: camera.requestHandlers
+
          } 
     }    
 }
