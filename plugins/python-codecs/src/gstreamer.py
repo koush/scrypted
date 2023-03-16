@@ -16,8 +16,12 @@ except:
 
 class Callback:
     def __init__(self, callback) -> None:
-        self.loop = asyncio.get_running_loop()
-        self.callback = callback
+        if callback:
+            self.loop = asyncio.get_running_loop()
+            self.callback = callback
+        else:
+            self.loop = None
+            self.callback = None
 
 def createPipelineIterator(pipeline: str):
     pipeline = '{pipeline} ! queue leaky=downstream max-size-buffers=0 ! appsink name=appsink emit-signals=true sync=false max-buffers=-1 drop=true'.format(pipeline=pipeline)
