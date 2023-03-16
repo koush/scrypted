@@ -487,32 +487,39 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.analyzeStop = Date.now() + this.getDetectionDuration();
 
     const newPipeline = this.newPipeline;
-    let generator: AsyncGenerator<VideoFrame & MediaObject>;
+    let generator : () => Promise<AsyncGenerator<VideoFrame & MediaObject>>;
     if (newPipeline === 'Snapshot') {
       const self = this;
-      generator = (async function* gen() {
-        while (true) {
-          const now = Date.now();
-          const sleeper = async () => {
-            const diff = now + 1100 - Date.now();
-            if (diff > 0)
-              await sleep(diff);
-          };
-          let image: MediaObject & VideoFrame;
-          try {
-            const mo = await self.cameraDevice.takePicture({
-              reason: 'event',
-            });
-            image = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.Image);
-          }
-          catch (e) {
-            self.console.error('Video analysis snapshot failed. Will retry in a moment.');
-            await sleeper();
-            continue;
-          }
+      generator = async () => (async function* gen() {
+        try {
+          while (self.detectorRunning) {
+            const now = Date.now();
+            const sleeper = async () => {
+              const diff = now + 1100 - Date.now();
+              if (diff > 0)
+                await sleep(diff);
+            };
+            let image: MediaObject & VideoFrame;
+            try {
+              const mo = await self.cameraDevice.takePicture({
+                reason: 'event',
+              });
+              image = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.Image);
+            }
+            catch (e) {
+              self.console.error('Video analysis snapshot failed. Will retry in a moment.');
+              await sleeper();
+              continue;
+            }
 
-          yield image;
-          await sleeper();
+            // self.console.log('yield')
+            yield image;
+            // self.console.log('done yield')
+            await sleeper();
+          }
+        }
+        finally {
+          self.console.log('Snapshot generation finished.');
         }
       })();
     }
@@ -526,14 +533,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         audio: null,
       });
 
-      generator = await videoFrameGenerator.generateVideoFrames(stream);
+      generator = async () => videoFrameGenerator.generateVideoFrames(stream);
     }
 
     try {
       const start = Date.now();
       let detections = 0;
       for await (const detected
-        of await this.objectDetection.generateObjectDetections(generator, {
+        of await this.objectDetection.generateObjectDetections(await generator(), {
           settings: this.getCurrentSettings(),
         })) {
         if (!this.detectorRunning) {
