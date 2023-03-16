@@ -40,13 +40,14 @@ echo "Installing Scrypted dependencies..."
 RUN_IGNORE xcode-select --install
 RUN brew update
 RUN_IGNORE brew install node@18
-# needed by scrypted-ffmpeg
-RUN_IGNORE brew install sdl2
+# snapshot plugin and others
+RUN brew install libvips
 # gstreamer plugins
 RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly
 # gst python bindings
 RUN_IGNORE brew install gst-python
 # python image library
+# todo: consider removing this
 RUN_IGNORE brew install pillow
 
 ### HACK WORKAROUND
@@ -102,7 +103,11 @@ then
 fi
 
 RUN python$PYTHON_VERSION -m pip install --upgrade pip
-RUN python$PYTHON_VERSION -m pip install aiofiles debugpy typing_extensions typing opencv-python psutil
+if [ "$PYTHON_VERSION" != "3.10" ]
+then
+    RUN python$PYTHON_VERSION -m pip install typing
+fi
+RUN python$PYTHON_VERSION -m pip install aiofiles debugpy typing_extensions opencv-python psutil
 
 echo "Installing Scrypted Launch Agent..."
 

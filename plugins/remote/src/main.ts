@@ -1,13 +1,39 @@
-import { Device, DeviceProvider, DeviceCreator, DeviceCreatorSettings, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, Battery, SettingValue, DeviceManifest} from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
+import { connectScryptedClient, ScryptedClientStatic } from '@scrypted/client/src/index';
+import sdk, { BufferConverter, Battery, Device, DeviceCreator, DeviceCreatorSettings, DeviceManifest, DeviceProvider, FFmpegInput, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, MediaObjectOptions, MediaManager } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import { connectScryptedClient, ScryptedClientStatic } from '@scrypted/client';
 import https from 'https';
 import { v4 as uuidv4 } from 'uuid';
+import { MediaObjectRemote } from '../../../server/src/plugin/plugin-api';
+import { RpcPeer } from '../../../server/src/rpc';
 
 const { deviceManager } = sdk;
 
-class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvider, Settings {
+export class MediaObject implements MediaObjectRemote {
+    __proxy_props: any;
+
+    constructor(public mimeType: string, public data: any, options: MediaObjectOptions) {
+        this.__proxy_props = {
+            mimeType,
+        }
+        if (options) {
+            for (const [key, value] of Object.entries(options)) {
+                if (RpcPeer.isTransportSafe(key))
+                    this.__proxy_props[key] = value;
+                (this as any)[key] = value;
+            }
+        }
+    }
+
+    async getData(): Promise<Buffer | string> {
+        return Promise.resolve(this.data);
+    }
+}
+
+interface RemoteMediaObject extends MediaObjectRemote {
+    realMimeType: string;
+}
+
+class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvider, Settings, BufferConverter {
     client: ScryptedClientStatic = null;
 
     devices = new Map<string, ScryptedDevice>();
@@ -32,7 +58,12 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
     constructor(nativeId: string) {
         super(nativeId);
         this.clearTryDiscoverDevices();
+
+
+        this.fromMimeType = 'x-scrypted-remote/x-media-object-' + this.id;
+        this.toMimeType = ScryptedMimeTypes.MediaObject;
     }
+
 
     /**
      * Checks the given remote device to see if it can be correctly imported by this plugin.
@@ -56,6 +87,9 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
 
         // only permit the following functional interfaces through
         const allowedInterfaces = [
+            ScryptedInterface.VideoRecorder,
+            ScryptedInterface.VideoClips,
+            ScryptedInterface.EventRecorder,
             ScryptedInterface.VideoCamera,
             ScryptedInterface.Camera,
             ScryptedInterface.RTCSignalingChannel,
@@ -156,8 +190,51 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
             axiosConfig: {
                 httpsAgent,
             },
-        })
+        });
+
+        this.client.onClose = () => {
+            this.console.log('client killed')
+        }
+
+        const { rpcPeer } = this.client;
+        const map = new WeakMap<RemoteMediaObject, MediaObject>();
+        rpcPeer.nameDeserializerMap.set('MediaObject', {
+            serialize(value, serializationContext) {
+                throw new Error();
+            },
+            deserialize: (mo: RemoteMediaObject, serializationContext) => {
+                let rmo = map.get(mo);
+                if (rmo)
+                    return rmo;
+                rmo = new MediaObject(this.fromMimeType, mo, {});
+                map.set(mo, rmo);
+                // mo.realMimeType = mo.mimeType;
+                // mo.mimeType = this.fromMimeType;
+                // mo.getData = async() => mo as any;
+                // mo.mediaManager = this.client.mediaManager;
+                return rmo;
+            },
+        });
         this.console.log(`Connected to remote Scrypted server. Remote server version: ${this.client.serverVersion}`)
+    }
+
+    async convert(data: RemoteMediaObject, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+        if (toMimeType === 'x-scrypted-remote/x-media-object')
+            return data;
+        let ret = await this.client.mediaManager.convertMediaObject(data, toMimeType);
+        if (toMimeType === ScryptedMimeTypes.FFmpegInput) {
+            const ffmpegInput = JSON.parse(ret.toString()) as FFmpegInput;
+            if (ffmpegInput.urls?.[0]) {
+                ffmpegInput.url = ffmpegInput.urls[0];
+                delete ffmpegInput.urls;
+                ret = Buffer.from(JSON.stringify(ffmpegInput));
+            }
+        }
+        else if (toMimeType === ScryptedMimeTypes.LocalUrl) {
+            ret = Buffer.from(new URL(ret.toString(),this.settingsStorage.values.baseUrl).toString());
+        }
+        return sdk.mediaManager.createMediaObject(ret, toMimeType);
+        return ret;
     }
 
     getSettings(): Promise<Setting[]> {
@@ -252,10 +329,6 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
 class ScryptedRemotePlugin extends ScryptedDeviceBase implements DeviceCreator, DeviceProvider {
     remotes = new Map<string, ScryptedRemoteInstance>();
 
-    constructor() {
-        super();
-    }
-
     async getDevice(nativeId: string): Promise<Device> {
         if (!this.remotes.has(nativeId)) {
             this.remotes.set(nativeId, new ScryptedRemoteInstance(nativeId));
@@ -301,6 +374,7 @@ class ScryptedRemotePlugin extends ScryptedDeviceBase implements DeviceCreator, 
             nativeId,
             name,
             interfaces: [
+                ScryptedInterface.BufferConverter,
                 ScryptedInterface.Settings,
                 ScryptedInterface.DeviceProvider
             ],

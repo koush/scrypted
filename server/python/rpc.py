@@ -59,16 +59,31 @@ class RpcProxy(object):
         self.__dict__['__proxy_entry'] = entry
         self.__dict__['__proxy_constructor'] = proxyConstructorName
         self.__dict__['__proxy_peer'] = peer
-        self.__dict__['__proxy_props'] = proxyProps
+        self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES] = proxyProps
         self.__dict__['__proxy_oneway_methods'] = proxyOneWayMethods
+
+    def __aiter__(self):
+        if self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES] and 'Symbol(Symbol.asyncIterator)' in self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES]:
+            return self
+        raise Exception('RpcProxy is not an async iterable')
+
+    async def __anext__(self):
+        if self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES] and 'Symbol(Symbol.asyncIterator)' in self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES]:
+            try:
+                return await RpcProxyMethod(self, self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES]['Symbol(Symbol.asyncIterator)']['next'])()
+            except RPCResultError as e:
+                if e.name == 'StopAsyncIteration':
+                    raise StopAsyncIteration()
+                raise
+        raise Exception('RpcProxy is not an async iterable')
 
     def __getattr__(self, name):
         if name == '__proxy_finalizer_id':
             return self.dict['__proxy_entry']['finalizerId']
         if name in self.__dict__:
             return self.__dict__[name]
-        if self.__dict__['__proxy_props'] and name in self.__dict__['__proxy_props']:
-            return self.__dict__['__proxy_props'][name]
+        if self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES] and name in self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES]:
+            return self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES][name]
         return RpcProxyMethod(self, name)
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -87,6 +102,8 @@ class RpcProxy(object):
 
 class RpcPeer:
     RPC_RESULT_ERROR_NAME = 'RPCResultError'
+    PROPERTY_PROXY_PROPERTIES = '__proxy_props'
+    PROPERTY_JSON_COPY_SERIALIZE_CHILDREN = '__json_copy_serialize_children'
 
     def __init__(self, send: Callable[[object, Callable[[Exception], None], Dict], None]) -> None:
         self.send = send
@@ -101,12 +118,13 @@ class RpcPeer:
         self.remoteWeakProxies: Mapping[str, any] = {}
         self.nameDeserializerMap: Mapping[str, RpcSerializer] = {}
         self.onProxySerialization: Callable[[Any, str], Any] = None
+        self.killed = False
 
     def __apply__(self, proxyId: str, oneWayMethods: List[str], method: str, args: list):
         serializationContext: Dict = {}
         serializedArgs = []
         for arg in args:
-            serializedArgs.append(self.serialize(arg, False, serializationContext))
+            serializedArgs.append(self.serialize(arg, serializationContext))
 
         rpcApply = {
             'type': 'apply',
@@ -128,8 +146,22 @@ class RpcPeer:
             self.send(rpcApply, reject, serializationContext)
         return self.createPendingResult(send)
 
-    def kill(self):
+    def kill(self, message: str = None):
+        # not thread safe..
+        if self.killed:
+            return
         self.killed = True
+
+        error = RPCResultError(None, message or 'peer was killed')
+        # this.killedDeferred.reject(error);
+        for str, future in self.pendingResults.items():
+            future.set_exception(error)
+
+        self.pendingResults = None
+        self.params = None
+        self.remoteWeakProxies = None
+        self.localProxyMap = None
+        self.localProxied = None
 
     def createErrorResult(self, result: Any, e: Exception):
         s = self.serializeError(e)
@@ -166,26 +198,36 @@ class RpcPeer:
             '__serialized_value': serialized,
         }
     
-    def getProxyProperties(value):
-        return getattr(value, '__proxy_props', None)
+    # def getProxyProperties(value):
+    #     return getattr(value, RpcPeer.PROPERTY_PROXY_PROPERTIES, None)
 
-    def setProxyProperties(value, properties):
-        setattr(value, '__proxy_props', properties)
+    # def setProxyProperties(value, properties):
+    #     setattr(value, RpcPeer.PROPERTY_PROXY_PROPERTIES, properties)
 
     def prepareProxyProperties(value):
         if not hasattr(value, '__aiter__') or not hasattr(value, '__anext__'):
-            return getattr(value, '__proxy_props', None)
+            return getattr(value, RpcPeer.PROPERTY_PROXY_PROPERTIES, None)
 
-        props = getattr(value, '__proxy_props', None) or {}
-        props['Symbol(Symbol.asyncIterator)'] = {
-            'next': '__anext__',
-            'throw': 'athrow',
-            'return': 'asend',
-        }
+        props = getattr(value, RpcPeer.PROPERTY_PROXY_PROPERTIES, None) or {}
+        if not props.get('Symbol(Symbol.asyncIterator)'):
+            props['Symbol(Symbol.asyncIterator)'] = {
+                'next': '__anext__',
+                'throw': 'athrow',
+                'return': 'aclose',
+            }
         return props
 
-    def serialize(self, value, requireProxy, serializationContext: Dict):
-        if (not value or (not requireProxy and type(value) in jsonSerializable)):
+    def isTransportSafe(value: any):
+        return not value or (type(value) in jsonSerializable)
+
+    def serialize(self, value, serializationContext: Dict):
+        if type(value) == dict and value.get(RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN, None):
+            ret = {}
+            for (key, val) in value.items():
+                ret[key] = self.serialize(val, serializationContext)
+            return ret
+
+        if (RpcPeer.isTransportSafe(value)):
             return value
 
         __remote_constructor_name = 'Function' if callable(value) else value.__proxy_constructor if hasattr(
@@ -193,6 +235,22 @@ class RpcPeer:
 
         if isinstance(value, Exception):
             return self.serializeError(value)
+
+        serializerMapName = self.constructorSerializerMap.get(
+            type(value), None)
+        if serializerMapName:
+            __remote_constructor_name = serializerMapName
+            serializer = self.nameDeserializerMap.get(serializerMapName, None)
+            serialized = serializer.serialize(value, serializationContext)
+            ret = {
+                '__remote_proxy_id': None,
+                '__remote_proxy_finalizer_id': None,
+                '__remote_constructor_name': __remote_constructor_name,
+                '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
+                '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
+                '__serialized_value': serialized,
+            }
+            return ret
 
         proxiedEntry = self.localProxied.get(value, None)
         if proxiedEntry:
@@ -215,22 +273,6 @@ class RpcPeer:
             }
             return ret
 
-        serializerMapName = self.constructorSerializerMap.get(
-            type(value), None)
-        if serializerMapName:
-            __remote_constructor_name = serializerMapName
-            serializer = self.nameDeserializerMap.get(serializerMapName, None)
-            serialized = serializer.serialize(value, serializationContext)
-            ret = {
-                '__remote_proxy_id': None,
-                '__remote_proxy_finalizer_id': None,
-                '__remote_constructor_name': __remote_constructor_name,
-                '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
-                '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
-                '__serialized_value': serialized,
-            }
-            return ret
-
         proxyId = str(self.proxyCounter)
         self.proxyCounter = self.proxyCounter + 1
         proxiedEntry = {
@@ -241,19 +283,23 @@ class RpcPeer:
         self.localProxyMap[proxyId] = value
 
         if self.onProxySerialization:
-            self.onProxySerialization(value, proxyId)
+            __remote_proxy_props = self.onProxySerialization(value, proxyId)
+        else:
+            __remote_proxy_props = RpcPeer.prepareProxyProperties(value)
 
         ret = {
             '__remote_proxy_id': proxyId,
             '__remote_proxy_finalizer_id': proxyId,
             '__remote_constructor_name': __remote_constructor_name,
-            '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
+            '__remote_proxy_props': __remote_proxy_props,
             '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
         }
 
         return ret
 
     def finalize(self, localProxiedEntry: LocalProxiedEntry):
+        if self.killed:
+            return
         id = localProxiedEntry['id']
         self.remoteWeakProxies.pop(id, None)
         rpcFinalize = {
@@ -282,6 +328,13 @@ class RpcPeer:
         if type(value) != dict:
             return value
 
+        copySerializeChildren = value.get(RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN, None)
+        if copySerializeChildren:
+            ret = {}
+            for (key, val) in value.items():
+                ret[key] = self.deserialize(val, deserializationContext)
+            return ret
+
         __remote_proxy_id = value.get('__remote_proxy_id', None)
         __remote_proxy_finalizer_id = value.get(
             '__remote_proxy_finalizer_id', None)
@@ -294,7 +347,7 @@ class RpcPeer:
             '__remote_proxy_oneway_methods', None)
 
         if __remote_constructor_name == RpcPeer.RPC_RESULT_ERROR_NAME:
-            return self.deserializeError(__serialized_value);
+            return RpcPeer.deserializeError(__serialized_value)
 
         if __remote_proxy_id:
             weakref = self.remoteWeakProxies.get('__remote_proxy_id', None)
@@ -332,8 +385,7 @@ class RpcPeer:
                 try:
                     value = self.params.get(message['param'], None)
                     value = await maybe_await(value)
-                    result['result'] = self.serialize(
-                        value, message.get('requireProxy', None), serializationContext)
+                    result['result'] = self.serialize(value, serializationContext)
                 except Exception as e:
                     tb = traceback.format_exc()
                     self.createErrorResult(
@@ -360,6 +412,9 @@ class RpcPeer:
                     for arg in (message['args'] or []):
                         args.append(self.deserialize(arg, deserializationContext))
 
+                    # if method == 'asend' and hasattr(target, '__aiter__') and hasattr(target, '__anext__') and not len(args):
+                    #     args.append(None)
+
                     value = None
                     if method:
                         if not hasattr(target, method):
@@ -370,7 +425,7 @@ class RpcPeer:
                     else:
                         value = await maybe_await(target(*args))
 
-                    result['result'] = self.serialize(value, False, serializationContext)
+                    result['result'] = self.serialize(value, serializationContext)
                 except StopAsyncIteration as e:
                     self.createErrorResult(result, e)
                 except Exception as e:

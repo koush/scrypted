@@ -26,16 +26,6 @@ defaultPeerConfig.headerExtensions = {
     audio: [],
 };
 
-mediaManager.addConverter({
-    fromMimeType: ScryptedMimeTypes.ScryptedDevice,
-    toMimeType: ScryptedMimeTypes.RequestMediaStream,
-    async convert(data, fromMimeType, toMimeType, options) {
-        const device = data as VideoCamera;
-        const requestMediaStream: RequestMediaStream = async options => device.getVideoStream(options);
-        return requestMediaStream;
-    }
-});
-
 const zygote = createZygote<ReturnType<typeof fork>>();
 
 class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
@@ -125,7 +115,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
         const device = systemManager.getDeviceById<VideoCamera & Intercom>(this.id);
         const hasIntercom = this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom);
 
-        const mo = await sdk.mediaManager.createMediaObject(device, ScryptedMimeTypes.ScryptedDevice, {
+        const requestMediaStream: RequestMediaStream = async options => device.getVideoStream(options);
+        const mo = await mediaManager.createMediaObject(requestMediaStream, ScryptedMimeTypes.RequestMediaStream, {
             sourceId: device.id,
         });
 
@@ -136,7 +127,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
             mo,
             this.plugin.storageSettings.values.maximumCompatibilityMode,
             this.plugin.getRTCConfiguration(),
-            await this.plugin.getWeriftConfiguration(),
+            await this.plugin.getWeriftConfiguration(options?.disableTurn),
         );
     }
 
@@ -419,7 +410,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         };
     }
 
-    async getWeriftConfiguration(): Promise<Partial<PeerConfig>> {
+    async getWeriftConfiguration(disableTurn?: boolean): Promise<Partial<PeerConfig>> {
         let ret: Partial<PeerConfig>;
         if (this.storageSettings.values.weriftConfiguration) {
             try {
@@ -430,7 +421,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             }
         }
 
-        const iceServers = this.storageSettings.values.useTurnServer
+        const iceServers = this.storageSettings.values.useTurnServer && !disableTurn
             ? [weriftStunServer, weriftTurnServer]
             : [weriftStunServer];
 

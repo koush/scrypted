@@ -1,0 +1,11 @@
+.DS_Store
+out/
+node_modules/
+*.map
+fs
+src
+.vscode
+dist/*.js
+dist/*.txt
+HAP-NodeJS
+.gitattributes

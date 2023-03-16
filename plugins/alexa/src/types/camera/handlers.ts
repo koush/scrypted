@@ -17,6 +17,13 @@ export class AlexaSignalingSession implements RTCSignalingSession {
                 sdp: this.directive.payload.offer.value,
             },
             disableTrickle: true,
+            disableTurn: true,
+            // this could be a low resolution screen, no way of knowning, so never send a 1080p stream
+            screen: {
+                devicePixelRatio: 1,
+                width: 1280,
+                height: 720
+            }
         }
     }
 

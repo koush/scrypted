@@ -20,14 +20,25 @@ async function main() {
 
     const rpcPeer = createDuplexRpcPeer('node', 'python', cp.stdio[3] as Readable, cp.stdio[4] as Writable);
 
-    const foo = await rpcPeer.getParam('foo');
-    assert.equal(foo, 3);
-
-    const ticker = await rpcPeer.getParam('ticker');
-    for await (const v of ticker) {
-        console.log(v);
+    async function* test() {
+        yield 1;
+        yield 2;
+        yield 3;
     }
-    process.exit();
+
+    rpcPeer.params['test'] = test();
+
+    // const foo = await rpcPeer.getParam('foo');
+    // assert.equal(foo, 3);
+
+    // const bar = await rpcPeer.getParam('bar');
+    // console.log(bar);
+
+    // const ticker = await rpcPeer.getParam('ticker');
+    // for await (const v of ticker) {
+    //     console.log(v);
+    // }
+    // process.exit();
 }
 
 main();

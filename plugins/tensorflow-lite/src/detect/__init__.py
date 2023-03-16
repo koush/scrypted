@@ -34,7 +34,7 @@ try:
 except:
     pass
 
-from scrypted_sdk.types import ObjectDetectionModel, Setting, FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
+from scrypted_sdk.types import ObjectDetectionGeneratorSession, ObjectDetectionModel, Setting, FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
 def optional_chain(root, *keys):
     result = root
@@ -206,11 +206,14 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pass
 
-    def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
-        pil: Image.Image = avframe.to_image()
-        return self.run_detection_image(detection_session, pil, settings, src_size, convert_to_src_size)
+    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame) -> ObjectsDetected:
+        pass
 
-    def run_detection_image(self, detection_session: DetectionSession, image: Image.Image, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+    async def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+        pil: Image.Image = avframe.to_image()
+        return await self.run_detection_image(detection_session, pil, settings, src_size, convert_to_src_size)
+
+    async def run_detection_image(self, detection_session: DetectionSession, image: Image.Image, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pass
 
     def run_detection_crop(self, detection_session: DetectionSession, sample: Any, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
@@ -281,6 +284,21 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             return (False, detection_session, self.create_detection_result_status(detection_id, detection_session.running))
 
         return (True, detection_session, None)
+    
+    async def generateObjectDetections(self, videoFrames: Any, session: ObjectDetectionGeneratorSession = None) -> Any:
+        try:
+            videoFrames = await scrypted_sdk.sdk.connectRPCObject(videoFrames)
+            async for videoFrame in videoFrames:
+               detected = await self.run_detection_videoframe(videoFrame, session and session.get('settings'))
+               yield {
+                   '__json_copy_serialize_children': True,
+                   'detected': detected,
+                   'videoFrame': videoFrame,
+               }
+        except:
+            raise
+        finally:
+            await videoFrames.aclose()
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         is_image = mediaObject and (mediaObject.mimeType.startswith('image/') or mediaObject.mimeType.endswith('/x-raw-image'))
@@ -291,6 +309,10 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if session:
             duration = session.get('duration', None)
             settings = session.get('settings', None)
+
+        if mediaObject and mediaObject.mimeType == ScryptedMimeTypes.Image.value:
+            vf: scrypted_sdk.VideoFrame = mediaObject
+            return await self.run_detection_videoframe(vf, settings)
 
         create, detection_session, objects_detected = self.ensure_session(
             mediaObject and mediaObject.mimeType, session)
@@ -313,7 +335,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 finally:
                     detection_session.running = False
             else:
-                return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
+                return await self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
 
         if not create:
             # a detection session may have been created, but not started
@@ -457,7 +479,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             if not current_data:
                 raise Exception('no sample')
 
-            detection_result = self.run_detection_crop(
+            detection_result = await self.run_detection_crop(
                 detection_session, current_data, detection_session.settings, current_src_size, current_convert_to_src_size, boundingBox)
 
             return detection_result['detections']
@@ -471,7 +493,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     first_frame = False
                     print("first frame received", detection_session.id)
 
-                detection_result, data = run_detection(
+                detection_result, data = await run_detection(
                     detection_session, sample, detection_session.settings, src_size, convert_to_src_size)
                 if detection_result:
                     detection_result['running'] = True

@@ -1,0 +1,1 @@
+# Eufy Plugin for Scrypted

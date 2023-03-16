@@ -41,12 +41,20 @@ async def readLoop(loop, peer: rpc.RpcPeer, reader: asyncio.StreamReader):
         'buffers': []
     }
 
+    if isinstance(reader, asyncio.StreamReader):
+        async def read(n):
+            return await reader.readexactly(n)
+    else:
+        async def read(n):
+            return await reader.read(n)
+
+
     while True:
-        lengthBytes = await reader.read(4)
-        typeBytes = await reader.read(1)
+        lengthBytes = await read(4)
+        typeBytes = await read(1)
         type = typeBytes[0]
         length = int.from_bytes(lengthBytes, 'big')
-        data = await reader.read(length - 1)
+        data = await read(length - 1)
 
         if type == 1:
             deserializationContext['buffers'].append(data)
@@ -73,6 +81,7 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, readFd: int = None, wri
             except Exception as e:
                 if reject:
                     reject(e)
+            return None
     else:
         def write(buffers, reject):
             try:
@@ -104,8 +113,13 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, readFd: int = None, wri
     peer.nameDeserializerMap['Buffer'] = SidebandBufferSerializer()
     peer.constructorSerializerMap[bytes] = 'Buffer'
     peer.constructorSerializerMap[bytearray] = 'Buffer'
+    peer.constructorSerializerMap[memoryview] = 'Buffer'
 
     async def peerReadLoop():
-        await readLoop(loop, peer, reader)
+        try:
+            await readLoop(loop, peer, reader)
+        except:
+            peer.kill()
+            raise
 
     return peer, peerReadLoop
