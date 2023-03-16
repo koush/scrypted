@@ -28,7 +28,7 @@
                 "${workspaceFolder}/**/*.js"
             ],
             "env": {
-                "SCRYPTED_PYTHON_PATH": "python3.9",
+                "SCRYPTED_PYTHON_PATH": "python3.10",
                 // "SCRYPTED_SHARED_WORKER": "true",
                 // "SCRYPTED_DISABLE_AUTHENTICATION": "true",
                 // "DEBUG": "*",
