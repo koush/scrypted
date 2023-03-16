@@ -250,13 +250,13 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         # print(detection_result)
         return detection_result
 
-    def run_detection_jpeg(self, detection_session: PredictSession, image_bytes: bytes, settings: Any) -> ObjectsDetected:
+    async def run_detection_jpeg(self, detection_session: PredictSession, image_bytes: bytes, settings: Any) -> ObjectsDetected:
         stream = io.BytesIO(image_bytes)
         image = Image.open(stream)
         if image.mode == 'RGBA':
             image = image.convert('RGB')
 
-        detections, _ = self.run_detection_image(detection_session, image, settings, image.size)
+        detections, _ = await self.run_detection_image(detection_session, image, settings, image.size)
         return detections
 
     def get_detection_input_size(self, src_size):
@@ -269,7 +269,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def get_input_size(self) -> Tuple[int, int]:
         pass
 
-    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
+    async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         pass
 
     async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame, settings: Any) -> ObjectsDetected:
@@ -288,7 +288,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             })
             image = Image.frombuffer('RGB', (w, h), data)
             try:
-                ret = self.detect_once(image, settings, src_size, cvss)
+                ret = await self.detect_once(image, settings, src_size, cvss)
                 return ret
             finally:
                 image.close()
@@ -339,9 +339,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         def cvss2(point, normalize=False):
             return point[0] / s + ow, point[1] / s + oh, True
 
-        ret1 = self.detect_once(first, settings, src_size, cvss1)
+        ret1 = await self.detect_once(first, settings, src_size, cvss1)
         first.close()
-        ret2 = self.detect_once(second, settings, src_size, cvss2)
+        ret2 = await self.detect_once(second, settings, src_size, cvss2)
         second.close()
 
         two_intersect = intersect_rect(Rectangle(*first_crop), Rectangle(*second_crop))
@@ -374,7 +374,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         ret['detections'] = dedupe_detections(ret1['detections'] + ret2['detections'], is_same_detection=is_same_detection_middle)
         return ret
     
-    def run_detection_image(self, detection_session: PredictSession, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, multipass_crop: Tuple[float, float, float, float] = None):
+    async def run_detection_image(self, detection_session: PredictSession, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, multipass_crop: Tuple[float, float, float, float] = None):
         (w, h) = self.get_input_size() or image.size
         (iw, ih) = image.size
 
@@ -448,7 +448,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
                 return converted
 
-            ret = self.detect_once(input, settings, src_size, cvss)
+            ret = await self.detect_once(input, settings, src_size, cvss)
             input.close()
             detection_session.processed = detection_session.processed + 1
             return ret, RawImage(image)
@@ -461,7 +461,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 converted = convert_to_src_size(point, normalize) if convert_to_src_size else (point[0], point[1], True)
                 return converted
 
-            ret = self.detect_once(image, settings, src_size, cvss)
+            ret = await self.detect_once(image, settings, src_size, cvss)
             if detection_session:
                 detection_session.processed = detection_session.processed + 1
         else:
@@ -483,11 +483,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
                 return converted
 
-            ret1 = self.detect_once(first, settings, src_size, cvss1)
+            ret1 = await self.detect_once(first, settings, src_size, cvss1)
             first.close()
             if detection_session:
                 detection_session.processed = detection_session.processed + 1
-            ret2 = self.detect_once(second, settings, src_size, cvss2)
+            ret2 = await self.detect_once(second, settings, src_size, cvss2)
             if detection_session:
                 detection_session.processed = detection_session.processed + 1
             second.close()
@@ -576,11 +576,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         #             print('untracked %s: %s' % (d['className'], d['score']))
 
 
-    def run_detection_crop(self, detection_session: DetectionSession, sample: RawImage, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
-        (ret, _) = self.run_detection_image(detection_session, sample.image, settings, src_size, convert_to_src_size, bounding_box)
+    async def run_detection_crop(self, detection_session: DetectionSession, sample: RawImage, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
+        (ret, _) = await self.run_detection_image(detection_session, sample.image, settings, src_size, convert_to_src_size, bounding_box)
         return ret
 
-    def run_detection_gstsample(self, detection_session: PredictSession, gstsample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Image.Image]:
+    async def run_detection_gstsample(self, detection_session: PredictSession, gstsample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Image.Image]:
         caps = gstsample.get_caps()
         # can't trust the width value, compute the stride
         height = caps.get_structure(0).get_value('height')
@@ -604,7 +604,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             gst_buffer.unmap(info)
 
         try:
-            return self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size)
+            return await self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size)
         except:
             image.close()
             traceback.print_exc()

@@ -209,11 +209,11 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame) -> ObjectsDetected:
         pass
 
-    def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+    async def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pil: Image.Image = avframe.to_image()
-        return self.run_detection_image(detection_session, pil, settings, src_size, convert_to_src_size)
+        return await self.run_detection_image(detection_session, pil, settings, src_size, convert_to_src_size)
 
-    def run_detection_image(self, detection_session: DetectionSession, image: Image.Image, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
+    async def run_detection_image(self, detection_session: DetectionSession, image: Image.Image, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pass
 
     def run_detection_crop(self, detection_session: DetectionSession, sample: Any, settings: Any, src_size, convert_to_src_size, bounding_box: Tuple[float, float, float, float]) -> ObjectsDetected:
@@ -335,7 +335,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 finally:
                     detection_session.running = False
             else:
-                return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
+                return await self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
 
         if not create:
             # a detection session may have been created, but not started
@@ -479,7 +479,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             if not current_data:
                 raise Exception('no sample')
 
-            detection_result = self.run_detection_crop(
+            detection_result = await self.run_detection_crop(
                 detection_session, current_data, detection_session.settings, current_src_size, current_convert_to_src_size, boundingBox)
 
             return detection_result['detections']
@@ -493,7 +493,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     first_frame = False
                     print("first frame received", detection_session.id)
 
-                detection_result, data = run_detection(
+                detection_result, data = await run_detection(
                     detection_session, sample, detection_session.settings, src_size, convert_to_src_size)
                 if detection_result:
                     detection_result['running'] = True
