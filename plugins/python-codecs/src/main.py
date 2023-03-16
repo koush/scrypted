@@ -1,3 +1,4 @@
+import time
 from gstreamer import createPipelineIterator
 import asyncio
 from util import optional_chain
@@ -5,10 +6,9 @@ import scrypted_sdk
 from typing import Any
 from urllib.parse import urlparse
 import pyvips
-import threading
-import traceback
 import concurrent.futures
 
+Gst = None
 try:
     import gi
     gi.require_version('Gst', '1.0')
@@ -18,6 +18,14 @@ try:
 except:
     pass
 
+av = None
+try:
+    import av
+    av.logging.set_level(av.logging.PANIC) 
+except:
+    pass
+
+# vips is already multithreaded, but needs to be kicked off the python asyncio thread.
 vipsExecutor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="vips")
 
 async def to_thread(f):
@@ -97,20 +105,100 @@ async def createVipsMediaObject(image: VipsImage):
     })
     return ret
 
-class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGenerator):
+class LibavGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGenerator):
+    async def generateVideoFrames(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
+        worker = scrypted_sdk.fork()
+        forked: CodecFork = await worker.result
+        return await forked.generateVideoFramesLibav(mediaObject, options, filter)
+
+class GstreamerGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGenerator):
+    async def generateVideoFrames(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
+        worker = scrypted_sdk.fork()
+        forked: CodecFork = await worker.result
+        return await forked.generateVideoFramesGstreamer(mediaObject, options, filter)
+    
+class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider):
     def __init__(self, nativeId = None):
         super().__init__(nativeId)
 
-    async def generateVideoFrames(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
-        worker = scrypted_sdk.fork()
-        forked = await worker.result
-        return await forked.generateVideoFrames(mediaObject, options, filter)
+        asyncio.ensure_future(self.initialize())
+
+    async def initialize(self):
+        manifest: scrypted_sdk.DeviceManifest = {
+            'devices': [],
+        }
+        if Gst:
+            gstDevice: scrypted_sdk.Device = {
+                'name': 'Gstreamer',
+                'nativeId': 'gstreamer',
+                'interfaces': [
+                    scrypted_sdk.ScryptedInterface.VideoFrameGenerator.value,
+                ],
+                'type': scrypted_sdk.ScryptedDeviceType.API.value,
+            }
+            manifest['devices'].append(gstDevice)
+
+        if av:
+            avDevice: scrypted_sdk.Device = {
+                'name': 'Libav',
+                'nativeId': 'libav',
+                'interfaces': [
+                    scrypted_sdk.ScryptedInterface.VideoFrameGenerator.value,
+                ],
+                'type': scrypted_sdk.ScryptedDeviceType.API.value,
+            }
+            manifest['devices'].append(avDevice)
+
+        await scrypted_sdk.deviceManager.onDevicesChanged(manifest)
+
+    def getDevice(self, nativeId: str) -> Any:
+        if nativeId == 'gstreamer':
+            return GstreamerGenerator('gstreamer')
+        if nativeId == 'libav':
+            return LibavGenerator('libav')
 
 def create_scrypted_plugin():
     return PythonCodecs()
 
+async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
+    ffmpegInput: scrypted_sdk.FFmpegInput = await scrypted_sdk.mediaManager.convertMediaObjectToJSON(mediaObject, scrypted_sdk.ScryptedMimeTypes.FFmpegInput.value)
+    videosrc = ffmpegInput.get('url')
+    container = av.open(videosrc, options = options)
+    # none of this stuff seems to work. might be libav being slow with rtsp.
+    # container.no_buffer = True
+    # container.options['-analyzeduration'] = '0'
+    # container.options['-probesize'] = '500000'
+    stream = container.streams.video[0]
+    # stream.codec_context.thread_count = 1
+    # stream.codec_context.low_delay = True
+    # stream.codec_context.options['-analyzeduration'] = '0'
+    # stream.codec_context.options['-probesize'] = '500000'
 
-async def generateVideoFrames(mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
+    start = 0
+    try:
+        for idx, frame in enumerate(container.decode(stream)):
+            now = time.time()
+            if not start:
+                start = now
+            elapsed = now - start
+            if (frame.time or 0) < elapsed - 0.500:
+                # print('too slow, skipping frame')
+                continue
+            # print(frame)
+            vips = pyvips.Image.new_from_array(frame.to_ndarray(format='rgb24'))
+            vipsImage = VipsImage(vips)
+            try:
+                mo = await createVipsMediaObject(VipsImage(vips))
+                yield mo
+            finally:
+                vipsImage.vipsImage.invalidate()
+                vipsImage.vipsImage = None
+
+    finally:
+        container.close()
+
+
+async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
     ffmpegInput: scrypted_sdk.FFmpegInput = await scrypted_sdk.mediaManager.convertMediaObjectToJSON(mediaObject, scrypted_sdk.ScryptedMimeTypes.FFmpegInput.value)
     container = ffmpegInput.get('container', None)
     videosrc = ffmpegInput.get('url')
@@ -157,9 +245,18 @@ async def generateVideoFrames(mediaObject: scrypted_sdk.MediaObject, options: sc
             gst_buffer.unmap(info)
 
 class CodecFork:
-    async def generateVideoFrames(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
+    async def generateVideoFramesGstreamer(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
         try:
-            async for data in generateVideoFrames(mediaObject, options, filter):
+            async for data in generateVideoFramesGstreamer(mediaObject, options, filter):
+                yield data
+        finally:
+            import os
+            os._exit(os.EX_OK)
+            pass
+
+    async def generateVideoFramesLibav(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
+        try:
+            async for data in generateVideoFramesLibav(mediaObject, options, filter):
                 yield data
         finally:
             import os
