@@ -1,11 +1,12 @@
 from scrypted_sdk.types import BinarySensor, ScryptedInterface
 
 from .camera import ArloCamera
+from .provider import ArloProvider
 
 
 class ArloDoorbell(ArloCamera, BinarySensor):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
+        super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
 
         self.start_doorbell_subscription()
 

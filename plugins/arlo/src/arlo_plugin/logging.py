@@ -1,5 +1,4 @@
 import logging
-import sys
 
 
 class ScryptedDeviceLoggingWrapper(logging.Handler):
@@ -20,7 +19,7 @@ def createScryptedLogger(scrypted_device, name):
 
     logger.setLevel(logging.INFO)
 
-    # configure logger to output to scrypted's log stream 
+    # configure logger to output to scrypted's log stream
     sh = ScryptedDeviceLoggingWrapper(scrypted_device)
 
     # log formatting
