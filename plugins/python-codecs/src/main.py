@@ -219,7 +219,22 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
         if videoCodec == 'h264':
             videosrc += ' ! rtph264depay ! h264parse'
 
-    videosrc += ' ! decodebin ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! video/x-raw,format=RGB'
+    videocaps = 'video/x-raw'
+    # if options and options.get('resize'):
+    #     videocaps = 'videoscale ! video/x-raw,width={width},height={height}'.format(width=options['resize']['width'], height=options['resize']['height'])
+
+    format = options and options.get('format')
+    # I420 is a cheap way to get gray out of an h264 stream without color conversion.
+    if format == 'gray':
+        format = 'I420'
+        bands = 1
+    else:
+        format = 'RGB'
+        bands = 3
+    
+    videocaps += ',format={format}'.format(format=format)
+
+    videosrc += ' ! decodebin ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! ' + videocaps
 
     gst, gen = createPipelineIterator(videosrc)
     async for gstsample in gen():
@@ -232,8 +247,7 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
             continue
 
         try:
-            # pyvips.Image.new_from_memory(info.data, width, height, 3, pyvips.BandFormat.UCHAR)
-            vips = pyvips.Image.new_from_memory(info.data, width, height, 3, pyvips.BandFormat.UCHAR)
+            vips = pyvips.Image.new_from_memory(info.data, width, height, bands, pyvips.BandFormat.UCHAR)
             vipsImage = VipsImage(vips)
             try:
                 mo = await createVipsMediaObject(VipsImage(vips))

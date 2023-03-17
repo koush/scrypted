@@ -1296,6 +1296,7 @@ export interface ObjectDetectionSession extends ObjectDetectionGeneratorSession 
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;
   inputSize?: number[];
+  inputFormat?: 'gray' | 'rgb' | 'rgba';
   settings: Setting[];
   triggerClasses?: string[];
 }
@@ -1328,7 +1329,7 @@ export interface ImageOptions {
     width?: number,
     height?: number,
   };
-  format?: 'rgba' | 'rgb' | 'jpg';
+  format?: 'gray' | 'rgba' | 'rgb' | 'jpg';
 }
 export interface Image {
   width: number;
