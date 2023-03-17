@@ -1,4 +1,4 @@
-import sdk, { ScryptedMimeTypes, Image, VideoFrame, VideoFrameGenerator, Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { ScryptedMimeTypes, Image, VideoFrame, VideoFrameGenerator, Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, MediaStreamDestination } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import cloneDeep from 'lodash/cloneDeep';
@@ -53,13 +53,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     newPipeline: {
       title: 'Video Pipeline',
       description: 'Configure how frames are provided to the video analysis pipeline.',
-      async onGet() {
+      onGet: async () => {
+        const choices = [
+          'Default',
+          ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
+        ];
+        if (!this.hasMotionType)
+          choices.push('Snapshot');
         return {
-          choices: [
-            'Default',
-            'Snapshot',
-            ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
-          ],
+          choices,
         }
       },
       defaultValue: 'Default',
@@ -142,7 +144,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   analyzeStop = 0;
   lastDetectionInput = 0;
 
-  constructor(public plugin: ObjectDetectionPlugin, mixinDevice: VideoCamera & Camera & MotionSensor & ObjectDetector & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, modelName: string, group: string, public hasMotionType: boolean, public settings: Setting[]) {
+  constructor(public plugin: ObjectDetectionPlugin, mixinDevice: VideoCamera & Camera & MotionSensor & ObjectDetector & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, public model: ObjectDetectionModel, group: string, public hasMotionType: boolean, public settings: Setting[]) {
     super({
       mixinDevice, mixinDeviceState,
       mixinProviderNativeId: providerNativeId,
@@ -153,7 +155,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     });
 
     this.cameraDevice = systemManager.getDeviceById<Camera & VideoCamera & MotionSensor & ObjectDetector>(this.id);
-    this.detectionId = modelName + '-' + this.cameraDevice.id;
+    this.detectionId = model.name + '-' + this.cameraDevice.id;
 
     this.bindObjectDetection();
     this.register();
@@ -171,7 +173,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (this.hasMotionType) {
         // force a motion detection restart if it quit
         if (this.motionSensorSupplementation === BUILTIN_MOTION_SENSOR_REPLACE)
-          await this.startVideoDetection();
+          await this.startStreamAnalysis();
         return;
       }
     }, this.storageSettings.values.detectionInterval * 1000);
@@ -224,7 +226,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       return;
     if (this.motionSensorSupplementation !== BUILTIN_MOTION_SENSOR_REPLACE)
       return;
-    await this.startVideoDetection();
+    await this.startStreamAnalysis();
   }
 
   endObjectDetection() {
@@ -310,7 +312,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
             return;
           if (!this.detectorRunning)
             this.console.log('built in motion sensor started motion, starting video detection.');
-          await this.startVideoDetection();
+          await this.startStreamAnalysis();
           return;
         }
 
@@ -491,8 +493,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.analyzeStop = Date.now() + this.getDetectionDuration();
 
     const newPipeline = this.newPipeline;
-    let generator : () => Promise<AsyncGenerator<VideoFrame & MediaObject>>;
-    if (newPipeline === 'Snapshot') {
+    let generator: () => Promise<AsyncGenerator<VideoFrame & MediaObject>>;
+    if (newPipeline === 'Snapshot' && !this.hasMotionType) {
       const self = this;
       generator = async () => (async function* gen() {
         try {
@@ -528,20 +530,26 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       })();
     }
     else {
+      const destination: MediaStreamDestination = this.hasMotionType ? 'low-resolution' : 'local-recorder';
       const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(newPipeline);
       if (!videoFrameGenerator)
         throw new Error('invalid VideoFrameGenerator');
       const stream = await this.cameraDevice.getVideoStream({
-        destination: 'local-recorder',
+        destination,
         // ask rebroadcast to mute audio, not needed.
         audio: null,
       });
 
-      generator = async () => videoFrameGenerator.generateVideoFrames(stream);
+      generator = async () => videoFrameGenerator.generateVideoFrames(stream, {
+        resize: this.model?.inputSize ? {
+          width: this.model.inputSize[0],
+          height: this.model.inputSize[1],
+        } : undefined,
+        format: this.model?.inputFormat,
+      });
     }
 
     try {
-      const start = Date.now();
       let detections = 0;
       for await (const detected
         of await this.objectDetection.generateObjectDetections(await generator(), {
@@ -587,6 +595,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.reportObjectDetections(detected.detected);
         // this.handleDetectionEvent(detected.detected);
       }
+    }
+    catch (e) {
+      this.console.error('video pipeline ended with error', e);
     }
     finally {
       this.endObjectDetection();
@@ -1190,7 +1201,7 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
 
     const settings = this.model.settings;
 
-    const ret = new ObjectDetectionMixin(this.plugin, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.model.name, group, hasMotionType, settings);
+    const ret = new ObjectDetectionMixin(this.plugin, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.model, group, hasMotionType, settings);
     this.currentMixins.add(ret);
     return ret;
   }

@@ -272,7 +272,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         pass
 
-    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame, settings: Any) -> ObjectsDetected:
+    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame, detection_session: PredictSession) -> ObjectsDetected:
+        settings = detection_session.settings
         src_size = videoFrame.width, videoFrame.height
         w, h = self.get_input_size()
         iw, ih = src_size

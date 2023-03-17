@@ -122,6 +122,9 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def get_input_details(self) -> Tuple[int, int, int]:
         pass
 
+    def get_input_format(self) -> str:
+        pass
+
     def getModelSettings(self, settings: Any = None) -> list[Setting]:
         return []
 
@@ -131,6 +134,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             'classes': self.getClasses(),
             'triggerClasses': self.getTriggerClasses(),
             'inputSize': self.get_input_details(),
+            'inputFormat': self.get_input_format(),
             'settings': [],
         }
 
@@ -206,7 +210,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pass
 
-    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame) -> ObjectsDetected:
+    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame, detection_session: DetectionSession) -> ObjectsDetected:
         pass
 
     async def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
@@ -288,13 +292,17 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     async def generateObjectDetections(self, videoFrames: Any, session: ObjectDetectionGeneratorSession = None) -> Any:
         try:
             videoFrames = await scrypted_sdk.sdk.connectRPCObject(videoFrames)
+            detection_session = self.create_detection_session()
+            detection_session.plugin = self
+            detection_session.settings = session and session.get('settings')
             async for videoFrame in videoFrames:
-               detected = await self.run_detection_videoframe(videoFrame, session and session.get('settings'))
+               detected = await self.run_detection_videoframe(videoFrame, detection_session)
                yield {
                    '__json_copy_serialize_children': True,
                    'detected': detected,
                    'videoFrame': videoFrame,
                }
+               await self.detection_event_notified(detection_session.settings)
         except:
             raise
         finally:
@@ -456,7 +464,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         return ret
 
-    def detection_event_notified(self, settings: Any):
+    async def detection_event_notified(self, settings: Any):
         pass
 
     async def createMedia(self, data: Any) -> MediaObject:
@@ -527,7 +535,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                         self.invalidateMedia(detection_session, data)
 
                     # asyncio.run_coroutine_threadsafe(, loop = self.loop).result()
-                    self.detection_event_notified(detection_session.settings)
+                    await self.detection_event_notified(detection_session.settings)
 
                 if not detection_session or duration == None:
                     safe_set_result(detection_session.loop,
