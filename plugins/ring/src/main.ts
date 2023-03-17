@@ -3,15 +3,15 @@ import { RefreshPromise } from "@scrypted/common/src/promise-utils";
 import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
+import sdk, { Battery, BinarySensor, Camera, Device, DeviceProvider, EntrySensor, FFmpegInput, FloodSensor, Lock, LockState, MediaObject, MediaStreamUrl, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, SecuritySystem, SecuritySystemMode, Setting, Settings, SettingValue, TamperSensor, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import sdk, { Battery, BinarySensor, Camera, Device, DeviceProvider, EntrySensor, FFmpegInput, FloodSensor, MediaObject, MediaStreamUrl, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, SecuritySystem, SecuritySystemMode, Setting, Settings, SettingValue, TamperSensor, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { Location, LocationMode, RingDevice, isStunMessage, RtpDescription, SipSession, BasicPeerConnection, CameraData, clientApi, generateUuid, RingBaseApi, RingRestClient, rxjs, SimpleWebRtcSession, StreamingSession, RingDeviceType, RingDeviceData } from './ring-client-api';
+import { BasicPeerConnection, CameraData, clientApi, generateUuid, isStunMessage, Location, LocationMode, RingBaseApi, RingDevice, RingDeviceData, RingDeviceType, RingRestClient, RtpDescription, rxjs, SimpleWebRtcSession, SipSession, StreamingSession } from './ring-client-api';
 import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
 
 const STREAM_TIMEOUT = 120000;
@@ -661,7 +661,51 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
     }
 }
 
+class RingLock extends ScryptedDeviceBase implements Battery, Lock {
+    device: RingDevice
+
+    constructor(nativeId: string, device: RingDevice) {
+        super(nativeId);
+        this.device = device;
+        device.onData.subscribe(async (data: RingDeviceData) => {
+            this.updateState(data);
+        });
+    }
+
+    async lock(): Promise<void> {
+        return this.device.sendCommand('lock.lock');
+    }
+
+    async unlock(): Promise<void> {
+        return this.device.sendCommand('lock.unlock');
+    }
+
+    updateState(data: RingDeviceData) {
+        this.batteryLevel = data.batteryLevel;
+        switch (data.locked) {
+            case 'locked':
+                this.lockState = LockState.Locked;
+                break;
+            case 'unlocked':
+                this.lockState = LockState.Unlocked;
+                break;
+            case 'jammed':
+                this.lockState = LockState.Jammed;
+                break;
+            default:
+                this.lockState = undefined;
+        }
+    }
+}
+
 class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, EntrySensor, MotionSensor, FloodSensor {
+    constructor(nativeId: string, device: RingDevice) {
+        super(nativeId);
+        device.onData.subscribe(async (data: RingDeviceData) => {
+            this.updateState(data);
+        });
+    }
+
     updateState(data: RingDeviceData) {
         this.tampered = data.tamperStatus === 'tamper';
         this.batteryLevel = data.batteryLevel;
@@ -673,6 +717,7 @@ class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, En
 
 export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProvider, SecuritySystem {
     devices = new Map<string, any>();
+    locationDevices = new Map<string, RingDevice>();
 
     constructor(public plugin: RingPlugin, nativeId: string) {
         super(nativeId);
@@ -762,11 +807,21 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
         return this.plugin.locations.find(l => l.id === this.nativeId);
     }
 
+    async findRingDeviceAtLocation(id: string): Promise<RingDevice> {
+        const location = this.findLocation();
+        return (await location.getDevices()).find((x) => x.id === id);
+    }
+
     async getDevice(nativeId: string) {
         if (!this.devices.has(nativeId)) {
             if (nativeId.endsWith('-sensor')) {
-                const sensor = new RingSensor(nativeId);
-                this.devices.set(nativeId, sensor);
+                const ringRevice = await this.findRingDeviceAtLocation(nativeId.replace('-sensor', ''));
+                const device = new RingSensor(nativeId, ringRevice);
+                this.devices.set(nativeId, device);
+            } else if (nativeId.endsWith('-lock')) {
+                const ringRevice = await this.findRingDeviceAtLocation(nativeId.replace('-lock', ''));
+                const device = new RingLock(nativeId, ringRevice);
+                this.devices.set(nativeId, device);
             } else {
                 const camera = new RingCameraDevice(this.plugin, this, nativeId);
                 this.devices.set(nativeId, camera);
@@ -1028,41 +1083,52 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
                 });
             }
 
-            const sensors = (await location.getDevices()).filter(x => {
-                const supportedSensors = [
-                    RingDeviceType.ContactSensor, 
-                    RingDeviceType.RetrofitZone,
-                    RingDeviceType.TiltSensor, 
-                    RingDeviceType.MotionSensor,
-                    RingDeviceType.FloodFreezeSensor,
-                    RingDeviceType.WaterSensor,
-                ]
-                return x.data.status !== 'disabled' && (supportedSensors.includes(x.data.deviceType))
-            });
-            for (const sensor of sensors) {
-                const nativeId = sensor.id.toString() + '-sensor';
-                const data: RingDeviceData = sensor.data;
+            // add location devices
+            const locationDevices = await location.getDevices();
+            for (const locationDevice of locationDevices) {
+                const data: RingDeviceData = locationDevice.data;
+                let nativeId: string;
+                let type: ScryptedDeviceType;
+                let interfaces: ScryptedInterface[] = [];
 
-                const interfaces = [ScryptedInterface.TamperSensor];
-                switch (data.deviceType){
+                if (data.status === 'disabled') {
+                    continue;
+                }
+
+                switch (data.deviceType) {
                     case RingDeviceType.ContactSensor:
                     case RingDeviceType.RetrofitZone: 
                     case RingDeviceType.TiltSensor:
-                        interfaces.push(ScryptedInterface.EntrySensor);
+                        nativeId = locationDevice.id.toString() + '-sensor';
+                        type = ScryptedDeviceType.Sensor
+                        interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.EntrySensor);
                         break;
                     case RingDeviceType.MotionSensor:
-                        interfaces.push(ScryptedInterface.MotionSensor);
+                        nativeId = locationDevice.id.toString() + '-sensor';
+                        type = ScryptedDeviceType.Sensor
+                        interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.MotionSensor);
                         break;
                     case RingDeviceType.FloodFreezeSensor:
                     case RingDeviceType.WaterSensor:
-                        interfaces.push(ScryptedInterface.FloodSensor);
+                        nativeId = locationDevice.id.toString() + '-sensor';
+                        type = ScryptedDeviceType.Sensor
+                        interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.FloodSensor);
                         break;
-                    default: break;
+                    default:
+                        if (/^lock($|\.)/.test(data.deviceType)) {
+                            nativeId = locationDevice.id.toString() + '-lock';
+                            type = ScryptedDeviceType.Lock
+                            interfaces.push(ScryptedInterface.Lock);
+                            break;
+                        } else {
+                            this.console.debug(`discovered and ignoring unsupported '${locationDevice.deviceType}' device: '${locationDevice.name}'`)
+                            continue;
+                        }
                 }
-                
+
                 if (data.batteryStatus !== 'none')
                     interfaces.push(ScryptedInterface.Battery);
-                
+
                 const device: Device = {
                     info: {
                         model: data.deviceType,
@@ -1071,22 +1137,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
                     },
                     providerNativeId: location.id,
                     nativeId: nativeId,
-                    name: sensor.name,
-                    type: ScryptedDeviceType.Sensor,
+                    name: locationDevice.name,
+                    type: type,
                     interfaces,
                 };
                 devices.push(device);
-
-                const getScryptedDevice = async () => {
-                    const locationDevice = await this.getDevice(location.id);
-                    const scryptedDevice = await locationDevice?.getDevice(nativeId);
-                    return scryptedDevice as RingSensor;
-                }
-
-                sensor.onData.subscribe(async (data: RingDeviceData) => {
-                    const scryptedDevice = await getScryptedDevice();
-                    scryptedDevice?.updateState(data)
-                });
             }
 
             await deviceManager.onDevicesChanged({
