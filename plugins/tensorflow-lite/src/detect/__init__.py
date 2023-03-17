@@ -303,10 +303,11 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                    'videoFrame': videoFrame,
                }
                await self.detection_event_notified(detection_session.settings)
-        except:
-            raise
         finally:
-            await videoFrames.aclose()
+            try:
+                await videoFrames.aclose()
+            except:
+                pass
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         is_image = mediaObject and (mediaObject.mimeType.startswith('image/') or mediaObject.mimeType.endswith('/x-raw-image'))
