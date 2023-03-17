@@ -597,6 +597,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           // this.console.log('image saved', detected.detected.detections);
         }
         this.reportObjectDetections(detected.detected);
+        if (this.hasMotionType) {
+          await sleep(250);
+        }
         // this.handleDetectionEvent(detected.detected);
       }
     }
@@ -681,6 +684,19 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
+  normalizeBox(boundingBox: [number, number, number, number], inputDimensions: [number, number]) {
+    let [x, y, width, height] = boundingBox;
+    let x2 = x + width;
+    let y2 = y + height;
+    // the zones are point paths in percentage format
+    x = x * 100 / inputDimensions[0];
+    y = y * 100 / inputDimensions[1];
+    x2 = x2 * 100 / inputDimensions[0];
+    y2 = y2 * 100 / inputDimensions[1];
+    const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
+    return box;
+  }
+
   getDetectionDuration() {
     // when motion type, the detection interval is a keepalive reset.
     // the duration needs to simply be an arbitrarily longer time.
@@ -697,15 +713,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         continue;
 
       o.zones = []
-      let [x, y, width, height] = o.boundingBox;
-      let x2 = x + width;
-      let y2 = y + height;
-      // the zones are point paths in percentage format
-      x = x * 100 / detection.inputDimensions[0];
-      y = y * 100 / detection.inputDimensions[1];
-      x2 = x2 * 100 / detection.inputDimensions[0];
-      y2 = y2 * 100 / detection.inputDimensions[1];
-      const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
+      const box = this.normalizeBox(o.boundingBox, detection.inputDimensions);
 
       let included: boolean;
       for (const [zone, zoneValue] of Object.entries(this.zones)) {
@@ -743,6 +751,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
           included = true;
         }
+      }
+
+      // if this is a motion sensor and there are no inclusion zones set up,
+      // use a default inclusion zone that crops the top and bottom to
+      // prevents errant motion from the on screen time changing every second.
+      if (this.hasMotionType && included === undefined) {
+        const defaultInclusionZone = [[0, 10], [100, 10], [100, 90], [0, 90]];
+        included = polygonOverlap(box, defaultInclusionZone);
       }
 
       // if there are inclusion zones and this object

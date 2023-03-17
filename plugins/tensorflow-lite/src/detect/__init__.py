@@ -302,7 +302,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                    'detected': detected,
                    'videoFrame': videoFrame,
                }
-               await self.detection_event_notified(detection_session.settings)
         finally:
             try:
                 await videoFrames.aclose()
