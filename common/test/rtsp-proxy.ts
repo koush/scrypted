@@ -28,7 +28,6 @@ async function main() {
 
                 path: setupTrack.control,
                 onRtp(rtspHeader, rtp) {
-                    console.log('got rtsp')
                     server.sendTrack(setupTrack.control, rtp, false);
                 },
             });
