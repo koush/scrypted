@@ -29,16 +29,17 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def __init__(self, nativeId: str | None = None):
         super().__init__(MIME_TYPE, nativeId=nativeId)
 
-        modelPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'zip', 'unzipped', 'fs', 'MobileNetV2_SSDLite.mlmodel')
-        self.model = ct.models.MLModel(modelPath)
+        labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/coreml-survival-guide/master/MobileNetV2%2BSSDLite/coco_labels.txt', 'coco_labels.txt')
+        modelFile = self.downloadFile('https://github.com/koush/coreml-survival-guide/raw/master/MobileNetV2%2BSSDLite/ObjectDetection/ObjectDetection/MobileNetV2_SSDLite.mlmodel', 'MobileNetV2_SSDLite.mlmodel')
+        
+        self.model = ct.models.MLModel(modelFile)
         
         self.modelspec = self.model.get_spec()
         self.inputdesc = self.modelspec.description.input[0]
         self.inputheight = self.inputdesc.type.imageType.height
         self.inputwidth = self.inputdesc.type.imageType.width
 
-        labels_contents = scrypted_sdk.zip.open(
-            'fs/coco_labels.txt').read().decode('utf8')
+        labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
         self.loop = asyncio.get_event_loop()
 

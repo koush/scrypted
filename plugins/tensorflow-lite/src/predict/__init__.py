@@ -8,6 +8,8 @@ from typing import Any, List, Tuple, Mapping
 import asyncio
 import time
 from .rectangle import Rectangle, intersect_area, intersect_rect, to_bounding_box, from_bounding_box, combine_rect
+import urllib.request
+import os
 
 from detect import DetectionSession, DetectPlugin
 
@@ -125,6 +127,17 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
         loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+
+    def downloadFile(self, url: str, filename: str):
+        filesPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'files')
+        fullpath = os.path.join(filesPath, filename)
+        if os.path.isfile(fullpath):
+            return fullpath
+        os.makedirs(filesPath, exist_ok=True)
+        tmp = fullpath + '.tmp'
+        urllib.request.urlretrieve(url, tmp)
+        os.rename(tmp, fullpath)
+        return fullpath
 
     def getClasses(self) -> list[str]:
         return list(self.labels.values())
