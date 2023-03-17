@@ -273,7 +273,7 @@ class OpenCVPlugin(DetectPlugin):
                 buffer=info.data,
                 dtype=np.uint8)
             detections = self.detect(
-                detection_session, mat, settings, src_size, convert_to_src_size)
+                detection_session, mat, src_size, convert_to_src_size)
             # no point in triggering empty events.
         finally:
             buf.unmap(info)
