@@ -75,6 +75,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         BUILTIN_MOTION_SENSOR_REPLACE,
       ],
       defaultValue: "Default",
+      onPut: () => {
+        this.endObjectDetection();
+        this.maybeStartMotionDetection();
+      }
     },
     captureMode: {
       title: 'Capture Mode',
