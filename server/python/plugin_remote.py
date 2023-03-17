@@ -488,6 +488,11 @@ class PluginRemote:
                     reader = StreamPipeReader(parent_conn)
                     forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, reader = reader, writeFd = parent_conn.fileno())
                     forkPeer.peerName = 'thread'
+
+                    async def updateStats(stats):
+                        allMemoryStats[forkPeer] = stats
+                    forkPeer.params['updateStats'] = updateStats
+
                     async def forkReadLoop():
                         try:
                             await readLoop()
@@ -495,6 +500,7 @@ class PluginRemote:
                             # traceback.print_exc()
                             print('fork read loop exited')
                         finally:
+                            allMemoryStats.pop(forkPeer)
                             parent_conn.close()
                             reader.executor.shutdown()
                     asyncio.run_coroutine_threadsafe(forkReadLoop(), loop=self.loop)
@@ -585,6 +591,9 @@ class PluginRemote:
     async def getServicePort(self, name):
         pass
 
+
+allMemoryStats = {}
+
 async def plugin_async_main(loop: AbstractEventLoop, readFd: int = None, writeFd: int = None, reader: asyncio.StreamReader = None, writer: asyncio.StreamWriter = None):
     peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, readFd=readFd, writeFd=writeFd, reader=reader, writer=writer)
     peer.params['print'] = print
@@ -593,6 +602,7 @@ async def plugin_async_main(loop: AbstractEventLoop, readFd: int = None, writeFd
     async def get_update_stats():
         update_stats = await peer.getParam('updateStats')
         if not update_stats:
+            print('host did not provide update_stats')
             return
 
         def stats_runner():
@@ -608,8 +618,12 @@ async def plugin_async_main(loop: AbstractEventLoop, readFd: int = None, writeFd
                         resource.RUSAGE_SELF).ru_maxrss
                 except:
                     heapTotal = 0
+
+            for _, stats in allMemoryStats.items():
+                ptime += stats['cpu']['user']
+                heapTotal += stats['memoryUsage']['heapTotal']
+
             stats = {
-                'type': 'stats',
                 'cpu': {
                     'user': ptime,
                     'system': 0,
