@@ -27,4 +27,33 @@ class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTa
         self.cancel_pending_tasks()
 
     def get_applicable_interfaces(self) -> list:
+        """Returns the list of Scrypted interfaces that applies to this device."""
+        return []
+
+    def get_device_type(self) -> str:
+        """Returns the Scrypted device type that applies to this device."""
+        return ""
+
+    def get_device_manifest(self) -> dict:
+        """Returns the Scrypted device manifest representing this device."""
+        parent = None
+        if self.arlo_device.get("parentId") and self.arlo_device["parentId"] != self.arlo_device["deviceId"]:
+            parent = self.arlo_device["parentId"]
+
+        return {
+            "info": {
+                "model": f"{self.arlo_device['modelId']} {self.arlo_device['properties'].get('hwVersion', '')}".strip(),
+                "manufacturer": "Arlo",
+                "firmware": self.arlo_device.get("firmwareVersion"),
+                "serialNumber": self.arlo_device["deviceId"],
+            },
+            "nativeId": self.arlo_device["deviceId"],
+            "name": self.arlo_device["deviceName"],
+            "interfaces": self.get_applicable_interfaces(),
+            "type": self.get_device_type(),
+            "providerNativeId": parent,
+        }
+
+    def get_builtin_child_device_manifests(self) -> list:
+        """Returns the list of child device manifests representing hardware features built into this device."""
         return []

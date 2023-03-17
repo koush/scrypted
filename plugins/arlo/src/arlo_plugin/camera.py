@@ -6,7 +6,7 @@ import time
 import scrypted_arlo_go
 
 import scrypted_sdk
-from scrypted_sdk.types import Settings, Camera, VideoCamera, MotionSensor, Battery, MediaObject, ScryptedMimeTypes, ScryptedInterface
+from scrypted_sdk.types import Settings, Camera, VideoCamera, MotionSensor, Battery, MediaObject, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .device_base import ArloDeviceBase
 from .provider import ArloProvider
@@ -64,6 +64,9 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Ba
             results.discard(ScryptedInterface.Intercom.value)
 
         return list(results)
+
+    def get_device_type(self) -> str:
+        return ScryptedDeviceType.Camera.value
 
     @property
     def webrtc_emulation(self) -> bool:

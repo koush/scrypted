@@ -574,29 +574,20 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 continue
             self.arlo_basestations[nativeId] = basestation
 
-            scrypted_interfaces = (await self.getDevice(nativeId)).get_applicable_interfaces()
+            device = await self.getDevice(nativeId)
+            scrypted_interfaces = device.get_applicable_interfaces()
+            manifest = device.get_device_manifest()
             self.logger.debug(f"Interfaces for {nativeId} ({basestation['modelId']}): {scrypted_interfaces}")
 
-            device = {
-                "info": {
-                    "model": f"{basestation['modelId']} {basestation['properties'].get('hwVersion', '')}".strip(),
-                    "manufacturer": "Arlo",
-                    "firmware": basestation.get("firmwareVersion"),
-                    "serialNumber": basestation["deviceId"],
-                },
-                "nativeId": basestation["deviceId"],
-                "name": basestation["deviceName"],
-                "interfaces": scrypted_interfaces,
-                "type": ScryptedDeviceType.DeviceProvider.value,
-                "providerNativeId": self.nativeId,
-            }
-
             # for basestations, we want to add them to the top level DeviceProvider
-            provider_to_device_map.setdefault(self.nativeId, []).append(device)
+            provider_to_device_map.setdefault(None, []).append(manifest)
+
+            # add any builtin child devices
+            provider_to_device_map.setdefault(nativeId, []).extend(device.get_builtin_child_device_manifests())
 
             # we also want to trickle discover them so they are added without deleting all existing
             # root level devices - this is for backward compatibility
-            await scrypted_sdk.deviceManager.onDeviceDiscovered(device)
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(manifest)
         self.logger.info(f"Discovered {len(basestations)} basestations")
 
         cameras = self.arlo.GetDevices(['camera', "arloq", "arloqs", "doorbell"])
@@ -611,30 +602,23 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 continue
             self.arlo_cameras[nativeId] = camera
 
-            scrypted_interfaces = (await self.getDevice(nativeId)).get_applicable_interfaces()
+            device = await self.getDevice(nativeId)
+            scrypted_interfaces = device.get_applicable_interfaces()
+            manifest = device.get_device_manifest()
             self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']}): {scrypted_interfaces}")
 
-            device = {
-                "info": {
-                    "model": f"{camera['modelId']} {camera['properties'].get('hwVersion', '')}".strip(),
-                    "manufacturer": "Arlo",
-                    "firmware": camera.get("firmwareVersion"),
-                    "serialNumber": camera["deviceId"],
-                },
-                "nativeId": camera["deviceId"],
-                "name": camera["deviceName"],
-                "interfaces": scrypted_interfaces,
-                "type": ScryptedDeviceType.Camera.value,
-                "providerNativeId": self.nativeId if camera["deviceId"] == camera["parentId"] else camera["parentId"],
-            }
-
             if camera["deviceId"] == camera["parentId"]:
+                # these are standalone cameras with no basestation, so they act as their
+                # own basestation
                 self.arlo_basestations[camera["deviceId"]] = camera
-                provider_to_device_map.setdefault(self.nativeId, []).append(device)
+                provider_to_device_map.setdefault(None, []).append(manifest)
             else:
-                provider_to_device_map.setdefault(camera["parentId"], []).append(device)
+                provider_to_device_map.setdefault(camera["parentId"], []).append(manifest)
 
-            camera_devices.append(device)
+            # add any builtin child devices
+            provider_to_device_map.setdefault(nativeId, []).extend(device.get_builtin_child_device_manifests())
+
+            camera_devices.append(manifest)
 
         if len(cameras) != len(camera_devices):
             self.logger.info(f"Discovered {len(cameras)} cameras, but only {len(camera_devices)} are usable")
@@ -642,7 +626,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             self.logger.info(f"Discovered {len(cameras)} cameras")
 
         for provider_id in provider_to_device_map.keys():
-            if provider_id == self.nativeId:
+            if provider_id is None:
                 continue
             await scrypted_sdk.deviceManager.onDevicesChanged({
                 "devices": provider_to_device_map[provider_id],
@@ -651,8 +635,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
         # ensure devices at the root match all that was discovered
         await scrypted_sdk.deviceManager.onDevicesChanged({
-            "devices": provider_to_device_map[self.nativeId],
-            "providerNativeId": self.nativeId,
+            "devices": provider_to_device_map[None]
         })
 
     async def getDevice(self, nativeId: str) -> ScryptedDeviceBase:

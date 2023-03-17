@@ -10,7 +10,7 @@ class ArloDoorbell(ArloCamera, BinarySensor):
 
         self.start_doorbell_subscription()
 
-    def start_doorbell_subscription(self):
+    def start_doorbell_subscription(self) -> None:
         def callback(doorbellPressed):
             self.binaryState = doorbellPressed
             return self.stop_subscriptions
@@ -19,7 +19,7 @@ class ArloDoorbell(ArloCamera, BinarySensor):
             self.provider.arlo.SubscribeToDoorbellEvents(self.arlo_basestation, self.arlo_device, callback)
         )
 
-    def get_applicable_interfaces(self):
+    def get_applicable_interfaces(self) -> list:
         camera_interfaces = super().get_applicable_interfaces()
         camera_interfaces.append(ScryptedInterface.BinarySensor.value)
 
