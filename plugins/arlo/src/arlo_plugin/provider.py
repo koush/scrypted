@@ -632,16 +632,16 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             camera_devices.append(device)
 
+        if len(cameras) != len(camera_devices):
+            self.logger.info(f"Discovered {len(cameras)} cameras, but only {len(camera_devices)} are usable")
+        else:
+            self.logger.info(f"Discovered {len(cameras)} cameras")
+
         for provider_id in provider_to_device_map.keys():
             await scrypted_sdk.deviceManager.onDevicesChanged({
                 "devices": provider_to_device_map[provider_id],
                 "providerNativeId": provider_id,
             })
-
-        if len(cameras) != len(camera_devices):
-            self.logger.info(f"Discovered {len(cameras)} cameras, but only {len(camera_devices)} are usable")
-        else:
-            self.logger.info(f"Discovered {len(cameras)} cameras")
 
     async def getDevice(self, nativeId: str) -> ScryptedDeviceBase:
         ret = self.scrypted_devices.get(nativeId, None)
