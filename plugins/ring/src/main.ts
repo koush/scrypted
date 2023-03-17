@@ -783,6 +783,43 @@ class RingLock extends ScryptedDeviceBase implements Battery, Lock {
     }
 }
 
+class RingLock extends ScryptedDeviceBase implements Battery, Lock {
+    device: RingDevice
+
+    constructor(nativeId: string, device: RingDevice) {
+        super(nativeId);
+        this.device = device;
+        device.onData.subscribe(async (data: RingDeviceData) => {
+            this.updateState(data);
+        });
+    }
+
+    async lock(): Promise<void> {
+        return this.device.sendCommand('lock.lock');
+    }
+
+    async unlock(): Promise<void> {
+        return this.device.sendCommand('lock.unlock');
+    }
+
+    updateState(data: RingDeviceData) {
+        this.batteryLevel = data.batteryLevel;
+        switch (data.locked) {
+            case 'locked':
+                this.lockState = LockState.Locked;
+                break;
+            case 'unlocked':
+                this.lockState = LockState.Unlocked;
+                break;
+            case 'jammed':
+                this.lockState = LockState.Jammed;
+                break;
+            default:
+                this.lockState = undefined;
+        }
+    }
+}
+
 class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, EntrySensor, MotionSensor, FloodSensor {
     constructor(nativeId: string, device: RingDevice) {
         super(nativeId);
