@@ -38,7 +38,6 @@ class GstreamerGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFram
                 'value': self.storage.getItem('h264Decoder') or 'Default',
                 'choices': [
                     'Default',
-                    'libav',
                     'decodebin',
                     'vtdec_hw',
                     'nvh264dec',
