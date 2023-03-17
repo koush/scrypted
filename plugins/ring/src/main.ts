@@ -668,7 +668,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
         });
 
         return response.video_search.map((result) => {
-            this.console.log(result);
             const videoClip =  {
                 id: result.ding_id,
                 startTime: result.created_at,
@@ -706,80 +705,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
     
     async removeVideoClips(...videoClipIds: string[]): Promise<void> {
         throw new Error('Removing video clips not supported.');
-    }
-}
-
-class RingLock extends ScryptedDeviceBase implements Battery, Lock {
-    device: RingDevice
-
-    constructor(nativeId: string, device: RingDevice) {
-        super(nativeId);
-        this.device = device;
-        device.onData.subscribe(async (data: RingDeviceData) => {
-            this.updateState(data);
-        });
-    }
-
-    async lock(): Promise<void> {
-        return this.device.sendCommand('lock.lock');
-    }
-
-    async unlock(): Promise<void> {
-        return this.device.sendCommand('lock.unlock');
-    }
-
-    updateState(data: RingDeviceData) {
-        this.batteryLevel = data.batteryLevel;
-        switch (data.locked) {
-            case 'locked':
-                this.lockState = LockState.Locked;
-                break;
-            case 'unlocked':
-                this.lockState = LockState.Unlocked;
-                break;
-            case 'jammed':
-                this.lockState = LockState.Jammed;
-                break;
-            default:
-                this.lockState = undefined;
-        }
-    }
-}
-
-class RingLock extends ScryptedDeviceBase implements Battery, Lock {
-    device: RingDevice
-
-    constructor(nativeId: string, device: RingDevice) {
-        super(nativeId);
-        this.device = device;
-        device.onData.subscribe(async (data: RingDeviceData) => {
-            this.updateState(data);
-        });
-    }
-
-    async lock(): Promise<void> {
-        return this.device.sendCommand('lock.lock');
-    }
-
-    async unlock(): Promise<void> {
-        return this.device.sendCommand('lock.unlock');
-    }
-
-    updateState(data: RingDeviceData) {
-        this.batteryLevel = data.batteryLevel;
-        switch (data.locked) {
-            case 'locked':
-                this.lockState = LockState.Locked;
-                break;
-            case 'unlocked':
-                this.lockState = LockState.Unlocked;
-                break;
-            case 'jammed':
-                this.lockState = LockState.Jammed;
-                break;
-            default:
-                this.lockState = undefined;
-        }
     }
 }
 
