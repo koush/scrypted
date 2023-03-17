@@ -3,7 +3,7 @@ import { RefreshPromise } from "@scrypted/common/src/promise-utils";
 import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
-import sdk, { Battery, BinarySensor, Camera, Device, DeviceProvider, EntrySensor, FFmpegInput, FloodSensor, Lock, LockState, MediaObject, MediaStreamUrl, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, SecuritySystem, SecuritySystemMode, Setting, Settings, SettingValue, TamperSensor, VideoCamera } from '@scrypted/sdk';
+import sdk, { Battery, BinarySensor, Camera, Device, DeviceProvider, EntrySensor, FFmpegInput, FloodSensor, Lock, LockState, MediaObject, MediaStreamUrl, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, SecuritySystem, SecuritySystemMode, Setting, Settings, SettingValue, TamperSensor, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
@@ -79,7 +79,7 @@ class RingCameraSiren extends ScryptedDeviceBase implements OnOff {
     }
 }
 
-class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Camera, MotionSensor, BinarySensor, RTCSignalingChannel {
+class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Camera, MotionSensor, BinarySensor, RTCSignalingChannel, VideoClips {
     buttonTimeout: NodeJS.Timeout;
     session: SipSession;
     rtpDescription: RtpDescription;
@@ -89,6 +89,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
     currentMediaMimeType: string;
     refreshTimeout: NodeJS.Timeout;
     picturePromise: RefreshPromise<Buffer>;
+    videoClips = new Map<string, VideoClip>();
 
     constructor(public plugin: RingPlugin, public location: RingLocationDevice, nativeId: string) {
         super(nativeId);
@@ -97,7 +98,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
         if (this.interfaces.includes(ScryptedInterface.Battery))
             this.batteryLevel = this.findCamera()?.batteryLevel;
     }
-
 
     async startIntercom(media: MediaObject): Promise<void> {
         if (!this.session)
@@ -659,6 +659,53 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
             siren.on = data.siren_status.seconds_remaining > 0 ? true : false;
         }
     }
+
+    async getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
+        this.videoClips = new Map<string, VideoClip>;
+        const response = await this.findCamera().videoSearch({
+            dateFrom: options.startTime, 
+            dateTo: options.endTime,
+        });
+
+        return response.video_search.map((result) => {
+            const videoClip =  {
+                id: result.ding_id,
+                startTime: result.created_at,
+                duration: Math.round(result.duration * 1000),
+                event: result.kind.toString(),
+                description: result.kind.toString(),
+                thumbnailId: result.ding_id,
+                resources: {
+                    thumbnail: {
+                        href: result.thumbnail_url
+                    },
+                    video: {
+                        href: result.hq_url
+                    }
+                }
+            }
+            this.videoClips.set(result.ding_id, videoClip)
+            return videoClip;
+        });
+    }
+
+    async getVideoClip(videoId: string): Promise<MediaObject> {
+        if (this.videoClips.has(videoId)) {
+            return mediaManager.createMediaObjectFromUrl(this.videoClips.get(videoId).resources.video.href);
+        }
+        throw new Error('Failed to get video clip.')
+    }
+
+    async getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject> {
+        if (this.videoClips.has(thumbnailId)) {
+            return mediaManager.createMediaObjectFromUrl(this.videoClips.get(thumbnailId).resources.thumbnail.href);
+        }
+        throw new Error('Failed to get video clip thumbnail.')
+    }
+    
+    async removeVideoClips(...videoClipIds: string[]): Promise<void> {
+        throw new Error('Removing video clips not supported.');
+    }
 }
 
 class RingLock extends ScryptedDeviceBase implements Battery, Lock {
@@ -1022,6 +1069,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
                     interfaces.push(
                         ScryptedInterface.VideoCamera,
                         ScryptedInterface.Intercom,
+                        ScryptedInterface.VideoClips,
                     );
                 }
                 if (camera.operatingOnBattery)
