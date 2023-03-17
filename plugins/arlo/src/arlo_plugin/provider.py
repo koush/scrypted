@@ -593,6 +593,10 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             # for basestations, we want to add them to the top level DeviceProvider
             provider_to_device_map.setdefault(self.nativeId, []).append(device)
+
+            # we also want to trickle discover them so they are added without deleting all existing
+            # root level devices - this is for backward compatibility
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(device)
         self.logger.info(f"Discovered {len(basestations)} basestations")
 
         cameras = self.arlo.GetDevices(['camera', "arloq", "arloqs", "doorbell"])
@@ -638,10 +642,18 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             self.logger.info(f"Discovered {len(cameras)} cameras")
 
         for provider_id in provider_to_device_map.keys():
+            if provider_id == self.nativeId:
+                continue
             await scrypted_sdk.deviceManager.onDevicesChanged({
                 "devices": provider_to_device_map[provider_id],
                 "providerNativeId": provider_id,
             })
+
+        # ensure devices at the root match all that was discovered
+        await scrypted_sdk.deviceManager.onDevicesChanged({
+            "devices": provider_to_device_map[self.nativeId],
+            "providerNativeId": self.nativeId,
+        })
 
     async def getDevice(self, nativeId: str) -> ScryptedDeviceBase:
         ret = self.scrypted_devices.get(nativeId, None)
