@@ -32,7 +32,7 @@ class VipsImage(scrypted_sdk.VideoFrame):
         elif options['format'] == 'rgb':
             def format():
                 if vipsImage.vipsImage.hasalpha():
-                    rgb = vipsImage.vipsImage.extract_band(0, vipsImage.vipsImage.bands - 1)
+                    rgb = vipsImage.vipsImage.extract_band(0, n=vipsImage.vipsImage.bands - 1)
                 else:
                     rgb = vipsImage.vipsImage
                 mem = memoryview(rgb.write_to_memory())
