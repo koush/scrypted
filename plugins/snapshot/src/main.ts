@@ -300,6 +300,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 picture = await this.cropAndScale(picture);
                 if (needSoftwareResize) {
                     picture = await ffmpegFilterImageBuffer(picture, {
+                        ffmpegPath: await mediaManager.getFFmpegPath(),
                         console: this.debugConsole,
                         resize: options?.picture,
                     });
@@ -352,6 +353,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
         return ffmpegFilterImageBuffer(buffer, {
+            ffmpegPath: await mediaManager.getFFmpegPath(),
             console: this.debugConsole,
             crop: {
                 fractional: true,
@@ -444,6 +446,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         }
         else {
             return ffmpegFilterImageBuffer(errorBackground, {
+                ffmpegPath: await mediaManager.getFFmpegPath(),
                 console: this.debugConsole,
                 blur: true,
                 brightness: -.2,
