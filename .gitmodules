@@ -1,6 +1,3 @@
-[submodule "plugins/homekit/HAP-NodeJS"]
-	path = external/HAP-NodeJS
-	url = ../../koush/HAP-NodeJS
 [submodule "plugins/unifi-protect/src/unifi-protect"]
 	path = external/unifi-protect
 	url = ../../koush/unifi-protect.git
