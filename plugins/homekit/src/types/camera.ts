@@ -98,12 +98,13 @@ addSupportedType({
         const detectAudio = storage.getItem('detectAudio') === 'true';
         const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
         const linkedMotionSensor = storage.getItem('linkedMotionSensor');
+        const isRecordingEnabled = !!linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService
 
         const storageKeySelectedRecordingConfiguration = 'selectedRecordingConfiguration';
 
         let configuration: CameraRecordingConfiguration;
         const openRecordingStreams = new Map<number, Deferred<any>>();
-        if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
+        if (isRecordingEnabled) {
             recordingDelegate = {
                 updateRecordingConfiguration(newConfiguration: CameraRecordingConfiguration ) {
                     configuration = newConfiguration;
@@ -193,12 +194,12 @@ addSupportedType({
             cameraStreamCount: 8,
             delegate,
             streamingOptions,
-            recording: {
+            recording: !isRecordingEnabled ? undefined : {
                 options: recordingOptions,
                 delegate: recordingDelegate,
             },
             sensors: {
-                motion: true,
+                motion: isRecordingEnabled,
             },
         });
 
