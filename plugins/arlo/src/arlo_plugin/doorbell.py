@@ -1,4 +1,4 @@
-from scrypted_sdk.types import BinarySensor, ScryptedInterface
+from scrypted_sdk.types import BinarySensor, ScryptedInterface, ScryptedDeviceType
 
 from .camera import ArloCamera
 from .provider import ArloProvider
@@ -18,6 +18,9 @@ class ArloDoorbell(ArloCamera, BinarySensor):
         self.register_task(
             self.provider.arlo.SubscribeToDoorbellEvents(self.arlo_basestation, self.arlo_device, callback)
         )
+
+    def get_device_type(self) -> str:
+        return ScryptedDeviceType.Doorbell.value
 
     def get_applicable_interfaces(self) -> list:
         camera_interfaces = super().get_applicable_interfaces()
