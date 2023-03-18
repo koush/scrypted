@@ -89,7 +89,7 @@ async def createVipsMediaObject(image: VipsImage):
     return ret
 
 class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter):
-    def __init__(self, nativeId: str | None = None):
+    def __init__(self, nativeId: str):
         super().__init__(nativeId)
 
         self.fromMimeType = 'image/*'
@@ -100,7 +100,7 @@ class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
         return await createVipsMediaObject(VipsImage(vips))
 
 class ImageWriter(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter):
-    def __init__(self, nativeId: str | None = None):
+    def __init__(self, nativeId: str):
         super().__init__(nativeId)
 
         self.fromMimeType = scrypted_sdk.ScryptedMimeTypes.Image.value
