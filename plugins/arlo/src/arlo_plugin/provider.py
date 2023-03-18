@@ -577,7 +577,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             device = await self.getDevice(nativeId)
             scrypted_interfaces = device.get_applicable_interfaces()
             manifest = device.get_device_manifest()
-            self.logger.debug(f"Interfaces for {nativeId} ({basestation['modelId']}): {scrypted_interfaces}")
+            self.logger.info(f"Interfaces for {nativeId} ({basestation['modelId']}): {scrypted_interfaces}")
 
             # for basestations, we want to add them to the top level DeviceProvider
             provider_to_device_map.setdefault(None, []).append(manifest)
@@ -602,15 +602,17 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 continue
             self.arlo_cameras[nativeId] = camera
 
-            device = await self.getDevice(nativeId)
-            scrypted_interfaces = device.get_applicable_interfaces()
-            manifest = device.get_device_manifest()
-            self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']}): {scrypted_interfaces}")
-
             if camera["deviceId"] == camera["parentId"]:
                 # these are standalone cameras with no basestation, so they act as their
                 # own basestation
                 self.arlo_basestations[camera["deviceId"]] = camera
+
+            device = await self.getDevice(nativeId)
+            scrypted_interfaces = device.get_applicable_interfaces()
+            manifest = device.get_device_manifest()
+            self.logger.info(f"Interfaces for {nativeId} ({camera['modelId']}): {scrypted_interfaces}")
+
+            if camera["deviceId"] == camera["parentId"]:
                 provider_to_device_map.setdefault(None, []).append(manifest)
             else:
                 provider_to_device_map.setdefault(camera["parentId"], []).append(manifest)
@@ -652,6 +654,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         from .basestation import ArloBasestation
 
         if nativeId not in self.arlo_cameras and nativeId not in self.arlo_basestations:
+            self.logger.info(f"Unknown nativeId {nativeId}")
             return None
 
         arlo_device = self.arlo_cameras.get(nativeId)
@@ -661,6 +664,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             return ArloBasestation(nativeId, arlo_device, arlo_device, self)
 
         if arlo_device["parentId"] not in self.arlo_basestations:
+            self.logger.info(f"Cannot create camera with nativeId {nativeId} when {arlo_device['parentId']} is not a valid basestation")
             return None
         arlo_basestation = self.arlo_basestations[arlo_device["parentId"]]
 
