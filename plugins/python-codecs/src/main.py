@@ -4,6 +4,7 @@ from scrypted_sdk import Setting, SettingValue
 from typing import Any
 import gstreamer
 import libav
+import vips
 
 Gst = None
 try:
@@ -84,6 +85,24 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider)
             }
             manifest['devices'].append(avDevice)
 
+        manifest['devices'].append({
+            'name': 'Image Reader',
+            'type': scrypted_sdk.ScryptedDeviceType.Builtin.value,
+            'nativeId': 'reader',
+            'interfaces': [
+                scrypted_sdk.ScryptedInterface.BufferConverter.value,
+            ]
+        })
+
+        manifest['devices'].append({
+            'name': 'Image Writer',
+            'type': scrypted_sdk.ScryptedDeviceType.Builtin.value,
+            'nativeId': 'writer',
+            'interfaces': [
+                scrypted_sdk.ScryptedInterface.BufferConverter.value,
+            ]
+        })
+
         await scrypted_sdk.deviceManager.onDevicesChanged(manifest)
 
     def getDevice(self, nativeId: str) -> Any:
@@ -91,6 +110,10 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider)
             return GstreamerGenerator('gstreamer')
         if nativeId == 'libav':
             return LibavGenerator('libav')
+        if nativeId == 'reader':
+            return vips.ImageReader('reader')
+        if nativeId == 'writer':
+            return vips.ImageWriter('writer')
 
 def create_scrypted_plugin():
     return PythonCodecs()
