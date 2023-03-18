@@ -6,8 +6,8 @@ import { getAddressOverride } from "./address-override";
 import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
-import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
-import { createHAPUsernameStorageSettingsDict, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, logConnections, typeToCategory } from './hap-utils';
+import { HAPStorage, Accessory, Bridge, Categories, Characteristic, ControllerStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
+import { createHAPUsernameStorageSettingsDict, getHAPUUID, getRandomPort as createRandomPort, logConnections, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { addAccessoryDeviceInfo } from './info';
 import { randomPinCode } from './pincode';
@@ -15,9 +15,43 @@ import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { VideoClipsMixinProvider } from './video-clips-provider';
 
+const hapStorage: Storage = {
+    get length() {
+        return localStorage.length;
+    },
+    clear: function (): void {
+        return localStorage.clear();
+    },
+    key: function (index: number): string {
+        return localStorage.key(index);
+    },
+    removeItem: function (key: string): void {
+        return localStorage.removeItem(key);
+    },
+    getItem(key: string): any {
+        const data = localStorage.getItem(key);
+        if (!data)
+            return;
+        return JSON.parse(data);
+    },
+    setItem(key: string, value: any) {
+        localStorage.setItem(key, JSON.stringify(value));
+    },
+    setItemSync(key: string, value: any) {
+        localStorage.setItem(key, JSON.stringify(value));
+    },
+    removeItemSync(key: string) {
+        localStorage.removeItem(key);
+    },
+    persistSync() {
+    }
+}
+HAPStorage.storage = () => {
+    return hapStorage;
+}
+
 const { systemManager, deviceManager } = sdk;
 
-initializeHapStorage();
 const includeToken = 4;
 
 export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, Settings, DeviceProvider {
@@ -294,9 +328,10 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             bind,
         };
 
-        this.bridge.publish(publishInfo, true);
-        this.storageSettings.values.qrCode = this.bridge.setupURI();
-        logConnections(this.console, this.bridge, this.seenConnections);
+        this.bridge.publish(publishInfo, true).then(() => {
+            this.storageSettings.values.qrCode = this.bridge.setupURI();
+            logConnections(this.console, this.bridge, this.seenConnections);
+        });
 
         systemManager.listen(async (eventSource, eventDetails, eventData) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)

@@ -1,12 +1,13 @@
 import sdk, { AudioSensor, Camera, Intercom, MotionSensor, ObjectsDetected, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, DataStreamConnection, H264Level, H264Profile, OccupancySensor, RecordingManagement, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, DataStreamConnection, H264Level, H264Profile, MediaContainerType, OccupancySensor, RecordingManagement, RecordingPacket, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
 import { FORCE_OPUS } from './camera/camera-utils';
 import { makeAccessory } from './common';
 import type { HomeKitPlugin } from '../main';
+import { Deferred } from '@scrypted/common/src/deferred';
 
 const { deviceManager, systemManager } = sdk;
 
@@ -62,7 +63,6 @@ addSupportedType({
         const streamingOptions: CameraStreamingOptions = {
             video: {
                 codec: {
-                    type: VideoCodecType.H264,
                     levels: [H264Level.LEVEL3_1, H264Level.LEVEL3_2, H264Level.LEVEL4_0],
                     profiles: [H264Profile.MAIN],
                 },
@@ -101,12 +101,28 @@ addSupportedType({
 
         const storageKeySelectedRecordingConfiguration = 'selectedRecordingConfiguration';
 
+        let configuration: CameraRecordingConfiguration;
+        const openRecordingStreams = new Map<number, Deferred<any>>();
         if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
-                handleFragmentsRequests(connection: DataStreamConnection): AsyncGenerator<Buffer, void, unknown> {
-                    const configuration = RecordingManagement.parseSelectedConfiguration(storage.getItem(storageKeySelectedRecordingConfiguration))
-                    return handleFragmentsRequests(connection, device, configuration, console, homekitPlugin)
-                }
+                updateRecordingConfiguration(newConfiguration: CameraRecordingConfiguration ) {
+                    configuration = newConfiguration;
+                },
+                handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
+                    const ret = handleFragmentsRequests(streamId, device, configuration, console, homekitPlugin);
+                    const d = new Deferred<any>();
+                    d.promise.then(reason => {
+                        ret.throw(new Error(reason.toString()));
+                        openRecordingStreams.delete(streamId);
+                    });
+                    openRecordingStreams.set(streamId, d);
+                    return ret;
+                },
+                closeRecordingStream(streamId, reason) {
+                    openRecordingStreams.get(streamId)?.resolve(reason);
+                },
+                updateRecordingActive(active) {
+                },
             };
 
             const recordingCodecs: AudioRecordingCodec[] = [];
@@ -146,23 +162,17 @@ addSupportedType({
             // ensureHasWidthResolution(recordingResolutions, 1280, 720);
             // ensureHasWidthResolution(recordingResolutions, 1920, 1080);
 
-            const h265Support = storage.getItem('h265Support') === 'true';
-            const codecType = h265Support ? VideoCodecType.H265 : VideoCodecType.H264
-
             recordingOptions = {
-                motionService: true,
                 prebufferLength: numberPrebufferSegments * iframeIntervalSeconds * 1000,
-                eventTriggerOptions: 0x01,
-                mediaContainerConfigurations: [
+                mediaContainerConfiguration: [
                     {
-                        type: 0,
+                        type: MediaContainerType.FRAGMENTED_MP4,
                         fragmentLength: iframeIntervalSeconds * 1000,
                     }
                 ],
-
                 video: {
-                    codec: {
-                        type: codecType,
+                    type: VideoCodecType.H264,
+                    parameters: {
                         levels: [H264Level.LEVEL3_1, H264Level.LEVEL3_2, H264Level.LEVEL4_0],
                         profiles: [H264Profile.BASELINE, H264Profile.MAIN, H264Profile.HIGH],
                     },
@@ -186,7 +196,10 @@ addSupportedType({
             recording: {
                 options: recordingOptions,
                 delegate: recordingDelegate,
-            }
+            },
+            sensors: {
+                motion: true,
+            },
         });
 
         accessory.configureController(controller);
@@ -214,26 +227,27 @@ addSupportedType({
                 const property = `characteristic-v2-${characteristic.UUID}`
                 service.getCharacteristic(characteristic)
                     .on(CharacteristicEventTypes.GET, callback => callback(null, storage.getItem(property) === 'true' ? 1 : 0))
+                    .removeOnSet()
                     .on(CharacteristicEventTypes.SET, (value, callback) => {
                         callback();
                         storage.setItem(property, (!!value).toString());
                     });
             }
 
-            persistBooleanCharacteristic(recordingManagement.getService(), Characteristic.Active);
-            persistBooleanCharacteristic(recordingManagement.getService(), Characteristic.RecordingAudioActive);
-            persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.EventSnapshotsActive);
-            persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.HomeKitCameraActive);
-            persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.PeriodicSnapshotsActive);
+            persistBooleanCharacteristic(recordingManagement.recordingManagementService, Characteristic.Active);
+            persistBooleanCharacteristic(recordingManagement.recordingManagementService, Characteristic.RecordingAudioActive);
+            persistBooleanCharacteristic(recordingManagement.operatingModeService, Characteristic.EventSnapshotsActive);
+            persistBooleanCharacteristic(recordingManagement.operatingModeService, Characteristic.HomeKitCameraActive);
+            persistBooleanCharacteristic(recordingManagement.operatingModeService, Characteristic.PeriodicSnapshotsActive);
 
             if (!device.interfaces.includes(ScryptedInterface.OnOff)) {
-                persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.CameraOperatingModeIndicator);
+                persistBooleanCharacteristic(recordingManagement.operatingModeService, Characteristic.CameraOperatingModeIndicator);
             }
             else {
-                const indicator = controller.cameraOperatingModeService.getCharacteristic(Characteristic.CameraOperatingModeIndicator);
+                const indicator = recordingManagement.operatingModeService.getCharacteristic(Characteristic.CameraOperatingModeIndicator);
                 const linkStatusIndicator = storage.getItem('statusIndicator') === 'true';
                 const property = `characteristic-v2-${Characteristic.CameraOperatingModeIndicator.UUID}`
-                bindCharacteristic(device, ScryptedInterface.OnOff, controller.cameraOperatingModeService, Characteristic.CameraOperatingModeIndicator, () => {
+                bindCharacteristic(device, ScryptedInterface.OnOff, recordingManagement.operatingModeService, Characteristic.CameraOperatingModeIndicator, () => {
                     if (!linkStatusIndicator)
                         return storage.getItem(property) === 'true' ? 1 : 0;
 
@@ -251,10 +265,12 @@ addSupportedType({
                 });
             }
 
-            recordingManagement.getService().getCharacteristic(Characteristic.SelectedCameraRecordingConfiguration)
+            recordingManagement.recordingManagementService.getCharacteristic(Characteristic.SelectedCameraRecordingConfiguration)
+                .removeOnGet()
                 .on(CharacteristicEventTypes.GET, callback => {
                     callback(null, storage.getItem(storageKeySelectedRecordingConfiguration) || '');
                 })
+                .removeOnSet()
                 .on(CharacteristicEventTypes.SET, (value, callback) => {
                     // prepare recording here if necessary.
                     storage.setItem(storageKeySelectedRecordingConfiguration, value.toString());
