@@ -35,25 +35,6 @@ class SystemDeviceState(TypedDict):
     stateTime: int
     value: any
 
-
-class StreamPipeReader:
-    def __init__(self, conn: multiprocessing.connection.Connection) -> None:
-        self.conn = conn
-        self.executor = concurrent.futures.ThreadPoolExecutor()
-
-    def readBlocking(self, n):
-        b = bytes(0)
-        while len(b) < n:
-            self.conn.poll(None)
-            add = os.read(self.conn.fileno(), n - len(b))
-            if not len(add):
-                raise Exception('unable to read requested bytes')
-            b += add
-        return b
-
-    async def read(self, n):
-        return await asyncio.get_event_loop().run_in_executor(self.executor, lambda: self.readBlocking(n))
-    
 class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
     def __init__(self, api: Any, systemState: Mapping[str, Mapping[str, SystemDeviceState]]) -> None:
         super().__init__()
@@ -288,8 +269,9 @@ class PluginRemote:
         clusterSecret = options['clusterSecret']
 
         async def handleClusterClient(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+            rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
             peer: rpc.RpcPeer
-            peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, reader = reader, writer = writer)
+            peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
             async def connectRPCObject(id: str, secret: str):
                 m = hashlib.sha256()
                 m.update(bytes('%s%s' % (clusterPort, clusterSecret), 'utf8'))
@@ -324,7 +306,8 @@ class PluginRemote:
                 async def connectClusterPeer():
                     reader, writer = await asyncio.open_connection(
                         '127.0.0.1', port)
-                    peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, reader = reader, writer = writer)
+                    rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
+                    peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
                     async def run_loop():
                         try:
                             await peerReadLoop()
@@ -485,8 +468,8 @@ class PluginRemote:
                 schedule_exit_check()
 
                 async def getFork():
-                    reader = StreamPipeReader(parent_conn)
-                    forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, reader = reader, writeFd = parent_conn.fileno())
+                    rpcTransport = rpc_reader.RpcConnectionTransport(parent_conn)
+                    forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
                     forkPeer.peerName = 'thread'
 
                     async def updateStats(stats):
@@ -502,7 +485,7 @@ class PluginRemote:
                         finally:
                             allMemoryStats.pop(forkPeer)
                             parent_conn.close()
-                            reader.executor.shutdown()
+                            rpcTransport.executor.shutdown()
                     asyncio.run_coroutine_threadsafe(forkReadLoop(), loop=self.loop)
                     getRemote = await forkPeer.getParam('getRemote')
                     remote: PluginRemote = await getRemote(self.api, self.pluginId, self.hostInfo)
@@ -594,8 +577,8 @@ class PluginRemote:
 
 allMemoryStats = {}
 
-async def plugin_async_main(loop: AbstractEventLoop, readFd: int = None, writeFd: int = None, reader: asyncio.StreamReader = None, writer: asyncio.StreamWriter = None):
-    peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, readFd=readFd, writeFd=writeFd, reader=reader, writer=writer)
+async def plugin_async_main(loop: AbstractEventLoop, rpcTransport: rpc_reader.RpcTransport):
+    peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, rpcTransport)
     peer.params['print'] = print
     peer.params['getRemote'] = lambda api, pluginId, hostInfo: PluginRemote(peer, api, pluginId, hostInfo, loop)
 
@@ -642,11 +625,11 @@ async def plugin_async_main(loop: AbstractEventLoop, readFd: int = None, writeFd
     try:
         await readLoop()
     finally:
-        if reader and hasattr(reader, 'executor'):
-            r: StreamPipeReader = reader
+        if type(rpcTransport) == rpc_reader.RpcConnectionTransport:
+            r: rpc_reader.RpcConnectionTransport = rpcTransport
             r.executor.shutdown()
 
-def main(readFd: int = None, writeFd: int = None, reader: asyncio.StreamReader = None, writer: asyncio.StreamWriter = None):
+def main(rpcTransport: rpc_reader.RpcTransport):
     loop = asyncio.new_event_loop()
 
     def gc_runner():
@@ -654,10 +637,10 @@ def main(readFd: int = None, writeFd: int = None, reader: asyncio.StreamReader =
         loop.call_later(10, gc_runner)
     gc_runner()
 
-    loop.run_until_complete(plugin_async_main(loop, readFd=readFd, writeFd=writeFd, reader=reader, writer=writer))
+    loop.run_until_complete(plugin_async_main(loop, rpcTransport))
     loop.close()
 
-def plugin_main(readFd: int = None, writeFd: int = None, reader: asyncio.StreamReader = None, writer: asyncio.StreamWriter = None):
+def plugin_main(rpcTransport: rpc_reader.RpcTransport):
     try:
         import gi
         gi.require_version('Gst', '1.0')
@@ -666,18 +649,16 @@ def plugin_main(readFd: int = None, writeFd: int = None, reader: asyncio.StreamR
 
         loop = GLib.MainLoop()
 
-        worker = threading.Thread(target=main, args=(readFd, writeFd, reader, writer), name="asyncio-main")
+        worker = threading.Thread(target=main, args=(rpcTransport,), name="asyncio-main")
         worker.start()
 
         loop.run()
     except:
-        main(readFd=readFd, writeFd=writeFd, reader=reader, writer=writer)
+        main(rpcTransport)
 
 
 def plugin_fork(conn: multiprocessing.connection.Connection):
-    fd = os.dup(conn.fileno())
-    reader = StreamPipeReader(conn)
-    plugin_main(reader=reader, writeFd=fd)
+    plugin_main(rpc_reader.RpcConnectionTransport(conn))
 
 if __name__ == "__main__":
-    plugin_main(3, 4)
+    plugin_main(rpc_reader.RpcFileTransport(3, 4))
