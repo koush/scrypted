@@ -62,6 +62,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             // stdin, stdout, stderr, peer in, peer out
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
             env: Object.assign({
+                PYTHONUNBUFFERED: '1',
                 PYTHONPATH: path.join(process.cwd(), 'node_modules/@scrypted/types'),
             }, gstEnv, process.env, env),
         });
