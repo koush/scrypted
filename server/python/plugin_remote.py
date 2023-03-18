@@ -44,7 +44,7 @@ class StreamPipeReader:
     def readBlocking(self, n):
         b = bytes(0)
         while len(b) < n:
-            self.conn.poll()
+            self.conn.poll(None)
             add = os.read(self.conn.fileno(), n - len(b))
             if not len(add):
                 raise Exception('unable to read requested bytes')
