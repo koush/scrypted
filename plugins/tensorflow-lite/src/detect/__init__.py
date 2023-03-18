@@ -363,19 +363,29 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         container = j.get('container', None)
         videosrc = j['url']
+        videoCodec = optional_chain(j, 'mediaStreamOptions', 'video', 'codec')
 
         decoder = settings and settings.get('decoder')
+        if decoder == 'Default':
+            decoder = None
         if decoder == 'libav' and not av:
             decoder = None
         elif decoder != 'libav' and not Gst:
             decoder = None
 
-        decoder = decoder or 'Default'
-        if decoder == 'Default':
+        if not decoder:
             if Gst:
-                if platform.system() == 'Darwin':
-                    decoder = 'vtdec_hw'
+                if videoCodec == 'h264':
+                    # hw acceleration is "safe" to use on mac, but not
+                    # on other hosts where it may crash.
+                    # defaults must be safe.
+                    if platform.system() == 'Darwin':
+                        decoder = 'vtdec_hw'
+                    else:
+                        decoder = 'avdec_h264'
                 else:
+                    # decodebin may pick a hardware accelerated decoder, which isn't ideal
+                    # so use a known software decoder for h264 and decodebin for anything else.
                     decoder = 'decodebin'
             elif av:
                 decoder = 'libav'
@@ -422,8 +432,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if not Gst:
             raise Exception('Gstreamer is unavailable')
       
-        videoCodec = optional_chain(j, 'mediaStreamOptions', 'video', 'codec')
-
         if videosrc.startswith('tcp://'):
             parsed_url = urlparse(videosrc)
             videosrc = 'tcpclientsrc port=%s host=%s' % (

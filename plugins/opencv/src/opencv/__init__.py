@@ -250,7 +250,7 @@ class OpenCVPlugin(DetectPlugin):
         else:
             mat = np.ndarray((avframe.height, avframe.width, self.pixelFormatChannelCount), buffer=avframe.planes[0], dtype=np.uint8)
         detections = self.detect(
-            detection_session, mat, settings, src_size, convert_to_src_size)
+            detection_session, mat, src_size, convert_to_src_size)
         if not detections or not len(detections['detections']):
             await self.detection_sleep(settings)
             return None, None
