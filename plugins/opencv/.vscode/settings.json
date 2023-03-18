@@ -16,6 +16,6 @@
 
     "scrypted.pythonRemoteRoot": "${config:scrypted.serverRoot}/volume/plugin.zip",
     "python.analysis.extraPaths": [
-        "./node_modules/@scrypted/sdk/scrypted_python"
+        "./node_modules/@scrypted/sdk/types/scrypted_python"
     ]
 }

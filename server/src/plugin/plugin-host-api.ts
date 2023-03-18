@@ -141,7 +141,8 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
 
         for (const upsert of deviceManifest.devices) {
             upsert.providerNativeId = deviceManifest.providerNativeId;
-            await this.pluginHost.upsertDevice(upsert);
+            const id = await this.pluginHost.upsertDevice(upsert);
+            this.scrypted.getDevice(id)?.probe().catch(() => { });
         }
     }
 

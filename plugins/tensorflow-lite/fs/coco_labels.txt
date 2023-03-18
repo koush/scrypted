@@ -1,1 +1,0 @@
-../all_models/coco_labels.txt

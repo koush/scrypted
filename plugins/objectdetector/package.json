@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/objectdetector",
-   "version": "0.0.103",
+   "version": "0.0.108",
    "description": "Scrypted Video Analysis Plugin. Installed alongside a detection service like OpenCV or TensorFlow.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -38,7 +38,10 @@
          "Settings",
          "MixinProvider"
       ],
-      "realfs": true
+      "realfs": true,
+      "pluginDependencies": [
+         "@scrypted/python-codecs"
+      ]
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",

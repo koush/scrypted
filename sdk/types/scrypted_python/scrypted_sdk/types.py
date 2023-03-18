@@ -233,7 +233,7 @@ class HttpResponseOptions(TypedDict):
 
 class ImageOptions(TypedDict):
     crop: Any
-    format: Any | Any | Any
+    format: Any | Any | Any | Any
     resize: Any
     pass
 
@@ -486,6 +486,7 @@ class ObjectDetectionGeneratorSession(TypedDict):
 
 class ObjectDetectionModel(TypedDict):
     classes: list[str]
+    inputFormat: Any | Any | Any
     inputSize: list[float]
     name: str
     settings: list[Setting]
@@ -693,7 +694,7 @@ class VideoClipOptions(TypedDict):
 
 class VideoFrameGeneratorOptions(TypedDict):
     crop: Any
-    format: Any | Any | Any
+    format: Any | Any | Any | Any
     resize: Any
     pass
 

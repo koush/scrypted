@@ -9,13 +9,24 @@ Do not enable prebuffer on Ring cameras and doorbells.
   * The persistent live stream will drain the battery faster than it can charge.
   * The persistent live stream will also count against ISP bandwidth limits.
 
-## Supported Cameras
+## Supported Devices
+
+### Cameras
 - Ring Video Doorbell Wired, Pro, Pro 2, 4, 3, 2nd Gen
 - Ring Floodlight Cam Wired Plus
 - Ring Floodlight Cam Wired Pro
 - Ring Spotlight Cam (Wired and Battery)
 - Ring Indoor Cam
 - Ring Stick-Up Cam (Wired and Battery)
+
+### Other Devices
+- Security Panel
+- Location Modes
+- Contact Sensor / Retrofit Alarm Zones / Tilt Sensor
+- Motion Sensor
+- Flood / Freeze Sensor
+- Water Sensor
+- Smart Locks
 
 ## Problems and Solutions
 

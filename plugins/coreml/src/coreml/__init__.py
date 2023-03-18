@@ -6,6 +6,10 @@ from predict import PredictPlugin, Prediction, Rectangle
 import coremltools as ct
 import os
 from PIL import Image
+import asyncio
+import concurrent.futures
+
+predictExecutor = concurrent.futures.ThreadPoolExecutor(2, "CoreML-Predict")
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -25,17 +29,19 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def __init__(self, nativeId: str | None = None):
         super().__init__(MIME_TYPE, nativeId=nativeId)
 
-        modelPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'zip', 'unzipped', 'fs', 'MobileNetV2_SSDLite.mlmodel')
-        self.model = ct.models.MLModel(modelPath)
+        labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/coreml-survival-guide/master/MobileNetV2%2BSSDLite/coco_labels.txt', 'coco_labels.txt')
+        modelFile = self.downloadFile('https://github.com/koush/coreml-survival-guide/raw/master/MobileNetV2%2BSSDLite/ObjectDetection/ObjectDetection/MobileNetV2_SSDLite.mlmodel', 'MobileNetV2_SSDLite.mlmodel')
+        
+        self.model = ct.models.MLModel(modelFile)
         
         self.modelspec = self.model.get_spec()
         self.inputdesc = self.modelspec.description.input[0]
         self.inputheight = self.inputdesc.type.imageType.height
         self.inputwidth = self.inputdesc.type.imageType.width
 
-        labels_contents = scrypted_sdk.zip.open(
-            'fs/coco_labels.txt').read().decode('utf8')
+        labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
+        self.loop = asyncio.get_event_loop()
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
@@ -44,8 +50,12 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def get_input_size(self) -> Tuple[float, float]:
         return (self.inputwidth, self.inputheight)
 
-    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        out_dict = self.model.predict({'image': input, 'confidenceThreshold': .2 })
+    async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
+        # run in executor if this is the plugin loop
+        if asyncio.get_event_loop() is self.loop:
+            out_dict = await asyncio.get_event_loop().run_in_executor(predictExecutor, lambda: self.model.predict({'image': input, 'confidenceThreshold': .2 }))
+        else:
+            out_dict = self.model.predict({'image': input, 'confidenceThreshold': .2 })
 
         coordinatesList = out_dict['coordinates']
 
