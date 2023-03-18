@@ -1,7 +1,7 @@
 import asyncio
 import scrypted_sdk
 from scrypted_sdk import Setting, SettingValue
-from typing import Any
+from typing import Any, List
 import gstreamer
 import libav
 import vips
@@ -30,7 +30,7 @@ class GstreamerGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFram
         forked: CodecFork = await worker.result
         return await forked.generateVideoFramesGstreamer(mediaObject, options, filter, self.storage.getItem('h264Decoder'))
     
-    async def getSettings(self) -> list[Setting]:
+    async def getSettings(self) -> List[Setting]:
         return [
             {
                 'key': 'h264Decoder',
