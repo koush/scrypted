@@ -55,13 +55,17 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
         },
     });
 
+    fromMimeType: string = ""
+    toMimeType: string = ""
+
     constructor(nativeId: string) {
         super(nativeId);
         this.clearTryDiscoverDevices();
 
 
         this.fromMimeType = 'x-scrypted-remote/x-media-object-' + this.id;
-        this.toMimeType = ScryptedMimeTypes.MediaObject;
+        this.toMimeType = '*';
+        sdk.mediaManager.addConverter(this);
     }
 
 
@@ -193,9 +197,11 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
         });
 
         this.client.onClose = () => {
-            this.console.log('client killed')
+            this.console.log('client killed, reconnecting in 60s');
+            setTimeout(async () => await this.clearTryDiscoverDevices(), 60000);
         }
 
+        /* bjia56: since the MediaObject conversion isn't completely implemented, disable this for now
         const { rpcPeer } = this.client;
         const map = new WeakMap<RemoteMediaObject, MediaObject>();
         rpcPeer.nameDeserializerMap.set('MediaObject', {
@@ -215,11 +221,13 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
                 return rmo;
             },
         });
+        */
+
         this.console.log(`Connected to remote Scrypted server. Remote server version: ${this.client.serverVersion}`)
     }
 
     async convert(data: RemoteMediaObject, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
-        if (toMimeType === 'x-scrypted-remote/x-media-object')
+        if (toMimeType.startsWith('x-scrypted-remote/x-media-object'))
             return data;
         let ret = await this.client.mediaManager.convertMediaObject(data, toMimeType);
         if (toMimeType === ScryptedMimeTypes.FFmpegInput) {
@@ -298,9 +306,9 @@ class ScryptedRemoteInstance extends ScryptedDeviceBase implements DeviceProvide
 
         // first register the top level devices, then register the remaining
         // devices by provider id
-        await deviceManager.onDevicesChanged(<DeviceManifest>{
-            devices: providerDeviceMap.get(this.nativeId),
-            providerNativeId: this.nativeId,
+        // top level devices are discovered one by one to avoid clobbering
+        providerDeviceMap.get(this.nativeId).map(async device => {
+            await deviceManager.onDeviceDiscovered(device);
         });
         for (let [providerNativeId, devices] of providerDeviceMap) {
             await deviceManager.onDevicesChanged(<DeviceManifest>{
