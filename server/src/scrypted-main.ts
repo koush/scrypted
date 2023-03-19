@@ -22,6 +22,8 @@ process.env['NODE_OPTIONS'] = '--dns-result-order=ipv4first';
 
 startPeriodicGarbageCollection();
 
+let startPromise: any;
+
 if (process.argv[2] === 'child' || process.argv[2] === 'child-thread') {
     // plugins should never crash. this handler will be removed, and then readded
     // after the plugin source map is retrieved.
@@ -33,7 +35,7 @@ if (process.argv[2] === 'child' || process.argv[2] === 'child-thread') {
     });
 
     const start = require('./scrypted-plugin-main').default;
-    start(__filename);
+    startPromise = start(__filename);
 }
 else {
     // unhandled rejections are allowed if they are from a rpc/plugin call.
@@ -46,5 +48,7 @@ else {
     });
 
     const start = require('./scrypted-server-main').default;
-    start(__filename);
+    startPromise = start(__filename);
 }
+
+export default startPromise;
