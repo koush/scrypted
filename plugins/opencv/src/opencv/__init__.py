@@ -220,17 +220,18 @@ class OpenCVPlugin(DetectPlugin):
         if width <= 640 and height < 640:
             scale = 1
             resize = None
-        elif aspectRatio > 1:
-            scale = height / 300
-            resize = {
-                'height': 300,
-                'width': int(300 * aspectRatio)
-            }
         else:
-            scale = width / 300
+            if aspectRatio > 1:
+                scale = height / 300
+                height = 300
+                width = int(300 * aspectRatio)
+            else:
+                width = 300
+                height = int(300 / aspectRatio)
+                scale = width / 300
             resize = {
-                'width': 300,
-                'height': int(300 / aspectRatio)
+                'width': width,
+                'height': height,
             }
 
         buffer = await videoFrame.toBuffer({
@@ -239,7 +240,7 @@ class OpenCVPlugin(DetectPlugin):
 
         def convert_to_src_size(point, normalize = False):
             return point[0] * scale, point[1] * scale, True
-        mat = np.ndarray((videoFrame.height, videoFrame.width, self.pixelFormatChannelCount), buffer=buffer, dtype=np.uint8)
+        mat = np.ndarray((height, width, self.pixelFormatChannelCount), buffer=buffer, dtype=np.uint8)
         detections = self.detect(
             detection_session, mat, (width, height), convert_to_src_size)
         return detections
