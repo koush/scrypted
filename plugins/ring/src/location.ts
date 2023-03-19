@@ -179,6 +179,7 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
                 case RingDeviceType.ContactSensor:
                 case RingDeviceType.RetrofitZone: 
                 case RingDeviceType.TiltSensor:
+                case RingDeviceType.GlassbreakSensor:
                     nativeId = locationDevice.id.toString() + '-sensor';
                     type = ScryptedDeviceType.Sensor
                     interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.EntrySensor);
