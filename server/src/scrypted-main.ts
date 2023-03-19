@@ -1,7 +1,14 @@
+import v8 from 'v8';
+import vm from 'vm';
 import process from 'process';
 import semver from 'semver';
 import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
 import { PluginError } from './plugin/plugin-error';
+
+if (!global.gc) {
+    v8.setFlagsFromString('--expose_gc')
+    global.gc = vm.runInNewContext("gc");
+}
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')

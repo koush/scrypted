@@ -16,7 +16,6 @@
             "program": "${workspaceFolder}/dist/scrypted-main.js",
             "runtimeArgs": [
                 "--trace-warnings",
-                "--expose-gc",
                 "--nolazy",
             ],
             "sourceMaps": true,
