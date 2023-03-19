@@ -27,8 +27,10 @@ Do not enable prebuffer on Ring cameras and doorbells.
 - Tilt Sensor
 - Glassbreak Sensor
 - Motion Sensor
+- Outdoor Motion Sensor
 - Flood / Freeze Sensor
 - Water Sensor
+- Mailbox Sensor
 - Smart Locks
 
 ## Problems and Solutions
