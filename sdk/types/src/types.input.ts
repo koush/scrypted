@@ -765,7 +765,10 @@ export enum PanTiltZoomMovement {
 }
 
 export interface PanTiltZoomCommand {
-  movement: PanTiltZoomMovement;
+  /**
+   * Specify the movement origin. If unspecified, the movement will be relative to the current position.
+   */
+  movement?: PanTiltZoomMovement;
   /**
    * Ranges between -1 and 1.
    */
