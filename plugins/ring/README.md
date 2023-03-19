@@ -22,10 +22,15 @@ Do not enable prebuffer on Ring cameras and doorbells.
 ### Other Devices
 - Security Panel
 - Location Modes
-- Contact Sensor / Retrofit Alarm Zones / Tilt Sensor
+- Contact Sensor
+- Retrofit Alarm Zones
+- Tilt Sensor
+- Glassbreak Sensor
 - Motion Sensor
+- Outdoor Motion Sensor
 - Flood / Freeze Sensor
 - Water Sensor
+- Mailbox Sensor
 - Smart Locks
 
 ## Problems and Solutions

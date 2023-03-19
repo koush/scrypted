@@ -43,9 +43,17 @@ class RingLock extends ScryptedDeviceBase implements Battery, Lock {
 }
 
 class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, EntrySensor, MotionSensor, FloodSensor {
+    device: RingDevice;
+    data: RingDeviceData;
+
     constructor(nativeId: string, device: RingDevice) {
         super(nativeId);
+        this.device = device;
+        this.data = device.data;
+        this.updateState(device.data);
+
         device.onData.subscribe(async (data: RingDeviceData) => {
+            this.data = data;
             this.updateState(data);
         });
     }
@@ -54,8 +62,12 @@ class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, En
         this.tampered = data.tamperStatus === 'tamper';
         this.batteryLevel = data.batteryLevel;
         this.entryOpen = data.faulted;
-        this.motionDetected = data.faulted;
+        this.motionDetected = this.device.deviceType === RingDeviceType.BeamsMotionSensor ? data.motionStatus === 'faulted' : data.faulted;
         this.flooded = data.flood?.faulted || data.faulted;
+    }
+
+    isBypassable() {
+        return (this.device.deviceType === RingDeviceType.ContactSensor || this.device.deviceType === RingDeviceType.RetrofitZone) && this.data.faulted;
     }
 }
 
@@ -68,39 +80,14 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
         super(nativeId);
         this.location = location;
 
-        const updateLocationMode = (f: LocationMode) => {
-            let mode: SecuritySystemMode;
-            if (f === 'away')
-                mode = SecuritySystemMode.AwayArmed;
-            else if (f === 'home')
-                mode = SecuritySystemMode.HomeArmed;
-            else
-                mode = SecuritySystemMode.Disarmed;
-
-            let supportedModes = [
-                SecuritySystemMode.Disarmed,
-                SecuritySystemMode.AwayArmed,
-                SecuritySystemMode.HomeArmed
-            ]
-            if (plugin.settingsStorage.values.nightModeBypassAlarmState !== 'Disabled') {
-                supportedModes.push(SecuritySystemMode.NightArmed)
-            }
-
-            this.securitySystemState = {
-                mode,
-                // how to get this?
-                triggered: false,
-                supportedModes
-            }
-        }
-        this.location.onLocationMode.subscribe(updateLocationMode);
+        this.location.onLocationMode.subscribe(this.updateLocationMode);
         
         // if the location has a base station, updates when arming/disarming are not sent to the `onLocationMode` subscription
         // instead we subscribe to the security panel, which is updated during arming actions
         this.location.getSecurityPanel().then(panel => {
             panel.onData.subscribe(_ => { 
                 this.location.getLocationMode().then(response => {
-                    updateLocationMode(response.mode);
+                    this.updateLocationMode(response.mode);
                 });
             });
         }).catch(error => {
@@ -110,11 +97,11 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
 
         if (this.location.hasAlarmBaseStation) {
             this.location.getLocationMode().then(response => {
-                updateLocationMode(response.mode);
+                this.updateLocationMode(response.mode);
             });
 
             if (!this.securitySystemState) {
-                updateLocationMode('disabled');
+                this.updateLocationMode('disabled');
             }
         }
 
@@ -179,11 +166,13 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
                 case RingDeviceType.ContactSensor:
                 case RingDeviceType.RetrofitZone: 
                 case RingDeviceType.TiltSensor:
+                case RingDeviceType.GlassbreakSensor:
                     nativeId = locationDevice.id.toString() + '-sensor';
                     type = ScryptedDeviceType.Sensor
                     interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.EntrySensor);
                     break;
                 case RingDeviceType.MotionSensor:
+                case RingDeviceType.BeamsMotionSensor:
                     nativeId = locationDevice.id.toString() + '-sensor';
                     type = ScryptedDeviceType.Sensor
                     interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.MotionSensor);
@@ -249,25 +238,45 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {}
 
+    updateLocationMode(locationMode: LocationMode) {
+        let mode: SecuritySystemMode;
+        if (locationMode === 'away')
+            mode = SecuritySystemMode.AwayArmed;
+        else if (locationMode === 'home')
+            mode = SecuritySystemMode.HomeArmed;
+        else
+            mode = SecuritySystemMode.Disarmed;
+
+        let supportedModes = [
+            SecuritySystemMode.Disarmed,
+            SecuritySystemMode.AwayArmed,
+            SecuritySystemMode.HomeArmed
+        ]
+        if (this.plugin.settingsStorage.values.nightModeBypassAlarmState !== 'Disabled') {
+            supportedModes.push(SecuritySystemMode.NightArmed)
+        }
+
+        this.securitySystemState = {
+            mode,
+            // how to get this?
+            triggered: false,
+            supportedModes
+        }
+    }
+
     async armSecuritySystem(mode: SecuritySystemMode): Promise<void> {
         if (mode === SecuritySystemMode.AwayArmed) {
             await this.location.armAway();
-        }
-        else if (mode === SecuritySystemMode.HomeArmed) {
+        } else if (mode === SecuritySystemMode.HomeArmed) {
             await this.location.armHome();
-        }
-        else if (mode === SecuritySystemMode.NightArmed) {
-            const bypassContactSensors = Object.values(this.locationDevices).filter(device => {
-                return ((device.deviceType === RingDeviceType.ContactSensor || device.deviceType === RingDeviceType.RetrofitZone) && device.data.faulted)
-            }).map(sensor => sensor.id);
-        
+        } else if (mode === SecuritySystemMode.NightArmed) {
+            const bypassContactSensors = Object.values(this.locationDevices).filter(device => device.isBypassable()).map(sensor => sensor.id);
             if (this.plugin.settingsStorage.values.nightModeBypassAlarmState === 'Away') {
                 await this.location.armAway(bypassContactSensors);
             } else {
                 await this.location.armHome(bypassContactSensors);
             }
-        }
-        else if (mode === SecuritySystemMode.Disarmed) {
+        } else if (mode === SecuritySystemMode.Disarmed) {
             await this.location.disarm();
         }
     }
