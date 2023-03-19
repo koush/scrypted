@@ -294,19 +294,22 @@ export class PluginHost {
                 pluginDebug,
             });
         }
-        else {
+        else if (!this.packageJson.scrypted.runtime || this.packageJson.scrypted.runtime === 'node') {
             if (!process.env.SCRYPTED_SHARED_WORKER || (this.packageJson.optionalDependencies && Object.keys(this.packageJson.optionalDependencies).length)) {
-                this.worker = new NodeForkWorker(this.pluginId, {
+                this.worker = new NodeForkWorker(this.scrypted.mainFilename, this.pluginId, {
                     env,
                     pluginDebug,
                 });
             }
             else {
-                this.worker = new NodeThreadWorker(this.pluginId, {
+                this.worker = new NodeThreadWorker(this.scrypted.mainFilename, this.pluginId, {
                     env,
                     pluginDebug,
                 });
             }
+        }
+        else {
+            throw new Error(`Unsupported Scrypted runtime: ${this.packageJson.scrypted.runtime}`);
         }
 
         this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {

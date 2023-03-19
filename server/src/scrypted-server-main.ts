@@ -7,7 +7,6 @@ import fs from 'fs';
 import http from 'http';
 import httpAuth from 'http-auth';
 import https from 'https';
-import ip from 'ip';
 import mkdirp from 'mkdirp';
 import net from 'net';
 import os from 'os';
@@ -105,7 +104,7 @@ app.use(bodyParser.json())
 // parse some custom thing into a Buffer
 app.use(bodyParser.raw({ type: 'application/zip', limit: 100000000 }) as any)
 
-async function start() {
+async function start(mainFilename: string) {
     const volumeDir = getScryptedVolume();
     mkdirp.sync(volumeDir);
     const dbPath = path.join(volumeDir, 'scrypted.db');
@@ -271,7 +270,7 @@ async function start() {
         next();
     });
 
-    const scrypted = new ScryptedRuntime(db, insecure, secure, app);
+    const scrypted = new ScryptedRuntime(mainFilename, db, insecure, secure, app);
     await scrypted.start();
 
     listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
@@ -627,4 +626,4 @@ async function start() {
     app.get('/', (_req, res) => res.redirect('/endpoint/@scrypted/core/public/'));
 }
 
-start();
+export default start;

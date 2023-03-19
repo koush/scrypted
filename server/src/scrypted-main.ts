@@ -25,7 +25,8 @@ if (process.argv[2] === 'child' || process.argv[2] === 'child-thread') {
         console.error('unhandledRejection', e);
     });
 
-    require('./scrypted-plugin-main');
+    const start = require('./scrypted-plugin-main').default;
+    start(__filename);
 }
 else {
     // unhandled rejections are allowed if they are from a rpc/plugin call.
@@ -37,5 +38,6 @@ else {
         console.warn('unhandled rejection of RPC Result', error);
     });
 
-    require('./scrypted-server-main');
+    const start = require('./scrypted-server-main').default;
+    start(__filename);
 }
