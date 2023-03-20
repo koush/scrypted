@@ -30,8 +30,8 @@ RUN apt-get -y install \
     gcc \
     libgirepository1.0-dev \
     libglib2.0-dev \
-    pkg-config \
-    libvips
+    libvips \
+    pkg-config
 
 # gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
 RUN apt-get -y install \
