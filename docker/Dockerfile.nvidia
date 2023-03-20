@@ -1,4 +1,4 @@
-ARG BASE="18-bullseye-full"
+ARG BASE="18-bullseye-full.s6"
 FROM koush/scrypted-common:${BASE}
 
 # avahi advertiser support
