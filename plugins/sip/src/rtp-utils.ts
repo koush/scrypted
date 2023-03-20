@@ -1,10 +1,11 @@
 // by @dgrief from @homebridge/camera-utils
+import { SrtpOptions } from '@homebridge/camera-utils'
 import dgram from 'dgram'
 const stun = require('stun')
 
 const stunMagicCookie = 0x2112a442 // https://tools.ietf.org/html/rfc5389#section-6
 
-export interface RtpStreamOptions {
+export interface RtpStreamOptions extends SrtpOptions {
   port: number
   rtcpPort: number
 }
