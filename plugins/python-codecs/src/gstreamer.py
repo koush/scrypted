@@ -55,6 +55,7 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
 
     decoder = None
     def setDecoderClearDefault(value: str):
+        nonlocal decoder
         decoder = value
         if decoder == 'Default':
             decoder = None
