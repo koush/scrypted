@@ -34,7 +34,7 @@ function start(mainFilename: string) {
         });
 
         const start = require('./scrypted-plugin-main').default;
-        start(mainFilename);
+        return start(mainFilename);
     }
     else {
         // unhandled rejections are allowed if they are from a rpc/plugin call.
@@ -47,7 +47,7 @@ function start(mainFilename: string) {
         });
 
         const start = require('./scrypted-server-main').default;
-        start(mainFilename);
+        return start(mainFilename);
     }
 }
 
