@@ -122,6 +122,9 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def get_input_details(self) -> Tuple[int, int, int]:
         pass
 
+    def get_input_format(self) -> str:
+        pass
+
     def getModelSettings(self, settings: Any = None) -> list[Setting]:
         return []
 
@@ -131,6 +134,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             'classes': self.getClasses(),
             'triggerClasses': self.getTriggerClasses(),
             'inputSize': self.get_input_details(),
+            'inputFormat': self.get_input_format(),
             'settings': [],
         }
 
@@ -206,7 +210,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pass
 
-    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame) -> ObjectsDetected:
+    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame, detection_session: DetectionSession) -> ObjectsDetected:
         pass
 
     async def run_detection_avframe(self, detection_session: DetectionSession, avframe, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
@@ -288,17 +292,21 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     async def generateObjectDetections(self, videoFrames: Any, session: ObjectDetectionGeneratorSession = None) -> Any:
         try:
             videoFrames = await scrypted_sdk.sdk.connectRPCObject(videoFrames)
+            detection_session = self.create_detection_session()
+            detection_session.plugin = self
+            detection_session.settings = session and session.get('settings')
             async for videoFrame in videoFrames:
-               detected = await self.run_detection_videoframe(videoFrame, session and session.get('settings'))
+               detected = await self.run_detection_videoframe(videoFrame, detection_session)
                yield {
                    '__json_copy_serialize_children': True,
                    'detected': detected,
                    'videoFrame': videoFrame,
                }
-        except:
-            raise
         finally:
-            await videoFrames.aclose()
+            try:
+                await videoFrames.aclose()
+            except:
+                pass
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         is_image = mediaObject and (mediaObject.mimeType.startswith('image/') or mediaObject.mimeType.endswith('/x-raw-image'))
@@ -355,19 +363,29 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         container = j.get('container', None)
         videosrc = j['url']
+        videoCodec = optional_chain(j, 'mediaStreamOptions', 'video', 'codec')
 
         decoder = settings and settings.get('decoder')
+        if decoder == 'Default':
+            decoder = None
         if decoder == 'libav' and not av:
             decoder = None
         elif decoder != 'libav' and not Gst:
             decoder = None
 
-        decoder = decoder or 'Default'
-        if decoder == 'Default':
+        if not decoder:
             if Gst:
-                if platform.system() == 'Darwin':
-                    decoder = 'vtdec_hw'
+                if videoCodec == 'h264':
+                    # hw acceleration is "safe" to use on mac, but not
+                    # on other hosts where it may crash.
+                    # defaults must be safe.
+                    if platform.system() == 'Darwin':
+                        decoder = 'vtdec_hw'
+                    else:
+                        decoder = 'avdec_h264'
                 else:
+                    # decodebin may pick a hardware accelerated decoder, which isn't ideal
+                    # so use a known software decoder for h264 and decodebin for anything else.
                     decoder = 'decodebin'
             elif av:
                 decoder = 'libav'
@@ -414,8 +432,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if not Gst:
             raise Exception('Gstreamer is unavailable')
       
-        videoCodec = optional_chain(j, 'mediaStreamOptions', 'video', 'codec')
-
         if videosrc.startswith('tcp://'):
             parsed_url = urlparse(videosrc)
             videosrc = 'tcpclientsrc port=%s host=%s' % (
@@ -456,7 +472,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         return ret
 
-    def detection_event_notified(self, settings: Any):
+    async def detection_event_notified(self, settings: Any):
         pass
 
     async def createMedia(self, data: Any) -> MediaObject:
@@ -527,7 +543,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                         self.invalidateMedia(detection_session, data)
 
                     # asyncio.run_coroutine_threadsafe(, loop = self.loop).result()
-                    self.detection_event_notified(detection_session.settings)
+                    await self.detection_event_notified(detection_session.settings)
 
                 if not detection_session or duration == None:
                     safe_set_result(detection_session.loop,

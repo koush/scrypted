@@ -765,7 +765,10 @@ export enum PanTiltZoomMovement {
 }
 
 export interface PanTiltZoomCommand {
-  movement: PanTiltZoomMovement;
+  /**
+   * Specify the movement origin. If unspecified, the movement will be relative to the current position.
+   */
+  movement?: PanTiltZoomMovement;
   /**
    * Ranges between -1 and 1.
    */
@@ -1296,6 +1299,7 @@ export interface ObjectDetectionSession extends ObjectDetectionGeneratorSession 
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;
   inputSize?: number[];
+  inputFormat?: 'gray' | 'rgb' | 'rgba';
   settings: Setting[];
   triggerClasses?: string[];
 }
@@ -1328,7 +1332,7 @@ export interface ImageOptions {
     width?: number,
     height?: number,
   };
-  format?: 'rgba' | 'rgb' | 'jpg';
+  format?: 'gray' | 'rgba' | 'rgb' | 'jpg';
 }
 export interface Image {
   width: number;

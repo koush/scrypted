@@ -709,3 +709,29 @@ class Arlo(object):
             trigger,
             callback,
         )
+
+    def SirenOn(self, basestation):
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": "siren",
+            "publishResponse": True,
+            "properties": {
+                "sirenState": "on",
+                "duration": 300,
+                "volume": 8,
+                "pattern": "alarm"
+            }
+        })
+
+    def SirenOff(self, basestation):
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": "siren",
+            "publishResponse": True,
+            "properties": {
+                "sirenState": "off",
+                "duration": 300,
+                "volume": 8,
+                "pattern": "alarm"
+            }
+        })

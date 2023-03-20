@@ -108,18 +108,6 @@ addSupportedType({
             () => Math.max(device.thermostatSetpoint || 0, 10));
 
         if (device.thermostatAvailableModes.includes(ThermostatMode.HeatCool)) {
-            service.getCharacteristic(Characteristic.CoolingThresholdTemperature).setProps({
-                minStep: minStep, // 0.1
-                minValue: minSetTemp, // default = 10, change to 9C or 50F (10C)
-                maxValue: maxSetTemp // default = 35, change to 32C or 90F (32.2222C)
-            });
-
-            service.getCharacteristic(Characteristic.HeatingThresholdTemperature).setProps({
-                minStep: minStep, // 0.1
-                minValue: minSetTemp, // default = 0, change to 9C or 50F (10C)
-                maxValue: maxSetTemp // default = 25, change to 32C or 90F (32.2222C)
-            });
-
             service.getCharacteristic(Characteristic.HeatingThresholdTemperature)
                 .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                     callback();
@@ -137,6 +125,19 @@ addSupportedType({
 
             bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.CoolingThresholdTemperature,
                 () => Math.max(device.thermostatSetpointHigh || 0, 10));
+
+            // sets props after binding initial state to avoid warnings in logs
+            service.getCharacteristic(Characteristic.CoolingThresholdTemperature).setProps({
+                minStep: minStep, // 0.1
+                minValue: minSetTemp, // default = 10, change to 9C or 50F (10C)
+                maxValue: maxSetTemp // default = 35, change to 32C or 90F (32.2222C)
+            });
+
+            service.getCharacteristic(Characteristic.HeatingThresholdTemperature).setProps({
+                minStep: minStep, // 0.1
+                minValue: minSetTemp, // default = 0, change to 9C or 50F (10C)
+                maxValue: maxSetTemp // default = 25, change to 32C or 90F (32.2222C)
+            });
         }
 
         bindCharacteristic(device, ScryptedInterface.Thermometer, service, Characteristic.TemperatureDisplayUnits,

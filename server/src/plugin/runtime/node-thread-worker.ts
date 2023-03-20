@@ -10,11 +10,11 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
     terminated: boolean;
     worker: worker_threads.Worker;
 
-    constructor(public pluginId: string, options: RuntimeWorkerOptions) {
+    constructor(mainFilename: string, public pluginId: string, options: RuntimeWorkerOptions) {
         super();
         const { env } = options;
 
-        this.worker = new worker_threads.Worker(require.main.filename, {
+        this.worker = new worker_threads.Worker(mainFilename, {
             argv: ['child-thread', this.pluginId],
             env: Object.assign({}, process.env, env, {
                 NODE_PATH: path.join(getPluginNodePath(this.pluginId), 'node_modules'),

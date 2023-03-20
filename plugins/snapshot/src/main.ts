@@ -8,9 +8,7 @@ import axios, { AxiosInstance } from "axios";
 import https from 'https';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
-import { ffmpegFilterImage } from './ffmpeg-image-filter';
-import { ImageReader, ImageWriter } from './image-reader';
-import { sharpFilterImage } from './sharp-image-filter';
+import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -301,9 +299,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 } : undefined);
                 picture = await this.cropAndScale(picture);
                 if (needSoftwareResize) {
-                    picture = await sharpFilterImage(picture, {
+                    picture = await ffmpegFilterImageBuffer(picture, {
                         console: this.debugConsole,
+                        ffmpegPath: await mediaManager.getFFmpegPath(),
                         resize: options?.picture,
+                        timeout: 10000,
                     });
                 }
                 this.clearCachedPictures();
@@ -353,8 +353,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const xmax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
-        return sharpFilterImage(buffer, {
+        return ffmpegFilterImageBuffer(buffer, {
             console: this.debugConsole,
+            ffmpegPath: await mediaManager.getFFmpegPath(),
             crop: {
                 fractional: true,
                 left: xmin,
@@ -362,6 +363,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 width: xmax - xmin,
                 height: ymax - ymin,
             },
+            timeout: 10000,
         });
     }
 
@@ -445,14 +447,16 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             })
         }
         else {
-            return sharpFilterImage(errorBackground, {
+            return ffmpegFilterImageBuffer(errorBackground, {
                 console: this.debugConsole,
+                ffmpegPath: await mediaManager.getFFmpegPath(),
                 blur: true,
                 brightness: -.2,
                 text: {
                     fontFile,
                     text,
                 },
+                timeout: 10000,
             });
         }
     }
@@ -497,7 +501,7 @@ export function parseDims<T extends string>(dict: DimDict<T>) {
     return ret;
 }
 
-class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider {
+class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings {
     storageSettings = new StorageSettings(this, {
         debugLogging: {
             title: 'Debug Logging',
@@ -515,35 +519,9 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
         process.nextTick(() => {
             sdk.deviceManager.onDevicesChanged({
                 devices: [
-                    {
-                        name: 'Image Reader',
-                        type: ScryptedDeviceType.Builtin,
-                        nativeId: 'reader',
-                        interfaces: [
-                            ScryptedInterface.BufferConverter,
-                        ]
-                    },
-                    {
-                        name: 'Image Writer',
-                        type: ScryptedDeviceType.Builtin,
-                        nativeId: 'writer',
-                        interfaces: [
-                            ScryptedInterface.BufferConverter,
-                        ]
-                    }
                 ]
             })
         })
-    }
-
-    async getDevice(nativeId: string): Promise<any> {
-        if (nativeId === 'reader')
-            return new ImageReader('reader')
-        if (nativeId === 'writer')
-            return new ImageWriter('writer')
-    }
-
-    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     getSettings(): Promise<Setting[]> {

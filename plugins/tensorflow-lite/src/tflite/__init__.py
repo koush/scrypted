@@ -40,8 +40,11 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
     def __init__(self, nativeId: str | None = None):
         super().__init__(MIME_TYPE, nativeId=nativeId)
 
-        labels_contents = scrypted_sdk.zip.open(
-            'fs/coco_labels.txt').read().decode('utf8')
+        tfliteFile = self.downloadFile('https://raw.githubusercontent.com/google-coral/test_data/master/ssd_mobilenet_v2_coco_quant_postprocess.tflite', 'ssd_mobilenet_v2_coco_quant_postprocess.tflite')
+        edgetpuFile = self.downloadFile('https://raw.githubusercontent.com/google-coral/test_data/master/ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite', 'ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite')
+        labelsFile = self.downloadFile('https://raw.githubusercontent.com/google-coral/test_data/master/coco_labels.txt', 'coco_labels.txt')
+
+        labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
         self.interpreters = queue.Queue()
         self.interpreter_count = 0
@@ -54,13 +57,11 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
             self.edge_tpu_found = str(edge_tpus)
             # todo co-compile
             # https://coral.ai/docs/edgetpu/compiler/#co-compiling-multiple-models
-            model = scrypted_sdk.zip.open(
-                'fs/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite').read()
             # face_model = scrypted_sdk.zip.open(
             #     'fs/mobilenet_ssd_v2_face_quant_postprocess.tflite').read()
             for idx, edge_tpu in enumerate(edge_tpus):
                 try:
-                    interpreter = make_interpreter(model, ":%s" % idx)
+                    interpreter = make_interpreter(edgetpuFile, ":%s" % idx)
                     interpreter.allocate_tensors()
                     _, height, width, channels = interpreter.get_input_details()[
                             0]['shape']
@@ -77,11 +78,9 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
         except Exception as e:
             print('unable to use Coral Edge TPU', e)
             self.edge_tpu_found = 'Edge TPU not found'
-            model = scrypted_sdk.zip.open(
-                'fs/mobilenet_ssd_v2_coco_quant_postprocess.tflite').read()
             # face_model = scrypted_sdk.zip.open(
             #     'fs/mobilenet_ssd_v2_face_quant_postprocess.tflite').read()
-            interpreter = tflite.Interpreter(model_content=model)
+            interpreter = tflite.Interpreter(model_path=tfliteFile)
             interpreter.allocate_tensors()
             _, height, width, channels = interpreter.get_input_details()[
                     0]['shape']

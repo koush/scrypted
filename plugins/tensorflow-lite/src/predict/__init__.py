@@ -8,6 +8,8 @@ from typing import Any, List, Tuple, Mapping
 import asyncio
 import time
 from .rectangle import Rectangle, intersect_area, intersect_rect, to_bounding_box, from_bounding_box, combine_rect
+import urllib.request
+import os
 
 from detect import DetectionSession, DetectPlugin
 
@@ -125,6 +127,17 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
         loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+
+    def downloadFile(self, url: str, filename: str):
+        filesPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'files')
+        fullpath = os.path.join(filesPath, filename)
+        if os.path.isfile(fullpath):
+            return fullpath
+        os.makedirs(filesPath, exist_ok=True)
+        tmp = fullpath + '.tmp'
+        urllib.request.urlretrieve(url, tmp)
+        os.rename(tmp, fullpath)
+        return fullpath
 
     def getClasses(self) -> list[str]:
         return list(self.labels.values())
@@ -272,7 +285,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         pass
 
-    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame, settings: Any) -> ObjectsDetected:
+    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame, detection_session: PredictSession) -> ObjectsDetected:
+        settings = detection_session and detection_session.settings
         src_size = videoFrame.width, videoFrame.height
         w, h = self.get_input_size()
         iw, ih = src_size

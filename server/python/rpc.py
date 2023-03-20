@@ -29,6 +29,8 @@ class RPCResultError(Exception):
     def __init__(self, caught, message):
         self.caught = caught
         self.message = message
+        self.name = None
+        self.stack = None
 
 
 class RpcSerializer:
@@ -121,6 +123,16 @@ class RpcPeer:
         self.killed = False
 
     def __apply__(self, proxyId: str, oneWayMethods: List[str], method: str, args: list):
+        oneway = oneWayMethods and method in oneWayMethods
+
+        if self.killed:
+            future = Future()
+            if oneway:
+                future.set_result(None)
+                return future
+            future.set_exception(RPCResultError(None, 'RpcPeer has been killed (apply) ' + str(method)))
+            return future
+
         serializationContext: Dict = {}
         serializedArgs = []
         for arg in args:
@@ -134,7 +146,7 @@ class RpcPeer:
             'method': method,
         }
 
-        if oneWayMethods and method in oneWayMethods:
+        if oneway:
             rpcApply['oneway'] = True
             self.send(rpcApply, None, serializationContext)
             future = Future()
@@ -472,12 +484,13 @@ class RpcPeer:
             pass
 
     async def createPendingResult(self, cb: Callable[[str, Callable[[Exception], None]], None]):
-        # if (Object.isFrozen(this.pendingResults))
-        #     return Promise.reject(new RPCResultError('RpcPeer has been killed'));
+        future = Future()
+        if self.killed:
+            future.set_exception(RPCResultError(None, 'RpcPeer has been killed (createPendingResult)'))
+            return future
 
         id = str(self.idCounter)
         self.idCounter = self.idCounter + 1
-        future = Future()
         self.pendingResults[id] = future
         await cb(id, lambda e: future.set_exception(RPCResultError(e, None)))
         return await future

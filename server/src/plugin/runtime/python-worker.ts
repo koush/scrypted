@@ -58,11 +58,14 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
 
         args.push(this.pluginId);
 
+        const types = require.resolve('@scrypted/types');
+        const PYTHONPATH = types.substring(0, types.indexOf('@scrypted/types') + '@scrypted/types'.length);
         this.worker = child_process.spawn(pythonPath, args, {
             // stdin, stdout, stderr, peer in, peer out
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
             env: Object.assign({
-                PYTHONPATH: path.join(process.cwd(), 'node_modules/@scrypted/types'),
+                PYTHONUNBUFFERED: '1',
+                PYTHONPATH,
             }, gstEnv, process.env, env),
         });
 

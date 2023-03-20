@@ -158,33 +158,33 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 // may not be reachable.
                 // Return the incoming address, assuming the sanity checks pass. Otherwise, fall through
                 // to the HAP-NodeJS implementation.
-                let check: string;
-                if (request.addressVersion === 'ipv4') {
-                    const localAddress = request.connection.localAddress;
-                    if (v4Regex.exec(localAddress)) {
-                        check = localAddress;
-                    }
-                    else if (v4v6Regex.exec(localAddress)) {
-                        // if this is a v4 over v6 address, parse it out.
-                        check = localAddress.substring('::ffff:'.length);
-                    }
-                }
-                else if (request.addressVersion === 'ipv6' && !v4Regex.exec(request.connection.localAddress)) {
-                    check = request.connection.localAddress;
-                }
+                // let check: string;
+                // if (request.addressVersion === 'ipv4') {
+                //     const localAddress = request.connection.localAddress;
+                //     if (v4Regex.exec(localAddress)) {
+                //         check = localAddress;
+                //     }
+                //     else if (v4v6Regex.exec(localAddress)) {
+                //         // if this is a v4 over v6 address, parse it out.
+                //         check = localAddress.substring('::ffff:'.length);
+                //     }
+                // }
+                // else if (request.addressVersion === 'ipv6' && !v4Regex.exec(request.connection.localAddress)) {
+                //     check = request.connection.localAddress;
+                // }
 
-                // ignore the IP if it is APIPA (Automatic Private IP Addressing)
-                if (check?.startsWith('169.')) {
-                    check = undefined;
-                }
+                // // ignore the IP if it is APIPA (Automatic Private IP Addressing)
+                // if (check?.startsWith('169.')) {
+                //     check = undefined;
+                // }
 
-                // sanity check this address.
-                if (check) {
-                    const infos = os.networkInterfaces()[request.connection.networkInterface];
-                    if (infos && infos.find(info => info.address === check)) {
-                        response.addressOverride = check;
-                    }
-                }
+                // // sanity check this address.
+                // if (check) {
+                //     const infos = os.networkInterfaces()[request.connection.networkInterface];
+                //     if (infos && infos.find(info => info.address === check)) {
+                //         response.addressOverride = check;
+                //     }
+                // }
             }
 
             console.log('source address', response.addressOverride, videoPort, audioPort);

@@ -84,7 +84,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     addressSettings = new AddressSettings(this);
     usersService = new UsersService(this);
 
-    constructor(datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
+    constructor(public mainFilename: string, datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
         super(app);
         this.datastore = datastore;
         this.app = app;
