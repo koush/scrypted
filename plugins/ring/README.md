@@ -32,6 +32,8 @@ Do not enable prebuffer on Ring cameras and doorbells.
 - Water Sensor
 - Mailbox Sensor
 - Smart Locks
+- Ring Smart Lights (Flood/Path/Step/Spot Lights, Bulbs, Transformer)
+- Lights, Switches & Outlets
 
 ## Problems and Solutions
 

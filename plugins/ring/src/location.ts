@@ -1,7 +1,7 @@
-import sdk, { Battery, Device, DeviceProvider, EntrySensor, FloodSensor, Lock, LockState, MotionSensor, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, SecuritySystem, SecuritySystemMode, TamperSensor } from '@scrypted/sdk';
+import sdk, { Battery, Brightness, Device, DeviceProvider, EntrySensor, FloodSensor, Lock, LockState, MotionSensor, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, SecuritySystem, SecuritySystemMode, TamperSensor } from '@scrypted/sdk';
 import { RingCameraDevice } from './camera';
 import RingPlugin from './main';
-import { Location, LocationMode, RingCamera, RingDevice, RingDeviceData, RingDeviceType } from './ring-client-api';
+import { Location, LocationMode, RingCamera, RingDevice, RingDeviceCategory, RingDeviceData, RingDeviceType } from './ring-client-api';
 
 const { deviceManager } = sdk;
 
@@ -11,6 +11,8 @@ class RingLock extends ScryptedDeviceBase implements Battery, Lock {
     constructor(nativeId: string, device: RingDevice) {
         super(nativeId);
         this.device = device;
+        this.updateState(device.data);
+
         device.onData.subscribe(async (data: RingDeviceData) => {
             this.updateState(data);
         });
@@ -42,7 +44,7 @@ class RingLock extends ScryptedDeviceBase implements Battery, Lock {
     }
 }
 
-class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, EntrySensor, MotionSensor, FloodSensor {
+class RingLight extends ScryptedDeviceBase implements Battery, TamperSensor, MotionSensor, OnOff, Brightness {
     device: RingDevice;
     data: RingDeviceData;
 
@@ -58,16 +60,93 @@ class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, En
         });
     }
 
+    private isBeamDevice() {
+        return [RingDeviceType.BeamsMultiLevelSwitch,  RingDeviceType.BeamsSwitch, RingDeviceType.BeamsTransformerSwitch].includes(this.device.deviceType);
+    }
+
     updateState(data: RingDeviceData) {
-        this.tampered = data.tamperStatus === 'tamper';
         this.batteryLevel = data.batteryLevel;
+        this.tampered = data.tamperStatus === 'tamper';
+        this.motionDetected = data.motionStatus === 'faulted';
+        this.on = data.on;
+        this.brightness = data.level && !isNaN(data.level) ? 100 * data.level : 0;
+    }
+
+    turnOff(): Promise<void> {
+        if (this.isBeamDevice()) {
+            this.device.sendCommand('light-mode.set', { lightMode: 'default' });
+            return;
+        } else {
+            return this.device.setInfo({ device: { v1: { on: false } } });
+        }
+    }
+    
+    turnOn(): Promise<void> {
+        if (this.isBeamDevice()) {
+            this.device.sendCommand('light-mode.set', { lightMode: 'on' });
+            return;
+        } else {
+            return this.device.setInfo({ device: { v1: { on: true } } });
+        }
+    }
+
+    setBrightness(brightness: number): Promise<void> {
+        return this.device.setInfo({
+            device: { v1: { level: brightness / 100 } },
+        });
+    }
+}
+
+class RingSwitch extends ScryptedDeviceBase implements OnOff {
+    device: RingDevice;
+    data: RingDeviceData;
+
+    constructor(nativeId: string, device: RingDevice) {
+        super(nativeId);
+        this.device = device;
+        this.updateState(device.data);
+
+        device.onData.subscribe(async (data: RingDeviceData) => {
+            this.updateState(data);
+        });
+    }
+
+    updateState(data: RingDeviceData) {
+        this.on = data.on;
+    }
+
+    turnOff(): Promise<void> {
+        return this.device.setInfo({ device: { v1: { on: false } } });
+    }
+    
+    turnOn(): Promise<void> {
+        return this.device.setInfo({ device: { v1: { on: true } } });
+    }
+}
+
+class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, EntrySensor, MotionSensor, FloodSensor {
+    device: RingDevice;
+
+    constructor(nativeId: string, device: RingDevice) {
+        super(nativeId);
+        this.device = device;
+        this.updateState(device.data);
+
+        device.onData.subscribe(async (data: RingDeviceData) => {
+            this.updateState(data);
+        });
+    }
+
+    updateState(data: RingDeviceData) {
+        this.batteryLevel = data.batteryLevel;
+        this.tampered = data.tamperStatus === 'tamper';
         this.entryOpen = data.faulted;
         this.motionDetected = this.device.deviceType === RingDeviceType.BeamsMotionSensor ? data.motionStatus === 'faulted' : data.faulted;
         this.flooded = data.flood?.faulted || data.faulted;
     }
 
     isBypassable() {
-        return (this.device.deviceType === RingDeviceType.ContactSensor || this.device.deviceType === RingDeviceType.RetrofitZone) && this.data.faulted;
+        return (this.device.deviceType === RingDeviceType.ContactSensor || this.device.deviceType === RingDeviceType.RetrofitZone) && this.device.data.faulted;
     }
 }
 
@@ -168,25 +247,51 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
                 case RingDeviceType.TiltSensor:
                 case RingDeviceType.GlassbreakSensor:
                     nativeId = locationDevice.id.toString() + '-sensor';
-                    type = ScryptedDeviceType.Sensor
+                    type = ScryptedDeviceType.Sensor;
                     interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.EntrySensor);
                     break;
                 case RingDeviceType.MotionSensor:
                 case RingDeviceType.BeamsMotionSensor:
                     nativeId = locationDevice.id.toString() + '-sensor';
-                    type = ScryptedDeviceType.Sensor
+                    type = ScryptedDeviceType.Sensor;
                     interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.MotionSensor);
                     break;
                 case RingDeviceType.FloodFreezeSensor:
                 case RingDeviceType.WaterSensor:
                     nativeId = locationDevice.id.toString() + '-sensor';
-                    type = ScryptedDeviceType.Sensor
+                    type = ScryptedDeviceType.Sensor;
                     interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.FloodSensor);
+                    break;
+                case RingDeviceType.BeamsMultiLevelSwitch:
+                case RingDeviceType.BeamsSwitch:
+                case RingDeviceType.BeamsTransformerSwitch:
+                case RingDeviceType.MultiLevelBulb:
+                    nativeId = locationDevice.id.toString() + '-light';
+                    type = ScryptedDeviceType.Light;
+                    interfaces.push(ScryptedInterface.OnOff);
+                    if (data.level !== undefined)
+                        interfaces.push(ScryptedInterface.Brightness)
+                    if (data.motionStatus !== undefined && !!data.motionSensorEnabled)
+                        interfaces.push(ScryptedInterface.TamperSensor, ScryptedInterface.MotionSensor);
+                    break;
+                case RingDeviceType.MultiLevelSwitch:
+                    if (data.categoryId === RingDeviceCategory.Lights) {
+                        nativeId = locationDevice.id.toString() + '-light';
+                        type = ScryptedDeviceType.Light;
+                        interfaces.push(ScryptedInterface.OnOff);
+                        if (data.level !== undefined)
+                            interfaces.push(ScryptedInterface.Brightness)
+                        break;
+                    }
+                case RingDeviceType.Switch:
+                    nativeId = locationDevice.id.toString() + '-switch';
+                    type = data.categoryId === RingDeviceCategory.Outlets ? ScryptedDeviceType.Outlet : ScryptedDeviceType.Switch;
+                    interfaces.push(ScryptedInterface.OnOff);
                     break;
                 default:
                     if (/^lock($|\.)/.test(data.deviceType)) {
                         nativeId = locationDevice.id.toString() + '-lock';
-                        type = ScryptedDeviceType.Lock
+                        type = ScryptedDeviceType.Lock;
                         interfaces.push(ScryptedInterface.Lock);
                         break;
                     } else {
@@ -227,6 +332,12 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
                 this.devices.set(nativeId, device);
             } else if (nativeId.endsWith('-lock')) {
                 const device = new RingLock(nativeId, this.locationDevices.get(nativeId) as RingDevice);
+                this.devices.set(nativeId, device);
+            } else if (nativeId.endsWith('-light')) {
+                const device = new RingLight(nativeId, this.locationDevices.get(nativeId) as RingDevice);
+                this.devices.set(nativeId, device);
+            } else if (nativeId.endsWith('-switch')) {
+                const device = new RingSwitch(nativeId, this.locationDevices.get(nativeId) as RingDevice);
                 this.devices.set(nativeId, device);
             } else {
                 const device = new RingCameraDevice(this.plugin.api, nativeId, this.locationDevices.get(nativeId) as RingCamera);
