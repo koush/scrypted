@@ -317,6 +317,11 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
             providerNativeId: this.location.id,
             devices: devices,
         });
+
+        // probe to intiailize location devices
+        for (const device of devices) {
+            await this.getDevice(device.nativeId);
+        };
     }
 
     async getDevice(nativeId: string) {
