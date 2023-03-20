@@ -151,23 +151,23 @@ class RingSensor extends ScryptedDeviceBase implements TamperSensor, Battery, En
 }
 
 export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProvider, SecuritySystem {
+    plugin: RingPlugin;
     location: Location;
     devices = new Map<string, any>();
     locationDevices = new Map<string, RingDevice | RingCamera>();
 
-    constructor(public plugin: RingPlugin, nativeId: string, location: Location) {
+    constructor(plugin: RingPlugin, nativeId: string, location: Location) {
         super(nativeId);
+        this.plugin = plugin;
         this.location = location;
 
-        this.location.onLocationMode.subscribe(this.updateLocationMode);
+        this.location.onLocationMode.subscribe(mode => this.updateLocationMode(mode));
         
         // if the location has a base station, updates when arming/disarming are not sent to the `onLocationMode` subscription
         // instead we subscribe to the security panel, which is updated during arming actions
         this.location.getSecurityPanel().then(panel => {
-            panel.onData.subscribe(_ => { 
-                this.location.getLocationMode().then(response => {
-                    this.updateLocationMode(response.mode);
-                });
+            panel.onData.subscribe(_ => {
+                this.location.getLocationMode();
             });
         }).catch(error => {
             // could not find a security panel for location
@@ -175,13 +175,7 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
         });
 
         if (this.location.hasAlarmBaseStation) {
-            this.location.getLocationMode().then(response => {
-                this.updateLocationMode(response.mode);
-            });
-
-            if (!this.securitySystemState) {
-                this.updateLocationMode('disabled');
-            }
+            this.location.getLocationMode();
         }
 
         this.discoverDevices();
@@ -323,6 +317,11 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
             providerNativeId: this.location.id,
             devices: devices,
         });
+
+        // probe to intiailize location devices
+        for (const device of devices) {
+            await this.getDevice(device.nativeId);
+        };
     }
 
     async getDevice(nativeId: string) {

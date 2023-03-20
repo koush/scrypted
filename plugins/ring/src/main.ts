@@ -176,6 +176,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
         await deviceManager.onDevicesChanged({
             devices: locationDevices,
         });
+
+        // probe to intiailize locations
+        for (const device of locationDevices) {
+            await this.getDevice(device.nativeId);
+        };
     }
 
     async getDevice(nativeId: string) {
