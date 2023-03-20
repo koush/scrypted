@@ -38,7 +38,7 @@ export class SipCallSession extends Subscribed {
     sipManager.setSipOptions( sipOptions )
   }
 
-  static async createCallSession(console: Console, cameraName: string, sipOptions: SipOptions, sipManager: SipManager ) {
+  static async createCallSession(console: Console, cameraName: string, sipOptions: SipOptions, sipManager?: SipManager ) {
     const audioSplitter = await createBindZero(),
     audioRtcpSplitter = await createBindUdp(audioSplitter.port + 1),
     videoSplitter = await createBindZero(),
