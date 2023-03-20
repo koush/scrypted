@@ -60,7 +60,7 @@
   "bin": {
     "scrypted-serve": "bin/scrypted-serve"
   },
-  "main": "dist/scrypted-main.js",
+  "main": "dist/scrypted-main-exports.js",
   "scripts": {
     "preserve": "npm run build",
     "serve": "node --expose-gc dist/scrypted-main.js",
