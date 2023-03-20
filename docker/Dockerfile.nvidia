@@ -1,0 +1,57 @@
+ARG BASE="18-bullseye-full"
+FROM koush/scrypted-common:${BASE}
+
+# avahi advertiser support
+RUN apt-get -y install \
+    libnss-mdns \
+    avahi-discover \
+    libavahi-compat-libdnssd-dev
+
+# copy configurations and scripts
+COPY fs /
+
+# s6 process supervisor
+ARG S6_OVERLAY_VERSION=3.1.1.2
+ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
+ENV S6_KEEP_ENV=1
+RUN case "$(uname -m)" in \
+    x86_64) S6_ARCH='x86_64';; \
+    armv7l) S6_ARCH='armhf';; \
+    aarch64) S6_ARCH='aarch64';; \
+    *) echo "Your system architecture isn't supported."; exit 1 ;; \
+    esac \
+  && cd /tmp \
+  && set -x \
+  && curl -SLOf https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz \
+  && tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
+  && curl -SLOf  https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz \
+  && tar -C / -Jxpf /tmp/s6-overlay-${S6_ARCH}.tar.xz
+
+ENTRYPOINT ["/init"]
+
+WORKDIR /
+
+# Install miniconda
+ENV CONDA_DIR /opt/conda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+     /bin/bash ~/miniconda.sh -b -p /opt/conda
+# Put conda in path so we can use conda activate
+ENV PATH=$CONDA_DIR/bin:$PATH
+
+RUN conda install -c conda-forge cudatoolkit=11.2.2 cudnn=8.1.0
+ENV CONDA_PREFIX=/opt/conda
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/
+
+# cache bust
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+ARG SCRYPTED_INSTALL_VERSION="latest"
+RUN test -n "$SCRYPTED_INSTALL_VERSION"
+RUN npx -y scrypted@latest install-server ${SCRYPTED_INSTALL_VERSION}
+WORKDIR /server
+
+# this prevents node from preferring ipv6 addresses locally on
+# networks with busted ipv6 setups.
+# https://github.com/nodejs/node/issues/41145#issuecomment-992948130
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
+
+CMD npm --prefix /server exec scrypted-serve
