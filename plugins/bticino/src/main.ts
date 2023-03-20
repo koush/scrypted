@@ -1,4 +1,4 @@
-import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, LockState, MediaObject, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk'
+import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, LockState, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from '@scrypted/sdk'
 import { randomBytes } from 'crypto'
 import { BticinoSipCamera } from './bticino-camera'
 

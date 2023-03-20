@@ -1,17 +1,15 @@
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { sleep } from '@scrypted/common/src/sleep';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
-import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
+import { addTrackControls } from '@scrypted/common/src/sdp-utils';
 import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
 import { SipCallSession } from '../../sip/src/sip-call-session';
-import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType, RtpDescription } from '../../sip/src/rtp-utils';
+import { RtpDescription } from '../../sip/src/rtp-utils';
 import { VoicemailHandler } from './bticino-voicemailHandler';
 import { CompositeSipMessageHandler } from '../../sip/src/compositeSipMessageHandler';
-import { decodeSrtpOptions, encodeSrtpOptions, SrtpOptions } from '../../ring/src/srtp-utils'
 import { SipHelper } from './sip-helper';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
-import fs from 'fs'
 import { BticinoStorageSettings } from './storage-settings';
 import { BticinoSipPlugin } from './main';
 import { BticinoSipLock } from './bticino-lock';
@@ -19,7 +17,7 @@ import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from
 import { PersistentSipManager } from './persistent-sip-manager';
 import { InviteHandler } from './bticino-inviteHandler';
 import { SipRequest } from '../../sip/src/sip-manager';
-import crypto from 'crypto';
+
 import { get } from 'http'
 
 const STREAM_TIMEOUT = 65000;
@@ -41,15 +39,14 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     private inviteHandler : InviteHandler = new InviteHandler(this)
     //TODO: randomize this
     private keyAndSalt : string = "/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X"
-    private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
+    //private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
     private persistentSipManager : PersistentSipManager
     public doorbellWebhookUrl : string
     public doorbellLockWebhookUrl : string
-    private md5
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
-        this.md5 = crypto.createHash('md5').update( nativeId ).digest("hex")
+        
         this.requestHandlers.add( this.voicemailHandler ).add( this.inviteHandler )
         this.persistentSipManager = new PersistentSipManager( this );
         (async() => {
@@ -57,9 +54,11 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             this.doorbellLockWebhookUrl = await this.doorbellLockWebhookEndpoint()
         })();
     }
+
     getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
        return new Promise<VideoClip[]>(  (resolve,reject ) => {
-            let c300x = SipHelper.sipOptions(this).deviceIp
+            let c300x = SipHelper.getIntercomIp(this)
+            if( !c300x ) return []
             get(`http://${c300x}:8080/videoclips?raw=true&startTime=${options.startTime/1000}&endTime=${options.endTime/1000}`, (res) => {
             let rawData = '';
             res.on('data', (chunk) => { rawData += chunk; });
@@ -89,15 +88,16 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }
 
     getVideoClip(videoId: string): Promise<MediaObject> {
-        let c300x = SipHelper.sipOptions(this).deviceIp
+        let c300x = SipHelper.getIntercomIp(this)
         const url = `http://${c300x}:8080/voicemail?msg=${videoId}/aswm.avi&raw=true`;
         return mediaManager.createMediaObjectFromUrl(url);        
     }
     getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject> {
-        let c300x = SipHelper.sipOptions(this).deviceIp
+        let c300x = SipHelper.sipOptions(this)
         const url = `http://${c300x}:8080/voicemail?msg=${thumbnailId}/aswm.jpg&raw=true`;
         return mediaManager.createMediaObjectFromUrl(url);        
     }
+
     removeVideoClips(...videoClipIds: string[]): Promise<void> {
         //TODO
         throw new Error('Method not implemented.')
@@ -292,10 +292,10 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 let sdp : string = [ 
                     "v=0",
                     "m=audio 5000 RTP/AVP 110",
-                    "c=IN IP4 172.21.0.134",
+                    "c=IN IP4 127.0.0.1",
                     "a=rtpmap:110 speex/8000/1",
                     "m=video 5002 RTP/AVP 96",
-                    "c=IN IP4 172.21.0.134",
+                    "c=IN IP4 127.0.0.1",
                     "a=rtpmap:96 H264/90000",
                 ].join('\r\n')
                 //sdp = sdp.replaceAll(/a=crypto\:1.*/g, '')
@@ -404,10 +404,4 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         this.console.log( webhookUrl + " -> endpoints: " + endpoints.join(' - ') )
         return `${webhookUrl}`;
     }  
-
-
-
-    getGruuInstanceId(): string {
-        return this.md5.substring(0, 8) + '-' + this.md5.substring(8, 12) + '-' + this.md5.substring(12,16) + '-' + this.md5.substring(16, 32);
-    }
 }

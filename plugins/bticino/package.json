@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/bticino",
-   "version": "0.0.7-beta.0",
+   "version": "0.0.7",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
