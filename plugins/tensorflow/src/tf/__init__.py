@@ -47,7 +47,7 @@ class TensorFlowPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk
     def get_input_size(self) -> Tuple[float, float]:
         return (self.inputwidth, self.inputheight)
 
-    def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
+    async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         image_array  = tf.keras.utils.img_to_array(input)
         
         input_tensor = tf.convert_to_tensor(image_array, dtype = tf.uint8)
