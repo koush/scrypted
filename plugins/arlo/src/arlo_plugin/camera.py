@@ -221,36 +221,30 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, Moti
     async def getVideoClip(self, videoId: str) -> MediaObject:
         self.logger.info(f"Getting video clip {videoId}")
 
-        try:
-            id_as_time = int(videoId) / 1000.0
-            start = datetime.fromtimestamp(id_as_time) - timedelta(days=1)
-            end = datetime.fromtimestamp(id_as_time) + timedelta(days=1)
+        id_as_time = int(videoId) / 1000.0
+        start = datetime.fromtimestamp(id_as_time) - timedelta(seconds=10)
+        end = datetime.fromtimestamp(id_as_time) + timedelta(seconds=10)
 
-            library = self.provider.arlo.GetLibrary(self.arlo_device, start, end)
-            for recording in library:
-                if videoId == recording["name"]:
-                    return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedContentUrl"])
-            self.logger.warn(f"Clip {videoId} not found")
-            return None
-        except Exception as e:
-            self.logger.error(e)
+        library = self.provider.arlo.GetLibrary(self.arlo_device, start, end)
+        for recording in library:
+            if videoId == recording["name"]:
+                return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedContentUrl"])
+        self.logger.warn(f"Clip {videoId} not found")
+        return None
 
     async def getVideoClipThumbnail(self, thumbnailId: str) -> MediaObject:
         self.logger.info(f"Getting video clip thumbnail {thumbnailId}")
 
-        try:
-            id_as_time = int(thumbnailId) / 1000.0
-            start = datetime.fromtimestamp(id_as_time) - timedelta(days=1)
-            end = datetime.fromtimestamp(id_as_time) + timedelta(days=1)
+        id_as_time = int(thumbnailId) / 1000.0
+        start = datetime.fromtimestamp(id_as_time) - timedelta(seconds=10)
+        end = datetime.fromtimestamp(id_as_time) + timedelta(seconds=10)
 
-            library = self.provider.arlo.GetLibrary(self.arlo_device, start, end)
-            for recording in library:
-                if thumbnailId == recording["name"]:
-                    return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedThumbnailUrl"])
-            self.logger.warn(f"Clip thumbnail {thumbnailId} not found")
-            return None
-        except Exception as e:
-            self.logger.error(e)
+        library = self.provider.arlo.GetLibrary(self.arlo_device, start, end)
+        for recording in library:
+            if thumbnailId == recording["name"]:
+                return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedThumbnailUrl"])
+        self.logger.warn(f"Clip thumbnail {thumbnailId} not found")
+        return None
 
     async def getVideoClips(self, options: VideoClipOptions = None) -> List[VideoClip]:
         self.logger.info(f"Fetching remote video clips {options}")
@@ -285,6 +279,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, Moti
 
     async def removeVideoClips(self, videoClipIds: List[str]) -> None:
         # Arlo does support deleting, but let's be safe and disable that
+        self.logger.error("deleting Arlo video clips is not implemented by this plugin")
         raise Exception("deleting Arlo video clips is not implemented by this plugin")
 
 

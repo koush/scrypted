@@ -29,7 +29,7 @@ from .sse_stream_async import EventStream
 from .logging import logger
 
 # Import all of the other stuff.
-from datetime import datetime
+from datetime import datetime, timedelta
 from cachetools import cached, TTLCache
 
 import asyncio
@@ -763,13 +763,19 @@ class Arlo(object):
           }
         ]
         """
+        # give the query range a bit of buffer
+        from_date_internal = from_date - timedelta(days=1)
+        to_date_internal = to_date + timedelta(days=1)
+
         return [
             result for result in
-            self._getLibraryCached(from_date.strftime("%Y%m%d"), to_date.strftime("%Y%m%d"))
+            self._getLibraryCached(from_date_internal.strftime("%Y%m%d"), to_date_internal.strftime("%Y%m%d"))
             if result["deviceId"] == device["deviceId"]
+            and datetime.fromtimestamp(int(result["name"]) / 1000.0) <= to_date
+            and datetime.fromtimestamp(int(result["name"]) / 1000.0) >= from_date
         ]
 
-    @cached(cache=TTLCache(maxsize=64, ttl=30))
+    @cached(cache=TTLCache(maxsize=512, ttl=60))
     def _getLibraryCached(self, from_date: str, to_date: str):
         logger.debug(f"Library cache miss for {from_date}, {to_date}")
         return self.request.post(
