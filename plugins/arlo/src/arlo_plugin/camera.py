@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import json
 import threading
 import time
@@ -7,7 +8,7 @@ from typing import List
 import scrypted_arlo_go
 
 import scrypted_sdk
-from scrypted_sdk.types import Setting, Settings, Camera, VideoCamera, MotionSensor, Battery, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Setting, Settings, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, Battery, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .device_base import ArloDeviceBase
 from .provider import ArloProvider
@@ -15,9 +16,10 @@ from .child_process import HeartbeatChildProcess
 from .util import BackgroundTaskMixin
 
 
-class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Battery):
+class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, MotionSensor, Battery):
     timeout: int = 30
     intercom_session = None
+    library: List[dict] = None
 
     def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
@@ -50,6 +52,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Ba
             ScryptedInterface.MotionSensor.value,
             ScryptedInterface.Battery.value,
             ScryptedInterface.Settings.value,
+            ScryptedInterface.VideoClips.value,
         ])
 
         if self.two_way_audio:
@@ -215,6 +218,55 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Ba
     def _can_push_to_talk(self) -> bool:
         # Right now, only implement push to talk for basestation cameras
         return self.arlo_device["deviceId"] != self.arlo_device["parentId"]
+
+    async def getVideoClip(self, videoId: str) -> MediaObject:
+        self.logger.info(f"Getting video clip {videoId}")
+        for recording in self.library:
+            if videoId == recording["name"]:
+                return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedContentUrl"])
+        raise Exception(f"Clip {videoId} not found")
+
+    async def getVideoClipThumbnail(self, thumbnailId: str) -> MediaObject:
+        self.logger.info(f"Getting video clip thumbnail {thumbnailId}")
+        for recording in self.library:
+            if thumbnailId == recording["name"]:
+                return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedThumbnailUrl"])
+        raise Exception(f"Clip thumbnail {thumbnailId} not found")
+
+    async def getVideoClips(self, options: VideoClipOptions = None) -> List[VideoClip]:
+        self.logger.info("Fetching remote video clips")
+
+        start = datetime.fromtimestamp(options["startTime"] / 1000.0)
+        end = datetime.fromtimestamp(options["endTime"] / 1000.0)
+
+        self.library = self.provider.arlo.GetLibrary(self.arlo_device, start, end)
+        clips = []
+        for recording in self.library:
+            clip = {
+                "duration": recording["mediaDurationSecond"] * 1000.0,
+                "id": recording["name"],
+                "thumbnailId": recording["name"],
+                "videoId": recording["name"],
+                "startTime": recording["utcCreatedDate"],
+                "description": recording["reason"],
+                "resources": {
+                    "thumbnail": {
+                        "href": recording["presignedThumbnailUrl"],
+                    },
+                    "video": {
+                        "href": recording["presignedContentUrl"],
+                    },
+                },
+            }
+            clips.append(clip)
+
+        if options.get("reverseOrder"):
+            clips.reverse()
+        return clips
+
+    async def removeVideoClips(self, videoClipIds: List[str]) -> None:
+        # Arlo does support deleting, but let's be safe and disable that
+        raise Exception("deleting Arlo video clips is not implemented by this plugin")
 
 
 class ArloCameraRTCSignalingSession(BackgroundTaskMixin):

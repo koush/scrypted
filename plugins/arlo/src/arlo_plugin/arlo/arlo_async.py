@@ -735,3 +735,35 @@ class Arlo(object):
                 "pattern": "alarm"
             }
         })
+
+    def GetLibrary(self, device, from_date: datetime, to_date: datetime):
+        """
+        This call returns the following:
+        presignedContentUrl is a link to the actual video in Amazon AWS.
+        presignedThumbnailUrl is a link to the thumbnail .jpg of the actual video in Amazon AWS.
+        [
+          {
+            "mediaDurationSecond": 30,
+            "contentType": "video/mp4",
+            "name": "XXXXXXXXXXXXX",
+            "presignedContentUrl": "https://arlos3-prod-z2.s3.amazonaws.com/XXXXXXX_XXXX_XXXX_XXXX_XXXXXXXXXXXXX/XXX-XXXXXXX/XXXXXXXXXXXXX/recordings/XXXXXXXXXXXXX.mp4?AWSAccessKeyId=XXXXXXXXXXXXXXXXXXXX&Expires=1472968703&Signature=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "lastModified": 1472881430181,
+            "localCreatedDate": XXXXXXXXXXXXX,
+            "presignedThumbnailUrl": "https://arlos3-prod-z2.s3.amazonaws.com/XXXXXXX_XXXX_XXXX_XXXX_XXXXXXXXXXXXX/XXX-XXXXXXX/XXXXXXXXXXXXX/recordings/XXXXXXXXXXXXX_thumb.jpg?AWSAccessKeyId=XXXXXXXXXXXXXXXXXXXX&Expires=1472968703&Signature=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "reason": "motionRecord",
+            "deviceId": "XXXXXXXXXXXXX",
+            "createdBy": "XXXXXXXXXXXXX",
+            "createdDate": "20160903",
+            "timeZone": "America/Chicago",
+            "ownerId": "XXX-XXXXXXX",
+            "utcCreatedDate": XXXXXXXXXXXXX,
+            "currentState": "new",
+            "mediaDuration": "00:00:30"
+          }
+        ]
+        """
+        return [
+            result for result in
+            self.request.post(f'https://{self.BASE_URL}/hmsweb/users/library', {'dateFrom':from_date.strftime("%Y%m%d"), 'dateTo':to_date.strftime("%Y%m%d")})
+            if result["deviceId"] == device["deviceId"]
+        ]

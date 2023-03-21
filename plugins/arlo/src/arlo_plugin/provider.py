@@ -10,7 +10,7 @@ from typing import List
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
-from scrypted_sdk.types import Setting, SettingValue, Settings, DeviceProvider, DeviceDiscovery, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Setting, SettingValue, Settings, DeviceProvider, DeviceDiscovery, ScryptedInterface
 
 from .arlo import Arlo
 from .arlo.arlo_async import change_stream_class
