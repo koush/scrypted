@@ -208,7 +208,9 @@ else {
                     // todo: read write file system? seems like a potential sandbox and backup nightmare to do a real fs. scripts should
                     // use localStorage, etc?
                     zip.addLocalFile(path.join(out, runtime.output));
-                    zip.addLocalFile(path.join(out, runtime.output + '.map'));
+                    const sourcemap = path.join(out, runtime.output + '.map');
+                    if (fs.existsSync(sourcemap))
+                        zip.addLocalFile(sourcemap);
                     console.log(runtime.output);
                     resolve();
                 })
