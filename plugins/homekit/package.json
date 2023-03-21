@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/homekit",
-   "version": "1.2.17",
+   "version": "1.2.18",
    "description": "HomeKit Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -45,7 +45,7 @@
       "@scrypted/sdk": "file:../../sdk",
       "@types/debug": "^4.1.7",
       "@types/lodash": "^4.14.191",
-      "@types/node": "^18.15.0",
+      "@types/node": "^18.15.5",
       "@types/url-parse": "^1.4.8"
    }
 }

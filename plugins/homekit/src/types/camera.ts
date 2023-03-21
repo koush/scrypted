@@ -1,13 +1,13 @@
+import { Deferred } from '@scrypted/common/src/deferred';
 import sdk, { AudioSensor, Camera, Intercom, MotionSensor, ObjectsDetected, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
-import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, DataStreamConnection, H264Level, H264Profile, MediaContainerType, OccupancySensor, RecordingManagement, RecordingPacket, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
+import { addSupportedType, bindCharacteristic, DummyDevice } from '../common';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, H264Level, H264Profile, MediaContainerType, OccupancySensor, RecordingPacket, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
+import type { HomeKitPlugin } from '../main';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
 import { FORCE_OPUS } from './camera/camera-utils';
 import { makeAccessory } from './common';
-import type { HomeKitPlugin } from '../main';
-import { Deferred } from '@scrypted/common/src/deferred';
 
 const { deviceManager, systemManager } = sdk;
 
@@ -99,8 +99,6 @@ addSupportedType({
         const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
         const linkedMotionSensor = storage.getItem('linkedMotionSensor');
         const isRecordingEnabled = !!linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService
-
-        const storageKeySelectedRecordingConfiguration = 'selectedRecordingConfiguration';
 
         let configuration: CameraRecordingConfiguration;
         const openRecordingStreams = new Map<number, Deferred<any>>();
@@ -235,12 +233,6 @@ addSupportedType({
                     });
             }
 
-            persistBooleanCharacteristic(recordingManagement.recordingManagementService, Characteristic.Active);
-            persistBooleanCharacteristic(recordingManagement.recordingManagementService, Characteristic.RecordingAudioActive);
-            persistBooleanCharacteristic(recordingManagement.operatingModeService, Characteristic.EventSnapshotsActive);
-            persistBooleanCharacteristic(recordingManagement.operatingModeService, Characteristic.HomeKitCameraActive);
-            persistBooleanCharacteristic(recordingManagement.operatingModeService, Characteristic.PeriodicSnapshotsActive);
-
             if (!device.interfaces.includes(ScryptedInterface.OnOff)) {
                 persistBooleanCharacteristic(recordingManagement.operatingModeService, Characteristic.CameraOperatingModeIndicator);
             }
@@ -265,18 +257,6 @@ addSupportedType({
                         device.turnOff();
                 });
             }
-
-            recordingManagement.recordingManagementService.getCharacteristic(Characteristic.SelectedCameraRecordingConfiguration)
-                .removeOnGet()
-                .on(CharacteristicEventTypes.GET, callback => {
-                    callback(null, storage.getItem(storageKeySelectedRecordingConfiguration) || '');
-                })
-                .removeOnSet()
-                .on(CharacteristicEventTypes.SET, (value, callback) => {
-                    // prepare recording here if necessary.
-                    storage.setItem(storageKeySelectedRecordingConfiguration, value.toString());
-                    callback();
-                });
         }
 
 
