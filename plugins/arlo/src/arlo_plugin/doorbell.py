@@ -1,3 +1,5 @@
+from typing import List
+
 from scrypted_sdk.types import BinarySensor, ScryptedInterface, ScryptedDeviceType
 
 from .camera import ArloCamera
@@ -22,7 +24,7 @@ class ArloDoorbell(ArloCamera, BinarySensor):
     def get_device_type(self) -> str:
         return ScryptedDeviceType.Doorbell.value
 
-    def get_applicable_interfaces(self) -> list:
+    def get_applicable_interfaces(self) -> List[str]:
         camera_interfaces = super().get_applicable_interfaces()
         camera_interfaces.append(ScryptedInterface.BinarySensor.value)
 

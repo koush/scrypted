@@ -2,11 +2,12 @@ import asyncio
 import json
 import threading
 import time
+from typing import List
 
 import scrypted_arlo_go
 
 import scrypted_sdk
-from scrypted_sdk.types import Settings, Camera, VideoCamera, MotionSensor, Battery, MediaObject, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Setting, Settings, Camera, VideoCamera, MotionSensor, Battery, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .device_base import ArloDeviceBase
 from .provider import ArloProvider
@@ -42,7 +43,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Ba
             self.provider.arlo.SubscribeToBatteryEvents(self.arlo_basestation, self.arlo_device, callback)
         )
 
-    def get_applicable_interfaces(self) -> list:
+    def get_applicable_interfaces(self) -> List[str]:
         results = set([
             ScryptedInterface.VideoCamera.value,
             ScryptedInterface.Camera.value,
@@ -85,7 +86,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Ba
         else:
             return True
 
-    async def getSettings(self) -> list:
+    async def getSettings(self) -> List[Setting]:
         if self._can_push_to_talk():
             return [
                 {
@@ -111,7 +112,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Ba
             self.storage.setItem(key, value == "true")
             await self.provider.discoverDevices()
 
-    async def getPictureOptions(self) -> list:
+    async def getPictureOptions(self) -> List[ResponsePictureOptions]:
         return []
 
     async def takePicture(self, options: dict = None) -> MediaObject:
@@ -131,7 +132,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Ba
 
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(pic_url), ScryptedMimeTypes.Url.value)
 
-    async def getVideoStreamOptions(self) -> list:
+    async def getVideoStreamOptions(self) -> List[ResponseMediaStreamOptions]:
         return [
             {
                 "id": 'default',
@@ -200,18 +201,18 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, MotionSensor, Ba
         except Exception as e:
             self.logger.error(e)
 
-    async def startIntercom(self, media):
+    async def startIntercom(self, media) -> None:
         self.logger.info("Starting intercom")
         self.intercom_session = ArloCameraRTCSignalingSession(self)
         await self.intercom_session.initialize_push_to_talk(media)
 
-    async def stopIntercom(self):
+    async def stopIntercom(self) -> None:
         self.logger.info("Stopping intercom")
         if self.intercom_session is not None:
             await self.intercom_session.shutdown()
             self.intercom_session = None
 
-    def _can_push_to_talk(self):
+    def _can_push_to_talk(self) -> bool:
         # Right now, only implement push to talk for basestation cameras
         return self.arlo_device["deviceId"] != self.arlo_device["parentId"]
 

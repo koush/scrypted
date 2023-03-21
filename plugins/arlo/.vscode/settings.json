@@ -22,6 +22,6 @@
     //"scrypted.volumeRoot": "${config:scrypted.serverRoot}/volume",
 
     "python.analysis.extraPaths": [
-        "./node_modules/@scrypted/sdk/scrypted_python"
+        "./node_modules/@scrypted/sdk/types/scrypted_python"
     ]
 }
