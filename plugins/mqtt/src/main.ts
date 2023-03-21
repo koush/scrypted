@@ -1,24 +1,19 @@
-// https://developer.scrypted.app/#getting-started
-// package.json contains the metadata (name, interfaces) about this device
-// under the "scrypted" key.
-import { Settings, Setting, DeviceProvider, ScryptedDeviceBase, ScryptedInterface, ScryptedDeviceType, Scriptable, ScriptSource, ScryptedInterfaceDescriptors, MixinProvider, ScryptedDevice, EventListenerRegister, DeviceCreator, DeviceCreatorSettings } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
-import { monacoEvalDefaults } from './monaco';
-import { scryptedEval } from './scrypted-eval';
-import { MqttClient, MqttClientPublishOptions, MqttSubscriptions } from './api/mqtt-client';
+import { createScriptDevice, ScriptDeviceImpl, tsCompile } from '@scrypted/common/src/eval/scrypted-eval';
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, EventListenerRegister, MixinProvider, Scriptable, ScriptSource, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, Setting, Settings } from '@scrypted/sdk';
 import aedes, { AedesOptions } from 'aedes';
-import net from 'net';
-import ws from 'websocket-stream';
+import fs from 'fs';
 import http from 'http';
+import { Client, connect } from 'mqtt';
+import net from 'net';
+import path from 'path';
+import ws from 'websocket-stream';
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
+import { MqttClient, MqttClientPublishOptions, MqttSubscriptions } from './api/mqtt-client';
 import { MqttDeviceBase } from './api/mqtt-device-base';
 import { MqttAutoDiscoveryProvider } from './autodiscovery/autodiscovery';
-import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
-import { connect, Client } from 'mqtt';
+import { monacoEvalDefaults } from './monaco';
 import { isPublishable } from './publishable-types';
-import { createScriptDevice, ScriptDeviceImpl } from '@scrypted/common/src/eval/scrypted-eval';
-import fs from 'fs';
-import path from 'path';
-import { randomBytes } from 'crypto';
+import { scryptedEval } from './scrypted-eval';
 
 export function filterExample(filename: string) {
     return fs.readFileSync(`examples/${filename}`).toString()
@@ -533,4 +528,11 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
     }
 }
 
-export default new MqttProvider();
+export default MqttProvider;
+
+
+export async function fork() {
+    return {
+        tsCompile,
+    }
+}
