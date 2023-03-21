@@ -27,6 +27,8 @@ import { setScryptedUserPassword } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 
+export type Runtime = ScryptedRuntime;
+
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
 }
@@ -104,7 +106,9 @@ app.use(bodyParser.json())
 // parse some custom thing into a Buffer
 app.use(bodyParser.raw({ type: 'application/zip', limit: 100000000 }) as any)
 
-async function start(mainFilename: string) {
+async function start(mainFilename: string, options?: {
+    onRuntimeCreated?: (runtime: ScryptedRuntime) => Promise<void>,
+}) {
     const volumeDir = getScryptedVolume();
     mkdirp.sync(volumeDir);
     const dbPath = path.join(volumeDir, 'scrypted.db');
@@ -271,6 +275,7 @@ async function start(mainFilename: string) {
     });
 
     const scrypted = new ScryptedRuntime(mainFilename, db, insecure, secure, app);
+    await options?.onRuntimeCreated?.(scrypted);
     await scrypted.start();
 
     listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);

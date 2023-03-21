@@ -11,9 +11,9 @@ export class NodeForkWorker extends ChildProcessWorker {
 
     constructor(mainFilename: string, pluginId: string, options: RuntimeWorkerOptions) {
         super(pluginId, options);
-        
-        const {env, pluginDebug} = options;
-        
+
+        const { env, pluginDebug } = options;
+
         const execArgv: string[] = process.execArgv.slice();
         if (pluginDebug) {
             execArgv.push(`--inspect=0.0.0.0:${pluginDebug.inspectPort}`);

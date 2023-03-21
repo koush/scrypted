@@ -191,10 +191,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const module = require(name);
                 return module;
             };
-            const window: any = {};
-            const exports: any = window;
-            window.exports = exports;
-            params.window = window;
+            // const window: any = {};
+            const exports: any = {};
+            // window.exports = exports;
+            // params.window = window;
             params.exports = exports;
 
             const entry = pluginReader('main.nodejs.js.map')

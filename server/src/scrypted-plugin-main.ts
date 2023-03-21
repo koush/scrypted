@@ -25,7 +25,7 @@ function start(mainFilename: string) {
             if (e)
                 reject?.(e);
         }));
-    
+
         peer.transportSafeArgumentTypes.add(Buffer.name);
         peer.addSerializer(net.Socket, net.Socket.name, new SidebandSocketSerializer());
         process.on('message', message => peer.handleMessage(message as RpcMessage));

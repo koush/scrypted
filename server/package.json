@@ -61,6 +61,7 @@
     "scrypted-serve": "bin/scrypted-serve"
   },
   "main": "dist/scrypted-main-exports.js",
+  "types": "dist/scrypted-main-exports.d.ts",
   "scripts": {
     "preserve": "npm run build",
     "serve": "node --expose-gc dist/scrypted-main.js",

@@ -4,8 +4,15 @@ import process from 'process';
 import semver from 'semver';
 import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
 import { PluginError } from './plugin/plugin-error';
+import type { Runtime } from './scrypted-server-main';
 
-function start(mainFilename: string) {
+export function isChildProcess() {
+    return process.argv[2] === 'child' || process.argv[2] === 'child-thread'
+}
+
+function start(mainFilename: string, options?: {
+    onRuntimeCreated?: (runtime: Runtime) => Promise<void>,
+}) {
     if (!global.gc) {
         v8.setFlagsFromString('--expose_gc')
         global.gc = vm.runInNewContext("gc");
@@ -47,7 +54,7 @@ function start(mainFilename: string) {
         });
 
         const start = require('./scrypted-server-main').default;
-        return start(mainFilename);
+        return start(mainFilename, options);
     }
 }
 
