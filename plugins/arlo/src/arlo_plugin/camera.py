@@ -234,7 +234,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, Moti
         raise Exception(f"Clip thumbnail {thumbnailId} not found")
 
     async def getVideoClips(self, options: VideoClipOptions = None) -> List[VideoClip]:
-        self.logger.info("Fetching remote video clips")
+        self.logger.info(f"Fetching remote video clips {options}")
 
         start = datetime.fromtimestamp(options["startTime"] / 1000.0)
         end = datetime.fromtimestamp(options["endTime"] / 1000.0)
