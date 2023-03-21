@@ -31,7 +31,6 @@ RUN apt-get -y install \
     python3-setuptools \
     python3-wheel
 
-
 # python pip
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install aiofiles debugpy typing_extensions psutil
