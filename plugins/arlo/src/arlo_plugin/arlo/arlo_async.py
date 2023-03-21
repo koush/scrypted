@@ -30,6 +30,7 @@ from .logging import logger
 
 # Import all of the other stuff.
 from datetime import datetime
+from cachetools import cached, TTLCache
 
 import asyncio
 import sys
@@ -764,6 +765,17 @@ class Arlo(object):
         """
         return [
             result for result in
-            self.request.post(f'https://{self.BASE_URL}/hmsweb/users/library', {'dateFrom':from_date.strftime("%Y%m%d"), 'dateTo':to_date.strftime("%Y%m%d")})
+            self._getLibraryCached(from_date.strftime("%Y%m%d"), to_date.strftime("%Y%m%d"))
             if result["deviceId"] == device["deviceId"]
         ]
+
+    @cached(cache=TTLCache(maxsize=64, ttl=30))
+    def _getLibraryCached(self, from_date: str, to_date: str):
+        logger.debug(f"Library cache miss for {from_date}, {to_date}")
+        return self.request.post(
+            f'https://{self.BASE_URL}/hmsweb/users/library',
+            {
+                'dateFrom': from_date,
+                'dateTo': to_date
+            }
+        )

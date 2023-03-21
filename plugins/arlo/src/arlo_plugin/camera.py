@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import threading
 import time
@@ -19,7 +19,6 @@ from .util import BackgroundTaskMixin
 class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, MotionSensor, Battery):
     timeout: int = 30
     intercom_session = None
-    library: List[dict] = None
 
     def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
@@ -221,17 +220,37 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, Moti
 
     async def getVideoClip(self, videoId: str) -> MediaObject:
         self.logger.info(f"Getting video clip {videoId}")
-        for recording in self.library:
-            if videoId == recording["name"]:
-                return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedContentUrl"])
-        raise Exception(f"Clip {videoId} not found")
+
+        try:
+            id_as_time = int(videoId) / 1000.0
+            start = datetime.fromtimestamp(id_as_time) - timedelta(days=1)
+            end = datetime.fromtimestamp(id_as_time) + timedelta(days=1)
+
+            library = self.provider.arlo.GetLibrary(self.arlo_device, start, end)
+            for recording in library:
+                if videoId == recording["name"]:
+                    return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedContentUrl"])
+            self.logger.warn(f"Clip {videoId} not found")
+            return None
+        except Exception as e:
+            self.logger.error(e)
 
     async def getVideoClipThumbnail(self, thumbnailId: str) -> MediaObject:
         self.logger.info(f"Getting video clip thumbnail {thumbnailId}")
-        for recording in self.library:
-            if thumbnailId == recording["name"]:
-                return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedThumbnailUrl"])
-        raise Exception(f"Clip thumbnail {thumbnailId} not found")
+
+        try:
+            id_as_time = int(thumbnailId) / 1000.0
+            start = datetime.fromtimestamp(id_as_time) - timedelta(days=1)
+            end = datetime.fromtimestamp(id_as_time) + timedelta(days=1)
+
+            library = self.provider.arlo.GetLibrary(self.arlo_device, start, end)
+            for recording in library:
+                if thumbnailId == recording["name"]:
+                    return await scrypted_sdk.mediaManager.createMediaObjectFromUrl(recording["presignedThumbnailUrl"])
+            self.logger.warn(f"Clip thumbnail {thumbnailId} not found")
+            return None
+        except Exception as e:
+            self.logger.error(e)
 
     async def getVideoClips(self, options: VideoClipOptions = None) -> List[VideoClip]:
         self.logger.info(f"Fetching remote video clips {options}")
@@ -239,9 +258,9 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, Moti
         start = datetime.fromtimestamp(options["startTime"] / 1000.0)
         end = datetime.fromtimestamp(options["endTime"] / 1000.0)
 
-        self.library = self.provider.arlo.GetLibrary(self.arlo_device, start, end)
+        library = self.provider.arlo.GetLibrary(self.arlo_device, start, end)
         clips = []
-        for recording in self.library:
+        for recording in library:
             clip = {
                 "duration": recording["mediaDurationSecond"] * 1000.0,
                 "id": recording["name"],
