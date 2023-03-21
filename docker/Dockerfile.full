@@ -52,7 +52,7 @@ RUN apt-get -y install \
     python3-setuptools \
     python3-wheel
 
-RUN if [ "$(uname -m)" == "armhf" ]; \
+RUN if [ "$(uname -m)" == "armv7l" ]; \
     then \
         apt-get -y install \
         python3-matplotlib \
