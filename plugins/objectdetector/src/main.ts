@@ -1,4 +1,4 @@
-import sdk, { ScryptedMimeTypes, Image, VideoFrame, VideoFrameGenerator, Camera, DeviceState, EventListenerRegister, MediaObject, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, MediaStreamDestination } from '@scrypted/sdk';
+import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import cloneDeep from 'lodash/cloneDeep';
@@ -428,7 +428,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     if (retainImage && mediaObject) {
       this.lastDetectionInput = now;
-      this.console.log('retaining detection image');
       this.setDetection(detection, mediaObject);
     }
 
@@ -887,6 +886,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   setDetection(detection: ObjectsDetected, detectionInput: MediaObject) {
     if (!detection.detectionId)
       detection.detectionId = crypto.randomBytes(4).toString('hex');
+
+    this.console.log('retaining detection image');
 
     const { detectionId } = detection;
     this.detections.set(detectionId, detectionInput);
