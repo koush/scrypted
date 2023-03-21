@@ -41,7 +41,7 @@ RUN apt-get -y install \
 # these are necessary for pillow-simd, additional on disk size is small
 # but could consider removing this.
 RUN apt-get -y install \
-    apt install libjpeg-dev zlib1g-dev
+    libjpeg-dev zlib1g-dev
 
 # gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
 RUN apt-get -y install \
