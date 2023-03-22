@@ -6,10 +6,6 @@ import child_process from 'child_process';
 import sharp from 'sharp';
 import { Readable } from 'stream';
 
-console.log(sharp.kernel);
-sharp.kernel['linear'] = 'linear';
-sharp.kernel['linear2'] = 'linear2';
-
 async function createVipsMediaObject(image: VipsImage): Promise<VideoFrame & MediaObject> {
     const ret = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
         timestamp: 0,
