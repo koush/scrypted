@@ -1,22 +1,16 @@
-import time
-from gst_generator import createPipelineIterator
-import asyncio
-from util import optional_chain
 import scrypted_sdk
 from typing import Any
-from urllib.parse import urlparse
-import pyvips
-import concurrent.futures
-
-# vips is already multithreaded, but needs to be kicked off the python asyncio thread.
-vipsExecutor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="vips")
-
-async def to_thread(f):
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(vipsExecutor, f)
+try:
+    import pyvips
+    from pyvips import Image
+except:
+    Image = None
+    pyvips = None
+    pass
+from thread import to_thread
 
 class VipsImage(scrypted_sdk.VideoFrame):
-    def __init__(self, vipsImage: pyvips.Image) -> None:
+    def __init__(self, vipsImage: Image) -> None:
         super().__init__()
         self.vipsImage = vipsImage
         self.width = vipsImage.width
@@ -96,7 +90,7 @@ class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
         self.toMimeType = scrypted_sdk.ScryptedMimeTypes.Image.value
 
     async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: scrypted_sdk.MediaObjectOptions = None) -> Any:
-        vips = pyvips.Image.new_from_buffer(data, '')
+        vips = Image.new_from_buffer(data, '')
         return await createVipsMediaObject(VipsImage(vips))
 
 class ImageWriter(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter):
@@ -110,3 +104,6 @@ class ImageWriter(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
         return await data.toBuffer({
             format: 'jpg',
         })
+
+def new_from_memory(data, width: int, height: int, bands: int):
+    return Image.new_from_memory(data, width, height, bands, pyvips.BandFormat.UCHAR)

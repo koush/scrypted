@@ -2,8 +2,8 @@ import time
 from gst_generator import createPipelineIterator
 import scrypted_sdk
 from typing import Any
-import pyvips
-from vips import createVipsMediaObject, VipsImage
+import vipsimage
+import pilimage
 
 av = None
 try:
@@ -38,14 +38,23 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
                 # print('too slow, skipping frame')
                 continue
             # print(frame)
-            vips = pyvips.Image.new_from_array(frame.to_ndarray(format='rgb24'))
-            vipsImage = VipsImage(vips)
-            try:
-                mo = await createVipsMediaObject(VipsImage(vips))
-                yield mo
-            finally:
-                vipsImage.vipsImage.invalidate()
-                vipsImage.vipsImage = None
-
+            if vipsimage.pyvips:
+                vips = vipsimage.pyvips.Image.new_from_array(frame.to_ndarray(format='rgb24'))
+                vipsImage = vipsimage.VipsImage(vips)
+                try:
+                    mo = await vipsimage.createVipsMediaObject(vipsImage)
+                    yield mo
+                finally:
+                    vipsImage.vipsImage = None
+                    vips.invalidate()
+            else:
+                pil = frame.to_image()
+                pilImage = pilimage.PILImage(pil)
+                try:
+                    mo = await pilimage.createPILMediaObject(pilImage)
+                    yield mo
+                finally:
+                    pilImage.pilImage = None
+                    pil.close()
     finally:
         container.close()

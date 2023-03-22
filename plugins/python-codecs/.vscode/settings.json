@@ -4,6 +4,10 @@
     // "scrypted.debugHost": "koushik-ubuntu",
     // "scrypted.serverRoot": "/server",
 
+    // windows installation
+    // "scrypted.debugHost": "koushik-windows",
+    // "scrypted.serverRoot": "C:\\Users\\koush\\.scrypted",
+
     // pi local installation
     // "scrypted.debugHost": "192.168.2.119",
     // "scrypted.serverRoot": "/home/pi/.scrypted",

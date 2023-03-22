@@ -4,7 +4,8 @@ from scrypted_sdk import Setting, SettingValue
 from typing import Any, List
 import gstreamer
 import libav
-import vips
+import vipsimage
+import pilimage
 
 Gst = None
 try:
@@ -110,10 +111,17 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider)
             return GstreamerGenerator('gstreamer')
         if nativeId == 'libav':
             return LibavGenerator('libav')
-        if nativeId == 'reader':
-            return vips.ImageReader('reader')
-        if nativeId == 'writer':
-            return vips.ImageWriter('writer')
+        
+        if vipsimage.pyvips:
+            if nativeId == 'reader':
+                return vipsimage.ImageReader('reader')
+            if nativeId == 'writer':
+                return vipsimage.ImageWriter('writer')
+        else:
+            if nativeId == 'reader':
+                return pilimage.ImageReader('reader')
+            if nativeId == 'writer':
+                return pilimage.ImageWriter('writer')
 
 def create_scrypted_plugin():
     return PythonCodecs()

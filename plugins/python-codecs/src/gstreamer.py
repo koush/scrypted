@@ -3,8 +3,8 @@ from util import optional_chain
 import scrypted_sdk
 from typing import Any
 from urllib.parse import urlparse
-import pyvips
-from vips import createVipsMediaObject, VipsImage
+import vipsimage
+import pilimage
 import platform
 
 Gst = None
@@ -91,13 +91,23 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
             continue
 
         try:
-            vips = pyvips.Image.new_from_memory(info.data, width, height, bands, pyvips.BandFormat.UCHAR)
-            vipsImage = VipsImage(vips)
-            try:
-                mo = await createVipsMediaObject(VipsImage(vips))
-                yield mo
-            finally:
-                vipsImage.vipsImage.invalidate()
-                vipsImage.vipsImage = None
+            if vipsimage.pyvips:
+                vips = vipsimage.new_from_memory(info.data, width, height, bands)
+                vipsImage = vipsimage.VipsImage(vips)
+                try:
+                    mo = await vipsimage.createVipsMediaObject(vipsImage)
+                    yield mo
+                finally:
+                    vipsImage.vipsImage = None
+                    vips.invalidate()
+            else:
+                pil = pilimage.new_from_memory(info.data, width, height, bands)
+                pilImage = pilimage.PILImage(pil)
+                try:
+                    mo = await pilimage.createPILMediaObject(pilImage)
+                    yield mo
+                finally:
+                    pilImage.pilImage = None
+                    pil.close()
         finally:
             gst_buffer.unmap(info)

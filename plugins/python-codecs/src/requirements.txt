@@ -2,4 +2,5 @@
 PyGObject>=3.30.4; sys_platform != 'win32'
 # libav doesnt work on arm7
 av>=10.0.0; sys_platform != 'linux' or platform_machine == 'x86_64' or platform_machine == 'aarch64'
-pyvips
+pyvips; sys_platform != 'win32'
+Pillow
