@@ -1,9 +1,8 @@
 import child_process from 'child_process';
+import net from 'net';
 import path from 'path';
 import type { Readable, Writable } from "stream";
 import { createDuplexRpcPeer } from '../src/rpc-serializer';
-import assert from 'assert';
-import net from 'net';
 
 async function main() {
     const server = net.createServer(client => {
@@ -21,12 +20,17 @@ async function main() {
     const rpcPeer = createDuplexRpcPeer('node', 'python', cp.stdio[3] as Readable, cp.stdio[4] as Writable);
 
     async function* test() {
-        yield 1;
-        yield 2;
-        yield 3;
+        try {
+            for (let i = 0; ; i++) {
+                yield i;
+            }
+        }
+        finally {
+            console.log('closed');
+        }
     }
 
-    rpcPeer.params['test'] = test();
+    rpcPeer.params['test'] = test;
 
     // const foo = await rpcPeer.getParam('foo');
     // assert.equal(foo, 3);

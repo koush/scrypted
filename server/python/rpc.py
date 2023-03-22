@@ -79,6 +79,14 @@ class RpcProxy(object):
                 raise
         raise Exception('RpcProxy is not an async iterable')
 
+    async def aclose(self):
+        if self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES] and 'Symbol(Symbol.asyncIterator)' in self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES]:
+            try:
+                return await RpcProxyMethod(self, self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES]['Symbol(Symbol.asyncIterator)']['return'])()
+            except RPCResultError as e:
+                pass
+        raise Exception('RpcProxy is not an async iterable')
+
     def __getattr__(self, name):
         if name == '__proxy_finalizer_id':
             return self.dict['__proxy_entry']['finalizerId']
