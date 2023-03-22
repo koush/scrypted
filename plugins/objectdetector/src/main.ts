@@ -1,10 +1,11 @@
-import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
+import sdk, { Camera, DeviceProvider, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import cloneDeep from 'lodash/cloneDeep';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } from './denoise';
+import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
 import { serverSupportsMixinEventMasking } from './server-version';
 import { sleep } from './sleep';
 import { getAllDevices, safeParseJson } from './util';
@@ -606,6 +607,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.console.error('video pipeline ended with error', e);
     }
     finally {
+      this.console.log('video pipeline analysis ended');
       this.endObjectDetection();
     }
   }
@@ -1233,7 +1235,7 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
   }
 }
 
-class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings {
+class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings, DeviceProvider {
   currentMixins = new Set<ObjectDetectorMixin>();
 
   storageSettings = new StorageSettings(this, {
@@ -1264,6 +1266,29 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings 
 
   constructor(nativeId?: ScryptedNativeId) {
     super(nativeId);
+
+    process.nextTick(() => {
+      sdk.deviceManager.onDevicesChanged({
+        devices: [
+          {
+            name: 'FFmpeg Frame Generator',
+            type: ScryptedDeviceType.Builtin,
+            interfaces: [
+              ScryptedInterface.VideoFrameGenerator,
+            ],
+            nativeId: 'ffmpeg',
+          }
+        ]
+      })
+    })
+  }
+
+  async getDevice(nativeId: string): Promise<any> {
+    if (nativeId === 'ffmpeg')
+      return new FFmpegVideoFrameGenerator('ffmpeg');
+  }
+
+  async releaseDevice(id: string, nativeId: string): Promise<void> {
   }
 
   getSettings(): Promise<Setting[]> {

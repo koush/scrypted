@@ -36,12 +36,16 @@
       "type": "API",
       "interfaces": [
          "Settings",
-         "MixinProvider"
+         "MixinProvider",
+         "DeviceProvider"
       ],
       "realfs": true,
       "pluginDependencies": [
          "@scrypted/python-codecs"
       ]
+   },
+   "optionalDependencies": {
+      "sharp": "^0.31.3"
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
@@ -55,6 +59,6 @@
       "@types/lodash": "^4.14.175",
       "@types/node": "^14.17.11",
       "@types/semver": "^7.3.13",
-      "ts-node": "^10.9.1"
+      "@types/sharp": "^0.31.1"
    }
 }
