@@ -1,9 +1,6 @@
 ARG BASE="18-bullseye-full"
 FROM koush/scrypted-common:${BASE}
 
-# changing this forces pip and npm to perform reinstalls
-ENV SCRYPTED_BASE_VERSION=20230322
-
 WORKDIR /
 # cache bust
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
