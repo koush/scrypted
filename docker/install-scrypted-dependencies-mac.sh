@@ -42,6 +42,8 @@ RUN brew update
 RUN_IGNORE brew install node@18
 # snapshot plugin and others
 RUN brew install libvips
+# dlib
+RUN brew install cmake
 # gstreamer plugins
 RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly
 # gst python bindings
