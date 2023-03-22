@@ -184,12 +184,17 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         }
 
         const plugins = await systemManager.getComponent('plugins');
-
         const accessoryIds = new Set<string>();
-
         const deviceIds = Object.keys(systemManager.getSystemState());
+
+        // when creating accessories in order, some DeviceProviders may merge in
+        // their child devices (and report back which devices are merged via
+        // this.mergedDevices)
+        // we need to ensure that the iteration processes DeviceProviders before
+        // their children, so a reordering is necessary
         const reorderedDeviceIds = reorderDevicesByProvider(deviceIds);
         if (deviceIds.length !== reorderedDeviceIds.length) {
+            // safety check in case something went wrong
             throw Error(`error in device reordering, expected ${deviceIds.length} devices but only got ${reorderedDeviceIds.length}!`);
         }
 
