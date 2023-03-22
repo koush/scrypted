@@ -3,4 +3,8 @@ PyGObject>=3.30.4; sys_platform != 'win32'
 # libav doesnt work on arm7
 av>=10.0.0; sys_platform != 'linux' or platform_machine == 'x86_64' or platform_machine == 'aarch64'
 pyvips; sys_platform != 'win32'
-Pillow
+
+# in case pyvips fails to load, use a pillow fallback.
+# pillow for anything not intel linux, pillow-simd is available on x64 linux
+Pillow>=5.4.1; sys_platform != 'linux' or platform_machine != 'x86_64'
+pillow-simd; sys_platform == 'linux' and platform_machine == 'x86_64'
