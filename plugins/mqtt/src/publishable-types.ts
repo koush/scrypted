@@ -1,6 +1,13 @@
 import { ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
 
 export function isPublishable(type: ScryptedDeviceType, interfaces: string[]): boolean {
+    switch (type) {
+        case ScryptedDeviceType.API:
+        case ScryptedDeviceType.Builtin:
+        case ScryptedDeviceType.DataSource:
+        case ScryptedDeviceType.Unknown:
+            return false;
+    }
     const set = new Set(interfaces);
     set.delete(ScryptedInterface.ObjectDetection);
     set.delete(ScryptedInterface.DeviceDiscovery);
@@ -14,6 +21,7 @@ export function isPublishable(type: ScryptedDeviceType, interfaces: string[]): b
     set.delete(ScryptedInterface.Readme);
     set.delete(ScryptedInterface.BufferConverter);
     set.delete(ScryptedInterface.ScryptedPlugin);
+    set.delete(ScryptedInterface.OauthClient);
     set.delete(ScryptedInterface.OauthClient);
     set.delete(ScryptedInterface.LauncherApplication);
     return !!set.size;

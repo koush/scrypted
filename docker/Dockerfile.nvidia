@@ -1,0 +1,22 @@
+FROM koush/18-bullseye-full.s6
+
+WORKDIR /
+
+# Install miniconda
+ENV CONDA_DIR /opt/conda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+     /bin/bash ~/miniconda.sh -b -p /opt/conda
+# Put conda in path so we can use conda activate
+ENV PATH=$CONDA_DIR/bin:$PATH
+
+RUN conda install -c conda-forge cudatoolkit=11.2.2 cudnn=8.1.0
+ENV CONDA_PREFIX=/opt/conda
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/
+
+# this is a copy pasta, seems to need a reinstall.
+# python pip
+RUN python3 -m pip install --upgrade pip
+# pyvips is broken on x86 due to mismatch ffi
+# https://stackoverflow.com/questions/62658237/it-seems-that-the-version-of-the-libffi-library-seen-at-runtime-is-different-fro
+RUN python3 -m pip install --force-reinstall --no-binary :all: cffi
+RUN python3 -m pip install aiofiles debugpy typing_extensions psutil

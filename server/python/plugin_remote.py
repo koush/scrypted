@@ -641,6 +641,8 @@ def main(rpcTransport: rpc_reader.RpcTransport):
     loop.close()
 
 def plugin_main(rpcTransport: rpc_reader.RpcTransport):
+    # gi import will fail on windows (and posisbly elsewhere)
+    # if it does, try starting without it.
     try:
         import gi
         gi.require_version('Gst', '1.0')
@@ -653,8 +655,12 @@ def plugin_main(rpcTransport: rpc_reader.RpcTransport):
         worker.start()
 
         loop.run()
+        return
     except:
-        main(rpcTransport)
+        pass
+
+    # reattempt without gi outside of the exception handler in case the plugin fails. 
+    main(rpcTransport)
 
 
 def plugin_fork(conn: multiprocessing.connection.Connection):

@@ -22,7 +22,7 @@ const { link } = require('linkfs');
 
 const serverVersion = require('../../package.json').version;
 
-export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
+export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
     let systemManager: SystemManager;
@@ -191,10 +191,10 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
                 const module = require(name);
                 return module;
             };
-            const window: any = {};
-            const exports: any = window;
-            window.exports = exports;
-            params.window = window;
+            // const window: any = {};
+            const exports: any = {};
+            // window.exports = exports;
+            // params.window = window;
             params.exports = exports;
 
             const entry = pluginReader('main.nodejs.js.map')
@@ -244,7 +244,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             const forks = new Set<PluginRemote>();
 
             scrypted.fork = () => {
-                const ntw = new NodeThreadWorker(pluginId, {
+                const ntw = new NodeThreadWorker(mainFilename, pluginId, {
                     env: process.env,
                     pluginDebug: undefined,
                 });

@@ -300,9 +300,10 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 picture = await this.cropAndScale(picture);
                 if (needSoftwareResize) {
                     picture = await ffmpegFilterImageBuffer(picture, {
-                        ffmpegPath: await mediaManager.getFFmpegPath(),
                         console: this.debugConsole,
+                        ffmpegPath: await mediaManager.getFFmpegPath(),
                         resize: options?.picture,
+                        timeout: 10000,
                     });
                 }
                 this.clearCachedPictures();
@@ -353,8 +354,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
         return ffmpegFilterImageBuffer(buffer, {
-            ffmpegPath: await mediaManager.getFFmpegPath(),
             console: this.debugConsole,
+            ffmpegPath: await mediaManager.getFFmpegPath(),
             crop: {
                 fractional: true,
                 left: xmin,
@@ -362,6 +363,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 width: xmax - xmin,
                 height: ymax - ymin,
             },
+            timeout: 10000,
         });
     }
 
@@ -446,14 +448,15 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         }
         else {
             return ffmpegFilterImageBuffer(errorBackground, {
-                ffmpegPath: await mediaManager.getFFmpegPath(),
                 console: this.debugConsole,
+                ffmpegPath: await mediaManager.getFFmpegPath(),
                 blur: true,
                 brightness: -.2,
                 text: {
                     fontFile,
                     text,
                 },
+                timeout: 10000,
             });
         }
     }

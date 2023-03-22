@@ -1,6 +1,6 @@
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { PluginDebug } from "../plugin-debug";
-import {Readable} from "stream";
+import { Readable } from "stream";
 import net from "net";
 
 export interface RuntimeWorkerOptions {

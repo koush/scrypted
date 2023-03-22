@@ -1,7 +1,7 @@
 import { DeviceState, MixinDeviceBase, MixinDeviceOptions, MixinProvider, PanTiltZoom, PanTiltZoomCommand, PanTiltZoomMovement, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { connectCameraAPI } from "./onvif-api";
-import {SettingsMixinDeviceBase, SettingsMixinDeviceOptions} from '../../../common/src/settings-mixin';
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '../../../common/src/settings-mixin';
 
 export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements PanTiltZoom, Settings {
     storageSettings = new StorageSettings(this, {
@@ -55,9 +55,9 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
             };
         }
 
-        if (command.movement === PanTiltZoomMovement.Relative) {
+        if (command.movement === PanTiltZoomMovement.Absolute) {
             return new Promise<void>((r, f) => {
-                client.cam.relativeMove({
+                client.cam.absoluteMove({
                     x: command.pan,
                     y: command.tilt,
                     zoom: command.zoom,
@@ -69,9 +69,10 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
                 })
             })
         }
-        else if (command.movement === PanTiltZoomMovement.Absolute) {
+        else {
+            // relative movement is default.
             return new Promise<void>((r, f) => {
-                client.cam.absoluteMove({
+                client.cam.relativeMove({
                     x: command.pan,
                     y: command.tilt,
                     zoom: command.zoom,

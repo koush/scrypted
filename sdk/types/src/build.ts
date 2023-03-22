@@ -10,8 +10,12 @@ const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInter
 const allProperties: { [property: string]: any } = {};
 
 function toTypescriptType(type: any): string {
+    if (type.type === 'literal')
+        return `'${type.value}'`;
     if (type.type === 'array')
         return `${toTypescriptType(type.elementType)}[]`;
+    if (type.type === 'union')
+        return type.types.map((type: any) => toTypescriptType(type)).join(' | ')
     return type.name;
 }
 

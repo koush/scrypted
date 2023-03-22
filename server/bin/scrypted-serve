@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-const { spawn } = require('child_process');
 const path = require('path');
 const mainPath = path.join(__dirname, '../dist/scrypted-main.js');
-spawn('node', ['--expose-gc', mainPath], { stdio: 'inherit' });
+require(mainPath);

@@ -53,14 +53,30 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
     
     videocaps += ',format={format}'.format(format=format)
 
-    decoder = 'decodebin'
-    if videoCodec == 'h264':
-        decoder = h264Decoder or 'Default'
+    decoder = None
+    def setDecoderClearDefault(value: str):
+        nonlocal decoder
+        decoder = value
         if decoder == 'Default':
+            decoder = None
+
+    setDecoderClearDefault(None)
+
+    if videoCodec == 'h264':
+        setDecoderClearDefault(h264Decoder)
+
+        if not decoder:
+            # hw acceleration is "safe" to use on mac, but not
+            # on other hosts where it may crash.
+            # defaults must be safe.
             if platform.system() == 'Darwin':
                 decoder = 'vtdec_hw'
             else:
-                decoder = 'decodebin'
+                decoder = 'avdec_h264'
+    else:
+        # decodebin may pick a hardware accelerated decoder, which isn't ideal
+        # so use a known software decoder for h264 and decodebin for anything else.
+        decoder = 'decodebin'
 
     videosrc += ' ! {decoder} ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! {videocaps}'.format(decoder=decoder, videocaps=videocaps)
 

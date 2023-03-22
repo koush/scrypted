@@ -9,17 +9,17 @@ import net from "net";
 
 export class NodeForkWorker extends ChildProcessWorker {
 
-    constructor(pluginId: string, options: RuntimeWorkerOptions) {
+    constructor(mainFilename: string, pluginId: string, options: RuntimeWorkerOptions) {
         super(pluginId, options);
-        
-        const {env, pluginDebug} = options;
-        
+
+        const { env, pluginDebug } = options;
+
         const execArgv: string[] = process.execArgv.slice();
         if (pluginDebug) {
             execArgv.push(`--inspect=0.0.0.0:${pluginDebug.inspectPort}`);
         }
 
-        this.worker = child_process.fork(require.main.filename, ['child', this.pluginId], {
+        this.worker = child_process.fork(mainFilename, ['child', this.pluginId], {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
             env: Object.assign({}, process.env, env, {
                 NODE_PATH: path.join(getPluginNodePath(this.pluginId), 'node_modules'),

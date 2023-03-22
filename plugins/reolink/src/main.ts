@@ -196,7 +196,7 @@ class ReolinkProider extends RtspProvider {
                 throw e;
             }
         }
-        settings.newCamera ||= 'Hikvision Camera';
+        settings.newCamera ||= 'Reolink Camera';
 
         nativeId = await super.createDevice(settings, nativeId);
 

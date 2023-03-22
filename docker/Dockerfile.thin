@@ -1,5 +1,7 @@
 ARG BUILDPACK_DEPS_BASE="bullseye"
-FROM buildpack-deps:${BUILDPACK_DEPS_BASE} as header
+FROM debian:${BUILDPACK_DEPS_BASE} as header
+
+RUN apt-get update && apt-get -y install curl wget
 
 # switch to nvm?
 ARG NODE_VERSION=18
@@ -11,18 +13,6 @@ RUN apt-get -y update
 RUN apt-get -y upgrade
 RUN apt-get -y install software-properties-common apt-utils
 RUN apt-get -y update
-
-# base development stuff
-RUN apt-get -y install \
-    build-essential \
-    gcc \
-    libglib2.0-dev \
-    pkg-config
-
-# ffmpeg
-RUN apt-get -y install \
-    ffmpeg
-ENV SCRYPTED_FFMPEG_PATH=ffmpeg
 
 ENV SCRYPTED_DOCKER_SERVE="true"
 ENV SCRYPTED_CAN_RESTART="true"

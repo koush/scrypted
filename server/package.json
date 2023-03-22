@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.7.17",
+  "version": "0.7.23",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.10",
@@ -60,6 +60,8 @@
   "bin": {
     "scrypted-serve": "bin/scrypted-serve"
   },
+  "main": "dist/scrypted-main-exports.js",
+  "types": "dist/scrypted-main-exports.d.ts",
   "scripts": {
     "preserve": "npm run build",
     "serve": "node --expose-gc dist/scrypted-main.js",
