@@ -13,6 +13,7 @@ import { addAccessoryDeviceInfo } from './info';
 import { randomPinCode } from './pincode';
 import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
+import { reorderDevicesByProvider } from './util';
 import { VideoClipsMixinProvider } from './video-clips-provider';
 
 const hapStorage: Storage = {
@@ -109,6 +110,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             description: 'The last home hub to request a recording. Internally used to determine if a streaming request is coming from remote wifi.',
         },
     });
+    mergedDevices = new Set<string>();
 
     constructor() {
         super();
@@ -171,6 +173,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
     async start() {
         this.log.clearAlerts();
+        this.mergedDevices = new Set<string>();
 
         let defaultIncluded: any;
         try {
@@ -184,7 +187,13 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
         const accessoryIds = new Set<string>();
 
-        for (const id of Object.keys(systemManager.getSystemState())) {
+        const deviceIds = Object.keys(systemManager.getSystemState());
+        const reorderedDeviceIds = reorderDevicesByProvider(deviceIds);
+        if (deviceIds.length !== reorderedDeviceIds.length) {
+            throw Error(`error in device reordering, expected ${deviceIds.length} devices but only got ${reorderedDeviceIds.length}!`);
+        }
+
+        for (const id of reorderedDeviceIds) {
             const device = systemManager.getDeviceById<Online>(id);
             const supportedType = supportedTypes[device.type];
             if (!supportedType?.probe(device))
@@ -203,6 +212,11 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             catch (e) {
                 console.error('error while checking device if syncable', e);
                 this.log.a('Error while checking device if syncable. See Console.');
+                continue;
+            }
+
+            if (this.mergedDevices.has(device.id)) {
+                this.console.log(`${device.name} was merged into an existing Homekit accessory and will not be exposed independently`)
                 continue;
             }
 

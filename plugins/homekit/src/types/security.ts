@@ -1,7 +1,7 @@
-import { SecuritySystem, OnOff, SecuritySystemMode, SecuritySystemObstruction, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { SecuritySystem, SecuritySystemMode, SecuritySystemObstruction, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, DeviceProvider } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
-import { makeAccessory } from './common';
+import { makeAccessory, addChildSirens } from './common';
 import type { HomeKitPlugin } from "../main";
 
 addSupportedType({
@@ -89,19 +89,12 @@ addSupportedType({
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemAlarmType,
             () => !!device.securitySystemState?.triggered);
 
-        if (device.interfaces.includes(ScryptedInterface.OnOff)) {
-            const onOffDevice = device as any as OnOff;
-            const onOffService = accessory.addService(Service.Switch, device.name);
-            onOffService.getCharacteristic(Characteristic.On)
-                .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                    callback();
-                    if (value)
-                        onOffDevice.turnOn();
-                    else
-                        onOffDevice.turnOff();
-                })
+        if (device.interfaces.includes(ScryptedInterface.DeviceProvider)) {
+            const { devices } = addChildSirens(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory);
 
-            bindCharacteristic(device, ScryptedInterface.OnOff, onOffService, Characteristic.On, () => !!onOffDevice.on);
+            // ensure child devices are skipped by the rest of homekit by
+            // reporting that they've been merged
+            devices.map(device => homekitPlugin.mergedDevices.add(device.id));
         }
 
         return accessory;
