@@ -948,8 +948,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (newPipeline === 'Snapshot')
       return newPipeline;
     const pipelines = getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator));
-    const found = pipelines.find(p => p.name === newPipeline);
-    return found?.id || pipelines[0]?.id;
+    const gstreamer = pipelines.find(p => p.nativeId === 'gstreamer');
+    const libav = pipelines.find(p => p.nativeId === 'libav');
+    const ffmpeg = pipelines.find(p => p.nativeId === 'ffmpeg');
+    const use = pipelines.find(p => p.name === newPipeline) || gstreamer || libav || ffmpeg;
+    return use.id;
   }
 
   async getMixinSettings(): Promise<Setting[]> {
