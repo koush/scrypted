@@ -1,18 +1,22 @@
-import { ensurePluginVolume } from "./plugin-volume";
-import fs from 'fs';
 import child_process from 'child_process';
-import path from 'path';
 import { once } from 'events';
-import process from 'process';
+import fs from 'fs';
 import mkdirp from "mkdirp";
-import semver from 'semver';
 import os from 'os';
+import path from 'path';
+import process from 'process';
 import rimraf from "rimraf";
+import semver from 'semver';
+import { ensurePluginVolume } from "./plugin-volume";
 
 export function getPluginNodePath(name: string) {
     const pluginVolume = ensurePluginVolume(name);
     const nodeMajorVersion = semver.parse(process.version).major;
-    const nodePrefix = path.join(pluginVolume, `node${nodeMajorVersion}-${process.platform}-${process.arch}`);
+    let nodeVersionedDirectory = `node${nodeMajorVersion}-${process.platform}-${process.arch}`;
+    const scryptedBase = process.env.SCRYPTED_BASE_VERSION;
+    if (scryptedBase)
+        nodeVersionedDirectory += '-' + nodeVersionedDirectory;
+    const nodePrefix = path.join(pluginVolume, nodeVersionedDirectory);
     return nodePrefix;
 }
 
