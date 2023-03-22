@@ -731,17 +731,25 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
     }
 
     async getVideoClip(videoId: string): Promise<MediaObject> {
-        if (this.videoClips.has(videoId)) {
-            return mediaManager.createMediaObjectFromUrl(this.videoClips.get(videoId).resources.video.href);
+        if (!this.videoClips.has(videoId)) {
+            throw new Error('Failed to get video clip.');
         }
-        throw new Error('Failed to get video clip.')
+        return mediaManager.createMediaObjectFromUrl(this.videoClips.get(videoId).resources.video.href);
     }
 
     async getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject> {
-        if (this.videoClips.has(thumbnailId)) {
-            return mediaManager.createMediaObjectFromUrl(this.videoClips.get(thumbnailId).resources.thumbnail.href);
+        if (!this.videoClips.has(thumbnailId)) {
+            throw new Error('Failed to get video clip thumbnail.');
         }
-        throw new Error('Failed to get video clip thumbnail.')
+        const ffmpegInput: FFmpegInput = {
+            inputArguments: [
+                '-f', 'h264',
+                '-i', this.videoClips.get(thumbnailId).resources.thumbnail.href,
+            ]
+        };
+        const input = await mediaManager.createFFmpegMediaObject(ffmpegInput);
+        const jpeg = await mediaManager.convertMediaObjectToBuffer(input, 'image/jpeg');
+        return await mediaManager.createMediaObject(jpeg, 'image/jpeg');
     }
     
     async removeVideoClips(...videoClipIds: string[]): Promise<void> {
