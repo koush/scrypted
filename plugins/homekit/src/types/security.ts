@@ -1,4 +1,4 @@
-import { SecuritySystem, SecuritySystemMode, SecuritySystemObstruction, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { SecuritySystem, OnOff, SecuritySystemMode, SecuritySystemObstruction, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -44,7 +44,7 @@ addSupportedType({
 
             return Characteristic.SecuritySystemCurrentState.DISARMED;
         }
-        
+
         function toTargetState(mode: SecuritySystemMode) {
             switch(mode) {
                 case SecuritySystemMode.AwayArmed:
@@ -71,7 +71,7 @@ addSupportedType({
 
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemCurrentState,
             () => toCurrentState(device.securitySystemState?.mode, device.securitySystemState?.triggered));
-        
+
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemTargetState,
             () => toTargetState(device.securitySystemState?.mode));
 
@@ -88,6 +88,21 @@ addSupportedType({
 
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemAlarmType,
             () => !!device.securitySystemState?.triggered);
+
+        if (device.interfaces.includes(ScryptedInterface.OnOff)) {
+            const onOffDevice = device as any as OnOff;
+            const onOffService = accessory.addService(Service.Switch, device.name);
+            onOffService.getCharacteristic(Characteristic.On)
+                .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                    callback();
+                    if (value)
+                        onOffDevice.turnOn();
+                    else
+                        onOffDevice.turnOff();
+                })
+
+            bindCharacteristic(device, ScryptedInterface.OnOff, onOffService, Characteristic.On, () => !!onOffDevice.on);
+        }
 
         return accessory;
     },
