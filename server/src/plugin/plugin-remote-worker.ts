@@ -12,7 +12,7 @@ import { createDuplexRpcPeer } from '../rpc-serializer';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { prepareConsoles } from './plugin-console';
-import { installOptionalDependencies } from './plugin-npm-dependencies';
+import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, DeviceManagerImpl, PluginReader, setupPluginRemote } from './plugin-remote';
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
@@ -114,7 +114,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 let clusterPeerPromise = clusterPeers.get(port);
                 if (!clusterPeerPromise) {
                     clusterPeerPromise = (async () => {
-                        const socket = net.connect(port);
+                        const socket = net.connect(port, '127.0.0.1');
                         socket.on('close', () => clusterPeers.delete(port));
 
                         try {
@@ -181,6 +181,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             const pluginConsole = getPluginConsole?.();
             params.console = pluginConsole;
+            const pnp = getPluginNodePath(pluginId);
             params.require = (name: string) => {
                 if (name === 'fakefs' || (name === 'fs' && !packageJson.scrypted.realfs)) {
                     return volume;
@@ -188,8 +189,14 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 if (name === 'realfs') {
                     return require('fs');
                 }
-                const module = require(name);
-                return module;
+                try {
+                    const module = require(name);
+                    return module;
+                }
+                catch (e) {
+                    const c = path.join(pnp, 'node_modules', name);
+                    return require(c);
+                }
             };
             // const window: any = {};
             const exports: any = {};
