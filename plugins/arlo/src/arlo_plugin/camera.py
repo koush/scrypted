@@ -1,19 +1,24 @@
+from __future__ import annotations
+
 import asyncio
 from datetime import datetime, timedelta
 import json
 import threading
 import time
-from typing import List
+from typing import List, TYPE_CHECKING
 
 import scrypted_arlo_go
 
 import scrypted_sdk
 from scrypted_sdk.types import Setting, Settings, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, Battery, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
-from .device_base import ArloDeviceBase
-from .provider import ArloProvider
+from .base import ArloDeviceBase
 from .child_process import HeartbeatChildProcess
 from .util import BackgroundTaskMixin
+
+if TYPE_CHECKING:
+    # https://adamj.eu/tech/2021/05/13/python-type-hints-how-to-fix-circular-imports/
+    from .provider import ArloProvider
 
 
 class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, MotionSensor, Battery):
@@ -22,7 +27,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, Moti
 
     def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
-
         self.start_motion_subscription()
         self.start_battery_subscription()
 

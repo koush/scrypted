@@ -22,5 +22,7 @@ class BackgroundTaskMixin:
         task.add_done_callback(self.background_tasks.discard)
 
     def cancel_pending_tasks(self) -> None:
+        if not hasattr(self, "background_tasks"):
+            return
         for task in self.background_tasks:
             task.cancel()

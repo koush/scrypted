@@ -1,11 +1,18 @@
-from typing import List
+from __future__ import annotations
+
+import traceback
+from typing import List, TYPE_CHECKING
 
 from scrypted_sdk import ScryptedDeviceBase
 from scrypted_sdk.types import Device
 
 from .logging import ScryptedDeviceLoggerMixin
 from .util import BackgroundTaskMixin
-from .provider import ArloProvider
+
+if TYPE_CHECKING:
+    # https://adamj.eu/tech/2021/05/13/python-type-hints-how-to-fix-circular-imports/
+    from .provider import ArloProvider
+
 
 class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     nativeId: str = None
@@ -60,3 +67,14 @@ class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTa
     def get_builtin_child_device_manifests(self) -> List[Device]:
         """Returns the list of child device manifests representing hardware features built into this device."""
         return []
+
+    @classmethod
+    def async_print_exception_guard(self, fn):
+        """Decorator to print an exception's stack trace before re-raising the exception."""
+        async def wrapped(*args, **kwargs):
+            try:
+                return await fn(*args, **kwargs)
+            except Exception:
+                traceback.print_exc()
+                raise
+        return wrapped
