@@ -54,6 +54,7 @@ export function createRpcSerializer(options: {
     const setupRpcPeer = (peer: RpcPeer) => {
         rpcPeer = peer;
         rpcPeer.addSerializer(Buffer, 'Buffer', new SidebandBufferSerializer());
+        rpcPeer.constructorSerializerMap.set(Uint8Array, 'Buffer');
     }
 
     const onMessageBuffer = (buffer: Buffer) => {
