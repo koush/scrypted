@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import List, TYPE_CHECKING
 
-from scrypted_sdk.types import Device, DeviceProvider, SecuritySystem, SecuritySystemMode, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Device, DeviceProvider, Setting, Settings, SettingValue, SecuritySystem, SecuritySystemMode, Readme, ScryptedInterface, ScryptedDeviceType
 
 from .base import ArloDeviceBase
 from .siren import ArloSiren
@@ -36,6 +36,10 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
         if mode not in ArloSirenVirtualSecuritySystem.SUPPORTED_MODES:
             raise ValueError(f"invalid mode {mode}")
         self.storage.setItem("mode", mode)
+        self.securitySystemState = {
+            **self.securitySystemState,
+            "mode": mode,
+        }
 
     async def delayed_init(self) -> None:
         iterations = 1
@@ -59,14 +63,15 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
         return [
             ScryptedInterface.SecuritySystem.value,
             ScryptedInterface.DeviceProvider.value,
+            ScryptedInterface.Settings.value,
+            ScryptedInterface.Readme.value,
         ]
 
     def get_device_type(self) -> str:
         return ScryptedDeviceType.SecuritySystem.value
 
     def get_builtin_child_device_manifests(self) -> List[Device]:
-        siren_id = f'{self.arlo_device["deviceId"]}.siren'
-        siren = self.get_or_create_siren(siren_id)
+        siren = self.get_or_create_siren()
         return [
             {
                 "info": {
@@ -75,7 +80,7 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
                     "firmware": self.arlo_device.get("firmwareVersion"),
                     "serialNumber": self.arlo_device["deviceId"],
                 },
-                "nativeId": siren_id,
+                "nativeId": siren.nativeId,
                 "name": f'{self.arlo_device["deviceName"]} Siren',
                 "interfaces": siren.get_applicable_interfaces(),
                 "type": siren.get_device_type(),
@@ -83,14 +88,43 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
             }
         ]
 
-    async def getDevice(self, nativeId: str) -> ArloDeviceBase:
-        return self.get_or_create_siren(nativeId)
+    async def getSettings(self) -> List[Setting]:
+        return [
+            {
+                "key": "mode",
+                "title": "Arm Mode",
+                "description": "If disarmed, the associated siren will not be physically triggered even if toggled.",
+                "value": self.mode,
+                "choices": ArloSirenVirtualSecuritySystem.SUPPORTED_MODES,
+            },
+        ]
 
-    def get_or_create_siren(self, nativeId: str) -> ArloSiren:
+    async def putSetting(self, key: str, value: SettingValue) -> None:
+        if key != "mode":
+            raise ValueError(f"invalid setting {key}")
+        self.mode = value
+        await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
+        if self.mode == SecuritySystemMode.Disarmed.value:
+            await self.get_or_create_siren().turnOff()
+
+    async def getReadmeMarkdown(self) -> str:
+        return """
+# Virtual Security System for Arlo Sirens
+
+This security system device is not a real physical device, but a virtual, emulated device provided by the Arlo Scrypted plugin. Its purpose is to grant security system semantics of Arm/Disarm to avoid the accidental, unwanted triggering of the real physical siren through integrations such as Homekit.
+
+To allow the siren to trigger, set the Arm Mode to any of the Armed options. When Disarmed, any triggers of the siren will be ignored.
+""".strip()
+
+    async def getDevice(self, nativeId: str) -> ArloDeviceBase:
         if not nativeId.endswith("siren"):
             return None
+        return self.get_or_create_siren()
+
+    def get_or_create_siren(self) -> ArloSiren:
+        siren_id = f'{self.arlo_device["deviceId"]}.siren'
         if not self.siren:
-            self.siren = ArloSiren(nativeId, self.arlo_device, self.arlo_basestation, self.provider, self)
+            self.siren = ArloSiren(siren_id, self.arlo_device, self.arlo_basestation, self.provider, self)
         return self.siren
 
     async def armSecuritySystem(self, mode: SecuritySystemMode) -> None:
@@ -100,7 +134,10 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
             **self.securitySystemState,
             "mode": mode,
         }
+        if mode == SecuritySystemMode.Disarmed.value:
+            await self.get_or_create_siren().turnOff()
 
+    @ArloDeviceBase.async_print_exception_guard
     async def disarmSecuritySystem(self) -> None:
         self.logger.info(f"Disarming")
         self.mode = SecuritySystemMode.Disarmed.value
@@ -108,3 +145,4 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
             **self.securitySystemState,
             "mode": SecuritySystemMode.Disarmed.value,
         }
+        await self.get_or_create_siren().turnOff()
