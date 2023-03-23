@@ -3,9 +3,10 @@ import sdk, { ScryptedInterface } from '@scrypted/sdk';
 const { systemManager } = sdk;
 
 /*
- * flattenDeviceTree uses BFS to traverse the given device mapping
- * and produce a list of device ids. deviceId is the node of the tree
- * currently being processed, where null is the root of the tree.
+ * flattenDeviceTree performs a modified DFS tree traversal of the given
+ * device mapping to produce a list of device ids. deviceId is the node
+ * of the tree currently being processed, where null is the root of the
+ * tree.
  */
 function flattenDeviceTree(deviceMap: Map<string, string[]>, deviceId: string): string[] {
     const result: string[] = [];
