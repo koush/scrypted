@@ -18,7 +18,7 @@ systemctl stop scrypted.service
 # bad hack to run a dockerfile like a shell script.
 
 RUN() {
-    echo "Running: $@"
+    # echo "Running: $@"
     $@
     if [ $? -ne 0 ]
     then
@@ -89,6 +89,8 @@ Environment="NODE_OPTIONS=$NODE_OPTIONS"
 WantedBy=multi-user.target
 
 EOT
+
+set -x
 
 RUN systemctl daemon-reload
 RUN systemctl enable scrypted.service
