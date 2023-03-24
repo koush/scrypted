@@ -13,6 +13,7 @@ import { readLength, readLine } from './read-stream';
 import { MSection, parseSdp } from './sdp-utils';
 import { sleep } from './sleep';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
+import { URL } from 'url';
 
 const REQUIRED_WWW_AUTHENTICATE_KEYS = ['realm', 'nonce'];
 
@@ -580,7 +581,7 @@ export class RtspClient extends RtspBase {
         const username = decodeURIComponent(authedUrl.username);
         const password = decodeURIComponent(authedUrl.password);
 
-        const strippedUrl = new URL(url);
+        const strippedUrl = new URL(url.toString());
         strippedUrl.username = '';
         strippedUrl.password = '';
 
