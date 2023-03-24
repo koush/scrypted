@@ -18,7 +18,7 @@ systemctl stop scrypted.service
 # bad hack to run a dockerfile like a shell script.
 
 RUN() {
-    # echo "Running: $@"
+    echo "Running: $@"
     $@
     if [ $? -ne 0 ]
     then
