@@ -21,4 +21,6 @@ jobs:
           
       - name: Test server is running
         run: |
+          systemctl status scrypted.service
+          journalctl -u scrypted.service --no-pager
           curl -k https://localhost:10443/
