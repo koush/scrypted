@@ -5,7 +5,7 @@ on:
     branches: ["main"]
   pull_request:
   workflow_dispatch:
-
+  
 jobs:
   test_linux_local:
     name: Test Linux local installation
@@ -22,4 +22,37 @@ jobs:
       - name: Test server is running
         run: |
           systemctl status scrypted.service
-          curl -k --retry 20 --retry-connrefused --retry-max-time 600 https://localhost:10443/
+          curl -k --retry 20 --retry-all-errors --retry-max-time 600 https://localhost:10443/
+          
+  test_mac_local:
+    name: Test Mac local installation
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Run install script
+        run: |
+          mkdir -p ~/.scrypted
+          bash ./docker/install-scrypted-dependencies-mac.sh
+          
+      - name: Test server is running
+        run: |
+          curl -k --retry 20 --retry-all-errors --retry-max-time 600 https://localhost:10443/
+          
+  test_windows_local:
+    name: Test Windows local installation
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Run install script
+        run: |
+          .\docker\install-scrypted-dependencies-win.ps1
+          
+      - name: Test server is running
+        run: |
+          curl -k --retry 20 --retry-all-errors --retry-max-time 600 https://localhost:10443/
