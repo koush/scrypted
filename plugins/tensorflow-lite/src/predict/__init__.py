@@ -44,7 +44,6 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
-
 class RawImage:
     jpegMediaObject: scrypted_sdk.MediaObject
 
@@ -298,9 +297,12 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 return point[0], point[1], True
 
             data = await videoFrame.toBuffer({
-                'format': 'rgb',
+                'format': videoFrame.format or 'rgb',
             })
-            image = Image.frombuffer('RGB', (w, h), data)
+            if videoFrame.format == 'rgba':
+                image = Image.frombuffer('RGBA', (w, h), data).convert('RGB')
+            else:
+                image = Image.frombuffer('RGB', (w, h), data)
             try:
                 ret = await self.detect_once(image, settings, src_size, cvss)
                 return ret
@@ -328,7 +330,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     'width': sw,
                     'height': sh,
                 },
-                'format': 'rgb',
+                'format': videoFrame.format or 'rgb',
             }),
             videoFrame.toBuffer({
                 'resize': {
@@ -341,12 +343,18 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     'width': sw,
                     'height': sh,
                 },
-                'format': 'rgb',
+                'format': videoFrame.format or 'rgb',
             })
         )
 
-        first = Image.frombuffer('RGB', (w, h), firstData)
-        second = Image.frombuffer('RGB', (w, h), secondData)
+        if videoFrame.format == 'rgba':
+            first = Image.frombuffer('RGBA', (w, h), firstData).convert('RGB')
+        else:
+            first = Image.frombuffer('RGB', (w, h), firstData)
+        if videoFrame.format == 'rgba':
+            second = Image.frombuffer('RGBA', (w, h), secondData).convert('RGB')
+        else:
+            second = Image.frombuffer('RGB', (w, h), secondData)
 
         def cvss1(point, normalize=False):
             return point[0] / s, point[1] / s, True

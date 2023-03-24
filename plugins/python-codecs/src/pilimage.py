@@ -72,6 +72,7 @@ def toPILImage(pilImageWrapper: PILImage, options: scrypted_sdk.ImageOptions = N
 
 async def createPILMediaObject(image: PILImage):
     ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
+        'format': None,
         'width': image.width,
         'height': image.height,
         'toBuffer': lambda options = None: image.toBuffer(options),

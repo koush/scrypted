@@ -8,6 +8,7 @@ import { Readable } from 'stream';
 
 async function createVipsMediaObject(image: VipsImage): Promise<VideoFrame & MediaObject> {
     const ret = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
+        format: null,
         timestamp: 0,
         width: image.width,
         height: image.height,

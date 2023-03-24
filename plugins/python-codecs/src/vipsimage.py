@@ -75,6 +75,7 @@ def toVipsImage(vipsImageWrapper: VipsImage, options: scrypted_sdk.ImageOptions 
 
 async def createVipsMediaObject(image: VipsImage):
     ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
+        'format': None,
         'width': image.width,
         'height': image.height,
         'toBuffer': lambda options = None: image.toBuffer(options),
