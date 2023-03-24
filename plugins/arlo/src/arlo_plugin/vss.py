@@ -114,6 +114,8 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
 This security system device is not a real physical device, but a virtual, emulated device provided by the Arlo Scrypted plugin. Its purpose is to grant security system semantics of Arm/Disarm to avoid the accidental, unwanted triggering of the real physical siren through integrations such as Homekit.
 
 To allow the siren to trigger, set the Arm Mode to any of the Armed options. When Disarmed, any triggers of the siren will be ignored.
+
+If this virtual security system is synced to Homekit, the siren device will be merged into the same security system accessory as a switch. The siren device will not be added as a separate accessory. To access the siren as a switch without the security system, disable syncing of the virtual security system and enable syncing of the siren, then ensure that the virtual security system is armed manually in its settings in Scrypted.
 """.strip()
 
     async def getDevice(self, nativeId: str) -> ArloDeviceBase:
