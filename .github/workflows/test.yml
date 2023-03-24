@@ -1,0 +1,24 @@
+name: Test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test_linux_local:
+    name: Test Linux local installation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Run install script
+        run: |
+          cat ./docker/install-scrypted-dependencies-linux.sh | sudo SERVICE_USER=$USER bash
+          
+      - name: Test server is running
+        run: |
+          curl -k https://localhost:10443/
