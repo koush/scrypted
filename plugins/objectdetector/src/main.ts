@@ -553,8 +553,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
     }
 
+    const start = Date.now();
+    let detections = 0;
     try {
-      let detections = 0;
       for await (const detected
         of await this.objectDetection.generateObjectDetections(await generator(), {
           settings: this.getCurrentSettings(),
@@ -607,7 +608,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.console.error('video pipeline ended with error', e);
     }
     finally {
-      this.console.log('video pipeline analysis ended');
+      this.console.log('video pipeline analysis ended, dps:', detections / (Date.now() - start) * 1000);
       this.endObjectDetection();
     }
   }
