@@ -22,4 +22,4 @@ jobs:
       - name: Test server is running
         run: |
           systemctl status scrypted.service
-          curl -k --connect-timeout 300 https://localhost:10443/
+          curl -k --retry 20 --retry-connrefused --retry-max-time 600 https://localhost:10443/
