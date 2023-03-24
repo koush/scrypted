@@ -233,7 +233,7 @@ class HttpResponseOptions(TypedDict):
 
 class ImageOptions(TypedDict):
     crop: Any
-    format: Any | Any | Any | Any
+    format: ImageFormat
     resize: Any
     pass
 
@@ -279,6 +279,9 @@ class VideoStreamOptions(TypedDict):
     minBitrate: float
     profile: str
     width: float
+    pass
+
+class ImageFormat(TypedDict):
     pass
 
 class MediaStreamDestination(TypedDict):
@@ -694,7 +697,7 @@ class VideoClipOptions(TypedDict):
 
 class VideoFrameGeneratorOptions(TypedDict):
     crop: Any
-    format: Any | Any | Any | Any
+    format: ImageFormat
     resize: Any
     pass
 
@@ -2427,6 +2430,7 @@ class ObjectDetectionCallbacks:
     pass
 
 class VideoFrame:
+    format: ImageFormat
     height: float
     timestamp: float
     width: float
