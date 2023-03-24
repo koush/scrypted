@@ -64,6 +64,8 @@ fi
 
 # this is not RUN as we do not care about the result
 USER_HOME=$(eval echo ~$SERVICE_USER)
+echo "Creating $USER_HOME/.scrypted if it does not exist"
+mkdir -p $USER_HOME/.scrypted
 echo "Setting permissions on $USER_HOME/.scrypted"
 chown -R $SERVICE_USER $USER_HOME/.scrypted
 
@@ -89,8 +91,6 @@ Environment="NODE_OPTIONS=$NODE_OPTIONS"
 WantedBy=multi-user.target
 
 EOT
-
-set -x
 
 RUN systemctl daemon-reload
 RUN systemctl enable scrypted.service
