@@ -14,6 +14,11 @@ if TYPE_CHECKING:
 
 
 class ArloBasestation(ArloDeviceBase, DeviceProvider):
+    MODELS_WITH_SIRENS = [
+        "vmb4000",
+        "vmb4500"
+    ]
+
     vss: ArloSirenVirtualSecuritySystem = None
 
     def __init__(self, nativeId: str, arlo_basestation: dict, provider: ArloProvider) -> None:
@@ -26,6 +31,10 @@ class ArloBasestation(ArloDeviceBase, DeviceProvider):
         return ScryptedDeviceType.DeviceProvider.value
 
     def get_builtin_child_device_manifests(self) -> List[Device]:
+        if not any([self.arlo_device['modelId'].lower().startswith(model) for model in ArloBasestation.MODELS_WITH_SIRENS]):
+            # this basestation has no builtin siren, so no manifests to return
+            return []
+
         vss_id = f'{self.arlo_device["deviceId"]}.vss'
         vss = self.get_or_create_vss(vss_id)
         return [
