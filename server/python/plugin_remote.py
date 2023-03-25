@@ -218,6 +218,7 @@ class PluginRemote:
     consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
 
     def __init__(self, peer: rpc.RpcPeer, api, pluginId, hostInfo, loop: AbstractEventLoop):
+        self.allMemoryStats = {}
         self.peer = peer
         self.api = api
         self.pluginId = pluginId
@@ -446,6 +447,8 @@ class PluginRemote:
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
         self.mediaManager = MediaManager(await self.api.getMediaManager())
 
+        await self.start_stats_runner()
+
         try:
             from scrypted_sdk import sdk_init2  # type: ignore
 
@@ -479,7 +482,7 @@ class PluginRemote:
                     forkPeer.peerName = 'thread'
 
                     async def updateStats(stats):
-                        allMemoryStats[forkPeer] = stats
+                        self.allMemoryStats[forkPeer] = stats
                     forkPeer.params['updateStats'] = updateStats
 
                     async def forkReadLoop():
@@ -489,7 +492,7 @@ class PluginRemote:
                             # traceback.print_exc()
                             print('fork read loop exited')
                         finally:
-                            allMemoryStats.pop(forkPeer)
+                            self.allMemoryStats.pop(forkPeer)
                             parent_conn.close()
                             rpcTransport.executor.shutdown()
                     asyncio.run_coroutine_threadsafe(forkReadLoop(), loop=self.loop)
@@ -580,16 +583,8 @@ class PluginRemote:
     async def getServicePort(self, name):
         pass
 
-
-allMemoryStats = {}
-
-async def plugin_async_main(loop: AbstractEventLoop, rpcTransport: rpc_reader.RpcTransport):
-    peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, rpcTransport)
-    peer.params['print'] = print
-    peer.params['getRemote'] = lambda api, pluginId, hostInfo: PluginRemote(peer, api, pluginId, hostInfo, loop)
-
-    async def get_update_stats():
-        update_stats = await peer.getParam('updateStats')
+    async def start_stats_runner(self):
+        update_stats = await self.peer.getParam('updateStats')
         if not update_stats:
             print('host did not provide update_stats')
             return
@@ -608,7 +603,7 @@ async def plugin_async_main(loop: AbstractEventLoop, rpcTransport: rpc_reader.Rp
                 except:
                     heapTotal = 0
 
-            for _, stats in allMemoryStats.items():
+            for _, stats in self.allMemoryStats.items():
                 ptime += stats['cpu']['user']
                 heapTotal += stats['memoryUsage']['heapTotal']
 
@@ -621,12 +616,15 @@ async def plugin_async_main(loop: AbstractEventLoop, rpcTransport: rpc_reader.Rp
                     'heapTotal': heapTotal,
                 },
             }
-            asyncio.run_coroutine_threadsafe(update_stats(stats), loop)
-            loop.call_later(10, stats_runner)
+            asyncio.run_coroutine_threadsafe(update_stats(stats), self.loop)
+            self.loop.call_later(10, stats_runner)
 
         stats_runner()
 
-    asyncio.run_coroutine_threadsafe(get_update_stats(), loop)
+async def plugin_async_main(loop: AbstractEventLoop, rpcTransport: rpc_reader.RpcTransport):
+    peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, rpcTransport)
+    peer.params['print'] = print
+    peer.params['getRemote'] = lambda api, pluginId, hostInfo: PluginRemote(peer, api, pluginId, hostInfo, loop)
 
     try:
         await readLoop()

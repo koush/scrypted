@@ -39,12 +39,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
     const { getDeviceConsole, getMixinConsole } = prepareConsoles(() => peer.selfName, () => systemManager, () => deviceManager, getPlugins);
 
-    // process.cpuUsage is for the entire process.
-    // process.memoryUsage is per thread.
-    const allMemoryStats = new Map<NodeThreadWorker, NodeJS.MemoryUsage>();
-
-    peer.getParam('updateStats').then(updateStats => startStatsUpdater(allMemoryStats, updateStats));
-
     let replPort: Promise<number>;
 
     let _pluginConsole: Console;
@@ -239,6 +233,12 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             };
 
             await installOptionalDependencies(getPluginConsole(), packageJson);
+
+            // process.cpuUsage is for the entire process.
+            // process.memoryUsage is per thread.
+            const allMemoryStats = new Map<NodeThreadWorker, NodeJS.MemoryUsage>();
+            // start the stats updater/watchdog after installation has finished, as that may take some time.
+            peer.getParam('updateStats').then(updateStats => startStatsUpdater(allMemoryStats, updateStats));
 
             const main = pluginReader('main.nodejs.js');
             pluginReader = undefined;
