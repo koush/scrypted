@@ -57,7 +57,8 @@ RUN apt-get -y install \
 # armv7l does not have wheels for any of these
 # and compile times would forever, if it works at all.
 # furthermore, it's possible to run 32bit docker on 64bit arm,
-# which causes all sorts of weird behavior.
+# which causes weird behavior in python which looks at the arch version
+# which still reports 64bit, even if running in 32bit docker.
 # RUN if [ "$(uname -m)" = "armv7l" ] || [ "$(uname -m)" = "aarch64" ]; \
 #     then \
 #         apt-get -y install \
@@ -68,7 +69,7 @@ RUN apt-get -y install \
 #         python3-skimage; \
 #     fi
 
-# for consistency jsut always install it...
+# for consistency just always install it...
 RUN apt-get -y install \
         python3-matplotlib \
         python3-numpy \
