@@ -1291,6 +1291,7 @@ export interface ObjectDetector {
 }
 export interface ObjectDetectionGeneratorSession {
   settings?: { [key: string]: any };
+  sourceId?: string;
 }
 export interface ObjectDetectionSession extends ObjectDetectionGeneratorSession {
   detectionId?: string;

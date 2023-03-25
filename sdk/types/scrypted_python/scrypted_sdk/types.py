@@ -485,6 +485,7 @@ class ObjectDetectionGeneratorResult(TypedDict):
 
 class ObjectDetectionGeneratorSession(TypedDict):
     settings: Any
+    sourceId: str
     pass
 
 class ObjectDetectionModel(TypedDict):
@@ -500,6 +501,7 @@ class ObjectDetectionSession(TypedDict):
     detectionId: str
     duration: float
     settings: Any
+    sourceId: str
     pass
 
 class ObjectDetectionTypes(TypedDict):
