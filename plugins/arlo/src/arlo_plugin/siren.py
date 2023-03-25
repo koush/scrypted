@@ -42,7 +42,7 @@ class ArloSiren(ArloDeviceBase, OnOff):
             }
             return
 
-        #self.provider.arlo.SirenOn(self.arlo_device)
+        self.provider.arlo.SirenOn(self.arlo_device)
 
         self.on = True
         self.vss.securitySystemState = {
@@ -53,7 +53,7 @@ class ArloSiren(ArloDeviceBase, OnOff):
     @ArloDeviceBase.async_print_exception_guard
     async def turnOff(self) -> None:
         self.logger.info("Turning off")
-        #self.provider.arlo.SirenOff(self.arlo_device)
+        self.provider.arlo.SirenOff(self.arlo_device)
         self.on = False
         self.vss.securitySystemState = {
             **self.vss.securitySystemState,
