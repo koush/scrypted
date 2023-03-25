@@ -1,6 +1,7 @@
 import { Deferred } from "@scrypted/common/src/deferred";
-import { ffmpegLogInitialOutput, safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
+import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import { readLength, readLine } from "@scrypted/common/src/read-stream";
+import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import sdk, { FFmpegInput, Image, ImageOptions, MediaObject, ScryptedDeviceBase, ScryptedMimeTypes, VideoFrame, VideoFrameGenerator, VideoFrameGeneratorOptions } from "@scrypted/sdk";
 import child_process from 'child_process';
 import sharp from 'sharp';
@@ -99,10 +100,15 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
             'pipe:3',
         ];
 
+        // this seems to reduce latency.
+        addVideoFilterArguments(args, 'fps=10', 'fps');
+
         const cp = child_process.spawn(await sdk.mediaManager.getFFmpegPath(), args, {
             stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
         });
-        ffmpegLogInitialOutput(this.console, cp);
+        const console = mediaObject?.sourceId ? sdk.deviceManager.getMixinConsole(mediaObject.sourceId) : this.console;
+        safePrintFFmpegArguments(console, args);
+        ffmpegLogInitialOutput(console, cp);
 
         let finished = false;
         let frameDeferred: Deferred<RawFrame>;
@@ -143,14 +149,14 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                         });
                     }
                     else {
-                        // this.console.warn('skipped frame');
+                        this.console.warn('skipped frame');
                     }
                 }
             }
             catch (e) {
             }
             finally {
-                this.console.log('finished reader');
+                console.log('finished reader');
                 finished = true;
                 frameDeferred?.reject(new Error('frame generator finished'));
             }
@@ -171,16 +177,20 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                     }
                 });
                 const vipsImage = new VipsImage(image, width, height);
-                const mo = await createVipsMediaObject(vipsImage);
-                yield mo;
-                vipsImage.image.destroy();
-                vipsImage.image = undefined;
+                try {
+                    const mo = await createVipsMediaObject(vipsImage);
+                    yield mo;
+                }
+                finally {
+                    vipsImage.image = undefined;
+                    image.destroy();
+                }
             }
         }
         catch (e) {
         }
         finally {
-            this.console.log('finished generator');
+            console.log('finished generator');
             finished = true;
             safeKillFFmpeg(cp);
         }

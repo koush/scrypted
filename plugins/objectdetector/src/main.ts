@@ -980,7 +980,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     this.storageSettings.settings.motionSensorSupplementation.hide = !this.hasMotionType || !this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor);
     this.storageSettings.settings.captureMode.hide = this.hasMotionType || !!this.plugin.storageSettings.values.newPipeline;
-    this.storageSettings.settings.newPipeline.hide = this.hasMotionType || !this.plugin.storageSettings.values.newPipeline;
+    this.storageSettings.settings.newPipeline.hide = !this.plugin.storageSettings.values.newPipeline;
     this.storageSettings.settings.detectionDuration.hide = this.hasMotionType;
     this.storageSettings.settings.detectionTimeout.hide = this.hasMotionType;
     this.storageSettings.settings.motionDuration.hide = !this.hasMotionType;
