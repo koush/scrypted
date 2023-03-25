@@ -1248,8 +1248,9 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
   storageSettings = new StorageSettings(this, {
     newPipeline: {
       title: 'New Video Pipeline',
-      description: 'WARNING! DO NOT ENABLE: Use the new video pipeline. Leave blank to use the legacy pipeline.',
+      description: 'Enables the new video pipeline addded on 2023/03/25. If there are issues with motion or object detection, disable this to switch back to the old pipeline. Then reload the plugin.',
       type: 'boolean',
+      defaultValue: true,
     },
     activeMotionDetections: {
       title: 'Active Motion Detection Sessions',
