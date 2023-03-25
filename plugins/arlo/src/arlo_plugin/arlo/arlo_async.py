@@ -29,7 +29,8 @@ from .sse_stream_async import EventStream
 from .logging import logger
 
 # Import all of the other stuff.
-from datetime import datetime
+from datetime import datetime, timedelta
+from cachetools import cached, TTLCache
 
 import asyncio
 import sys
@@ -735,3 +736,52 @@ class Arlo(object):
                 "pattern": "alarm"
             }
         })
+
+    def GetLibrary(self, device, from_date: datetime, to_date: datetime):
+        """
+        This call returns the following:
+        presignedContentUrl is a link to the actual video in Amazon AWS.
+        presignedThumbnailUrl is a link to the thumbnail .jpg of the actual video in Amazon AWS.
+        [
+          {
+            "mediaDurationSecond": 30,
+            "contentType": "video/mp4",
+            "name": "XXXXXXXXXXXXX",
+            "presignedContentUrl": "https://arlos3-prod-z2.s3.amazonaws.com/XXXXXXX_XXXX_XXXX_XXXX_XXXXXXXXXXXXX/XXX-XXXXXXX/XXXXXXXXXXXXX/recordings/XXXXXXXXXXXXX.mp4?AWSAccessKeyId=XXXXXXXXXXXXXXXXXXXX&Expires=1472968703&Signature=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "lastModified": 1472881430181,
+            "localCreatedDate": XXXXXXXXXXXXX,
+            "presignedThumbnailUrl": "https://arlos3-prod-z2.s3.amazonaws.com/XXXXXXX_XXXX_XXXX_XXXX_XXXXXXXXXXXXX/XXX-XXXXXXX/XXXXXXXXXXXXX/recordings/XXXXXXXXXXXXX_thumb.jpg?AWSAccessKeyId=XXXXXXXXXXXXXXXXXXXX&Expires=1472968703&Signature=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "reason": "motionRecord",
+            "deviceId": "XXXXXXXXXXXXX",
+            "createdBy": "XXXXXXXXXXXXX",
+            "createdDate": "20160903",
+            "timeZone": "America/Chicago",
+            "ownerId": "XXX-XXXXXXX",
+            "utcCreatedDate": XXXXXXXXXXXXX,
+            "currentState": "new",
+            "mediaDuration": "00:00:30"
+          }
+        ]
+        """
+        # give the query range a bit of buffer
+        from_date_internal = from_date - timedelta(days=1)
+        to_date_internal = to_date + timedelta(days=1)
+
+        return [
+            result for result in
+            self._getLibraryCached(from_date_internal.strftime("%Y%m%d"), to_date_internal.strftime("%Y%m%d"))
+            if result["deviceId"] == device["deviceId"]
+            and datetime.fromtimestamp(int(result["name"]) / 1000.0) <= to_date
+            and datetime.fromtimestamp(int(result["name"]) / 1000.0) >= from_date
+        ]
+
+    @cached(cache=TTLCache(maxsize=512, ttl=60))
+    def _getLibraryCached(self, from_date: str, to_date: str):
+        logger.debug(f"Library cache miss for {from_date}, {to_date}")
+        return self.request.post(
+            f'https://{self.BASE_URL}/hmsweb/users/library',
+            {
+                'dateFrom': from_date,
+                'dateTo': to_date
+            }
+        )

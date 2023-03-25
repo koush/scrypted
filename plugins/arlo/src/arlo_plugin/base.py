@@ -1,8 +1,18 @@
+from __future__ import annotations
+
+import traceback
+from typing import List, TYPE_CHECKING
+
 from scrypted_sdk import ScryptedDeviceBase
+from scrypted_sdk.types import Device
 
 from .logging import ScryptedDeviceLoggerMixin
 from .util import BackgroundTaskMixin
-from .provider import ArloProvider
+
+if TYPE_CHECKING:
+    # https://adamj.eu/tech/2021/05/13/python-type-hints-how-to-fix-circular-imports/
+    from .provider import ArloProvider
+
 
 class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     nativeId: str = None
@@ -22,11 +32,11 @@ class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTa
         self.provider = provider
         self.logger.setLevel(self.provider.get_current_log_level())
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.stop_subscriptions = True
         self.cancel_pending_tasks()
 
-    def get_applicable_interfaces(self) -> list:
+    def get_applicable_interfaces(self) -> List[str]:
         """Returns the list of Scrypted interfaces that applies to this device."""
         return []
 
@@ -34,7 +44,7 @@ class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTa
         """Returns the Scrypted device type that applies to this device."""
         return ""
 
-    def get_device_manifest(self) -> dict:
+    def get_device_manifest(self) -> Device:
         """Returns the Scrypted device manifest representing this device."""
         parent = None
         if self.arlo_device.get("parentId") and self.arlo_device["parentId"] != self.arlo_device["deviceId"]:
@@ -54,6 +64,17 @@ class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTa
             "providerNativeId": parent,
         }
 
-    def get_builtin_child_device_manifests(self) -> list:
+    def get_builtin_child_device_manifests(self) -> List[Device]:
         """Returns the list of child device manifests representing hardware features built into this device."""
         return []
+
+    @classmethod
+    def async_print_exception_guard(self, fn):
+        """Decorator to print an exception's stack trace before re-raising the exception."""
+        async def wrapped(*args, **kwargs):
+            try:
+                return await fn(*args, **kwargs)
+            except Exception:
+                traceback.print_exc()
+                raise
+        return wrapped
