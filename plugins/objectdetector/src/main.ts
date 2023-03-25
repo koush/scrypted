@@ -536,6 +536,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     else {
       const destination: MediaStreamDestination = this.hasMotionType ? 'low-resolution' : 'local-recorder';
       const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(newPipeline);
+      this.console.log('decoder:', videoFrameGenerator.name);
       if (!videoFrameGenerator)
         throw new Error('invalid VideoFrameGenerator');
       const stream = await this.cameraDevice.getVideoStream({
@@ -559,6 +560,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       for await (const detected
         of await this.objectDetection.generateObjectDetections(await generator(), {
           settings: this.getCurrentSettings(),
+          sourceId: this.id,
         })) {
         if (!this.detectorRunning) {
           break;
@@ -949,10 +951,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (newPipeline === 'Snapshot')
       return newPipeline;
     const pipelines = getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator));
+    const webcodec = pipelines.find(p => p.nativeId === 'webcodec');
     const gstreamer = pipelines.find(p => p.nativeId === 'gstreamer');
     const libav = pipelines.find(p => p.nativeId === 'libav');
     const ffmpeg = pipelines.find(p => p.nativeId === 'ffmpeg');
-    const use = pipelines.find(p => p.name === newPipeline) || gstreamer || libav || ffmpeg;
+    const use = pipelines.find(p => p.name === newPipeline) || webcodec || gstreamer || libav || ffmpeg;
     return use.id;
   }
 
