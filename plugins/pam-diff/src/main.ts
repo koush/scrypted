@@ -231,7 +231,7 @@ ENDHDR
                     detections.push(
                         {
                             className: 'motion',
-                            score: trigger.percent / 100,
+                            score: 1,
                             boundingBox: [blob.minX, blob.minY, blob.maxX - blob.minX, blob.maxY - blob.minY],
                         }
                     )
@@ -241,7 +241,7 @@ ENDHDR
                 detections.push(
                     {
                         className: 'motion',
-                        score: trigger.percent / 100,
+                        score: 1,
                     }
                 )
             }
