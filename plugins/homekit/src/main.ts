@@ -13,6 +13,7 @@ import { addAccessoryDeviceInfo } from './info';
 import { randomPinCode } from './pincode';
 import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
+import { reorderDevicesByProvider } from './util';
 import { VideoClipsMixinProvider } from './video-clips-provider';
 
 const hapStorage: Storage = {
@@ -109,6 +110,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             description: 'The last home hub to request a recording. Internally used to determine if a streaming request is coming from remote wifi.',
         },
     });
+    mergedDevices = new Set<string>();
 
     constructor() {
         super();
@@ -171,6 +173,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
     async start() {
         this.log.clearAlerts();
+        this.mergedDevices = new Set<string>();
 
         let defaultIncluded: any;
         try {
@@ -181,10 +184,27 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         }
 
         const plugins = await systemManager.getComponent('plugins');
-
         const accessoryIds = new Set<string>();
+        const deviceIds = Object.keys(systemManager.getSystemState());
 
-        for (const id of Object.keys(systemManager.getSystemState())) {
+        // when creating accessories in order, some DeviceProviders may merge in
+        // their child devices (and report back which devices are merged via
+        // this.mergedDevices)
+        // we need to ensure that the iteration processes DeviceProviders before
+        // their children, so a reordering is necessary
+        const reorderedDeviceIds = reorderDevicesByProvider(deviceIds);
+
+        // safety checks in case something went wrong
+        if (deviceIds.length !== reorderedDeviceIds.length) {
+            throw Error(`error in device reordering, expected ${deviceIds.length} devices but only got ${reorderedDeviceIds.length}!`);
+        }
+        const uniqueDeviceIds = new Set<string>(deviceIds);
+        const uniqueReorderedIds = new Set<string>(reorderedDeviceIds);
+        if (uniqueDeviceIds.size !== uniqueReorderedIds.size) {
+            throw Error(`error in device reordering, expected ${uniqueDeviceIds.size} unique devices but only got ${uniqueReorderedIds.size} entries!`);
+        }
+
+        for (const id of reorderedDeviceIds) {
             const device = systemManager.getDeviceById<Online>(id);
             const supportedType = supportedTypes[device.type];
             if (!supportedType?.probe(device))
@@ -203,6 +223,11 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             catch (e) {
                 console.error('error while checking device if syncable', e);
                 this.log.a('Error while checking device if syncable. See Console.');
+                continue;
+            }
+
+            if (this.mergedDevices.has(device.id)) {
+                this.console.log(`${device.name} was merged into an existing Homekit accessory and will not be exposed independently`)
                 continue;
             }
 

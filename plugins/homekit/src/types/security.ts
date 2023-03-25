@@ -1,7 +1,7 @@
-import { SecuritySystem, SecuritySystemMode, SecuritySystemObstruction, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { SecuritySystem, SecuritySystemMode, SecuritySystemObstruction, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, DeviceProvider } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
-import { makeAccessory } from './common';
+import { makeAccessory, addChildSirens } from './common';
 import type { HomeKitPlugin } from "../main";
 
 addSupportedType({
@@ -44,7 +44,7 @@ addSupportedType({
 
             return Characteristic.SecuritySystemCurrentState.DISARMED;
         }
-        
+
         function toTargetState(mode: SecuritySystemMode) {
             switch(mode) {
                 case SecuritySystemMode.AwayArmed:
@@ -71,7 +71,7 @@ addSupportedType({
 
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemCurrentState,
             () => toCurrentState(device.securitySystemState?.mode, device.securitySystemState?.triggered));
-        
+
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemTargetState,
             () => toTargetState(device.securitySystemState?.mode));
 
@@ -88,6 +88,14 @@ addSupportedType({
 
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemAlarmType,
             () => !!device.securitySystemState?.triggered);
+
+        if (device.interfaces.includes(ScryptedInterface.DeviceProvider)) {
+            const { devices } = addChildSirens(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory);
+
+            // ensure child devices are skipped by the rest of homekit by
+            // reporting that they've been merged
+            devices.map(device => homekitPlugin.mergedDevices.add(device.id));
+        }
 
         return accessory;
     },
