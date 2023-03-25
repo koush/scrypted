@@ -40,6 +40,7 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
             **self.securitySystemState,
             "mode": mode,
         }
+        self.create_task(self.onDeviceEvent(ScryptedInterface.Settings.value, None))
 
     async def delayed_init(self) -> None:
         iterations = 1
@@ -103,7 +104,6 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
         if key != "mode":
             raise ValueError(f"invalid setting {key}")
         self.mode = value
-        await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
         if self.mode == SecuritySystemMode.Disarmed.value:
             await self.get_or_create_siren().turnOff()
 

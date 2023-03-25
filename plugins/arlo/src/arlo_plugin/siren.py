@@ -28,15 +28,22 @@ class ArloSiren(ArloDeviceBase, OnOff):
     @ArloDeviceBase.async_print_exception_guard
     async def turnOn(self) -> None:
         self.logger.info("Turning on")
+
         if self.vss.securitySystemState["mode"] == SecuritySystemMode.Disarmed.value:
             self.logger.info("Virtual security system is disarmed, ignoring trigger")
+
+            # set and unset this property to force homekit to display the
+            # switch as off
+            self.on = True
             self.on = False
             self.vss.securitySystemState = {
                 **self.vss.securitySystemState,
                 "triggered": False,
             }
             return
+
         #self.provider.arlo.SirenOn(self.arlo_device)
+
         self.on = True
         self.vss.securitySystemState = {
             **self.vss.securitySystemState,
