@@ -472,11 +472,10 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             {
                 "group": "General",
                 "key": "plugin_verbosity",
-                "title": "Plugin Verbosity",
-                "description": "Select the verbosity of this plugin. 'Verbose' will show debugging messages, "
-                               "including events received from connected Arlo cameras.",
-                "value": self.plugin_verbosity,
-                "choices": sorted(self.plugin_verbosity_choices.keys()),
+                "title": "Verbose Logging",
+                "description": "Enable this option to show debug messages, including events received from connected Arlo cameras.",
+                "value": self.plugin_verbosity == "Verbose",
+                "type": "boolean",
             },
         ])
 
@@ -493,13 +492,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         elif key == "force_reauth":
             # force arlo client to be invalidated and reloaded
             self.invalidate_arlo_client()
+        elif key == "plugin_verbosity":
+            self.storage.setItem(key, "Verbose" if value == "true" else "Normal")
+            self.propagate_verbosity()
+            skip_arlo_client = True
         else:
             self.storage.setItem(key, value)
 
-            if key == "plugin_verbosity":
-                self.propagate_verbosity()
-                skip_arlo_client = True
-            elif key == "arlo_transport":
+            if key == "arlo_transport":
                 self.propagate_transport()
                 # force arlo client to be invalidated and reloaded, but
                 # keep any mfa codes
