@@ -374,12 +374,13 @@ class PluginRemote:
             # to fail because pip only allows filtering on machine, even if running a different architeture.
             # this will cause prebuilt wheel installation to fail.
             if platform.machine() == 'aarch64' and platform.architecture()[0] == '32bit':
-                print('Python machine vs architecture mismatch detected.')
+                print('=============================================')
+                print('Python machine vs architecture mismatch detected. Plugin installation may fail.')
                 print('If Scrypted is running in docker, the docker version may be 32bit while the host kernel is 64bit.')
                 print('This may be resolved by reinstalling a 64bit docker.')
                 print('The docker architecture can be checked with the command: "file $(which docker)"')
                 print('The host architecture can be checked with: "uname -m"')
-                raise Exception('Python machine/architecture mismatch')
+                print('=============================================')
 
             python_version = 'python%s' % str(
                 sys.version_info[0])+"."+str(sys.version_info[1])
