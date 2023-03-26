@@ -464,19 +464,6 @@ async function start(mainFilename: string, options?: {
         res.send(200);
     });
 
-    const resetLogin = path.join(getScryptedVolume(), 'reset-login');
-    async function checkResetLogin() {
-        try {
-            if (fs.existsSync(resetLogin)) {
-                fs.rmSync(resetLogin);
-                await db.removeAll(ScryptedUser);
-                hasLogin = false;
-            }
-        }
-        catch (e) {
-        }
-    }
-
     app.post('/login', async (req, res) => {
         const { username, password, change_password, maxAge: maxAgeRequested } = req.body;
         const timestamp = Date.now();
@@ -562,6 +549,19 @@ async function start(mainFilename: string, options?: {
         });
     });
 
+    const resetLogin = path.join(getScryptedVolume(), 'reset-login');
+    async function checkResetLogin() {
+        try {
+            if (fs.existsSync(resetLogin)) {
+                fs.rmSync(resetLogin);
+                await db.removeAll(ScryptedUser);
+                hasLogin = false;
+            }
+        }
+        catch (e) {
+        }
+    }
+
     app.get('/login', async (req, res) => {
         await checkResetLogin();
 
@@ -570,7 +570,11 @@ async function start(mainFilename: string, options?: {
 
         // env/header based admin login
         if (res.locals.username && res.locals.username === process.env.SCRYPTED_ADMIN_USERNAME) {
+            const userToken = new UserToken(res.locals.username, undefined, Date.now());
+
             res.send({
+                ...createTokens(userToken),
+                expiration: ONE_DAY_MILLISECONDS,
                 username: res.locals.username,
                 token: process.env.SCRYPTED_ADMIN_TOKEN,
                 addresses,
