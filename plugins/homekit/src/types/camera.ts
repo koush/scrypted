@@ -1,5 +1,5 @@
 import { Deferred } from '@scrypted/common/src/deferred';
-import sdk, { AudioSensor, Camera, Intercom, MotionSensor, ObjectsDetected, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { AudioSensor, Camera, Intercom, MotionSensor, ObjectsDetected, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, DeviceProvider, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common';
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, H264Level, H264Profile, MediaContainerType, OccupancySensor, RecordingPacket, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
@@ -7,7 +7,7 @@ import type { HomeKitPlugin } from '../main';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
 import { FORCE_OPUS } from './camera/camera-utils';
-import { makeAccessory } from './common';
+import { makeAccessory, mergeOnOffDevicesByType } from './common';
 
 const { deviceManager, systemManager } = sdk;
 
@@ -301,6 +301,15 @@ addSupportedType({
                     return contactState;
                 }, true);
             }
+        }
+
+        if (device.interfaces.includes(ScryptedInterface.DeviceProvider)) {
+            // merge in lights
+            const { devices } = mergeOnOffDevicesByType(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory, ScryptedDeviceType.Light);
+
+            // ensure child devices are skipped by the rest of homekit by
+            // reporting that they've been merged
+            devices.map(device => homekitPlugin.mergedDevices.add(device.id));
         }
 
         return accessory;

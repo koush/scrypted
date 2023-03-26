@@ -167,29 +167,30 @@ export function addFan(device: ScryptedDevice & Fan & OnOff, accessory: Accessor
 }
 
 /*
- * addChildSirens looks for siren-type child devices of the given device provider
- * and merges them as switches to the accessory represented by the device provider.
+ * mergeOnOffDevicesByType looks for the specified type of child devices under the
+ * given device provider and merges them as switches to the accessory represented
+ * by the device provider.
  *
- * Returns the services created as well as all of the child siren devices which have
+ * Returns the services created as well as all of the child OnOff devices which have
  * been merged.
  */
-export function addChildSirens(device: ScryptedDevice & DeviceProvider, accessory: Accessory): { services: Service[], devices: (ScryptedDevice & OnOff)[] } {
+export function mergeOnOffDevicesByType(device: ScryptedDevice & DeviceProvider, accessory: Accessory, type: ScryptedDeviceType): { services: Service[], devices: (ScryptedDevice & OnOff)[] } {
     if (!device.interfaces.includes(ScryptedInterface.DeviceProvider))
         return undefined;
 
     const children = getChildDevices(device);
-    const sirenDevices = [];
+    const mergedDevices = [];
     const services = children.map((child: ScryptedDevice & OnOff) => {
-        if (child.type !== ScryptedDeviceType.Siren || !child.interfaces.includes(ScryptedInterface.OnOff))
+        if (child.type !== type || !child.interfaces.includes(ScryptedInterface.OnOff))
             return undefined;
 
         const onOffService = getOnOffService(child, accessory, Service.Switch)
-        sirenDevices.push(child);
+        mergedDevices.push(child);
         return onOffService;
     });
 
     return {
         services: services.filter(service => !!service),
-        devices: sirenDevices,
+        devices: mergedDevices,
     };
 }
