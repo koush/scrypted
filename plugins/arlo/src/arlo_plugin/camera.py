@@ -339,9 +339,9 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             clips.reverse()
         return clips
 
+    @ArloDeviceBase.async_print_exception_guard
     async def removeVideoClips(self, videoClipIds: List[str]) -> None:
         # Arlo does support deleting, but let's be safe and disable that
-        self.logger.error("deleting Arlo video clips is not implemented by this plugin")
         raise Exception("deleting Arlo video clips is not implemented by this plugin")
 
     async def getDevice(self, nativeId: str) -> ArloDeviceBase:
