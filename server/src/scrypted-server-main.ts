@@ -446,6 +446,18 @@ async function start(mainFilename: string, options?: {
 
     let hasLogin = await db.getCount(ScryptedUser) > 0;
 
+    if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_TOKEN) {
+        let user = await db.tryGet(ScryptedUser, process.env.SCRYPTED_ADMIN_USERNAME);
+        if (!user) {
+            user = new ScryptedUser();
+            user._id = process.env.SCRYPTED_ADMIN_USERNAME;
+            setScryptedUserPassword(user, crypto.randomBytes(8).toString('hex'), Date.now());
+            user.token = crypto.randomBytes(16).toString('hex');
+            await db.upsert(user);
+            hasLogin = true;
+        }
+    }
+
     app.options('/login', (req, res) => {
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
