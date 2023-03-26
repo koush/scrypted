@@ -39,7 +39,10 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
                 '/usr/local/lib/gstreamer-1.0',
             ];
             for (const gstPath of gstPaths) {
-                if (fs.existsSync(path.join(gstPath, 'libgstx264.dylib'))) {
+                // search for common plugins.
+                if (fs.existsSync(path.join(gstPath, 'libgstx264.dylib'))
+                    || fs.existsSync(path.join(gstPath, 'libgstlibav.dylib'))
+                    || fs.existsSync(path.join(gstPath, 'libgstvideotestsrc.dylib'))) {
                     gstEnv['GST_PLUGIN_PATH'] = gstPath;
                     break;
                 }
