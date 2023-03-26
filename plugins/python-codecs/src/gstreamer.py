@@ -34,7 +34,7 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
         else:
             raise Exception('unknown container %s' % container)
     elif videosrc.startswith('rtsp'):
-        videosrc = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0 is-live=false' % videosrc
+        videosrc = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0' % videosrc
         if videoCodec == 'h264':
             videosrc += ' ! rtph264depay ! h264parse'
 
