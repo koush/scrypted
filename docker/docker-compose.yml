@@ -90,4 +90,4 @@ services:
             # Must match the port in the auto update url above.
             - 10444:8080
         # check for updates once an hour (interval is in seconds)
-        command: --interval 3600 --cleanup
+        command: --interval 3600 --cleanup --scope scrypted
