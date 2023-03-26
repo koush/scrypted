@@ -10,7 +10,7 @@ from typing import List, TYPE_CHECKING
 import scrypted_arlo_go
 
 import scrypted_sdk
-from scrypted_sdk.types import Setting, Settings, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, Battery, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Setting, Settings, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, Battery, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .base import ArloDeviceBase
 from .child_process import HeartbeatChildProcess
@@ -21,7 +21,20 @@ if TYPE_CHECKING:
     from .provider import ArloProvider
 
 
-class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, MotionSensor, Battery):
+class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, VideoClips, MotionSensor, Battery):
+    MODELS_WITH_SPOTLIGHTS = [
+        "vmc4040p",
+        "vmc2030",
+        "vmc2032",
+        "vmc4041p",
+        "vmc4050p",
+        "vmc5040",
+        "vml2030",
+        "vml4030",
+    ]
+
+    MODELS_WITH_SIRENS = []
+
     timeout: int = 30
     intercom_session = None
 
@@ -55,7 +68,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, Moti
             ScryptedInterface.MotionSensor.value,
             ScryptedInterface.Battery.value,
             ScryptedInterface.Settings.value,
-            ScryptedInterface.VideoClips.value,
         ])
 
         if self.two_way_audio:
@@ -65,6 +77,12 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, Moti
         if self.webrtc_emulation:
             results.add(ScryptedInterface.RTCSignalingChannel.value)
             results.discard(ScryptedInterface.Intercom.value)
+
+        if self.has_siren or self.has_spotlight:
+            results.add(ScryptedInterface.DeviceProvider.value)
+
+        if self.has_cloud_recording:
+            results.add(ScryptedInterface.VideoClips.value)
 
         if not self._can_push_to_talk():
             results.discard(ScryptedInterface.RTCSignalingChannel.value)
@@ -91,6 +109,18 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, VideoClips, Moti
             return val
         else:
             return True
+
+    @property
+    def has_cloud_recording(self) -> bool:
+        return self.provider.arlo.GetSmartFeatures(self.arlo_device)["planFeatures"]["eventRecording"]
+
+    @property
+    def has_spotlight(self) -> bool:
+        return any([self.arlo_device["modelId"].lower().startswith(model) for model in ArloCamera.MODELS_WITH_SPOTLIGHTS])
+
+    @property
+    def has_siren(self) -> bool:
+        return any([self.arlo_device["modelId"].lower().startswith(model) for model in ArloCamera.MODELS_WITH_SIRENS])
 
     async def getSettings(self) -> List[Setting]:
         if self._can_push_to_talk():

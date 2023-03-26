@@ -558,6 +558,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 return False
         return True
 
+    @ArloDeviceBase.async_print_exception_guard
     async def discoverDevices(self, duration: int = 0) -> None:
         if not self.arlo:
             raise Exception("Arlo client not connected, cannot discover devices")

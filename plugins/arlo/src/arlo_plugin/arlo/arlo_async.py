@@ -785,3 +785,12 @@ class Arlo(object):
                 'dateTo': to_date
             }
         )
+
+    def GetSmartFeatures(self, device):
+        smart_features = self._getSmartFeaturesCached()
+        key = f"{device['owner']['ownerId']}_{device['deviceId']}"
+        return smart_features["features"].get(key)
+
+    @cached(cache=TTLCache(maxsize=1, ttl=60))
+    def _getSmartFeaturesCached(self):
+        return self.request.get(f'https://{self.BASE_URL}/hmsweb/users/subscription/smart/features')
