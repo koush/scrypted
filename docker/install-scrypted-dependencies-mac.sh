@@ -45,12 +45,22 @@ RUN brew install libvips
 # dlib
 RUN brew install cmake
 # gstreamer plugins
-RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly
+RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad
 # gst python bindings
 RUN_IGNORE brew install gst-python
-# python image library
-# todo: consider removing this
-RUN_IGNORE brew install pillow
+
+### HACK WORKAROUND
+### https://github.com/koush/scrypted/issues/544
+
+brew unpin gstreamer
+brew unpin gst-python
+brew unpin gst-plugins-ugly
+brew unpin gst-plugins-good
+brew unpin gst-plugins-base
+brew unpin gst-plugins-bad
+brew unpin gst-libav
+
+### END HACK WORKAROUND
 
 ARCH=$(arch)
 if [ "$ARCH" = "arm64" ]
