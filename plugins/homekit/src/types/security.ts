@@ -1,7 +1,7 @@
 import { SecuritySystem, SecuritySystemMode, SecuritySystemObstruction, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, DeviceProvider } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
-import { makeAccessory, addChildSirens } from './common';
+import { makeAccessory, mergeOnOffDevicesByType } from './common';
 import type { HomeKitPlugin } from "../main";
 
 addSupportedType({
@@ -90,7 +90,8 @@ addSupportedType({
             () => !!device.securitySystemState?.triggered);
 
         if (device.interfaces.includes(ScryptedInterface.DeviceProvider)) {
-            const { devices } = addChildSirens(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory);
+            // merge in sirens
+            const { devices } = mergeOnOffDevicesByType(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory, ScryptedDeviceType.Siren);
 
             // ensure child devices are skipped by the rest of homekit by
             // reporting that they've been merged
