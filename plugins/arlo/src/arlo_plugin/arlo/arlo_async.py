@@ -737,6 +737,58 @@ class Arlo(object):
             }
         })
 
+    def SpotlightOn(self, basestation, camera):
+        resource = f"cameras/{camera.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "spotlight": {
+                    "enabled": True,
+                },
+            },
+        })
+
+    def SpotlightOff(self, basestation, camera):
+        resource = f"cameras/{camera.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "spotlight": {
+                    "enabled": False,
+                },
+            },
+        })
+
+    def FloodlightOn(self, basestation, camera):
+        resource = f"cameras/{camera.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "floodlight": {
+                    "on": True,
+                },
+            },
+        })
+
+    def FloodlightOff(self, basestation, camera):
+        resource = f"cameras/{camera.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "floodlight": {
+                    "on": False,
+                },
+            },
+        })
+
     def GetLibrary(self, device, from_date: datetime, to_date: datetime):
         """
         This call returns the following:
