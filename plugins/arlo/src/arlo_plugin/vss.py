@@ -11,6 +11,8 @@ from .siren import ArloSiren
 if TYPE_CHECKING:
     # https://adamj.eu/tech/2021/05/13/python-type-hints-how-to-fix-circular-imports/
     from .provider import ArloProvider
+    from .basestation import ArloBasestation
+    from .camera import ArloCamera
 
 
 class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvider):
@@ -19,9 +21,11 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
     SUPPORTED_MODES = [SecuritySystemMode.AwayArmed.value, SecuritySystemMode.HomeArmed.value, SecuritySystemMode.Disarmed.value]
 
     siren: ArloSiren = None
+    parent: ArloBasestation | ArloCamera = None
 
-    def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
+    def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider, parent: ArloBasestation | ArloCamera) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
+        self.parent = parent
         self.create_task(self.delayed_init())
 
     @property
@@ -56,7 +60,7 @@ class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvi
                 }
                 return
             except Exception as e:
-                self.logger.info(f"Delayed init failed, will try again: {e}")
+                self.logger.debug(f"Delayed init failed, will try again: {e}")
                 await asyncio.sleep(0.1)
             iterations += 1
 
