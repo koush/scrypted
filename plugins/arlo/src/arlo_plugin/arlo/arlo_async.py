@@ -711,7 +711,20 @@ class Arlo(object):
             callback,
         )
 
-    def SirenOn(self, basestation):
+    def SirenOn(self, basestation, camera=None):
+        if camera is not None:
+            resource = f"siren/{camera.get('deviceId')}"
+            return self.Notify(basestation, {
+                "action": "set",
+                "resource": resource,
+                "publishResponse": True,
+                "properties": {
+                    "sirenState": "on",
+                    "duration": 300,
+                    "volume": 8,
+                    "pattern": "alarm"
+                }
+            })
         return self.Notify(basestation, {
             "action": "set",
             "resource": "siren",
@@ -724,7 +737,20 @@ class Arlo(object):
             }
         })
 
-    def SirenOff(self, basestation):
+    def SirenOff(self, basestation, camera=None):
+        if camera is not None:
+            resource = f"siren/{camera.get('deviceId')}"
+            return self.Notify(basestation, {
+                "action": "set",
+                "resource": resource,
+                "publishResponse": True,
+                "properties": {
+                    "sirenState": "off",
+                    "duration": 300,
+                    "volume": 8,
+                    "pattern": "alarm"
+                }
+            })
         return self.Notify(basestation, {
             "action": "set",
             "resource": "siren",

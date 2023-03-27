@@ -14,6 +14,7 @@ from scrypted_sdk.types import Setting, Settings, Device, Camera, VideoCamera, V
 
 from .base import ArloDeviceBase
 from .spotlight import ArloSpotlight, ArloFloodlight
+from .vss import ArloSirenVirtualSecuritySystem
 from .child_process import HeartbeatChildProcess
 from .util import BackgroundTaskMixin
 
@@ -36,11 +37,29 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     MODELS_WITH_FLOODLIGHTS = ["fb1001"]
 
-    MODELS_WITH_SIRENS = []
+    MODELS_WITH_SIRENS = [
+        "vmb4000",
+        "vmb4500",
+        "vmb4540",
+        "vmb5000",
+        "vmc4040p",
+        "fb1001",
+        "vmc2030",
+        "vmc2020",
+        "vmc2032",
+        "vmc4041p",
+        "vmc4050p",
+        "vmc5040",
+        "vml2030",
+        "vmc4030",
+        "vml4030",
+        "vmc4030p",
+    ]
 
     timeout: int = 30
     intercom_session = None
     light: ArloSpotlight = None
+    vss: ArloSirenVirtualSecuritySystem = None
 
     def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
@@ -98,9 +117,25 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         return ScryptedDeviceType.Camera.value
 
     def get_builtin_child_device_manifests(self) -> List[Device]:
+        results = []
         if self.has_spotlight or self.has_floodlight:
             light = self.get_or_create_spotlight_or_floodlight()
-            return [
+            results.append({
+                "info": {
+                    "model": f"{self.arlo_device['modelId']} {self.arlo_device['properties'].get('hwVersion', '')}".strip(),
+                    "manufacturer": "Arlo",
+                    "firmware": self.arlo_device.get("firmwareVersion"),
+                    "serialNumber": self.arlo_device["deviceId"],
+                },
+                "nativeId": light.nativeId,
+                "name": f'{self.arlo_device["deviceName"]} {"Spotlight" if self.has_spotlight else "Floodlight"}',
+                "interfaces": light.get_applicable_interfaces(),
+                "type": light.get_device_type(),
+                "providerNativeId": self.nativeId,
+            })
+        if self.has_siren:
+            vss = self.get_or_create_vss()
+            results.extend([
                 {
                     "info": {
                         "model": f"{self.arlo_device['modelId']} {self.arlo_device['properties'].get('hwVersion', '')}".strip(),
@@ -108,14 +143,14 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                         "firmware": self.arlo_device.get("firmwareVersion"),
                         "serialNumber": self.arlo_device["deviceId"],
                     },
-                    "nativeId": light.nativeId,
-                    "name": f'{self.arlo_device["deviceName"]} {"Spotlight" if self.has_spotlight else "Floodlight"}',
-                    "interfaces": light.get_applicable_interfaces(),
-                    "type": light.get_device_type(),
+                    "nativeId": vss.nativeId,
+                    "name": f'{self.arlo_device["deviceName"]} Siren Virtual Security System',
+                    "interfaces": vss.get_applicable_interfaces(),
+                    "type": vss.get_device_type(),
                     "providerNativeId": self.nativeId,
-                }
-            ]
-        return []
+                },
+            ] + vss.get_builtin_child_device_manifests())
+        return results
 
     @property
     def webrtc_emulation(self) -> bool:
@@ -174,7 +209,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     async def putSetting(self, key, value) -> None:
         if key in ["webrtc_emulation", "two_way_audio"]:
             self.storage.setItem(key, value == "true")
-            await self.provider.discoverDevices()
+            await self.provider.discover_devices()
 
     async def getPictureOptions(self) -> List[ResponsePictureOptions]:
         return []
@@ -347,6 +382,8 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     async def getDevice(self, nativeId: str) -> ArloDeviceBase:
         if (nativeId.endswith("spotlight") and self.has_spotlight) or (nativeId.endswith("floodlight") and self.has_floodlight):
             return self.get_or_create_spotlight_or_floodlight()
+        if nativeId.endswith("vss") and self.has_siren:
+            return self.get_or_create_vss()
         return None
 
     def get_or_create_spotlight_or_floodlight(self) -> ArloSpotlight:
@@ -359,6 +396,13 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             if not self.light:
                 self.light = ArloFloodlight(light_id, self.arlo_device, self.arlo_basestation, self.provider, self)
         return self.light
+
+    def get_or_create_vss(self) -> ArloSirenVirtualSecuritySystem:
+        if self.has_siren:
+            vss_id = f'{self.arlo_device["deviceId"]}.vss'
+            if not self.vss:
+                self.vss = ArloSirenVirtualSecuritySystem(vss_id, self.arlo_device, self.arlo_basestation, self.provider, self)
+        return self.vss
 
 
 class ArloCameraRTCSignalingSession(BackgroundTaskMixin):

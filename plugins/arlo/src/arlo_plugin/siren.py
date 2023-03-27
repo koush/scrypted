@@ -27,6 +27,7 @@ class ArloSiren(ArloDeviceBase, OnOff):
 
     @ArloDeviceBase.async_print_exception_guard
     async def turnOn(self) -> None:
+        from .basestation import ArloBasestation
         self.logger.info("Turning on")
 
         if self.vss.securitySystemState["mode"] == SecuritySystemMode.Disarmed.value:
@@ -42,7 +43,12 @@ class ArloSiren(ArloDeviceBase, OnOff):
             }
             return
 
-        self.provider.arlo.SirenOn(self.arlo_device)
+        if isinstance(self.vss.parent, ArloBasestation):
+            self.logger.debug("Parent device is a basestation")
+            self.provider.arlo.SirenOn(self.arlo_basestation)
+        else:
+            self.logger.debug("Parent device is a camera")
+            self.provider.arlo.SirenOn(self.arlo_basestation, self.arlo_device)
 
         self.on = True
         self.vss.securitySystemState = {
@@ -52,8 +58,12 @@ class ArloSiren(ArloDeviceBase, OnOff):
 
     @ArloDeviceBase.async_print_exception_guard
     async def turnOff(self) -> None:
+        from .basestation import ArloBasestation
         self.logger.info("Turning off")
-        self.provider.arlo.SirenOff(self.arlo_device)
+        if isinstance(self.vss.parent, ArloBasestation):
+            self.provider.arlo.SirenOff(self.arlo_basestation)
+        else:
+            self.provider.arlo.SirenOff(self.arlo_basestation, self.arlo_device)
         self.on = False
         self.vss.securitySystemState = {
             **self.vss.securitySystemState,

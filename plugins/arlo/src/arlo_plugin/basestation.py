@@ -24,6 +24,10 @@ class ArloBasestation(ArloDeviceBase, DeviceProvider):
     def __init__(self, nativeId: str, arlo_basestation: dict, provider: ArloProvider) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_basestation, arlo_basestation=arlo_basestation, provider=provider)
 
+    @property
+    def has_siren(self) -> bool:
+        return any([self.arlo_device["modelId"].lower().startswith(model) for model in ArloBasestation.MODELS_WITH_SIRENS])
+
     def get_applicable_interfaces(self) -> List[str]:
         return [ScryptedInterface.DeviceProvider.value]
 
@@ -31,12 +35,11 @@ class ArloBasestation(ArloDeviceBase, DeviceProvider):
         return ScryptedDeviceType.DeviceProvider.value
 
     def get_builtin_child_device_manifests(self) -> List[Device]:
-        if not any([self.arlo_device['modelId'].lower().startswith(model) for model in ArloBasestation.MODELS_WITH_SIRENS]):
+        if not self.has_siren:
             # this basestation has no builtin siren, so no manifests to return
             return []
 
-        vss_id = f'{self.arlo_device["deviceId"]}.vss'
-        vss = self.get_or_create_vss(vss_id)
+        vss = self.get_or_create_vss()
         return [
             {
                 "info": {
@@ -45,7 +48,7 @@ class ArloBasestation(ArloDeviceBase, DeviceProvider):
                     "firmware": self.arlo_device.get("firmwareVersion"),
                     "serialNumber": self.arlo_device["deviceId"],
                 },
-                "nativeId": vss_id,
+                "nativeId": vss.nativeId,
                 "name": f'{self.arlo_device["deviceName"]} Siren Virtual Security System',
                 "interfaces": vss.get_applicable_interfaces(),
                 "type": vss.get_device_type(),
@@ -57,11 +60,12 @@ class ArloBasestation(ArloDeviceBase, DeviceProvider):
         if not nativeId.startswith(self.nativeId):
             # must be a camera, so get it from the provider
             return await self.provider.getDevice(nativeId)
-        return self.get_or_create_vss(nativeId)
-
-    def get_or_create_vss(self, nativeId: str) -> ArloSirenVirtualSecuritySystem:
         if not nativeId.endswith("vss"):
             return None
+        return self.get_or_create_vss()
+
+    def get_or_create_vss(self) -> ArloSirenVirtualSecuritySystem:
+        vss_id = f'{self.arlo_device["deviceId"]}.vss'
         if not self.vss:
-            self.vss = ArloSirenVirtualSecuritySystem(nativeId, self.arlo_device, self.arlo_basestation, self.provider)
+            self.vss = ArloSirenVirtualSecuritySystem(vss_id, self.arlo_device, self.arlo_basestation, self.provider, self)
         return self.vss
