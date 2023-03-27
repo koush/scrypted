@@ -30,7 +30,7 @@ interface RawFrame {
 }
 
 class VipsImage implements Image {
-    constructor(public image: sharp.Sharp, public width: number, public height: number) {
+    constructor(public image: sharp.Sharp, public width: number, public height: number, public channels: number) {
     }
 
     toImageInternal(options: ImageOptions) {
@@ -55,11 +55,17 @@ class VipsImage implements Image {
 
     async toBuffer(options: ImageOptions) {
         const transformed = this.toImageInternal(options);
-        if (options?.format === 'rgb') {
-            transformed.removeAlpha().toFormat('raw');
-        }
-        else if (options?.format === 'jpg') {
+        if (options?.format === 'jpg') {
             transformed.toFormat('jpg');
+        }
+        else {
+            if (this.channels === 1 && (options?.format === 'gray' || !options.format))
+                transformed.extractChannel(0);
+            else if (options?.format === 'gray')
+                transformed.toColorspace('b-w');
+            else if (options?.format === 'rgb')
+                transformed.removeAlpha()
+            transformed.raw();
         }
         return transformed.toBuffer();
     }
@@ -75,7 +81,7 @@ class VipsImage implements Image {
         });
 
         const newMetadata = await newImage.metadata();
-        const newVipsImage = new VipsImage(newImage, newMetadata.width, newMetadata.height);
+        const newVipsImage = new VipsImage(newImage, newMetadata.width, newMetadata.height, newMetadata.channels);
         return newVipsImage;
     }
 
@@ -90,12 +96,14 @@ class VipsImage implements Image {
 export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements VideoFrameGenerator {
     async *generateVideoFramesInternal(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame & MediaObject) => Promise<boolean>): AsyncGenerator<VideoFrame & MediaObject, any, unknown> {
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
+        const gray = options?.format === 'gray';
+        const channels = gray ? 1 : 3;
         const args = [
             '-hide_banner',
             //'-hwaccel', 'auto',
             ...ffmpegInput.inputArguments,
             '-vcodec', 'pam',
-            '-pix_fmt', 'rgb24',
+            '-pix_fmt', gray ? 'gray' : 'rgb24',
             '-f', 'image2pipe',
             'pipe:3',
         ];
@@ -127,7 +135,7 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                     }
 
 
-                    if (headers['TUPLTYPE'] !== 'RGB')
+                    if (headers['TUPLTYPE'] !== 'RGB' && headers['TUPLTYPE'] !== 'GRAYSCALE')
                         throw new Error(`Unexpected TUPLTYPE in PAM stream: ${headers['TUPLTYPE']}`);
 
                     const width = parseInt(headers['WIDTH']);
@@ -135,7 +143,7 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                     if (!width || !height)
                         throw new Error('Invalid dimensions in PAM stream');
 
-                    const length = width * height * 3;
+                    const length = width * height * channels;
                     headers.clear();
                     const data = await readLength(readable, length);
 
@@ -149,7 +157,7 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                         });
                     }
                     else {
-                        this.console.warn('skipped frame');
+                        // this.console.warn('skipped frame');
                     }
                 }
             }
@@ -173,10 +181,10 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                     raw: {
                         width,
                         height,
-                        channels: 3,
+                        channels,
                     }
                 });
-                const vipsImage = new VipsImage(image, width, height);
+                const vipsImage = new VipsImage(image, width, height, channels);
                 try {
                     const mo = await createVipsMediaObject(vipsImage);
                     yield mo;
