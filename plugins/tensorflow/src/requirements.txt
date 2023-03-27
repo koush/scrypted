@@ -1,14 +1,8 @@
-# plugin
-numpy>=1.16.2
-# pillow for anything not intel linux
-Pillow>=5.4.1; sys_platform != 'linux' or platform_machine != 'x86_64'
-pillow-simd; sys_platform == 'linux' and platform_machine == 'x86_64'
 tensorflow-macos; sys_platform == 'darwin'
 tensorflow; sys_platform != 'darwin'
-PyGObject>=3.30.4; sys_platform != 'win32'
-# not available on armhf
-av>=10.0.0; sys_platform != 'linux' or platform_machine == 'x86_64' or platform_machine == 'aarch64'
 
-# sort_oh
-scipy
-filterpy
+numpy>=1.16.2
+
+# pillow for anything not intel linux, pillow-simd is available on x64 linux
+Pillow>=5.4.1; sys_platform != 'linux' or platform_machine != 'x86_64'
+pillow-simd; sys_platform == 'linux' and platform_machine == 'x86_64'
