@@ -616,7 +616,7 @@ class AmcrestProvider extends RtspProvider {
                 this.console.warn('Error probing two way audio', e);
             }
         }
-        settings.newCamera ||= 'Hikvision Camera';
+        settings.newCamera ||= 'Amcrest Camera';
 
         nativeId = await super.createDevice(settings, nativeId);
 
