@@ -311,7 +311,7 @@ export class PluginHost {
 
         this.worker.stdout.on('data', data => console.log(data.toString()));
         this.worker.stderr.on('data', data => console.error(data.toString()));
-        const consoleHeader = `${os.platform()} ${os.arch()} ${os.machine()} ${os.version()}\nserver version: ${serverVersion}\nplugin version: ${this.pluginId} ${this.packageJson.version}\n`;
+        const consoleHeader = `${os.platform()} ${os.arch()} ${os.version()}\nserver version: ${serverVersion}\nplugin version: ${this.pluginId} ${this.packageJson.version}\n`;
         this.consoleServer = createConsoleServer(this.worker.stdout, this.worker.stderr, consoleHeader);
 
         const disconnect = () => {
