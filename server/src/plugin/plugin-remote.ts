@@ -645,7 +645,13 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
                 params.pluginRuntimeAPI = ret;
 
-                return options.onLoadZip(ret, params, packageJson, zipData, zipOptions);
+                try {
+                    return await options.onLoadZip(ret, params, packageJson, zipData, zipOptions);
+                }
+                catch (e) {
+                    console.error('plugin start/fork failed', e)
+                    throw e;
+                }
             },
         }
 

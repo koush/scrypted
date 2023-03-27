@@ -264,6 +264,14 @@ class PluginRemote:
             nativeId, *values, sep=sep, end=end, flush=flush), self.loop)
 
     async def loadZip(self, packageJson, zipData, options: dict=None):
+        try:
+            return await self.loadZipWrapped(packageJson, zipData, options)
+        except:
+            print('plugin start/fork failed')
+            traceback.print_exc()
+            raise
+
+    async def loadZipWrapped(self, packageJson, zipData, options: dict=None):
         sdk = ScryptedStatic()
 
         clusterId = options['clusterId']
@@ -531,20 +539,10 @@ class PluginRemote:
                      self.deviceManager, self.mediaManager)
 
         if not forkMain:
-            try:
-                from main import create_scrypted_plugin  # type: ignore
-            except:
-                print('plugin failed to start')
-                traceback.print_exc()
-                raise
+            from main import create_scrypted_plugin  # type: ignore
             return await rpc.maybe_await(create_scrypted_plugin())
 
-        try:
-            from main import fork  # type: ignore
-        except:
-            print('fork failed to start')
-            traceback.print_exc()
-            raise
+        from main import fork  # type: ignore
         forked = await rpc.maybe_await(fork())
         if type(forked) == dict:
             forked[rpc.RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN] = True
