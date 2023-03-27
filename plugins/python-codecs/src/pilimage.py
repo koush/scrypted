@@ -21,19 +21,26 @@ class PILImage(scrypted_sdk.VideoFrame):
 
         if not options or not options.get('format', None):
             def format():
-                bytesArray = io.BytesIO()
-                pilImage.pilImage.save(bytesArray, format='JPEG')
-                return bytesArray.getvalue()
+                return pilImage.pilImage.tobytes()
             return await to_thread(format)
         elif options['format'] == 'rgb':
             def format():
-                rgb = pilImage.pilImage
-                if rgb.format == 'RGBA':
-                    rgb = rgb.convert('RGB')
-                return rgb.tobytes()
+                rgbx = pilImage.pilImage
+                if rgbx.format != 'RGBA':
+                    return rgbx.tobytes()
+                rgb = rgbx.convert('RGB')
+                try:
+                    return rgb.tobytes()
+                finally:
+                    rgb.close()
             return await to_thread(format)
 
-        return await to_thread(lambda: pilImage.pilImage.write_to_buffer('.' + options['format']))
+        def save():
+            bytesArray = io.BytesIO()
+            pilImage.pilImage.save(bytesArray, format=options['format'])
+            return bytesArray.getvalue()
+
+        return await to_thread(lambda: save())
 
     async def toPILImage(self, options: scrypted_sdk.ImageOptions = None):
        return await to_thread(lambda: toPILImage(self, options))

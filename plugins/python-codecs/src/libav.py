@@ -27,6 +27,8 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
     # stream.codec_context.options['-analyzeduration'] = '0'
     # stream.codec_context.options['-probesize'] = '500000'
 
+    gray = options and options.get('format') == 'gray'
+
     start = 0
     try:
         for idx, frame in enumerate(container.decode(stream)):
@@ -39,7 +41,12 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
                 continue
             # print(frame)
             if vipsimage.pyvips:
-                vips = vipsimage.pyvips.Image.new_from_array(frame.to_ndarray(format='rgb24'))
+                if gray and frame.format.name.startswith('yuv') and frame.planes and len(frame.planes):
+                    vips = vipsimage.new_from_memory(memoryview(frame.planes[0]), frame.width, frame.height, 1)
+                elif gray:
+                    vips = vipsimage.pyvips.Image.new_from_array(frame.to_ndarray(format='gray'))
+                else:
+                    vips = vipsimage.pyvips.Image.new_from_array(frame.to_ndarray(format='rgb24'))
                 vipsImage = vipsimage.VipsImage(vips)
                 try:
                     mo = await vipsimage.createVipsMediaObject(vipsImage)
@@ -48,7 +55,16 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
                     vipsImage.vipsImage = None
                     vips.invalidate()
             else:
-                pil = frame.to_image()
+                if gray and frame.format.name.startswith('yuv') and frame.planes and len(frame.planes):
+                    pil = pilimage.new_from_memory(memoryview(frame.planes[0]), frame.width, frame.height, 1)
+                elif gray:
+                    rgb = frame.to_image()
+                    try:
+                        pil = rgb.convert('L')
+                    finally:
+                        rgb.close()
+                else:
+                    pil = frame.to_image()
                 pilImage = pilimage.PILImage(pil)
                 try:
                     mo = await pilimage.createPILMediaObject(pilImage)
