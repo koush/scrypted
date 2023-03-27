@@ -44,23 +44,24 @@ RUN_IGNORE brew install node@18
 RUN brew install libvips
 # dlib
 RUN brew install cmake
-# gstreamer plugins
-RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad
-# gst python bindings
-RUN_IGNORE brew install gst-python
 
 ### HACK WORKAROUND
 ### https://github.com/koush/scrypted/issues/544
 
 brew unpin gstreamer
-brew unpin gst-python
-brew unpin gst-plugins-ugly
-brew unpin gst-plugins-good
 brew unpin gst-plugins-base
+brew unpin gst-plugins-good
 brew unpin gst-plugins-bad
+brew unpin gst-plugins-ugly
 brew unpin gst-libav
+brew unpin gst-python
 
 ### END HACK WORKAROUND
+
+# gstreamer plugins
+RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-libav
+# gst python bindings
+RUN_IGNORE brew install gst-python
 
 ARCH=$(arch)
 if [ "$ARCH" = "arm64" ]
