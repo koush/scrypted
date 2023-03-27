@@ -1,5 +1,4 @@
 import asyncio
-from typing import Any
 import concurrent.futures
 
 # vips is already multithreaded, but needs to be kicked off the python asyncio thread.

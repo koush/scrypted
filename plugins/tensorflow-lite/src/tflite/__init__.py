@@ -1,5 +1,4 @@
 from __future__ import annotations
-import threading
 from .common import *
 from PIL import Image
 from pycoral.adapters import detect
@@ -21,7 +20,6 @@ from predict import PredictPlugin
 import concurrent.futures
 import queue
 import asyncio
-from time import time
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -117,7 +115,6 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
         def predict():
             interpreter = self.interpreters.get()
             try:
-                print('predict s %s'  % time())
                 common.set_input(
                     interpreter, input)
                 scale = (1, 1)
@@ -133,7 +130,6 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
                 raise e
             finally:
                 self.interpreters.put(interpreter)
-                print('predict e %s'  % time())
 
         objs = await asyncio.get_event_loop().run_in_executor(self.executor, predict)
 

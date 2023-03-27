@@ -1,10 +1,7 @@
 --extra-index-url https://google-coral.github.io/py-repo/
+pycoral~=2.0
+tflite-runtime==2.5.0.post1
 
-# plugin
-numpy>=1.16.2
-# pillow for anything not intel linux
+# pillow for anything not intel linux, pillow-simd is available on x64 linux
 Pillow>=5.4.1; sys_platform != 'linux' or platform_machine != 'x86_64'
 pillow-simd; sys_platform == 'linux' and platform_machine == 'x86_64'
-pycoral~=2.0
-PyGObject>=3.30.4; sys_platform != 'win32'
-tflite-runtime==2.5.0.post1

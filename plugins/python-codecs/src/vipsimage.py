@@ -6,7 +6,6 @@ try:
 except:
     Image = None
     pyvips = None
-    pass
 from thread import to_thread
 
 class VipsImage(scrypted_sdk.VideoFrame):
