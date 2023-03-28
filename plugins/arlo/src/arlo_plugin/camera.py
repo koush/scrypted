@@ -65,6 +65,25 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
         self.start_motion_subscription()
         self.start_battery_subscription()
+        self.create_task(self.delayed_init())
+
+    async def delayed_init(self) -> None:
+        if self.arlo_device.get("properties", {}).get("batteryLevel") is None:
+            return
+
+        iterations = 1
+        while not self.stop_subscriptions:
+            if iterations > 100:
+                self.logger.error("Delayed init exceeded iteration limit, giving up")
+                return
+
+            try:
+                self.batteryLevel = self.arlo_device["properties"]["batteryLevel"]
+                return
+            except Exception as e:
+                self.logger.debug(f"Delayed init failed, will try again: {e}")
+                await asyncio.sleep(0.1)
+            iterations += 1
 
     def start_motion_subscription(self) -> None:
         def callback(motionDetected):
