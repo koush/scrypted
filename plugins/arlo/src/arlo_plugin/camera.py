@@ -221,7 +221,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         msos = await real_device.getVideoStreamOptions()
         if any(["prebuffer" in m for m in msos]):
             self.logger.info("Getting snapshot from prebuffer")
-            return await real_device.getVideoStream({"refresh": False})
+            return await real_device.getVideoStream()
 
         pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=self.timeout)
         self.logger.debug(f"Got snapshot URL for at {pic_url}")
