@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import os
 import re
 import urllib.request
@@ -16,15 +17,24 @@ from detect import DetectPlugin
 from .rectangle import (Rectangle, combine_rect, from_bounding_box,
                         intersect_area, intersect_rect, to_bounding_box)
 
-def ensureRGBData(data: bytes, size: Tuple[int, int], format: str):
-    if format == 'rgba':
+# vips is already multithreaded, but needs to be kicked off the python asyncio thread.
+toThreadExecutor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="image")
+
+async def to_thread(f):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(toThreadExecutor, f)
+
+async def ensureRGBData(data: bytes, size: Tuple[int, int], format: str):
+    if format != 'rgba':
+        return Image.frombuffer('RGB', size, data)
+
+    def convert():
         rgba = Image.frombuffer('RGBA', size, data)
         try:
             return rgba.convert('RGB')
         finally:
             rgba.close()
-    else:
-        return Image.frombuffer('RGB', size, data)
+    return await to_thread(convert)
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -190,12 +200,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             detection_result['detections'] = []
             for detection in detections:
                 bb = detection['boundingBox']
-                x, y, valid = convert_to_src_size((bb[0], bb[1]), True)
-                x2, y2, valid2 = convert_to_src_size(
-                    (bb[0] + bb[2], bb[1] + bb[3]), True)
-                if not valid or not valid2:
-                    # print("filtering out", detection['className'])
-                    continue
+                x, y = convert_to_src_size((bb[0], bb[1]))
+                x2, y2 = convert_to_src_size(
+                    (bb[0] + bb[2], bb[1] + bb[3]))
                 detection['boundingBox'] = (x, y, x2 - x + 1, y2 - y + 1)
                 detection_result['detections'].append(detection)
 
@@ -224,13 +231,13 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         hs = h / ih
         s = max(ws, hs)
         if ws == 1 and hs == 1:
-            def cvss(point, normalize=False):
-                return point[0], point[1], True
+            def cvss(point):
+                return point[0], point[1]
 
             data = await videoFrame.toBuffer({
                 'format': videoFrame.format or 'rgb',
             })
-            image = ensureRGBData(data, (w, h), videoFrame.format)
+            image = await ensureRGBData(data, (w, h), videoFrame.format)
             try:
                 ret = await self.detect_once(image, settings, src_size, cvss)
                 return ret
@@ -275,13 +282,15 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             })
         )
 
-        first = ensureRGBData(firstData, (w, h), videoFrame.format)
-        second = ensureRGBData(secondData, (w, h), videoFrame.format)
+        first, second = await asyncio.gather(
+            ensureRGBData(firstData, (w, h), videoFrame.format),
+            ensureRGBData(secondData, (w, h), videoFrame.format)
+        )
 
-        def cvss1(point, normalize=False):
-            return point[0] / s, point[1] / s, True
-        def cvss2(point, normalize=False):
-            return point[0] / s + ow, point[1] / s + oh, True
+        def cvss1(point):
+            return point[0] / s, point[1] / s
+        def cvss2(point):
+            return point[0] / s + ow, point[1] / s + oh
 
         ret1 = await self.detect_once(first, settings, src_size, cvss1)
         first.close()
