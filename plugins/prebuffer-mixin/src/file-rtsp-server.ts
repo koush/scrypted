@@ -57,13 +57,14 @@ export class FileRtspServer extends RtspServer {
                     truncateWriteStream = fs.createWriteStream(undefined, {
                         fd,
                     })
+                    // this.writeConsole?.log('truncating', truncate);
                 }
                 catch (e) {
                     throw e;
                 }
             }
             catch (e) {
-                this.writeConsole?.error('RTSP WRITE error renaming truncate file', truncate);
+                this.writeConsole?.error('RTSP WRITE error during truncate file', truncate, e);
             }
         }
 
