@@ -45,7 +45,7 @@ export class FileRtspServer extends RtspServer {
         if (truncate) {
             try {
                 const d = new Deferred<number>();
-                fs.open(truncate, 'w+', (e, fd) => {
+                fs.open(truncate, 'w', (e, fd) => {
                     if (e)
                         d.reject(e);
                     else
@@ -72,7 +72,7 @@ export class FileRtspServer extends RtspServer {
         this.cleanup();
         this.segmentBytesWritten = 0;
 
-        this.writeStream = truncateWriteStream || fs.createWriteStream(truncate || file);
+        this.writeStream = truncateWriteStream || fs.createWriteStream(file);
         this.writeStream.on('error', e => {
             this.writeConsole?.error('RTSP WRITE error', e);
         });
