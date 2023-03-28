@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 
 
 class BackgroundTaskMixin:
@@ -26,3 +27,13 @@ class BackgroundTaskMixin:
             return
         for task in self.background_tasks:
             task.cancel()
+
+def async_print_exception_guard(fn):
+    """Decorator to print an exception's stack trace before re-raising the exception."""
+    async def wrapped(*args, **kwargs):
+        try:
+            return await fn(*args, **kwargs)
+        except Exception:
+            traceback.print_exc()
+            raise
+    return wrapped

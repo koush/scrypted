@@ -5,6 +5,7 @@ from typing import List, TYPE_CHECKING
 from scrypted_sdk.types import OnOff, ScryptedInterface, ScryptedDeviceType
 
 from .base import ArloDeviceBase
+from .util import async_print_exception_guard
 
 if TYPE_CHECKING:
     # https://adamj.eu/tech/2021/05/13/python-type-hints-how-to-fix-circular-imports/
@@ -25,13 +26,13 @@ class ArloSpotlight(ArloDeviceBase, OnOff):
     def get_device_type(self) -> str:
         return ScryptedDeviceType.Light.value
 
-    @ArloDeviceBase.async_print_exception_guard
+    @async_print_exception_guard
     async def turnOn(self) -> None:
         self.logger.info("Turning on")
         self.provider.arlo.SpotlightOn(self.arlo_basestation, self.arlo_device)
         self.on = True
 
-    @ArloDeviceBase.async_print_exception_guard
+    @async_print_exception_guard
     async def turnOff(self) -> None:
         self.logger.info("Turning off")
         self.provider.arlo.SpotlightOff(self.arlo_basestation, self.arlo_device)
@@ -40,13 +41,13 @@ class ArloSpotlight(ArloDeviceBase, OnOff):
 
 class ArloFloodlight(ArloSpotlight):
 
-    @ArloDeviceBase.async_print_exception_guard
+    @async_print_exception_guard
     async def turnOn(self) -> None:
         self.logger.info("Turning on")
         self.provider.arlo.FloodlightOn(self.arlo_basestation, self.arlo_device)
         self.on = True
 
-    @ArloDeviceBase.async_print_exception_guard
+    @async_print_exception_guard
     async def turnOff(self) -> None:
         self.logger.info("Turning off")
         self.provider.arlo.FloodlightOff(self.arlo_basestation, self.arlo_device)

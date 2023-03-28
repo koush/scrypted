@@ -5,6 +5,7 @@ from typing import List, TYPE_CHECKING
 from scrypted_sdk.types import OnOff, SecuritySystemMode, ScryptedInterface, ScryptedDeviceType
 
 from .base import ArloDeviceBase
+from .util import async_print_exception_guard
 
 if TYPE_CHECKING:
     # https://adamj.eu/tech/2021/05/13/python-type-hints-how-to-fix-circular-imports/
@@ -25,7 +26,7 @@ class ArloSiren(ArloDeviceBase, OnOff):
     def get_device_type(self) -> str:
         return ScryptedDeviceType.Siren.value
 
-    @ArloDeviceBase.async_print_exception_guard
+    @async_print_exception_guard
     async def turnOn(self) -> None:
         from .basestation import ArloBasestation
         self.logger.info("Turning on")
@@ -56,7 +57,7 @@ class ArloSiren(ArloDeviceBase, OnOff):
             "triggered": True,
          }
 
-    @ArloDeviceBase.async_print_exception_guard
+    @async_print_exception_guard
     async def turnOff(self) -> None:
         from .basestation import ArloBasestation
         self.logger.info("Turning off")

@@ -16,7 +16,7 @@ from .arlo import Arlo
 from .arlo.arlo_async import change_stream_class
 from .arlo.logging import logger as arlo_lib_logger
 from .logging import ScryptedDeviceLoggerMixin
-from .util import BackgroundTaskMixin
+from .util import BackgroundTaskMixin, async_print_exception_guard
 from .camera import ArloCamera
 from .doorbell import ArloDoorbell
 from .basestation import ArloBasestation
@@ -558,7 +558,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 return False
         return True
 
-    @ArloDeviceBase.async_print_exception_guard
+    @async_print_exception_guard
     async def discover_devices(self, duration: int = 0) -> None:
         if not self.arlo:
             raise Exception("Arlo client not connected, cannot discover devices")

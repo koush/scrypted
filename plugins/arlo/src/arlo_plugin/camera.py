@@ -16,7 +16,7 @@ from .base import ArloDeviceBase
 from .spotlight import ArloSpotlight, ArloFloodlight
 from .vss import ArloSirenVirtualSecuritySystem
 from .child_process import HeartbeatChildProcess
-from .util import BackgroundTaskMixin
+from .util import BackgroundTaskMixin, async_print_exception_guard
 
 if TYPE_CHECKING:
     # https://adamj.eu/tech/2021/05/13/python-type-hints-how-to-fix-circular-imports/
@@ -214,6 +214,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     async def getPictureOptions(self) -> List[ResponsePictureOptions]:
         return []
 
+    @async_print_exception_guard
     async def takePicture(self, options: dict = None) -> MediaObject:
         self.logger.info("Taking picture")
 
@@ -221,7 +222,11 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         msos = await real_device.getVideoStreamOptions()
         if any(["prebuffer" in m for m in msos]):
             self.logger.info("Getting snapshot from prebuffer")
-            return await real_device.getVideoStream()
+            try:
+                return await real_device.getVideoStream({"refresh": False})
+            except Exception as e:
+                self.logger.warning(f"Could not fetch from prebuffer due to: {e}")
+                self.logger.warning("Will try to fetch snapshot from Arlo cloud")
 
         pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=self.timeout)
         self.logger.debug(f"Got snapshot URL for at {pic_url}")
@@ -273,32 +278,30 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         }
         return await scrypted_sdk.mediaManager.createFFmpegMediaObject(ffmpeg_input)
 
+    @async_print_exception_guard
     async def startRTCSignalingSession(self, scrypted_session):
-        try:
-            plugin_session = ArloCameraRTCSignalingSession(self)
-            await plugin_session.initialize()
+        plugin_session = ArloCameraRTCSignalingSession(self)
+        await plugin_session.initialize()
 
-            scrypted_setup = {
-                "type": "offer",
-                "audio": {
-                    "direction": "sendrecv" if self._can_push_to_talk() else "recvonly",
-                },
-                "video": {
-                    "direction": "recvonly",
-                }
+        scrypted_setup = {
+            "type": "offer",
+            "audio": {
+                "direction": "sendrecv" if self._can_push_to_talk() else "recvonly",
+            },
+            "video": {
+                "direction": "recvonly",
             }
-            plugin_setup = {}
+        }
+        plugin_setup = {}
 
-            scrypted_offer = await scrypted_session.createLocalDescription("offer", scrypted_setup, sendIceCandidate=plugin_session.addIceCandidate)
-            self.logger.info(f"Scrypted offer sdp:\n{scrypted_offer['sdp']}")
-            await plugin_session.setRemoteDescription(scrypted_offer, plugin_setup)
-            plugin_answer = await plugin_session.createLocalDescription("answer", plugin_setup, scrypted_session.sendIceCandidate)
-            self.logger.info(f"Scrypted answer sdp:\n{plugin_answer['sdp']}")
-            await scrypted_session.setRemoteDescription(plugin_answer, scrypted_setup)
+        scrypted_offer = await scrypted_session.createLocalDescription("offer", scrypted_setup, sendIceCandidate=plugin_session.addIceCandidate)
+        self.logger.info(f"Scrypted offer sdp:\n{scrypted_offer['sdp']}")
+        await plugin_session.setRemoteDescription(scrypted_offer, plugin_setup)
+        plugin_answer = await plugin_session.createLocalDescription("answer", plugin_setup, scrypted_session.sendIceCandidate)
+        self.logger.info(f"Scrypted answer sdp:\n{plugin_answer['sdp']}")
+        await scrypted_session.setRemoteDescription(plugin_answer, scrypted_setup)
 
-            return ArloCameraRTCSessionControl(plugin_session)
-        except Exception as e:
-            self.logger.error(e)
+        return ArloCameraRTCSessionControl(plugin_session)
 
     async def startIntercom(self, media) -> None:
         self.logger.info("Starting intercom")
@@ -374,7 +377,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             clips.reverse()
         return clips
 
-    @ArloDeviceBase.async_print_exception_guard
+    @async_print_exception_guard
     async def removeVideoClips(self, videoClipIds: List[str]) -> None:
         # Arlo does support deleting, but let's be safe and disable that
         raise Exception("deleting Arlo video clips is not implemented by this plugin")
