@@ -101,6 +101,9 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             results.add(ScryptedInterface.RTCSignalingChannel.value)
             results.discard(ScryptedInterface.Intercom.value)
 
+        if self.wired_to_power:
+            results.discard(ScryptedInterface.Battery.value)
+
         if self.has_siren or self.has_spotlight or self.has_floodlight:
             results.add(ScryptedInterface.DeviceProvider.value)
 
@@ -155,7 +158,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     @property
     def webrtc_emulation(self) -> bool:
         if self.storage:
-            return True if self.storage.getItem("webrtc_emulation") else False
+            return True if self.storage.getItem("webrtc_emulation") == "True" else False
         else:
             return False
 
@@ -165,9 +168,16 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             val = self.storage.getItem("two_way_audio")
             if val is None:
                 val = True
-            return val
+            return val == "True"
         else:
             return True
+
+    @property
+    def wired_to_power(self) -> bool:
+        if self.storage:
+            return True if self.storage.getItem("wired_to_power") == "True" else False
+        else:
+            return False
 
     @property
     def has_cloud_recording(self) -> bool:
@@ -189,6 +199,14 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         if self._can_push_to_talk():
             return [
                 {
+                    "key": "wired_to_power",
+                    "title": "Plugged In to External Power",
+                    "value": self.wired_to_power,
+                    "description": "Informs Scrypted that this device is plugged in to an external power source. " + \
+                                   "Will allow features like persistent prebuffer to work, however will no longer report this device's battery percentage.",
+                    "type": "boolean",
+                },
+                {
                     "key": "two_way_audio",
                     "title": "(Experimental) Enable native two-way audio",
                     "value": self.two_way_audio,
@@ -207,7 +225,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         return []
 
     async def putSetting(self, key, value) -> None:
-        if key in ["webrtc_emulation", "two_way_audio"]:
+        if key in ["webrtc_emulation", "two_way_audio", "wired_to_power"]:
             self.storage.setItem(key, value == "true")
             await self.provider.discover_devices()
 
