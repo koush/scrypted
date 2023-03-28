@@ -3,7 +3,7 @@ import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-p
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, listenZeroSingleClient, ListenZeroSingleClientTimeoutError } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
 import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, listenSingleRtspClient, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
@@ -946,23 +946,35 @@ class PrebufferSession {
     const { isActiveClient, container, session, socketPromise, requestedPrebuffer } = options;
     this.console.log('sending prebuffer', requestedPrebuffer);
 
-    // in case the client never connects, do an inactivity check.
-    socketPromise.catch(() => this.inactivityCheck(session, false));
-    socketPromise.then(socket => {
+    let socket: Duplex;
+
+    try {
+      socket = await socketPromise;
+    }
+    catch (e) {
+      // in case the client never connects, do an inactivity check.
+      this.inactivityCheck(session, false);
+      if (e instanceof ListenZeroSingleClientTimeoutError)
+        this.console.warn('client connection timed out');
+      else
+        this.console.error('client connection error', e);
+      return;
+    }
+
+    if (isActiveClient) {
+      this.activeClients++;
+      this.printActiveClients();
+    }
+
+    socket.once('close', () => {
       if (isActiveClient) {
-        this.activeClients++;
+        this.activeClients--;
         this.printActiveClients();
       }
-      socket.once('close', () => {
-        if (isActiveClient) {
-          this.activeClients--;
-          this.printActiveClients();
-        }
-        this.inactivityCheck(session, isActiveClient);
-      })
+      this.inactivityCheck(session, isActiveClient);
     });
 
-    handleRebroadcasterClient(socketPromise, {
+    handleRebroadcasterClient(socket, {
       // console: this.console,
       connect: (connection) => {
         const now = Date.now();
@@ -1138,7 +1150,7 @@ class PrebufferSession {
         }
         // server.console = this.console;
         await server.handlePlayback();
-        server.handleTeardown().finally(() => server.client.destroy());
+        server.handleTeardown().catch(() => {}).finally(() => server.client.destroy());
         for (const track of Object.values(server.setupTracks)) {
           if (track.protocol === 'udp') {
             serverPortMap.set(track.codec, track);
