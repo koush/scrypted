@@ -10,7 +10,7 @@ from typing import List
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
-from scrypted_sdk.types import Setting, SettingValue, Settings, DeviceProvider, DeviceDiscovery, ScryptedInterface
+from scrypted_sdk.types import Setting, SettingValue, Settings, DeviceProvider, ScryptedInterface
 
 from .arlo import Arlo
 from .arlo.arlo_async import change_stream_class
@@ -23,7 +23,7 @@ from .basestation import ArloBasestation
 from .base import ArloDeviceBase
 
 
-class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
+class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     arlo_cameras = None
     arlo_basestations = None
     _arlo_mfa_code = None
@@ -188,7 +188,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
     async def do_arlo_setup(self) -> None:
         try:
-            await self.discoverDevices()
+            await self.discover_devices()
             await self.arlo.Subscribe([
                 (self.arlo_basestations[camera["parentId"]], camera) for camera in self.arlo_cameras.values()
             ])
@@ -472,11 +472,10 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             {
                 "group": "General",
                 "key": "plugin_verbosity",
-                "title": "Plugin Verbosity",
-                "description": "Select the verbosity of this plugin. 'Verbose' will show debugging messages, "
-                               "including events received from connected Arlo cameras.",
-                "value": self.plugin_verbosity,
-                "choices": sorted(self.plugin_verbosity_choices.keys()),
+                "title": "Verbose Logging",
+                "description": "Enable this option to show debug messages, including events received from connected Arlo cameras.",
+                "value": self.plugin_verbosity == "Verbose",
+                "type": "boolean",
             },
         ])
 
@@ -493,13 +492,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         elif key == "force_reauth":
             # force arlo client to be invalidated and reloaded
             self.invalidate_arlo_client()
+        elif key == "plugin_verbosity":
+            self.storage.setItem(key, "Verbose" if value == "true" else "Normal")
+            self.propagate_verbosity()
+            skip_arlo_client = True
         else:
             self.storage.setItem(key, value)
 
-            if key == "plugin_verbosity":
-                self.propagate_verbosity()
-                skip_arlo_client = True
-            elif key == "arlo_transport":
+            if key == "arlo_transport":
                 self.propagate_transport()
                 # force arlo client to be invalidated and reloaded, but
                 # keep any mfa codes
@@ -558,7 +558,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 return False
         return True
 
-    async def discoverDevices(self, duration: int = 0) -> None:
+    @ArloDeviceBase.async_print_exception_guard
+    async def discover_devices(self, duration: int = 0) -> None:
         if not self.arlo:
             raise Exception("Arlo client not connected, cannot discover devices")
 
@@ -573,6 +574,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         basestations = self.arlo.GetDevices(['basestation', 'siren'])
         for basestation in basestations:
             nativeId = basestation["deviceId"]
+            self.logger.debug(f"Adding {nativeId}")
 
             if nativeId in self.arlo_basestations:
                 self.logger.info(f"Skipping basestation {nativeId} ({basestation['modelId']}) as it has already been added")
@@ -582,7 +584,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             device = await self.getDevice(nativeId)
             scrypted_interfaces = device.get_applicable_interfaces()
             manifest = device.get_device_manifest()
-            self.logger.info(f"Interfaces for {nativeId} ({basestation['modelId']}): {scrypted_interfaces}")
+            self.logger.debug(f"Interfaces for {nativeId} ({basestation['modelId']}): {scrypted_interfaces}")
 
             # for basestations, we want to add them to the top level DeviceProvider
             provider_to_device_map.setdefault(None, []).append(manifest)
@@ -601,11 +603,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
         cameras = self.arlo.GetDevices(['camera', "arloq", "arloqs", "doorbell"])
         for camera in cameras:
+            nativeId = camera["deviceId"]
+            self.logger.debug(f"Adding {nativeId}")
+
             if camera["deviceId"] != camera["parentId"] and camera["parentId"] not in self.arlo_basestations:
                 self.logger.info(f"Skipping camera {camera['deviceId']} ({camera['modelId']}) because its basestation was not found")
                 continue
 
-            nativeId = camera["deviceId"]
             if nativeId in self.arlo_cameras:
                 self.logger.info(f"Skipping camera {nativeId} ({camera['modelId']}) as it has already been added")
                 continue
@@ -619,7 +623,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             device: ArloDeviceBase = await self.getDevice(nativeId)
             scrypted_interfaces = device.get_applicable_interfaces()
             manifest = device.get_device_manifest()
-            self.logger.info(f"Interfaces for {nativeId} ({camera['modelId']}): {scrypted_interfaces}")
+            self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']}): {scrypted_interfaces}")
 
             if camera["deviceId"] == camera["parentId"]:
                 provider_to_device_map.setdefault(None, []).append(manifest)

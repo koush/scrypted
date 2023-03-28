@@ -711,7 +711,20 @@ class Arlo(object):
             callback,
         )
 
-    def SirenOn(self, basestation):
+    def SirenOn(self, basestation, camera=None):
+        if camera is not None:
+            resource = f"siren/{camera.get('deviceId')}"
+            return self.Notify(basestation, {
+                "action": "set",
+                "resource": resource,
+                "publishResponse": True,
+                "properties": {
+                    "sirenState": "on",
+                    "duration": 300,
+                    "volume": 8,
+                    "pattern": "alarm"
+                }
+            })
         return self.Notify(basestation, {
             "action": "set",
             "resource": "siren",
@@ -724,7 +737,20 @@ class Arlo(object):
             }
         })
 
-    def SirenOff(self, basestation):
+    def SirenOff(self, basestation, camera=None):
+        if camera is not None:
+            resource = f"siren/{camera.get('deviceId')}"
+            return self.Notify(basestation, {
+                "action": "set",
+                "resource": resource,
+                "publishResponse": True,
+                "properties": {
+                    "sirenState": "off",
+                    "duration": 300,
+                    "volume": 8,
+                    "pattern": "alarm"
+                }
+            })
         return self.Notify(basestation, {
             "action": "set",
             "resource": "siren",
@@ -735,6 +761,58 @@ class Arlo(object):
                 "volume": 8,
                 "pattern": "alarm"
             }
+        })
+
+    def SpotlightOn(self, basestation, camera):
+        resource = f"cameras/{camera.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "spotlight": {
+                    "enabled": True,
+                },
+            },
+        })
+
+    def SpotlightOff(self, basestation, camera):
+        resource = f"cameras/{camera.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "spotlight": {
+                    "enabled": False,
+                },
+            },
+        })
+
+    def FloodlightOn(self, basestation, camera):
+        resource = f"cameras/{camera.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "floodlight": {
+                    "on": True,
+                },
+            },
+        })
+
+    def FloodlightOff(self, basestation, camera):
+        resource = f"cameras/{camera.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "floodlight": {
+                    "on": False,
+                },
+            },
         })
 
     def GetLibrary(self, device, from_date: datetime, to_date: datetime):
@@ -785,3 +863,12 @@ class Arlo(object):
                 'dateTo': to_date
             }
         )
+
+    def GetSmartFeatures(self, device):
+        smart_features = self._getSmartFeaturesCached()
+        key = f"{device['owner']['ownerId']}_{device['deviceId']}"
+        return smart_features["features"].get(key)
+
+    @cached(cache=TTLCache(maxsize=1, ttl=60))
+    def _getSmartFeaturesCached(self):
+        return self.request.get(f'https://{self.BASE_URL}/hmsweb/users/subscription/smart/features')
