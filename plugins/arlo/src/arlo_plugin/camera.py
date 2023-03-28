@@ -171,7 +171,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     @property
     def has_cloud_recording(self) -> bool:
-        return self.provider.arlo.GetSmartFeatures(self.arlo_device)["planFeatures"]["eventRecording"]
+        return self.provider.arlo.GetSmartFeatures(self.arlo_device).get("planFeatures", {}).get("eventRecording", False)
 
     @property
     def has_spotlight(self) -> bool:
