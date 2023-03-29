@@ -42,7 +42,7 @@ fi
 WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum)
 DOCKER_COMPOSE_YML=$SCRYPTED_HOME/docker-compose.yml
 echo "Created $DOCKER_COMPOSE_YML"
-curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/docker-compose.yml | sed s/SET_THIS_TO_SOME_RANDOM_TEXT/"$(echo $RANDOM | md5sum)"/g > $DOCKER_COMPOSE_YML
+curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/docker-compose.yml | sed s/SET_THIS_TO_SOME_RANDOM_TEXT/"$(echo $RANDOM | md5sum | head -c 32)"/g > $DOCKER_COMPOSE_YML
 
 echo "Setting permissions on $SCRYPTED_HOME"
 chown -R $SERVICE_USER $SCRYPTED_HOME
