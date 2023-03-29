@@ -397,10 +397,12 @@ class PluginRemote:
             python_versioned_directory = '%s-%s-%s' % (python_version, platform.system(), platform.machine())
             SCRYPTED_BASE_VERSION = os.environ.get('SCRYPTED_BASE_VERSION')
             if SCRYPTED_BASE_VERSION:
-                python_versioned_directory += SCRYPTED_BASE_VERSION
+                python_versioned_directory += '-' + SCRYPTED_BASE_VERSION
 
             python_prefix = os.path.join(
                 plugin_volume, python_versioned_directory)
+
+            print('python prefix: %s' % python_prefix)
 
             if not os.path.exists(python_prefix):
                 os.makedirs(python_prefix)

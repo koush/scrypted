@@ -176,6 +176,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             const pluginConsole = getPluginConsole?.();
             params.console = pluginConsole;
             const pnp = getPluginNodePath(pluginId);
+            pluginConsole?.log('node modules', pnp);
             params.require = (name: string) => {
                 if (name === 'fakefs' || (name === 'fs' && !packageJson.scrypted.realfs)) {
                     return volume;

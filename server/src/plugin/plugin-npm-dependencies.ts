@@ -15,7 +15,7 @@ export function getPluginNodePath(name: string) {
     let nodeVersionedDirectory = `node${nodeMajorVersion}-${process.platform}-${process.arch}`;
     const scryptedBase = process.env.SCRYPTED_BASE_VERSION;
     if (scryptedBase)
-        nodeVersionedDirectory += '-' + nodeVersionedDirectory;
+        nodeVersionedDirectory += '-' + scryptedBase;
     const nodePrefix = path.join(pluginVolume, nodeVersionedDirectory);
     return nodePrefix;
 }
