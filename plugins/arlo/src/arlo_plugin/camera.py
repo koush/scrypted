@@ -65,25 +65,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
         self.start_motion_subscription()
         self.start_battery_subscription()
-        self.create_task(self.delayed_init())
-
-    async def delayed_init(self) -> None:
-        if self.arlo_device.get("properties", {}).get("batteryLevel") is None:
-            return
-
-        iterations = 1
-        while not self.stop_subscriptions:
-            if iterations > 100:
-                self.logger.error("Delayed init exceeded iteration limit, giving up")
-                return
-
-            try:
-                self.batteryLevel = self.arlo_device["properties"]["batteryLevel"]
-                return
-            except Exception as e:
-                self.logger.debug(f"Delayed init failed, will try again: {e}")
-                await asyncio.sleep(0.1)
-            iterations += 1
 
     def start_motion_subscription(self) -> None:
         def callback(motionDetected):
@@ -177,7 +158,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     @property
     def webrtc_emulation(self) -> bool:
         if self.storage:
-            return True if self.storage.getItem("webrtc_emulation") == "True" else False
+            return True if self.storage.getItem("webrtc_emulation") else False
         else:
             return False
 
@@ -187,14 +168,14 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             val = self.storage.getItem("two_way_audio")
             if val is None:
                 val = True
-            return val == "True"
+            return val
         else:
             return True
 
     @property
     def wired_to_power(self) -> bool:
         if self.storage:
-            return True if self.storage.getItem("wired_to_power") == "True" else False
+            return True if self.storage.getItem("wired_to_power") else False
         else:
             return False
 
@@ -215,8 +196,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         return any([self.arlo_device["modelId"].lower().startswith(model) for model in ArloCamera.MODELS_WITH_SIRENS])
 
     async def getSettings(self) -> List[Setting]:
-        if self._can_push_to_talk():
-            return [
+        result = [
                 {
                     "key": "wired_to_power",
                     "title": "Plugged In to External Power",
@@ -225,6 +205,9 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                                    "Will allow features like persistent prebuffer to work, however will no longer report this device's battery percentage.",
                     "type": "boolean",
                 },
+        ]
+        if self._can_push_to_talk():
+            result.extend([
                 {
                     "key": "two_way_audio",
                     "title": "(Experimental) Enable native two-way audio",
@@ -240,8 +223,8 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                                    "If enabled, takes precedence over native two-way audio. May use increased system resources.",
                     "type": "boolean",
                 },
-            ]
-        return []
+            ])
+        return result
 
     async def putSetting(self, key, value) -> None:
         if key in ["webrtc_emulation", "two_way_audio", "wired_to_power"]:
