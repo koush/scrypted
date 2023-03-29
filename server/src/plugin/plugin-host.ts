@@ -311,7 +311,9 @@ export class PluginHost {
 
         this.worker.stdout.on('data', data => console.log(data.toString()));
         this.worker.stderr.on('data', data => console.error(data.toString()));
-        const consoleHeader = `${os.platform()} ${os.arch()} ${os.version()}\nserver version: ${serverVersion}\nplugin version: ${this.pluginId} ${this.packageJson.version}\n`;
+        let consoleHeader = `${os.platform()} ${os.arch()} ${os.version()}\nserver version: ${serverVersion}\nplugin version: ${this.pluginId} ${this.packageJson.version}\n`;
+        if (process.env.SCRYPTED_DOCKER_FLAVOR)
+            consoleHeader += `${process.env.SCRYPTED_DOCKER_FLAVOR}\n`;
         this.consoleServer = createConsoleServer(this.worker.stdout, this.worker.stderr, consoleHeader);
 
         const disconnect = () => {
