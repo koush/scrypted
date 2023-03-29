@@ -42,20 +42,15 @@ export function getWeriftIceServers(configuration: RTCConfiguration): RTCIceServ
     return ret;
 }
 
-export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection) {
+export function isPrivateIceTransport(pc: RTCPeerConnection) {
     let isPrivate = true;
     let destinationId: string;
     for (const ice of pc.iceTransports) {
         const [address, port] = (ice.connection as any).nominated[1].remoteAddr;
         if (!destinationId)
             destinationId = address;
-        const { turnServer } = ice.connection;
         isPrivate = isPrivate && ip.isPrivate(address);
-        console.log('ice transport ip', {
-            address,
-            port,
-            turnServer: !!turnServer,
-        });
+
     }
     console.log('Connection is local network:', isPrivate);
     const ipv4 = ip.isV4Format(destinationId);
@@ -64,4 +59,11 @@ export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection
         isPrivate,
         destinationId,
     };
+}
+
+export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection) {
+    const ret = isPrivateIceTransport(pc);
+    console.log('ice transport', ret);
+    console.log('Connection is local network:', ret.isPrivate);
+    return ret;
 }

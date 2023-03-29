@@ -250,7 +250,8 @@ export class BrowserSignalingSession implements RTCSignalingSession {
 function logSendCandidate(console: Console, type: string, session: RTCSignalingSession): RTCSignalingSendIceCandidate {
     return async (candidate) => {
         try {
-            console.log(`${type} trickled candidate:`, candidate.sdpMLineIndex, candidate.candidate);
+            if (localStorage.getItem('debugLog') === 'true')
+                console.log(`${type} trickled candidate:`, candidate.sdpMLineIndex, candidate.candidate);
             await session.addIceCandidate(candidate);
         }
         catch (e) {
@@ -308,11 +309,13 @@ export async function connectRTCSignalingClients(
 
     const offer = await offerClient.createLocalDescription('offer', offerSetup as RTCAVSignalingSetup,
         disableTrickle ? undefined : answerQueue.queueSendCandidate);
-    console.log('offer sdp', offer.sdp);
+    if (localStorage.getItem('debugLog') === 'true')
+        console.log('offer sdp', offer.sdp);
     await answerClient.setRemoteDescription(offer, answerSetup as RTCAVSignalingSetup);
     const answer = await answerClient.createLocalDescription('answer', answerSetup as RTCAVSignalingSetup,
         disableTrickle ? undefined : offerQueue.queueSendCandidate);
-    console.log('answer sdp', answer.sdp);
+    if (localStorage.getItem('debugLog') === 'true')
+        console.log('answer sdp', answer.sdp);
     await offerClient.setRemoteDescription(answer, offerSetup as RTCAVSignalingSetup);
     offerQueue.flush();
     answerQueue.flush();
