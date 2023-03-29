@@ -9,7 +9,7 @@ from PIL import Image
 import asyncio
 import concurrent.futures
 
-predictExecutor = concurrent.futures.ThreadPoolExecutor(2, "CoreML-Predict")
+predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "CoreML-Predict")
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()

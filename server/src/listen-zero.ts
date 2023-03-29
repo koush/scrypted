@@ -1,6 +1,12 @@
 import { once } from 'events';
 import net from 'net';
 
+export class ListenZeroSingleClientTimeoutError extends Error {
+    constructor() {
+        super('timeout waiting for client')
+    }
+}
+
 export async function listenZero(server: net.Server, hostname?: string) {
     server.listen(0, hostname);
     await once(server, 'listening');
@@ -14,7 +20,7 @@ export async function listenZeroSingleClient(hostname?: string) {
     const clientPromise = new Promise<net.Socket>((resolve, reject) => {
         const timeout = setTimeout(() => {
             server.close();
-            reject(new Error('timeout waiting for client'));
+            reject(new ListenZeroSingleClientTimeoutError());
         }, 30000)
         server.on('connection', client => {
             server.close();

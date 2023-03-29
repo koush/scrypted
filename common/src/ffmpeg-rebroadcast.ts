@@ -361,8 +361,7 @@ export interface RebroadcasterOptions {
     },
 }
 
-export async function handleRebroadcasterClient(duplex: Promise<Duplex> | Duplex, options?: RebroadcasterOptions) {
-    const socket = await duplex;
+export function handleRebroadcasterClient(socket: Duplex, options?: RebroadcasterOptions) {
     const firstWriteData = (data: StreamChunk) => {
         if (data.startStream) {
             socket.write(data.startStream)
