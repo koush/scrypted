@@ -60,7 +60,7 @@ RUN apt-get -y install \
 # which causes weird behavior in python which looks at the arch version
 # which still reports 64bit, even if running in 32bit docker.
 # this scenario is not supported and will be reported at runtime.
-RUN if [ "$(uname -m)" = "armv7l" ]; \
+RUN if [ "$(uname -m)" != "x86_64" ]; \
     then \
         apt-get -y install \
         python3-matplotlib \
