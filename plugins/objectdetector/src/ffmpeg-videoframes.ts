@@ -1,11 +1,31 @@
 import { Deferred } from "@scrypted/common/src/deferred";
+import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import { readLength, readLine } from "@scrypted/common/src/read-stream";
-import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import sdk, { FFmpegInput, Image, ImageOptions, MediaObject, ScryptedDeviceBase, ScryptedMimeTypes, VideoFrame, VideoFrameGenerator, VideoFrameGeneratorOptions } from "@scrypted/sdk";
 import child_process from 'child_process';
-import sharp from 'sharp';
+import type sharp from 'sharp';
 import { Readable } from 'stream';
+
+export let sharpLib: (input?:
+    | Buffer
+    | Uint8Array
+    | Uint8ClampedArray
+    | Int8Array
+    | Uint16Array
+    | Int16Array
+    | Uint32Array
+    | Int32Array
+    | Float32Array
+    | Float64Array
+    | string,
+    options?: sharp.SharpOptions) => sharp.Sharp;
+try {
+    sharpLib = require('sharp');
+}
+catch (e) {
+    console.warn('Sharp failed to load. FFmpeg Frame Generator will not function properly.')
+}
 
 async function createVipsMediaObject(image: VipsImage): Promise<VideoFrame & MediaObject> {
     const ret = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
@@ -76,7 +96,20 @@ class VipsImage implements Image {
             resolveWithObject: true,
         });
 
-        const newImage = sharp(data, {
+        const sharpLib = require('sharp') as (input?:
+            | Buffer
+            | Uint8Array
+            | Uint8ClampedArray
+            | Int8Array
+            | Uint16Array
+            | Int16Array
+            | Uint32Array
+            | Int32Array
+            | Float32Array
+            | Float64Array
+            | string,
+            options?) => sharp.Sharp;
+        const newImage = sharpLib(data, {
             raw: info,
         });
 
@@ -177,7 +210,7 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                 const raw = await frameDeferred.promise;
                 const { width, height, data } = raw;
 
-                const image = sharp(data, {
+                const image = sharpLib(data, {
                     raw: {
                         width,
                         height,

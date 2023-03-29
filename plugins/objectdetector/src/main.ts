@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { DenoisedDetectionState } from './denoise';
-import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
+import { FFmpegVideoFrameGenerator, sharpLib } from './ffmpeg-videoframes';
 import { serverSupportsMixinEventMasking } from './server-version';
 import { sleep } from './sleep';
 import { getAllDevices, safeParseJson } from './util';
@@ -820,9 +820,9 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
           {
             name: 'FFmpeg Frame Generator',
             type: ScryptedDeviceType.Builtin,
-            interfaces: [
+            interfaces: sharpLib ? [
               ScryptedInterface.VideoFrameGenerator,
-            ],
+            ] : [],
             nativeId: 'ffmpeg',
           }
         ]
