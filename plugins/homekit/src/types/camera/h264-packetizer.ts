@@ -64,6 +64,9 @@ export class H264Repacketizer {
     extraPackets = 0;
     fuaMax: number;
     pendingFuA: RtpPacket[];
+    // log whether a stapa sps/pps has been seen.
+    // resets on every idr frame, to trigger codec information
+    // to be resent.
     seenStapASps = false;
     fuaMin: number;
 
@@ -402,8 +405,12 @@ export class H264Repacketizer {
                 // if this is an idr frame, but no sps has been sent via a stapa, dummy one up.
                 // the stream may not contain codec information in stapa or may be sending it
                 // in separate sps/pps packets which is not supported by homekit.
-                if (originalNalType === NAL_TYPE_IDR && !this.seenStapASps)
-                    this.maybeSendSpsPps(packet, ret);
+                if (originalNalType === NAL_TYPE_IDR) {
+                    if (!this.seenStapASps)
+                        this.maybeSendSpsPps(packet, ret);
+                    this.seenStapASps = false;
+                }
+
             }
             else {
                 if (this.pendingFuA) {
@@ -486,10 +493,12 @@ export class H264Repacketizer {
                 return;
             }
 
-            if (nalType === NAL_TYPE_IDR && !this.seenStapASps) {
+            if (nalType === NAL_TYPE_IDR) {
                 // if this is an idr frame, but no sps has been sent, dummy one up.
                 // the stream may not contain sps.
-                this.maybeSendSpsPps(packet, ret);
+                if (!this.seenStapASps)
+                    this.maybeSendSpsPps(packet, ret);
+                this.seenStapASps = false;
             }
 
             this.fragment(packet, ret);
