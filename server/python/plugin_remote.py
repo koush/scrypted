@@ -423,7 +423,18 @@ class PluginRemote:
                     pass
 
                 if need_pip:
-                    shutil.rmtree(python_prefix)
+                    try:
+                        for de in os.listdir(plugin_volume):
+                            if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
+                                filePath = os.path.join(plugin_volume, de)
+                                print('Removing old dependencies: %s' % filePath)
+                                try:
+                                    shutil.rmtree(filePath)
+                                except:
+                                    pass
+                    except:
+                        pass
+
                     os.makedirs(python_prefix)
 
                     print('requirements.txt (outdated)')
