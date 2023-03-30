@@ -252,5 +252,5 @@ class OpenCVPlugin(DetectPlugin):
         def convert_to_src_size(point):
             return point[0] * scale, point[1] * scale
         mat = np.ndarray((height, width, self.pixelFormatChannelCount), buffer=buffer, dtype=np.uint8)
-        detections = self.detect(mat, settings, detection_session,  (width, height), convert_to_src_size)
+        detections = self.detect(mat, settings, detection_session, (videoFrame.width, videoFrame.height), convert_to_src_size)
         return detections
