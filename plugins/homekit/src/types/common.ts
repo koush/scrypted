@@ -184,7 +184,7 @@ export function mergeOnOffDevicesByType(device: ScryptedDevice & DeviceProvider,
         if (child.type !== type || !child.interfaces.includes(ScryptedInterface.OnOff))
             return undefined;
 
-        const onOffService = getOnOffService(child, accessory, Service.Switch)
+        const onOffService = getOnOffService(child, accessory, type ===  ScryptedDeviceType.Light ? Service.Lightbulb : Service.Switch)
         mergedDevices.push(child);
         return onOffService;
     });
