@@ -75,6 +75,3 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             vf = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.Image.value)
 
         return await self.run_detection_videoframe(vf, session)
-
-    def get_pixel_format(self):
-        return 'RGB'
