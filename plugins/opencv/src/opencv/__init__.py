@@ -1,17 +1,42 @@
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 from typing import Any, List, Tuple
 
 import cv2
 import imutils
 import numpy as np
+import scrypted_sdk
+from PIL import Image
+from scrypted_sdk.types import (ObjectDetectionGeneratorSession,
+                                ObjectDetectionResult, ObjectsDetected,
+                                Setting, VideoFrame)
 
 from detect import DetectPlugin
 
-import scrypted_sdk
-from scrypted_sdk.types import (ObjectDetectionGeneratorSession,
-                                ObjectDetectionResult,
-                                ObjectsDetected, Setting, VideoFrame)
+# vips is already multithreaded, but needs to be kicked off the python asyncio thread.
+toThreadExecutor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="image")
+
+async def to_thread(f):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(toThreadExecutor, f)
+
+async def ensureGrayData(data: bytes, size: Tuple[int, int], format: str):
+    if format == 'gray':
+        return data
+
+    def convert():
+        if format == 'rgba':
+            image = Image.frombuffer('RGBA', size, data)
+        else:
+            image = Image.frombuffer('RGB', size, data)
+
+        try:
+            return image.convert('L').tobytes()
+        finally:
+            image.close()
+    return await to_thread(convert)
 
 
 class OpenCVDetectionSession:
@@ -34,21 +59,6 @@ defaultBlur = 5
 class OpenCVPlugin(DetectPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
-        self.color2Gray = None
-        self.pixelFormat = "I420"
-        self.pixelFormatChannelCount = 1
-
-        if True:
-            self.retainAspectRatio = False
-            self.color2Gray = None
-            self.pixelFormat = "I420"
-            self.pixelFormatChannelCount = 1
-        else:
-            self.retainAspectRatio = True
-            self.color2Gray = cv2.COLOR_BGRA2GRAY
-            self.pixelFormat = "BGRA"
-            self.pixelFormatChannelCount = 4
-
 
     def getClasses(self) -> list[str]:
         return ['motion']
@@ -90,9 +100,6 @@ class OpenCVPlugin(DetectPlugin):
         ]
 
         return settings
-
-    def get_pixel_format(self):
-        return self.pixelFormat
     
     def get_input_format(self) -> str:
         return 'gray'
@@ -112,13 +119,7 @@ class OpenCVPlugin(DetectPlugin):
     def detect(self, frame, settings: Any, detection_session: OpenCVDetectionSession, src_size, convert_to_src_size) -> ObjectsDetected:
         area, threshold, interval, blur = self.parse_settings(settings)
 
-        # see get_detection_input_size on undocumented size requirements for GRAY8
-        if self.color2Gray != None:
-            detection_session.gray = cv2.cvtColor(
-                frame, self.color2Gray, dst=detection_session.gray)
-            gray = detection_session.gray
-        else:
-            gray = frame
+        gray = frame
         detection_session.curFrame = cv2.GaussianBlur(
             gray, (blur, blur), 0, dst=detection_session.curFrame)
 
@@ -245,12 +246,26 @@ class OpenCVPlugin(DetectPlugin):
                 'height': height,
             }
 
+        format = videoFrame.format or 'gray'
         buffer = await videoFrame.toBuffer({
             'resize': resize,
+            'format': format,
         })
+
+        if format == 'gray':
+            expectedLength = width * height
+            # check if resize could not be completed
+            if expectedLength != len(buffer):
+                image = Image.frombuffer('L', (videoFrame.width, videoFrame.height), buffer)
+                try:
+                    buffer = image.resize((width, height), Image.BILINEAR).tobytes()
+                finally:
+                    image.close()
+        else:
+            buffer = await ensureGrayData(buffer, (width, height), format)
 
         def convert_to_src_size(point):
             return point[0] * scale, point[1] * scale
-        mat = np.ndarray((height, width, self.pixelFormatChannelCount), buffer=buffer, dtype=np.uint8)
+        mat = np.ndarray((height, width, 1), buffer=buffer, dtype=np.uint8)
         detections = self.detect(mat, settings, detection_session, (videoFrame.width, videoFrame.height), convert_to_src_size)
         return detections
