@@ -38,10 +38,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     MODELS_WITH_FLOODLIGHTS = ["fb1001"]
 
     MODELS_WITH_SIRENS = [
-        "vmb4000",
-        "vmb4500",
-        "vmb4540",
-        "vmb5000",
         "vmc4040p",
         "fb1001",
         "vmc2030",
