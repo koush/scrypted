@@ -10,7 +10,7 @@ from typing import List, TYPE_CHECKING
 import scrypted_arlo_go
 
 import scrypted_sdk
-from scrypted_sdk.types import Setting, Settings, Device, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, Battery, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Setting, Settings, Device, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .base import ArloDeviceBase
 from .spotlight import ArloSpotlight, ArloFloodlight
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from .provider import ArloProvider
 
 
-class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, VideoClips, MotionSensor, Battery):
+class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, VideoClips, MotionSensor, AudioSensor, Battery):
     MODELS_WITH_SPOTLIGHTS = [
         "vmc4040p",
         "vmc2030",
@@ -56,6 +56,25 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         "vmc4030p",
     ]
 
+    MODELS_WITH_AUDIO_SENSORS = [
+        "vmc4040p",
+        "fb1001",
+        "vmc4041p",
+        "vmc4050p",
+        "vmc5040",
+        "vmc3040",
+        "vmc3040s",
+        "vmc4030",
+        "vml4030",
+        "vmc4030p",
+    ]
+
+    MODELS_WITHOUT_BATTERY = [
+        "avd1001",
+        "vmc3040",
+        "vmc3040s",
+    ]
+
     timeout: int = 30
     intercom_session = None
     light: ArloSpotlight = None
@@ -64,6 +83,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
         self.start_motion_subscription()
+        self.start_audio_subscription()
         self.start_battery_subscription()
 
     def start_motion_subscription(self) -> None:
@@ -75,7 +95,22 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             self.provider.arlo.SubscribeToMotionEvents(self.arlo_basestation, self.arlo_device, callback)
         )
 
+    def start_audio_subscription(self) -> None:
+        if not self.has_audio_sensor:
+            return
+
+        def callback(audioDetected):
+            self.audioDetected = audioDetected
+            return self.stop_subscriptions
+
+        self.register_task(
+            self.provider.arlo.SubscribeToAudioEvents(self.arlo_basestation, self.arlo_device, callback)
+        )
+
     def start_battery_subscription(self) -> None:
+        if self.wired_to_power:
+            return
+
         def callback(batteryLevel):
             self.batteryLevel = batteryLevel
             return self.stop_subscriptions
@@ -89,7 +124,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             ScryptedInterface.VideoCamera.value,
             ScryptedInterface.Camera.value,
             ScryptedInterface.MotionSensor.value,
-            ScryptedInterface.Battery.value,
             ScryptedInterface.Settings.value,
         ])
 
@@ -101,11 +135,17 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             results.add(ScryptedInterface.RTCSignalingChannel.value)
             results.discard(ScryptedInterface.Intercom.value)
 
+        if self.has_battery:
+            results.add(ScryptedInterface.Battery.value)
+
         if self.wired_to_power:
             results.discard(ScryptedInterface.Battery.value)
 
         if self.has_siren or self.has_spotlight or self.has_floodlight:
             results.add(ScryptedInterface.DeviceProvider.value)
+
+        if self.has_audio_sensor:
+            results.add(ScryptedInterface.AudioSensor.value)
 
         if self.has_cloud_recording:
             results.add(ScryptedInterface.VideoClips.value)
@@ -195,17 +235,28 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     def has_siren(self) -> bool:
         return any([self.arlo_device["modelId"].lower().startswith(model) for model in ArloCamera.MODELS_WITH_SIRENS])
 
+    @property
+    def has_audio_sensor(self) -> bool:
+        return any([self.arlo_device["modelId"].lower().startswith(model) for model in ArloCamera.MODELS_WITH_AUDIO_SENSORS])
+
+    @property
+    def has_battery(self) -> bool:
+        return not any([self.arlo_device["modelId"].lower().startswith(model) for model in ArloCamera.MODELS_WITHOUT_BATTERY])
+
     async def getSettings(self) -> List[Setting]:
-        result = [
+        result = []
+        if self.has_battery:
+            result.append(
                 {
                     "key": "wired_to_power",
                     "title": "Plugged In to External Power",
                     "value": self.wired_to_power,
                     "description": "Informs Scrypted that this device is plugged in to an external power source. " + \
-                                   "Will allow features like persistent prebuffer to work, however will no longer report this device's battery percentage.",
+                                   "Will allow features like persistent prebuffer to work, however will no longer report this device's battery percentage. " + \
+                                   "Note that a persistent prebuffer may cause excess battery drain if the external power is not able to charge faster than the battery consumption rate.",
                     "type": "boolean",
                 },
-        ]
+            )
         if self._can_push_to_talk():
             result.extend([
                 {
