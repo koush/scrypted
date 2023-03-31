@@ -9,7 +9,7 @@ export function probe(device: DummyDevice): boolean {
 }
 
 export function getService(device: ScryptedDevice & OnOff, accessory: Accessory, serviceType: any): Service {
-    const service = accessory.addService(serviceType, device.name);
+    const service = accessory.addService(serviceType, device.name, device.nativeId);
     service.getCharacteristic(Characteristic.On)
         .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
             callback();

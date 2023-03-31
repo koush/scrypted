@@ -303,13 +303,19 @@ addSupportedType({
             }
         }
 
+        // if the camera is a device provider, merge in child devices and 
+        // ensure the devices are skipped by the rest of homekit by
+        // reporting that they've been merged
         if (device.interfaces.includes(ScryptedInterface.DeviceProvider)) {
             // merge in lights
-            const { devices } = mergeOnOffDevicesByType(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory, ScryptedDeviceType.Light);
+            mergeOnOffDevicesByType(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory, ScryptedDeviceType.Light).devices.forEach(device => {
+                homekitPlugin.mergedDevices.add(device.id)
+            });
 
-            // ensure child devices are skipped by the rest of homekit by
-            // reporting that they've been merged
-            devices.map(device => homekitPlugin.mergedDevices.add(device.id));
+            // merge in sirens
+            mergeOnOffDevicesByType(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory, ScryptedDeviceType.Siren).devices.forEach(device => {
+                homekitPlugin.mergedDevices.add(device.id)
+            });
         }
 
         return accessory;
