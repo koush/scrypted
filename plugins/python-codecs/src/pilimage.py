@@ -37,7 +37,8 @@ class PILImage(scrypted_sdk.VideoFrame):
 
         def save():
             bytesArray = io.BytesIO()
-            pilImage.pilImage.save(bytesArray, format=options['format'])
+            pilImage.pilImage.save(bytesArray, format='JPEG')
+            # pilImage.pilImage.save(bytesArray, format=options['format'])
             return bytesArray.getvalue()
 
         return await to_thread(lambda: save())
