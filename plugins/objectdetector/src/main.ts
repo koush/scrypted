@@ -201,7 +201,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (this.hasMotionType)
       this.motionDetected = false;
 
-    this.detectorRunning = false;
     this.endObjectDetection();
 
     this.maybeStartMotionDetection();
@@ -333,8 +332,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         if (!this.detectorRunning) {
           break;
         }
-        const now = Date.now();
-        if (now > this.analyzeStop) {
+        if (!this.hasMotionType && Date.now() > this.analyzeStop) {
           break;
         }
 
