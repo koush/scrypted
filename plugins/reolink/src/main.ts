@@ -115,6 +115,20 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
             });
         }
 
+        // rough guesses for rebroadcast stream selection.
+        ret[0].video = {
+            width: 2560,
+            height: 1920,
+        }
+        ret[1].video = {
+            width: 896,
+            height: 672,
+        }
+        ret[2].video = {
+            width: 640,
+            height: 480,
+        }
+
         const channel = (this.getRtspChannel() + 1).toString().padStart(2, '0');
         const rtspPreviews = [
             `h264Preview_${channel}_main`,
