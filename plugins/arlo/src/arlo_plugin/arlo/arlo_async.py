@@ -383,6 +383,33 @@ class Arlo(object):
             self.HandleEvents(basestation, resource, [('is', 'motionDetected')], callbackwrapper)
         )
 
+    def SubscribeToAudioEvents(self, basestation, camera, callback):
+        """
+        Use this method to subscribe to audio events. You must provide a callback function which will get called once per audio event.
+
+        The callback function should have the following signature:
+        def callback(self, event)
+
+        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
+        that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
+        """
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        def callbackwrapper(self, event):
+            properties = event.get('properties', {})
+            stop = None
+            if 'audioDetected' in properties:
+                stop = callback(properties['audioDetected'])
+            if not stop:
+                return None
+            return stop
+
+        return asyncio.get_event_loop().create_task(
+            self.HandleEvents(basestation, resource, [('is', 'audioDetected')], callbackwrapper)
+        )
+
     def SubscribeToBatteryEvents(self, basestation, camera, callback):
         """
         Use this method to subscribe to battery events. You must provide a callback function which will get called once per battery event.
@@ -864,11 +891,11 @@ class Arlo(object):
             }
         )
 
-    def GetSmartFeatures(self, device):
+    def GetSmartFeatures(self, device) -> dict:
         smart_features = self._getSmartFeaturesCached()
         key = f"{device['owner']['ownerId']}_{device['deviceId']}"
-        return smart_features["features"].get(key)
+        return smart_features["features"].get(key, {})
 
     @cached(cache=TTLCache(maxsize=1, ttl=60))
-    def _getSmartFeaturesCached(self):
+    def _getSmartFeaturesCached(self) -> dict:
         return self.request.get(f'https://{self.BASE_URL}/hmsweb/users/subscription/smart/features')

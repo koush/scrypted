@@ -67,14 +67,3 @@ class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTa
     def get_builtin_child_device_manifests(self) -> List[Device]:
         """Returns the list of child device manifests representing hardware features built into this device."""
         return []
-
-    @classmethod
-    def async_print_exception_guard(self, fn):
-        """Decorator to print an exception's stack trace before re-raising the exception."""
-        async def wrapped(*args, **kwargs):
-            try:
-                return await fn(*args, **kwargs)
-            except Exception:
-                traceback.print_exc()
-                raise
-        return wrapped
