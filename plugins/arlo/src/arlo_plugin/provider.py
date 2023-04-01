@@ -16,7 +16,7 @@ from .arlo import Arlo
 from .arlo.arlo_async import change_stream_class
 from .arlo.logging import logger as arlo_lib_logger
 from .logging import ScryptedDeviceLoggerMixin
-from .util import BackgroundTaskMixin
+from .util import BackgroundTaskMixin, async_print_exception_guard
 from .camera import ArloCamera
 from .doorbell import ArloDoorbell
 from .basestation import ArloBasestation
@@ -30,6 +30,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
     scrypted_devices = None
     _arlo = None
     _arlo_mfa_complete_auth = None
+    device_discovery_lock: asyncio.Lock = None
 
     plugin_verbosity_choices = {
         "Normal": logging.INFO,
@@ -50,6 +51,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         self.imap = None
         self.imap_signal = None
         self.imap_skip_emails = None
+        self.device_discovery_lock = asyncio.Lock()
 
         self.propagate_verbosity()
         self.propagate_transport()
@@ -192,9 +194,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             await self.arlo.Subscribe([
                 (self.arlo_basestations[camera["parentId"]], camera) for camera in self.arlo_cameras.values()
             ])
-
-            for nativeId in self.arlo_cameras.keys():
-                await self.getDevice(nativeId)
 
             self.arlo.event_stream.set_refresh_interval(self.refresh_interval)
         except requests.exceptions.HTTPError as e:
@@ -558,8 +557,12 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 return False
         return True
 
-    @ArloDeviceBase.async_print_exception_guard
-    async def discover_devices(self, duration: int = 0) -> None:
+    @async_print_exception_guard
+    async def discover_devices(self) -> None:
+        async with self.device_discovery_lock:
+            return await self.discover_devices_impl()
+
+    async def discover_devices_impl(self) -> None:
         if not self.arlo:
             raise Exception("Arlo client not connected, cannot discover devices")
 
@@ -581,7 +584,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 continue
             self.arlo_basestations[nativeId] = basestation
 
-            device = await self.getDevice(nativeId)
+            device = await self.getDevice_impl(nativeId)
             scrypted_interfaces = device.get_applicable_interfaces()
             manifest = device.get_device_manifest()
             self.logger.debug(f"Interfaces for {nativeId} ({basestation['modelId']}): {scrypted_interfaces}")
@@ -620,7 +623,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 # own basestation
                 self.arlo_basestations[camera["deviceId"]] = camera
 
-            device: ArloDeviceBase = await self.getDevice(nativeId)
+            device = await self.getDevice_impl(nativeId)
             scrypted_interfaces = device.get_applicable_interfaces()
             manifest = device.get_device_manifest()
             self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']}): {scrypted_interfaces}")
@@ -660,6 +663,10 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         })
 
     async def getDevice(self, nativeId: str) -> ArloDeviceBase:
+        async with self.device_discovery_lock:
+            return await self.getDevice_impl(nativeId)
+
+    async def getDevice_impl(self, nativeId: str) -> ArloDeviceBase:
         ret = self.scrypted_devices.get(nativeId, None)
         if ret is None:
             ret = self.create_device(nativeId)
