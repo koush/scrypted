@@ -384,10 +384,9 @@ class PluginRemote:
             if platform.machine() == 'aarch64' and platform.architecture()[0] == '32bit':
                 print('=============================================')
                 print('Python machine vs architecture mismatch detected. Plugin installation may fail.')
-                print('If Scrypted is running in docker, the docker version may be 32bit while the host kernel is 64bit.')
-                print('This may be resolved by reinstalling a 64bit docker.')
-                print('The docker architecture can be checked with the command: "file $(which docker)"')
-                print('The host architecture can be checked with: "uname -m"')
+                print('This issue occurs if a 32bit system was upgraded to a 64bit kernel.')
+                print('Reverting to the 32bit kernel (or reflashing as native 64 bit is recommended.')
+                print('https://github.com/koush/scrypted/issues/678')
                 print('=============================================')
 
             python_version = 'python%s' % str(
