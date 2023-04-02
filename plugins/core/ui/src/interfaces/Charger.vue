@@ -1,25 +1,43 @@
 <template>
   <v-tooltip left>
-    <font-awesome-icon class="white--text mr-1 mr-1" size="sm" :icon="chargeIcon" color="#a9afbb" />
+    <template v-slot:activator="{ on }">
+      <v-icon
+        v-on="on"
+        v-if="lazyValue.chargeState === Charging"
+        class="mr-1 mr-1"
+        small
+      >fa-plug</v-icon>
+      <v-icon
+        v-on="on"
+        v-else-if="lazyValue.chargeState == Trickle"
+        class="mr-1 mr-1"
+        small
+      >fa-plug-circle-minus</v-icon>
+      <v-icon
+        v-on="on"
+        v-else
+        class="mr-1 mr-1"
+        small
+      >fa-plug-circle-xmark</v-icon>
+    </template>
     <span>{{ chargeText }}</span>
   </v-tooltip>
 </template>
 
 <script>
+import { ChargeState } from '@scrypted/sdk';
 import RPCInterface from "./RPCInterface.vue";
 
 export default {
   mixins: [RPCInterface],
+  data() {
+    return {
+      Charging: ChargeState.Charging,
+      Trickle: ChargeState.Trickle,
+      NotCharging: ChargeState.NotCharging,
+    };
+  },
   computed: {
-    chargeIcon() {
-      if (this.lazyValue.chargeState === "trickle") {
-        return "plug";
-      }
-      if (this.lazyValue.chargeState === "charging") {
-        return "plug-circle-bolt";
-      }
-      return "plug-circle-xmark";
-    },
     chargeText() {
       if (this.lazyValue.chargeState === "trickle") {
         return "Trickle Charging";
@@ -28,7 +46,7 @@ export default {
         return "Charging";
       }
       return "Not Charging";
-    }
-  }
+    },
+  },
 };
 </script>
