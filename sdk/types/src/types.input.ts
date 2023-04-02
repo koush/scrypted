@@ -5,7 +5,7 @@ export type ScryptedNativeId = string | undefined;
 
 /**
  * All devices in Scrypted implement ScryptedDevice, which contains the id, name, and type. Add listeners to subscribe to events from that device.
- * 
+ *
  * @category Core Reference
  */
 export interface ScryptedDevice {
@@ -78,7 +78,7 @@ export interface EventDetails {
 }
 /**
  * Returned when an event listener is attached to an EventEmitter. Call removeListener to unregister from events.
- * 
+ *
  * @category Core Reference
 */
 export interface EventListenerRegister {
@@ -230,7 +230,7 @@ export interface Notifier {
 }
 /**
  * MediaObject is an intermediate object within Scrypted to represent all media objects. Plugins should use the MediaConverter to convert the Scrypted MediaObject into a desired type, whether it is a externally accessible URL, a Buffer, etc.
- * 
+ *
  * @category Media Reference
  */
 export interface MediaObject {
@@ -560,7 +560,7 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
 
   /**
    * Set this to true to allow for prebuffering even if the device implements the Battery interface.
-   * Handy if you have a device that can continuously prebuffer when on mains power, but you still 
+   * Handy if you have a device that can continuously prebuffer when on mains power, but you still
    * want battery status reported.
    */
   allowBatteryPrebuffer?: boolean;
@@ -752,7 +752,7 @@ export interface VideoClips {
 }
 
 /**
- * Intercom devices can playback audio. 
+ * Intercom devices can playback audio.
  */
 export interface Intercom {
   startIntercom(media: MediaObject): Promise<void>;
@@ -874,7 +874,7 @@ export interface EntrySensor {
 }
 /**
  * DeviceManager is the interface used by DeviceProvider to report new devices, device states, and device events to Scrypted.
- * 
+ *
  * @category Device Provider Reference
  */
 export interface DeviceManager {
@@ -952,7 +952,7 @@ export interface DeviceManager {
 }
 /**
  * DeviceProvider acts as a controller/hub and exposes multiple devices to Scrypted Device Manager.
- * 
+ *
  * @category Device Provider Reference
  */
 export interface DeviceProvider {
@@ -970,7 +970,7 @@ export interface DeviceProvider {
 }
 /**
  * DeviceManifest is passed to DeviceManager.onDevicesChanged to sync a full list of devices from the controller/hub (Hue, SmartThings, etc)
- * 
+ *
  * @category Device Provider Reference
  */
 export interface DeviceManifest {
@@ -985,7 +985,7 @@ export interface DeviceCreatorSettings {
 }
 /**
  * A DeviceProvider that allows the user to create a device.
- * 
+ *
  * @category Device Provider Reference
  */
 export interface DeviceCreator {
@@ -1013,7 +1013,7 @@ export interface AdoptDevice {
 }
 /**
  * A DeviceProvider that has a device discovery mechanism.
- * 
+ *
  * @category Device Provider Reference
  */
 export interface DeviceDiscovery {
@@ -1035,9 +1035,21 @@ export interface DeviceDiscovery {
 export interface Battery {
   batteryLevel?: number;
 }
+export enum ChargeState {
+  Trickle = 'trickle',
+  Charging = 'charging',
+  NotCharging = 'not-charging',
+}
+/**
+ * Charger reports whether or not a device is being charged from an external power source.
+ * Usually used for battery powered devices.
+ */
+export interface Charger {
+  chargeState?: ChargeState;
+}
 /**
  * Refresh indicates that this device has properties that are not automatically updated, and must be periodically refreshed via polling. Device implementations should never implement their own underlying polling algorithm, and instead implement Refresh to allow Scrypted to manage polling intelligently.
- * 
+ *
  * @category Device Provider Reference
  */
 export interface Refresh {
@@ -1537,7 +1549,7 @@ export interface DeviceInformation {
 }
 /**
  * Device objects are created by DeviceProviders when new devices are discover and synced to Scrypted via the DeviceManager.
- * 
+ *
  * @category Device Provider Reference
  */
 export interface Device {
@@ -1563,7 +1575,7 @@ export interface EndpointAccessControlAllowOrigin {
 
 /**
  * EndpointManager provides publicly accessible URLs that can be used to contact your Scrypted Plugin.
- * 
+ *
  * @category Webhook and Push Reference
  */
 export interface EndpointManager {
@@ -1656,7 +1668,7 @@ export interface EndpointManager {
 }
 /**
  * SystemManager is used by scripts to query device state and access devices.
- * 
+ *
  * @category Core Reference
  */
 export interface SystemManager {
@@ -1714,7 +1726,7 @@ export interface SystemManager {
 }
 /**
  * MixinProviders can add and intercept interfaces to other devices to add or augment their behavior.
- * 
+ *
  * @category Mixin Reference
  */
 export interface MixinProvider {
@@ -1735,7 +1747,7 @@ export interface MixinProvider {
 }
 /**
  * The HttpRequestHandler allows handling of web requests under the endpoint path: /endpoint/npm-package-name/*.
- * 
+ *
  * @category Webhook and Push Reference
  */
 export interface HttpRequestHandler {
@@ -1760,7 +1772,7 @@ export interface HttpRequest {
 }
 /**
  * Response object provided by the HttpRequestHandler.
- * 
+ *
  * @category Webhook and Push Reference
  */
 export interface HttpResponse {
@@ -1791,7 +1803,7 @@ export interface EngineIOHandler {
 }
 /**
  * @category Webhook and Push Reference
- * 
+ *
  */
 export interface PushHandler {
   /**
@@ -1885,6 +1897,7 @@ export enum ScryptedInterface {
   DeviceDiscovery = "DeviceDiscovery",
   DeviceCreator = "DeviceCreator",
   Battery = "Battery",
+  Charger = "Charger",
   Refresh = "Refresh",
   MediaPlayer = "MediaPlayer",
   Online = "Online",
@@ -1935,7 +1948,7 @@ export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => P
 
 /**
  * Implemented by WebRTC cameras to negotiate a peer connection session with Scrypted.
- * 
+ *
  * @category WebRTC Reference
  */
 export interface RTCSignalingSession {
@@ -1979,7 +1992,7 @@ export interface RTCSignalingOptions {
 }
 
 /**
- * A flexible RTC signaling endpoint, typically a browser, that can handle offer and answer. 
+ * A flexible RTC signaling endpoint, typically a browser, that can handle offer and answer.
  * Like Chromecast, etc, which has a Chromecast AppId that can connect to Scrypted.
  */
 export interface RTCSignalingClient {
@@ -2029,7 +2042,7 @@ export interface RTCConnectionManagement {
  * An inflexible RTC Signaling channel, typically a vendor, like Nest or Ring.
  * They generally can only handle either offer or answer, but not both. Usually has
  * strict requirements and expectations on client setup.
- * 
+ *
  * @category WebRTC Reference
  */
 export interface RTCSignalingChannel {
