@@ -384,10 +384,9 @@ class PluginRemote:
             if platform.machine() == 'aarch64' and platform.architecture()[0] == '32bit':
                 print('=============================================')
                 print('Python machine vs architecture mismatch detected. Plugin installation may fail.')
-                print('If Scrypted is running in docker, the docker version may be 32bit while the host kernel is 64bit.')
-                print('This may be resolved by reinstalling a 64bit docker.')
-                print('The docker architecture can be checked with the command: "file $(which docker)"')
-                print('The host architecture can be checked with: "uname -m"')
+                print('This issue occurs if a 32bit system was upgraded to a 64bit kernel.')
+                print('Reverting to the 32bit kernel (or reflashing as native 64 bit is recommended.')
+                print('https://github.com/koush/scrypted/issues/678')
                 print('=============================================')
 
             python_version = 'python%s' % str(
@@ -397,10 +396,12 @@ class PluginRemote:
             python_versioned_directory = '%s-%s-%s' % (python_version, platform.system(), platform.machine())
             SCRYPTED_BASE_VERSION = os.environ.get('SCRYPTED_BASE_VERSION')
             if SCRYPTED_BASE_VERSION:
-                python_versioned_directory += SCRYPTED_BASE_VERSION
+                python_versioned_directory += '-' + SCRYPTED_BASE_VERSION
 
             python_prefix = os.path.join(
                 plugin_volume, python_versioned_directory)
+
+            print('python prefix: %s' % python_prefix)
 
             if not os.path.exists(python_prefix):
                 os.makedirs(python_prefix)
@@ -421,7 +422,18 @@ class PluginRemote:
                     pass
 
                 if need_pip:
-                    shutil.rmtree(python_prefix)
+                    try:
+                        for de in os.listdir(plugin_volume):
+                            if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
+                                filePath = os.path.join(plugin_volume, de)
+                                print('Removing old dependencies: %s' % filePath)
+                                try:
+                                    shutil.rmtree(filePath)
+                                except:
+                                    pass
+                    except:
+                        pass
+
                     os.makedirs(python_prefix)
 
                     print('requirements.txt (outdated)')

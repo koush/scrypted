@@ -81,6 +81,7 @@ export default {
             const mediaManager = this.$scrypted.mediaManager;
             const mo = await mediaManager.createMediaObject(buffer, 'image/*');
             const detected = await this.rpc().detectObjects(mo);
+            console.log(detected);
             this.lastDetection = detected;
         },
         allowDrop(ev) {

@@ -63,7 +63,7 @@ RUN apt-get -y install \
 # which causes weird behavior in python which looks at the arch version
 # which still reports 64bit, even if running in 32bit docker.
 # this scenario is not supported and will be reported at runtime.
-RUN if [ "$(uname -m)" = "armv7l" ]; \
+RUN if [ "$(uname -m)" != "x86_64" ]; \
     then \
         apt-get -y install \
         python3-matplotlib \
@@ -95,7 +95,8 @@ ENV SCRYPTED_INSTALL_PATH="/server"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION=20230322
+ENV SCRYPTED_BASE_VERSION=20230329
+ENV SCRYPTED_DOCKER_FLAVOR=full
 
 ################################################################
 # End section generated from template/Dockerfile.full.footer

@@ -702,7 +702,6 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
     }
 
     async getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
-        this.videoClips = new Map<string, VideoClip>;
         const response = await this.camera.videoSearch({
             dateFrom: options.startTime, 
             dateTo: options.endTime,

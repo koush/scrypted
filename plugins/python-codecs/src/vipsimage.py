@@ -31,6 +31,10 @@ class VipsImage(scrypted_sdk.VideoFrame):
                 mem = memoryview(rgb.write_to_memory())
                 return mem
             return await to_thread(format)
+        elif options['format'] == 'gray':
+            def format():
+                return memoryview(vipsImage.vipsImage.write_to_memory())
+            return await to_thread(format)
 
         return await to_thread(lambda: vipsImage.vipsImage.write_to_buffer('.' + options['format']))
 

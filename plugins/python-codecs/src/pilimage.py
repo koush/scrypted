@@ -26,7 +26,7 @@ class PILImage(scrypted_sdk.VideoFrame):
         elif options['format'] == 'rgb':
             def format():
                 rgbx = pilImage.pilImage
-                if rgbx.format != 'RGBA':
+                if rgbx.mode != 'RGBA':
                     return rgbx.tobytes()
                 rgb = rgbx.convert('RGB')
                 try:
@@ -37,7 +37,8 @@ class PILImage(scrypted_sdk.VideoFrame):
 
         def save():
             bytesArray = io.BytesIO()
-            pilImage.pilImage.save(bytesArray, format=options['format'])
+            pilImage.pilImage.save(bytesArray, format='JPEG')
+            # pilImage.pilImage.save(bytesArray, format=options['format'])
             return bytesArray.getvalue()
 
         return await to_thread(lambda: save())
@@ -96,6 +97,7 @@ class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
 
     async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: scrypted_sdk.MediaObjectOptions = None) -> Any:
         pil = Image.open(io.BytesIO(data))
+        pil.load()
         return await createPILMediaObject(PILImage(pil))
 
 class ImageWriter(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter):

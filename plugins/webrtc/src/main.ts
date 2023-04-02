@@ -223,6 +223,10 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             type: 'textarea',
             description: "RTCConfiguration that can be used to specify custom TURN and STUN servers. https://gist.github.com/koush/631d38ac8647a86baaac7b22d863f010",
         },
+        debugLog: {
+            title: 'Debug Log',
+            type: 'boolean',
+        }
     });
     bridge: WebRTCBridge;
     activeConnections = 0;

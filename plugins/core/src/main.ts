@@ -92,6 +92,17 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             this.automationCore = new AutomationCore();
         })();
 
+        deviceManager.onDeviceDiscovered({
+            name: 'Add to Launcher',
+            nativeId: 'launcher',
+            interfaces: [
+                '@scrypted/launcher-ignore',
+                ScryptedInterface.MixinProvider,
+                ScryptedInterface.Readme,
+            ],
+            type: ScryptedDeviceType.Builtin,
+        });
+
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {

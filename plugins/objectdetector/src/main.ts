@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { DenoisedDetectionState } from './denoise';
-import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
+import { FFmpegVideoFrameGenerator, sharpLib } from './ffmpeg-videoframes';
 import { serverSupportsMixinEventMasking } from './server-version';
 import { sleep } from './sleep';
 import { getAllDevices, safeParseJson } from './util';
@@ -201,7 +201,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (this.hasMotionType)
       this.motionDetected = false;
 
-    this.detectorRunning = false;
     this.endObjectDetection();
 
     this.maybeStartMotionDetection();
@@ -333,8 +332,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         if (!this.detectorRunning) {
           break;
         }
-        const now = Date.now();
-        if (now > this.analyzeStop) {
+        if (!this.hasMotionType && Date.now() > this.analyzeStop) {
           break;
         }
 
@@ -820,9 +818,9 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
           {
             name: 'FFmpeg Frame Generator',
             type: ScryptedDeviceType.Builtin,
-            interfaces: [
+            interfaces: sharpLib ? [
               ScryptedInterface.VideoFrameGenerator,
-            ],
+            ] : [],
             nativeId: 'ffmpeg',
           }
         ]

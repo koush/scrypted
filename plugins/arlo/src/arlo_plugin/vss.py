@@ -7,6 +7,7 @@ from scrypted_sdk.types import Device, DeviceProvider, Setting, Settings, Settin
 
 from .base import ArloDeviceBase
 from .siren import ArloSiren
+from .util import async_print_exception_guard
 
 if TYPE_CHECKING:
     # https://adamj.eu/tech/2021/05/13/python-type-hints-how-to-fix-circular-imports/
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
     from .camera import ArloCamera
 
 
-class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, DeviceProvider):
+class ArloSirenVirtualSecuritySystem(ArloDeviceBase, SecuritySystem, Settings, Readme, DeviceProvider):
     """A virtual, emulated security system that controls when scrypted events can trip the real physical siren."""
 
     SUPPORTED_MODES = [SecuritySystemMode.AwayArmed.value, SecuritySystemMode.HomeArmed.value, SecuritySystemMode.Disarmed.value]
@@ -133,6 +134,7 @@ If this virtual security system is synced to Homekit, the siren device will be m
             self.siren = ArloSiren(siren_id, self.arlo_device, self.arlo_basestation, self.provider, self)
         return self.siren
 
+    @async_print_exception_guard
     async def armSecuritySystem(self, mode: SecuritySystemMode) -> None:
         self.logger.info(f"Arming {mode}")
         self.mode = mode
@@ -143,7 +145,7 @@ If this virtual security system is synced to Homekit, the siren device will be m
         if mode == SecuritySystemMode.Disarmed.value:
             await self.get_or_create_siren().turnOff()
 
-    @ArloDeviceBase.async_print_exception_guard
+    @async_print_exception_guard
     async def disarmSecuritySystem(self) -> None:
         self.logger.info(f"Disarming")
         self.mode = SecuritySystemMode.Disarmed.value

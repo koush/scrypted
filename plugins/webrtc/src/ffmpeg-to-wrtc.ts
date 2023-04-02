@@ -4,7 +4,7 @@ import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { logIsPrivateIceTransport } from "./werift-util";
+import { isPrivateIceTransport, logIsPrivateIceTransport } from "./werift-util";
 
 import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
@@ -431,10 +431,6 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         waitConnected(this.pc)
             .then(() => logIsPrivateIceTransport(this.console, this.pc)).catch(() => {});
 
-        this.pc.signalingStateChange.subscribe(() => {
-            this.console.log('sig change', this.pc.signalingState);
-        })
-
         this.weriftSignalingSession = new WeriftSignalingSession(console, this.pc);
     }
 
@@ -469,7 +465,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             createTrackForwarder: async (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) => {
                 const ret = await createTrackForwarder({
                     timeStart,
-                    ...logIsPrivateIceTransport(console, this.pc),
+                    ...isPrivateIceTransport(this.pc),
                     requestMediaStream,
                     videoTransceiver,
                     audioTransceiver,
@@ -582,7 +578,7 @@ export async function createRTCPeerConnectionSink(
     clientOffer = true,
 ) {
     const clientOptions = await clientSignalingSession.getOptions();
-    console.log('remote options', clientOptions);
+    // console.log('remote options', clientOptions);
 
     const connection = new WebRTCConnectionManagement(console, clientSignalingSession, maximumCompatibilityMode, clientOptions, {
         configuration,

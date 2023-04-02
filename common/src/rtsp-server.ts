@@ -129,6 +129,16 @@ export function getNaluTypes(streamChunk: StreamChunk) {
     return getNaluTypesInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12))
 }
 
+export function getNaluFragmentInformation(nalu: Buffer) {
+    const naluType = nalu[0] & 0x1f;
+    const fua = naluType === H264_NAL_TYPE_FU_A;
+    return {
+        fua,
+        fuaStart: fua && !!(nalu[1] & 0x80),
+        fuaEnd: fua && !!(nalu[1] & 0x40),
+    }
+}
+
 export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false, fuaRequireEnd = false) {
     const ret = new Set<number>();
     const naluType = nalu[0] & 0x1f;
