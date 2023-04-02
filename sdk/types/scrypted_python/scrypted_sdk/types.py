@@ -15,6 +15,11 @@ class AirQuality(Enum):
     Poor = "Poor"
     Unknown = "Unknown"
 
+class ChargeState(Enum):
+    Charging = "charging"
+    NotCharging = "not-charging"
+    Trickle = "trickle"
+
 class FanMode(Enum):
     Auto = "Auto"
     Manual = "Manual"
@@ -85,6 +90,7 @@ class ScryptedInterface(Enum):
     BufferConverter = "BufferConverter"
     CO2Sensor = "CO2Sensor"
     Camera = "Camera"
+    Charger = "Charger"
     ColorSettingHsv = "ColorSettingHsv"
     ColorSettingRgb = "ColorSettingRgb"
     ColorSettingTemperature = "ColorSettingTemperature"
@@ -750,6 +756,10 @@ class Camera:
         pass
     pass
 
+class Charger:
+    chargeState: ChargeState
+    pass
+
 class ColorSettingHsv:
     hsv: ColorHsv
     async def setHsv(self, hue: float, saturation: float, value: float) -> None:
@@ -1342,6 +1352,7 @@ class ScryptedInterfaceProperty(Enum):
     lockState = "lockState"
     entryOpen = "entryOpen"
     batteryLevel = "batteryLevel"
+    chargeState = "chargeState"
     online = "online"
     fromMimeType = "fromMimeType"
     toMimeType = "toMimeType"
@@ -1617,6 +1628,13 @@ class DeviceState:
     @batteryLevel.setter
     def batteryLevel(self, value: float):
         self.setScryptedProperty("batteryLevel", value)
+
+    @property
+    def chargeState(self) -> ChargeState:
+        return self.getScryptedProperty("chargeState")
+    @chargeState.setter
+    def chargeState(self, value: ChargeState):
+        self.setScryptedProperty("chargeState", value)
 
     @property
     def online(self) -> bool:
@@ -2095,6 +2113,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "batteryLevel"
+    ]
+  },
+  "Charger": {
+    "name": "Charger",
+    "methods": [],
+    "properties": [
+      "chargeState"
     ]
   },
   "Refresh": {
