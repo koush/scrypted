@@ -651,9 +651,7 @@ async def plugin_async_main(loop: AbstractEventLoop, rpcTransport: rpc_reader.Rp
     try:
         await readLoop()
     finally:
-        if type(rpcTransport) == rpc_reader.RpcConnectionTransport:
-            r: rpc_reader.RpcConnectionTransport = rpcTransport
-            r.executor.shutdown()
+        os._exit(0)
 
 def main(rpcTransport: rpc_reader.RpcTransport):
     loop = asyncio.new_event_loop()
@@ -675,6 +673,9 @@ def plugin_main(rpcTransport: rpc_reader.RpcTransport):
         from gi.repository import GLib, Gst
         Gst.init(None)
 
+        # can't remember why starting the glib main loop is necessary.
+        # maybe gstreamer on linux and other things needed it?
+        # seems optional on other platforms.
         loop = GLib.MainLoop()
 
         worker = threading.Thread(target=main, args=(rpcTransport,), name="asyncio-main")
