@@ -215,6 +215,7 @@ import Notifier from "../interfaces/Notifier.vue";
 import OnOff from "../interfaces/OnOff.vue";
 import Brightness from "../interfaces/Brightness.vue";
 import Battery from "../interfaces/Battery.vue";
+import Charger from "../interfaces/Charger.vue";
 import Lock from "../interfaces/Lock.vue";
 import ColorSettingHsv from "../interfaces/ColorSettingHsv.vue";
 import ColorSettingRgb from "../interfaces/ColorSettingRgb.vue";
@@ -263,6 +264,7 @@ const cardHeaderInterfaces = [
   ScryptedInterface.AudioSensor,
   ScryptedInterface.HumiditySensor,
   ScryptedInterface.Thermometer,
+  ScryptedInterface.Charger,
   ScryptedInterface.Battery,
   ScryptedInterface.Lock,
   ScryptedInterface.OnOff,
@@ -362,6 +364,7 @@ export default {
 
     Lock,
     OnOff,
+    Charger,
     Battery,
     Thermometer,
     HumiditySensor,
