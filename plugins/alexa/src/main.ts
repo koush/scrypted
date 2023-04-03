@@ -15,6 +15,11 @@ const includeToken = 4;
 
 export let DEBUG = false;
 
+function debug(...args: any[]) {
+    if (DEBUG)
+        console.debug(...args);
+}
+
 class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, MixinProvider, Settings {
     storageSettings = new StorageSettings(this, {
         tokenInfo: {
@@ -34,6 +39,14 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             description: 'This is the endpoint Alexa will use to send events to. This is set after you login.',
             type: 'string',
             readonly: true
+        },
+        debug: {
+            title: 'Debug Events',
+            description: 'Log all events to the console. This will be very noisy and should not be left enabled.',
+            type: 'boolean',
+            onPut(oldValue: boolean, newValue: boolean) {
+                DEBUG = newValue;
+            }
         }
     });
 
@@ -43,6 +56,8 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
 
     constructor(nativeId?: string) {
         super(nativeId);
+
+        DEBUG = this.storageSettings.values.debug ?? false;
 
         alexaHandlers.set('Alexa.Authorization/AcceptGrant', this.onAlexaAuthorization);
         alexaHandlers.set('Alexa.Discovery/Discover', this.onDiscoverEndpoints);
@@ -141,11 +156,22 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         if (!supportedType)
             return;
 
-        const report = await supportedType.sendEvent(eventSource, eventDetails, eventData);
+        let report = await supportedType.sendEvent(eventSource, eventDetails, eventData);
+
+        if (!report && eventDetails.eventInterface === ScryptedInterface.Online) {
+            report = {};
+        }
+
+        if (!report && eventDetails.eventInterface === ScryptedInterface.Battery) {
+            report = {};
+        }
+
         if (!report) {
             this.console.warn(`${eventDetails.eventInterface}.${eventDetails.property} not supported for device ${eventSource.type}`);
             return;
         }
+
+        debug("event", eventDetails.eventInterface, eventDetails.property, eventSource.type);
 
         let data = {
             "event": {
@@ -234,7 +260,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         const endpoint = await this.getAlexaEndpoint();
         const self = this;
 
-        this.console.assert(!DEBUG, `event:`, data);
+        debug("send event to alexa", data);
 
         return axios.post(`https://${endpoint}/v3/events`, data, {
             headers: {
@@ -570,6 +596,8 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         const { authorization } = request.headers;
         if (!this.validAuths.has(authorization)) {
             try {
+                debug("making authorization request to Scrypted");
+
                 await axios.get('https://home.scrypted.app/_punch/getcookie', {
                     headers: {
                         'Authorization': authorization,
@@ -590,11 +618,11 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         const { directive } = body;
         const { namespace, name } = directive.header;
 
-        this.console.assert(!DEBUG, `request: ${namespace}/${name}`);
-
         const mapName = `${namespace}/${name}`;
-        const handler = alexaHandlers.get(mapName);
 
+        debug("received directive from alexa", mapName, body);
+
+        const handler = alexaHandlers.get(mapName);
         if (handler)
             return handler.apply(this, [request, response, directive]);
 
@@ -641,7 +669,7 @@ class HttpResponseLoggingImpl implements AlexaHttpResponse {
         if (options.code !== 200)
             this.console.error(`response error ${options.code}:`, body);
         else
-            this.console.assert(!DEBUG, `response ${options.code}:`, body);
+            debug("response to alexa directive", options.code, body);
 
         if (typeof body === 'object')
             body = JSON.stringify(body);
