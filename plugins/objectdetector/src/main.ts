@@ -61,6 +61,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           choices,
         }
       },
+      onPut: () => {
+        this.endObjectDetection();
+        this.maybeStartMotionDetection();
+      },
       defaultValue: 'Default',
     },
     motionSensorSupplementation: {
