@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import { ChargeState } from '@scrypted/sdk';
+import { ChargeState } from '@scrypted/types';
 import RPCInterface from "./RPCInterface.vue";
 
 export default {

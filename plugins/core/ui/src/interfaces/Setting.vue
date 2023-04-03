@@ -41,8 +41,7 @@
       </template>
     </DevicePicker>
     <DevicePicker v-else-if="lazyValue.type === 'interface'" v-model="lazyValue.value" :multiple="lazyValue.multiple"
-      :readonly="lazyValue.readonly" :devices="interfaces" :title="lazyValue.title"
-      :description="lazyValue.description">
+      :readonly="lazyValue.readonly" :devices="interfaces" :title="lazyValue.title" :description="lazyValue.description">
       <template v-slot:append-outer>
         <v-btn v-if="dirty && device" color="success" @click="save" class="shift-up">
           <v-icon>send</v-icon>
@@ -52,7 +51,7 @@
     <div v-else-if="lazyValue.type === 'clippath'" class="mb-2">
       <v-btn small block @click="editZone">{{ lazyValue.title }} </v-btn>
       <Camera :value="device" :device="device" :clipPathValue="sanitizedClipPathValue" :showDialog="editingZone"
-        :hidePreview="true" @dialog="editingZoneChanged" @clipPath="lazyValue.value = $event"></Camera>
+        :hidePreview="true" @dialog="editingZoneChanged" @clipPath="updateClipPath"></Camera>
     </div>
     <v-textarea v-else-if="lazyValue.type === 'textarea'" v-model="lazyValue.value" outlined persistent-hint
       :hint="lazyValue.description" :label="lazyValue.title">
@@ -88,6 +87,7 @@ export default {
   data() {
     return {
       editingZone: false,
+      clipPathThrottle: null,
     };
   },
   watch: {
@@ -142,7 +142,7 @@ export default {
         );
       },
       set(val) {
-        this.lazyValue.value = val.toString();
+        this.lazyValue.value = !!val;
       },
     },
     dirty() {
@@ -228,6 +228,17 @@ export default {
   },
   methods: {
     onChange() { },
+    updateClipPath(e) {
+      clearTimeout(this.clipPathThrottle);
+      this.clipPathThrottle = setTimeout(() => {
+        // this.lazyValue.value = e;
+        this.rpc().putSetting(
+          this.lazyValue.key,
+          this.createInputValue().value
+        );
+        this.onInput();
+      }, 500)
+    },
     editingZoneChanged(value) {
       this.editingZone = value;
       if (!value) {
