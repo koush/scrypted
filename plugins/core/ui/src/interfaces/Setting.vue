@@ -231,7 +231,7 @@ export default {
     updateClipPath(e) {
       clearTimeout(this.clipPathThrottle);
       this.clipPathThrottle = setTimeout(() => {
-        // this.lazyValue.value = e;
+        this.lazyValue.value = e;
         this.rpc().putSetting(
           this.lazyValue.key,
           this.createInputValue().value
