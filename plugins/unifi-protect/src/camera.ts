@@ -1,6 +1,6 @@
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { fitHeightToWidth } from "@scrypted/common/src/resolution-utils";
-import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, NotifierOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, NotifierOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, Online, PanTiltZoom, PanTiltZoomCommand, PictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { once } from "events";
 import { Readable } from "stream";
@@ -38,7 +38,7 @@ export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, Vi
     }
 }
 
-export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector, DeviceProvider, OnOff {
+export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector, DeviceProvider, OnOff, PanTiltZoom, Online {
     motionTimeout: NodeJS.Timeout;
     detectionTimeout: NodeJS.Timeout;
     ringTimeout: NodeJS.Timeout;
@@ -59,6 +59,15 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         }
 
         this.updateState(protectCamera);
+    }
+
+    async ptzCommand(command: PanTiltZoomCommand): Promise<void> {
+        const camera = this.findCamera() as any;
+        await this.protect.api.updateCamera(camera, {
+            ispSettings: {
+                zoomPosition: Math.abs(command.zoom * 100),
+            }
+        });
     }
 
     async setStatusLight(on: boolean) {
@@ -411,6 +420,11 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         if (!camera)
             return;
         this.on = !!camera.ledSettings?.isEnabled;
+        this.online = !!camera.isConnected;
         this.setMotionDetected(!!camera.isMotionDetected);
+
+        if (!!camera.featureFlags.canOpticalZoom) {
+            this.ptzCapabilities = { pan: false, tilt: false, zoom: true };
+        }
     }
 }
