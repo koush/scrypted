@@ -23,6 +23,15 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
     })
 
     async getScryptedUserAccessControl(): Promise<ScryptedUserAccessControl> {
+        const usersService = await sdk.systemManager.getComponent('users');
+        const users: DBUser[] = await usersService.getAllUsers();
+        const user = users.find(user => user.username === this.username);
+        if (!user)
+            throw new Error("user not found");
+
+        if (user.admin)
+            return;
+
         const self = sdk.deviceManager.getDeviceState(this.nativeId);
 
         const ret: ScryptedUserAccessControl = {
