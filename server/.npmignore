@@ -10,3 +10,6 @@ scrypted.db.bak
 __pycache__
 .venv
 .vscode
+tsconfig.json
+test
+scripts
