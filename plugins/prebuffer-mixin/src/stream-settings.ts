@@ -111,7 +111,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             placeholder: '-hwaccel auto',
             choices: Object.keys(getH264DecoderArgs()),
             combobox: true,
-            mapPut: (oldValue, newValue) => getH264DecoderArgs()[newValue]?.join(' ') || newValue,
+            mapPut: (oldValue, newValue) => getH264DecoderArgs()[newValue]?.join(' ') || newValue || '',
             hide: true,
         },
         videoFilterArguments: {
