@@ -94,6 +94,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         super(app);
         this.datastore = datastore;
         this.app = app;
+        // ensure that all the users are loaded from the db.
+        this.usersService.getAllUsers();
 
         this.pluginHosts.set('python', (_, pluginId, options) => new PythonRuntimeWorker(pluginId, options));
         this.pluginHosts.set('node', (mainFilename, pluginId, options) => new NodeForkWorker(mainFilename, pluginId, options));

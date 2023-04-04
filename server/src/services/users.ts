@@ -3,14 +3,32 @@ import { ScryptedRuntime } from "../runtime";
 import crypto from 'crypto';
 
 export class UsersService {
+    users = new Map<string, ScryptedUser>();
+    usersPromise: Promise<ScryptedUser[]>;
+
     constructor(public scrypted: ScryptedRuntime) {
     }
 
-    async getAllUsers() {
-        const users: ScryptedUser[] = [];
-        for await (const user of this.scrypted.datastore.getAll(ScryptedUser)) {
-            users.push(user);
+    private async ensureUsersPromise() {
+        if (!this.usersPromise) {
+            this.usersPromise = (async() => {
+                const users = new Map<string, ScryptedUser>();
+                for await (const user of this.scrypted.datastore.getAll(ScryptedUser)) {
+                    users.set(user._id, user);
+                }
+                this.users = users;
+                return [...this.users.values()];
+            })();
         }
+        return this.usersPromise;
+    }
+
+    private updateUsersPromise() {
+        this.usersPromise = Promise.resolve([...this.users.values()]);
+    }
+
+    async getAllUsers() {
+        const users = await this.ensureUsersPromise();
 
         return users.map(user => ({
             username: user._id,
@@ -19,19 +37,31 @@ export class UsersService {
     }
 
     async removeUser(username: string) {
+        await this.ensureUsersPromise();
+
         await this.scrypted.datastore.removeId(ScryptedUser, username);
+        this.users.delete(username);
+        this.updateUsersPromise();
     }
 
     async removeAllUsers() {
+        await this.ensureUsersPromise();
+
         await this.scrypted.datastore.removeAll(ScryptedUser);
+        this.users.clear();
+        this.updateUsersPromise();
     }
 
     async addUser(username: string, password: string, aclId: string) {
+        await this.ensureUsersPromise();
+
         const user = new ScryptedUser();
         user._id = username;
         user.aclId = aclId;
         setScryptedUserPassword(user, password, Date.now());
         await this.scrypted.datastore.upsert(user);
+        this.users.set(username, user);
+        this.updateUsersPromise();
     }
 }
 

@@ -6,6 +6,9 @@ export class UserToken {
     }
 
     static validateToken(token: string): UserToken {
+        if (!token)
+            throw new Error('Token not found.');
+
         let json: {
             u: string,
             a: string,
