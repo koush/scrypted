@@ -279,6 +279,15 @@ export class DeviceManagerImpl implements DeviceManager {
     }
 }
 
+function toStorageString(value: any) {
+    if (value === null)
+        return 'null';
+    if (value === undefined)
+        return 'undefined;'
+
+    return value.toString();
+}
+
 class StorageImpl implements Storage {
     api: PluginAPI;
     [name: string]: any;
@@ -293,17 +302,17 @@ class StorageImpl implements Storage {
     ];
     private static indexedHandler: ProxyHandler<StorageImpl> = {
         get(target, property) {
-            if (StorageImpl.allowedMethods.includes(property.toString())) {
-                const prop = property.toString();
-                const f = target[property.toString()];
-                if (prop === 'length')
+            const keyString = property.toString();
+            if (StorageImpl.allowedMethods.includes(keyString)) {
+                const f = target[keyString];
+                if (keyString === 'length')
                     return f;
                 return f.bind(target);
             }
-            return target.getItem(property.toString());
+            return target.getItem(toStorageString(property));
         },
         set(target, property, value): boolean {
-            target.setItem(property.toString(), value);
+            target.setItem(toStorageString(property), value);
             return true;
         }
     };
@@ -351,6 +360,8 @@ class StorageImpl implements Storage {
         this.api.setStorage(this.nativeId, this.storage);
     }
     setItem(key: string, value: string): void {
+        key = toStorageString(key);
+        value = toStorageString(value);
         if (this.storage[this.prefix + key] === value)
             return;
         this.storage[this.prefix + key] = value;
