@@ -9,7 +9,7 @@ import { PassThrough, Writable } from 'stream';
 const { mediaManager } = sdk;
 
 const defaultDifference = 9;
-const defaultPercentage = 15;
+const defaultPercentage = 2;
 
 interface PamDiffSession {
     id: string;
