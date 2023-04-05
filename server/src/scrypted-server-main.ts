@@ -453,11 +453,7 @@ async function start(mainFilename: string, options?: {
     if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_TOKEN) {
         let user = await db.tryGet(ScryptedUser, process.env.SCRYPTED_ADMIN_USERNAME);
         if (!user) {
-            user = new ScryptedUser();
-            user._id = process.env.SCRYPTED_ADMIN_USERNAME;
-            setScryptedUserPassword(user, crypto.randomBytes(8).toString('hex'), Date.now());
-            user.token = crypto.randomBytes(16).toString('hex');
-            await db.upsert(user);
+            user = await scrypted.usersService.addUserInternal(process.env.SCRYPTED_ADMIN_USERNAME, crypto.randomBytes(8).toString('hex'), undefined);
             hasLogin = true;
         }
     }
@@ -528,11 +524,7 @@ async function start(mainFilename: string, options?: {
             return;
         }
 
-        const user = new ScryptedUser();
-        user._id = username;
-        setScryptedUserPassword(user, password, timestamp);
-        user.token = crypto.randomBytes(16).toString('hex');
-        await db.upsert(user);
+        const user = await scrypted.usersService.addUserInternal(username, password, undefined);
         hasLogin = true;
 
         const userToken = new UserToken(username, user.aclId, timestamp);

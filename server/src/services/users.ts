@@ -52,16 +52,23 @@ export class UsersService {
         this.updateUsersPromise();
     }
 
-    async addUser(username: string, password: string, aclId: string) {
+    async addUserInternal(username: string, password: string, aclId: string) {
         await this.ensureUsersPromise();
 
         const user = new ScryptedUser();
         user._id = username;
         user.aclId = aclId;
+        user.token = crypto.randomBytes(16).toString('hex');
         setScryptedUserPassword(user, password, Date.now());
         await this.scrypted.datastore.upsert(user);
         this.users.set(username, user);
         this.updateUsersPromise();
+
+        return user;
+    }
+
+    async addUser(username: string, password: string, aclId: string) {
+        await this.addUserInternal(username, password, aclId);
     }
 }
 
