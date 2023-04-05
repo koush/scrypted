@@ -1967,6 +1967,7 @@ export interface RTCSignalingOptions {
    */
   offer?: RTCSessionDescriptionInit;
   requiresOffer?: boolean;
+  requiresAnswer?: boolean;
   /**
    * Disables trickle ICE. All candidates must be sent in the initial offer/answer sdp.
    */

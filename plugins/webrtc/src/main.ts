@@ -128,6 +128,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
             this.plugin.storageSettings.values.maximumCompatibilityMode,
             this.plugin.getRTCConfiguration(),
             await this.plugin.getWeriftConfiguration(options?.disableTurn),
+            options?.requiresAnswer === true ? false : true,
         );
     }
 
