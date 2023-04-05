@@ -1,3 +1,4 @@
+import traceback
 import asyncio
 import scrypted_sdk
 from scrypted_sdk import Setting, SettingValue
@@ -6,6 +7,7 @@ import gstreamer
 import libav
 import vipsimage
 import pilimage
+import time
 
 Gst = None
 try:
@@ -128,19 +130,29 @@ def create_scrypted_plugin():
 
 class CodecFork:
     async def generateVideoFramesGstreamer(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None, h264Decoder: str = None) -> scrypted_sdk.VideoFrame:
+        start = time.time()
         try:
             async for data in gstreamer.generateVideoFramesGstreamer(mediaObject, options, filter, h264Decoder):
                 yield data
+        except Exception as e:
+            traceback.print_exc()
+            raise
         finally:
+            print('gstreamer finished after %s' % (time.time() - start))
             import os
             os._exit(os.EX_OK)
             pass
 
     async def generateVideoFramesLibav(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
+        start = time.time()
         try:
             async for data in libav.generateVideoFramesLibav(mediaObject, options, filter):
                 yield data
+        except Exception as e:
+            traceback.print_exc()
+            raise
         finally:
+            print('libav finished after %s' % (time.time() - start))
             import os
             os._exit(os.EX_OK)
             pass

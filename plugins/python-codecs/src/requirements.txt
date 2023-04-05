@@ -1,3 +1,6 @@
+# needed by libav to_ndarray
+numpy>=1.16.2
+
 # gobject instrospection for gstreamer.
 PyGObject>=3.30.4; sys_platform != 'win32'
 
