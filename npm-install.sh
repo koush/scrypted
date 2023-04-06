@@ -27,13 +27,6 @@ echo "sdk > npm run build"
 npm run build
 popd
 
-pushd external/HAP-NodeJS
-echo "external/HAP-NodeJS > npm install"
-npm install
-echo "external/HAP-NodeJS > npm run build"
-npm run build
-popd
-
 pushd external/werift
 echo "external/werift > npm install"
 npm install
