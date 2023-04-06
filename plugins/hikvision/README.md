@@ -41,7 +41,7 @@ The Channel number is the hundreds digit and (sub-)stream is ones digit:
 
 # Troubleshooting
 ## General
-* Not receiving motion alerts in the device's Scrypted event log? Check all of the following: **(1)** device has a motion detection grid drawn and enabled, **(2)** user or group access permissions of account used for device **(3)** do not use self-signed certs for HTTPS on the device, and **(4)** `CGI` and `ISAPI` integration protocol/service on device is enabled. 
+* Not receiving motion alerts in the device's Scrypted event log? Check all of the following: **(1)** device has a motion detection grid drawn and enabled, **(2)** user or group access permissions of account used for device **(3)** do not use self-signed certs for HTTPS on the device, **(4)** `CGI` and `ISAPI` integration protocol/service on device is enabled, and **(5)** that the authentication method on the device is set to "digest". 
 * If device has HTTPS enabled, try disabling HTTPS on the device to see if that resolves issue (do not use self-signed certs).
 * If device has enabled user lockout, max connections, concurrent requests, etc., try disabling and/or increasing to max allowed for troubleshooting.
 * Does your account (`Username`) have proper user and/or group permissions?  Try granting all permissions for testing. 
