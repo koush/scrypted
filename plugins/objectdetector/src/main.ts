@@ -327,6 +327,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     const start = Date.now();
     let detections = 0;
+    const currentDetections = new Set<string>();
+    let lastReport = 0;
     try {
       for await (const detected
         of await this.objectDetection.generateObjectDetections(await generator(), {
@@ -347,6 +349,22 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
         detections++;
         // this.console.warn('dps', detections / (Date.now() - start) * 1000);
+
+        if (!this.hasMotionType) {
+          for (const d of detected.detected.detections) {
+            currentDetections.add(d.className);
+          }
+
+          const now = Date.now();
+          if (now > lastReport + 3000) {
+            const found = [...currentDetections.values()];
+            if (!found.length)
+              found.push('[no detections]');
+            this.console.log(`[${Math.round((now - start) / 100) / 10}s] Detected:`, ...found);
+            currentDetections.clear();
+            lastReport = now;
+          }
+        }
 
         if (detected.detected.detectionId) {
           const jpeg = await detected.videoFrame.toBuffer({
