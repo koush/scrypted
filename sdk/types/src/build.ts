@@ -256,7 +256,10 @@ class ${td.name}(TypedDict):
 
 const pythonTypes = `from __future__ import annotations
 from enum import Enum
-from typing_extensions import TypedDict
+try:
+    from typing import TypedDict
+except:
+    from typing_extensions import TypedDict
 from typing import Any
 from typing import Callable
 

@@ -1,8 +1,13 @@
-from asyncio.futures import Future
-from typing import Any, Callable, Dict, Mapping, List
-import traceback
 import inspect
-from typing_extensions import TypedDict
+import traceback
+from asyncio.futures import Future
+from typing import Any, Callable, Dict, List, Mapping
+
+try:
+    from typing import TypedDict
+except:
+    from typing_extensions import TypedDict
+
 import weakref
 
 jsonSerializable = set()

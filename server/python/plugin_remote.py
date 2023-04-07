@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import gc
-import sys
 import os
 import platform
 import shutil
 import subprocess
+import sys
 import threading
-import concurrent.futures
 import time
 import traceback
 import zipfile
@@ -21,14 +20,23 @@ from os import sys
 from typing import Any, Optional, Set, Tuple
 
 import scrypted_python.scrypted_sdk.types
-from scrypted_python.scrypted_sdk import ScryptedStatic, PluginFork
-from scrypted_python.scrypted_sdk.types import Device, DeviceManifest, EventDetails, ScryptedInterfaceProperty, Storage
-from typing_extensions import TypedDict
-import rpc
-import rpc_reader
+from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
+from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
+                                                EventDetails,
+                                                ScryptedInterfaceProperty,
+                                                Storage)
+
+try:
+    from typing import TypedDict
+except:
+    from typing_extensions import TypedDict
+
+import hashlib
 import multiprocessing
 import multiprocessing.connection
-import hashlib
+
+import rpc
+import rpc_reader
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
