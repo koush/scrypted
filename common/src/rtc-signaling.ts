@@ -298,7 +298,7 @@ export async function connectRTCSignalingClients(
     if (offerOptions?.offer && answerOptions?.offer)
         throw new Error('Both RTC clients have offers and can not negotiate. Consider implementing this in @scrypted/webrtc.');
 
-    if (offerOptions?.requiresOffer && answerOptions.requiresOffer)
+    if (offerOptions?.requiresOffer && answerOptions?.requiresOffer)
         throw new Error('Both RTC clients require offers and can not negotiate.');
 
     offerSetup.type = 'offer';
