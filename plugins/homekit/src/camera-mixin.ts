@@ -192,7 +192,7 @@ The latest troubleshooting guide for all known streaming or recording issues can
             this.storage.setItem(key, JSON.stringify(value));
         }
         else {
-            this.storage.setItem(key, value?.toString());
+            this.storage.setItem(key, value?.toString() || '');
         }
 
         if (key === 'detectAudio' || key === 'linkedMotionSensor' || key === 'objectDetectionContactSensors') {
