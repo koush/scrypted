@@ -2,6 +2,7 @@ import sdk, { Device, DeviceProvider, ScryptedDeviceBase, ScryptedDeviceType, Sc
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { RingLocationDevice } from './location';
 import { generateUuid, Location, RingBaseApi, RingRestClient } from './ring-client-api';
+import { sleep } from '@scrypted/common/src/sleep';
 
 const { deviceManager, mediaManager } = sdk;
 
@@ -19,12 +20,18 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
         },
         email: {
             title: 'Email',
-            onPut: async () => this.clearTryDiscoverDevices(),
+            onPut: async () => {
+                if (await this.loginNextTick())
+                    this.clearTryDiscoverDevices();
+            },
         },
         password: {
             title: 'Password',
             type: 'password',
-            onPut: async () => this.clearTryDiscoverDevices(),
+            onPut: async () => {
+                if (await this.loginNextTick())
+                    this.clearTryDiscoverDevices();
+            },
         },
         loginCode: {
             title: 'Two Factor Code',
@@ -72,8 +79,18 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             this.settingsStorage.values.systemId = generateUuid();
     }
 
+    waiting = false;
+    async loginNextTick() {
+        if (this.waiting)
+            return false;
+        this.waiting = true;
+        await sleep(500);
+        this.waiting = false;
+        return true;
+    }
+
     async clearTryDiscoverDevices() {
-        this.settingsStorage.values.refreshToken = undefined;
+        this.settingsStorage.values.refreshToken = '';
         await this.discoverDevices();
         this.console.log('discovery completed successfully');
     }
@@ -192,7 +209,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
         return this.devices.get(nativeId);
     }
 
-    async releaseDevice(id: string, nativeId: string): Promise<void> {}
+    async releaseDevice(id: string, nativeId: string): Promise<void> { }
 }
 
 export default RingPlugin;
