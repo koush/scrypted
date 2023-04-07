@@ -47,13 +47,6 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
-class RawImage:
-    jpegMediaObject: scrypted_sdk.MediaObject
-
-    def __init__(self, image: Image.Image):
-        self.image = image
-        self.jpegMediaObject = None
-
 def is_same_box(bb1, bb2, threshold = .7):
     r1 = from_bounding_box(bb1)
     r2 = from_bounding_box(bb2)
@@ -146,10 +139,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def getTriggerClasses(self) -> list[str]:
         return ['motion']
 
-    async def createMedia(self, data: RawImage) -> scrypted_sdk.MediaObject:
-        mo = await scrypted_sdk.mediaManager.createMediaObject(data, self.fromMimeType)
-        return mo
-
     def requestRestart(self):
         asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
 
@@ -226,15 +215,28 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         settings = detection_session and detection_session.get('settings')
         src_size = videoFrame.width, videoFrame.height
         w, h = self.get_input_size()
+        input_aspect_ratio = w / h
         iw, ih = src_size
+        src_aspect_ratio = iw / ih
         ws = w / iw
         hs = h / ih
         s = max(ws, hs)
-        if ws == 1 and hs == 1:
+
+        # image is already correct aspect ratio, so it can be processed in a single pass.
+        if input_aspect_ratio == src_aspect_ratio:
             def cvss(point):
                 return point[0], point[1]
 
+            # aspect ratio matches, but image must be scaled.
+            resize = None
+            if ih != w:
+                resize = {
+                    'width': w,
+                    'height': h,
+                }
+
             data = await videoFrame.toBuffer({
+                'resize': resize,
                 'format': videoFrame.format or 'rgb',
             })
             image = await ensureRGBData(data, (w, h), videoFrame.format)
