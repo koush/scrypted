@@ -283,7 +283,7 @@ function toStorageString(value: any) {
     if (value === null)
         return 'null';
     if (value === undefined)
-        return 'undefined;'
+        return 'undefined';
 
     return value.toString();
 }
