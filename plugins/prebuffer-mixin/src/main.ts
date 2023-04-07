@@ -1618,7 +1618,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     if (this.streamSettings.storageSettings.settings[key])
       await this.streamSettings.storageSettings.putSetting(key, value);
     else
-      this.storage.setItem(key, value?.toString());
+      this.storage.setItem(key, value?.toString() || '');
 
     // no prebuffer change necessary if the setting is a transcoding hint.
     if (this.streamSettings.storageSettings.settings[key]?.group === 'Transcoding')

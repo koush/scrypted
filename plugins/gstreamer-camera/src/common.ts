@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFmpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFmpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import { recommendRebroadcast } from "./recommend";
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';
@@ -14,7 +14,7 @@ export interface UrlMediaStreamOptions extends MediaStreamOptions {
     url: string;
 }
 
-export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedDeviceBase implements Camera, VideoCamera, Settings {
+export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends ScryptedDeviceBase implements Camera, VideoCamera, Settings {
     snapshotAuth: AxiosDigestAuth;
     pendingPicture: Promise<MediaObject>;
 
@@ -194,7 +194,7 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
         if (key === 'defaultStream') {
             const vsos = await this.getVideoStreamOptions();
             const stream = vsos.find(vso => vso.name === value);
-            this.storage.setItem('defaultStream', stream?.id);
+            this.storage.setItem('defaultStream', stream?.id || '');
         }
         else {
             this.storage.setItem(key, value.toString());
@@ -220,7 +220,7 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
     }
 }
 
-export abstract class CameraProviderBase<T extends MediaStreamOptions> extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
+export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
     devices = new Map<string, any>();
 
     constructor(nativeId?: string) {
@@ -232,6 +232,9 @@ export abstract class CameraProviderBase<T extends MediaStreamOptions> extends S
         }
 
         recommendRebroadcast();
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {

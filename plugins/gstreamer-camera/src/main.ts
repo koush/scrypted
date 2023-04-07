@@ -1,4 +1,4 @@
-import sdk, { FFmpegInput, MediaObject, MediaStreamOptions, Setting, SettingValue } from "@scrypted/sdk";
+import sdk, { FFmpegInput, MediaObject, MediaStreamOptions, ResponseMediaStreamOptions, Setting, SettingValue } from "@scrypted/sdk";
 import child_process, { ChildProcess } from "child_process";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "./common";
 // import {} from "../../../common/src/stream-parser"
@@ -8,10 +8,10 @@ import { listenZero } from "../../../common/src/listen-cluster"
 
 const { log, deviceManager, mediaManager } = sdk;
 
-class GStreamerCamera extends CameraBase<MediaStreamOptions> {
+class GStreamerCamera extends CameraBase<ResponseMediaStreamOptions> {
     currentProcess: ChildProcess;
 
-    createGStreamerMediaStreamOptions(gstreamerInput: string, index: number): MediaStreamOptions {
+    createGStreamerMediaStreamOptions(gstreamerInput: string, index: number): ResponseMediaStreamOptions {
         return {
             id: `channel${index}`,
             name: `Stream ${index + 1}`,
@@ -32,7 +32,7 @@ class GStreamerCamera extends CameraBase<MediaStreamOptions> {
         return gstreamerInputs;
     }
 
-    getRawVideoStreamOptions(): MediaStreamOptions[] {
+    getRawVideoStreamOptions(): ResponseMediaStreamOptions[] {
         const gstreamerInputs = this.getGStreamerInputs();
 
         // filter out empty strings.
@@ -86,7 +86,7 @@ class GStreamerCamera extends CameraBase<MediaStreamOptions> {
         ];
     }
 
-    async createVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+    async createVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
         const index = this.getRawVideoStreamOptions()?.findIndex(vso => vso.id === options.id);
         const gstreamerInputs = this.getGStreamerInputs();
         const gstreamerInput = gstreamerInputs[index];
@@ -147,7 +147,7 @@ class GStreamerCamera extends CameraBase<MediaStreamOptions> {
 
 }
 
-class GStreamerProvider extends CameraProviderBase<MediaStreamOptions> {
+class GStreamerProvider extends CameraProviderBase<ResponseMediaStreamOptions> {
     createCamera(nativeId: string): GStreamerCamera {
         return new GStreamerCamera(nativeId, this);
     }

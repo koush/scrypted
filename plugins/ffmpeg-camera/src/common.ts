@@ -144,7 +144,7 @@ export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends S
         if (key === 'defaultStream') {
             const vsos = await this.getVideoStreamOptions();
             const stream = vsos.find(vso => vso.name === value);
-            this.storage.setItem('defaultStream', stream?.id);
+            this.storage.setItem('defaultStream', stream?.id || '');
         }
         else {
             this.storage.setItem(key, value.toString());

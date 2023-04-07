@@ -236,7 +236,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async putSetting(key: string, value: string | number | boolean) {
-        this.storage.setItem(key, value?.toString());
+        this.storage.setItem(key, value?.toString() || '');
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 

@@ -327,7 +327,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
     }
 
     setHttpPortOverride(port: string) {
-        this.storage.setItem('httpPort', port);
+        this.storage.setItem('httpPort', port || '');
     }
 
     getRtspUrlOverride() {

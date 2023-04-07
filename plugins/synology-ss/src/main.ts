@@ -41,7 +41,7 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
     }
 
     public async putSetting(key: string, value: string | number | boolean) {
-        this.storage.setItem(key, value?.toString());
+        this.storage.setItem(key, value?.toString() || '');
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
@@ -171,6 +171,9 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
         super(nativeId);
 
         this.startup = this.discoverDevices(0);
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     public async discoverDevices(duration: number): Promise<void> {
