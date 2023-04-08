@@ -22,7 +22,11 @@ const { link } = require('linkfs');
 
 const serverVersion = require('../../package.json').version;
 
-export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
+export interface StartPluginRemoteOptions {
+    onClusterPeer(peer: RpcPeer): void;
+}
+
+export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void, startPluginRemoteOptions?: StartPluginRemoteOptions) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
     let systemManager: SystemManager;
@@ -75,6 +79,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             const { clusterId, clusterSecret } = zipOptions;
             const clusterRpcServer = net.createServer(client => {
                 const clusterPeer = createDuplexRpcPeer(peer.selfName, 'cluster-client', client, client);
+                startPluginRemoteOptions?.onClusterPeer?.(clusterPeer);
                 const portSecret = crypto.createHash('sha256').update(`${clusterPort}${clusterSecret}`).digest().toString('hex');
                 clusterPeer.params['connectRPCObject'] = async (id: string, secret: string) => {
                     if (secret !== portSecret)
