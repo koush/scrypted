@@ -33,13 +33,13 @@ export interface RpcMessage {
     type: 'apply' | 'result' | 'finalize' | 'param';
 }
 
-interface RpcParam extends RpcMessage {
+export interface RpcParam extends RpcMessage {
     type: 'param';
     id: string;
     param: string;
 }
 
-interface RpcApply extends RpcMessage {
+export interface RpcApply extends RpcMessage {
     type: 'apply';
     id: string | undefined;
     proxyId: string;
@@ -48,7 +48,7 @@ interface RpcApply extends RpcMessage {
     oneway?: boolean;
 }
 
-interface RpcResult extends RpcMessage {
+export interface RpcResult extends RpcMessage {
     type: 'result';
     id: string;
     // TODO 3/2/2023
