@@ -265,6 +265,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       return;
 
     this.detectorRunning = true;
+    try {
+      return await this.startPipelineAnalysisWrapped();
+    }
+    finally {
+      this.endObjectDetection();
+    }
+  }
+
+  async startPipelineAnalysisWrapped() {
     this.analyzeStop = Date.now() + this.getDetectionDuration();
 
     const newPipeline = this.newPipeline;
@@ -386,7 +395,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
     finally {
       this.console.log('video pipeline analysis ended, dps:', detections / (Date.now() - start) * 1000);
-      this.endObjectDetection();
     }
   }
 
