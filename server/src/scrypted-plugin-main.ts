@@ -16,6 +16,7 @@ function start(mainFilename: string) {
             }
         });
         peer.transportSafeArgumentTypes.add(Buffer.name);
+        peer.transportSafeArgumentTypes.add(Uint8Array.name);
         worker_threads.parentPort.on('message', message => peer.handleMessage(v8.deserialize(message)));
     }
     else {
@@ -27,6 +28,7 @@ function start(mainFilename: string) {
         }));
 
         peer.transportSafeArgumentTypes.add(Buffer.name);
+        peer.transportSafeArgumentTypes.add(Uint8Array.name);
         peer.addSerializer(net.Socket, net.Socket.name, new SidebandSocketSerializer());
         process.on('message', message => peer.handleMessage(message as RpcMessage));
         process.on('disconnect', () => {

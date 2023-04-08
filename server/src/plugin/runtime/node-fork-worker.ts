@@ -46,6 +46,7 @@ export class NodeForkWorker extends ChildProcessWorker {
             }
         });
         peer.transportSafeArgumentTypes.add(Buffer.name);
+        peer.transportSafeArgumentTypes.add(Uint8Array.name);
         peer.addSerializer(net.Socket, net.Socket.name, new SidebandSocketSerializer());
     }
 

@@ -43,6 +43,7 @@ export async function newThread<T>(...args: any[]): Promise<T> {
             }
         });
         mainPeer.transportSafeArgumentTypes.add(Buffer.name);
+        mainPeer.transportSafeArgumentTypes.add(Uint8Array.name);
         thread_worker_threads.parentPort.on('message', (message: any) => mainPeer.handleMessage(thread_v8.deserialize(message)));
 
         mainPeer.params.eval = async (script: string, moduleNames: string[], paramNames: string[], ...paramValues: any[]) => {
@@ -82,6 +83,7 @@ export async function newThread<T>(...args: any[]): Promise<T> {
         }
     });
     threadPeer.transportSafeArgumentTypes.add(Buffer.name);
+    threadPeer.transportSafeArgumentTypes.add(Uint8Array.name);
     worker.on('message', (message: any) => threadPeer.handleMessage(v8.deserialize(message)));
 
     const e = await threadPeer.getParam('eval');
