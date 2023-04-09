@@ -153,9 +153,12 @@ class CodecFork:
             raise
         finally:
             print('libav finished after %s' % (time.time() - start))
-            import os
-            os._exit(os.EX_OK)
-            pass
+            import sys
+            if sys.platform == 'win32':
+                sys.exit()
+            else:
+                import os
+                os._exit(os.EX_OK)
 
 
 async def fork():
