@@ -273,9 +273,10 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             ])
         return result
 
+    @async_print_exception_guard
     async def putSetting(self, key, value) -> None:
         if key in ["webrtc_emulation", "two_way_audio", "wired_to_power"]:
-            self.storage.setItem(key, value == "true")
+            self.storage.setItem(key, value == "true" or value == True)
             await self.provider.discover_devices()
 
     async def getPictureOptions(self) -> List[ResponsePictureOptions]:

@@ -480,6 +480,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
         return results
 
+    @async_print_exception_guard
     async def putSetting(self, key: str, value: SettingValue) -> None:
         if not self.validate_setting(key, value):
             await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
@@ -492,7 +493,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             # force arlo client to be invalidated and reloaded
             self.invalidate_arlo_client()
         elif key == "plugin_verbosity":
-            self.storage.setItem(key, "Verbose" if value == "true" else "Normal")
+            self.storage.setItem(key, "Verbose" if value == "true" or value == True else "Normal")
             self.propagate_verbosity()
             skip_arlo_client = True
         else:
