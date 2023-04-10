@@ -681,7 +681,7 @@ export class RtspClient extends RtspBase {
         });
     }
 
-    async setup(options: RtspClientTcpSetupOptions | RtspClientUdpSetupOptions) {
+    async setup(options: RtspClientTcpSetupOptions | RtspClientUdpSetupOptions, headers?: Headers) {
         const protocol = options.type === 'udp' ? '' : '/TCP';
         const client = options.type === 'udp' ? 'client_port' : 'interleaved';
         let port: number;
@@ -697,9 +697,9 @@ export class RtspClient extends RtspBase {
             port = options.dgram.address().port;
             options.dgram.on('message', data => options.onRtp(undefined, data));
         }
-        const headers: any = {
+        headers = Object.assign({
             Transport: `RTP/AVP${protocol};unicast;${client}=${port}-${port + 1}`,
-        };
+        }, headers);
         const response = await this.request('SETUP', headers, options.path);
         let interleaved: {
             begin: number;

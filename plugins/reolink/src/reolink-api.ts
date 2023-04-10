@@ -26,6 +26,23 @@ export class ReolinkCameraClient {
         return getMotionState(this.digestAuth, this.username, this.password, this.host, this.channelId);
     }
 
+    async getAiState() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'GetAiState');
+        params.set('channel', this.channelId.toString());
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.digestAuth.request({
+            url: url.toString(),
+            httpsAgent: reolinkHttpsAgent,
+        });
+        return {
+            value: !!response.data?.[0]?.value?.state,
+            data: response.data,
+        };
+    }
+
     async jpegSnapshot() {
         const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
         const params = url.searchParams;

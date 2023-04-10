@@ -1,11 +1,13 @@
-import sdk, { MediaObject, Intercom, FFmpegInput, ScryptedMimeTypes } from "@scrypted/sdk";
-import { RtspSmartCamera } from "../../rtsp/src/rtsp";
-import { parseSemicolonDelimited, RtspClient } from "@scrypted/common/src/rtsp-server";
+import { createBindZero } from "@scrypted/common/src/listen-cluster";
+import { RtspClient, parseSemicolonDelimited } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
-import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
-import child_process from 'child_process';
-import { createBindZero, reserveUdpPort } from "@scrypted/common/src/listen-cluster";
+import sdk, { FFmpegInput, Intercom, MediaObject, ScryptedMimeTypes } from "@scrypted/sdk";
 import crypto from 'crypto';
+import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
+import { nextSequenceNumber } from "../../homekit/src/types/camera/jitter-buffer";
+import { RtspSmartCamera } from "../../rtsp/src/rtsp";
+import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
+
 
 const { mediaManager } = sdk;
 
@@ -80,11 +82,11 @@ export class OnvifIntercom implements Intercom {
         const url = new URL(this.url);
         url.username = username;
         url.password = password;
-        this.intercomClient = new RtspClient(url.toString());
-        this.intercomClient.console = this.camera.console;
-        await this.intercomClient.options();
+        const intercomClient = this.intercomClient = new RtspClient(url.toString());
+        intercomClient.console = this.camera.console;
+        await intercomClient.options();
 
-        const describe = await this.intercomClient.describe({
+        const describe = await intercomClient.describe({
             Require,
         });
         this.camera.console.log('ONVIF Backchannel SDP:');
@@ -94,31 +96,35 @@ export class OnvifIntercom implements Intercom {
         if (!audioBackchannel)
             throw new Error('ONVIF audio backchannel not found');
 
-        return audioBackchannel;
+        return { audioBackchannel, intercomClient };
     }
 
     async startIntercom(media: MediaObject) {
+        const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
+
         await this.stopIntercom();
 
-        const audioBackchannel = await this.checkIntercom();
+        const { audioBackchannel, intercomClient } = await this.checkIntercom();
         if (!audioBackchannel)
             throw new Error('ONVIF audio backchannel not found');
 
-        const rtp = await reserveUdpPort();
+        const rtpServer = await createBindZero('udp4');
+        const rtp = rtpServer.port;
         const rtcp = rtp + 1;
 
         let ip: string;
         let serverRtp: number;
         let transportDict: ReturnType<typeof parseSemicolonDelimited>;
+        let tcp = false;
         try {
             const headers: any = {
                 Require,
                 Transport: `RTP/AVP;unicast;client_port=${rtp}-${rtcp}`,
             };
 
-            const response = await this.intercomClient.request('SETUP', headers, audioBackchannel.control);
+            const response = await intercomClient.request('SETUP', headers, audioBackchannel.control);
             transportDict = parseSemicolonDelimited(response.headers.transport);
-            this.intercomClient.session = response.headers.session.split(';')[0];
+            intercomClient.session = response.headers.session.split(';')[0];
             ip = this.camera.getIPAddress();
 
             const { server_port } = transportDict;
@@ -126,6 +132,7 @@ export class OnvifIntercom implements Intercom {
             serverRtp = parseInt(serverPorts[0]);
         }
         catch (e) {
+            tcp = true;
             this.camera.console.error('onvif udp backchannel failed, falling back to tcp', e);
 
             const headers: any = {
@@ -133,20 +140,18 @@ export class OnvifIntercom implements Intercom {
                 Transport: `RTP/AVP/TCP;unicast;interleaved=0-1`,
             };
 
-            const response = await this.intercomClient.request('SETUP', headers, audioBackchannel.control);
+            const response = await intercomClient.request('SETUP', headers, audioBackchannel.control);
             transportDict = parseSemicolonDelimited(response.headers.transport);
-            this.intercomClient.session = response.headers.session.split(';')[0];
+            intercomClient.session = response.headers.session.split(';')[0];
             ip = '127.0.0.1';
             const server = await createBindZero('udp4');
-            this.intercomClient.client.on('close', () => server.server.close());
+            intercomClient.client.on('close', () => server.server.close());
             serverRtp = server.port;
             server.server.on('message', data => {
-                this.intercomClient.send(data, 0);
+                intercomClient.send(data, 0);
             });
         }
         this.camera.console.log('backchannel transport', transportDict);
-
-        const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
         const availableCodecs = [...parseCodecs(audioBackchannel.contents)];
         let match: CodecMatch;
@@ -171,27 +176,69 @@ export class OnvifIntercom implements Intercom {
         }
         // ffmpeg expects ssrc as signed int32.
         const ssrc = ssrcBuffer.readInt32BE(0);
+        const ssrcUnsigned = ssrcBuffer.readUint32BE(0);
 
-        const args = [
-            '-hide_banner',
-            ...ffmpegInput.inputArguments,
-            '-vn',
-            '-acodec', codec.ffmpegCodec,
-            '-ar', match.sampleRate,
-            '-ac', match.channels || '1',
-            "-payload_type", match.payloadType,
-            "-ssrc", ssrc.toString(),
-            '-f', 'rtp',
-            `rtp://${ip}:${serverRtp}?localrtpport=${rtp}&localrtcpport=${rtcp}`,
-        ];
-        safePrintFFmpegArguments(this.camera.console, args);
-        const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
+        const payloadType = parseInt(match.payloadType);
 
-        ffmpegLogInitialOutput(this.camera.console, cp);
-
-        await this.intercomClient.play({
+        await intercomClient.play({
             Require,
         });
+
+        let pending: RtpPacket;
+        let seqNumber = 0;
+
+        const forwarder = await startRtpForwarderProcess(console, ffmpegInput, {
+            audio: {
+                onRtp: (rtp) => {
+                    // if (true) {
+                    //     const p = RtpPacket.deSerialize(rtp);
+                    //     p.header.payloadType = payloadType;
+                    //     p.header.ssrc = ssrcUnsigned;
+                    //     p.header.marker = true;
+                    //     rtpServer.server.send(p.serialize(), serverRtp, ip);
+                    //     return;
+                    // }
+
+                    const p = RtpPacket.deSerialize(rtp);
+
+                    if (!pending) {
+                        pending = p;
+                        return;
+                    }
+
+                    if (pending.payload.length + p.payload.length < 1024) {
+                        pending.payload = Buffer.concat([pending.payload, p.payload]);
+                        return;
+                    }
+
+                    pending.header.payloadType = payloadType;
+                    pending.header.ssrc = ssrcUnsigned;
+                    pending.header.sequenceNumber = seqNumber;
+                    seqNumber = nextSequenceNumber(seqNumber);
+                    pending.header.marker = true;
+
+                    if (!tcp)
+                        rtpServer.server.send(pending.serialize(), serverRtp, ip);
+                    else
+                        intercomClient.send(pending.serialize(), 0);
+
+                    pending = p;
+                },
+                codecCopy: codec.ffmpegCodec,
+                payloadType,
+                ssrc,
+                packetSize: 1024,
+                encoderArguments: [
+                    '-acodec', codec.ffmpegCodec,
+                    '-ar', match.sampleRate,
+                    '-ac', match.channels || '1',
+                ],
+            }
+        });
+
+        intercomClient.client.on('close', () => forwarder.kill());
+        forwarder.killPromise.finally(() => intercomClient?.client.destroy());
+
         this.camera.console.log('intercom playing');
     }
 

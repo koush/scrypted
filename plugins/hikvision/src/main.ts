@@ -8,6 +8,8 @@ import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 import { hikvisionHttpsAgent } from './probe';
+import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
+import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 
 const { mediaManager } = sdk;
 
@@ -21,8 +23,8 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     client: HikvisionCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
-    cp: ChildProcess;
-
+    activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
+    
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
@@ -360,13 +362,11 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
 
     async startIntercom(media: MediaObject): Promise<void> {
         if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
+            this.activeIntercom?.kill();
+            this.activeIntercom = undefined;
             const options = await this.getConstructedVideoStreamOptions();
             const stream = options[0];
-            const url = new URL(stream.url);
-            // amcrest onvif requires this proto query parameter, or onvif two way
-            // will not activate.
-            url.searchParams.set('proto', 'Onvif');
-            this.onvifIntercom.url = url.toString();
+            this.onvifIntercom.url = stream.url;
             return this.onvifIntercom.startIntercom(media);
         }
 
@@ -390,7 +390,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
             }
         }
         catch (e) {
-            this.console.error('Fialure while determining two way audio codec', e);
+            this.console.error('Failure while determining two way audio codec', e);
         }
 
         if (codec === 'G.711ulaw') {
@@ -415,76 +415,64 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
         const ffmpegInput = JSON.parse(buffer.toString()) as FFmpegInput;
 
-        const args = ffmpegInput.inputArguments.slice();
-        args.unshift('-hide_banner');
-
-        args.push(
-            "-vn",
-            '-ar', '8000',
-            '-ac', '1',
-            '-acodec', codec,
-            '-f', format,
-            'pipe:3',
-        );
-
-        this.console.log('ffmpeg intercom', args);
-
-        const ffmpeg = await mediaManager.getFFmpegPath();
-        this.cp = child_process.spawn(ffmpeg, args, {
-            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+        const passthrough = new PassThrough();
+        const open = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/open`;
+        const { data } = await this.getClient().digestAuth.request({
+            httpsAgent: hikvisionHttpsAgent,
+            method: 'PUT',
+            url: open,
         });
-        this.cp.on('exit', () => this.cp = undefined);
-        ffmpegLogInitialOutput(this.console, this.cp);
-        const socket = this.cp.stdio[3] as Readable;
+        this.console.log('two way audio opened', data);
 
-        (async () => {
-            const passthrough = new PassThrough();
+        const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/audioData`;
+        this.console.log('posting audio data to', url);
 
-            try {
-                const open = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/open`;
-                const { data } = await this.getClient().digestAuth.request({
-                    httpsAgent: hikvisionHttpsAgent,
-                    method: 'PUT',
-                    url: open,
-                });
-                this.console.log('two way audio opened', data);
+        const put = this.getClient().digestAuth.request({
+            httpsAgent: hikvisionHttpsAgent,
+            method: 'PUT',
+            url,
+            headers: {
+                'Content-Type': 'application/octet-stream',
+                // 'Connection': 'close',
+                'Content-Length': '0'
+            },
+            data: passthrough,
+        });
 
-                const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/audioData`;
-                this.console.log('posting audio data to', url);
-
-                // seems the dahua doorbells preferred 1024 chunks. should investigate adts
-                // parsing and sending multipart chunks instead.
-                this.getClient().digestAuth.request({
-                    httpsAgent: hikvisionHttpsAgent,
-                    method: 'PUT',
-                    url,
-                    headers: {
-                        'Content-Type': 'application/octet-stream',
-                        // 'Connection': 'close',
-                        'Content-Length': '0'
-                    },
-                    data: passthrough,
-                });
-
-
-                while (true) {
-                    const data = await readLength(socket, 1024);
-                    passthrough.push(data);
-                }
+        let available = Buffer.alloc(0);
+        this.activeIntercom?.kill();
+        const forwarder = this.activeIntercom = await startRtpForwarderProcess(this.console, ffmpegInput, {
+            audio: {
+                onRtp: rtp => {
+                    const parsed = RtpPacket.deSerialize(rtp);
+                    available = Buffer.concat([available, parsed.payload]);
+                    if (available.length > 1024) {
+                        passthrough.push(available.subarray(0, 1024));
+                        available = available.subarray(1024);
+                    }
+                },
+                codecCopy: codec,
+                encoderArguments: [
+                    '-ar', '8000',
+                    '-ac', '1',
+                    '-acodec', codec,
+                ]
             }
-            catch (e) {
-            }
-            finally {
-                this.console.log('audio finished');
-                passthrough.end();
-            }
+        });
 
+        forwarder.killPromise.finally(() => {
+            this.console.log('audio finished');
+            passthrough.end();
             this.stopIntercom();
-        })();
+        });
+
+        put.finally(() => forwarder.kill());
     }
 
-
     async stopIntercom(): Promise<void> {
+        this.activeIntercom?.kill();
+        this.activeIntercom = undefined;
+
         if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
             return this.onvifIntercom.stopIntercom();
         }

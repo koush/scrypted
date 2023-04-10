@@ -6,7 +6,7 @@ export const reolinkHttpsAgent = new https.Agent({
 });
 
 export async function getMotionState(digestAuth: AxiosDigestAuth, username: string, password: string, address: string, channelId: number) {
-    const url = new URL(`http://${address}/cgi-bin/api.cgi`);
+    const url = new URL(`http://${address}/api.cgi`);
     const params = url.searchParams;
     params.set('cmd', 'GetMdState');
     params.set('channel', channelId.toString());

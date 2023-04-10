@@ -35,7 +35,7 @@ function stripNamespaces(topic: string) {
     let parts = topic.split('/')
     for (let index = 0; index < parts.length; index++) {
         let stringNoNamespace = parts[index].split(':').pop() // split on :, then return the last item in the array
-        if (output.length == 0) {
+        if (output.length === 0) {
             output += stringNoNamespace
         } else {
             output += '/' + stringNoNamespace
@@ -92,9 +92,18 @@ export class OnvifCameraAPI {
                     else
                         ret.emit('event', OnvifEvent.AudioStop)
                 }
+                // Reolink
+                else if (eventTopic.includes('Visitor') && (dataValue === true || dataValue === false)) {
+                    if (dataValue) {
+                        ret.emit('event', OnvifEvent.BinaryStart)
+                    }
+                    else {
+                        ret.emit('event', OnvifEvent.BinaryStop)
+                    }
+                }
                 // Mobotix T26
                 else if (eventTopic.includes('VideoSource/Alarm')) {
-                    if (dataValue == "Ring" || dataValue == "CameraBellButton") {
+                    if (dataValue === "Ring" || dataValue === "CameraBellButton") {
                         ret.emit('event', OnvifEvent.BinaryRingEvent);
                     }
                 }
@@ -155,7 +164,7 @@ export class OnvifCameraAPI {
                     this.console.log('supportsEvents error', err);
                     return reject(err);
                 }
-                if (!err && data.events && data.events.WSPullPointSupport && data.events.WSPullPointSupport == true) {
+                if (!err && data.events && data.events.WSPullPointSupport && data.events.WSPullPointSupport === true) {
                     this.console.log('Camera supports WSPullPoint', xml);
                 } else {
                     this.console.log('Camera does not show WSPullPoint support, but trying anyway', xml);

@@ -51,9 +51,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
         (async () => {
             while (!killed) {
                 try {
+                    // const ai = await client.getAiState();
+                    // ret.emit('data', JSON.stringify(ai));
                     const { value, data } = await client.getMotionState();
                     this.motionDetected = value;
-                    ret.emit('data', data);
+                    ret.emit('data', JSON.stringify(data));
                 }
                 catch (e) {
                     ret.emit('error', e);
@@ -116,14 +118,17 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
         }
 
         // rough guesses for rebroadcast stream selection.
+        ret[0].container = 'rtmp';
         ret[0].video = {
             width: 2560,
             height: 1920,
         }
+        ret[1].container = 'rtmp';
         ret[1].video = {
             width: 896,
             height: 672,
         }
+        ret[2].container = 'rtmp';
         ret[2].video = {
             width: 640,
             height: 480,
@@ -146,6 +151,28 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
                 },
             });
         }
+
+        // rough guesses for h264
+        ret[3].container = 'rtsp';
+        ret[3].video = {
+            codec: 'h264',
+            width: 2560,
+            height: 1920,
+        }
+        ret[4].container = 'rtsp';
+        ret[4].video = {
+            codec: 'h264',
+            width: 896,
+            height: 672,
+        }
+
+        ret[5].container = 'rtsp';
+        ret[5].video = {
+            codec: 'h265',
+            width: 896,
+            height: 672,
+        }
+
 
         return ret;
     }
