@@ -259,7 +259,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     const signal = this.detectorSignal = new Deferred();
     if (!this.hasMotionType)
-      this.plugin.objectDetectionStarted();
+      this.plugin.objectDetectionStarted(this.console);
 
     const options = {
       onObjectDetection: () => this.plugin.trackDetection(),
@@ -271,7 +271,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.console.error('Video Analysis ended with error', e);
       }).finally(() => {
         if (!this.hasMotionType)
-          this.plugin.objectDetectionEnded();
+          this.plugin.objectDetectionEnded(this.console);
         else
           this.console.log('Video Analysis motion detection ended.');
         signal.resolve();
@@ -291,8 +291,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       lastStatusTime = Date.now();
     }
 
-    let frameGenerator: AsyncGenerator<VideoFrame & MediaObject>;
-    let detectionGenerator: AsyncGenerator<ObjectDetectionGeneratorResult>;
+    let frameGenerator: AsyncGenerator<VideoFrame & MediaObject, void>;
+    let detectionGenerator: AsyncGenerator<ObjectDetectionGeneratorResult, void>;
     const interval = setInterval(() => {
       if (Date.now() - lastStatusTime > 30000) {
         signal.resolve();
@@ -370,7 +370,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
     }
 
-    signal.promise.finally(() => frameGenerator.return(undefined));
+    signal.promise.finally(() => frameGenerator.return());
 
     const currentDetections = new Set<string>();
     let lastReport = 0;
@@ -378,7 +378,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       settings: this.getCurrentSettings(),
       sourceId: this.id,
     }));
-    signal.promise.finally(() => detectionGenerator.return(undefined));
+    signal.promise.finally(() => detectionGenerator.return());
 
     updatePipelineStatus('waiting result');
 
@@ -910,18 +910,18 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     this.statsSnapshotDetections++;
   }
 
-  objectDetectionStarted() {
-    this.resetStats();
+  objectDetectionStarted(console?: Console) {
+    this.resetStats(console);
 
     this.statsSnapshotConcurrent++;
   }
-  objectDetectionEnded() {
-    this.resetStats();
+  objectDetectionEnded(console?: Console) {
+    this.resetStats(console);
 
     this.statsSnapshotConcurrent--;
   }
 
-  resetStats() {
+  resetStats(console?: Console) {
     const now = Date.now();
     const concurrentSessions = this.statsSnapshotConcurrent;
     if (concurrentSessions) {
@@ -937,7 +937,9 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
         this.pruneOldStatistics();
       }
 
-      this.console.log(`video analysis, ${concurrentSessions} camera(s), dps: ${Math.round(stats.dps * 10) / 10} (${this.statsSnapshotDetections}/${Math.round(duration / 1000)})`);
+      const str = `video analysis, ${concurrentSessions} camera(s), dps: ${Math.round(stats.dps * 10) / 10} (${this.statsSnapshotDetections}/${Math.round(duration / 1000)})`;
+      this.console.log(str);
+      console?.log(str);
     }
 
     this.statsSnapshotDetections = 0;
