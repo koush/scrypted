@@ -459,6 +459,10 @@ export class H264Repacketizer {
                     if (this.shouldFilter(nalType)) {
                         return false;
                     }
+                    if (nalType === NAL_TYPE_SPS)
+                        this.updateSps(payload);
+                    if (nalType === NAL_TYPE_PPS)
+                        this.updatePps(payload);
                     return true;
                 });
             if (depacketized.length === 0) {
