@@ -262,16 +262,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.plugin.objectDetectionStarted(this.console);
 
     const options = {
-      onObjectDetection: () => this.plugin.trackDetection(),
+      snapshotPipeline: this.plugin.shouldUseSnapshotPipeline(),
     };
 
-    const start = Date.now();
     this.runPipelineAnalysis(signal, options)
       .catch(e => {
         this.console.error('Video Analysis ended with error', e);
       }).finally(() => {
         if (!this.hasMotionType)
-          this.plugin.objectDetectionEnded(this.console);
+          this.plugin.objectDetectionEnded(this.console, options.snapshotPipeline);
         else
           this.console.log('Video Analysis motion detection ended.');
         signal.resolve();
@@ -279,7 +278,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   async runPipelineAnalysis(signal: Deferred<void>, options: {
-    onObjectDetection: () => void,
+    snapshotPipeline: boolean,
   }) {
     const start = Date.now();
     this.analyzeStop = start + this.getDetectionDuration();
@@ -303,13 +302,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     let newPipeline: string = this.newPipeline;
     if (!this.hasMotionType && (!newPipeline || newPipeline === 'Default')) {
-      if (this.plugin.shouldUseSnapshotPipeline()) {
+      if (options.snapshotPipeline) {
         newPipeline = 'Snapshot';
         this.console.warn(`Due to limited performance, Snapshot mode is being used with ${this.plugin.statsSnapshotConcurrent} actively detecting cameras.`);
       }
     }
 
     if (newPipeline === 'Snapshot' && !this.hasMotionType) {
+      options.snapshotPipeline = true;
       this.console.log('decoder:', 'Snapshot +', this.objectDetection.name);
       const self = this;
       frameGenerator = (async function* gen() {
@@ -398,7 +398,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       // this.console.warn('dps', detections / (Date.now() - start) * 1000);
 
       if (!this.hasMotionType) {
-        options.onObjectDetection();
+        this.plugin.trackDetection();
 
         for (const d of detected.detected.detections) {
           currentDetections.add(d.className);
@@ -910,18 +910,19 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     this.statsSnapshotDetections++;
   }
 
-  objectDetectionStarted(console?: Console) {
+  objectDetectionStarted(console: Console) {
     this.resetStats(console);
 
     this.statsSnapshotConcurrent++;
   }
-  objectDetectionEnded(console?: Console) {
-    this.resetStats(console);
+
+  objectDetectionEnded(console: Console, snapshotPipeline: boolean) {
+    this.resetStats(console, snapshotPipeline);
 
     this.statsSnapshotConcurrent--;
   }
 
-  resetStats(console?: Console) {
+  resetStats(console: Console, snapshotPipeline?: boolean) {
     const now = Date.now();
     const concurrentSessions = this.statsSnapshotConcurrent;
     if (concurrentSessions) {
@@ -931,11 +932,13 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
         dps: this.statsSnapshotDetections / (duration / 1000),
       };
 
-      // ignore short/busted sessions.
-      if (duration > 10000 && this.statsSnapshotDetections) {
+      // ignore short sessions and sessions with no detections (busted?).
+      // also ignore snapshot sessions because that will skew/throttle the stats used
+      // to determine system dps capabilities.
+      if (duration > 10000 && this.statsSnapshotDetections && !snapshotPipeline)
         this.objectDetectionStatistics.set(concurrentSessions, stats);
-        this.pruneOldStatistics();
-      }
+
+      this.pruneOldStatistics();
 
       const str = `video analysis, ${concurrentSessions} camera(s), dps: ${Math.round(stats.dps * 10) / 10} (${this.statsSnapshotDetections}/${Math.round(duration / 1000)})`;
       this.console.log(str);
