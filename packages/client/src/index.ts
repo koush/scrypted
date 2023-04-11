@@ -7,6 +7,7 @@ import { timeoutPromise } from "../../../common/src/promise-utils";
 import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
 import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-debouncer";
 import type { IOSocket } from '../../../server/src/io';
+import { MediaObject } from '../../../server/src/plugin/mediaobject';
 import type { MediaObjectRemote } from '../../../server/src/plugin/plugin-api';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
@@ -505,22 +506,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         console.log('api attached', Date.now() - start);
 
         mediaManager.createMediaObject = async<T extends MediaObjectOptions>(data: any, mimeType: string, options: T) => {
-            const mo: MediaObjectRemote & {
-                [RpcPeer.PROPERTY_PROXY_PROPERTIES]: any,
-                [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
-            } = {
-                [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
-                [RpcPeer.PROPERTY_PROXY_PROPERTIES]: {
-                    mimeType,
-                    sourceId: options?.sourceId,
-                },
-                mimeType,
-                sourceId: options?.sourceId,
-                async getData() {
-                    return data;
-                },
-            };
-            return mo as any;
+            return new MediaObject(mimeType, data, options) as any;
         }
 
         const { browserSignalingSession, connectionManagementId, updateSessionId } = rpcPeer.params;

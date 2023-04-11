@@ -9,27 +9,8 @@ import Graph from 'node-dijkstra';
 import os from 'os';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
-import { RpcPeer } from "../rpc";
 import { MediaObjectRemote } from "./plugin-api";
-
-class MediaObject implements MediaObjectRemote {
-    __proxy_props: any;
-
-    constructor(public mimeType: string, public data: any, options: MediaObjectOptions) {
-        this.__proxy_props = {}
-        options ||= {};
-        options.mimeType = mimeType;
-        for (const [key, value] of Object.entries(options)) {
-            if (RpcPeer.isTransportSafe(value))
-                this.__proxy_props[key] = value;
-            (this as any)[key] = value;
-        }
-    }
-
-    async getData(): Promise<Buffer | string> {
-        return Promise.resolve(this.data);
-    }
-}
+import { MediaObject } from "./mediaobject";
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything

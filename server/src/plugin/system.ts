@@ -1,7 +1,7 @@
 import { EventListener, EventListenerOptions, EventListenerRegister, Logger, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptor, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, SystemDeviceState, SystemManager } from "@scrypted/types";
 import { EventRegistry } from "../event-registry";
 import { PrimitiveProxyHandler, RpcPeer } from '../rpc';
-import type { PluginComponent } from "../services/plugin";
+// import type { PluginComponent } from "../services/plugin";
 import { getInterfaceMethods, getInterfaceProperties, getPropertyInterfaces, isValidInterfaceMethod, propertyInterfaces } from "./descriptor";
 import { PluginAPI } from "./plugin-api";
 
@@ -122,7 +122,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
     }
 
     async setMixins(mixins: string[]) {
-        const plugins = await this.systemManager.getComponent('plugins') as PluginComponent;
+        const plugins = await this.systemManager.getComponent('plugins');// as PluginComponent;
         await plugins.setMixins(this.id, mixins);
     }
 

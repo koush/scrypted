@@ -309,7 +309,7 @@ class PluginRemote:
         clusterPeers: Mapping[int, asyncio.Future[rpc.RpcPeer]] = {}
         async def connectRPCObject(value):
             clusterObject = getattr(value, '__cluster')
-            if not clusterObject:
+            if type(clusterObject) is not dict:
                 return value
 
             if clusterObject.get('id', None) != clusterId:
