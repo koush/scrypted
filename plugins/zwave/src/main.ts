@@ -341,6 +341,9 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         return this.devices[nativeId];
     }
 
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+    }
+
     _addType(scryptedDevice: ZwaveDeviceBase, instance: Endpoint, type: CommandClassInfo, valueId: ValueID) {
         var interfaces = type.getInterfaces(instance.getNodeUnsafe(), valueId);
         if (!interfaces) {
