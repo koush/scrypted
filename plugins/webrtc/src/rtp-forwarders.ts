@@ -454,14 +454,12 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             if (!allowAudioTranscoderExit)
                 killDeferred.resolve(undefined);
         });
-        killDeferred.promise.finally(() => safeKillFFmpeg(cp));
         if (pipeSdp) {
             const pipe = cp.stdio[3] as Writable;
             pipe.write(pipeSdp);
             pipe.end();
         }
         ffmpegLogInitialOutput(console, cp);
-        killDeferred.promise.finally(() => safeKillFFmpeg(cp));
 
         if (useRtp) {
             cp.stdio[4].on('data', data => {
