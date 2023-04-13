@@ -17,6 +17,13 @@ export function safeKillFFmpeg(cp: ChildProcess) {
     catch (e) {
     }
     setTimeout(() => {
+        for (const f of cp.stdio) {
+            try {
+                f?.destroy();
+            }
+            catch (e) {
+            }
+        }
         cp.kill();
         setTimeout(() => {
             cp.kill('SIGKILL');
