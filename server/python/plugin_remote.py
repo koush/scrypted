@@ -224,6 +224,7 @@ class PluginRemote:
     mediaManager: MediaManager
     loop: AbstractEventLoop
     consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
+    ptimeSum = 0
 
     def __init__(self, peer: rpc.RpcPeer, api, pluginId, hostInfo, loop: AbstractEventLoop):
         self.allMemoryStats = {}
@@ -522,6 +523,7 @@ class PluginRemote:
                     forkPeer.peerName = 'thread'
 
                     async def updateStats(stats):
+                        self.ptimeSum += stats['cpu']['user']
                         self.allMemoryStats[forkPeer] = stats
                     forkPeer.params['updateStats'] = updateStats
 
@@ -535,6 +537,7 @@ class PluginRemote:
                             self.allMemoryStats.pop(forkPeer)
                             parent_conn.close()
                             rpcTransport.executor.shutdown()
+                            pluginFork.worker.kill()
                     asyncio.run_coroutine_threadsafe(forkReadLoop(), loop=self.loop)
                     getRemote = await forkPeer.getParam('getRemote')
                     remote: PluginRemote = await getRemote(self.api, self.pluginId, self.hostInfo)
@@ -620,7 +623,7 @@ class PluginRemote:
             return
 
         def stats_runner():
-            ptime = round(time.process_time() * 1000000)
+            ptime = round(time.process_time() * 1000000) + self.ptimeSum
             try:
                 import psutil
                 process = psutil.Process(os.getpid())
@@ -634,7 +637,6 @@ class PluginRemote:
                     heapTotal = 0
 
             for _, stats in self.allMemoryStats.items():
-                ptime += stats['cpu']['user']
                 heapTotal += stats['memoryUsage']['heapTotal']
 
             stats = {
