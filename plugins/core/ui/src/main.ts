@@ -10,6 +10,13 @@ import './plugins/is-mobile';
 import Launcher from './Launcher.vue'
 import './registerServiceWorker'
 
+import VCalendar from 'v-calendar';
+
+// Use v-calendar & v-date-picker components
+Vue.use(VCalendar, {
+  componentPrefix: 'vc',  // Use <vc-calendar /> instead of <v-calendar />
+});
+
 // STYLES
 // Main Theme SCSS
 // import './assets/scss/theme.scss'

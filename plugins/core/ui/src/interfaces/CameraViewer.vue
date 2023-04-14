@@ -40,7 +40,7 @@
             <v-btn :dark="!isLive" v-on="on" small :color="isLive ? 'white' : 'blue'" :outlined="isLive">
               <v-icon small color="white" :outlined="isLive">fa fa-calendar-alt</v-icon>&nbsp;{{ monthDay }}</v-btn>
           </template>
-          <v-date-picker @input="datePicked"></v-date-picker>
+          <vc-date-picker mode="date" :value="startTime" @input="datePicked"></vc-date-picker>
         </v-dialog>
 
         <v-btn v-if="showNvr" :dark="!isLive" small :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
@@ -181,8 +181,8 @@ export default {
   methods: {
     datePicked(value) {
       this.dateDialog = false;
-      const dt = datePickerLocalTimeToUTC(value);
-      this.streamRecorder(dt);
+      if (value && value.getTime)
+        this.streamRecorder(value.getTime());
     },
     doTimeScroll(e) {
       if (!this.device.interfaces.includes(ScryptedInterface.VideoRecorder))

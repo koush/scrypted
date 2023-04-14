@@ -40,11 +40,11 @@
           <v-btn v-on="on" small>
             <v-icon x-small>fa fa-calendar-alt</v-icon>
             &nbsp;
-            {{ year }}-{{ month }}-{{ date }}
+            {{ new Date(date).getFullYear() }}-{{ new Date(date).getMonth() }}-{{ new Date(date).getDate() }}
           </v-btn>
         </template>
         <v-card>
-          <v-date-picker @input="onDate"> </v-date-picker>
+          <vc-date-picker mode="date" @input="onDate" v-model="date"> </vc-date-picker>
         </v-card>
       </v-dialog>
       <v-btn text small disabled v-if="pages">{{ pageRange }}</v-btn>
@@ -70,7 +70,6 @@
   </div>
 </template>
 <script>
-import { datePickerLocalTimeToUTC } from "../common/date";
 import { fetchClipThumbnail, fetchClipUrl } from "../common/videoclip";
 import RPCInterface from "./RPCInterface.vue";
 import Vue from "vue";
@@ -129,14 +128,11 @@ export default {
     clips: {
       async get() {
         await this.refreshNonce;
-        const date = new Date();
+        const date = new Date(this.date);
         date.setMilliseconds(0);
         date.setSeconds(0);
         date.setMinutes(0);
         date.setHours(0);
-        date.setFullYear(this.year);
-        date.setMonth(this.month - 1);
-        date.setDate(this.date);
         console.log(date);
         const dt = date.getTime();
         const ret = await this.device.getVideoClips({
@@ -165,9 +161,7 @@ export default {
       fetchingImages: [],
       page: 1,
       dialog: false,
-      date: new Date().getDate(),
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear(),
+      date: Date.now(),
     };
   },
   methods: {
@@ -202,11 +196,8 @@ export default {
     onDate(value) {
       this.page = 1;
       this.dialog = false;
-      const dt = datePickerLocalTimeToUTC(value);
-      const d = new Date(dt);
-      this.month = d.getMonth() + 1;
-      this.date = d.getDate();
-      this.year = d.getFullYear();
+      console.log(value);
+      this.date = value;
       this.refresh();
     },
   },

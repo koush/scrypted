@@ -17,10 +17,21 @@ export default {
     VueMarkdown,
     CardTitle,
   },
+  data() {
+    return {
+      token: 0,
+    }
+  },
+  methods: {
+    refresh() {
+      this.token++;
+    }
+  },
   asyncComputed: {
     readme: {
       async get() {
-        return this.device.getReadmeMarkdown();;
+        await this.token;
+        return this.device.getReadmeMarkdown();
       },
       default: undefined,
     }

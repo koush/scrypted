@@ -1,6 +1,10 @@
 <template>
   <div>
-    <v-checkbox v-if="lazyValue.type === 'boolean'" dense :readonly="lazyValue.readonly" v-model="booleanValue"
+    <vc-date-picker v-if="lazyValue.type === 'date'" mode="date" v-model="dateValue" :is-range="lazyValue.combobox"></vc-date-picker>
+    <vc-date-picker v-else-if="lazyValue.type === 'time'" mode="time" v-model="dateValue"
+      class="hide-header" :is-range="lazyValue.combobox"></vc-date-picker>
+    <vc-date-picker v-else-if="lazyValue.type === 'datetime'" mode="datetime" v-model="dateValue" :is-range="lazyValue.combobox"></vc-date-picker>
+    <v-checkbox v-else-if="lazyValue.type === 'boolean'" dense :readonly="lazyValue.readonly" v-model="booleanValue"
       :label="lazyValue.title" :hint="lazyValue.description" :placeholder="lazyValue.placeholder" persistent-hint
       @change="save" :class="lazyValue.description ? 'mb-2' : ''"></v-checkbox>
     <div v-else-if="lazyValue.type === 'qrcode'">
@@ -134,6 +138,25 @@ export default {
         return [];
       }
     },
+    dateValue: {
+      get() {
+        if (this.lazyValue.combobox) {
+          return {
+            start: new Date(parseInt(this.lazyValue.value?.[0]) || Date.now()),
+            end: new Date(parseInt(this.lazyValue.value?.[1]) || Date.now()),
+          };
+        }
+        return new Date(parseInt(this.lazyValue.value) || Date.now());
+      },
+      set(val) {
+        if (this.lazyValue.combobox) {
+          this.lazyValue.value = [val.start.getTime(), val.end.getTime()];
+        }
+        else {
+          this.lazyValue.value = val.getTime();
+        }
+      }
+    },
     booleanValue: {
       get() {
         return (
@@ -251,6 +274,7 @@ export default {
     },
     createLazyValue() {
       var type = this.value.type || "";
+
       if (type.indexOf("[]") == -1 && type !== "clippath") {
         return cloneDeep(this.value);
       }
@@ -265,6 +289,7 @@ export default {
     },
     createInputValue() {
       var type = this.lazyValue.type || "";
+
       if (type.indexOf("[]") == -1 && type !== "clippath") {
         return this.lazyValue;
       }
@@ -286,5 +311,9 @@ export default {
 <style scoped>
 .shift-up {
   margin-top: -8px;
+}
+
+.hide-header .vc-date {
+  display: none !important;
 }
 </style>

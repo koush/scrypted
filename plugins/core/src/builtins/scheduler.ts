@@ -27,25 +27,8 @@ export class Scheduler {
         ];
 
         const date = new Date();
-        if (schedule.clockType === 'AM' || schedule.clockType === 'PM') {
-            let hour = schedule.hour;
-            if (schedule.clockType === 'AM') {
-                if (hour === 12)
-                    hour -= 12;
-            }
-            else {
-                if (hour != 12)
-                    hour += 12;
-            }
-            date.setHours(hour);
-            date.setMinutes(schedule.minute, 0, 0);
-        }
-        else if (schedule.clockType === '24HourClock') {
-            date.setHours(schedule.hour, schedule.minute, 0, 0);
-        }
-        else {
-            throw new Error('sunrise/sunset clock not supported');
-        }
+        date.setHours(schedule.hour);
+        date.setMinutes(schedule.minute);
 
         const ret: ScryptedDevice = {
             async setName() { },
@@ -65,7 +48,7 @@ export class Scheduler {
                         if (!days[day])
                             continue;
         
-                        source.log.i(`event will fire at ${future}`);
+                        source.log.i(`event will fire at ${future.toLocaleString()}`);
                         return future;
                     }
                     source.log.w('event will never fire');
@@ -80,6 +63,7 @@ export class Scheduler {
                 }
 
                 const delay = when.getTime() - Date.now();
+                source.log.i(`event will fire in ${Math.round(delay / 60 / 1000)} minutes.`);
 
                 let timeout = setTimeout(() => {
                     reschedule();
