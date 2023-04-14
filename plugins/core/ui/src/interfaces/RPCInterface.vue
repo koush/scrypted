@@ -22,6 +22,7 @@ export default {
   watch: {
     device() {
       this.watchDevice();
+      this.refresh();
     },
   },
   methods: {
