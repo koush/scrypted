@@ -506,9 +506,14 @@ class PluginRemote:
                 print('new fork')
                 pluginFork.worker = multiprocessing.Process(target=plugin_fork, args=(child_conn,), daemon=True)
                 pluginFork.worker.start()
+                lastUpdate = time.time()
 
                 def schedule_exit_check():
                     def exit_check():
+                        if time.time() - lastUpdate() > 60:
+                            print('fork worker is unresponsive, terminating')
+                            pluginFork.worker.kill()
+
                         if pluginFork.worker.exitcode != None:
                             pluginFork.worker.join()
                         else:
@@ -523,6 +528,8 @@ class PluginRemote:
                     forkPeer.peerName = 'thread'
 
                     async def updateStats(stats):
+                        nonlocal lastUpdate
+                        lastUpdate = time.time()
                         self.ptimeSum += stats['cpu']['user']
                         self.allMemoryStats[forkPeer] = stats
                     forkPeer.params['updateStats'] = updateStats
@@ -532,8 +539,9 @@ class PluginRemote:
                             await readLoop()
                         except:
                             # traceback.print_exc()
-                            print('fork read loop exited')
+                            pass
                         finally:
+                            print('fork read loop exited')
                             self.allMemoryStats.pop(forkPeer)
                             parent_conn.close()
                             rpcTransport.executor.shutdown()
