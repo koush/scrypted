@@ -1688,6 +1688,16 @@ export interface SystemManager {
   getDeviceById<T>(id: string): ScryptedDevice & T;
 
   /**
+   * Find a Scrypted device by pluginId and optionally the nativeId.
+   */
+  getDeviceById(pluginId: string, nativeId?: ScryptedNativeId): ScryptedDevice;
+
+  /**
+   * Find a Scrypted device by pluginId and optionally the nativeId.
+   */
+  getDeviceById<T>(pluginId: string, nativeId?: ScryptedNativeId): ScryptedDevice & T;
+
+  /**
    * Find a Scrypted device by name.
    */
   getDeviceByName(name: string): ScryptedDevice;

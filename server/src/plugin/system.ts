@@ -183,9 +183,9 @@ export class SystemManagerImpl implements SystemManager {
         else {
             for (const check of Object.keys(this.state)) {
                 const state = this.state[check];
-                if (state[ScryptedInterfaceProperty.pluginId] === idOrPluginId) {
+                if (state[ScryptedInterfaceProperty.pluginId].value === idOrPluginId) {
                     // null and undefined should match here.
-                    if (nativeId == state[ScryptedInterfaceProperty.nativeId]) {
+                    if (nativeId == state[ScryptedInterfaceProperty.nativeId]?.value) {
                         id = check;
                         break;
                     }
