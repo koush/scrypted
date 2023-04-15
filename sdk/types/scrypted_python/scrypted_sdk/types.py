@@ -251,6 +251,7 @@ class ObjectDetectionResult(TypedDict):
     className: str
     history: ObjectDetectionHistory
     id: str
+    moving: bool
     name: str
     resources: VideoResource
     score: float
@@ -520,10 +521,8 @@ class ObjectDetectionTypes(TypedDict):
 class ObjectsDetected(TypedDict):
     detectionId: str
     detections: list[ObjectDetectionResult]
-    eventId: Any
     inputDimensions: tuple[float, float]
     resources: VideoResource
-    running: bool
     timestamp: float
     pass
 

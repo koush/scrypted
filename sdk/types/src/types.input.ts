@@ -1255,23 +1255,14 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
   name?: string;
   score: number;
   resources?: VideoResource;
+  moving?: boolean;
 }
 export interface ObjectsDetected {
-  /**
-   * Object detection session state. Will be true if processing video, until
-   * the video ends or is timed out.
-   */
-  running?: boolean;
   detections?: ObjectDetectionResult[];
   /**
    * The id for the detection session.
    */
   detectionId?: string;
-  /**
-   * The id for this specific event/frame within a detection video session.
-   * Will be undefined for single image detections.
-   */
-  eventId?: any;
   inputDimensions?: [number, number],
   timestamp: number;
   resources?: VideoResource;
