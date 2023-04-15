@@ -1,4 +1,4 @@
-import { EventListener, EventListenerOptions, EventListenerRegister, Logger, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptor, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, SystemDeviceState, SystemManager } from "@scrypted/types";
+import { EventListener, EventListenerOptions, EventListenerRegister, Logger, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptor, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import { EventRegistry } from "../event-registry";
 import { PrimitiveProxyHandler, RpcPeer } from '../rpc';
 // import type { PluginComponent } from "../services/plugin";
@@ -175,8 +175,24 @@ export class SystemManagerImpl implements SystemManager {
         return this.state;
     }
 
-    getDeviceById(id: string): any {
-        if (!this.state[id])
+    getDeviceById(idOrPluginId: string, nativeId?: ScryptedNativeId): any {
+        let id: string;
+        if (this.state[idOrPluginId]) {
+            id = idOrPluginId;
+        }
+        else {
+            for (const check of Object.keys(this.state)) {
+                const state = this.state[check];
+                if (state[ScryptedInterfaceProperty.pluginId] === idOrPluginId) {
+                    // null and undefined should match here.
+                    if (nativeId == state[ScryptedInterfaceProperty.nativeId]) {
+                        id = check;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!id)
             return;
         let proxy = this.deviceProxies[id];
         if (!proxy)
