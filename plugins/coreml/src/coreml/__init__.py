@@ -42,6 +42,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
         self.loop = asyncio.get_event_loop()
+        self.minThreshold = .2
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
@@ -53,9 +54,9 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         # run in executor if this is the plugin loop
         if asyncio.get_event_loop() is self.loop:
-            out_dict = await asyncio.get_event_loop().run_in_executor(predictExecutor, lambda: self.model.predict({'image': input, 'confidenceThreshold': .2 }))
+            out_dict = await asyncio.get_event_loop().run_in_executor(predictExecutor, lambda: self.model.predict({'image': input, 'confidenceThreshold': self.minThreshold }))
         else:
-            out_dict = self.model.predict({'image': input, 'confidenceThreshold': .2 })
+            out_dict = self.model.predict({'image': input, 'confidenceThreshold': self.minThreshold })
 
         coordinatesList = out_dict['coordinates']
 
@@ -65,7 +66,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             values = confidenceList
             maxConfidenceIndex = max(range(len(values)), key=values.__getitem__)
             maxConfidence = confidenceList[maxConfidenceIndex]
-            if maxConfidence < .2:
+            if maxConfidence < self.minThreshold:
                 continue
 
             coordinates = coordinatesList[index]

@@ -147,25 +147,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         pass
 
     def getModelSettings(self, settings: Any = None) -> list[Setting]:
-        allowList: Setting = {
-            'title': 'Detections Types',
-            # 'subgroup': 'Advanced',
-            'description': 'The detections that will be reported. If none are specified, all detections will be reported. Select only detection types of interest for optimal performance.',
-            'choices': self.getClasses(),
-            'multiple': True,
-            'key': 'allowList',
-            'value': [
-                'person',
-                'dog',
-                'cat',
-                'car',
-                'truck',
-                'bus',
-                'motorcycle',
-            ],
-        }
-
-        return [allowList]
+        return []
 
     def create_detection_result(self, objs: List[Prediction], size, allowList, convert_to_src_size=None) -> ObjectsDetected:
         detections: List[ObjectDetectionResult] = []
