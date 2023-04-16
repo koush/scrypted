@@ -370,15 +370,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
     }
 
-    signal.promise.finally(() => frameGenerator.return());
-
     const currentDetections = new Set<string>();
     let lastReport = 0;
     detectionGenerator = await sdk.connectRPCObject(await this.objectDetection.generateObjectDetections(frameGenerator, {
       settings: this.getCurrentSettings(),
       sourceId: this.id,
     }));
-    signal.promise.finally(() => detectionGenerator.return());
 
     updatePipelineStatus('waiting result');
 
