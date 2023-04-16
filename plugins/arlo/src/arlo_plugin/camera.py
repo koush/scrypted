@@ -265,7 +265,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     "title": "Plugged In to External Power",
                     "value": self.wired_to_power,
                     "description": "Informs Scrypted that this device is plugged in to an external power source. " + \
-                                   "Will allow features like persistent prebuffer to work, however will no longer report this device's battery percentage. " + \
+                                   "Will allow features like persistent prebuffer to work. " + \
                                    "Note that a persistent prebuffer may cause excess battery drain if the external power is not able to charge faster than the battery consumption rate.",
                     "type": "boolean",
                 },
