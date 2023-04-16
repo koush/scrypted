@@ -251,7 +251,7 @@ class ObjectDetectionResult(TypedDict):
     className: str
     history: ObjectDetectionHistory
     id: str
-    moving: bool
+    movement: Any
     name: str
     resources: VideoResource
     score: float

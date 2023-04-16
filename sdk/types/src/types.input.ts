@@ -1255,7 +1255,10 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
   name?: string;
   score: number;
   resources?: VideoResource;
-  moving?: boolean;
+  /**
+   * Movement history will track the first/last time this object was moving.
+   */
+  movement?: ObjectDetectionHistory & { moving?: boolean; };
 }
 export interface ObjectsDetected {
   detections?: ObjectDetectionResult[];
