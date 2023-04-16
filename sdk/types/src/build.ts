@@ -196,6 +196,14 @@ for (const val of properties) {
 }
 
 python += `
+class ScryptedInterfaceMethods(Enum):
+`
+for (const val of methods) {
+    python += `    ${val} = "${val}"
+`;
+}
+
+python += `
 class DeviceState:
     def getScryptedProperty(self, property: str) -> Any:
         pass
