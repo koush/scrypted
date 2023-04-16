@@ -349,8 +349,9 @@ class PluginRemote:
                         '127.0.0.1', port)
                     _, clusterPeerPort = writer.get_extra_info('sockname')
                     rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
-                    peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
-                    peer.onProxySerialization = lambda value, proxyId: onProxySerialization(value, proxyId, clusterPeerPort)
+                    clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
+                    clusterPeer.tags['localPort'] = clusterPeerPort
+                    clusterPeer.onProxySerialization = lambda value, proxyId: onProxySerialization(value, proxyId, clusterPeerPort)
 
                     async def run_loop():
                         try:
@@ -360,7 +361,7 @@ class PluginRemote:
                         finally:
                             clusterPeers.pop(port)
                     asyncio.run_coroutine_threadsafe(run_loop(), self.loop)
-                    return peer
+                    return clusterPeer
                 clusterPeerPromise = self.loop.create_task(connectClusterPeer())
                 clusterPeers[port] = clusterPeerPromise
             return clusterPeerPromise
@@ -383,6 +384,8 @@ class PluginRemote:
 
             try:
                 clusterPeer = await clusterPeerPromise
+                if clusterPeer.tags.get('localPort') == source:
+                    return value
                 c = await clusterPeer.getParam('connectRPCObject')
                 m = hashlib.sha256()
                 m.update(bytes('%s%s' % (port, clusterSecret), 'utf8'))

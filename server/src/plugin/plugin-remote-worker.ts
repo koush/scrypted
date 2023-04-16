@@ -151,10 +151,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                             await once(socket, 'connect');
                             const clusterPeerPort = (socket.address() as net.AddressInfo).port;
 
-                            const ret = createDuplexRpcPeer(peer.selfName, 'cluster-server', socket, socket);
-                            ret.onProxySerialization = (value, proxyId) => onProxySerialization(value, proxyId, clusterPeerPort);
-
-                            return ret;
+                            const clusterPeer = createDuplexRpcPeer(peer.selfName, 'cluster-server', socket, socket);
+                            clusterPeer.tags.localPort = clusterPeerPort;
+                            clusterPeer.onProxySerialization = (value, proxyId) => onProxySerialization(value, proxyId, clusterPeerPort);
+                            return clusterPeer;
                         }
                         catch (e) {
                             console.error('failure ipc connect', e);
@@ -177,6 +177,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 try {
                     const clusterPeerPromise = ensureClusterPeer(port);
                     const clusterPeer = await clusterPeerPromise;
+                    // this object is already connected
+                    if (clusterPeer.tags.localPort === source)
+                        return value;
                     const connectRPCObject: ConnectRPCObject = await clusterPeer.getParam('connectRPCObject');
                     const portSecret = crypto.createHash('sha256').update(`${port}${clusterSecret}`).digest().toString('hex');
                     const newValue = await connectRPCObject(proxyId, portSecret, source);
