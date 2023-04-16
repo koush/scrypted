@@ -286,46 +286,72 @@ class PluginRemote:
         clusterId = options['clusterId']
         clusterSecret = options['clusterSecret']
 
+        def onProxySerialization(value: Any, proxyId: str, source: int = None):
+            properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
+            clusterEntry = properties.get('__cluster', None)
+            if not properties.get('__cluster', None):
+                clusterEntry = {
+                    'id': clusterId,
+                    'proxyId': proxyId,
+                    'port': clusterPort,
+                    'source': source,
+                }
+                properties['__cluster'] = clusterEntry
+
+            # clusterEntry['proxyId'] = proxyId
+            # clusterEntry['source'] = source
+            return properties
+
+        self.peer.onProxySerialization = onProxySerialization
+
+        async def resolveObject(id: str, sourcePeerPort: int):
+            sourcePeer: rpc.RpcPeer = self.peer if not sourcePeerPort else await rpc.maybe_await(clusterPeers.get(sourcePeerPort))
+            if not sourcePeer:
+                return
+            return sourcePeer.localProxyMap.get(id, None)
+
+        clusterPeers: Mapping[int, asyncio.Future[rpc.RpcPeer]] = {}
         async def handleClusterClient(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+            _, clusterPeerPort = writer.get_extra_info('peername')
             rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
             peer: rpc.RpcPeer
             peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
-            async def connectRPCObject(id: str, secret: str):
+            peer.onProxySerialization = lambda value, proxyId: onProxySerialization(value, proxyId, clusterPeerPort)
+            future = asyncio.Future[rpc.RpcPeer]()
+            future.set_result(peer)
+            clusterPeers[clusterPeerPort] = future
+            async def connectRPCObject(id: str, secret: str, sourcePeerPort: int = None):
                 m = hashlib.sha256()
                 m.update(bytes('%s%s' % (clusterPort, clusterSecret), 'utf8'))
                 portSecret = m.hexdigest()
                 if secret != portSecret:
                     raise Exception('secret incorrect')
-                return self.peer.localProxyMap.get(id, None)
+                return await resolveObject(id, sourcePeerPort)
 
             peer.params['connectRPCObject'] = connectRPCObject
             try:
                 await peerReadLoop()
             except:
+                pass
+            finally:
+                clusterPeers.pop(clusterPeerPort)
+                peer.kill('cluster client killed')
                 writer.close()
 
         clusterRpcServer = await asyncio.start_server(handleClusterClient, '127.0.0.1', 0)
         clusterPort = clusterRpcServer.sockets[0].getsockname()[1]
 
-        clusterPeers: Mapping[int, asyncio.Future[rpc.RpcPeer]] = {}
-        async def connectRPCObject(value):
-            clusterObject = getattr(value, '__cluster')
-            if type(clusterObject) is not dict:
-                return value
-
-            if clusterObject.get('id', None) != clusterId:
-                return value
-            
-            port = clusterObject['port']
-            proxyId = clusterObject['proxyId']
-
+        def ensureClusterPeer(port: int):
             clusterPeerPromise = clusterPeers.get(port)
             if not clusterPeerPromise:
                 async def connectClusterPeer():
                     reader, writer = await asyncio.open_connection(
                         '127.0.0.1', port)
+                    _, clusterPeerPort = writer.get_extra_info('sockname')
                     rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
                     peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
+                    peer.onProxySerialization = lambda value, proxyId: onProxySerialization(value, proxyId, clusterPeerPort)
+
                     async def run_loop():
                         try:
                             await peerReadLoop()
@@ -337,6 +363,23 @@ class PluginRemote:
                     return peer
                 clusterPeerPromise = self.loop.create_task(connectClusterPeer())
                 clusterPeers[port] = clusterPeerPromise
+            return clusterPeerPromise
+
+        async def connectRPCObject(value):
+            clusterObject = getattr(value, '__cluster')
+            if type(clusterObject) is not dict:
+                return value
+
+            if clusterObject.get('id', None) != clusterId:
+                return value
+            
+            port = clusterObject['port']
+            proxyId = clusterObject['proxyId']
+            source = clusterObject.get('source', None)
+            if port == clusterPort:
+                return await resolveObject(proxyId, source)
+
+            clusterPeerPromise = ensureClusterPeer(port)
 
             try:
                 clusterPeer = await clusterPeerPromise
@@ -344,7 +387,7 @@ class PluginRemote:
                 m = hashlib.sha256()
                 m.update(bytes('%s%s' % (port, clusterSecret), 'utf8'))
                 portSecret = m.hexdigest()
-                newValue = await c(proxyId, portSecret)
+                newValue = await c(proxyId, portSecret, source)
                 if not newValue:
                     raise Exception('ipc object not found?')
                 return newValue
@@ -352,17 +395,6 @@ class PluginRemote:
                 return value
 
         sdk.connectRPCObject = connectRPCObject
-
-        def onProxySerialization(value: Any, proxyId: str):
-            properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
-            properties['__cluster'] = {
-                'id': clusterId,
-                'proxyId': proxyId,
-                'port': clusterPort,
-            }
-            return properties
-
-        self.peer.onProxySerialization = onProxySerialization
 
         forkMain = options and options.get('fork')
 
