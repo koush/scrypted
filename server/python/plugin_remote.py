@@ -143,6 +143,17 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
             if checkName.get('value', None) == name:
                 return self.getDeviceById(check)
 
+    # TODO
+    async def listen(self, callback: scrypted_python.scrypted_sdk.EventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
+        return super().listen(callback)
+
+    # TODO
+    async def listenDevice(self, id: str, event: str | scrypted_python.scrypted_sdk.EventListenerOptions, callback: scrypted_python.scrypted_sdk.EventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
+        return super().listenDevice(id, event, callback)
+
+    async def removeDevice(self, id: str) -> None:
+        return await self.api.removeDevice(id)
+
 
 class MediaObject(scrypted_python.scrypted_sdk.types.MediaObject):
     def __init__(self, data, mimeType, options):
