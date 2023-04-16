@@ -23,6 +23,7 @@ import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 EventDetails,
+                                                ScryptedInterfaceMethods,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
 
@@ -38,19 +39,109 @@ import multiprocessing.connection
 import rpc
 import rpc_reader
 
+
 class SystemDeviceState(TypedDict):
     lastEventTime: int
     stateTime: int
     value: any
 
+
+class DeviceProxy(object):
+    device: asyncio.Future[rpc.RpcPeer]
+
+    def __init__(self, systemManager: SystemManager, id: str):
+        self.systemManager = systemManager
+        self.id = id
+        self.device = None
+
+    def __getattr__(self, name):
+        if name == 'id':
+            return self.id
+
+        if hasattr(ScryptedInterfaceProperty, name):
+            state = self.systemManager.systemState.get(self.id)
+            if not state:
+                return
+            p = state.get(name)
+            if not p:
+                return
+            return p.get('value', None)
+        if hasattr(ScryptedInterfaceMethods, name):
+            return rpc.RpcProxyMethod(self, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == '__proxy_finalizer_id':
+            self.__dict__['__proxy_entry']['finalizerId'] = value
+
+        return super().__setattr__(name, value)
+
+    def __apply__(self, method: str, args: list):
+        if not self.device:
+            self.device = self.systemManager.api.getDeviceById(self.id)
+
+        async def apply():
+            device = await self.device
+            return await device.__apply__(method, args)
+        return apply()
+
+
 class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
+    deviceProxies: Mapping[str, DeviceProxy]
+
     def __init__(self, api: Any, systemState: Mapping[str, Mapping[str, SystemDeviceState]]) -> None:
         super().__init__()
         self.api = api
         self.systemState = systemState
+        self.deviceProxies = {}
 
     async def getComponent(self, id: str) -> Any:
         return await self.api.getComponent(id)
+
+    def getSystemState(self) -> Any:
+        return self.systemState
+
+    def getDeviceById(self, idOrPluginId: str, nativeId: str = None) -> scrypted_python.scrypted_sdk.ScryptedDevice:
+        id: str = None
+        if self.systemState.get(idOrPluginId, None):
+            if nativeId is not None:
+                return
+            id = idOrPluginId
+        else:
+            for check in self.systemState:
+                state = self.systemState.get(check, None)
+                if not state:
+                    continue
+                pluginId = state.get('pluginId', None)
+                if not pluginId:
+                    continue
+                pluginId = pluginId.get('value', None)
+                if pluginId == idOrPluginId:
+                    checkNativeId = state.get('nativeId', None)
+                    if not checkNativeId:
+                        continue
+                    checkNativeId = checkNativeId.get('value', None)
+                    if nativeId == checkNativeId:
+                        id = idOrPluginId
+                        break
+
+        if not id:
+            return
+        ret = self.deviceProxies.get(id)
+        if not ret:
+            ret = DeviceProxy(self, id)
+            self.deviceProxies[id] = ret
+        return ret
+
+    def getDeviceByName(self, name: str) -> scrypted_python.scrypted_sdk.ScryptedDevice:
+        for check in self.systemState:
+            state = self.systemState.get(check, None)
+            if not state:
+                continue
+            checkName = state.get('name', None)
+            if not checkName:
+                continue
+            if checkName.get('value', None) == name:
+                return self.getDeviceById(check)
 
 
 class MediaObject(scrypted_python.scrypted_sdk.types.MediaObject):
@@ -216,6 +307,7 @@ class DeviceManager(scrypted_python.scrypted_sdk.types.DeviceManager):
     def getDeviceStorage(self, nativeId: str = None) -> Storage:
         return self.nativeIds.get(nativeId, None)
 
+
 class PluginRemote:
     systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}
     nativeIds: Mapping[str, DeviceStorage] = {}
@@ -272,7 +364,7 @@ class PluginRemote:
         asyncio.run_coroutine_threadsafe(self.print_async(
             nativeId, *values, sep=sep, end=end, flush=flush), self.loop)
 
-    async def loadZip(self, packageJson, zipData, options: dict=None):
+    async def loadZip(self, packageJson, zipData, options: dict = None):
         try:
             return await self.loadZipWrapped(packageJson, zipData, options)
         except:
@@ -280,7 +372,7 @@ class PluginRemote:
             traceback.print_exc()
             raise
 
-    async def loadZipWrapped(self, packageJson, zipData, options: dict=None):
+    async def loadZipWrapped(self, packageJson, zipData, options: dict = None):
         sdk = ScryptedStatic()
 
         clusterId = options['clusterId']
@@ -311,15 +403,18 @@ class PluginRemote:
             return sourcePeer.localProxyMap.get(id, None)
 
         clusterPeers: Mapping[int, asyncio.Future[rpc.RpcPeer]] = {}
+
         async def handleClusterClient(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
             _, clusterPeerPort = writer.get_extra_info('peername')
             rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
             peer: rpc.RpcPeer
             peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
-            peer.onProxySerialization = lambda value, proxyId: onProxySerialization(value, proxyId, clusterPeerPort)
+            peer.onProxySerialization = lambda value, proxyId: onProxySerialization(
+                value, proxyId, clusterPeerPort)
             future = asyncio.Future[rpc.RpcPeer]()
             future.set_result(peer)
             clusterPeers[clusterPeerPort] = future
+
             async def connectRPCObject(id: str, secret: str, sourcePeerPort: int = None):
                 m = hashlib.sha256()
                 m.update(bytes('%s%s' % (clusterPort, clusterSecret), 'utf8'))
@@ -348,10 +443,12 @@ class PluginRemote:
                     reader, writer = await asyncio.open_connection(
                         '127.0.0.1', port)
                     _, clusterPeerPort = writer.get_extra_info('sockname')
-                    rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
+                    rpcTransport = rpc_reader.RpcStreamTransport(
+                        reader, writer)
                     clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
                     clusterPeer.tags['localPort'] = clusterPeerPort
-                    clusterPeer.onProxySerialization = lambda value, proxyId: onProxySerialization(value, proxyId, clusterPeerPort)
+                    clusterPeer.onProxySerialization = lambda value, proxyId: onProxySerialization(
+                        value, proxyId, clusterPeerPort)
 
                     async def run_loop():
                         try:
@@ -362,7 +459,8 @@ class PluginRemote:
                             clusterPeers.pop(port)
                     asyncio.run_coroutine_threadsafe(run_loop(), self.loop)
                     return clusterPeer
-                clusterPeerPromise = self.loop.create_task(connectClusterPeer())
+                clusterPeerPromise = self.loop.create_task(
+                    connectClusterPeer())
                 clusterPeers[port] = clusterPeerPromise
             return clusterPeerPromise
 
@@ -373,7 +471,7 @@ class PluginRemote:
 
             if clusterObject.get('id', None) != clusterId:
                 return value
-            
+
             port = clusterObject['port']
             proxyId = clusterObject['proxyId']
             source = clusterObject.get('source', None)
@@ -407,7 +505,8 @@ class PluginRemote:
             zipPath: str
 
             if isinstance(zipData, str):
-                zipPath = (options and options.get('filename', None)) or zipData
+                zipPath = (options and options.get(
+                    'filename', None)) or zipData
                 if zipPath != zipData:
                     shutil.copyfile(zipData, zipPath)
             else:
@@ -427,9 +526,12 @@ class PluginRemote:
             # this will cause prebuilt wheel installation to fail.
             if platform.machine() == 'aarch64' and platform.architecture()[0] == '32bit':
                 print('=============================================')
-                print('Python machine vs architecture mismatch detected. Plugin installation may fail.')
-                print('This issue occurs if a 32bit system was upgraded to a 64bit kernel.')
-                print('Reverting to the 32bit kernel (or reflashing as native 64 bit is recommended.')
+                print(
+                    'Python machine vs architecture mismatch detected. Plugin installation may fail.')
+                print(
+                    'This issue occurs if a 32bit system was upgraded to a 64bit kernel.')
+                print(
+                    'Reverting to the 32bit kernel (or reflashing as native 64 bit is recommended.')
                 print('https://github.com/koush/scrypted/issues/678')
                 print('=============================================')
 
@@ -437,7 +539,8 @@ class PluginRemote:
                 sys.version_info[0])+"."+str(sys.version_info[1])
             print('python version:', python_version)
 
-            python_versioned_directory = '%s-%s-%s' % (python_version, platform.system(), platform.machine())
+            python_versioned_directory = '%s-%s-%s' % (
+                python_version, platform.system(), platform.machine())
             SCRYPTED_BASE_VERSION = os.environ.get('SCRYPTED_BASE_VERSION')
             if SCRYPTED_BASE_VERSION:
                 python_versioned_directory += '-' + SCRYPTED_BASE_VERSION
@@ -454,7 +557,8 @@ class PluginRemote:
                 requirements = zip.open('requirements.txt').read()
                 str_requirements = requirements.decode('utf8')
 
-                requirementstxt = os.path.join(python_prefix, 'requirements.txt')
+                requirementstxt = os.path.join(
+                    python_prefix, 'requirements.txt')
                 installed_requirementstxt = os.path.join(
                     python_prefix, 'requirements.installed.txt')
 
@@ -470,7 +574,8 @@ class PluginRemote:
                         for de in os.listdir(plugin_volume):
                             if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
                                 filePath = os.path.join(plugin_volume, de)
-                                print('Removing old dependencies: %s' % filePath)
+                                print('Removing old dependencies: %s' %
+                                      filePath)
                                 try:
                                     shutil.rmtree(filePath)
                                 except:
@@ -488,7 +593,7 @@ class PluginRemote:
                     f.close()
 
                     p = subprocess.Popen([sys.executable, '-m', 'pip', 'install', '-r', requirementstxt,
-                                        '--prefix', python_prefix], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                                          '--prefix', python_prefix], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                     while True:
                         line = p.stdout.readline()
                         if not line:
@@ -539,7 +644,8 @@ class PluginRemote:
                 parent_conn, child_conn = multiprocessing.Pipe()
                 pluginFork = PluginFork()
                 print('new fork')
-                pluginFork.worker = multiprocessing.Process(target=plugin_fork, args=(child_conn,), daemon=True)
+                pluginFork.worker = multiprocessing.Process(
+                    target=plugin_fork, args=(child_conn,), daemon=True)
                 pluginFork.worker.start()
 
                 def schedule_exit_check():
@@ -553,7 +659,8 @@ class PluginRemote:
                 schedule_exit_check()
 
                 async def getFork():
-                    rpcTransport = rpc_reader.RpcConnectionTransport(parent_conn)
+                    rpcTransport = rpc_reader.RpcConnectionTransport(
+                        parent_conn)
                     forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
                     forkPeer.peerName = 'thread'
 
@@ -573,7 +680,8 @@ class PluginRemote:
                             parent_conn.close()
                             rpcTransport.executor.shutdown()
                             pluginFork.worker.kill()
-                    asyncio.run_coroutine_threadsafe(forkReadLoop(), loop=self.loop)
+                    asyncio.run_coroutine_threadsafe(
+                        forkReadLoop(), loop=self.loop)
                     getRemote = await forkPeer.getParam('getRemote')
                     remote: PluginRemote = await getRemote(self.api, self.pluginId, self.hostInfo)
                     await remote.setSystemState(self.systemManager.getSystemState())
@@ -688,15 +796,18 @@ class PluginRemote:
 
         stats_runner()
 
+
 async def plugin_async_main(loop: AbstractEventLoop, rpcTransport: rpc_reader.RpcTransport):
     peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, rpcTransport)
     peer.params['print'] = print
-    peer.params['getRemote'] = lambda api, pluginId, hostInfo: PluginRemote(peer, api, pluginId, hostInfo, loop)
+    peer.params['getRemote'] = lambda api, pluginId, hostInfo: PluginRemote(
+        peer, api, pluginId, hostInfo, loop)
 
     try:
         await readLoop()
     finally:
         os._exit(0)
+
 
 def main(rpcTransport: rpc_reader.RpcTransport):
     loop = asyncio.new_event_loop()
@@ -708,6 +819,7 @@ def main(rpcTransport: rpc_reader.RpcTransport):
 
     loop.run_until_complete(plugin_async_main(loop, rpcTransport))
     loop.close()
+
 
 def plugin_main(rpcTransport: rpc_reader.RpcTransport):
     # gi import will fail on windows (and posisbly elsewhere)
@@ -723,7 +835,8 @@ def plugin_main(rpcTransport: rpc_reader.RpcTransport):
         # seems optional on other platforms.
         loop = GLib.MainLoop()
 
-        worker = threading.Thread(target=main, args=(rpcTransport,), name="asyncio-main")
+        worker = threading.Thread(target=main, args=(
+            rpcTransport,), name="asyncio-main")
         worker.start()
 
         loop.run()
@@ -731,12 +844,13 @@ def plugin_main(rpcTransport: rpc_reader.RpcTransport):
     except:
         pass
 
-    # reattempt without gi outside of the exception handler in case the plugin fails. 
+    # reattempt without gi outside of the exception handler in case the plugin fails.
     main(rpcTransport)
 
 
 def plugin_fork(conn: multiprocessing.connection.Connection):
     plugin_main(rpc_reader.RpcConnectionTransport(conn))
+
 
 if __name__ == "__main__":
     plugin_main(rpc_reader.RpcFileTransport(3, 4))
