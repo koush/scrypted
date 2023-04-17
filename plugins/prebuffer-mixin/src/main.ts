@@ -946,7 +946,7 @@ class PrebufferSession {
       return;
     }
 
-    const lowBatteryDisablePrebuffer = async () => {
+    const checkDisablePrebuffer = async () => {
       if (this.stopInactive) {
         this.console.log(this.streamName, 'low battery or not charging, prebuffering and rebroadcasting will only work on demand')
         if (!this.activeClients && this.parserSessionPromise) {
@@ -960,8 +960,8 @@ class PrebufferSession {
     }
 
     const device = this.mixinDevice as any as ScryptedDevice;
-    device.listen(ScryptedInterface.Battery, lowBatteryDisablePrebuffer);
-    device.listen(ScryptedInterface.Charger, lowBatteryDisablePrebuffer);
+    device.listen(ScryptedInterface.Battery, checkDisablePrebuffer);
+    device.listen(ScryptedInterface.Charger, checkDisablePrebuffer);
   }
 
   shouldDisableBatteryPrebuffer(): boolean {
