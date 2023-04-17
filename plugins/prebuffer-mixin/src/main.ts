@@ -10,7 +10,7 @@ import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, DeviceProvider, DeviceState, EventListenerRegister, FFmpegInput, H264Info, MediaObject, MediaStreamDestination, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, ChargeState, DeviceBase, DeviceProvider, DeviceState, EventListenerRegister, FFmpegInput, H264Info, MediaObject, MediaStreamDestination, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { once } from 'events';
@@ -105,7 +105,7 @@ class PrebufferSession {
   rtspServerPath: string;
   rtspServerMutedPath: string;
 
-  constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: ResponseMediaStreamOptions, public stopInactive: boolean) {
+  constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: ResponseMediaStreamOptions, public enabled: boolean, public forceBatteryPrebuffer: boolean) {
     this.storage = mixin.storage;
     this.console = mixin.console;
     this.mixinDevice = mixin.mixinDevice;
@@ -129,6 +129,12 @@ class PrebufferSession {
       this.rtspServerMutedPath = crypto.randomBytes(8).toString('hex');
       this.storage.setItem(rtspServerMutedPathKey, this.rtspServerMutedPath);
     }
+
+    this.handleChargingBatteryEvents();
+  }
+
+  get stopInactive() {
+    return !this.enabled || this.shouldDisableBatteryPrebuffer();
   }
 
   get canPrebuffer() {
@@ -934,6 +940,39 @@ class PrebufferSession {
     }, 10000);
   }
 
+  handleChargingBatteryEvents() {
+    if (!this.mixin.interfaces.includes(ScryptedInterface.Charger) ||
+        !this.mixin.interfaces.includes(ScryptedInterface.Battery)) {
+      return;
+    }
+
+    const lowBatteryDisablePrebuffer = async () => {
+      if (this.stopInactive) {
+        this.console.log(this.streamName, 'low battery or not charging, prebuffering and rebroadcasting will only work on demand')
+        if (!this.activeClients && this.parserSessionPromise) {
+          this.console.log(this.streamName, 'terminating rebroadcast due to low battery')
+          const session = await this.parserSessionPromise;
+          session.kill(new Error('low battery or not charging'));
+        }
+      } else {
+        this.ensurePrebufferSession();
+      }
+    }
+
+    const device = this.mixinDevice as any as ScryptedDevice;
+    device.listen(ScryptedInterface.Battery, lowBatteryDisablePrebuffer);
+    device.listen(ScryptedInterface.Charger, lowBatteryDisablePrebuffer);
+  }
+
+  shouldDisableBatteryPrebuffer(): boolean {
+    if (!this.mixin.interfaces.includes(ScryptedInterface.Battery) || this.forceBatteryPrebuffer) {
+      return false;
+    }
+    const lowBattery = this.mixin.batteryLevel == null || this.mixin.batteryLevel < 20;
+    const hasCharger = this.mixin.interfaces.includes(ScryptedInterface.Charger);
+    return lowBattery || (hasCharger && this.mixin.chargeState !== ChargeState.Charging);
+  }
+
   async handleRebroadcasterClient(options: {
     findSyncFrame: boolean,
     isActiveClient: boolean,
@@ -1497,8 +1536,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       }
     }
 
-    const isBatteryPowered = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
-
     if (!enabledIds.length)
       this.online = true;
 
@@ -1524,17 +1561,16 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       }
       const name = mso?.name;
       const enabled = enabledIds.includes(id);
-      const stopInactive = (isBatteryPowered && !mso.allowBatteryPrebuffer) || !enabled;
-      session = new PrebufferSession(this, mso, stopInactive);
+      session = new PrebufferSession(this, mso, enabled, mso.allowBatteryPrebuffer);
       this.sessions.set(id, session);
 
-      if (isBatteryPowered && !mso.allowBatteryPrebuffer) {
-        this.console.log('camera is battery powered, prebuffering and rebroadcasting will only work on demand.');
+      if (!enabled) {
+        this.console.log('stream', name, 'is not enabled and will be rebroadcast on demand.');
         continue;
       }
 
-      if (!enabled) {
-        this.console.log('stream', name, 'will be rebroadcast on demand.');
+      if (session.shouldDisableBatteryPrebuffer()) {
+        this.console.log('camera is battery powered and either not charging or on low battery, prebuffering and rebroadcasting will only work on demand.');
         continue;
       }
 
