@@ -1309,6 +1309,7 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
   inputFormat?: 'gray' | 'rgb' | 'rgba';
   settings: Setting[];
   triggerClasses?: string[];
+  prebuffer?: number;
 }
 export interface ObjectDetectionCallbacks {
   onDetection(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject): Promise<boolean>;

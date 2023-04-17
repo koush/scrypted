@@ -356,6 +356,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.console.log(videoFrameGenerator.name, '+', this.objectDetection.name);
       updatePipelineStatus('getVideoStream');
       const stream = await this.cameraDevice.getVideoStream({
+        prebuffer: this.model.prebuffer,
         destination,
         // ask rebroadcast to mute audio, not needed.
         audio: null,

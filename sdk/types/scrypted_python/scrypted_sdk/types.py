@@ -503,6 +503,7 @@ class ObjectDetectionModel(TypedDict):
     inputFormat: Any | Any | Any
     inputSize: list[float]
     name: str
+    prebuffer: float
     settings: list[Setting]
     triggerClasses: list[str]
     pass
