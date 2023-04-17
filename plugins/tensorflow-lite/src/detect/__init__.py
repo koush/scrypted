@@ -55,6 +55,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         try:
             videoFrames = await scrypted_sdk.sdk.connectRPCObject(videoFrames)
             async for videoFrame in videoFrames:
+               videoFrame = await scrypted_sdk.sdk.connectRPCObject(videoFrame)
                detected = await self.run_detection_videoframe(videoFrame, session)
                yield {
                    '__json_copy_serialize_children': True,
