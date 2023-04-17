@@ -415,16 +415,21 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
       if (detected.detected.detectionId) {
         updatePipelineStatus('creating jpeg');
-        const jpeg = await detected.videoFrame.toBuffer({
+        // const start = Date.now();
+        const vf = await sdk.connectRPCObject(detected.videoFrame);
+        const jpeg = await vf.toBuffer({
           format: 'jpg',
         });
-        updatePipelineStatus('converting jpeg');
         const mo = await sdk.mediaManager.createMediaObject(jpeg, 'image/jpeg');
+        // this.console.log('retain took', Date.now() -start);
         this.setDetection(detected.detected, mo);
         // this.console.log('image saved', detected.detected.detections);
       }
       this.reportObjectDetections(detected.detected);
       if (this.hasMotionType) {
+        // const diff = Date.now() - when;
+        // when = Date.now();
+        // this.console.log('sleper', diff);
         await sleep(250);
       }
       updatePipelineStatus('waiting result');
