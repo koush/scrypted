@@ -422,7 +422,7 @@ class PluginRemote:
             peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
             peer.onProxySerialization = lambda value, proxyId: onProxySerialization(
                 value, proxyId, clusterPeerPort)
-            future = asyncio.Future[rpc.RpcPeer]()
+            future: asyncio.Future[rpc.RpcPeer] = asyncio.Future()
             future.set_result(peer)
             clusterPeers[clusterPeerPort] = future
 
