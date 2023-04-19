@@ -240,12 +240,6 @@ class HttpResponseOptions(TypedDict):
     headers: object
     pass
 
-class ImageOptions(TypedDict):
-    crop: Any
-    format: ImageFormat
-    resize: Any
-    pass
-
 class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     className: str
@@ -490,7 +484,7 @@ class NotifierOptions(TypedDict):
 class ObjectDetectionGeneratorResult(TypedDict):
     __json_copy_serialize_children: Any
     detected: ObjectsDetected
-    videoFrame: VideoFrame
+    videoFrame: Any
     pass
 
 class ObjectDetectionGeneratorSession(TypedDict):
@@ -709,6 +703,8 @@ class VideoClipOptions(TypedDict):
 class VideoFrameGeneratorOptions(TypedDict):
     crop: Any
     format: ImageFormat
+    fps: float
+    queue: float
     resize: Any
     pass
 
@@ -938,7 +934,7 @@ class OauthClient:
 class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         pass
-    async def generateObjectDetections(self, videoFrames: VideoFrame, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
+    async def generateObjectDetections(self, videoFrames: AsyncGenerator, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
         pass
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         pass
@@ -2558,17 +2554,6 @@ class ObjectDetectionCallbacks:
     async def onDetection(self, detection: ObjectsDetected, redetect: Any = None, mediaObject: MediaObject = None) -> bool:
         pass
     async def onDetectionEnded(self, detection: ObjectsDetected) -> None:
-        pass
-    pass
-
-class VideoFrame:
-    format: ImageFormat
-    height: float
-    timestamp: float
-    width: float
-    async def toBuffer(self, options: ImageOptions = None) -> bytearray:
-        pass
-    async def toImage(self, options: ImageOptions = None) -> Any:
         pass
     pass
 

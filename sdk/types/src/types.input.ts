@@ -1317,7 +1317,7 @@ export interface ObjectDetectionCallbacks {
 }
 export interface ObjectDetectionGeneratorResult {
   __json_copy_serialize_children: true,
-  videoFrame: VideoFrame;
+  videoFrame: VideoFrame & MediaObject;
   detected: ObjectsDetected;
 }
 /**
@@ -1325,7 +1325,7 @@ export interface ObjectDetectionGeneratorResult {
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
-  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult>>;
+  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame & MediaObject>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
@@ -1357,8 +1357,12 @@ export interface Image {
 }
 export interface VideoFrame extends Image {
   timestamp: number;
+  queued: number;
+  flush(count?: number): Promise<void>;
 }
 export interface VideoFrameGeneratorOptions extends ImageOptions {
+  queue?: number;
+  fps?: number;
 }
 export interface VideoFrameGenerator {
   generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame & MediaObject) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame & MediaObject>>;
