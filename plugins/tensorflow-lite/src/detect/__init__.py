@@ -71,7 +71,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         vf: scrypted_sdk.VideoFrame
         if mediaObject and mediaObject.mimeType == ScryptedMimeTypes.Image.value:
-            vf = mediaObject
+            vf = await scrypted_sdk.sdk.connectRPCObject(mediaObject)
         else:
             vf = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.Image.value)
 
