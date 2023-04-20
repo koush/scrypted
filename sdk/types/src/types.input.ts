@@ -1300,8 +1300,6 @@ export interface ObjectDetectionGeneratorSession {
   sourceId?: string;
 }
 export interface ObjectDetectionSession extends ObjectDetectionGeneratorSession {
-  detectionId?: string;
-  duration?: number;
 }
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;
@@ -1326,7 +1324,7 @@ export interface ObjectDetectionGeneratorResult {
  */
 export interface ObjectDetection {
   generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame & MediaObject>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult>>;
-  detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected>;
+  detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
 export type ImageFormat = 'gray' | 'rgba' | 'rgb' | 'jpg';
@@ -1838,6 +1836,8 @@ export enum MediaPlayerState {
   Buffering = "Buffering",
 }
 export type SettingValue = undefined | null | string | number | boolean | string[] | number[];
+export type Point = [number, number];
+export type ClipPath = Point[];
 export interface Setting {
   key?: string;
   title?: string;

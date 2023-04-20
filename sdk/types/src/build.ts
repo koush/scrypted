@@ -79,6 +79,8 @@ discoveredTypes.add('EventDetails');
 function toPythonType(type: any): string {
     if (type.type === 'array')
         return `list[${toPythonType(type.elementType)}]`;
+    if (type.type === 'intersection')
+        return `Union[${type.types.map((et: any) => toPythonType(et)).join(', ')}]`
     if (type.type === 'tuple')
         return `tuple[${type.elements.map((et: any) => toPythonType(et)).join(', ')}]`;
     if (type.type === 'union')
@@ -265,9 +267,9 @@ class ${td.name}(TypedDict):
 const pythonTypes = `from __future__ import annotations
 from enum import Enum
 try:
-    from typing import TypedDict
+    from typing import TypedDict, Union
 except:
-    from typing_extensions import TypedDict
+    from typing_extensions import TypedDict, Union
 from typing import Any
 from typing import Callable
 

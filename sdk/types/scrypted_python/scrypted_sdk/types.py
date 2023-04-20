@@ -1,9 +1,9 @@
 from __future__ import annotations
 from enum import Enum
 try:
-    from typing import TypedDict
+    from typing import TypedDict, Union
 except:
-    from typing_extensions import TypedDict
+    from typing_extensions import TypedDict, Union
 from typing import Any
 from typing import Callable
 
@@ -218,6 +218,12 @@ class H264Info(TypedDict):
     stapb: bool
     pass
 
+class ImageOptions(TypedDict):
+    crop: Any
+    format: ImageFormat
+    resize: Any
+    pass
+
 class ObjectDetectionHistory(TypedDict):
     firstSeen: float
     lastSeen: float
@@ -245,7 +251,7 @@ class ObjectDetectionResult(TypedDict):
     className: str
     history: ObjectDetectionHistory
     id: str
-    movement: Any
+    movement: Union[ObjectDetectionHistory, Any]
     name: str
     resources: VideoResource
     score: float
@@ -484,7 +490,7 @@ class NotifierOptions(TypedDict):
 class ObjectDetectionGeneratorResult(TypedDict):
     __json_copy_serialize_children: Any
     detected: ObjectsDetected
-    videoFrame: Any
+    videoFrame: Union[VideoFrame, MediaObject]
     pass
 
 class ObjectDetectionGeneratorSession(TypedDict):
@@ -503,8 +509,6 @@ class ObjectDetectionModel(TypedDict):
     pass
 
 class ObjectDetectionSession(TypedDict):
-    detectionId: str
-    duration: float
     settings: Any
     sourceId: str
     pass
@@ -932,7 +936,7 @@ class OauthClient:
     pass
 
 class ObjectDetection:
-    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
+    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         pass
     async def generateObjectDetections(self, videoFrames: AsyncGenerator, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
         pass
@@ -1277,7 +1281,7 @@ class MediaManager:
         pass
     async def createFFmpegMediaObject(self, ffmpegInput: FFmpegInput, options: MediaObjectOptions = None) -> MediaObject:
         pass
-    async def createMediaObject(self, data: Any, mimeType: str, options: Any = None) -> Any:
+    async def createMediaObject(self, data: Any, mimeType: str, options: Any = None) -> Union[MediaObject, Any]:
         pass
     async def createMediaObjectFromUrl(self, data: str, options: Any = None) -> MediaObject:
         pass
@@ -2550,10 +2554,27 @@ class HttpResponse:
         pass
     pass
 
-class ObjectDetectionCallbacks:
-    async def onDetection(self, detection: ObjectsDetected, redetect: Any = None, mediaObject: MediaObject = None) -> bool:
+class VideoFrame:
+    format: ImageFormat
+    height: float
+    queued: float
+    timestamp: float
+    width: float
+    async def flush(self, count: float = None) -> None:
         pass
-    async def onDetectionEnded(self, detection: ObjectsDetected) -> None:
+    async def toBuffer(self, options: ImageOptions = None) -> bytearray:
+        pass
+    async def toImage(self, options: ImageOptions = None) -> Union[Image, MediaObject]:
+        pass
+    pass
+
+class Image:
+    format: ImageFormat
+    height: float
+    width: float
+    async def toBuffer(self, options: ImageOptions = None) -> bytearray:
+        pass
+    async def toImage(self, options: ImageOptions = None) -> Union[Image, MediaObject]:
         pass
     pass
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 from typing import Any, List, Tuple
+import time
 
 import cv2
 import imutils
@@ -49,11 +50,11 @@ class OpenCVDetectionSession:
         self.thresh = None
         self.gray = None
         self.gstsample = None
+        self.lastFrame = 0
 
 
 defaultThreshold = 25
 defaultArea = 200
-defaultInterval = 250
 defaultBlur = 5
 
 class OpenCVPlugin(DetectPlugin):
@@ -89,14 +90,6 @@ class OpenCVPlugin(DetectPlugin):
                 'placeholder': defaultBlur,
                 'type': 'number',
             },
-            {
-                'title': "Frame Analysis Interval",
-                'description': "The number of milliseconds to wait between motion analysis.",
-                'value': defaultInterval,
-                'key': 'interval',
-                'placeholder': defaultInterval,
-                'type': 'number',
-            },
         ]
 
         return settings
@@ -107,19 +100,19 @@ class OpenCVPlugin(DetectPlugin):
     def parse_settings(self, settings: Any):
         area = defaultArea
         threshold = defaultThreshold
-        interval = defaultInterval
         blur = defaultBlur
+        referenceFrameFrequency = 0
         if settings:
             area = float(settings.get('area', area))
             threshold = int(settings.get('threshold', threshold))
-            interval = float(settings.get('interval', interval))
             blur = int(settings.get('blur', blur))
-        return area, threshold, interval, blur
+            referenceFrameFrequency = float(settings.get('referenceFrameFrequency', 0))
+        return area, threshold, blur, referenceFrameFrequency
 
     def detect(self, frame, detection_session: ObjectDetectionSession, src_size, convert_to_src_size) -> ObjectsDetected:
         session: OpenCVDetectionSession = detection_session['settings']['session']
         settings = detection_session and detection_session.get('settings', None)
-        area, threshold, interval, blur = self.parse_settings(settings)
+        area, threshold, blur, referenceFrameFrequency = self.parse_settings(settings)
 
         gray = frame
         session.curFrame = cv2.GaussianBlur(
@@ -127,6 +120,8 @@ class OpenCVPlugin(DetectPlugin):
 
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
+        now = round(time.time() * 1000)
+        detection_result['timestamp'] = now
         detection_result['detections'] = detections
         detection_result['inputDimensions'] = src_size
 
@@ -137,9 +132,10 @@ class OpenCVPlugin(DetectPlugin):
 
         session.frameDelta = cv2.absdiff(
             session.previous_frame, session.curFrame, dst=session.frameDelta)
-        tmp = session.curFrame
-        session.curFrame = session.previous_frame
-        session.previous_frame = tmp
+        if not referenceFrameFrequency or now - session.lastFrame > referenceFrameFrequency:
+            tmp = session.curFrame
+            session.curFrame = session.previous_frame
+            session.previous_frame = tmp
 
         _, session.thresh = cv2.threshold(
             session.frameDelta, threshold, 255, cv2.THRESH_BINARY, dst=session.thresh)
