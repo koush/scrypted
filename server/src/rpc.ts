@@ -320,6 +320,7 @@ export class RpcPeer {
     killed: Promise<string>;
     killedDeferred: Deferred;
     tags: any = {};
+    yieldedAsyncIterators = new Set<AsyncGenerator>();
 
     static readonly finalizerIdSymbol = Symbol('rpcFinalizerId');
     static remotesCollected = 0;
@@ -445,6 +446,10 @@ export class RpcPeer {
         for (const result of Object.values(this.pendingResults)) {
             result.reject(error);
         }
+        for (const y of this.yieldedAsyncIterators) {
+            y.throw(error);
+        }
+        this.yieldedAsyncIterators.clear();
         this.pendingResults = Object.freeze({});
         this.params = Object.freeze({});
         this.remoteWeakProxies = Object.freeze({});
@@ -735,9 +740,13 @@ export class RpcPeer {
                             const method = target[rpcApply.method];
                             if (!method)
                                 throw new Error(`target ${target?.constructor?.name} does not have method ${rpcApply.method}`);
+
+                            const isIteratorNext = RpcPeer.getIteratorNext(target) === rpcApply.method;
+                            if (isIteratorNext)
+                                this.yieldedAsyncIterators.delete(target);
                             value = await target[rpcApply.method](...args);
 
-                            if (RpcPeer.getIteratorNext(target) === rpcApply.method) {
+                            if (isIteratorNext) {
                                 if (value.done) {
                                     const errorType: ErrorType = {
                                         name: 'StopAsyncIteration',
@@ -746,6 +755,12 @@ export class RpcPeer {
                                     throw errorType;
                                 }
                                 else {
+                                    if (Object.isFrozen(this.pendingResults)) {
+                                        (target as AsyncGenerator).throw(new RPCResultError(this, 'RpcPeer has been killed (yield)'));
+                                    }
+                                    else {
+                                        this.yieldedAsyncIterators.add(target);
+                                    }
                                     value = value.value;
                                 }
                             }
