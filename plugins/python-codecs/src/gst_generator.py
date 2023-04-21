@@ -17,13 +17,12 @@ except:
 class Callback:
     def __init__(self, callback) -> None:
         if callback:
-            self.loop = asyncio.get_running_loop()
             self.callback = callback
         else:
-            self.loop = None
             self.callback = None
 
-def createPipelineIterator(pipeline: str):
+async def createPipelineIterator(pipeline: str):
+    loop = asyncio.get_running_loop()
     pipeline = '{pipeline} ! queue leaky=downstream max-size-buffers=0 ! appsink name=appsink emit-signals=true sync=false max-buffers=-1 drop=true'.format(pipeline=pipeline)
     print(pipeline)
     gst = Gst.parse_launch(pipeline)
@@ -52,8 +51,7 @@ def createPipelineIterator(pipeline: str):
         hasFinished = True
         callback = Callback(None)
         callbackQueue.put(callback)
-        if not asyncFuture.done():
-            asyncFuture.set_result(None)
+        asyncio.run_coroutine_threadsafe(sampleQueue.put(None), loop = loop)
         if not finished.done():
             finished.set_result(None)
 
@@ -66,23 +64,20 @@ def createPipelineIterator(pipeline: str):
 
     appsink = gst.get_by_name('appsink')
     callbackQueue = Queue()
-    asyncFuture = asyncio.Future()
+    sampleQueue = asyncio.Queue()
 
     async def gen():
         try:      
             while True:
-                nonlocal asyncFuture
-                asyncFuture = asyncio.Future()
                 yieldFuture = asyncio.Future()
                 async def asyncCallback(sample):
-                    asyncFuture.set_result(sample)
+                    sampleQueue.put_nowait(sample)
                     await yieldFuture
                 callbackQueue.put(Callback(asyncCallback))
-                sample = await asyncFuture
-                if not sample:
-                    yieldFuture.set_result(None)
-                    break
                 try:
+                    sample = await sampleQueue.get()
+                    if not sample:
+                        break
                     yield sample
                 finally:
                     yieldFuture.set_result(None)
@@ -100,10 +95,10 @@ def createPipelineIterator(pipeline: str):
         if not callback.callback or hasFinished:
             hasFinished = True
             if callback.callback:
-                asyncio.run_coroutine_threadsafe(callback.callback(None), loop = callback.loop)
+                asyncio.run_coroutine_threadsafe(callback.callback(None), loop = loop)
             return Gst.FlowReturn.OK
 
-        future = asyncio.run_coroutine_threadsafe(callback.callback(sample), loop = callback.loop)
+        future = asyncio.run_coroutine_threadsafe(callback.callback(sample), loop = loop)
         try:
             future.result()
         except:
