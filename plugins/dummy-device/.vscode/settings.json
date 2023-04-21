@@ -1,0 +1,27 @@
+
+{
+    // specify the following paths on the target scrypted server:
+    // 1) where @scrypted/server node module resides: this may either be a checkout or a install.
+    // 2) where the scrypted "volume" data is located on the server. ie, the docker volume.
+    // the following default examples are provided for local and docker installations,
+    // only modifying the debugHost should be necessary:
+
+    // local installation
+    // "scrypted.debugHost": "192.168.2.119",
+    // "scrypted.serverRoot": "/home/pi/.scrypted/node_modules/@scrypted/server",
+    // "scrypted.volumeRoot": "/home/pi/.scrypted/volume",
+
+    // docker installation
+    // "scrypted.debugHost": "192.168.2.109",
+    "scrypted.serverRoot": "/server/node_modules/@scrypted/server",
+    "scrypted.volumeRoot": "/server/volume",
+
+    // local checkout
+    "scrypted.debugHost": "127.0.0.1",
+    //"scrypted.serverRoot": "/Volumes/Dev/scrypted/server",
+    //"scrypted.volumeRoot": "${config:scrypted.serverRoot}/volume",
+
+    "python.analysis.extraPaths": [
+        "./node_modules/@scrypted/sdk/types/scrypted_python"
+    ]
+}

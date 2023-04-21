@@ -1,0 +1,30 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Scrypted Debugger",
+            "type": "python",
+            "request": "attach",
+            "connect": {
+                "host": "${config:scrypted.debugHost}",
+                "port": 10081
+            },
+            "justMyCode": false,
+            "preLaunchTask": "scrypted: deploy+debug",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/../../server/python/",
+                    "remoteRoot": "${config:scrypted.serverRoot}/python",
+                },
+                {
+                    "localRoot": "${workspaceFolder}/src",
+                    "remoteRoot": "${config:scrypted.volumeRoot}/plugin.zip"
+                },
+
+            ]
+        }
+    ]
+}
