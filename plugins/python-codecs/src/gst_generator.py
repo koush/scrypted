@@ -14,13 +14,6 @@ try:
 except:
     pass
 
-class Callback:
-    def __init__(self, callback) -> None:
-        if callback:
-            self.callback = callback
-        else:
-            self.callback = None
-
 async def createPipelineIterator(pipeline: str):
     loop = asyncio.get_running_loop()
     pipeline = '{pipeline} ! queue leaky=downstream max-size-buffers=0 ! appsink name=appsink emit-signals=true sync=false max-buffers=-1 drop=true'.format(pipeline=pipeline)
@@ -32,6 +25,7 @@ async def createPipelineIterator(pipeline: str):
         t = str(message.type)
         # print(t)
         if t == str(Gst.MessageType.EOS):
+            print('EOS: Stream ended.')
             finish()
         elif t == str(Gst.MessageType.WARNING):
             err, debug = message.parse_warning()
@@ -49,8 +43,8 @@ async def createPipelineIterator(pipeline: str):
     def finish():
         nonlocal hasFinished
         hasFinished = True
-        callback = Callback(None)
-        callbackQueue.put(callback)
+        yieldQueue.put(None)
+        sampleQueue.put_nowait(None)
         asyncio.run_coroutine_threadsafe(sampleQueue.put(None), loop = loop)
         if not finished.done():
             finished.set_result(None)
@@ -63,24 +57,19 @@ async def createPipelineIterator(pipeline: str):
     hasFinished = False
 
     appsink = gst.get_by_name('appsink')
-    callbackQueue = Queue()
+    yieldQueue = Queue()
     sampleQueue = asyncio.Queue()
 
     async def gen():
         try:      
             while True:
-                yieldFuture = asyncio.Future()
-                async def asyncCallback(sample):
-                    sampleQueue.put_nowait(sample)
-                    await yieldFuture
-                callbackQueue.put(Callback(asyncCallback))
                 try:
                     sample = await sampleQueue.get()
                     if not sample:
                         break
                     yield sample
                 finally:
-                    yieldFuture.set_result(None)
+                    yieldQueue.put(None)
         finally:
             finish()
             print('gstreamer finished')
@@ -91,16 +80,12 @@ async def createPipelineIterator(pipeline: str):
 
         sample = sink.emit('pull-preroll' if preroll else 'pull-sample')
 
-        callback: Callback = callbackQueue.get()
-        if not callback.callback or hasFinished:
-            hasFinished = True
-            if callback.callback:
-                asyncio.run_coroutine_threadsafe(callback.callback(None), loop = loop)
+        if hasFinished:
             return Gst.FlowReturn.OK
 
-        future = asyncio.run_coroutine_threadsafe(callback.callback(sample), loop = loop)
+        asyncio.run_coroutine_threadsafe(sampleQueue.put(sample), loop = loop)
         try:
-            future.result()
+            yieldQueue.get()
         except:
             pass
         return Gst.FlowReturn.OK
