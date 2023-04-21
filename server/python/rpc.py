@@ -134,6 +134,7 @@ class RpcPeer:
         self.nameDeserializerMap: Mapping[str, RpcSerializer] = {}
         self.onProxySerialization: Callable[[Any, str], Any] = None
         self.killed = False
+        self.tags = {}
 
     def __apply__(self, proxyId: str, oneWayMethods: List[str], method: str, args: list):
         oneway = oneWayMethods and method in oneWayMethods

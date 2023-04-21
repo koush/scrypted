@@ -86,6 +86,5 @@ class TensorFlowPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk
             ))
             objs.append(obj)
 
-        allowList = settings.get('allowList', None) if settings else None
-        ret = self.create_detection_result(objs, src_size, allowList, cvss)
+        ret = self.create_detection_result(objs, src_size, cvss)
         return ret

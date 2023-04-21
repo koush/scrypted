@@ -34,6 +34,7 @@ class PILImage(scrypted_sdk.VideoFrame):
                 finally:
                     rgb.close()
             return await to_thread(format)
+        # TODO: gray...
 
         def save():
             bytesArray = io.BytesIO()

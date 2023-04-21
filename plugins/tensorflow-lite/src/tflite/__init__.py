@@ -133,6 +133,5 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
 
         objs = await asyncio.get_event_loop().run_in_executor(self.executor, predict)
 
-        allowList = settings.get('allowList', None) if settings else None
-        ret = self.create_detection_result(objs, src_size, allowList, cvss)
+        ret = self.create_detection_result(objs, src_size, cvss)
         return ret

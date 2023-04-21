@@ -3,13 +3,14 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 from typing import Any, List, Tuple
+import time
 
 import cv2
 import imutils
 import numpy as np
 import scrypted_sdk
 from PIL import Image
-from scrypted_sdk.types import (ObjectDetectionGeneratorSession,
+from scrypted_sdk.types import (ObjectDetectionGeneratorSession,ObjectDetectionSession,
                                 ObjectDetectionResult, ObjectsDetected,
                                 Setting, VideoFrame)
 
@@ -49,11 +50,11 @@ class OpenCVDetectionSession:
         self.thresh = None
         self.gray = None
         self.gstsample = None
+        self.lastFrame = 0
 
 
 defaultThreshold = 25
 defaultArea = 200
-defaultInterval = 250
 defaultBlur = 5
 
 class OpenCVPlugin(DetectPlugin):
@@ -89,14 +90,6 @@ class OpenCVPlugin(DetectPlugin):
                 'placeholder': defaultBlur,
                 'type': 'number',
             },
-            {
-                'title': "Frame Analysis Interval",
-                'description': "The number of milliseconds to wait between motion analysis.",
-                'value': defaultInterval,
-                'key': 'interval',
-                'placeholder': defaultInterval,
-                'type': 'number',
-            },
         ]
 
         return settings
@@ -107,44 +100,49 @@ class OpenCVPlugin(DetectPlugin):
     def parse_settings(self, settings: Any):
         area = defaultArea
         threshold = defaultThreshold
-        interval = defaultInterval
         blur = defaultBlur
+        referenceFrameFrequency = 0
         if settings:
             area = float(settings.get('area', area))
             threshold = int(settings.get('threshold', threshold))
-            interval = float(settings.get('interval', interval))
             blur = int(settings.get('blur', blur))
-        return area, threshold, interval, blur
+            referenceFrameFrequency = float(settings.get('referenceFrameFrequency', 0))
+        return area, threshold, blur, referenceFrameFrequency
 
-    def detect(self, frame, settings: Any, detection_session: OpenCVDetectionSession, src_size, convert_to_src_size) -> ObjectsDetected:
-        area, threshold, interval, blur = self.parse_settings(settings)
+    def detect(self, frame, detection_session: ObjectDetectionSession, src_size, convert_to_src_size) -> ObjectsDetected:
+        session: OpenCVDetectionSession = detection_session['settings']['session']
+        settings = detection_session and detection_session.get('settings', None)
+        area, threshold, blur, referenceFrameFrequency = self.parse_settings(settings)
 
         gray = frame
-        detection_session.curFrame = cv2.GaussianBlur(
-            gray, (blur, blur), 0, dst=detection_session.curFrame)
+        session.curFrame = cv2.GaussianBlur(
+            gray, (blur, blur), 0, dst=session.curFrame)
 
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
+        now = round(time.time() * 1000)
+        detection_result['timestamp'] = now
         detection_result['detections'] = detections
         detection_result['inputDimensions'] = src_size
 
-        if detection_session.previous_frame is None:
-            detection_session.previous_frame = detection_session.curFrame
-            detection_session.curFrame = None
+        if session.previous_frame is None:
+            session.previous_frame = session.curFrame
+            session.curFrame = None
             return detection_result
 
-        detection_session.frameDelta = cv2.absdiff(
-            detection_session.previous_frame, detection_session.curFrame, dst=detection_session.frameDelta)
-        tmp = detection_session.curFrame
-        detection_session.curFrame = detection_session.previous_frame
-        detection_session.previous_frame = tmp
+        session.frameDelta = cv2.absdiff(
+            session.previous_frame, session.curFrame, dst=session.frameDelta)
+        if not referenceFrameFrequency or now - session.lastFrame > referenceFrameFrequency:
+            tmp = session.curFrame
+            session.curFrame = session.previous_frame
+            session.previous_frame = tmp
 
-        _, detection_session.thresh = cv2.threshold(
-            detection_session.frameDelta, threshold, 255, cv2.THRESH_BINARY, dst=detection_session.thresh)
-        detection_session.dilated = cv2.dilate(
-            detection_session.thresh, None, iterations=2, dst=detection_session.dilated)
+        _, session.thresh = cv2.threshold(
+            session.frameDelta, threshold, 255, cv2.THRESH_BINARY, dst=session.thresh)
+        session.dilated = cv2.dilate(
+            session.thresh, None, iterations=2, dst=session.dilated)
         fcontours = cv2.findContours(
-            detection_session.dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            session.dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = imutils.grab_contours(fcontours)
 
 
@@ -205,24 +203,16 @@ class OpenCVPlugin(DetectPlugin):
             detection_session.cap = None
         return super().end_session(detection_session)
 
-    async def generateObjectDetections(self, videoFrames: Any, session: ObjectDetectionGeneratorSession = None) -> Any:
-        try:
-            ds = OpenCVDetectionSession()
-            videoFrames = await scrypted_sdk.sdk.connectRPCObject(videoFrames)
-            async for videoFrame in videoFrames:
-               detected = await self.run_detection_videoframe(videoFrame, session and session.get('settings'), ds)
-               yield {
-                   '__json_copy_serialize_children': True,
-                   'detected': detected,
-                   'videoFrame': videoFrame,
-               }
-        finally:
-            try:
-                await videoFrames.aclose()
-            except:
-                pass
+    async def generateObjectDetections(self, videoFrames: Any, detection_session: ObjectDetectionGeneratorSession = None) -> Any:
+        if not detection_session:
+            detection_session = {}
+        if not detection_session.get('settings'):
+            detection_session['settings'] = {}
+        settings = detection_session['settings']
+        settings['session'] = OpenCVDetectionSession()
+        return super().generateObjectDetections(videoFrames, detection_session)
 
-    async def run_detection_videoframe(self, videoFrame: VideoFrame, settings: Any, detection_session: OpenCVDetectionSession) -> ObjectsDetected:
+    async def run_detection_videoframe(self, videoFrame: VideoFrame, detection_session: ObjectDetectionSession) -> ObjectsDetected:
         width = videoFrame.width
         height = videoFrame.height
 
@@ -267,5 +257,5 @@ class OpenCVPlugin(DetectPlugin):
         def convert_to_src_size(point):
             return point[0] * scale, point[1] * scale
         mat = np.ndarray((height, width, 1), buffer=buffer, dtype=np.uint8)
-        detections = self.detect(mat, settings, detection_session, (videoFrame.width, videoFrame.height), convert_to_src_size)
+        detections = self.detect(mat, detection_session, (videoFrame.width, videoFrame.height), convert_to_src_size)
         return detections

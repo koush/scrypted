@@ -1,49 +1,10 @@
 import { Deferred } from "@scrypted/common/src/deferred";
-import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import { readLength, readLine } from "@scrypted/common/src/read-stream";
-import sdk, { FFmpegInput, Image, ImageOptions, MediaObject, ScryptedDeviceBase, ScryptedMimeTypes, VideoFrame, VideoFrameGenerator, VideoFrameGeneratorOptions } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Image, ImageFormat, ImageOptions, MediaObject, ScryptedDeviceBase, ScryptedMimeTypes, VideoFrame, VideoFrameGenerator, VideoFrameGeneratorOptions } from "@scrypted/sdk";
 import child_process from 'child_process';
-import type sharp from 'sharp';
 import { Readable } from 'stream';
 
-export let sharpLib: (input?:
-    | Buffer
-    | Uint8Array
-    | Uint8ClampedArray
-    | Int8Array
-    | Uint16Array
-    | Int16Array
-    | Uint32Array
-    | Int32Array
-    | Float32Array
-    | Float64Array
-    | string,
-    options?: sharp.SharpOptions) => sharp.Sharp;
-try {
-    sharpLib = require('sharp');
-}
-catch (e) {
-    console.warn('Sharp failed to load. FFmpeg Frame Generator will not function properly.')
-}
-
-async function createVipsMediaObject(image: VipsImage): Promise<VideoFrame & MediaObject> {
-    const ret = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
-        format: null,
-        timestamp: 0,
-        width: image.width,
-        height: image.height,
-        queued: 0,
-        toBuffer: (options: ImageOptions) => image.toBuffer(options),
-        toImage: async (options: ImageOptions) => {
-            const newImage = await image.toVipsImage(options);
-            return createVipsMediaObject(newImage);
-        },
-        flush: async () => {},
-    });
-
-    return ret;
-}
 
 interface RawFrame {
     width: number;
@@ -51,80 +12,40 @@ interface RawFrame {
     data: Buffer;
 }
 
-class VipsImage implements Image {
-    constructor(public image: sharp.Sharp, public width: number, public height: number, public channels: number) {
+async function createRawImageMediaObject(image: RawImage): Promise<VideoFrame & MediaObject> {
+    const ret = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
+        format: null,
+        timestamp: 0,
+        width: image.width,
+        height: image.height,
+        queued: 0,
+        toBuffer: (options: ImageOptions) => image.toBuffer(options),
+        toImage: (options: ImageOptions) => image.toImage(options),
+        flush: async () => { },
+    });
+
+    return ret;
+}
+
+class RawImage implements Image, RawFrame {
+    constructor(public data: Buffer, public width: number, public height: number, public format: ImageFormat) {
     }
 
-    toImageInternal(options: ImageOptions) {
-        const transformed = this.image.clone();
-        if (options?.crop) {
-            transformed.extract({
-                left: Math.floor(options.crop.left),
-                top: Math.floor(options.crop.top),
-                width: Math.floor(options.crop.width),
-                height: Math.floor(options.crop.height),
-            });
-        }
-        if (options?.resize) {
-            transformed.resize(typeof options.resize.width === 'number' ? Math.floor(options.resize.width) : undefined, typeof options.resize.height === 'number' ? Math.floor(options.resize.height) : undefined, {
-                fit: "fill",
-                kernel: 'cubic',
-            });
-        }
-
-        return transformed;
+    checkOptions(options: ImageOptions) {
+        if (options?.resize || options?.crop)
+            throw new Error('resize and crop are not supported');
+        if (options?.format && options?.format !== this.format)
+            throw new Error('format not supported');
     }
 
     async toBuffer(options: ImageOptions) {
-        const transformed = this.toImageInternal(options);
-        if (options?.format === 'jpg') {
-            transformed.toFormat('jpg');
-        }
-        else {
-            if (this.channels === 1 && (options?.format === 'gray' || !options.format))
-                transformed.extractChannel(0);
-            else if (options?.format === 'gray')
-                transformed.toColorspace('b-w');
-            else if (options?.format === 'rgb')
-                transformed.removeAlpha()
-            transformed.raw();
-        }
-        return transformed.toBuffer();
-    }
-
-    async toVipsImage(options: ImageOptions) {
-        const transformed = this.toImageInternal(options);
-        const { info, data } = await transformed.raw().toBuffer({
-            resolveWithObject: true,
-        });
-
-        const sharpLib = require('sharp') as (input?:
-            | Buffer
-            | Uint8Array
-            | Uint8ClampedArray
-            | Int8Array
-            | Uint16Array
-            | Int16Array
-            | Uint32Array
-            | Int32Array
-            | Float32Array
-            | Float64Array
-            | string,
-            options?) => sharp.Sharp;
-        const newImage = sharpLib(data, {
-            raw: info,
-        });
-
-        const newMetadata = await newImage.metadata();
-        const newVipsImage = new VipsImage(newImage, newMetadata.width, newMetadata.height, newMetadata.channels);
-        return newVipsImage;
+        this.checkOptions(options);
+        return this.data;
     }
 
     async toImage(options: ImageOptions) {
-        if (options.format)
-            throw new Error('format can only be used with toBuffer');
-        const newVipsImage = await this.toVipsImage(options);
-        return createVipsMediaObject(newVipsImage);
+        this.checkOptions(options);
+        return createRawImageMediaObject(this);
     }
 }
 
@@ -133,18 +54,28 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
         const gray = options?.format === 'gray';
         const channels = gray ? 1 : 3;
+        const format: ImageFormat = gray ? 'gray' : 'rgb';
+        const vf: string[] = [];
+        if (options?.fps)
+            vf.push(`fps=${options.fps}`);
+        if (options.resize)
+            vf.push(`scale=${options.resize.width}:${options.resize.height}`);
         const args = [
             '-hide_banner',
             //'-hwaccel', 'auto',
             ...ffmpegInput.inputArguments,
             '-vcodec', 'pam',
             '-pix_fmt', gray ? 'gray' : 'rgb24',
+            ...vf.length ? [
+                '-vf',
+                vf.join(','),
+            ] : [],
             '-f', 'image2pipe',
             'pipe:3',
         ];
 
         // this seems to reduce latency.
-        addVideoFilterArguments(args, 'fps=10', 'fps');
+        // addVideoFilterArguments(args, 'fps=10', 'fps');
 
         const cp = child_process.spawn(await sdk.mediaManager.getFFmpegPath(), args, {
             stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
@@ -212,21 +143,13 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                 const raw = await frameDeferred.promise;
                 const { width, height, data } = raw;
 
-                const image = sharpLib(data, {
-                    raw: {
-                        width,
-                        height,
-                        channels,
-                    }
-                });
-                const vipsImage = new VipsImage(image, width, height, channels);
+                const rawImage = new RawImage(data, width, height, format);
                 try {
-                    const mo = await createVipsMediaObject(vipsImage);
+                    const mo = await createRawImageMediaObject(rawImage);
                     yield mo;
                 }
                 finally {
-                    vipsImage.image = undefined;
-                    image.destroy();
+                    rawImage.data = undefined;
                 }
             }
         }
