@@ -17,7 +17,7 @@ const { systemManager } = sdk;
 const defaultDetectionDuration = 20;
 const defaultDetectionInterval = 60;
 const defaultDetectionTimeout = 60;
-const defaultMotionDuration = 10;
+const defaultMotionDuration = 30;
 
 const BUILTIN_MOTION_SENSOR_ASSIST = 'Assist';
 const BUILTIN_MOTION_SENSOR_REPLACE = 'Replace';
@@ -277,28 +277,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
   }
 
-  async runPipelineAnalysis(signal: Deferred<void>, options: {
+  async createFrameGenerator(signal: Deferred<void>, options: {
     snapshotPipeline: boolean,
-  }) {
-    const start = Date.now();
-    this.analyzeStop = start + this.getDetectionDuration();
-
-    let lastStatusTime = Date.now();
-    let lastStatus = 'starting';
-    const updatePipelineStatus = (status: string) => {
-      lastStatus = status;
-      lastStatusTime = Date.now();
-    }
-
-    let frameGenerator: AsyncGenerator<VideoFrame & MediaObject, void>;
-    let detectionGenerator: AsyncGenerator<ObjectDetectionGeneratorResult, void>;
-    const interval = setInterval(() => {
-      if (Date.now() - lastStatusTime > 30000) {
-        signal.resolve();
-        this.console.error('VideoAnalysis is hung and will terminate:', lastStatus);
-      }
-    }, 30000);
-    signal.promise.finally(() => clearInterval(interval));
+  }, updatePipelineStatus: (status: string) => void) {
 
     let newPipeline: string = this.newPipeline;
     if (!this.hasMotionType && (!newPipeline || newPipeline === 'Default')) {
@@ -312,7 +293,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       options.snapshotPipeline = true;
       this.console.log('decoder:', 'Snapshot +', this.objectDetection.name);
       const self = this;
-      frameGenerator = (async function* gen() {
+      return (async function* gen() {
         try {
           while (!signal.finished) {
             const now = Date.now();
@@ -362,7 +343,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         audio: null,
       });
 
-      frameGenerator = await videoFrameGenerator.generateVideoFrames(stream, {
+      return await videoFrameGenerator.generateVideoFrames(stream, {
         queue: 0,
         resize: this.model?.inputSize ? {
           width: this.model.inputSize[0],
@@ -371,17 +352,41 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         format: this.model?.inputFormat,
       });
     }
+  }
+
+  async runPipelineAnalysis(signal: Deferred<void>, options: {
+    snapshotPipeline: boolean,
+  }) {
+    const start = Date.now();
+    this.analyzeStop = start + this.getDetectionDuration();
+
+    let lastStatusTime = Date.now();
+    let lastStatus = 'starting';
+    const updatePipelineStatus = (status: string) => {
+      lastStatus = status;
+      lastStatusTime = Date.now();
+    }
+
+    const interval = setInterval(() => {
+      if (Date.now() - lastStatusTime > 30000) {
+        signal.resolve();
+        this.console.error('VideoAnalysis is hung and will terminate:', lastStatus);
+      }
+    }, 30000);
+    signal.promise.finally(() => clearInterval(interval));
 
     const currentDetections = new Set<string>();
     let lastReport = 0;
-    detectionGenerator = await sdk.connectRPCObject(await this.objectDetection.generateObjectDetections(frameGenerator, {
-      settings: this.getCurrentSettings(),
-      sourceId: this.id,
-    }));
 
     updatePipelineStatus('waiting result');
 
-    for await (const detected of detectionGenerator) {
+    for await (const detected of
+      await sdk.connectRPCObject(
+        await this.objectDetection.generateObjectDetections(
+          await this.createFrameGenerator(signal, options, updatePipelineStatus), {
+          settings: this.getCurrentSettings(),
+          sourceId: this.id,
+        }))) {
       if (signal.finished) {
         break;
       }
