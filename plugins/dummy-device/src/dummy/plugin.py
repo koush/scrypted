@@ -6,7 +6,7 @@ import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
 from scrypted_sdk.types import DeviceProvider, DeviceCreator, DeviceCreatorSettings, Setting, ScryptedDeviceType, ScryptedInterface
 
-from .device import DummyDevice, SUPPORTED_TYPES
+from .device import DummyDevice
 
 
 class DummyDevicePlugin(ScryptedDeviceBase, DeviceProvider, DeviceCreator):
@@ -25,25 +25,18 @@ class DummyDevicePlugin(ScryptedDeviceBase, DeviceProvider, DeviceCreator):
                 "title": "Dummy Device Name",
                 "placeholder": "My Dummy Device",
             },
-            {
-                "key": "type",
-                "title": "Device Type",
-                "choices": SUPPORTED_TYPES,
-            }
         ]
 
     async def createDevice(self, settings: DeviceCreatorSettings) -> str:
         if settings.get("name", "") == "":
             raise Exception("cannot create device with empty name")
-        if settings.get("type", "") == "":
-            raise Exception("cannot create device with empty type")
 
         id = str(uuid.uuid4())
         await scrypted_sdk.deviceManager.onDeviceDiscovered({
             "nativeId": id,
             "name": settings["name"],
             "interfaces": [ScryptedInterface.Settings.value],
-            "type": settings["type"],
+            "type": ScryptedDeviceType.API.value,
         })
 
     async def getDevice(self, nativeId: str) -> DummyDevice:
