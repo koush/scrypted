@@ -178,14 +178,19 @@ export class SystemManagerImpl implements SystemManager {
     getDeviceById(idOrPluginId: string, nativeId?: ScryptedNativeId): any {
         let id: string;
         if (this.state[idOrPluginId]) {
+            // don't allow invalid input on nativeId, must be nullish if there is an exact id match.
+            if (nativeId != null)
+                return;
             id = idOrPluginId;
         }
         else {
             for (const check of Object.keys(this.state)) {
                 const state = this.state[check];
-                if (state[ScryptedInterfaceProperty.pluginId].value === idOrPluginId) {
+                if (!state)
+                    continue;
+                if (state[ScryptedInterfaceProperty.pluginId]?.value === idOrPluginId) {
                     // null and undefined should match here.
-                    if (nativeId == state[ScryptedInterfaceProperty.nativeId]?.value) {
+                    if (state[ScryptedInterfaceProperty.nativeId]?.value == nativeId) {
                         id = check;
                         break;
                     }

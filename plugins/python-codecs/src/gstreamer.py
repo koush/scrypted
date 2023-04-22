@@ -80,7 +80,7 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
 
     videosrc += ' ! {decoder} ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! {videocaps}'.format(decoder=decoder, videocaps=videocaps)
 
-    gst, gen = createPipelineIterator(videosrc)
+    gst, gen = await createPipelineIterator(videosrc)
     async for gstsample in gen():
         caps = gstsample.get_caps()
         height = caps.get_structure(0).get_value('height')

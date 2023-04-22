@@ -5,9 +5,9 @@ import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-// import { FFmpegVideoFrameGenerator, sharpLib } from './ffmpeg-videoframes';
 import { serverSupportsMixinEventMasking } from './server-version';
 import { getAllDevices, safeParseJson } from './util';
+import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes-no-sharp';
 
 const polygonOverlap = require('polygon-overlap');
 const insidePolygon = require('point-inside-polygon');
@@ -356,12 +356,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.console.log(videoFrameGenerator.name, '+', this.objectDetection.name);
       updatePipelineStatus('getVideoStream');
       const stream = await this.cameraDevice.getVideoStream({
+        prebuffer: this.model.prebuffer,
         destination,
         // ask rebroadcast to mute audio, not needed.
         audio: null,
       });
 
       frameGenerator = await videoFrameGenerator.generateVideoFrames(stream, {
+        queue: 0,
         resize: this.model?.inputSize ? {
           width: this.model.inputSize[0],
           height: this.model.inputSize[1],
@@ -370,15 +372,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
     }
 
-    signal.promise.finally(() => frameGenerator.return());
-
     const currentDetections = new Set<string>();
     let lastReport = 0;
     detectionGenerator = await sdk.connectRPCObject(await this.objectDetection.generateObjectDetections(frameGenerator, {
       settings: this.getCurrentSettings(),
       sourceId: this.id,
     }));
-    signal.promise.finally(() => detectionGenerator.return());
 
     updatePipelineStatus('waiting result');
 
@@ -417,16 +416,21 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
       if (detected.detected.detectionId) {
         updatePipelineStatus('creating jpeg');
-        const jpeg = await detected.videoFrame.toBuffer({
+        // const start = Date.now();
+        const vf = await sdk.connectRPCObject(detected.videoFrame);
+        const jpeg = await vf.toBuffer({
           format: 'jpg',
         });
-        updatePipelineStatus('converting jpeg');
         const mo = await sdk.mediaManager.createMediaObject(jpeg, 'image/jpeg');
+        // this.console.log('retain took', Date.now() -start);
         this.setDetection(detected.detected, mo);
         // this.console.log('image saved', detected.detected.detections);
       }
       this.reportObjectDetections(detected.detected);
       if (this.hasMotionType) {
+        // const diff = Date.now() - when;
+        // when = Date.now();
+        // this.console.log('sleper', diff);
         await sleep(250);
       }
       updatePipelineStatus('waiting result');
@@ -952,25 +956,25 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
   constructor(nativeId?: ScryptedNativeId) {
     super(nativeId);
 
-    // process.nextTick(() => {
-    //   sdk.deviceManager.onDevicesChanged({
-    //     devices: [
-    //       {
-    //         name: 'FFmpeg Frame Generator',
-    //         type: ScryptedDeviceType.Builtin,
-    //         interfaces: sharpLib ? [
-    //           ScryptedInterface.VideoFrameGenerator,
-    //         ] : [],
-    //         nativeId: 'ffmpeg',
-    //       }
-    //     ]
-    //   })
-    // })
+    process.nextTick(() => {
+      sdk.deviceManager.onDevicesChanged({
+        devices: [
+          {
+            name: 'FFmpeg Frame Generator',
+            type: ScryptedDeviceType.Builtin,
+            interfaces: [
+              ScryptedInterface.VideoFrameGenerator,
+            ],
+            nativeId: 'ffmpeg',
+          }
+        ]
+      })
+    })
   }
 
   async getDevice(nativeId: string): Promise<any> {
-    // if (nativeId === 'ffmpeg')
-    //   return new FFmpegVideoFrameGenerator('ffmpeg');
+    if (nativeId === 'ffmpeg')
+      return new FFmpegVideoFrameGenerator('ffmpeg');
   }
 
   async releaseDevice(id: string, nativeId: string): Promise<void> {

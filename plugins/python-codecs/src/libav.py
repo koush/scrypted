@@ -1,5 +1,4 @@
 import time
-from gst_generator import createPipelineIterator
 import scrypted_sdk
 from typing import Any
 import vipsimage

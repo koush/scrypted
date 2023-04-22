@@ -5,7 +5,6 @@ from typing import Any, Tuple
 
 import scrypted_sdk
 from scrypted_sdk.types import (MediaObject, ObjectDetection,
-                                ObjectDetectionCallbacks,
                                 ObjectDetectionGeneratorSession,
                                 ObjectDetectionModel, ObjectDetectionSession,
                                 ObjectsDetected, ScryptedMimeTypes, Setting)
@@ -55,6 +54,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         try:
             videoFrames = await scrypted_sdk.sdk.connectRPCObject(videoFrames)
             async for videoFrame in videoFrames:
+               videoFrame = await scrypted_sdk.sdk.connectRPCObject(videoFrame)
                detected = await self.run_detection_videoframe(videoFrame, session)
                yield {
                    '__json_copy_serialize_children': True,
@@ -67,10 +67,10 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             except:
                 pass
 
-    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
+    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         vf: scrypted_sdk.VideoFrame
         if mediaObject and mediaObject.mimeType == ScryptedMimeTypes.Image.value:
-            vf = mediaObject
+            vf = await scrypted_sdk.sdk.connectRPCObject(mediaObject)
         else:
             vf = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.Image.value)
 

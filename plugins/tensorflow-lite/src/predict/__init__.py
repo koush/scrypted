@@ -149,7 +149,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     def getModelSettings(self, settings: Any = None) -> list[Setting]:
         return []
 
-    def create_detection_result(self, objs: List[Prediction], size, allowList, convert_to_src_size=None) -> ObjectsDetected:
+    def create_detection_result(self, objs: List[Prediction], size, convert_to_src_size=None) -> ObjectsDetected:
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
@@ -157,8 +157,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         for obj in objs:
             className = self.labels.get(obj.id, obj.id)
-            if allowList and len(allowList) and className not in allowList:
-                continue
             detection: ObjectDetectionResult = {}
             detection['boundingBox'] = (
                 obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)

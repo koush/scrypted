@@ -1,9 +1,9 @@
 from __future__ import annotations
 from enum import Enum
 try:
-    from typing import TypedDict
+    from typing import TypedDict, Union
 except:
-    from typing_extensions import TypedDict
+    from typing_extensions import TypedDict, Union
 from typing import Any
 from typing import Callable
 
@@ -218,6 +218,12 @@ class H264Info(TypedDict):
     stapb: bool
     pass
 
+class ImageOptions(TypedDict):
+    crop: Any
+    format: ImageFormat
+    resize: Any
+    pass
+
 class ObjectDetectionHistory(TypedDict):
     firstSeen: float
     lastSeen: float
@@ -240,18 +246,12 @@ class HttpResponseOptions(TypedDict):
     headers: object
     pass
 
-class ImageOptions(TypedDict):
-    crop: Any
-    format: ImageFormat
-    resize: Any
-    pass
-
 class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     className: str
     history: ObjectDetectionHistory
     id: str
-    moving: bool
+    movement: Union[ObjectDetectionHistory, Any]
     name: str
     resources: VideoResource
     score: float
@@ -490,7 +490,7 @@ class NotifierOptions(TypedDict):
 class ObjectDetectionGeneratorResult(TypedDict):
     __json_copy_serialize_children: Any
     detected: ObjectsDetected
-    videoFrame: VideoFrame
+    videoFrame: Union[VideoFrame, MediaObject]
     pass
 
 class ObjectDetectionGeneratorSession(TypedDict):
@@ -503,13 +503,12 @@ class ObjectDetectionModel(TypedDict):
     inputFormat: Any | Any | Any
     inputSize: list[float]
     name: str
+    prebuffer: float
     settings: list[Setting]
     triggerClasses: list[str]
     pass
 
 class ObjectDetectionSession(TypedDict):
-    detectionId: str
-    duration: float
     settings: Any
     sourceId: str
     pass
@@ -708,6 +707,8 @@ class VideoClipOptions(TypedDict):
 class VideoFrameGeneratorOptions(TypedDict):
     crop: Any
     format: ImageFormat
+    fps: float
+    queue: float
     resize: Any
     pass
 
@@ -935,9 +936,9 @@ class OauthClient:
     pass
 
 class ObjectDetection:
-    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
+    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         pass
-    async def generateObjectDetections(self, videoFrames: VideoFrame, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
+    async def generateObjectDetections(self, videoFrames: AsyncGenerator, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
         pass
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         pass
@@ -1280,7 +1281,7 @@ class MediaManager:
         pass
     async def createFFmpegMediaObject(self, ffmpegInput: FFmpegInput, options: MediaObjectOptions = None) -> MediaObject:
         pass
-    async def createMediaObject(self, data: Any, mimeType: str, options: Any = None) -> Any:
+    async def createMediaObject(self, data: Any, mimeType: str, options: Any = None) -> Union[MediaObject, Any]:
         pass
     async def createMediaObjectFromUrl(self, data: str, options: Any = None) -> MediaObject:
         pass
@@ -1379,6 +1380,108 @@ class ScryptedInterfaceProperty(Enum):
     humiditySetting = "humiditySetting"
     fan = "fan"
     applicationInfo = "applicationInfo"
+
+class ScryptedInterfaceMethods(Enum):
+    listen = "listen"
+    probe = "probe"
+    setMixins = "setMixins"
+    setName = "setName"
+    setRoom = "setRoom"
+    setType = "setType"
+    getPluginJson = "getPluginJson"
+    turnOff = "turnOff"
+    turnOn = "turnOn"
+    setBrightness = "setBrightness"
+    getTemperatureMaxK = "getTemperatureMaxK"
+    getTemperatureMinK = "getTemperatureMinK"
+    setColorTemperature = "setColorTemperature"
+    setRgb = "setRgb"
+    setHsv = "setHsv"
+    sendNotification = "sendNotification"
+    start = "start"
+    stop = "stop"
+    pause = "pause"
+    resume = "resume"
+    dock = "dock"
+    setTemperature = "setTemperature"
+    setThermostatMode = "setThermostatMode"
+    setThermostatSetpoint = "setThermostatSetpoint"
+    setThermostatSetpointHigh = "setThermostatSetpointHigh"
+    setThermostatSetpointLow = "setThermostatSetpointLow"
+    setTemperatureUnit = "setTemperatureUnit"
+    getPictureOptions = "getPictureOptions"
+    takePicture = "takePicture"
+    getAudioStream = "getAudioStream"
+    startDisplay = "startDisplay"
+    stopDisplay = "stopDisplay"
+    getVideoStream = "getVideoStream"
+    getVideoStreamOptions = "getVideoStreamOptions"
+    getRecordingStream = "getRecordingStream"
+    getRecordingStreamCurrentTime = "getRecordingStreamCurrentTime"
+    getRecordingStreamOptions = "getRecordingStreamOptions"
+    getRecordingStreamThumbnail = "getRecordingStreamThumbnail"
+    ptzCommand = "ptzCommand"
+    getRecordedEvents = "getRecordedEvents"
+    getVideoClip = "getVideoClip"
+    getVideoClipThumbnail = "getVideoClipThumbnail"
+    getVideoClips = "getVideoClips"
+    removeVideoClips = "removeVideoClips"
+    setVideoStreamOptions = "setVideoStreamOptions"
+    startIntercom = "startIntercom"
+    stopIntercom = "stopIntercom"
+    lock = "lock"
+    unlock = "unlock"
+    addPassword = "addPassword"
+    getPasswords = "getPasswords"
+    removePassword = "removePassword"
+    activate = "activate"
+    deactivate = "deactivate"
+    isReversible = "isReversible"
+    closeEntry = "closeEntry"
+    openEntry = "openEntry"
+    getDevice = "getDevice"
+    releaseDevice = "releaseDevice"
+    adoptDevice = "adoptDevice"
+    discoverDevices = "discoverDevices"
+    createDevice = "createDevice"
+    getCreateDeviceSettings = "getCreateDeviceSettings"
+    getRefreshFrequency = "getRefreshFrequency"
+    refresh = "refresh"
+    getMediaStatus = "getMediaStatus"
+    load = "load"
+    seek = "seek"
+    skipNext = "skipNext"
+    skipPrevious = "skipPrevious"
+    convert = "convert"
+    getSettings = "getSettings"
+    putSetting = "putSetting"
+    armSecuritySystem = "armSecuritySystem"
+    disarmSecuritySystem = "disarmSecuritySystem"
+    getReadmeMarkdown = "getReadmeMarkdown"
+    getOauthUrl = "getOauthUrl"
+    onOauthCallback = "onOauthCallback"
+    canMixin = "canMixin"
+    getMixin = "getMixin"
+    releaseMixin = "releaseMixin"
+    onRequest = "onRequest"
+    onConnection = "onConnection"
+    onPush = "onPush"
+    run = "run"
+    eval = "eval"
+    loadScripts = "loadScripts"
+    saveScript = "saveScript"
+    trackObjects = "trackObjects"
+    getDetectionInput = "getDetectionInput"
+    getObjectTypes = "getObjectTypes"
+    detectObjects = "detectObjects"
+    generateObjectDetections = "generateObjectDetections"
+    getDetectionModel = "getDetectionModel"
+    setHumidity = "setHumidity"
+    setFan = "setFan"
+    startRTCSignalingSession = "startRTCSignalingSession"
+    createRTCSignalingSession = "createRTCSignalingSession"
+    getScryptedUserAccessControl = "getScryptedUserAccessControl"
+    generateVideoFrames = "generateVideoFrames"
 
 class DeviceState:
     def getScryptedProperty(self, property: str) -> Any:
@@ -2451,21 +2554,27 @@ class HttpResponse:
         pass
     pass
 
-class ObjectDetectionCallbacks:
-    async def onDetection(self, detection: ObjectsDetected, redetect: Any = None, mediaObject: MediaObject = None) -> bool:
-        pass
-    async def onDetectionEnded(self, detection: ObjectsDetected) -> None:
-        pass
-    pass
-
 class VideoFrame:
     format: ImageFormat
     height: float
+    queued: float
     timestamp: float
+    width: float
+    async def flush(self, count: float = None) -> None:
+        pass
+    async def toBuffer(self, options: ImageOptions = None) -> bytearray:
+        pass
+    async def toImage(self, options: ImageOptions = None) -> Union[Image, MediaObject]:
+        pass
+    pass
+
+class Image:
+    format: ImageFormat
+    height: float
     width: float
     async def toBuffer(self, options: ImageOptions = None) -> bytearray:
         pass
-    async def toImage(self, options: ImageOptions = None) -> Any:
+    async def toImage(self, options: ImageOptions = None) -> Union[Image, MediaObject]:
         pass
     pass
 

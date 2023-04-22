@@ -22,18 +22,30 @@ class VipsImage(scrypted_sdk.VideoFrame):
             def format():
                 return memoryview(vipsImage.vipsImage.write_to_memory())
             return await to_thread(format)
+        elif options['format'] == 'rgba':
+            def format():
+                if not vipsImage.vipsImage.hasalpha():
+                    rgba = vipsImage.vipsImage.addalpha()
+                else:
+                    rgba = vipsImage.vipsImage
+                return memoryview(rgba.write_to_memory())
+            return await to_thread(format)
         elif options['format'] == 'rgb':
             def format():
                 if vipsImage.vipsImage.hasalpha():
                     rgb = vipsImage.vipsImage.extract_band(0, n=vipsImage.vipsImage.bands - 1)
                 else:
                     rgb = vipsImage.vipsImage
-                mem = memoryview(rgb.write_to_memory())
-                return mem
+                return memoryview(rgb.write_to_memory())
             return await to_thread(format)
         elif options['format'] == 'gray':
-            def format():
-                return memoryview(vipsImage.vipsImage.write_to_memory())
+            if vipsImage.vipsImage.bands == 1:
+                def format():
+                    return memoryview(vipsImage.vipsImage.write_to_memory())
+            else:
+                def format():
+                    gray = vipsImage.vipsImage.colourspace("b-w")
+                    return memoryview(gray.write_to_memory())
             return await to_thread(format)
 
         return await to_thread(lambda: vipsImage.vipsImage.write_to_buffer('.' + options['format']))
