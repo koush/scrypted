@@ -979,13 +979,16 @@ class PrebufferSession {
     }
   }
 
-  shouldDisableBatteryPrebuffer(): boolean {
-    if (!this.mixin.interfaces.includes(ScryptedInterface.Battery) || this.forceBatteryPrebuffer) {
+  shouldDisableBatteryPrebuffer(): boolean | null {
+    if (!this.mixin.interfaces.includes(ScryptedInterface.Battery)) {
+      return null;
+    }
+    if (this.forceBatteryPrebuffer) {
       return false;
     }
     const lowBattery = this.mixin.batteryLevel == null || this.mixin.batteryLevel < 20;
     const hasCharger = this.mixin.interfaces.includes(ScryptedInterface.Charger);
-    return lowBattery || (hasCharger && this.mixin.chargeState !== ChargeState.Charging);
+    return !hasCharger || lowBattery || this.mixin.chargeState !== ChargeState.Charging;
   }
 
   async handleRebroadcasterClient(options: {
@@ -1586,11 +1589,17 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
       if (session.shouldDisableBatteryPrebuffer()) {
         this.console.log('camera is battery powered and either not charging or on low battery, prebuffering and rebroadcasting will only work on demand.');
-        continue;
       }
 
       (async () => {
         while (this.sessions.get(id) === session && !this.released) {
+          if (session.shouldDisableBatteryPrebuffer()) {
+            // since battery devices could be eligible for prebuffer, check periodically
+            // in the event the battery device becomes eligible again
+            await new Promise(resolve => setTimeout(resolve, 60000));
+            continue;
+          }
+
           session.ensurePrebufferSession();
           let wasActive = false;
           try {
@@ -1612,12 +1621,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             wasActive = false;
             this.online = !!active;
           }
-          if (!session.shouldDisableBatteryPrebuffer()) {
-            this.console.log('restarting prebuffer session in 5 seconds');
-            await new Promise(resolve => setTimeout(resolve, 5000));
-          } else {
-            break;
-          }
+          this.console.log('restarting prebuffer session in 5 seconds');
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
         this.console.log('exiting prebuffer session (released or restarted with new configuration)');
       })();
