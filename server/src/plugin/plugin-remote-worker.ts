@@ -162,6 +162,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                             throw e;
                         }
                     })();
+                    clusterPeers.set(port, clusterPeerPromise);
                 }
                 return clusterPeerPromise;
             };

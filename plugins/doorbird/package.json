@@ -40,6 +40,7 @@
    "devDependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "@types/node": "^18.15.11"
+      "@types/node": "^18.15.11",
+      "cross-env": "^7.0.3"
    }
 }
