@@ -105,6 +105,9 @@ class PrebufferSession {
   rtspServerPath: string;
   rtspServerMutedPath: string;
 
+  batteryListener: EventListenerRegister;
+  chargerListener: EventListenerRegister;
+
   constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: ResponseMediaStreamOptions, public enabled: boolean, public forceBatteryPrebuffer: boolean) {
     this.storage = mixin.storage;
     this.console = mixin.console;
@@ -212,6 +215,14 @@ class PrebufferSession {
       parserSession.kill(new Error('rebroadcast disabled'));
       this.clearPrebuffers();
     });
+    if (this.batteryListener) {
+      this.batteryListener.removeListener();
+      this.batteryListener = null;
+    }
+    if (this.chargerListener) {
+      this.chargerListener.removeListener();
+      this.chargerListener = null;
+    }
   }
 
   ensurePrebufferSession() {
@@ -950,7 +961,7 @@ class PrebufferSession {
       if (this.stopInactive) {
         this.console.log(this.streamName, 'low battery or not charging, prebuffering and rebroadcasting will only work on demand')
         if (!this.activeClients && this.parserSessionPromise) {
-          this.console.log(this.streamName, 'terminating rebroadcast due to low battery')
+          this.console.log(this.streamName, 'terminating rebroadcast due to low battery or not charging')
           const session = await this.parserSessionPromise;
           session.kill(new Error('low battery or not charging'));
         }
@@ -959,9 +970,13 @@ class PrebufferSession {
       }
     }
 
-    const device = this.mixinDevice as any as ScryptedDevice;
-    device.listen(ScryptedInterface.Battery, checkDisablePrebuffer);
-    device.listen(ScryptedInterface.Charger, checkDisablePrebuffer);
+    const id = this.mixin.id;
+    if (!this.batteryListener) {
+      this.batteryListener = systemManager.listenDevice(id, ScryptedInterface.Battery, () => checkDisablePrebuffer());
+    }
+    if (!this.chargerListener) {
+      this.chargerListener = systemManager.listenDevice(id, ScryptedInterface.Charger, () => checkDisablePrebuffer());
+    }
   }
 
   shouldDisableBatteryPrebuffer(): boolean {
@@ -1597,8 +1612,12 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             wasActive = false;
             this.online = !!active;
           }
-          this.console.log('restarting prebuffer session in 5 seconds');
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          if (!session.shouldDisableBatteryPrebuffer()) {
+            this.console.log('restarting prebuffer session in 5 seconds');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          } else {
+            break;
+          }
         }
         this.console.log('exiting prebuffer session (released or restarted with new configuration)');
       })();
