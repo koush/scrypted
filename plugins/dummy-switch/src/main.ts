@@ -92,8 +92,19 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {
-                    name: 'Replace Motion Sensor',
+                    name: 'Custom Motion Sensor',
                     nativeId: ReplaceMotionSensorNativeId,
+                    interfaces: [ScryptedInterface.MixinProvider],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+        })();
+
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Custom Doorbell Button',
+                    nativeId: ReplaceBinarySensorNativeId,
                     interfaces: [ScryptedInterface.MixinProvider],
                     type: ScryptedDeviceType.Builtin,
                 },

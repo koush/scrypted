@@ -65,7 +65,7 @@ export class ReplaceBinarySensor extends ScryptedDeviceBase implements MixinProv
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any> {
         return new ReplaceBinarySensorMixin({
-            group: 'Replace Binary Sensor',
+            group: 'Custom Doorbell Button',
             groupKey: 'replaceBinarySensor',
             mixinDevice,
             mixinDeviceInterfaces,

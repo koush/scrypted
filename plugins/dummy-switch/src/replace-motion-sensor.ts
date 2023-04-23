@@ -65,7 +65,7 @@ export class ReplaceMotionSensor extends ScryptedDeviceBase implements MixinProv
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any> {
         return new ReplaceMotionSensorMixin({
-            group: 'Replace Motion Sensor',
+            group: 'Custom Motion Sensor',
             groupKey: 'replaceMotionSensor',
             mixinDevice,
             mixinDeviceInterfaces,
