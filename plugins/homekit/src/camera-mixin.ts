@@ -76,18 +76,20 @@ The latest troubleshooting guide for all known streaming or recording issues can
         const settings: Setting[] = [];
         const realDevice = systemManager.getDeviceById<ObjectDetector & VideoCamera>(this.id);
 
-        settings.push(
-            {
-                title: 'Linked Motion Sensor',
-                key: 'linkedMotionSensor',
-                type: 'device',
-                deviceFilter: 'interfaces.includes("MotionSensor")',
-                value: this.storage.getItem('linkedMotionSensor') || this.id,
-                placeholder: this.interfaces.includes(ScryptedInterface.MotionSensor)
-                    ? undefined : 'None',
-                description: "Set the motion sensor used to trigger HomeKit Secure Video recordings. Defaults to the device provided motion sensor when available.",
-            },
-        );
+        if (this.storage.getItem('linkedMotionSensor')) {
+            settings.push(
+                {
+                    title: 'Linked Motion Sensor',
+                    key: 'linkedMotionSensor',
+                    type: 'device',
+                    deviceFilter: 'interfaces.includes("MotionSensor")',
+                    value: this.storage.getItem('linkedMotionSensor') || this.id,
+                    placeholder: this.interfaces.includes(ScryptedInterface.MotionSensor)
+                        ? undefined : 'None',
+                    description: "Set the motion sensor used to trigger HomeKit Secure Video recordings. Defaults to the device provided motion sensor when available.",
+                },
+            );
+        }
 
         // settings.push({
         //     title: 'H265 Streams',
