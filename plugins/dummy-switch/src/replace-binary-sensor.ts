@@ -7,8 +7,8 @@ export const ReplaceBinarySensorNativeId = 'replaceBinarySensor';
 class ReplaceBinarySensorMixin extends SettingsMixinDeviceBase<any> implements Settings {
     storageSettings = new StorageSettings(this, {
         replaceBinarySensor: {
-            title: 'Binary Sensor',
-            description: 'The binary sensor to attach to this camera or doorbell.',
+            title: 'Doorbell Button',
+            description: 'The binary sensor to attach to this camera.',
             value: this.storage.getItem('replaceBinarySensor'),
             deviceFilter: `interfaces.includes('${ScryptedInterface.BinarySensor}') && !interfaces.includes('@scrypted/dummy-switch:ReplaceBinarySensor') && id !== '${this.id}'`,
             type: 'device',

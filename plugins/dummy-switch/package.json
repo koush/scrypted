@@ -38,5 +38,5 @@
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.21"
+   "version": "0.0.23"
 }
