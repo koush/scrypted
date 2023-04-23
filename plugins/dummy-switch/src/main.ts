@@ -1,6 +1,7 @@
 import { BinarySensor, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Lock, LockState, MotionSensor, OccupancySensor, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { ReplaceMotionSensor, ReplaceMotionSensorNativeId } from './replace-motion-sensor';
+import { ReplaceBinarySensor, ReplaceBinarySensorNativeId } from './replace-binary-sensor';
 
 const { log, deviceManager } = sdk;
 
@@ -140,6 +141,8 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
     async getDevice(nativeId: string) {
         if (nativeId === ReplaceMotionSensorNativeId)
             return new ReplaceMotionSensor(ReplaceMotionSensorNativeId);
+        if (nativeId === ReplaceBinarySensorNativeId)
+            return new ReplaceBinarySensor(ReplaceBinarySensorNativeId);
 
         let ret = this.devices.get(nativeId);
         if (!ret) {

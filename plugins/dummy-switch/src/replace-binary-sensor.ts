@@ -1,16 +1,16 @@
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import { DeviceState, EventListenerRegister, MixinProvider, MotionSensor, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from "@scrypted/sdk";
+import { BinarySensor, DeviceState, EventListenerRegister, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 
-export const ReplaceMotionSensorNativeId = 'replaceMotionSensor';
+export const ReplaceBinarySensorNativeId = 'replaceBinarySensor';
 
-class ReplaceMotionSensorMixin extends SettingsMixinDeviceBase<any> implements Settings {
+class ReplaceBinarySensorMixin extends SettingsMixinDeviceBase<any> implements Settings {
     storageSettings = new StorageSettings(this, {
-        replaceMotionSensor: {
-            title: 'Motion Sensor',
-            description: 'The motion sensor to attach to this camera or doorbell.',
-            value: this.storage.getItem('replaceMotionSensor'),
-            deviceFilter: `interfaces.includes('${ScryptedInterface.MotionSensor}') && !interfaces.includes('@scrypted/dummy-switch:ReplaceMotionSensor') && id !== '${this.id}'`,
+        replaceBinarySensor: {
+            title: 'Binary Sensor',
+            description: 'The binary sensor to attach to this camera or doorbell.',
+            value: this.storage.getItem('replaceBinarySensor'),
+            deviceFilter: `interfaces.includes('${ScryptedInterface.BinarySensor}') && !interfaces.includes('@scrypted/dummy-switch:ReplaceBinarySensor') && id !== '${this.id}'`,
             type: 'device',
         }
     });
@@ -19,7 +19,7 @@ class ReplaceMotionSensorMixin extends SettingsMixinDeviceBase<any> implements S
 
     constructor(options: SettingsMixinDeviceOptions<any>) {
         super(options);
-        this.motionDetected = false;
+        this.binaryState = false;
 
         this.register();
     }
@@ -27,12 +27,12 @@ class ReplaceMotionSensorMixin extends SettingsMixinDeviceBase<any> implements S
     register() {
         this.release();
 
-        const d = this.storageSettings.values.replaceMotionSensor as ScryptedDevice & MotionSensor;
+        const d = this.storageSettings.values.replaceBinarySensor as ScryptedDevice & BinarySensor;
         if (!d)
             return;
 
-        this.listener = d.listen(ScryptedInterface.MotionSensor, () => {
-            this.motionDetected = d.motionDetected;
+        this.listener = d.listen(ScryptedInterface.BinarySensor, () => {
+            this.binaryState = d.binaryState;
         });
     }
 
@@ -51,22 +51,22 @@ class ReplaceMotionSensorMixin extends SettingsMixinDeviceBase<any> implements S
 }
 
 
-export class ReplaceMotionSensor extends ScryptedDeviceBase implements MixinProvider {
+export class ReplaceBinarySensor extends ScryptedDeviceBase implements MixinProvider {
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
         if (type !== ScryptedDeviceType.Camera && type !== ScryptedDeviceType.Doorbell)
             return;
 
         return [
-            ScryptedInterface.MotionSensor,
+            ScryptedInterface.BinarySensor,
             ScryptedInterface.Settings,
-            '@scrypted/dummy-switch:ReplaceMotionSensor',
+            '@scrypted/dummy-switch:ReplaceBinarySensor',
         ];
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any> {
-        return new ReplaceMotionSensorMixin({
-            group: 'Replace Motion Sensor',
-            groupKey: 'replaceMotionSensor',
+        return new ReplaceBinarySensorMixin({
+            group: 'Replace Binary Sensor',
+            groupKey: 'replaceBinarySensor',
             mixinDevice,
             mixinDeviceInterfaces,
             mixinProviderNativeId: this.nativeId,
