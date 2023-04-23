@@ -58,11 +58,11 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         else:
             out_dict = self.model.predict({'image': input, 'confidenceThreshold': self.minThreshold })
 
-        coordinatesList = out_dict['coordinates']
+        coordinatesList = out_dict['coordinates'].astype(float)
 
         objs = []
 
-        for index, confidenceList in enumerate(out_dict['confidence']):
+        for index, confidenceList in enumerate(out_dict['confidence'].astype(float)):
             values = confidenceList
             maxConfidenceIndex = max(range(len(values)), key=values.__getitem__)
             maxConfidence = confidenceList[maxConfidenceIndex]
