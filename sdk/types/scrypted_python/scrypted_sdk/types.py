@@ -234,6 +234,9 @@ class Resource(TypedDict):
     href: str
     pass
 
+class ClipPath(TypedDict):
+    pass
+
 class AudioStreamOptions(TypedDict):
     bitrate: float
     codec: str
@@ -257,6 +260,13 @@ class ObjectDetectionResult(TypedDict):
     score: float
     zoneHistory: Any
     zones: list[str]
+    pass
+
+class ObjectDetectionZone(TypedDict):
+    classes: list[str]
+    exclusion: bool
+    path: ClipPath
+    type: Any | Any
     pass
 
 class PictureDimensions(TypedDict):
@@ -496,6 +506,7 @@ class ObjectDetectionGeneratorResult(TypedDict):
 class ObjectDetectionGeneratorSession(TypedDict):
     settings: Any
     sourceId: str
+    zones: list[ObjectDetectionZone]
     pass
 
 class ObjectDetectionModel(TypedDict):
@@ -511,6 +522,7 @@ class ObjectDetectionModel(TypedDict):
 class ObjectDetectionSession(TypedDict):
     settings: Any
     sourceId: str
+    zones: list[ObjectDetectionZone]
     pass
 
 class ObjectDetectionTypes(TypedDict):

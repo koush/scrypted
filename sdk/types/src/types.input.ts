@@ -1296,6 +1296,7 @@ export interface ObjectDetector {
   getObjectTypes(): Promise<ObjectDetectionTypes>;
 }
 export interface ObjectDetectionGeneratorSession {
+  zones?: ObjectDetectionZone[];
   settings?: { [key: string]: any };
   sourceId?: string;
 }
@@ -1317,6 +1318,12 @@ export interface ObjectDetectionGeneratorResult {
   __json_copy_serialize_children: true,
   videoFrame: VideoFrame & MediaObject;
   detected: ObjectsDetected;
+}
+export interface ObjectDetectionZone {
+  exclusion?: boolean;
+  type?: 'Intersect' | 'Contain';
+  classes?: string[];
+  path?: ClipPath;
 }
 /**
  * ObjectDetection can run classifications or analysis on arbitrary media sources.

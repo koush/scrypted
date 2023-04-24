@@ -1,6 +1,6 @@
 import { Deferred } from '@scrypted/common/src/deferred';
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceProvider, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionGeneratorResult, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
+import sdk, { Camera, DeviceProvider, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionGeneratorResult, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetectionZone, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
@@ -399,12 +399,33 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     updatePipelineStatus('waiting result');
 
+    const zones: ObjectDetectionZone[] = [];
+    for (const detectorMixin of this.plugin.currentMixins.values()) {
+      for (const mixin of detectorMixin.currentMixins.values()) {
+        if (mixin.id !== this.id)
+          continue;
+        for (const [key, zi] of Object.entries(mixin.zoneInfos)) {
+          const zone = mixin.zones[key];
+          if (!zone?.length || zone?.length < 3)
+            continue;
+          const odz: ObjectDetectionZone = {
+            classes: mixin.hasMotionType ? ['motion'] : zi.classes,
+            exclusion: zi.exclusion,
+            path: zone,
+            type: zi.type,
+          }
+          zones.push(odz);
+        }
+      }
+    }
+
     for await (const detected of
       await sdk.connectRPCObject(
         await this.objectDetection.generateObjectDetections(
           await this.createFrameGenerator(signal, options, updatePipelineStatus), {
           settings: this.getCurrentSettings(),
           sourceId: this.id,
+          zones,
         }))) {
       if (signal.finished) {
         break;
@@ -722,6 +743,20 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         ],
         value: zi?.type || 'Intersect',
       });
+
+      if (!this.hasMotionType) {
+        settings.push(
+          {
+            subgroup,
+            key: `zoneinfo-classes-${name}`,
+            title: `Detection Classes`,
+            description: 'The detection classes to match inside this zone. An empty list will match all classes.',
+            choices: (await this.getObjectTypes())?.classes || [],
+            value: zi?.classes || [],
+            multiple: true,
+          },
+        );
+      }
     }
 
     if (!this.hasMotionType) {
