@@ -1,11 +1,10 @@
 from __future__ import annotations
 from enum import Enum
 try:
-    from typing import TypedDict, Union
+    from typing import TypedDict
 except:
-    from typing_extensions import TypedDict, Union
-from typing import Any
-from typing import Callable
+    from typing_extensions import TypedDict
+from typing import Union, Any, Callable
 
 from .other import *
 

@@ -1330,7 +1330,7 @@ export interface ObjectDetectionZone {
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
-  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame & MediaObject>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult>>;
+  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame & MediaObject, void>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
