@@ -46,7 +46,6 @@ async def createPipelineIterator(pipeline: str):
         nonlocal hasFinished
         hasFinished = True
         yieldQueue.put(None)
-        sampleQueue.put_nowait(None)
         asyncio.run_coroutine_threadsafe(sampleQueue.put(None), loop = loop)
         if not finished.done():
             finished.set_result(None)
@@ -73,8 +72,8 @@ async def createPipelineIterator(pipeline: str):
                 finally:
                     yieldQueue.put(None)
         finally:
-            finish()
             print('gstreamer finished')
+            finish()
 
 
     def on_new_sample(sink, preroll):

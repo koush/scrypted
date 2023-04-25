@@ -2,6 +2,7 @@ import scrypted_sdk
 from typing import Any
 from thread import to_thread
 import io
+import time
 
 try:
     from PIL import Image
@@ -81,6 +82,7 @@ def toPILImage(pilImageWrapper: PILImage, options: scrypted_sdk.ImageOptions = N
 
 async def createPILMediaObject(image: PILImage):
     ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
+        'timestamp': time.time() * 1000,
         'format': None,
         'width': image.width,
         'height': image.height,
