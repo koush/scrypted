@@ -37,17 +37,18 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     localAddresses: string[];
     storageSettings = new StorageSettings(this, {
         localAddresses: {
-            title: 'Scrypted Server Address',
-            description: 'The IP address used by the Scrypted server. Set this to the wired IP address to prevent usage of a wireless address.',
+            title: 'Scrypted Server Addresses',
+            description: 'The IP addresses used by the Scrypted server. Set this to the wired IP address to prevent usage of a wireless address.',
             combobox: true,
+            multiple: true,
             async onGet() {
                 return {
                     choices: getAddresses(),
                 };
             },
-            mapGet: () => this.localAddresses?.[0],
+            mapGet: () => this.localAddresses,
             onPut: async (oldValue, newValue) => {
-                this.localAddresses = newValue ? [newValue] : undefined;
+                this.localAddresses = newValue?.length ? newValue : undefined;
                 const service = await sdk.systemManager.getComponent('addresses');
                 service.setLocalAddresses(this.localAddresses);
             },
