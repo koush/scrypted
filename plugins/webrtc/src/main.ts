@@ -198,12 +198,6 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             type: 'boolean',
             defaultValue: true,
         },
-        useIPv6: {
-            title: 'Use IPv6',
-            description: 'Use IPv6 addresses when connecting. This is disabled by default due to commonly misconfigured IPv6 local networks.',
-            type: 'boolean',
-            defaultValue: false,
-        },
         activeConnections: {
             readonly: true,
             title: "Current Open Connections",
@@ -449,7 +443,6 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         }
 
         return {
-            iceUseIpv6: false,
             iceServers,
             iceInterfaceAddresses,
             ...ret,
