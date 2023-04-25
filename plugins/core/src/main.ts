@@ -17,7 +17,13 @@ const { systemManager, deviceManager, endpointManager } = sdk;
 const indexHtml = fs.readFileSync('dist/index.html').toString();
 
 export function getAddresses() {
-    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
+    const addresses: string[] = [];
+    for (const [iface, nif] of Object.entries(os.networkInterfaces())) {
+        if (iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')) {
+            addresses.push(iface);
+            addresses.push(...nif.map(addr => addr.address));
+        }
+    }
     return addresses;
 }
 
@@ -133,7 +139,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     async getSettings(): Promise<Setting[]> {
         try {
             const service = await sdk.systemManager.getComponent('addresses');
-            this.localAddresses = await service.getLocalAddresses();
+            this.localAddresses = await service.getLocalAddresses(true);
         }
         catch (e) {
         }
