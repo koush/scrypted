@@ -32,6 +32,8 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         super().__init__(nativeId=nativeId)
 
         self.core = ov.Core()
+        available_devices = self.core.available_devices
+        print('available devices: %s' % available_devices)
 
         xmlFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/FP16/ssd_mobilenet_v1_coco.xml', 'ssd_mobilenet_v1_coco.xml')
         mappingFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/FP16/ssd_mobilenet_v1_coco.mapping', 'ssd_mobilenet_v1_coco.mapping')

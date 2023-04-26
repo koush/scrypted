@@ -40,6 +40,13 @@ RUN apt-get -y install \
 RUN apt-get -y install \
     libjpeg-dev zlib1g-dev
 
+# intel opencl gpu for openvino
+RUN if [ "$(uname -m)" == "x86_64" ]; \
+    then \
+        apt-get -y install \
+        intel-opencl-icd; \
+    fi
+
 # gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
 RUN apt-get -y install \
     gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav gstreamer1.0-alsa \
