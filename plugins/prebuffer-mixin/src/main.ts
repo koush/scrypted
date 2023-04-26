@@ -261,8 +261,7 @@ class PrebufferSession {
           break;
         default:
           parser = SCRYPTED_PARSER_TCP;
-          break
-
+          break;
       }
     }
 
@@ -334,15 +333,15 @@ class PrebufferSession {
     let usingFFmpeg = false;
 
     if (this.canUseRtspParser(this.advertisedMediaStreamOptions)) {
-      const defaultValue = !this.getLastH264Oddities() ?
-        SCRYPTED_PARSER_TCP : FFMPEG_PARSER_TCP;
+      const parser = this.getParser(this.advertisedMediaStreamOptions);
+      const defaultValue = parser.parser;
 
       const scryptedOptions = [
         SCRYPTED_PARSER_TCP,
         SCRYPTED_PARSER_UDP,
       ];
 
-      const currentParser = this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT;
+      const currentParser = parser.isDefault ? STRING_DEFAULT : parser.parser;
 
       settings.push(
         {
@@ -361,9 +360,7 @@ class PrebufferSession {
         }
       );
 
-      if (!(currentParser === STRING_DEFAULT ? defaultValue : currentParser).includes('Scrypted')) {
-        usingFFmpeg = true;
-      }
+      usingFFmpeg = !parser.parser.includes('Scrypted');
     }
 
     if (usingFFmpeg) {
