@@ -59,8 +59,8 @@ type Prebuffers<T extends string> = {
   [key in T]: PrebufferStreamChunk[];
 }
 
-type PrebufferParsers = 'mpegts' | 'mp4' | 'rtsp';
-const PrebufferParserValues: PrebufferParsers[] = ['mpegts', 'mp4', 'rtsp'];
+type PrebufferParsers = 'rtsp';
+const PrebufferParserValues: PrebufferParsers[] = ['rtsp'];
 
 function hasOddities(h264Info: H264Info) {
   const h264Oddities = h264Info.fuab
@@ -79,8 +79,6 @@ class PrebufferSession {
   parserSessionPromise: Promise<ParserSession<PrebufferParsers>>;
   parserSession: ParserSession<PrebufferParsers>;
   prebuffers: Prebuffers<PrebufferParsers> = {
-    mp4: [],
-    mpegts: [],
     rtsp: [],
   };
   parsers: { [container: string]: StreamParser };
@@ -100,7 +98,6 @@ class PrebufferSession {
   ffmpegInputArgumentsKey: string;
   lastDetectedAudioCodecKey: string;
   lastH264ProbeKey: string;
-  rebroadcastModeKey: string;
   rtspParserKey: string;
   rtspServerPath: string;
   rtspServerMutedPath: string;
@@ -114,7 +111,6 @@ class PrebufferSession {
     this.mixinDevice = mixin.mixinDevice;
     this.audioConfigurationKey = 'audioConfiguration-' + this.streamId;
     this.ffmpegInputArgumentsKey = 'ffmpegInputArguments-' + this.streamId;
-    this.rebroadcastModeKey = 'rebroadcastMode-' + this.streamId;
     this.lastDetectedAudioCodecKey = 'lastDetectedAudioCodec-' + this.streamId;
     this.lastH264ProbeKey = 'lastH264Probe-' + this.streamId;
     this.rtspParserKey = 'rtspParser-' + this.streamId;
@@ -164,18 +160,7 @@ class PrebufferSession {
 
   getDetectedIdrInterval() {
     const durations: number[] = [];
-    if (this.prebuffers.mp4.length) {
-      let last: number;
-
-      for (const chunk of this.prebuffers.mp4) {
-        if (chunk.type === 'mdat') {
-          if (last)
-            durations.push(chunk.time - last);
-          last = chunk.time;
-        }
-      }
-    }
-    else if (this.prebuffers.rtsp.length) {
+    if (this.prebuffers.rtsp.length) {
       let last: number;
 
       for (const chunk of this.prebuffers.rtsp) {
@@ -259,7 +244,7 @@ class PrebufferSession {
     return mediaStreamOptions?.container?.startsWith('rtsp');
   }
 
-  getParser(rtspMode: boolean, mediaStreamOptions: MediaStreamOptions) {
+  getParser(mediaStreamOptions: MediaStreamOptions) {
     let parser: string;
     const rtspParser = this.storage.getItem(this.rtspParserKey);
 
@@ -267,43 +252,24 @@ class PrebufferSession {
       parser = STRING_DEFAULT;
     }
     else {
-
-      if (rtspParser === FFMPEG_PARSER_TCP)
-        parser = FFMPEG_PARSER_TCP;
-      if (rtspParser === FFMPEG_PARSER_UDP)
-        parser = FFMPEG_PARSER_UDP;
-
-      // scrypted parser can only be used in rtsp mode.
-      if (rtspMode && !parser) {
-        if (!rtspParser || rtspParser === STRING_DEFAULT)
+      switch (rtspParser) {
+        case FFMPEG_PARSER_TCP:
+        case FFMPEG_PARSER_UDP:
+        case SCRYPTED_PARSER_TCP:
+        case SCRYPTED_PARSER_UDP:
+          parser = rtspParser;
+          break;
+        default:
           parser = SCRYPTED_PARSER_TCP;
-        if (rtspParser === SCRYPTED_PARSER_TCP)
-          parser = SCRYPTED_PARSER_TCP;
-        if (rtspParser === SCRYPTED_PARSER_UDP)
-          parser = SCRYPTED_PARSER_UDP;
+          break
+
       }
-
-      // bad config, fall back to ffmpeg tcp parsing.
-      if (!parser)
-        parser = FFMPEG_PARSER_TCP;
     }
 
     return {
       parser,
       isDefault: !rtspParser || rtspParser === 'Default',
     }
-  }
-
-  getRebroadcastContainer() {
-    let mode = this.storage.getItem(this.rebroadcastModeKey) || 'Default';
-    if (mode === 'Default')
-      mode = 'RTSP';
-    const rtspMode = mode?.startsWith('RTSP');
-
-    return {
-      rtspMode: mode?.startsWith('RTSP'),
-      muxingMp4: !rtspMode,
-    };
   }
 
   async getMixinSettings(): Promise<Setting[]> {
@@ -313,8 +279,7 @@ class PrebufferSession {
 
     let total = 0;
     let start = 0;
-    const { muxingMp4, rtspMode } = this.getRebroadcastContainer();
-    for (const prebuffer of (muxingMp4 ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
+    for (const prebuffer of this.prebuffers.rtsp) {
       start = start || prebuffer.time;
       for (const chunk of prebuffer.chunks) {
         total += chunk.byteLength;
@@ -325,23 +290,6 @@ class PrebufferSession {
 
     const group = "Streams";
     const subgroup = `Stream: ${this.streamName}`;
-
-    settings.push(
-      {
-        title: 'Rebroadcast Container',
-        group,
-        subgroup,
-        description: `The container format to use when rebroadcasting. The default mode for this camera is RTSP.`,
-        placeholder: 'RTSP',
-        choices: [
-          STRING_DEFAULT,
-          'MPEG-TS',
-          'RTSP',
-        ],
-        key: this.rebroadcastModeKey,
-        value: this.storage.getItem(this.rebroadcastModeKey) || STRING_DEFAULT,
-      }
-    );
 
     const addFFmpegAudioSettings = () => {
       settings.push(
@@ -383,17 +331,16 @@ class PrebufferSession {
       )
     }
 
-    let usingFFmpeg = muxingMp4;
+    let usingFFmpeg = false;
 
     if (this.canUseRtspParser(this.advertisedMediaStreamOptions)) {
-      const canUseScryptedParser = rtspMode;
-      const defaultValue = canUseScryptedParser && !this.getLastH264Oddities() ?
+      const defaultValue = !this.getLastH264Oddities() ?
         SCRYPTED_PARSER_TCP : FFMPEG_PARSER_TCP;
 
-      const scryptedOptions = canUseScryptedParser ? [
+      const scryptedOptions = [
         SCRYPTED_PARSER_TCP,
         SCRYPTED_PARSER_UDP,
-      ] : [];
+      ];
 
       const currentParser = this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT;
 
@@ -419,9 +366,6 @@ class PrebufferSession {
       }
     }
 
-    if (muxingMp4) {
-      addFFmpegAudioSettings();
-    }
     if (usingFFmpeg) {
       addFFmpegInputSettings();
     }
@@ -492,26 +436,24 @@ class PrebufferSession {
       addOddities();
     }
 
-    if (rtspMode) {
-      settings.push({
-        group,
-        subgroup,
-        key: 'rtspRebroadcastUrl',
-        title: 'RTSP Rebroadcast Url',
-        description: 'The RTSP URL of the rebroadcast stream. Substitute localhost as appropriate.',
-        readonly: true,
-        value: `rtsp://localhost:${this.mixin.streamSettings.storageSettings.values.rebroadcastPort}/${this.rtspServerPath}`,
-      });
-      settings.push({
-        group,
-        subgroup,
-        key: 'rtspRebroadcastMutedUrl',
-        title: 'RTSP Rebroadcast Url (Muted)',
-        description: 'The RTSP URL of the muted rebroadcast stream. Substitute localhost as appropriate.',
-        readonly: true,
-        value: `rtsp://localhost:${this.mixin.streamSettings.storageSettings.values.rebroadcastPort}/${this.rtspServerMutedPath}`,
-      });
-    }
+    settings.push({
+      group,
+      subgroup,
+      key: 'rtspRebroadcastUrl',
+      title: 'RTSP Rebroadcast Url',
+      description: 'The RTSP URL of the rebroadcast stream. Substitute localhost as appropriate.',
+      readonly: true,
+      value: `rtsp://localhost:${this.mixin.streamSettings.storageSettings.values.rebroadcastPort}/${this.rtspServerPath}`,
+    });
+    settings.push({
+      group,
+      subgroup,
+      key: 'rtspRebroadcastMutedUrl',
+      title: 'RTSP Rebroadcast Url (Muted)',
+      description: 'The RTSP URL of the muted rebroadcast stream. Substitute localhost as appropriate.',
+      readonly: true,
+      value: `rtsp://localhost:${this.mixin.streamSettings.storageSettings.values.rebroadcastPort}/${this.rtspServerMutedPath}`,
+    });
 
     return settings;
   }
@@ -536,23 +478,9 @@ class PrebufferSession {
 
     const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio } = this.getAudioConfig();
 
-    const { rtspMode, muxingMp4 } = this.getRebroadcastContainer();
-
     let detectedAudioCodec = this.storage.getItem(this.lastDetectedAudioCodecKey) || undefined;
     if (detectedAudioCodec === 'null')
       detectedAudioCodec = null;
-
-    // only need to probe the audio under specific circumstances.
-    // rtsp only mode (ie, no mp4 mux) does not need probing.
-    let probingAudioCodec = false;
-    if (muxingMp4
-      && !audioSoftMuted
-      && !advertisedAudioCodec
-      && isUsingDefaultAudioConfig
-      && detectedAudioCodec === undefined) {
-      this.console.warn('Camera did not report an audio codec, muting the audio stream and probing the codec.');
-      probingAudioCodec = true;
-    }
 
     // the assumed audio codec is the detected codec first and the reported codec otherwise.
     const assumedAudioCodec = detectedAudioCodec === undefined
@@ -563,24 +491,7 @@ class PrebufferSession {
     // after probing the audio codec is complete, alert the user with appropriate instructions.
     // assume the codec is user configurable unless the camera explictly reports otherwise.
     const audioIncompatible = !COMPATIBLE_AUDIO_CODECS.includes(assumedAudioCodec);
-    if (muxingMp4 && !probingAudioCodec && mso?.userConfigurable !== false && !audioSoftMuted) {
-      if (audioIncompatible) {
-        // show an alert that rebroadcast needs an explicit setting by the user.
-        if (isUsingDefaultAudioConfig) {
-          log.a(`${this.mixin.name} is using the ${assumedAudioCodec} audio codec. Configuring your Camera to use Opus, PCM, or AAC audio is recommended. If this is not possible, Select 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
-        }
-        this.console.warn('Configure your camera to output Opus, PCM, or AAC audio. Suboptimal audio codec in use:', assumedAudioCodec);
-      }
-      else if (!audioSoftMuted && isUsingDefaultAudioConfig && advertisedAudioCodec === undefined && detectedAudioCodec !== undefined) {
-        // handling compatible codecs that were unspecified...
-        // if (detectedAudioCodec === 'aac') {
-        //   log.a(`${this.mixin.name} did not report a codec and ${detectedAudioCodec} was found during probe. Select '${AAC_AUDIO}' in the camera stream's Rebroadcast settings to suppress this alert and improve startup time.`);
-        // }
-        // else {
-        //   log.a(`${this.mixin.name} did not report a codec and ${detectedAudioCodec} was found during probe. Select '${COMPATIBLE_AUDIO}' in the camera stream's Rebroadcast settings to suppress this alert and improve startup time.`);
-        // }
-      }
-    }
+
 
     // aac needs to have the adts header stripped for mpegts and mp4.
     // use this filter sparingly as it prevents ffmpeg from starting on a mismatch.
@@ -599,15 +510,9 @@ class PrebufferSession {
     // enable transcoding by default. however, still allow the user to change the settings
     // in case something changed.
     let mustTranscode = false;
-    if (muxingMp4 && !probingAudioCodec && isUsingDefaultAudioConfig && audioIncompatible) {
-      if (mso?.userConfigurable === false)
-        this.console.log('camera reports it is not user configurable. transcoding due to incompatible codec', assumedAudioCodec);
-      else
-        this.console.log('camera audio transcoding due to incompatible codec. configure the camera to use a compatible codec if possible.');
-      mustTranscode = true;
-    }
 
-    if (audioSoftMuted || probingAudioCodec) {
+
+    if (audioSoftMuted) {
       // no audio? explicitly disable it.
       acodec = ['-an'];
       this.audioDisabled = true;
@@ -680,29 +585,14 @@ class PrebufferSession {
     };
     this.parsers = rbo.parsers;
 
-    this.console.log('rebroadcast mode:', rtspMode ? 'rtsp' : 'mpegts');
-    if (!rtspMode) {
-      rbo.parsers.mpegts = createMpegTsParser({
-        vcodec,
-        acodec,
-      });
-    }
-    else {
-      const parser = createRtspParser({
-        vcodec,
-        // the rtsp parser should always stream copy unless audio is soft muted.
-        acodec: audioSoftMuted ? acodec : ['-acodec', 'copy'],
-      });
-      this.sdp = parser.sdp;
-      rbo.parsers.rtsp = parser;
-    }
 
-    if (muxingMp4) {
-      rbo.parsers.mp4 = createFragmentedMp4Parser({
-        vcodec,
-        acodec,
-      });
-    }
+    const parser = createRtspParser({
+      vcodec,
+      // the rtsp parser should always stream copy unless audio is soft muted.
+      acodec: audioSoftMuted ? acodec : ['-acodec', 'copy'],
+    });
+    this.sdp = parser.sdp;
+    rbo.parsers.rtsp = parser;
 
     const mo = await this.mixinDevice.getVideoStream(mso);
     const isRfc4571 = mo.mimeType === 'x-scrypted/x-rfc4571';
@@ -717,7 +607,7 @@ class PrebufferSession {
 
     const h264Oddities = this.getLastH264Oddities();
 
-    if (rtspMode && isRfc4571) {
+    if (isRfc4571) {
       this.usingScryptedParser = true;
       this.console.log('bypassing ffmpeg: using scrypted rfc4571 parser')
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
@@ -731,7 +621,7 @@ class PrebufferSession {
       const ffmpegInput = JSON.parse(moBuffer.toString()) as FFmpegInput;
       sessionMso = ffmpegInput.mediaStreamOptions || this.advertisedMediaStreamOptions;
 
-      let { parser, isDefault } = this.getParser(rtspMode, sessionMso);
+      let { parser, isDefault } = this.getParser(sessionMso);
       this.usingScryptedParser = parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP;
       this.usingScryptedUdpParser = parser === SCRYPTED_PARSER_UDP;
 
@@ -788,7 +678,7 @@ class PrebufferSession {
         const oddity = hasOddities(h264Probe);
         if (oddity && !reportedOddity) {
           reportedOddity = true;
-          let { isDefault } = this.getParser(rtspMode, sessionMso);
+          let { isDefault } = this.getParser(sessionMso);
           this.console.warn('H264 oddity detected.');
           if (!isDefault) {
             this.console.warn('If there are issues streaming, consider using the Default parser.');
@@ -852,12 +742,6 @@ class PrebufferSession {
 
     if (session.inputVideoCodec !== 'h264') {
       this.console.error(`Video codec is not h264. If there are errors, try changing your camera's encoder output.`);
-    }
-
-    if (probingAudioCodec) {
-      this.console.warn('Audio probe complete, ending rebroadcast session and restarting with detected codecs.');
-      session.kill(new Error('audio probe completed, restarting'));
-      return this.startPrebufferSession();
     }
 
     this.parserSession = session;
@@ -953,7 +837,7 @@ class PrebufferSession {
 
   handleChargingBatteryEvents() {
     if (!this.mixin.interfaces.includes(ScryptedInterface.Charger) ||
-        !this.mixin.interfaces.includes(ScryptedInterface.Battery)) {
+      !this.mixin.interfaces.includes(ScryptedInterface.Battery)) {
       return;
     }
 
@@ -1119,11 +1003,6 @@ class PrebufferSession {
       requestedPrebuffer = Math.min(defaultPrebuffer, this.getDetectedIdrInterval() || defaultPrebuffer);;
     }
 
-    const { rtspMode, muxingMp4 } = this.getRebroadcastContainer();
-    const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
-
-    let container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
-
     const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
     let sdp = await this.sdp;
     if (!mediaStreamOptions.video?.h264Info && this.usingScryptedParser) {
@@ -1139,99 +1018,93 @@ class PrebufferSession {
     const interleavedMap = new Map<string, number>();
     const serverPortMap = new Map<string, RtspTrack>();
     let server: FileRtspServer;
+    const parsedSdp = parseSdp(sdp);
+    const videoSection = parsedSdp.msections.find(msection => msection.codec && msection.codec === mediaStreamOptions.video?.codec) || parsedSdp.msections.find(msection => msection.type === 'video');
+    let audioSection = parsedSdp.msections.find(msection => msection.codec && msection.codec === mediaStreamOptions.audio?.codec) || parsedSdp.msections.find(msection => msection.type === 'audio');
+    if (mediaStreamOptions.audio === null)
+      audioSection = undefined;
+    parsedSdp.msections = parsedSdp.msections.filter(msection => msection === videoSection || msection === audioSection);
+    const filterPrebufferAudio = options?.prebuffer === undefined;
+    const videoCodec = parsedSdp.msections.find(msection => msection.type === 'video')?.codec;
+    sdp = parsedSdp.toSdp();
+    filter = (chunk, prebuffer) => {
+      // if no prebuffer is explicitly requested, don't send prebuffer audio
+      if (prebuffer && filterPrebufferAudio && chunk.type !== videoCodec)
+        return;
 
-    if (container === 'rtsp') {
-      const parsedSdp = parseSdp(sdp);
-      const videoSection = parsedSdp.msections.find(msection => msection.codec && msection.codec === mediaStreamOptions.video?.codec) || parsedSdp.msections.find(msection => msection.type === 'video');
-      let audioSection = parsedSdp.msections.find(msection => msection.codec && msection.codec === mediaStreamOptions.audio?.codec) || parsedSdp.msections.find(msection => msection.type === 'audio');
-      if (mediaStreamOptions.audio === null)
-        audioSection = undefined;
-      parsedSdp.msections = parsedSdp.msections.filter(msection => msection === videoSection || msection === audioSection);
-      const filterPrebufferAudio = options?.prebuffer === undefined;
-      const videoCodec = parsedSdp.msections.find(msection => msection.type === 'video')?.codec;
-      sdp = parsedSdp.toSdp();
-      filter = (chunk, prebuffer) => {
-        // if no prebuffer is explicitly requested, don't send prebuffer audio
-        if (prebuffer && filterPrebufferAudio && chunk.type !== videoCodec)
-          return;
-
-        const channel = interleavedMap.get(chunk.type);
-        if (!interleavePassthrough) {
-          if (channel == undefined) {
-            const udp = serverPortMap.get(chunk.type);
-            if (udp)
-              server.sendTrack(udp.control, chunk.chunks[1], chunk.type.startsWith('rtcp-'));
-            return;
-          }
-
-          const chunks = chunk.chunks.slice();
-          const header = Buffer.from(chunks[0]);
-          header.writeUInt8(channel, 1);
-          chunks[0] = header;
-          chunk = {
-            startStream: chunk.startStream,
-            chunks,
-          }
-        }
-        else if (channel === undefined) {
+      const channel = interleavedMap.get(chunk.type);
+      if (!interleavePassthrough) {
+        if (channel == undefined) {
+          const udp = serverPortMap.get(chunk.type);
+          if (udp)
+            server.sendTrack(udp.control, chunk.chunks[1], chunk.type.startsWith('rtcp-'));
           return;
         }
 
-        if (server.writeStream) {
-          server.writeRtpPayload(chunk.chunks[0], chunk.chunks[1]);
-          return;
+        const chunks = chunk.chunks.slice();
+        const header = Buffer.from(chunks[0]);
+        header.writeUInt8(channel, 1);
+        chunks[0] = header;
+        chunk = {
+          startStream: chunk.startStream,
+          chunks,
         }
-
-        return chunk;
+      }
+      else if (channel === undefined) {
+        return;
       }
 
-      const hostname = options?.route === 'internal' ? undefined : '0.0.0.0';
-
-      const clientPromise = await listenSingleRtspClient({
-        hostname,
-        createServer: duplex => {
-          sdp = addTrackControls(sdp);
-          server = new FileRtspServer(duplex, sdp);
-          server.writeConsole = this.console;
-          return server;
-        }
-      });
-
-      socketPromise = clientPromise.rtspServerPromise.then(async server => {
-        if (session.parserSpecific) {
-          const parserSpecific = session.parserSpecific as RtspSessionParserSpecific;
-          server.resolveInterleaved = msection => {
-            const channel = parserSpecific.interleaved.get(msection.codec);
-            return [channel, channel + 1];
-          }
-        }
-        // server.console = this.console;
-        await server.handlePlayback();
-        server.handleTeardown().catch(() => {}).finally(() => server.client.destroy());
-        for (const track of Object.values(server.setupTracks)) {
-          if (track.protocol === 'udp') {
-            serverPortMap.set(track.codec, track);
-            serverPortMap.set(`rtcp-${track.codec}`, track);
-            continue;
-          }
-          interleavedMap.set(track.codec, track.destination);
-          interleavedMap.set(`rtcp-${track.codec}`, track.destination + 1);
-        }
-
-        interleavePassthrough = session.parserSpecific && serverPortMap.size === 0;
-        return server.client;
-      })
-
-      url = clientPromise.url;
-      if (hostname) {
-        urls = await getUrlLocalAdresses(this.console, url);
+      if (server.writeStream) {
+        server.writeRtpPayload(chunk.chunks[0], chunk.chunks[1]);
+        return;
       }
+
+      return chunk;
     }
-    else {
-      const client = await listenZeroSingleClient();
-      socketPromise = client.clientPromise;
-      url = client.url;
+
+    const hostname = options?.route === 'internal' ? undefined : '0.0.0.0';
+
+    const clientPromise = await listenSingleRtspClient({
+      hostname,
+      createServer: duplex => {
+        sdp = addTrackControls(sdp);
+        server = new FileRtspServer(duplex, sdp);
+        server.writeConsole = this.console;
+        return server;
+      }
+    });
+
+    socketPromise = clientPromise.rtspServerPromise.then(async server => {
+      if (session.parserSpecific) {
+        const parserSpecific = session.parserSpecific as RtspSessionParserSpecific;
+        server.resolveInterleaved = msection => {
+          const channel = parserSpecific.interleaved.get(msection.codec);
+          return [channel, channel + 1];
+        }
+      }
+      // server.console = this.console;
+      await server.handlePlayback();
+      server.handleTeardown().catch(() => { }).finally(() => server.client.destroy());
+      for (const track of Object.values(server.setupTracks)) {
+        if (track.protocol === 'udp') {
+          serverPortMap.set(track.codec, track);
+          serverPortMap.set(`rtcp-${track.codec}`, track);
+          continue;
+        }
+        interleavedMap.set(track.codec, track.destination);
+        interleavedMap.set(`rtcp-${track.codec}`, track.destination + 1);
+      }
+
+      interleavePassthrough = session.parserSpecific && serverPortMap.size === 0;
+      return server.client;
+    })
+
+    url = clientPromise.url;
+    if (hostname) {
+      urls = await getUrlLocalAdresses(this.console, url);
     }
+
+    const container = 'rtsp';
 
     mediaStreamOptions.sdp = sdp;
 
@@ -1254,7 +1127,7 @@ class PrebufferSession {
     if (this.audioDisabled) {
       mediaStreamOptions.audio = null;
     }
-    else if (reencodeAudio && muxingMp4) {
+    else if (reencodeAudio) {
       mediaStreamOptions.audio = {
         codec: 'aac',
         encoder: 'aac',
