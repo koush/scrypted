@@ -32,14 +32,14 @@ services:
         restart: unless-stopped
         network_mode: host
 
-        # uncomment this and a line below as needed.
-        # devices:
-        # zwave usb serial device
-        #   - /dev/ttyACM0:/dev/ttyACM0
-        # all usb devices, such as coral tpu
-        #   - /dev/bus/usb:/dev/bus/usb
-        # intel hardware accelerated video decoding and opencl
-        #   - /dev/dri:/dev/dri
+        devices:
+            # hardware accelerated video decoding, opencl, etc.
+            - /dev/dri:/dev/dri
+            # uncomment below as necessary.
+            # zwave usb serial device
+            #   - /dev/ttyACM0:/dev/ttyACM0
+            # all usb devices, such as coral tpu
+            #   - /dev/bus/usb:/dev/bus/usb
 
         volumes:
             - ~/.scrypted/volume:/server/volume
