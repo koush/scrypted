@@ -43,7 +43,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
 
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="tflite", )
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="openvino", )
 
     async def getSettings(self) -> list[Setting]:
         return []
