@@ -21,12 +21,9 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
-
-MIME_TYPE = 'x-scrypted-tensorflow/x-raw-image'
-
 class TensorFlowPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     def __init__(self, nativeId: str | None = None):
-        super().__init__(MIME_TYPE, nativeId=nativeId)
+        super().__init__(nativeId=nativeId)
 
         modelPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'zip', 'unzipped', 'fs')
         self.model = tf.saved_model.load(modelPath)

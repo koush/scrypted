@@ -110,13 +110,8 @@ class Prediction:
 class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     labels: dict
 
-    def __init__(self, PLUGIN_MIME_TYPE: str, nativeId: str | None = None):
+    def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
-
-        self.fromMimeType = PLUGIN_MIME_TYPE
-        self.toMimeType = scrypted_sdk.ScryptedMimeTypes.MediaObject.value
-
-        self.crop = False
 
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()

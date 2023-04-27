@@ -22,12 +22,9 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
-
-MIME_TYPE = 'x-scrypted-coreml/x-raw-image'
-
 class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     def __init__(self, nativeId: str | None = None):
-        super().__init__(MIME_TYPE, nativeId=nativeId)
+        super().__init__(nativeId=nativeId)
 
         labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/coreml-survival-guide/master/MobileNetV2%2BSSDLite/coco_labels.txt', 'coco_labels.txt')
         modelFile = self.downloadFile('https://github.com/koush/coreml-survival-guide/raw/master/MobileNetV2%2BSSDLite/ObjectDetection/ObjectDetection/MobileNetV2_SSDLite.mlmodel', 'MobileNetV2_SSDLite.mlmodel')
