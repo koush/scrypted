@@ -35,7 +35,16 @@ class PILImage(scrypted_sdk.VideoFrame):
                 finally:
                     rgb.close()
             return await to_thread(format)
-        # TODO: gray...
+        elif options['format'] == 'gray':
+            def format():
+                if pilImage.pilImage.mode == 'L':
+                    return pilImage.pilImage.tobytes()
+                l = pilImage.pilImage.convert('L')
+                try:
+                    return l.tobytes()
+                finally:
+                    l.close()
+            return await to_thread(format)
 
         def save():
             bytesArray = io.BytesIO()
