@@ -25,6 +25,8 @@ export class AddressSettings {
             const nif = networkInterfaces[addressOrInterface];
             if (!raw && nif) {
                 for (const addr of nif) {
+                    if (!addr.address || addr.address.startsWith('169.254.') || addr.address.toLowerCase().startsWith('fe80:'))
+                        continue;
                     ret.push(addr.address);
                 }
             }
