@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.7.93",
+  "version": "0.7.95",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.10",
@@ -72,7 +72,7 @@
     "beta": "npm publish --tag beta",
     "postbeta": "npm version patch && git add package.json && npm run build && git commit -m postbeta",
     "release": "npm publish",
-    "prepublish": "npm run build",
+    "prepublishOnly": "npm run build",
     "postrelease": "git tag v$npm_package_version && git push origin v$npm_package_version && npm version patch && git add package.json && git commit -m postrelease",
     "docker": "scripts/github-workflow-publish-docker.sh"
   },
