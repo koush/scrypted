@@ -742,6 +742,7 @@ export interface VideoClipOptions {
   startId?: string;
   count?: number;
   reverseOrder?: boolean;
+  thumbnailSize?: Point;
 }
 
 export interface VideoClips {
