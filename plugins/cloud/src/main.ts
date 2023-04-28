@@ -7,9 +7,8 @@ import { once } from 'events';
 import http from 'http';
 import HttpProxy from 'http-proxy';
 import https from 'https';
-import throttle from "lodash/throttle";
 import upnp from 'nat-upnp';
-import net, { AddressInfo } from 'net';
+import net from 'net';
 import os from 'os';
 import path from 'path';
 import qs from 'query-string';
@@ -210,6 +209,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         })
 
         this.updateCors();
+
+        if (!this.storageSettings.values.token_info && process.env.SCRYPTED_CLOUD_TOKEN) {
+            this.storageSettings.values.token_info = process.env.SCRYPTED_CLOUD_TOKEN;
+            this.manager.registrationId.then(r => this.sendRegistrationId(r));
+        }
     }
 
     scheduleRefreshPortForward() {
