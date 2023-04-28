@@ -200,7 +200,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         # image is already correct aspect ratio, so it can be processed in a single pass.
         if input_aspect_ratio == src_aspect_ratio:
             def cvss(point):
-                return point[0], point[1]
+                return point[0] / s, point[1] / s
 
             # aspect ratio matches, but image must be scaled.
             resize = None
