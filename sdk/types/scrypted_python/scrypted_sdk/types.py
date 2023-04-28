@@ -719,6 +719,10 @@ class VideoClipOptions(TypedDict):
     thumbnailSize: Point
     pass
 
+class VideoClipThumbnailOptions(TypedDict):
+    thumbnailSize: Point
+    pass
+
 class VideoFrameGeneratorOptions(TypedDict):
     crop: Any
     format: ImageFormat
@@ -1182,7 +1186,7 @@ class VideoCameraConfiguration:
 class VideoClips:
     async def getVideoClip(self, videoId: str) -> MediaObject:
         pass
-    async def getVideoClipThumbnail(self, thumbnailId: str) -> MediaObject:
+    async def getVideoClipThumbnail(self, thumbnailId: str, options: VideoClipThumbnailOptions = None) -> MediaObject:
         pass
     async def getVideoClips(self, options: VideoClipOptions = None) -> list[VideoClip]:
         pass

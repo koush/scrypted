@@ -736,19 +736,22 @@ export interface VideoClip {
   resources?: VideoResource;
 }
 
-export interface VideoClipOptions {
+export interface VideoClipOptions extends VideoClipThumbnailOptions {
   startTime?: number;
   endTime?: number;
   startId?: string;
   count?: number;
   reverseOrder?: boolean;
+}
+
+export interface VideoClipThumbnailOptions {
   thumbnailSize?: Point;
 }
 
 export interface VideoClips {
   getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]>;
   getVideoClip(videoId: string): Promise<MediaObject>;
-  getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject>;
+  getVideoClipThumbnail(thumbnailId: string, options?: VideoClipThumbnailOptions): Promise<MediaObject>;
   removeVideoClips(...videoClipIds: string[]): Promise<void>;
 }
 
