@@ -78,8 +78,12 @@ export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
     transports?: string[];
 }
 
+function isInstalledApp() {
+    return globalThis.navigator?.userAgent.includes('InstalledApp');
+}
+
 function isRunningStandalone() {
-    return globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.navigator?.userAgent.includes('InstalledApp');
+    return globalThis.matchMedia?.('(display-mode: standalone)').matches || isInstalledApp();
 }
 
 export async function logoutScryptedClient(baseUrl?: string) {
@@ -238,14 +242,15 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     // if the cert has been accepted. Other browsers seem fine.
     // So the default is not to connect to IP addresses on Chrome, but do so on other browsers.
     const isChrome = globalThis.navigator?.userAgent.includes('Chrome');
+    const isNotChromeOrIsInstalledApp = !isChrome || isInstalledApp();
 
     const addresses: string[] = [];
-    const localAddressDefault = !isChrome;
+    const localAddressDefault = isNotChromeOrIsInstalledApp;
     if (((scryptedCloud && options.local === undefined && localAddressDefault) || options.local) && localAddresses) {
         addresses.push(...localAddresses);
     }
 
-    const directAddressDefault = directAddress && (!isChrome || !isIPAddress(directAddress));
+    const directAddressDefault = directAddress && (isNotChromeOrIsInstalledApp || !isIPAddress(directAddress));
     if (((scryptedCloud && options.direct === undefined && directAddressDefault) || options.direct) && directAddress) {
         addresses.push(directAddress);
     }
