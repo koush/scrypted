@@ -312,9 +312,6 @@ class MediaStreamSource(TypedDict):
 class MediaStreamTool(TypedDict):
     pass
 
-class Point(TypedDict):
-    pass
-
 class AdoptDevice(TypedDict):
     nativeId: str
     settings: DeviceCreatorSettings
@@ -711,16 +708,16 @@ class VideoClip(TypedDict):
     pass
 
 class VideoClipOptions(TypedDict):
+    aspectRatio: float
     count: float
     endTime: float
     reverseOrder: bool
     startId: str
     startTime: float
-    thumbnailSize: Point
     pass
 
 class VideoClipThumbnailOptions(TypedDict):
-    thumbnailSize: Point
+    aspectRatio: float
     pass
 
 class VideoFrameGeneratorOptions(TypedDict):

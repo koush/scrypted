@@ -745,7 +745,7 @@ export interface VideoClipOptions extends VideoClipThumbnailOptions {
 }
 
 export interface VideoClipThumbnailOptions {
-  thumbnailSize?: Point;
+  aspectRatio?: number;
 }
 
 export interface VideoClips {
