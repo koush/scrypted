@@ -63,7 +63,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
     let postInstallSourceMapSupport: (scrypted: ScryptedStatic) => void;
 
-    attachPluginRemote(peer, {
+    const scrypted = attachPluginRemote(peer, {
         createMediaManager: async (sm, dm) => {
             systemManager = sm;
             deviceManager = dm
@@ -394,7 +394,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
     }).then(scrypted => {
         systemManager = scrypted.systemManager;
         deviceManager = scrypted.deviceManager as DeviceManagerImpl;
+        return scrypted;
     });
 
-    return peer;
+    return {
+        peer,
+        scryptedPromise: scrypted,
+    };
 }
