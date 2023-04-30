@@ -88,7 +88,10 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
         }
 
         client.removeAllListeners();
-        client.close();
+        try {
+          client.close();
+        } catch (e) {
+        }
       }
       client.client.on('close', cleanup);
       client.on('error', err => {
@@ -149,6 +152,14 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
   }
 
   async load(media: string | MediaObject, options: MediaPlayerOptions) {
+    if (this.mediaPlayerPromise) {
+      try {
+        (await this.mediaPlayerPromise).close();
+      } catch (e) {
+      }
+      this.mediaPlayerPromise = undefined;
+      this.mediaPlayerStatus = undefined;
+    }
     let url: string;
     let urlMimeType: string;
 
@@ -341,15 +352,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
                 });
               })
 
-              player.getStatus((err, status) => {
-                if (err) {
-                  reject(err);
-                  return;
-                }
-                this.mediaPlayerStatus = status;
-                this.updateState();
-                resolve(player);
-              })
+              resolve(player);
             });
           });
         });

@@ -722,6 +722,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
         this.invalidatePluginDevice(device._id);
         delete this.pluginDevices[device._id];
+        delete this.devices[device._id];
         await this.datastore.remove(device);
         this.stateManager.removeDevice(device._id);
 

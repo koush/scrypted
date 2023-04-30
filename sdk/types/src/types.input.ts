@@ -736,7 +736,7 @@ export interface VideoClip {
   resources?: VideoResource;
 }
 
-export interface VideoClipOptions {
+export interface VideoClipOptions extends VideoClipThumbnailOptions {
   startTime?: number;
   endTime?: number;
   startId?: string;
@@ -744,10 +744,14 @@ export interface VideoClipOptions {
   reverseOrder?: boolean;
 }
 
+export interface VideoClipThumbnailOptions {
+  aspectRatio?: number;
+}
+
 export interface VideoClips {
   getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]>;
   getVideoClip(videoId: string): Promise<MediaObject>;
-  getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject>;
+  getVideoClipThumbnail(thumbnailId: string, options?: VideoClipThumbnailOptions): Promise<MediaObject>;
   removeVideoClips(...videoClipIds: string[]): Promise<void>;
 }
 
@@ -1296,6 +1300,7 @@ export interface ObjectDetector {
   getObjectTypes(): Promise<ObjectDetectionTypes>;
 }
 export interface ObjectDetectionGeneratorSession {
+  zones?: ObjectDetectionZone[];
   settings?: { [key: string]: any };
   sourceId?: string;
 }
@@ -1318,12 +1323,18 @@ export interface ObjectDetectionGeneratorResult {
   videoFrame: VideoFrame & MediaObject;
   detected: ObjectsDetected;
 }
+export interface ObjectDetectionZone {
+  exclusion?: boolean;
+  type?: 'Intersect' | 'Contain';
+  classes?: string[];
+  path?: ClipPath;
+}
 /**
  * ObjectDetection can run classifications or analysis on arbitrary media sources.
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
-  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame & MediaObject>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult>>;
+  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame & MediaObject, void>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }

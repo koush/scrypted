@@ -21,6 +21,13 @@ RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 RUN apt-get -y update
 RUN apt-get -y install libedgetpu1-std
 
+# intel opencl gpu for openvino
+RUN if [ "$(uname -m)" = "x86_64" ]; \
+    then \
+        apt-get -y install \
+        intel-opencl-icd; \
+    fi
+
 RUN apt-get -y install software-properties-common apt-utils
 RUN apt-get -y update
 RUN apt-get -y upgrade

@@ -2,6 +2,7 @@ import scrypted_sdk
 from typing import Any
 from thread import to_thread
 import io
+import time
 
 try:
     from PIL import Image
@@ -34,7 +35,16 @@ class PILImage(scrypted_sdk.VideoFrame):
                 finally:
                     rgb.close()
             return await to_thread(format)
-        # TODO: gray...
+        elif options['format'] == 'gray':
+            def format():
+                if pilImage.pilImage.mode == 'L':
+                    return pilImage.pilImage.tobytes()
+                l = pilImage.pilImage.convert('L')
+                try:
+                    return l.tobytes()
+                finally:
+                    l.close()
+            return await to_thread(format)
 
         def save():
             bytesArray = io.BytesIO()
@@ -81,6 +91,7 @@ def toPILImage(pilImageWrapper: PILImage, options: scrypted_sdk.ImageOptions = N
 
 async def createPILMediaObject(image: PILImage):
     ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
+        'timestamp': time.time() * 1000,
         'format': None,
         'width': image.width,
         'height': image.height,

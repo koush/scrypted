@@ -640,6 +640,8 @@ async function start(mainFilename: string, options?: {
     });
 
     app.get('/', (_req, res) => res.redirect('/endpoint/@scrypted/core/public/'));
+
+    return scrypted;
 }
 
 export default start;

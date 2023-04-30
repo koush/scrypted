@@ -1,6 +1,6 @@
 import { Deferred } from '@scrypted/common/src/deferred';
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceProvider, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionGeneratorResult, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
+import sdk, { Camera, DeviceProvider, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionGeneratorResult, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetectionZone, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
@@ -17,7 +17,7 @@ const { systemManager } = sdk;
 const defaultDetectionDuration = 20;
 const defaultDetectionInterval = 60;
 const defaultDetectionTimeout = 60;
-const defaultMotionDuration = 10;
+const defaultMotionDuration = 30;
 
 const BUILTIN_MOTION_SENSOR_ASSIST = 'Assist';
 const BUILTIN_MOTION_SENSOR_REPLACE = 'Replace';
@@ -265,7 +265,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       snapshotPipeline: this.plugin.shouldUseSnapshotPipeline(),
     };
 
-    this.runPipelineAnalysis(signal, options)
+    this.runPipelineAnalysisLoop(signal, options)
       .catch(e => {
         this.console.error('Video Analysis ended with error', e);
       }).finally(() => {
@@ -277,28 +277,26 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
   }
 
-  async runPipelineAnalysis(signal: Deferred<void>, options: {
+  async runPipelineAnalysisLoop(signal: Deferred<void>, options: {
     snapshotPipeline: boolean,
+    suppress?: boolean,
   }) {
-    const start = Date.now();
-    this.analyzeStop = start + this.getDetectionDuration();
-
-    let lastStatusTime = Date.now();
-    let lastStatus = 'starting';
-    const updatePipelineStatus = (status: string) => {
-      lastStatus = status;
-      lastStatusTime = Date.now();
+    while (!signal.finished) {
+      const shouldSleep = await this.runPipelineAnalysis(signal, options);
+      options.suppress = true;
+      if (!shouldSleep || signal.finished)
+        return;
+      this.console.log('Suspending motion processing during active motion timeout.');
+      // sleep until a moment before motion duration to start peeking again
+      // to have an opporunity to reset the motion timeout.
+      await sleep(this.storageSettings.values.motionDuration * 1000 - 4000);
     }
+  }
 
-    let frameGenerator: AsyncGenerator<VideoFrame & MediaObject, void>;
-    let detectionGenerator: AsyncGenerator<ObjectDetectionGeneratorResult, void>;
-    const interval = setInterval(() => {
-      if (Date.now() - lastStatusTime > 30000) {
-        signal.resolve();
-        this.console.error('VideoAnalysis is hung and will terminate:', lastStatus);
-      }
-    }, 30000);
-    signal.promise.finally(() => clearInterval(interval));
+  async createFrameGenerator(signal: Deferred<void>, options: {
+    snapshotPipeline: boolean,
+    suppress?: boolean,
+  }, updatePipelineStatus: (status: string) => void) {
 
     let newPipeline: string = this.newPipeline;
     if (!this.hasMotionType && (!newPipeline || newPipeline === 'Default')) {
@@ -312,7 +310,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       options.snapshotPipeline = true;
       this.console.log('decoder:', 'Snapshot +', this.objectDetection.name);
       const self = this;
-      frameGenerator = (async function* gen() {
+      return (async function* gen() {
         try {
           while (!signal.finished) {
             const now = Date.now();
@@ -353,7 +351,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(newPipeline);
       if (!videoFrameGenerator)
         throw new Error('invalid VideoFrameGenerator');
-      this.console.log(videoFrameGenerator.name, '+', this.objectDetection.name);
+      if (!options?.suppress)
+        this.console.log(videoFrameGenerator.name, '+', this.objectDetection.name);
       updatePipelineStatus('getVideoStream');
       const stream = await this.cameraDevice.getVideoStream({
         prebuffer: this.model.prebuffer,
@@ -362,7 +361,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         audio: null,
       });
 
-      frameGenerator = await videoFrameGenerator.generateVideoFrames(stream, {
+      return await videoFrameGenerator.generateVideoFrames(stream, {
         queue: 0,
         resize: this.model?.inputSize ? {
           width: this.model.inputSize[0],
@@ -371,17 +370,63 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         format: this.model?.inputFormat,
       });
     }
+  }
+
+  async runPipelineAnalysis(signal: Deferred<void>, options: {
+    snapshotPipeline: boolean,
+    suppress?: boolean,
+  }) {
+    const start = Date.now();
+    this.analyzeStop = start + this.getDetectionDuration();
+
+    let lastStatusTime = Date.now();
+    let lastStatus = 'starting';
+    const updatePipelineStatus = (status: string) => {
+      lastStatus = status;
+      lastStatusTime = Date.now();
+    }
+
+    const interval = setInterval(() => {
+      if (Date.now() - lastStatusTime > 30000) {
+        signal.resolve();
+        this.console.error('VideoAnalysis is hung and will terminate:', lastStatus);
+      }
+    }, 30000);
+    signal.promise.finally(() => clearInterval(interval));
 
     const currentDetections = new Set<string>();
     let lastReport = 0;
-    detectionGenerator = await sdk.connectRPCObject(await this.objectDetection.generateObjectDetections(frameGenerator, {
-      settings: this.getCurrentSettings(),
-      sourceId: this.id,
-    }));
 
     updatePipelineStatus('waiting result');
 
-    for await (const detected of detectionGenerator) {
+    const zones: ObjectDetectionZone[] = [];
+    for (const detectorMixin of this.plugin.currentMixins.values()) {
+      for (const mixin of detectorMixin.currentMixins.values()) {
+        if (mixin.id !== this.id)
+          continue;
+        for (const [key, zi] of Object.entries(mixin.zoneInfos)) {
+          const zone = mixin.zones[key];
+          if (!zone?.length || zone?.length < 3)
+            continue;
+          const odz: ObjectDetectionZone = {
+            classes: mixin.hasMotionType ? ['motion'] : zi.classes,
+            exclusion: zi.exclusion,
+            path: zone,
+            type: zi.type,
+          }
+          zones.push(odz);
+        }
+      }
+    }
+
+    for await (const detected of
+      await sdk.connectRPCObject(
+        await this.objectDetection.generateObjectDetections(
+          await this.createFrameGenerator(signal, options, updatePipelineStatus), {
+          settings: this.getCurrentSettings(),
+          sourceId: this.id,
+          zones,
+        }))) {
       if (signal.finished) {
         break;
       }
@@ -426,11 +471,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.setDetection(detected.detected, mo);
         // this.console.log('image saved', detected.detected.detections);
       }
+      const hadMotionDetected = this.motionDetected;
       this.reportObjectDetections(detected.detected);
       if (this.hasMotionType) {
-        // const diff = Date.now() - when;
-        // when = Date.now();
-        // this.console.log('sleper', diff);
+        if (!hadMotionDetected && this.motionDetected) {
+          // if new motion is detected, stop processing and exit loop allowing it to sleep.
+          clearInterval(interval);
+          return true;
+        }
         await sleep(250);
       }
       updatePipelineStatus('waiting result');
@@ -695,6 +743,20 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         ],
         value: zi?.type || 'Intersect',
       });
+
+      if (!this.hasMotionType) {
+        settings.push(
+          {
+            subgroup,
+            key: `zoneinfo-classes-${name}`,
+            title: `Detection Classes`,
+            description: 'The detection classes to match inside this zone. An empty list will match all classes.',
+            choices: (await this.getObjectTypes())?.classes || [],
+            value: zi?.classes || [],
+            multiple: true,
+          },
+        );
+      }
     }
 
     if (!this.hasMotionType) {

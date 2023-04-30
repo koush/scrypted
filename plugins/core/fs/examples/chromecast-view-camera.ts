@@ -29,7 +29,7 @@ class ChromecastViewCameraExample implements StartStop {
     }
     async stop() {
         device.running = false;
-        return chromecast.stop();
+        await chromecast.stop();
     }
 }
 

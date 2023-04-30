@@ -147,7 +147,9 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     }
 
     async onDeviceDiscovered(device: Device) {
-        return this.pluginHost.upsertDevice(device);
+        const id = await this.pluginHost.upsertDevice(device);
+        this.scrypted.getDevice(id)?.probe().catch(() => { });
+        return id;
     }
 
     async onDeviceRemoved(nativeId: string) {

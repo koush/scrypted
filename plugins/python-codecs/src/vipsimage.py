@@ -7,6 +7,7 @@ except:
     Image = None
     pyvips = None
 from thread import to_thread
+import time
 
 class VipsImage(scrypted_sdk.VideoFrame):
     def __init__(self, vipsImage: Image) -> None:
@@ -90,6 +91,7 @@ def toVipsImage(vipsImageWrapper: VipsImage, options: scrypted_sdk.ImageOptions 
 
 async def createVipsMediaObject(image: VipsImage):
     ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
+        'timestamp': time.time() * 1000,
         'format': None,
         'width': image.width,
         'height': image.height,

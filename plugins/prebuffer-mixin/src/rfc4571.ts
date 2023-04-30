@@ -121,7 +121,7 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
             console.log('parsed sdp sps', parsedSps);
         }
         catch (e) {
-            console.warn('sdp sps parsing failed');
+            console.warn('sdp sps parsing failed', e);
         }
     }
 

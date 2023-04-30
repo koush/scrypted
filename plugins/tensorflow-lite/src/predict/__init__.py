@@ -110,13 +110,8 @@ class Prediction:
 class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     labels: dict
 
-    def __init__(self, PLUGIN_MIME_TYPE: str, nativeId: str | None = None):
+    def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
-
-        self.fromMimeType = PLUGIN_MIME_TYPE
-        self.toMimeType = scrypted_sdk.ScryptedMimeTypes.MediaObject.value
-
-        self.crop = False
 
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
@@ -205,7 +200,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         # image is already correct aspect ratio, so it can be processed in a single pass.
         if input_aspect_ratio == src_aspect_ratio:
             def cvss(point):
-                return point[0], point[1]
+                return point[0] / s, point[1] / s
 
             # aspect ratio matches, but image must be scaled.
             resize = None

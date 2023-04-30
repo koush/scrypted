@@ -30,6 +30,8 @@ async def createPipelineIterator(pipeline: str):
         elif t == str(Gst.MessageType.WARNING):
             err, debug = message.parse_warning()
             print('Warning: %s: %s\n' % (err, debug))
+            print('Ending stream due to warning. If this camera is causing errors, switch to the libav decoder.');
+            finish();
         elif t == str(Gst.MessageType.ERROR):
             err, debug = message.parse_error()
             print('Error: %s: %s\n' % (err, debug))
@@ -44,7 +46,6 @@ async def createPipelineIterator(pipeline: str):
         nonlocal hasFinished
         hasFinished = True
         yieldQueue.put(None)
-        sampleQueue.put_nowait(None)
         asyncio.run_coroutine_threadsafe(sampleQueue.put(None), loop = loop)
         if not finished.done():
             finished.set_result(None)
@@ -71,8 +72,8 @@ async def createPipelineIterator(pipeline: str):
                 finally:
                     yieldQueue.put(None)
         finally:
-            finish()
             print('gstreamer finished')
+            finish()
 
 
     def on_new_sample(sink, preroll):

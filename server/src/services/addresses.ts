@@ -1,5 +1,6 @@
 import { Settings } from "../db-types";
 import { ScryptedRuntime } from "../runtime";
+import os from 'os';
 
 export class AddressSettings {
     constructor(public scrypted: ScryptedRuntime) {
@@ -12,10 +13,27 @@ export class AddressSettings {
         await this.scrypted.datastore.upsert(localAddresses);
     }
 
-    async getLocalAddresses(): Promise<string[]> {
+    async getLocalAddresses(raw?: boolean): Promise<string[]> {
         const settings = await this.scrypted.datastore.tryGet(Settings, 'localAddresses');
+
         if (!settings?.value?.[0])
             return;
-        return settings.value as string[];
+
+        const ret: string[] = [];
+        const networkInterfaces = os.networkInterfaces();
+        for (const addressOrInterface of settings.value) {
+            const nif = networkInterfaces[addressOrInterface];
+            if (!raw && nif) {
+                for (const addr of nif) {
+                    if (!addr.address || addr.address.startsWith('169.254.') || addr.address.toLowerCase().startsWith('fe80:'))
+                        continue;
+                    ret.push(addr.address);
+                }
+            }
+            else {
+                ret.push(addressOrInterface);
+            }
+        }
+        return ret;
     }
 }

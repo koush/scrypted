@@ -213,6 +213,9 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             try {
                 const mixins = (device.mixins || []).slice();
                 if (!mixins.includes(this.id)) {
+                    // don't sync this by default, as it's solely for automations
+                    if (device.type === ScryptedDeviceType.Notifier)
+                        continue;
                     if (defaultIncluded[device.id] === includeToken)
                         continue;
                     mixins.push(this.id);

@@ -5,10 +5,10 @@ import base64
 import json
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from asyncio.events import AbstractEventLoop
 from typing import List, Any
 import multiprocessing.connection
-import aiofiles
 import rpc
 import concurrent.futures
 import json
@@ -52,28 +52,38 @@ class RpcTransport:
 
 
 class RpcFileTransport(RpcTransport):
-    reader: asyncio.StreamReader
+    executor: ThreadPoolExecutor
 
     def __init__(self, readFd: int, writeFd: int) -> None:
         super().__init__()
         self.readFd = readFd
         self.writeFd = writeFd
-        self.reader = None
+        self.executor = ThreadPoolExecutor(1, 'rpc-read')
 
-    async def prepare(self):
-        await super().prepare()
-        self.reader = await aiofiles.open(self.readFd, mode='rb')
+    def osReadExact(self, size: int):
+        b = bytes(0)
+        while size:
+            got = os.read(self.readFd, size)
+            if not len(got):
+                self.executor.shutdown(False)
+                raise Exception('rpc end of stream reached')
+            size -= len(got)
+            b += got
+        return b
 
-    async def read(self):
-        lengthBytes = await self.reader.read(4)
-        typeBytes = await self.reader.read(1)
+    def readMessageInternal(self):
+        lengthBytes = self.osReadExact(4)
+        typeBytes = self.osReadExact(1)
         type = typeBytes[0]
         length = int.from_bytes(lengthBytes, 'big')
-        data = await self.reader.read(length - 1)
+        data = self.osReadExact(length - 1)
         if type == 1:
             return data
         message = json.loads(data)
         return message
+
+    async def read(self):
+        return await asyncio.get_event_loop().run_in_executor(self.executor, lambda: self.readMessageInternal())
 
     def writeMessage(self, type: int, buffer, reject):
         length = len(buffer) + 1
