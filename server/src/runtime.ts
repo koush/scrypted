@@ -827,18 +827,22 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         return ret;
     }
 
-    killall() {
+    kill() {
         for (const host of Object.values(this.plugins)) {
             host?.kill();
         }
+    }
+
+    exit() {
+        this.kill();
         process.exit();
     }
 
     async start() {
         // catch ctrl-c
-        process.on('SIGINT', () => this.killall());
+        process.on('SIGINT', () => this.exit());
         // catch kill
-        process.on('SIGTERM', () => this.killall());
+        process.on('SIGTERM', () => this.exit());
 
         for await (const pluginDevice of this.datastore.getAll(PluginDevice)) {
             // this may happen due to race condition around deletion/update. investigate.
