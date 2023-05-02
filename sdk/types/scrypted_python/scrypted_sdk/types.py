@@ -139,6 +139,7 @@ class ScryptedInterface(Enum):
     RTCSignalingChannel = "RTCSignalingChannel"
     RTCSignalingClient = "RTCSignalingClient"
     Readme = "Readme"
+    Reboot = "Reboot"
     Refresh = "Refresh"
     Scene = "Scene"
     Scriptable = "Scriptable"
@@ -1042,6 +1043,11 @@ class Readme:
         pass
     pass
 
+class Reboot:
+    async def reboot(self) -> None:
+        pass
+    pass
+
 class Refresh:
     async def getRefreshFrequency(self) -> float:
         pass
@@ -1461,6 +1467,7 @@ class ScryptedInterfaceMethods(Enum):
     discoverDevices = "discoverDevices"
     createDevice = "createDevice"
     getCreateDeviceSettings = "getCreateDeviceSettings"
+    reboot = "reboot"
     getRefreshFrequency = "getRefreshFrequency"
     refresh = "refresh"
     getMediaStatus = "getMediaStatus"
@@ -2242,6 +2249,13 @@ ScryptedInterfaceDescriptors = {
     "properties": [
       "chargeState"
     ]
+  },
+  "Reboot": {
+    "name": "Reboot",
+    "methods": [
+      "reboot"
+    ],
+    "properties": []
   },
   "Refresh": {
     "name": "Refresh",
