@@ -1,18 +1,24 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, MediaObject, PictureOptions, ScryptedInterface, Setting } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, MediaObject, PictureOptions, Reboot, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { ReolinkCameraClient } from './reolink-api';
 
 const { mediaManager } = sdk;
 
-class ReolinkCamera extends RtspSmartCamera implements Camera {
+class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot {
     client: ReolinkCameraClient;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
         this.updateManagementUrl();
+        this.provider.updateDevice(this.nativeId, this.name, this.provider.getInterfaces(), this.providedType);
+    }
+
+    async reboot() {
+        const client = this.getClient();
+        await client.reboot();
     }
 
     updateManagementUrl() {
@@ -211,6 +217,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
 class ReolinkProider extends RtspProvider {
     getAdditionalInterfaces() {
         return [
+            ScryptedInterface.Reboot,
             ScryptedInterface.VideoCameraConfiguration,
             ScryptedInterface.Camera,
             ScryptedInterface.AudioSensor,

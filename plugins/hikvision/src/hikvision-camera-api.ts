@@ -39,6 +39,17 @@ export class HikvisionCameraAPI {
         });
     }
 
+    async reboot() {
+        const response = await this.digestAuth.request({
+            httpsAgent: hikvisionHttpsAgent,
+            method: "PUT",
+            responseType: 'text',
+            url: `http://${this.ip}/ISAPI/System/reboot`,
+        });
+
+        return response.data;
+    }
+
     async getDeviceInfo() {
         return getDeviceInfo(this.digestAuth, this.ip);
     }

@@ -1,15 +1,12 @@
-import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
-import { readLength } from '@scrypted/common/src/read-stream';
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting } from "@scrypted/sdk";
-import child_process, { ChildProcess } from 'child_process';
-import { PassThrough, Readable } from "stream";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting } from "@scrypted/sdk";
+import { PassThrough } from "stream";
 import xml2js from 'xml2js';
+import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 import { hikvisionHttpsAgent } from './probe';
-import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
-import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 
 const { mediaManager } = sdk;
 
@@ -19,16 +16,22 @@ function channelToCameraNumber(channel: string) {
     return channel.substring(0, channel.length - 2);
 }
 
-class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
+class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     client: HikvisionCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
-    
+
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
+        this.updateDevice();
         this.updateDeviceInfo();
+    }
+
+    async reboot() {
+        const client = this.getClient();
+        await client.reboot();
     }
 
     async updateDeviceInfo() {
@@ -40,7 +43,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
             ...this.info,
             managementUrl,
             ip,
-            manufacturer: 'Hikvision', 
+            manufacturer: 'Hikvision',
         };
         const client = this.getClient();
         const deviceInfo = await client.getDeviceInfo().catch(() => { });
@@ -272,11 +275,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
         return false;
     }
 
-    async putSetting(key: string, value: string) {
-        this.client = undefined;
-        this.detectedChannels = undefined;
-        super.putSetting(key, value);
-
+    updateDevice() {
         const doorbellType = this.storage.getItem('doorbellType');
         const isDoorbell = doorbellType === 'true';
 
@@ -295,7 +294,14 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom {
         }
 
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
+    }
 
+    async putSetting(key: string, value: string) {
+        this.client = undefined;
+        this.detectedChannels = undefined;
+        super.putSetting(key, value);
+
+        this.updateDevice();
         this.updateDeviceInfo();
     }
 
@@ -495,6 +501,7 @@ class HikvisionProvider extends RtspProvider {
 
     getAdditionalInterfaces() {
         return [
+            ScryptedInterface.Reboot,
             ScryptedInterface.Camera,
             ScryptedInterface.MotionSensor,
         ];
