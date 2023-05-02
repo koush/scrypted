@@ -471,11 +471,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.setDetection(detected.detected, mo);
         // this.console.log('image saved', detected.detected.detections);
       }
-      const hadMotionDetected = this.motionDetected;
       this.reportObjectDetections(detected.detected);
       if (this.hasMotionType) {
-        if (!hadMotionDetected && this.motionDetected) {
-          // if new motion is detected, stop processing and exit loop allowing it to sleep.
+        if (this.motionDetected) {
+          // if motion is detected, stop processing and exit loop allowing it to sleep.
           clearInterval(interval);
           return true;
         }
