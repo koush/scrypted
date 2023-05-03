@@ -10,7 +10,6 @@ import { parse as spsParse } from "h264-sps-parser";
 import net from 'net';
 import { EventEmitter, Readable } from "stream";
 import { getSpsResolution } from "./sps-resolution";
-import { normalizeCodec } from "./normalize-codec";
 
 export function negotiateMediaStream(sdp: string, mediaStreamOptions: MediaStreamOptions, inputVideoCodec: string, inputAudioCodec: string, requestMediaStream: MediaStreamOptions) {
     const parsedSdp = parseSdp(sdp);
@@ -77,8 +76,8 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
     const audioPt = audioSection?.payloadTypes?.[0];
     const videoPt = videoSection?.payloadTypes?.[0];
 
-    const inputAudioCodec = normalizeCodec(audioSection?.codec);
-    const inputVideoCodec = normalizeCodec(videoSection.codec);
+    const inputAudioCodec = audioSection?.codec;
+    const inputVideoCodec = videoSection.codec;
 
     let sessionKilled: any;
     const killed = new Promise<void>(resolve => {
