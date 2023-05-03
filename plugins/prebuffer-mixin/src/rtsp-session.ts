@@ -9,6 +9,7 @@ import { parse as spsParse } from "h264-sps-parser";
 import { EventEmitter } from "stream";
 import { negotiateMediaStream } from "./rfc4571";
 import { getSpsResolution } from "./sps-resolution";
+import { normalizeCodec } from "./normalize-codec";
 
 export type RtspChannelCodecMapping = { [key: number]: string };
 
@@ -209,9 +210,8 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
             if (!videoSection)
                 throw new Error('SDP does not contain a video section!');
 
-            const inputAudioCodec = audioSection?.codec;
-            const inputVideoCodec = videoSection.codec;
-
+            const inputAudioCodec = normalizeCodec(audioSection?.codec);
+            const inputVideoCodec = normalizeCodec(videoSection.codec);
 
             let inputVideoResolution: {
                 width: number;
