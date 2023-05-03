@@ -109,7 +109,7 @@ export async function createTrackForwarder(options: {
 
     if (!maximumCompatibilityMode) {
         let found: RTCRtpCodecParameters;
-        if (mediaStreamOptions?.audio?.codec === 'pcm_mulaw') {
+        if (mediaStreamOptions?.audio?.codec === 'pcm_ulaw') {
             found = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU')
         }
         else if (mediaStreamOptions?.audio?.codec === 'pcm_alaw') {

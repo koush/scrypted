@@ -50,7 +50,7 @@ export function getAudioCodec(outputCodecParameters: RTCRtpCodecParameters) {
     }
     if (outputCodecParameters.name === 'PCMU') {
         return {
-            name: 'pcm_mulaw',
+            name: 'pcm_ulaw',
             encoder: 'pcm_mulaw',
         };
     }

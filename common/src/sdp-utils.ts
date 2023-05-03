@@ -217,12 +217,25 @@ const acontrol = 'a=control:';
 const artpmap = 'a=rtpmap:';
 export function parseMSection(msection: string[]) {
     const control = msection.find(line => line.startsWith(acontrol))?.substring(acontrol.length);
-    const rtpmapFirst = msection.find(line => line.startsWith(artpmap));
     const mline = parseMLine(msection[0]);
 
-    let codec = parseRtpMap(mline.type, rtpmapFirst).codec;
-
     const rtpmaps = msection.filter(line => line.startsWith(artpmap)).map(line => parseRtpMap(mline.type, line));
+
+    let codec: string;
+    const [rtpmapFirst] = rtpmaps;
+    if (rtpmapFirst) {
+        codec = rtpmapFirst.codec;
+    }
+    else {
+        // just guess
+        const [firstPayloadType ] = mline.payloadTypes;
+        if (firstPayloadType === 0)
+            codec = 'pcm_ulaw';
+        else if (firstPayloadType === 8)
+            codec = 'pcm_alaw';
+        else
+            codec = 'pcm_alaw';
+    }
 
     let direction: string;
     for (const checkDirection of ['sendonly', 'sendrecv', 'recvonly', 'inactive']) {
