@@ -78,7 +78,13 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
         # so use a known software decoder for h264 and decodebin for anything else.
         decoder = 'decodebin'
 
-    videosrc += ' ! {decoder} ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! {videocaps}'.format(decoder=decoder, videocaps=videocaps)
+    fps = options and options.get('fps', None)
+    videorate = ''
+    if fps:
+        videorate = 'videorate !'
+        videocaps += ',framerate={fps}/1'.format(fps=fps)
+
+    videosrc += ' ! {decoder} ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! {videorate} {videocaps}'.format(decoder=decoder, videocaps=videocaps, videorate=videorate)
 
     gst, gen = await createPipelineIterator(videosrc)
     async for gstsample in gen():

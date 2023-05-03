@@ -363,6 +363,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
       return await videoFrameGenerator.generateVideoFrames(stream, {
         queue: 0,
+        fps: this.hasMotionType ? 4 : undefined,
         resize: this.model?.inputSize ? {
           width: this.model.inputSize[0],
           height: this.model.inputSize[1],
