@@ -69,7 +69,8 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
                 ScryptedInterface.BinarySensor,
                 ScryptedDeviceType.DeviceProvider,
                 ScryptedInterface.HttpRequestHandler,
-                ScryptedInterface.VideoClips
+                ScryptedInterface.VideoClips,
+                ScryptedInterface.Reboot
             ],
             type: ScryptedDeviceType.Doorbell,
         })
