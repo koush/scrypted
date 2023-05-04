@@ -8,6 +8,7 @@ import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { serverSupportsMixinEventMasking } from './server-version';
 import { getAllDevices, safeParseJson } from './util';
 import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes-no-sharp';
+import os from 'os';
 
 const polygonOverlap = require('polygon-overlap');
 const insidePolygon = require('point-inside-polygon');
@@ -298,17 +299,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     suppress?: boolean,
   }, updatePipelineStatus: (status: string) => void) {
 
-    let newPipeline: string = this.newPipeline;
-    if (!this.hasMotionType && (!newPipeline || newPipeline === 'Default')) {
-      if (options.snapshotPipeline) {
-        newPipeline = 'Snapshot';
-        this.console.warn(`Due to limited performance, Snapshot mode is being used with ${this.plugin.statsSnapshotConcurrent} actively detecting cameras.`);
-      }
+    let frameGenerator: string = this.frameGenerator;
+    if (!this.hasMotionType && options.snapshotPipeline) {
+      frameGenerator = 'Snapshot';
+      this.console.warn(`Due to limited performance, Snapshot mode is being used with ${this.plugin.statsSnapshotConcurrent} actively detecting cameras.`);
     }
 
-    if (newPipeline === 'Snapshot' && !this.hasMotionType) {
+    if (frameGenerator === 'Snapshot' && !this.hasMotionType) {
       options.snapshotPipeline = true;
-      this.console.log('decoder:', 'Snapshot +', this.objectDetection.name);
+      this.console.log('Snapshot', '+', this.objectDetection.name);
       const self = this;
       return (async function* gen() {
         try {
@@ -348,7 +347,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
     else {
       const destination: MediaStreamDestination = this.hasMotionType ? 'low-resolution' : 'local-recorder';
-      const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(newPipeline);
+      const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(frameGenerator);
       if (!videoFrameGenerator)
         throw new Error('invalid VideoFrameGenerator');
       if (!options?.suppress)
@@ -658,18 +657,22 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return BUILTIN_MOTION_SENSOR_REPLACE;
   }
 
-  get newPipeline() {
-    const newPipeline = this.storageSettings.values.newPipeline;
-    if (!newPipeline)
-      return newPipeline;
-    if (newPipeline === 'Snapshot')
-      return newPipeline;
+  get frameGenerator() {
+    const frameGenerator = this.storageSettings.values.newPipeline as string || 'Default';
+    if (frameGenerator === 'Snapshot')
+      return frameGenerator;
+
+    if (frameGenerator === 'Default' && !this.hasMotionType && os.cpus().length < 4) {
+      this.console.log('Less than 4 processors detected. Defaulting to snapshot mode.');
+      return 'Snapshot';
+    }
+
     const pipelines = getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator));
     const webcodec = pipelines.find(p => p.nativeId === 'webcodec');
     const gstreamer = pipelines.find(p => p.nativeId === 'gstreamer');
     const libav = pipelines.find(p => p.nativeId === 'libav');
     const ffmpeg = pipelines.find(p => p.nativeId === 'ffmpeg');
-    const use = pipelines.find(p => p.name === newPipeline) || webcodec || gstreamer || libav || ffmpeg;
+    const use = pipelines.find(p => p.name === frameGenerator) || webcodec || gstreamer || libav || ffmpeg;
     return use.id;
   }
 
