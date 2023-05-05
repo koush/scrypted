@@ -1,19 +1,14 @@
-import { ScryptedStatic } from '@scrypted/types';
-import { DeviceManager } from '@scrypted/types';
-import { DeviceCreator } from '@scrypted/types';
-import { ScryptedInterface } from '@scrypted/types';
-import { Scriptable } from '@scrypted/types';
-import { SystemManager } from '@scrypted/types';
+import { DeviceCreator, Scriptable, ScryptedInterface, ScryptedStatic, SystemManager } from '@scrypted/types';
 import axios, { AxiosResponse } from 'axios';
 import semver from 'semver';
 import { getAllDevices } from '../../common/mixin';
+import { sleep } from '../../common/sleep';
+import { getComponentWebPath } from "../helpers";
+const componentPath = getComponentWebPath('script');
 const pluginSnapshot = require("!!raw-loader!./plugin-snapshot.ts").default.split('\n')
     .filter(line => !line.includes('SCRYPTED_FILTER_EXAMPLE_LINE'))
     .join('\n')
     .trim();
-
-import { getComponentWebPath } from "../helpers";
-const componentPath = getComponentWebPath('script');
 
 export interface PluginUpdateCheck {
     updateAvailable?: string;
@@ -64,11 +59,11 @@ export async function checkUpdate(npmPackage: string, npmPackageVersion: string)
 }
 
 export async function installNpm(systemManager: SystemManager, npmPackage: string, version?: string): Promise<string> {
-    let suffix = version ? `/${version}` : '';
-    const response = await axios.post(
-        `${componentPath}/install/${npmPackage}${suffix}`
-    );
-    return response.data.id;
+    const plugins = await systemManager.getComponent('plugins');
+    await plugins.installNpm(npmPackage, version);
+    await sleep(0);
+    const plugin = systemManager.getDeviceById(npmPackage)
+    return plugin.id;
 }
 
 export function getNpmPath(npmPackage: string) {

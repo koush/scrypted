@@ -19,7 +19,7 @@ export class LauncherMixin extends ScryptedDeviceBase implements MixinProvider, 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any> {
         mixinDeviceState.applicationInfo = {
             icon: 'fa ' + typeToIcon(mixinDeviceState.type),
-            href: '/endpoint/@scrypted/core/public/#/device/' + mixinDeviceState.id,
+            href: '#/device/' + mixinDeviceState.id,
         }
         return mixinDevice;
     }

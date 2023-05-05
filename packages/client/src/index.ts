@@ -87,11 +87,30 @@ function isRunningStandalone() {
 }
 
 export async function logoutScryptedClient(baseUrl?: string) {
-    const url = baseUrl ? new URL('/logout', baseUrl).toString() : '/logout';
+    const url = combineBaseUrl(baseUrl, 'logout');
     const response = await axios(url, {
         withCredentials: true,
     });
     return response.data;
+}
+
+export function getCurrentBaseUrl() {
+    // an endpoint within scrypted will be served at /endpoint/[org/][id]
+    // find the endpoint prefix and anything prior to that will be the server base url.
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.hash = '';
+    let endpointPath = window.location.pathname;
+    const parts = endpointPath.split('/');
+    const index = parts.findIndex(p => p === 'endpoint');
+    if (index === -1) {
+        console.warn('path not recognized, does not contain the segment "endpoint".')
+        return undefined;
+    }
+    const keep = parts.slice(0, index);
+    keep.push('');
+    url.pathname = keep.join('/');
+    return url.toString();
 }
 
 export async function loginScryptedClient(options: ScryptedLoginOptions) {
@@ -100,7 +119,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
     if (!maxAge && isRunningStandalone())
         maxAge = 365 * 24 * 60 * 60 * 1000;
 
-    const url = `${baseUrl || ''}/login`;
+    const url = combineBaseUrl(baseUrl, 'login');
     const response = await axios.post(url, {
         username,
         password,
@@ -133,7 +152,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
 
 export async function checkScryptedClientLogin(options?: ScryptedConnectionOptions) {
     let { baseUrl } = options || {};
-    const url = `${baseUrl || ''}/login`;
+    const url = combineBaseUrl(baseUrl, 'login');
     const response = await axios.get(url, {
         withCredentials: true,
         ...options?.axiosConfig,
@@ -179,9 +198,12 @@ export function redirectScryptedLogin(options?: {
     globalThis.location.href = redirect_uri;
 }
 
+export function combineBaseUrl(baseUrl: string, rootPath: string) {
+    return baseUrl ? new URL(rootPath, baseUrl).toString() : '/' + rootPath;
+}
+
 export async function redirectScryptedLogout(baseUrl?: string) {
-    baseUrl = baseUrl || '';
-    globalThis.location.href = `${baseUrl}/logout`;
+    globalThis.location.href = combineBaseUrl(baseUrl, 'logout');
 }
 
 export async function connectScryptedClient(options: ScryptedClientOptions): Promise<ScryptedClientStatic> {
@@ -223,9 +245,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     }
 
     let socket: IOClientSocket;
-    const endpointPath = `/endpoint/${pluginId}`;
+    const eioPath = `endpoint/${pluginId}/engine.io/api`;
+    const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
     const eioOptions: Partial<SocketOptions> = {
-        path: `${endpointPath}/engine.io/api`,
+        path: eioEndpoint,
         withCredentials: true,
         extraHeaders,
         rejectUnauthorized: false,
