@@ -218,26 +218,11 @@ const artpmap = 'a=rtpmap:';
 export function parseMSection(msection: string[]) {
     const control = msection.find(line => line.startsWith(acontrol))?.substring(acontrol.length);
     const mline = parseMLine(msection[0]);
-
-    const rtpmaps = msection.filter(line => line.startsWith(artpmap)).map(line => parseRtpMap(mline.type, line));
-
-    let codec: string;
-    const [rtpmapFirst] = rtpmaps;
-    if (rtpmapFirst) {
-        codec = rtpmapFirst.codec;
-    }
-    else {
-        // just guess
-        const [firstPayloadType ] = mline.payloadTypes;
-        if (firstPayloadType === 0)
-            codec = 'pcm_ulaw';
-        else if (firstPayloadType === 8)
-            codec = 'pcm_alaw';
-        else
-            codec = 'pcm_alaw';
-    }
-
+    const rawRtpmaps = msection.filter(line => line.startsWith(artpmap));
+    const rtpmaps = rawRtpmaps.map(line => parseRtpMap(mline.type, line));
+    const codec = parseRtpMap(mline.type, rawRtpmaps[0]).codec;
     let direction: string;
+    
     for (const checkDirection of ['sendonly', 'sendrecv', 'recvonly', 'inactive']) {
         const found = msection.find(line => line === 'a=' + checkDirection);
         if (found) {
