@@ -104,7 +104,7 @@ export function getCurrentBaseUrl() {
     const parts = endpointPath.split('/');
     const index = parts.findIndex(p => p === 'endpoint');
     if (index === -1) {
-        console.warn('path not recognized, does not contain the segment "endpoint".')
+        // console.warn('path not recognized, does not contain the segment "endpoint".')
         return undefined;
     }
     const keep = parts.slice(0, index);
