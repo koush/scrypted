@@ -278,9 +278,15 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
             }
 
             if (event === OnvifEvent.MotionStart)
-                this.motionDetected = true;
+                if (this.storage.getItem('inverseboolvaluemotion'))
+                    this.motionDetected = false;
+                else
+                    this.motionDetected = true;
             else if (event === OnvifEvent.MotionStop)
-                this.motionDetected = false;
+                if (this.storage.getItem('inverseboolvaluemotion'))
+                    this.motionDetected = true;
+                else
+                    this.motionDetected = false;
             else if (event === OnvifEvent.AudioStart)
                 this.audioDetected = true;
             else if (event === OnvifEvent.AudioStop)
@@ -376,7 +382,14 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
                 }
             )
         }
-
+        ret.push(
+            {
+                title: 'Inverse Bool Motion Value',
+                type: 'boolean',
+                key: 'inverseboolvaluemotion',
+                value:this.storage.getItem('inverseboolvaluemotion'),
+             }
+        )
         return ret;
     }
 
