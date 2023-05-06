@@ -36,6 +36,7 @@ import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import eio from "engine.io-client";
 import { sleep } from "../common/sleep";
+import { getCurrentBaseUrl } from "../../../../../packages/client/src";
 
 export default {
   props: ["deviceId"],
@@ -64,10 +65,12 @@ export default {
     },
     reconnect(term) {
       this.buffer = [];
-      const endpointPath = `/endpoint/@scrypted/core`;
+      const baseUrl = getCurrentBaseUrl();
+      const eioPath = `endpoint/@scrypted/core/engine.io/console/${this.deviceId}`;
+      const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
 
       const options = {
-        path: `${endpointPath}/engine.io/console/${this.deviceId}`,
+        path: eioEndpoint,
       };
       const rootLocation = `${window.location.protocol}//${window.location.host}`;
       this.socket = eio(rootLocation, options);

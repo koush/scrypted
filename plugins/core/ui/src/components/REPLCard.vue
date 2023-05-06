@@ -8,6 +8,7 @@
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import eio from "engine.io-client";
+import { getCurrentBaseUrl } from "../../../../../packages/client/src";
 
 export default {
   props: ["deviceId"],
@@ -28,10 +29,12 @@ export default {
     term.open(this.$refs.terminal);
     fitAddon.fit();
 
-    const endpointPath = `/endpoint/@scrypted/core`;
+    const baseUrl = getCurrentBaseUrl();
+    const eioPath = `endpoint/@scrypted/core/engine.io/repl/${this.deviceId}`;
+    const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
 
     const options = {
-      path: `${endpointPath}/engine.io/repl/${this.deviceId}`,
+      path: eioEndpoint,
     };
     const rootLocation = `${window.location.protocol}//${window.location.host}`;
     this.socket = eio(rootLocation, options);
