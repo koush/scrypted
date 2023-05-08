@@ -1,5 +1,5 @@
 name: Scrypted
-version: "v0.8.0"
+version: "homeassistant-v0.11.0"
 slug: scrypted
 description: A home automation platform powered by node.js
 url: "https://github.com/koush/scrypted"
@@ -18,7 +18,7 @@ gpio: true
 usb: true
 uart: true
 video: true
-# image: "ghcr.io/aegjoyce/{arch}-ha-addon-scrypted"
+image: "ghcr.io/koush/scrypted"
 environment:
   SCRYPTED_VOLUME: "/data/scrypted_data"
 backup_exclude:
