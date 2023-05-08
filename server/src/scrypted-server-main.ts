@@ -203,6 +203,14 @@ async function start(mainFilename: string, options?: {
                 return;
             }
 
+            for (const user of scrypted.usersService.users.values()) {
+                if (user.token === token) {
+                    res.locals.username = user._id;
+                    res.locals.aclId = user.aclId;
+                    break;
+                }
+            }
+
             const [checkHash, ...tokenParts] = token.split('#');
             const tokenPart = tokenParts?.join('#');
             if (checkHash && tokenPart) {
@@ -565,14 +573,15 @@ async function start(mainFilename: string, options?: {
         const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true)).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
 
         // env/header based admin login
-        if (res.locals.username && res.locals.username === process.env.SCRYPTED_ADMIN_USERNAME) {
-            const userToken = new UserToken(res.locals.username, undefined, Date.now());
+        if (res.locals.username) {
+            const user = scrypted.usersService.users.get(res.locals.username);
+            const userToken = new UserToken(res.locals.username, user.aclId, Date.now());
 
             res.send({
                 ...createTokens(userToken),
                 expiration: ONE_DAY_MILLISECONDS,
                 username: res.locals.username,
-                token: process.env.SCRYPTED_ADMIN_TOKEN,
+                token: user.token,
                 addresses,
                 hostname,
             });
