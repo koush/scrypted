@@ -2,16 +2,19 @@ ARG BASHIO_VERSION=0.14.3
 ARG TEMPIO_VERSION=2021.09.0
 FROM koush/scrypted:beta
 
+ARG BASHIO_VERSION
+ARG TEMPIO_VERSION
+
 # Install Nginx and a set of Home Assistant add-on tools
 RUN \
-    case "$(uname -m)" in \
-    x86_64) BUILD_ARCH='amd64';; \
-    armv7l) BUILD_ARCH='armhf';; \
-    aarch64) BUILD_ARCH='aarch64';; \
+    set -x \
+    && case "$(uname -m)" in \
+    x86_64) TEMPIO_ARCH='amd64';; \
+    armv7l) TEMPIO_ARCH='armhf';; \
+    aarch64) TEMPIO_ARCH='aarch64';; \
     \
     *) echo "Your system architecture isn't supported."; exit 1 ;; \
     esac \
-    set -x \
     && apt-get update && apt-get install -y --no-install-recommends \
         bash \
         jq \
@@ -26,7 +29,7 @@ RUN \
     && mkdir -p /etc/services.d \
     \
     && curl -L -f -s -o /usr/bin/tempio \
-        "https://github.com/home-assistant/tempio/releases/download/${TEMPIO_VERSION}/tempio_${BUILD_ARCH}" \
+        "https://github.com/home-assistant/tempio/releases/download/${TEMPIO_VERSION}/tempio_${TEMPIO_ARCH}" \
     && chmod a+x /usr/bin/tempio \
     \
     && mkdir -p /usr/src/bashio \
