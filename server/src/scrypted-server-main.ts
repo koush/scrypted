@@ -452,7 +452,7 @@ async function start(mainFilename: string, options?: {
             res.send({});
         }
         else {
-            res.redirect('/endpoint/@scrypted/core/public/');
+            res.redirect('./endpoint/@scrypted/core/public/');
         }
     });
 
@@ -648,7 +648,7 @@ async function start(mainFilename: string, options?: {
         }
     });
 
-    app.get('/', (_req, res) => res.redirect('/endpoint/@scrypted/core/public/'));
+    app.get('/', (_req, res) => res.redirect('./endpoint/@scrypted/core/public/'));
 
     return scrypted;
 }
