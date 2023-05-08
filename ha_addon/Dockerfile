@@ -5,7 +5,7 @@ FROM koush/scrypted:beta
 # Install Nginx and a set of Home Assistant add-on tools
 RUN \
     case "$(uname -m)" in \
-    x86_64) BUILD_ARCH='x86_64';; \
+    x86_64) BUILD_ARCH='amd64';; \
     armv7l) BUILD_ARCH='armhf';; \
     aarch64) BUILD_ARCH='aarch64';; \
     \
