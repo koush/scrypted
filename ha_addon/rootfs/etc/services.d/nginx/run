@@ -1,0 +1,31 @@
+#!/command/with-contenv bashio
+# ==============================================================================
+# Home Assistant Community Add-on: Scrypted
+# Runs the Nginx daemon
+# ==============================================================================
+
+# Wait for the Scrypted service to become available
+declare name
+declare value
+bashio::net.wait_for 10443
+
+bashio::log.info "Starting NGinx..."
+for var in $(bashio::config 'env_vars|keys'); do
+    name=$(bashio::config "env_vars[${var}].name")
+    value=$(bashio::config "env_vars[${var}].value")
+    bashio::log.info "Setting ${name} in nginx run" 
+    export "${name}=${value}"
+done
+
+
+if [[ ! -v SCRYPTED_ADMIN_TOKEN || -z "$SCRYPTED_ADMIN_TOKEN"  ]]; 
+then
+    bashio::log.info "No SCRYPTED_ADMIN_TOKEN setting found, removing proxy_pass_header config."
+    sed -i "s/.*Authorization.*//g" /etc/nginx/servers/ingress.conf
+else
+    bashio::log.info "SCRYPTED_ADMIN_TOKEN setting found, adding proxy_pass_header config." 
+    sed -i "s/%%authorization_header%%/$SCRYPTED_ADMIN_TOKEN/g" /etc/nginx/servers/ingress.conf
+fi
+
+
+exec nginx

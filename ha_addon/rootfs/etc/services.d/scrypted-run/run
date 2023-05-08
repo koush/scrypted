@@ -1,0 +1,29 @@
+#!/command/with-contenv bashio
+# ==============================================================================
+# Home Assistant Community Add-on: Log Viewer
+# Runs the Log Viewer
+# ==============================================================================
+declare name
+declare value
+bashio::log.info "Starting Scrypted..."
+
+# Ensure the configuration exists
+if bashio::fs.file_exists '/data/config/options.json'; then
+    cp -f -v /data/config/options.json /etc/options
+else
+    mkdir -p -v /data/config \
+        || bashio::exit.nok "Failed to create the Scrypted configuration directory"
+
+    # Copy in template file
+    cp -v /etc/options.json /data/config/
+fi
+
+
+for var in $(bashio::config 'env_vars|keys'); do
+    name=$(bashio::config "env_vars[${var}].name")
+    value=$(bashio::config "env_vars[${var}].value")
+    bashio::log.info "Setting ${name} in scrypted run" 
+    export "${name}=${value}"
+done
+
+cd /server && npm exec scrypted-serve

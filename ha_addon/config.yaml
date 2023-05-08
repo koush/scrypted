@@ -1,0 +1,51 @@
+name: Scrypted
+version: "v0.8.0"
+slug: scrypted
+description: A home automation platform powered by node.js
+url: "https://github.com/koush/scrypted"
+arch:
+  - amd64
+  - aarch64
+  - armv7
+init: false
+ingress: true
+ingress_port: 0
+panel_icon: mdi:memory
+hassio_api: true
+ingress_stream: true
+host_network: true
+gpio: true
+usb: true
+uart: true
+video: true
+# image: "ghcr.io/aegjoyce/{arch}-ha-addon-scrypted"
+environment:
+  SCRYPTED_VOLUME: "/data/scrypted_data"
+backup_exclude:
+  - '*/server/*'
+  - '*/data/scrypted_data/recordings/*'
+map:
+  - config
+options:
+  env_vars:
+    - name: SCRYPTED_ADMIN_USERNAME
+      value: homeassistant
+    - name: SCRYPTED_ADMIN_TOKEN
+      value: homeassistant
+    - name: SCRYPTED_NVR_VOLUME
+      value: /data/scrypted_data/recordings
+schema:
+  env_vars:
+    - name: match(^SCRYPTED_([A-Z0-9_])+$)
+      value: str
+devices:
+  - /dev/mem
+  - /dev/dri/renderD128
+  - /dev/apex_0
+  - /dev/apex_1
+  - /dev/apex_2
+  - /dev/apex_3
+  - /dev/dri/card0
+  - /dev/vchiq
+  - /dev/video10
+  - /dev/video0
