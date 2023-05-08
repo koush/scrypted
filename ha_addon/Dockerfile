@@ -1,14 +1,16 @@
 ARG BASHIO_VERSION=0.14.3
 ARG TEMPIO_VERSION=2021.09.0
-ARG BUILD_ARCH=debian
-FROM koush/scrypted
-
-ARG BASHIO_VERSION
-ARG TEMPIO_VERSION
-ARG BUILD_ARCH
+FROM koush/scrypted:beta
 
 # Install Nginx and a set of Home Assistant add-on tools
 RUN \
+    case "$(uname -m)" in \
+    x86_64) BUILD_ARCH='x86_64';; \
+    armv7l) BUILD_ARCH='armhf';; \
+    aarch64) BUILD_ARCH='aarch64';; \
+    \
+    *) echo "Your system architecture isn't supported."; exit 1 ;; \
+    esac \
     set -x \
     && apt-get update && apt-get install -y --no-install-recommends \
         bash \
