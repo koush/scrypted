@@ -168,6 +168,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         error: response.data.error as string,
         authorization: response.data.authorization as string,
         queryToken: response.data.queryToken as any,
+        token: response.data.token as string,
         addresses: response.data.addresses as string[],
         scryptedCloud,
         directAddress,
