@@ -98,6 +98,8 @@ export function getCurrentBaseUrl() {
     // an endpoint within scrypted will be served at /endpoint/[org/][id]
     // find the endpoint prefix and anything prior to that will be the server base url.
     const url = new URL(window.location.href);
+    url.search = '';
+    url.hash = '';
     let endpointPath = window.location.pathname;
     const parts = endpointPath.split('/');
     const index = parts.findIndex(p => p === 'endpoint');
