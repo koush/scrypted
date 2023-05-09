@@ -23,6 +23,7 @@ Select the appropriate guide. After installation is finished, remember to visit 
  * Windows
    * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Windows)
    * [WSL2 Installation](https://github.com/koush/scrypted/wiki/Installation:-WSL2-Windows)
+ * [Home Assistant OS](https://github.com/koush/scrypted/wiki/Installation:-Home-Assistant-OS)
 <!--    * Docker Desktop is [not supported](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop). -->
  * [ReadyNAS: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-ReadyNAS)
  * [Synology: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Synology-NAS)
