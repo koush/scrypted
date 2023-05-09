@@ -11,6 +11,8 @@ declare ingress_port
 declare keyfile
 declare ingress_entry
 
+# create the random admin token, though it may not be used.
+echo -n $RANDOM$RANDOM$RANDOM$RANDOM$RANDOM | md5sum  | awk '{ print $1 }' > /tmp/.scrypted_admin_token
 
 port=$(bashio::addon.port 71864)
 if bashio::var.has_value "${port}"; then
