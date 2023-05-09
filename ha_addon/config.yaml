@@ -1,5 +1,5 @@
 name: Scrypted
-version: "homeassistant-v0.11.1"
+version: "homeassistant-v0.11.2"
 slug: scrypted
 description: Scrypted is a high performance home video integration and automation platform
 url: "https://github.com/koush/scrypted"
