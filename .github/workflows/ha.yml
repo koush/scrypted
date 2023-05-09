@@ -3,11 +3,14 @@ name: Publish Scrypted Home Assistant Image
 on:
   workflow_dispatch:
     inputs:
+      npm_tag:
+        description: "The npm tag used to build the Home Assistant image. The tag will be resolved as a specific version on npm, and that version will be the base Scrypted Docker image."
+        required: false
       docker_tag:
-        description: "Docker Tag"
-        required: true
-      package_version:
-        description: "Package Version"
+        description: "The Scrypted Docker image tag used to build the Home Assistant image."
+        required: false
+      publish_tag:
+        description: "The tag for the published Scrypted Home Assistant image. Will use the Scrypted Docker Image tag or resolved npm version if not provided."
         required: false
   workflow_run:
     workflows: ["Publish Scrypted Docker Image"]
@@ -20,17 +23,25 @@ jobs:
     if: ${{ !github.event.action || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Check Arguments
+        if: ${{ (!github.event.inputs.npm_tag && !github.event.inputs.docker_tag) || (github.event.inputs.npm_tag && github.event.inputs.docker_tag) }}
+        run: exit 1
+
       - name: Check out the repo
         uses: actions/checkout@v3
 
-      - name: get-npm-version
-        id: package-version
-        uses: martinbeentjes/npm-get-version-action@master
+      - name: NPM Package Request
+        if: ${{ github.event.inputs.npm_tag }}
+        id: npm-request
+        uses: fjogeleit/http-request-action@v1
         with:
-          path: server
+          url: 'https://registry.npmjs.org/@scrypted/server'
+          method: 'GET'
 
-      - name: Print Version
-        run: echo "Version ${{ github.event.inputs.package_version || steps.package-version.outputs.current-version }}"
+      - name: Set NPM Version
+        if: ${{ github.event.inputs.npm_tag }}
+        id: package-version
+        run: echo "NPM_VERSION=${{ fromJson(steps.npm-request.outputs.response)['dist-tags'][ github.event.inputs.npm_tag] }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -54,15 +65,17 @@ jobs:
       - name: Build and push Home Assistant image
         uses: docker/build-push-action@v3
         with:
+          build-args: |
+            SCRYPTED_BASE_IMAGE_TAG=18-bullseye-full.s6-v${{ github.event.inputs.docker_tag || steps.package-version.outputs.NPM_VERSION }}
           context: ha_addon/
           file: ha_addon/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
-            ${{ format('koush/scrypted:homeassistant-v{0}', github.event.inputs.package_version || steps.package-version.outputs.current-version) }}
-            ${{ github.event.inputs.docker_tag == 'latest' && 'koush/scrypted:homeassistant' || '' }}
+            ${{ format('koush/scrypted:homeassistant-v{0}', github.event.inputs.publish_tag || github.event.inputs.docker_tag || steps.package-version.outputs.NPM_VERSION) }}
+            ${{ github.event.inputs.tag == 'latest' && 'koush/scrypted:homeassistant' || '' }}
 
-            ${{ format('ghcr.io/koush/scrypted:homeassistant-v{0}', github.event.inputs.package_version || steps.package-version.outputs.current-version) }}
-            ${{ github.event.inputs.docker_tag == 'latest' && 'ghcr.io/koush/scrypted:homeassistant' || '' }}
+            ${{ format('ghcr.io/koush/scrypted:homeassistant-v{0}', github.event.inputs.publish_tag || github.event.inputs.docker_tag || steps.package-version.outputs.NPM_VERSION) }}
+            ${{ github.event.inputs.tag == 'latest' && 'ghcr.io/koush/scrypted:homeassistant' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
