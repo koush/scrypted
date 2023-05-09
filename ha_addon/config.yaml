@@ -23,7 +23,7 @@ environment:
   SCRYPTED_VOLUME: "/data/scrypted_data"
 backup_exclude:
   - '*/server/*'
-  - '*/data/scrypted_data/recordings/*'
+  - '*/data/scrypted_nvr/*'
 map:
   - config
 options:
@@ -31,7 +31,7 @@ options:
     - name: SCRYPTED_ADMIN_USERNAME
       value: homeassistant
     - name: SCRYPTED_NVR_VOLUME
-      value: /data/scrypted_data/recordings
+      value: /data/scrypted_nvr
 schema:
   env_vars:
     - name: match(^SCRYPTED_([A-Z0-9_])+$)
