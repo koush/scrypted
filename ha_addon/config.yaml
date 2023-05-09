@@ -1,7 +1,7 @@
 name: Scrypted
 version: "homeassistant-v0.11.0"
 slug: scrypted
-description: A home automation platform powered by node.js
+description: Scrypted is a high performance home video integration and automation platform
 url: "https://github.com/koush/scrypted"
 arch:
   - amd64
@@ -29,8 +29,6 @@ map:
 options:
   env_vars:
     - name: SCRYPTED_ADMIN_USERNAME
-      value: homeassistant
-    - name: SCRYPTED_ADMIN_TOKEN
       value: homeassistant
     - name: SCRYPTED_NVR_VOLUME
       value: /data/scrypted_data/recordings

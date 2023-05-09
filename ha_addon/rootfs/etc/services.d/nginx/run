@@ -18,12 +18,13 @@ for var in $(bashio::config 'env_vars|keys'); do
 done
 
 
-if [[ ! -v SCRYPTED_ADMIN_TOKEN || -z "$SCRYPTED_ADMIN_TOKEN"  ]]; 
+if [[ ! -v SCRYPTED_ADMIN_USERNAME || -z "$SCRYPTED_ADMIN_USERNAME"  ]]; 
 then
-    bashio::log.info "No SCRYPTED_ADMIN_TOKEN setting found, removing proxy_pass_header config."
+    bashio::log.info "No SCRYPTED_ADMIN_USERNAME setting found, removing proxy_pass_header config."
     sed -i "s/.*Authorization.*//g" /etc/nginx/servers/ingress.conf
 else
-    bashio::log.info "SCRYPTED_ADMIN_TOKEN setting found, adding proxy_pass_header config." 
+    export SCRYPTED_ADMIN_TOKEN=$(echo $RANDOM$RANDOM$RANDOM$RANDOM$RANDOM | md5sum)
+    bashio::log.info "SCRYPTED_ADMIN_USERNAME setting found, adding proxy_pass_header config." 
     sed -i "s/%%authorization_header%%/$SCRYPTED_ADMIN_TOKEN/g" /etc/nginx/servers/ingress.conf
 fi
 
