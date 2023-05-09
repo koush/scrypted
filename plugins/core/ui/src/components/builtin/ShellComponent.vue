@@ -8,6 +8,7 @@
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import eio from "engine.io-client";
+import { getCurrentBaseUrl } from "../../../../../../packages/client/src";
 
 export default {
   socket: null,
@@ -27,8 +28,11 @@ export default {
     term.open(this.$refs.terminal);
     fitAddon.fit();
 
+    const baseUrl = getCurrentBaseUrl();
+    const eioPath = `engine.io/shell`;
+    const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
     const options = {
-      path: `/engine.io/shell`,
+      path: eioEndpoint,
     };
     const rootLocation = `${window.location.protocol}//${window.location.host}`;
     this.socket = eio(rootLocation, options);
