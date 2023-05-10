@@ -217,14 +217,12 @@ const acontrol = 'a=control:';
 const artpmap = 'a=rtpmap:';
 export function parseMSection(msection: string[]) {
     const control = msection.find(line => line.startsWith(acontrol))?.substring(acontrol.length);
-    const rtpmapFirst = msection.find(line => line.startsWith(artpmap));
     const mline = parseMLine(msection[0]);
-
-    let codec = parseRtpMap(mline.type, rtpmapFirst).codec;
-
-    const rtpmaps = msection.filter(line => line.startsWith(artpmap)).map(line => parseRtpMap(mline.type, line));
-
+    const rawRtpmaps = msection.filter(line => line.startsWith(artpmap));
+    const rtpmaps = rawRtpmaps.map(line => parseRtpMap(mline.type, line));
+    const codec = parseRtpMap(mline.type, rawRtpmaps[0]).codec;
     let direction: string;
+    
     for (const checkDirection of ['sendonly', 'sendrecv', 'recvonly', 'inactive']) {
         const found = msection.find(line => line === 'a=' + checkDirection);
         if (found) {

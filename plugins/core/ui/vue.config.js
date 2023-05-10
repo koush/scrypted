@@ -97,7 +97,7 @@ module.exports = {
       // clientsClaim: true,
     }
   },
-  publicPath: process.env.NODE_ENV === 'production' ? '/endpoint/@scrypted/core/public' : '/',
+  publicPath: process.env.NODE_ENV === 'production' ? '' : '/',
 
   runtimeCompiler: true,
   devServer: {

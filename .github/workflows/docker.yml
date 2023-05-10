@@ -1,19 +1,19 @@
-name: Publish Scrypted
+name: Publish Scrypted Docker Image
 
 on:
   workflow_dispatch:
     inputs:
-      docker_tag:
-        description: 'Docker Tag'
+      tag:
+        description: "The npm tag used to build the Docker image. The tag will be resolved as a specific version on npm, and that will be used to version the docker image."
         required: true
-      package_version:
-        description: 'Package Version'
+      publish_tag:
+        description: "The versioned tag for the published Docker image. NPM will use the minor version, Docker should only specify a patch version."
         required: false
   release:
     types: [published]
 
 jobs:
-  push_to_registry:
+  build:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     strategy:
@@ -23,26 +23,24 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-      
-      - name: get-npm-version
-        id: package-version
-        uses: martinbeentjes/npm-get-version-action@master
+
+      - name: NPM Package Request
+        id: npm-request
+        uses: fjogeleit/http-request-action@v1
         with:
-          path: server
+          url: 'https://registry.npmjs.org/@scrypted/server'
+          method: 'GET'
 
-      - name: Print Version
-        run: echo "Version ${{ github.event.inputs.package_version || steps.package-version.outputs.current-version }}"
-
-      - name: Get current date
-        id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+      - name: Set NPM Version
+        id: package-version
+        run: echo "NPM_VERSION=${{ fromJson(steps.npm-request.outputs.response)['dist-tags'][ github.event.inputs.tag] }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        
+
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -56,31 +54,31 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image (scrypted)
+      - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
           build-args: |
             BASE=${{ matrix.BASE }}
-            SCRYPTED_INSTALL_VERSION=${{ github.event.inputs.package_version }}
-          context: docker/
-          file: docker/Dockerfile${{ matrix.SUPERVISOR }}
+            SCRYPTED_INSTALL_VERSION=${{ steps.package-version.outputs.NPM_VERSION }}
+          context: install/docker/
+          file: install/docker/Dockerfile${{ matrix.SUPERVISOR }}
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
-            ${{ format('koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.package_version || steps.package-version.outputs.current-version) }}
-            ${{ matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '.s6' && format('koush/scrypted:{0}', github.event.inputs.docker_tag) || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '' && 'koush/scrypted:full' || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'koush/scrypted:lite' || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '' && 'koush/scrypted:thin' || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:lite-s6' || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:thin-s6' || '' }}
+            ${{ format('koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
+            ${{ matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '.s6' && format('koush/scrypted:{0}', github.event.inputs.tag) || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '' && 'koush/scrypted:full' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'koush/scrypted:lite' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '' && 'koush/scrypted:thin' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:lite-s6' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:thin-s6' || '' }}
 
-            ${{ format('ghcr.io/koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.package_version || steps.package-version.outputs.current-version) }}
-            ${{ matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '.s6' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.docker_tag) || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:full' || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:lite' || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:thin' || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '.s6' && 'ghcr.io/koush/scrypted:lite-s6' || '' }}
-            ${{ github.event.inputs.docker_tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '.s6' && 'ghcr.io/koush/scrypted:thin-s6' || '' }}
+            ${{ format('ghcr.io/koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
+            ${{ matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '.s6' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.tag) || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:full' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:lite' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:thin' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '.s6' && 'ghcr.io/koush/scrypted:lite-s6' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '.s6' && 'ghcr.io/koush/scrypted:thin-s6' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -67,7 +67,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             description: (this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)
                 ? 'Optional: '
                 : '')
-                + 'The http(s) URL that points that retrieves the latest image from your camera.',
+                + 'The http(s) URL that retrieves a jpeg image from your camera.',
             placeholder: 'https://ip:1234/cgi-bin/snapshot.jpg',
         },
         snapshotsFromPrebuffer: {

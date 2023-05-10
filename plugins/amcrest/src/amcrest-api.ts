@@ -33,6 +33,16 @@ export class AmcrestCameraClient {
         });
     }
 
+    async reboot() {
+        const response = await this.digestAuth.request({
+            httpsAgent: amcrestHttpsAgent,
+            method: "GET",
+            responseType: 'text',
+            url: `http://${this.ip}/cgi-bin/magicBox.cgi?action=reboot`,
+        });
+        return response.data as string;
+    }
+
     async checkTwoWayAudio() {
         const response = await this.digestAuth.request({
             httpsAgent: amcrestHttpsAgent,

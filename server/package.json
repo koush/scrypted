@@ -1,10 +1,10 @@
 {
   "name": "@scrypted/server",
-  "version": "0.7.99",
+  "version": "0.13.0",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.10",
-    "@scrypted/types": "^0.2.87",
+    "@scrypted/types": "^0.2.91",
     "adm-zip": "^0.5.10",
     "axios": "^0.21.4",
     "body-parser": "^1.20.2",
@@ -70,10 +70,10 @@
     "build": "tsc --outDir dist",
     "postbuild": "node test/check-build-output.js",
     "beta": "npm publish --tag beta",
-    "postbeta": "npm version patch && git add package.json && npm run build && git commit -m postbeta",
+    "postbeta": "npm version minor && git add package.json && npm run build && git commit -m postbeta",
     "release": "npm publish",
     "prepublishOnly": "npm run build",
-    "postrelease": "git tag v$npm_package_version && git push origin v$npm_package_version && npm version patch && git add package.json && git commit -m postrelease",
+    "postrelease": "git tag v$npm_package_version && git push origin v$npm_package_version && npm version minor && git add package.json && git commit -m postrelease",
     "docker": "scripts/github-workflow-publish-docker.sh"
   },
   "author": "",

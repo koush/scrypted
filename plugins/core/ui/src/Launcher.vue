@@ -118,14 +118,15 @@
 </template>
 
 <script>
-import Login from "./Login.vue";
-import App from "./App.vue";
-import store from "./store";
-import VueRouter from "vue-router";
-import Reconnect from "./Reconnect.vue";
-import { getAllDevices } from "./common/mixin";
 import { ScryptedInterface } from "@scrypted/types";
 import axios from 'axios';
+import VueRouter from "vue-router";
+import { combineBaseUrl, getCurrentBaseUrl, logoutScryptedClient } from '../../../../packages/client/src/index';
+import App from "./App.vue";
+import Login from "./Login.vue";
+import Reconnect from "./Reconnect.vue";
+import { getAllDevices } from "./common/mixin";
+import store from "./store";
 
 const nvrInstall = '/component/plugin/install/@scrypted/nvr'
 
@@ -163,8 +164,9 @@ export default {
         this.refreshApplications();
     },
     methods: {
-        logout() {
-            axios.get("/logout").then(() => window.location.reload());
+        async logout() {
+            await logoutScryptedClient(getCurrentBaseUrl());
+            window.location.reload();
         },
         refreshApplications() {
             if (!this.$store.state.isConnected || !this.$store.state.isLoggedIn || this.$route.name !== 'Launcher')
@@ -176,10 +178,13 @@ export default {
             const applications = getAllDevices(systemManager).filter(device => device.interfaces.includes(ScryptedInterface.LauncherApplication));
             this.applications = applications.map(app => {
                 const appId = app.interfaces.includes(ScryptedInterface.ScryptedPlugin) ? app.pluginId : app.id;
+                const baseUrl = getCurrentBaseUrl();
+                const defaultUrl = combineBaseUrl(baseUrl, `endpoint/${appId}/public/`);
+
                 const ret = {
                     name: (app.applicationInfo && app.applicationInfo.name) || app.name,
                     icon: app.applicationInfo && app.applicationInfo.icon,
-                    href: (app.applicationInfo && app.applicationInfo.href) || `/endpoint/${appId}/public/`,
+                    href: (app.applicationInfo && app.applicationInfo.href) || defaultUrl,
                 };
                 return ret;
             });

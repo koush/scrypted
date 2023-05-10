@@ -1051,6 +1051,10 @@ export enum ChargeState {
 export interface Charger {
   chargeState?: ChargeState;
 }
+
+export interface Reboot {
+  reboot(): Promise<void>;  
+}
 /**
  * Refresh indicates that this device has properties that are not automatically updated, and must be periodically refreshed via polling. Device implementations should never implement their own underlying polling algorithm, and instead implement Refresh to allow Scrypted to manage polling intelligently.
  *
@@ -1918,6 +1922,7 @@ export enum ScryptedInterface {
   DeviceCreator = "DeviceCreator",
   Battery = "Battery",
   Charger = "Charger",
+  Reboot = "Reboot",
   Refresh = "Refresh",
   MediaPlayer = "MediaPlayer",
   Online = "Online",

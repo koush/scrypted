@@ -148,11 +148,12 @@
 
 <script>
 import axios from "axios";
-import Drawer from "./components/Drawer.vue";
-import { removeAlert, getAlertIcon } from "./components/helpers";
-import router from "./router";
+import { getCurrentBaseUrl, logoutScryptedClient } from '../../../../packages/client/src/index';
 import Login from "./Login.vue";
 import Reconnect from "./Reconnect.vue";
+import Drawer from "./components/Drawer.vue";
+import { getAlertIcon, removeAlert } from "./components/helpers";
+import router from "./router";
 import store from "./store";
 
 export default {
@@ -176,7 +177,7 @@ export default {
   },
   methods: {
     goHome() {
-      window.location ='/';
+      window.location = getCurrentBaseUrl();
     },
     toggleDarkMode() {
       this.darkMode = !this.darkMode;
@@ -186,8 +187,9 @@ export default {
     reload() {
       window.location.reload();
     },
-    logout() {
-      axios.get("/logout").then(() => window.location.reload());
+    async logout() {
+      await logoutScryptedClient(getCurrentBaseUrl());
+      window.location.reload();
     },
     async clearAlerts() {
       const alerts = await this.$scrypted.systemManager.getComponent("alerts");

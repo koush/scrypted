@@ -6,7 +6,7 @@ on:
     types: [published]
 
 jobs:
-  push_to_registry:
+  build:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     strategy:

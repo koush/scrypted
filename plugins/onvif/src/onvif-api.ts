@@ -69,6 +69,19 @@ export class OnvifCameraAPI {
         });
     }
 
+    async reboot() {
+        return new Promise((resolve, reject) => {
+            this.cam.systemReboot((err: Error, data: any, xml: string) => {
+                if (err) {
+                    this.console.log('reboot error', err);
+                    return reject(err);
+                }
+
+                resolve(data as string);
+            });
+        })
+    }
+
     listenEvents() {
         const ret = new EventEmitter();
 

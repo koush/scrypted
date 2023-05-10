@@ -1,0 +1,43 @@
+# Home Assistant Addon Configuration
+name: Scrypted
+version: "18-bullseye-full.s6-v0.12.1"
+slug: scrypted
+description: Scrypted is a high performance home video integration and automation platform
+url: "https://github.com/koush/scrypted"
+arch:
+  - amd64
+  - aarch64
+  - armv7
+init: false
+ingress: true
+ingress_port: 11080
+panel_icon: mdi:memory
+hassio_api: true
+ingress_stream: true
+host_network: true
+gpio: true
+usb: true
+uart: true
+video: true
+image: "ghcr.io/koush/scrypted"
+environment:
+  SCRYPTED_VOLUME: "/data/scrypted_data"
+  SCRYPTED_NVR_VOLUME: "/data/scrypted_nvr"
+  SCRYPTED_ADMIN_ADDRESS: "172.30.32.2"
+  SCRYPTED_ADMIN_USERNAME: "homeassistant"
+backup_exclude:
+  - '*/server/*'
+  - '*/data/scrypted_nvr/*'
+map:
+  - config:rw
+devices:
+  - /dev/mem
+  - /dev/dri/renderD128
+  - /dev/apex_0
+  - /dev/apex_1
+  - /dev/apex_2
+  - /dev/apex_3
+  - /dev/dri/card0
+  - /dev/vchiq
+  - /dev/video10
+  - /dev/video0

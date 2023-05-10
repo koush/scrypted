@@ -216,8 +216,6 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
                 const detection: ObjectsDetected = {
                     detectionId,
-                    // eventId indicates that the detection is within a single frame.
-                    eventId: detectionId,
                     timestamp: Date.now(),
                     detections,
                 };
