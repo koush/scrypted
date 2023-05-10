@@ -6,6 +6,9 @@ on:
       tag:
         description: "The npm tag used to build the Docker image. The tag will be resolved as a specific version on npm, and that will be used to version the docker image."
         required: true
+      publish_tag:
+        description: "The versioned tag for the published Docker image. NPM will use the minor version, Docker should only specify a patch version."
+        required: false
   release:
     types: [published]
 
@@ -62,7 +65,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
-            ${{ format('koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, steps.package-version.outputs.NPM_VERSION) }}
+            ${{ format('koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
             ${{ matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '.s6' && format('koush/scrypted:{0}', github.event.inputs.tag) || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '' && 'koush/scrypted:full' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'koush/scrypted:lite' || '' }}
@@ -70,7 +73,7 @@ jobs:
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:lite-s6' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-thin' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:thin-s6' || '' }}
 
-            ${{ format('ghcr.io/koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, steps.package-version.outputs.NPM_VERSION) }}
+            ${{ format('ghcr.io/koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
             ${{ matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '.s6' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.tag) || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-full' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:full' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-bullseye-lite' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:lite' || '' }}
