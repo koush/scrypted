@@ -10,7 +10,7 @@ from typing import List, TYPE_CHECKING
 import scrypted_arlo_go
 
 import scrypted_sdk
-from scrypted_sdk.types import Setting, Settings, Device, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Setting, Settings, Device, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, Charger, ChargeState, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .base import ArloDeviceBase
 from .spotlight import ArloSpotlight, ArloFloodlight
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from .provider import ArloProvider
 
 
-class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, VideoClips, MotionSensor, AudioSensor, Battery):
+class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, VideoClips, MotionSensor, AudioSensor, Battery, Charger):
     MODELS_WITH_SPOTLIGHTS = [
         "vmc4040p",
         "vmc2030",
@@ -81,6 +81,25 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         self.start_motion_subscription()
         self.start_audio_subscription()
         self.start_battery_subscription()
+        self.create_task(self.delayed_init())
+
+    async def delayed_init(self) -> None:
+        if not self.has_battery:
+            return
+
+        iterations = 1
+        while not self.stop_subscriptions:
+            if iterations > 100:
+                self.logger.error("Delayed init exceeded iteration limit, giving up")
+                return
+
+            try:
+                self.chargeState = ChargeState.Charging.value if self.wired_to_power else ChargeState.NotCharging.value
+                return
+            except Exception as e:
+                self.logger.debug(f"Delayed init failed, will try again: {e}")
+                await asyncio.sleep(0.1)
+            iterations += 1
 
     def start_motion_subscription(self) -> None:
         def callback(motionDetected):
@@ -104,7 +123,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         )
 
     def start_battery_subscription(self) -> None:
-        if self.wired_to_power:
+        if not self.has_battery:
             return
 
         def callback(batteryLevel):
@@ -133,9 +152,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
         if self.has_battery:
             results.add(ScryptedInterface.Battery.value)
-
-        if self.wired_to_power:
-            results.discard(ScryptedInterface.Battery.value)
+            results.add(ScryptedInterface.Charger.value)
 
         if self.has_siren or self.has_spotlight or self.has_floodlight:
             results.add(ScryptedInterface.DeviceProvider.value)
@@ -248,7 +265,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     "title": "Plugged In to External Power",
                     "value": self.wired_to_power,
                     "description": "Informs Scrypted that this device is plugged in to an external power source. " + \
-                                   "Will allow features like persistent prebuffer to work, however will no longer report this device's battery percentage. " + \
+                                   "Will allow features like persistent prebuffer to work. " + \
                                    "Note that a persistent prebuffer may cause excess battery drain if the external power is not able to charge faster than the battery consumption rate.",
                     "type": "boolean",
                 },
