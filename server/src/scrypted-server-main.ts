@@ -192,6 +192,16 @@ async function start(mainFilename: string, options?: {
             return;
         }
 
+        // the remote address may be ipv6 prefixed so use a fuzzy match.
+        // eg ::ffff:192.168.2.124
+        if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_ADDRESS
+            && req.socket.remoteAddress?.endsWith(process.env.SCRYPTED_ADMIN_ADDRESS)) {
+            res.locals.username = process.env.SCRYPTED_ADMIN_USERNAME;
+            res.locals.aclId = undefined;
+            next();
+            return;
+        }
+
         // this is a trap for all auth.
         // only basic auth will fail with 401. it is up to the endpoints to manage
         // lack of login from cookie auth.
@@ -458,7 +468,7 @@ async function start(mainFilename: string, options?: {
 
     let hasLogin = await db.getCount(ScryptedUser) > 0;
 
-    if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_TOKEN) {
+    if (process.env.SCRYPTED_ADMIN_USERNAME) {
         let user = await db.tryGet(ScryptedUser, process.env.SCRYPTED_ADMIN_USERNAME);
         if (!user) {
             user = await scrypted.usersService.addUserInternal(process.env.SCRYPTED_ADMIN_USERNAME, crypto.randomBytes(8).toString('hex'), undefined);
