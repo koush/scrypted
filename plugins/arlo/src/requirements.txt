@@ -3,6 +3,7 @@ sseclient==0.0.22
 requests==2.28.2
 cachetools==5.3.0
 scrypted-arlo-go==0.0.1
+cloudscraper==1.2.71
 --extra-index-url=https://www.piwheels.org/simple/
 --extra-index-url=https://bjia56.github.io/scrypted-arlo-go/
 --prefer-binary

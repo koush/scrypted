@@ -139,6 +139,7 @@ class Arlo(object):
     def LoginMFA(self):
         self.request = Request()
 
+        # Authenticate
         headers = {
             'DNT': '1',
             'schemaVersion': '1',
@@ -150,8 +151,6 @@ class Arlo(object):
             'Source': 'arloCamWeb',
             'TE': 'Trailers',
         }
-
-        # Authenticate
         auth_body = self.request.post(
             f'https://{self.AUTH_URL}/api/auth',
             params={
@@ -182,7 +181,7 @@ class Arlo(object):
         # Start factor auth
         start_auth_body = self.request.post(
             f'https://{self.AUTH_URL}/api/startAuth',
-            {'factorId': factor_id},
+            params={'factorId': factor_id},
             headers=headers,
             raw=True
         )
@@ -193,7 +192,7 @@ class Arlo(object):
 
             finish_auth_body = self.request.post(
                 f'https://{self.AUTH_URL}/api/finishAuth',
-                {
+                params={
                     'factorAuthCode': factor_auth_code,
                     'otp': code
                 },
@@ -349,7 +348,7 @@ class Arlo(object):
         body['from'] = self.user_id+'_web'
         body['to'] = basestation_id
 
-        self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/notify/'+body['to'], body, headers={"xcloudId":basestation.get('xCloudId')})
+        self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/notify/'+body['to'], params=body, headers={"xcloudId":basestation.get('xCloudId')})
         return body.get('transId')
 
     def Ping(self, basestation):
@@ -629,7 +628,7 @@ class Arlo(object):
         def trigger(self):
             nl.stream_url_dict = self.request.post(
                 f'https://{self.BASE_URL}/hmsweb/users/devices/startStream',
-                {
+                params={
                     "to": camera.get('parentId'),
                     "from": self.user_id + "_web",
                     "resource": "cameras/" + camera.get('deviceId'),
@@ -702,7 +701,7 @@ class Arlo(object):
         def trigger(self):
             self.request.post(
                 f"https://{self.BASE_URL}/hmsweb/users/devices/fullFrameSnapshot",
-                {
+                params={
                     "to": camera.get("parentId"),
                     "from": self.user_id + "_web",
                     "resource": "cameras/" + camera.get("deviceId"),
@@ -885,7 +884,7 @@ class Arlo(object):
         logger.debug(f"Library cache miss for {from_date}, {to_date}")
         return self.request.post(
             f'https://{self.BASE_URL}/hmsweb/users/library',
-            {
+            params={
                 'dateFrom': from_date,
                 'dateTo': to_date
             }
