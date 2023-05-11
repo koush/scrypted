@@ -4,6 +4,8 @@ import fs from 'fs';
 import { format } from "path";
 import { Duplex } from "stream";
 
+const highWaterMark = 1024 * 1024;
+
 // non standard extension that dumps the rtp payload to a file.
 export class FileRtspServer extends RtspServer {
     writeStream: fs.WriteStream;
@@ -56,6 +58,7 @@ export class FileRtspServer extends RtspServer {
                     await fs.promises.rename(truncate, file);
                     truncateWriteStream = fs.createWriteStream(undefined, {
                         fd,
+                        highWaterMark,
                     })
                     // this.writeConsole?.log('truncating', truncate);
                 }
@@ -72,7 +75,9 @@ export class FileRtspServer extends RtspServer {
         this.cleanup();
         this.segmentBytesWritten = 0;
 
-        this.writeStream = truncateWriteStream || fs.createWriteStream(file);
+        this.writeStream = truncateWriteStream || fs.createWriteStream(file, {
+            highWaterMark,
+        });
         this.writeStream.on('error', e => {
             this.writeConsole?.error('RTSP WRITE error', e);
         });
