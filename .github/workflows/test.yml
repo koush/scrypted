@@ -19,7 +19,7 @@ jobs:
         
       - name: Run install script
         run: |
-          cat ./install/install-scrypted-dependencies-linux.sh | sudo SERVICE_USER=$USER bash
+          cat ./install/local/install-scrypted-dependencies-linux.sh | sudo SERVICE_USER=$USER bash
           
       - name: Test server is running
         run: |
@@ -37,7 +37,7 @@ jobs:
       - name: Run install script
         run: |
           mkdir -p ~/.scrypted
-          bash ./install/install-scrypted-dependencies-mac.sh
+          bash ./install/local/install-scrypted-dependencies-mac.sh
           
       - name: Test server is running
         run: |
@@ -53,7 +53,7 @@ jobs:
         
       - name: Run install script
         run: |
-          .\install\install-scrypted-dependencies-win.ps1
+          .\install\local\install-scrypted-dependencies-win.ps1
           
       - name: Test server is running
         run: |
