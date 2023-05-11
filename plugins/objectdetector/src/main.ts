@@ -935,23 +935,46 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
   storageSettings = new StorageSettings(this, {
     activeMotionDetections: {
       title: 'Active Motion Detection Sessions',
+      multiple: true,
       readonly: true,
+      onGet: async () => {
+        const motion = [...this.currentMixins.values()]
+          .map(d => [...d.currentMixins.values()].filter(dd => dd.hasMotionType)).flat();
+        const choices = motion.map(dd => dd.name);
+        const value = motion.filter(c => c.detectorRunning).map(dd => dd.name);
+        return {
+          choices,
+          value,
+        }
+      },
       mapGet: () => {
-        return [...this.currentMixins.values()]
-          .reduce((c1, v1) => c1 + [...v1.currentMixins.values()]
-            .reduce((c2, v2) => c2 + (v2.hasMotionType && v2.detectorRunning ? 1 : 0), 0), 0);
-      }
+        const motion = [...this.currentMixins.values()]
+          .map(d => [...d.currentMixins.values()].filter(dd => dd.hasMotionType)).flat();
+        const value = motion.filter(c => c.detectorRunning).map(dd => dd.name);
+        return value;
+      },
     },
     activeObjectDetections: {
       title: 'Active Object Detection Sessions',
+      multiple: true,
       readonly: true,
-      mapGet: () => {
-        // could use the stats variable...
-        return [...this.currentMixins.values()]
-          .reduce((c1, v1) => c1 + [...v1.currentMixins.values()]
-            .reduce((c2, v2) => c2 + (!v2.hasMotionType && v2.detectorRunning ? 1 : 0), 0), 0);
+      onGet: async () => {
+        const motion = [...this.currentMixins.values()]
+          .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat();
+        const choices = motion.map(dd => dd.name);
+        const value = motion.filter(c => c.detectorRunning).map(dd => dd.name);
+        return {
+          choices,
+          value,
+        }
       },
-    }
+      mapGet: () => {
+        const motion = [...this.currentMixins.values()]
+          .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat();
+        const value = motion.filter(c => c.detectorRunning).map(dd => dd.name);
+        return value;
+      },
+    },
   });
 
   shouldUseSnapshotPipeline() {
