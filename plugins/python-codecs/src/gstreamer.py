@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import vipsimage
 import pilimage
 import platform
+from generator_common import createVideoFrame
 
 Gst = None
 try:
@@ -87,6 +88,11 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
     videosrc += ' ! {decoder} ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! {videorate} {videocaps}'.format(decoder=decoder, videocaps=videocaps, videorate=videorate)
 
     gst, gen = await createPipelineIterator(videosrc)
+
+    vipsImage: vipsimage.VipsImage = None
+    pilImage: pilimage.PILImage = None
+    mo: scrypted_sdk.MediaObject = None
+
     async for gstsample in gen():
         caps = gstsample.get_caps()
         height = caps.get_structure(0).get_value('height')
@@ -99,19 +105,27 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
         try:
             if vipsimage.pyvips:
                 vips = vipsimage.new_from_memory(info.data, width, height, bands)
-                vipsImage = vipsimage.VipsImage(vips)
-                try:
+
+                if not mo:
+                    vipsImage = vipsimage.VipsImage(vips)
                     mo = await vipsimage.createVipsMediaObject(vipsImage)
-                    yield mo
+
+                vipsImage.vipsImage = vips
+                try:
+                    yield createVideoFrame(mo)
                 finally:
                     vipsImage.vipsImage = None
                     vips.invalidate()
             else:
                 pil = pilimage.new_from_memory(info.data, width, height, bands)
-                pilImage = pilimage.PILImage(pil)
-                try:
+
+                if not mo:
+                    pilImage = pilimage.PILImage(pil)
                     mo = await pilimage.createPILMediaObject(pilImage)
-                    yield mo
+
+                pilImage.pilImage = pil
+                try:
+                    yield createVideoFrame(mo)
                 finally:
                     pilImage.pilImage = None
                     pil.close()

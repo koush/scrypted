@@ -12,16 +12,13 @@ interface RawFrame {
     data: Buffer;
 }
 
-async function createRawImageMediaObject(image: RawImage): Promise<VideoFrame & MediaObject> {
+async function createRawImageMediaObject(image: RawImage): Promise<Image & MediaObject> {
     const ret = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
         format: null,
-        timestamp: 0,
         width: image.width,
         height: image.height,
-        queued: 0,
         toBuffer: (options: ImageOptions) => image.toBuffer(options),
         toImage: (options: ImageOptions) => image.toImage(options),
-        flush: async () => { },
     });
 
     return ret;
@@ -50,7 +47,7 @@ class RawImage implements Image, RawFrame {
 }
 
 export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements VideoFrameGenerator {
-    async *generateVideoFramesInternal(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame & MediaObject) => Promise<boolean>): AsyncGenerator<VideoFrame & MediaObject, any, unknown> {
+    async *generateVideoFramesInternal(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): AsyncGenerator<VideoFrame, any, unknown> {
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
         const gray = options?.format === 'gray';
         const channels = gray ? 1 : 3;
@@ -138,6 +135,8 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
 
         try {
             reader();
+            const flush = async () => { };
+
             while (!finished) {
                 frameDeferred = new Deferred();
                 const raw = await frameDeferred.promise;
@@ -145,8 +144,14 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
 
                 const rawImage = new RawImage(data, width, height, format);
                 try {
-                    const mo = await createRawImageMediaObject(rawImage);
-                    yield mo;
+                    const image = await createRawImageMediaObject(rawImage);
+                    yield {
+                        __json_copy_serialize_children: true,
+                        timestamp: 0,
+                        queued: 0,
+                        image,
+                        flush,
+                    };
                 }
                 finally {
                     rawImage.data = undefined;
@@ -163,7 +168,7 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
     }
 
 
-    async generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame & MediaObject) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame & MediaObject, any, unknown>> {
+    async generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame & MediaObject) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame, any, unknown>> {
         return this.generateVideoFramesInternal(mediaObject, options, filter);
     }
 }

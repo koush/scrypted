@@ -30,7 +30,8 @@
          "Settings"
       ],
       "pluginDependencies": [
-         "@scrypted/objectdetector"
+         "@scrypted/objectdetector",
+         "@scrypted/python-codecs"
       ]
    },
    "devDependencies": {

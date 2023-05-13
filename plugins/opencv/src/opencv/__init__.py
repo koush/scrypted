@@ -212,7 +212,7 @@ class OpenCVPlugin(DetectPlugin):
         settings['session'] = OpenCVDetectionSession()
         return super().generateObjectDetections(videoFrames, detection_session)
 
-    async def run_detection_videoframe(self, videoFrame: VideoFrame, detection_session: ObjectDetectionSession) -> ObjectsDetected:
+    async def run_detection_image(self, videoFrame: scrypted_sdk.Image, detection_session: ObjectDetectionSession) -> ObjectsDetected:
         width = videoFrame.width
         height = videoFrame.height
 

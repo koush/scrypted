@@ -1,4 +1,5 @@
 import scrypted_sdk
+import asyncio
 from typing import Any
 try:
     import pyvips
@@ -7,9 +8,8 @@ except:
     Image = None
     pyvips = None
 from thread import to_thread
-import time
 
-class VipsImage(scrypted_sdk.VideoFrame):
+class VipsImage(scrypted_sdk.Image):
     def __init__(self, vipsImage: Image) -> None:
         super().__init__()
         self.vipsImage = vipsImage
@@ -91,7 +91,6 @@ def toVipsImage(vipsImageWrapper: VipsImage, options: scrypted_sdk.ImageOptions 
 
 async def createVipsMediaObject(image: VipsImage):
     ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
-        'timestamp': time.time() * 1000,
         'format': None,
         'width': image.width,
         'height': image.height,

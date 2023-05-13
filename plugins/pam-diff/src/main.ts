@@ -70,8 +70,10 @@ TUPLTYPE RGB
 ENDHDR
 `;
 
-            const buffer = await videoFrame.toBuffer({
-                resize: (videoFrame.width !== width || videoFrame.height !== height) ? {
+            const { image } = videoFrame;
+
+            const buffer = await image.toBuffer({
+                resize: (image.width !== width || image.height !== height) ? {
                     width,
                     height,
                 } : undefined,

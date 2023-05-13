@@ -39,10 +39,7 @@
          "Settings",
          "MixinProvider"
       ],
-      "realfs": true,
-      "pluginDependencies": [
-         "@scrypted/python-codecs"
-      ]
+      "realfs": true
    },
    "optionalDependencies": {},
    "dependencies": {

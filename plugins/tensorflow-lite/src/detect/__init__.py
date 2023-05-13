@@ -47,15 +47,16 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def get_detection_input_size(self, src_size):
         pass
 
-    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame, detection_session: ObjectDetectionSession) -> ObjectsDetected:
+    async def run_detection_image(self, videoFrame: scrypted_sdk.Image, detection_session: ObjectDetectionSession) -> ObjectsDetected:
         pass
     
     async def generateObjectDetections(self, videoFrames: Any, session: ObjectDetectionGeneratorSession = None) -> Any:
         try:
             videoFrames = await scrypted_sdk.sdk.connectRPCObject(videoFrames)
+            videoFrame: scrypted_sdk.VideoFrame
             async for videoFrame in videoFrames:
-               videoFrame = await scrypted_sdk.sdk.connectRPCObject(videoFrame)
-               detected = await self.run_detection_videoframe(videoFrame, session)
+               image = await scrypted_sdk.sdk.connectRPCObject(videoFrame['image'])
+               detected = await self.run_detection_image(image, session)
                yield {
                    '__json_copy_serialize_children': True,
                    'detected': detected,
@@ -68,10 +69,10 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 pass
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
-        vf: scrypted_sdk.VideoFrame
-        if mediaObject and mediaObject.mimeType == ScryptedMimeTypes.Image.value:
-            vf = await scrypted_sdk.sdk.connectRPCObject(mediaObject)
+        image: scrypted_sdk.Image
+        if mediaObject.mimeType == ScryptedMimeTypes.Image.value:
+            image = await scrypted_sdk.sdk.connectRPCObject(mediaObject)
         else:
-            vf = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.Image.value)
+            image = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.Image.value)
 
-        return await self.run_detection_videoframe(vf, session)
+        return await self.run_detection_image(image, session)

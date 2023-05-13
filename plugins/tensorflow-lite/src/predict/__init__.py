@@ -186,9 +186,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         pass
 
-    async def run_detection_videoframe(self, videoFrame: scrypted_sdk.VideoFrame, detection_session: ObjectDetectionSession) -> ObjectsDetected:
+    async def run_detection_image(self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession) -> ObjectsDetected:
         settings = detection_session and detection_session.get('settings')
-        src_size = videoFrame.width, videoFrame.height
+        src_size = image.width, image.height
         w, h = self.get_input_size()
         input_aspect_ratio = w / h
         iw, ih = src_size
@@ -210,16 +210,16 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     'height': h,
                 }
 
-            data = await videoFrame.toBuffer({
+            data = await image.toBuffer({
                 'resize': resize,
-                'format': videoFrame.format or 'rgb',
+                'format': image.format or 'rgb',
             })
-            image = await ensureRGBData(data, (w, h), videoFrame.format)
+            single = await ensureRGBData(data, (w, h), image.format)
             try:
-                ret = await self.detect_once(image, settings, src_size, cvss)
+                ret = await self.detect_once(single, settings, src_size, cvss)
                 return ret
             finally:
-                image.close()
+                single.close()
 
         sw = int(w / s)
         sh = int(h / s)
@@ -231,7 +231,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         second_crop = (ow, oh, ow + sw, oh + sh)
 
         firstData, secondData = await asyncio.gather(
-            videoFrame.toBuffer({
+            image.toBuffer({
                 'resize': {
                     'width': w,
                     'height': h,
@@ -242,9 +242,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     'width': sw,
                     'height': sh,
                 },
-                'format': videoFrame.format or 'rgb',
+                'format': image.format or 'rgb',
             }),
-            videoFrame.toBuffer({
+            image.toBuffer({
                 'resize': {
                     'width': w,
                     'height': h,
@@ -255,13 +255,13 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     'width': sw,
                     'height': sh,
                 },
-                'format': videoFrame.format or 'rgb',
+                'format': image.format or 'rgb',
             })
         )
 
         first, second = await asyncio.gather(
-            ensureRGBData(firstData, (w, h), videoFrame.format),
-            ensureRGBData(secondData, (w, h), videoFrame.format)
+            ensureRGBData(firstData, (w, h), image.format),
+            ensureRGBData(secondData, (w, h), image.format)
         )
 
         def cvss1(point):

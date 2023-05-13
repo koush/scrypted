@@ -1318,13 +1318,9 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
   triggerClasses?: string[];
   prebuffer?: number;
 }
-export interface ObjectDetectionCallbacks {
-  onDetection(detection: ObjectsDetected, redetect?: (boundingBox: [number, number, number, number]) => Promise<ObjectDetectionResult[]>, mediaObject?: MediaObject): Promise<boolean>;
-  onDetectionEnded(detection: ObjectsDetected): Promise<void>;
-}
 export interface ObjectDetectionGeneratorResult {
-  __json_copy_serialize_children: true,
-  videoFrame: VideoFrame & MediaObject;
+  __json_copy_serialize_children: true;
+  videoFrame: VideoFrame;
   detected: ObjectsDetected;
 }
 export interface ObjectDetectionZone {
@@ -1338,7 +1334,7 @@ export interface ObjectDetectionZone {
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
-  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame & MediaObject, void>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
+  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame, void>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
@@ -1368,9 +1364,11 @@ export interface Image {
   toBuffer(options?: ImageOptions): Promise<Buffer>;
   toImage(options?: ImageOptions): Promise<Image & MediaObject>;
 }
-export interface VideoFrame extends Image {
+export interface VideoFrame {
+  __json_copy_serialize_children: true;
   timestamp: number;
   queued: number;
+  image: Image & MediaObject;
   flush(count?: number): Promise<void>;
 }
 export interface VideoFrameGeneratorOptions extends ImageOptions {
@@ -1378,7 +1376,7 @@ export interface VideoFrameGeneratorOptions extends ImageOptions {
   fps?: number;
 }
 export interface VideoFrameGenerator {
-  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame & MediaObject) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame & MediaObject>>;
+  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame>>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
