@@ -5,6 +5,7 @@ const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import { RequestMediaObjectHost, FileHost, BufferHost } from './converters';
 import url from 'url';
 
+export const MediaCoreNativeId = 'mediacore';
 export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, BufferConverter, HttpRequestHandler {
     httpHost: BufferHost;
     httpsHost: BufferHost;
@@ -12,8 +13,8 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
     fileHost: FileHost;
     filesHost: FileHost;
 
-    constructor(nativeId: string) {
-        super(nativeId);
+    constructor() {
+        super(MediaCoreNativeId);
 
         this.fromMimeType = ScryptedMimeTypes.SchemePrefix + 'scrypted-media';
         this.toMimeType = ScryptedMimeTypes.MediaObject;
