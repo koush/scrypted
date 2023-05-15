@@ -6,6 +6,8 @@ import { Duplex } from 'stream';
 import { cloneDeep } from './clone-deep';
 import { listenZeroSingleClient } from './listen-cluster';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from './media-helpers';
+import { createRtspParser } from "./rtsp-server";
+import { parseSdp } from "./sdp-utils";
 import { StreamChunk, StreamParser } from './stream-parser';
 
 const { mediaManager } = sdk;
@@ -57,9 +59,13 @@ export async function parseResolution(cp: ChildProcess) {
 }
 
 async function parseInputToken(cp: ChildProcess, token: string) {
+    let processed = 0;
     return new Promise<string>((resolve, reject) => {
         cp.on('exit', () => reject(new Error('ffmpeg exited while waiting to parse stream information: ' + token)));
         const parser = (data: Buffer) => {
+            processed += data.length;
+            if (processed > 10000)
+                return resolve(undefined);
             const stdout: string = data.toString().split('Output ')[0];
             const idx = stdout.lastIndexOf(`${token}: `);
             if (idx !== -1) {
@@ -77,7 +83,11 @@ async function parseInputToken(cp: ChildProcess, token: string) {
         };
         cp.stdout.on('data', parser);
         cp.stderr.on('data', parser);
-    });
+    })
+        .finally(() => {
+            cp.stdout.removeAllListeners('data');
+            cp.stderr.removeAllListeners('data');
+        });
 }
 
 export async function parseVideoCodec(cp: ChildProcess) {
@@ -158,8 +168,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
 
     const args = ffmpegInput.inputArguments.slice();
 
-    let needSdp = false;
-
     const ensureActive = (killed: () => void) => {
         if (!isActive) {
             killed();
@@ -211,11 +219,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         }
     }
 
-    if (needSdp) {
-        args.push('-sdp_file', `pipe:${pipeCount++}`);
-        stdio.push('pipe');
-    }
-
     // start ffmpeg process with child process pipes
     args.unshift('-hide_banner');
     safePrintFFmpegArguments(console, args);
@@ -224,20 +227,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     });
     ffmpegLogInitialOutput(console, cp, undefined, options?.storage);
     cp.on('exit', () => kill(new Error('ffmpeg exited')));
-
-    let sdp: Promise<Buffer[]>;
-    if (needSdp) {
-        sdp = new Promise<Buffer[]>(resolve => {
-            const ret: Buffer[] = [];
-            cp.stdio[pipeCount - 1].on('data', buffer => {
-                ret.push(buffer);
-                resolve(ret);
-            });
-        })
-    }
-    else {
-        sdp = Promise.resolve([]);
-    }
 
     // now parse the created pipes
     const start = () => {
@@ -268,14 +257,18 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         });
     };
 
-    // tbh parsing stdout is super sketchy way of doing this.
-    parseAudioCodec(cp).then(result => {
-        inputAudioCodec = result;
-        if (inputAudioCodec === 'pcm_mulaw')
-            inputAudioCodec = 'pcm_ulaw';
+    await parseVideoCodec(cp);
+    const rtsp = (options.parsers as any).rtsp as ReturnType<typeof createRtspParser>;
+    rtsp.sdp.then(sdp => {
+        const parsed = parseSdp(sdp);
+        console.log('sdp', parsed);
+        const audio = parsed.msections.find(msection=>msection.type === 'audio');
+        const video = parsed.msections.find(msection=>msection.type === 'video');
+        inputVideoCodec = video?.codec;
+        inputAudioCodec = audio?.codec;
     });
-    parseResolution(cp).then(result => inputVideoResolution = result);
-    await parseVideoCodec(cp).then(result => inputVideoCodec = result);
+
+    const sdp = rtsp.sdp.then(sdpString => [Buffer.from(sdpString)]);
 
     return {
         start,
