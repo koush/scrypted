@@ -261,7 +261,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     const rtsp = (options.parsers as any).rtsp as ReturnType<typeof createRtspParser>;
     rtsp.sdp.then(sdp => {
         const parsed = parseSdp(sdp);
-        console.log('sdp', parsed);
         const audio = parsed.msections.find(msection=>msection.type === 'audio');
         const video = parsed.msections.find(msection=>msection.type === 'video');
         inputVideoCodec = video?.codec;
