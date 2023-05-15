@@ -82,10 +82,18 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
     fps = options and options.get('fps', None)
     videorate = ''
     if fps:
-        videorate = 'videorate !'
+        videorate = 'videorate ! '
         videocaps += ',framerate={fps}/1'.format(fps=fps)
 
-    videosrc += ' ! {decoder} ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! {videorate} {videocaps}'.format(decoder=decoder, videocaps=videocaps, videorate=videorate)
+    if decoder.find("{videocaps}") == -1:
+        videosrc += ' ! {decoder} ! queue leaky=downstream max-size-buffers=0 ! videoconvert ! {videorate} {videocaps}'.format(decoder=decoder, videocaps=videocaps, videorate=videorate)
+    else:
+        if format == 'RGB':
+            format = 'RGBA'
+            bands = 4
+            videocaps += 'A'
+        d = decoder.replace('{videocaps}', '{videorate}{videocaps}'.format(videocaps=videocaps, videorate=videorate))
+        videosrc += ' ! {decoder}'.format(decoder=d)
 
     gst, gen = await createPipelineIterator(videosrc)
 

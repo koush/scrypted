@@ -25,7 +25,7 @@ class VipsImage(scrypted_sdk.Image):
             return await to_thread(format)
         elif options['format'] == 'rgba':
             def format():
-                if not vipsImage.vipsImage.hasalpha():
+                if not vipsImage.vipsImage.bands == 3:
                     rgba = vipsImage.vipsImage.addalpha()
                 else:
                     rgba = vipsImage.vipsImage
@@ -33,7 +33,7 @@ class VipsImage(scrypted_sdk.Image):
             return await to_thread(format)
         elif options['format'] == 'rgb':
             def format():
-                if vipsImage.vipsImage.hasalpha():
+                if vipsImage.vipsImage.bands == 4:
                     rgb = vipsImage.vipsImage.extract_band(0, n=vipsImage.vipsImage.bands - 1)
                 else:
                     rgb = vipsImage.vipsImage
@@ -45,7 +45,11 @@ class VipsImage(scrypted_sdk.Image):
                     return memoryview(vipsImage.vipsImage.write_to_memory())
             else:
                 def format():
-                    gray = vipsImage.vipsImage.colourspace("b-w")
+                    if vipsImage.vipsImage.bands == 4:
+                        gray = vipsImage.vipsImage.extract_band(0, n=vipsImage.vipsImage.bands - 1)
+                    else:
+                        gray = vipsImage.vipsImage
+                    gray = gray.colourspace("b-w")
                     return memoryview(gray.write_to_memory())
             return await to_thread(format)
 

@@ -46,6 +46,7 @@ class GstreamerGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFram
                     'vtdec_hw',
                     'nvh264dec',
                     'vaapih264dec',
+                    'vaapih264dec ! vaapipostproc ! {videocaps}',
                 ],
                 'combobox': True,
             }
