@@ -6,6 +6,7 @@ import child_process, { ChildProcess } from 'child_process';
 import { once } from 'events';
 import { Writable } from 'stream';
 import { Pipe2Jpeg } from './pipe2jpeg';
+import { timeoutFunction } from '@scrypted/common/src/promise-utils';
 
 export interface FFmpegImageFilterOptions {
     console?: Console,
@@ -51,8 +52,8 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
     // favor height, and always respect aspect ratio.
     if (options.resize?.width || options.resize?.height) {
         const { resize } = options;
-        let width: string|number;
-        let height: string|number;
+        let width: string | number;
+        let height: string | number;
 
         if (!resize.height) {
             height = -2;
@@ -86,7 +87,7 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
     //     console.log('input arguments', inputArguments);
 }
 
-export async function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpegImageFilterOptions) {
+export function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpegImageFilterOptions) {
     const inputArguments = [
         '-i', 'pipe:4',
     ];
@@ -119,7 +120,7 @@ export async function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpeg
     return ffmpegFilterImageInternal(cp, options);
 }
 
-export async function ffmpegFilterImage(inputArguments: string[], options: FFmpegImageFilterOptions) {
+export function ffmpegFilterImage(inputArguments: string[], options: FFmpegImageFilterOptions) {
     ffmpegCreateOutputArguments(inputArguments, options);
 
     let outputArguments: string[];
@@ -165,54 +166,47 @@ export async function ffmpegFilterImage(inputArguments: string[], options: FFmpe
 
 export async function ffmpegFilterImageInternal(cp: ChildProcess, options: FFmpegImageFilterOptions) {
     const buffers: Buffer[] = [];
-
     cp.stdio[3].on('data', data => buffers.push(data));
 
-    const to = options.timeout ? setTimeout(() => {
-        console.log('ffmpeg input to image conversion timed out.');
+    try {
+        await timeoutFunction(options.timeout || 10000, async () => {
+            const exit = once(cp, 'exit');
+            await once(cp.stdio[3], 'end').catch(() => { });
+            const [exitCode] = await exit;
+            if (exitCode)
+                throw new Error(`ffmpeg input to image conversion failed with exit code: ${exitCode}, ${cp.spawnargs.join(' ')}`);
+        });
+    }
+    catch (e) {
+        if (!buffers.length)
+            throw e;
+    }
+    finally {
         safeKillFFmpeg(cp);
-    }, 10000) : undefined;
-
-    const exit = once(cp, 'exit');
-    await once(cp.stdio[3], 'end').catch(() => {});
-    const [exitCode] = await exit;
-    clearTimeout(to);
-    if (exitCode && !buffers.length)
-        throw new Error(`ffmpeg input to image conversion failed with exit code: ${exitCode}, ${cp.spawnargs.join(' ')}`);
+    }
 
     return Buffer.concat(buffers);
 }
 
 export async function ffmpegFilterImageStream(cp: ChildProcess, options: FFmpegImageFilterOptions) {
-    const ret = new Promise<Buffer>((resolve, reject) => {
-        const to = options.timeout ? setTimeout(() => {
-            reject(new Error('ffmpeg stream to image conversion timed out.'));
-        }, 10000) : undefined;
-
-        const pipe = cp.stdio[3].pipe(new Pipe2Jpeg());
-        let last: Buffer;
-        let count = 0;
-        pipe.on('jpeg', jpeg => {
-            ++count;
-            last = jpeg;
+    try {
+        return await timeoutFunction(options.timeout || 10000, async () => {
+            const pipe = cp.stdio[3].pipe(new Pipe2Jpeg());
+            let last: Buffer;
+            let count = 0;
+            pipe.on('jpeg', jpeg => {
+                ++count;
+                last = jpeg;
+            });
+    
+            await once(pipe, 'jpeg');
+            await Promise.any([once(cp, 'exit'), sleep(options.time)]).catch(() => {});
+            if (!last)
+                throw new Error(`ffmpeg stream to image conversion failed with exit code: ${cp.exitCode}, ${cp.spawnargs.join(' ')}`);
+            return last;
         });
-
-        pipe.once('jpeg', async () => {
-            clearTimeout(to);
-            // convert images for the requested number of milliseconds before returning a value.
-            // this may below through the prebuffer.
-            await sleep(options.time);
-            resolve(last);
-        });
-
-        cp.on('exit', exitCode => {
-            clearTimeout(to);
-            if (last)
-                resolve(last);
-            else
-                reject(new Error(`ffmpeg stream to image conversion failed with exit code: ${exitCode}, ${cp.spawnargs.join(' ')}`));
-        })
-    });
-
-    return ret.finally(() => safeKillFFmpeg(cp));
+    }
+    finally {
+        safeKillFFmpeg(cp);
+    }
 }
