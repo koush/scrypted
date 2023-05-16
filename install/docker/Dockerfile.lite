@@ -33,7 +33,7 @@ RUN apt-get -y install \
 
 # python pip
 RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install aiofiles debugpy typing_extensions psutil
+RUN python3 -m pip install debugpy typing_extensions psutil
 
 ENV SCRYPTED_DOCKER_SERVE="true"
 ENV SCRYPTED_CAN_RESTART="true"
