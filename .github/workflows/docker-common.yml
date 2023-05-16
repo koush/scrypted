@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         NODE_VERSION: ["18"]
-        BUILDPACK_DEPS_BASE: ["bullseye"]
+        BUILDPACK_DEPS_BASE: ["bullseye", "bookworm"]
         FLAVOR: ["full", "lite", "thin"]
     steps:
       - name: Check out the repo
