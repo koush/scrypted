@@ -38,6 +38,7 @@ import base64
 import math
 import random
 import time
+import uuid
 
 stream_class = MQTTStream
 
@@ -138,6 +139,7 @@ class Arlo(object):
 
     def LoginMFA(self):
         self.request = Request()
+        device_id = str(uuid.uuid4())
 
         # Authenticate
         headers = {
@@ -150,7 +152,11 @@ class Arlo(object):
             'Referer': f'https://{self.BASE_URL}/',
             'Source': 'arloCamWeb',
             'TE': 'Trailers',
+            'x-user-device-id': device_id,
+            'x-user-device-automation-name': 'QlJPV1NFUg==',
+            'x-user-device-type': 'BROWSER',
         }
+        self.request.options(f'https://{self.AUTH_URL}/api/auth', headers=headers)
         auth_body = self.request.post(
             f'https://{self.AUTH_URL}/api/auth',
             params={

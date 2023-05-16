@@ -29,7 +29,8 @@ class Request(object):
     """HTTP helper class"""
 
     def __init__(self, timeout=5):
-        self.session = cloudscraper.CloudScraper()
+        from .arlo_async import USER_AGENTS
+        self.session = cloudscraper.CloudScraper(browser={"custom": USER_AGENTS["arlo"]})
         self.timeout = timeout
 
     def gen_event_id(self):
