@@ -3,8 +3,8 @@
 # This common file will be used by both Docker and the linux
 # install script.
 ################################################################
-ARG BUILDPACK_DEPS_BASE="bullseye"
-FROM debian:${BUILDPACK_DEPS_BASE} as header
+ARG BASE="bullseye"
+FROM debian:${BASE} as header
 
 RUN apt-get update && apt-get -y install curl wget
 
