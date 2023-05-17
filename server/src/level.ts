@@ -144,8 +144,8 @@ interface LevelOptions {
 
 
 interface LevelConstructor {
-    new(location: string, options?: LevelOptions): Level;
-    (location: string, options?: LevelOptions): Level;
+    new(location: string, options?: LevelOptions, callback?: (err: Error) => void): Level;
+    (location: string, options?: LevelOptions, callback?: (err: Error) => void): Level;
 }
 
 declare const Level: LevelConstructor;
@@ -158,8 +158,8 @@ function createLevelDocument(documentConstructor: any, json: any) {
     return doc;
 }
 
-const wrapped = (location: string, options?: LevelOptions) => {
-    const ret = level(location, options);
+const wrapped = (location: string, options?: LevelOptions, callback?: (err: Error) => void) => {
+    const ret = level(location, options, callback);
     ret.tryGet = async (documentConstructor: any, _id: any, options?: AbstractGetOptions): Promise<any> => {
         try {
             const _documentType = documentConstructor.name;

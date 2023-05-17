@@ -47,7 +47,7 @@ function start(mainFilename: string, options?: {
         // unhandled rejections are allowed if they are from a rpc/plugin call.
         process.on('unhandledRejection', error => {
             if (error?.constructor !== RPCResultError && error?.constructor !== PluginError) {
-                console.error('wtf', error);
+                console.error('fatal error', error);
                 throw error;
             }
             console.warn('unhandled rejection of RPC Result', error);

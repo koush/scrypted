@@ -16,7 +16,7 @@ import semver from 'semver';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { Plugin, ScryptedUser, Settings } from './db-types';
-import level from './level';
+import level, { Level } from './level';
 import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { RPCResultError } from './rpc';
@@ -27,6 +27,7 @@ import { setScryptedUserPassword } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 import { once } from 'events';
+import util from 'util';
 
 export type Runtime = ScryptedRuntime;
 
@@ -117,7 +118,13 @@ async function start(mainFilename: string, options?: {
     const volumeDir = getScryptedVolume();
     mkdirp.sync(volumeDir);
     const dbPath = path.join(volumeDir, 'scrypted.db');
-    const db = level(dbPath);
+    const db = await new Promise<Level>((r, f) => {
+        const db = level(dbPath, undefined, (e) => {
+            if (e)
+                return f(e);
+            r(db);
+        });
+    })
     await db.open();
 
     let certSetting = await db.tryGet(Settings, 'certificate') as Settings;
