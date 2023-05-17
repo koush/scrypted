@@ -194,7 +194,8 @@ async function start(mainFilename: string, options?: {
 
         // the remote address may be ipv6 prefixed so use a fuzzy match.
         // eg ::ffff:192.168.2.124
-        if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_ADDRESS
+        if (process.env.SCRYPTED_ADMIN_USERNAME
+            && process.env.SCRYPTED_ADMIN_ADDRESS
             && req.socket.remoteAddress?.endsWith(process.env.SCRYPTED_ADMIN_ADDRESS)) {
             res.locals.username = process.env.SCRYPTED_ADMIN_USERNAME;
             res.locals.aclId = undefined;
@@ -207,10 +208,17 @@ async function start(mainFilename: string, options?: {
         // lack of login from cookie auth.
 
         const checkToken = (token: string) => {
-            if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_TOKEN === token) {
-                res.locals.username = process.env.SCRYPTED_ADMIN_USERNAME;
-                res.locals.aclId = undefined;
-                return;
+            if (process.env.SCRYPTED_ADMIN_TOKEN === token) {
+                let username = process.env.SCRYPTED_ADMIN_USERNAME;
+                if (!username) {
+                    const firstAdmin = [...scrypted.usersService.users.values()].find(u => !u.aclId);
+                    username = firstAdmin?._id;
+                }
+                if (username) {
+                    res.locals.username = username;
+                    res.locals.aclId = undefined;
+                    return;
+                }
             }
 
             for (const user of scrypted.usersService.users.values()) {
