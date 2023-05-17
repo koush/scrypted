@@ -5,7 +5,8 @@ FROM koush/scrypted-common:${BASE}
 RUN apt-get -y install \
     libnss-mdns \
     avahi-discover \
-    libavahi-compat-libdnssd-dev
+    libavahi-compat-libdnssd-dev \
+    xz-utils
 
 # copy configurations and scripts
 COPY fs /
