@@ -26,6 +26,7 @@ import { Info } from './services/info';
 import { setScryptedUserPassword } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
+import { once } from 'events';
 
 export type Runtime = ScryptedRuntime;
 
@@ -41,13 +42,16 @@ process.on('unhandledRejection', error => {
     console.warn('unhandled rejection of RPC Result', error);
 });
 
-function listenServerPort(env: string, port: number, server: any) {
-    server.listen(port,);
-    server.on('error', (e: Error) => {
+async function listenServerPort(env: string, port: number, server: any) {
+    server.listen(port);
+    try {
+        await once(server, 'listening');
+    }
+    catch (e) {
         console.error(`Failed to listen on port ${port}. It may be in use.`);
         console.error(`Use the environment variable ${env} to change the port.`);
         throw e;
-    })
+    }
 }
 
 installSourceMapSupport({
@@ -91,7 +95,8 @@ const debugServer = net.createServer(async (socket) => {
     console.warn('debugger connect timed out');
     socket.destroy();
 })
-listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, debugServer);
+listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, debugServer)
+    .catch(() => { });
 
 const app = express();
 
@@ -304,13 +309,8 @@ async function start(mainFilename: string, options?: {
     await options?.onRuntimeCreated?.(scrypted);
     await scrypted.start();
 
-    listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
-    listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
-    const legacyInsecure = http.createServer(app);
-    legacyInsecure.listen(10080);
-    legacyInsecure.on('error', () => {
-        // can ignore.
-    });
+    await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
+    await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
 
     console.log('#######################################################');
     console.log(`Scrypted Volume           : ${volumeDir}`);
