@@ -16,6 +16,12 @@ class PILImage(scrypted_sdk.Image):
         self.width = pilImage.width
         self.height = pilImage.height
 
+    async def close(self):
+        pil = self.pilImage
+        self.pilImage = None
+        if pil:
+            pil.close()
+
     async def toBuffer(self, options: scrypted_sdk.ImageOptions = None) -> bytearray:
         pilImage: PILImage = await self.toPILImage(options)
 

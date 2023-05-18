@@ -60,8 +60,7 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
                 try:
                     yield createVideoFrame(mo)
                 finally:
-                    vipsImage.vipsImage = None
-                    vips.invalidate()
+                    await vipsImage.close()
             else:
                 if gray and frame.format.name.startswith('yuv') and frame.planes and len(frame.planes):
                     pil = pilimage.new_from_memory(memoryview(frame.planes[0]), frame.width, frame.height, 1)
@@ -82,7 +81,6 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
                 try:
                     yield createVideoFrame(mo)
                 finally:
-                    pilImage.pilImage = None
-                    pil.close()
+                    await pilImage.close()
     finally:
         container.close()

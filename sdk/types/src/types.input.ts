@@ -1363,6 +1363,7 @@ export interface Image {
   format?: ImageFormat;
   toBuffer(options?: ImageOptions): Promise<Buffer>;
   toImage(options?: ImageOptions): Promise<Image & MediaObject>;
+  close(): Promise<void>;
 }
 export interface VideoFrame {
   __json_copy_serialize_children: true;

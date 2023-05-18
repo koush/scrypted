@@ -16,6 +16,12 @@ class VipsImage(scrypted_sdk.Image):
         self.width = vipsImage.width
         self.height = vipsImage.height
 
+    async def close(self):
+        vips = self.vipsImage
+        self.vipsImage = None
+        if vips:
+            vips.invalidate()
+
     async def toBuffer(self, options: scrypted_sdk.ImageOptions = None) -> bytearray:
         vipsImage: VipsImage = await self.toVipsImage(options)
 

@@ -122,8 +122,7 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
                 try:
                     yield createVideoFrame(mo)
                 finally:
-                    vipsImage.vipsImage = None
-                    vips.invalidate()
+                    await vipsImage.close()
             else:
                 pil = pilimage.new_from_memory(info.data, width, height, bands)
 
@@ -135,7 +134,6 @@ async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, op
                 try:
                     yield createVideoFrame(mo)
                 finally:
-                    pilImage.pilImage = None
-                    pil.close()
+                    await pilImage.close()
         finally:
             gst_buffer.unmap(info)

@@ -2597,6 +2597,8 @@ class Image:
     format: ImageFormat
     height: float
     width: float
+    async def close(self) -> None:
+        pass
     async def toBuffer(self, options: ImageOptions = None) -> bytearray:
         pass
     async def toImage(self, options: ImageOptions = None) -> Union[Image, MediaObject]:
