@@ -5,7 +5,11 @@ from requests_toolbelt.adapters import host_header_ssl
 from cryptography import x509
 from cryptography.x509.oid import ExtensionOID
 
+from .logging import logger
+
+
 setdefaulttimeout(5)
+
 
 def pick_host(hosts, hostname_to_match, endpoint_to_test):
     session = requests.Session()
@@ -21,5 +25,5 @@ def pick_host(hosts, hostname_to_match, endpoint_to_test):
                 r.raise_for_status()
                 return host
         except Exception as e:
-            print(f"{host} is invalid: {e}")
+            logger.warning(f"{host} is invalid: {e}")
     raise Exception("no valid hosts found!")

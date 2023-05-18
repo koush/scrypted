@@ -32,6 +32,7 @@ from .logging import logger
 # Import all of the other stuff.
 from datetime import datetime, timedelta
 from cachetools import cached, TTLCache
+import scrypted_arlo_go
 
 import asyncio
 import sys
@@ -80,20 +81,7 @@ USER_AGENTS = {
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
-    AUTH_HOSTS = [
-        'NTIuMTYuMTM4LjI=',
-        'NjMuMzIuODEuMjE4',
-        'MzQuMjQ2LjIzOS4xNzk=',
-        'NTQuNzMuMjI5LjUz',
-        'MzQuMjUwLjE4MC4xOTA=',
-        'MzQuMjU0LjIxNS4xOTQ=',
-        'MzQuMjQzLjkwLjIwMA==',
-        'NTQuNzIuMjI0LjI0Mg==',
-        'MzQuMjUyLjIyMS40Ng==',
-    ]
     TRANSID_PREFIX = 'web'
-
-    random.shuffle(AUTH_HOSTS)
 
     def __init__(self, username, password):
         self.username = username
@@ -152,15 +140,7 @@ class Arlo(object):
         self.BASE_URL = 'myapi.arlo.com'
 
     def LoginMFA(self):
-        self.request = Request(mode="ip")
         device_id = str(uuid.uuid4())
-
-        auth_host = pick_host([
-            base64.b64decode(h.encode("utf-8")).decode("utf-8")
-            for h in self.AUTH_HOSTS
-        ], self.AUTH_URL, "/api/auth")
-
-        # Authenticate
         headers = {
             'DNT': '1',
             'schemaVersion': '1',
@@ -176,6 +156,27 @@ class Arlo(object):
             'x-user-device-type': 'BROWSER',
             'Host': self.AUTH_URL,
         }
+
+        self.request = Request()
+        try:
+            auth_host = self.AUTH_URL
+            self.request.options(f'https://{auth_host}/api/auth', headers=headers)
+            logger.info("Using primary authentication host")
+        except Exception as e:
+            # in case cloudflare rejects our auth request...
+            logger.warning(f"Using fallback authentication host due to: {e}")
+
+            backup_hosts = list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
+            random.shuffle(backup_hosts)
+
+            auth_host = pick_host([
+                base64.b64decode(h.encode("utf-8")).decode("utf-8")
+                for h in backup_hosts
+            ], self.AUTH_URL, "/api/auth")
+
+            self.request = Request(mode="ip")
+
+        # Authenticate
         self.request.options(f'https://{auth_host}/api/auth', headers=headers)
         auth_body = self.request.post(
             f'https://{auth_host}/api/auth',
