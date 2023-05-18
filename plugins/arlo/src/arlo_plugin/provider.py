@@ -573,7 +573,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         self.scrypted_devices = {}
 
         camera_devices = []
-        provider_to_device_map = {}
+        provider_to_device_map = {None: []}
 
         basestations = self.arlo.GetDevices(['basestation', 'siren'])
         for basestation in basestations:
