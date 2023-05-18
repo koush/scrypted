@@ -158,7 +158,7 @@ class Arlo(object):
         auth_host = pick_host([
             base64.b64decode(h.encode("utf-8")).decode("utf-8")
             for h in self.AUTH_HOSTS
-        ], self.AUTH_URL)
+        ], self.AUTH_URL, "/api/auth")
 
         # Authenticate
         headers = {
