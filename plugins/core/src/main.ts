@@ -35,7 +35,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     router: any = Router();
     publicRouter: any = Router();
     mediaCore: MediaCore;
-    launcher: LauncherMixin;
     scriptCore: ScriptCore;
     aggregateCore: AggregateCore;
     automationCore: AutomationCore;
@@ -73,7 +72,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     type: ScryptedDeviceType.Builtin,
                 },
             );
-            this.mediaCore = new MediaCore('mediacore');
         })();
         (async () => {
             await deviceManager.onDeviceDiscovered(
@@ -84,7 +82,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     type: ScryptedDeviceType.Builtin,
                 },
             );
-            this.scriptCore = new ScriptCore();
         })();
 
         (async () => {
@@ -96,7 +93,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     type: ScryptedDeviceType.Builtin,
                 },
             );
-            this.automationCore = new AutomationCore();
         })();
 
         deviceManager.onDeviceDiscovered({
@@ -119,7 +115,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     type: ScryptedDeviceType.Builtin,
                 },
             );
-            this.aggregateCore = new AggregateCore();
         })();
 
 
@@ -132,7 +127,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     type: ScryptedDeviceType.Builtin,
                 },
             );
-            this.users = new UsersCore();
         })();
     }
 
@@ -145,6 +139,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         }
         return this.storageSettings.getSettings();
     }
+
     async putSetting(key: string, value: SettingValue): Promise<void> {
         await this.storageSettings.putSetting(key, value);
     }
@@ -153,15 +148,15 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         if (nativeId === 'launcher')
             return new LauncherMixin('launcher');
         if (nativeId === 'mediacore')
-            return this.mediaCore;
+            return this.mediaCore ||= new MediaCore();
         if (nativeId === ScriptCoreNativeId)
-            return this.scriptCore;
+            return this.scriptCore ||= new ScriptCore();
         if (nativeId === AutomationCoreNativeId)
-            return this.automationCore;
+            return this.automationCore ||= new AutomationCore()
         if (nativeId === AggregateCoreNativeId)
-            return this.aggregateCore;
+            return this.aggregateCore ||= new AggregateCore();
         if (nativeId === UsersNativeId)
-            return this.users;
+            return this.users ||= new UsersCore();
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
@@ -218,9 +213,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                 const u = new URL(endpoint);
 
                 const rewritten = indexHtml
-                    .replace('href="/endpoint/@scrypted/core/public/manifest.json"', `href="/endpoint/@scrypted/core/public/manifest.json${u.search}"`)
-                    .replace('href="/endpoint/@scrypted/core/public/img/icons/apple-touch-icon-152x152.png"', `href="/endpoint/@scrypted/core/public/img/icons/apple-touch-icon-152x152.png${u.search}"`)
-                    .replace('href="/endpoint/@scrypted/core/public/img/icons/safari-pinned-tab.svg"', `href="/endpoint/@scrypted/core/public/img/icons/safari-pinned-tab.svg${u.search}"`)
+                    .replace('href="manifest.json"', `href="manifest.json${u.search}"`)
+                    .replace('href="img/icons/apple-touch-icon-152x152.png"', `href="img/icons/apple-touch-icon-152x152.png${u.search}"`)
+                    .replace('href="img/icons/safari-pinned-tab.svg"', `href="img/icons/safari-pinned-tab.svg${u.search}"`)
                     ;
                 response.send(rewritten, {
                     headers: {

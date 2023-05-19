@@ -1,8 +1,10 @@
 import { Deferred } from "@scrypted/common/src/deferred";
 import { Headers, RtspServer } from "@scrypted/common/src/rtsp-server";
 import fs from 'fs';
-import { format } from "path";
+import path from 'path';
 import { Duplex } from "stream";
+
+const highWaterMark = 1024 * 1024;
 
 // non standard extension that dumps the rtp payload to a file.
 export class FileRtspServer extends RtspServer {
@@ -31,10 +33,14 @@ export class FileRtspServer extends RtspServer {
     }
 
     async write(url: string, requestHeaders: Headers) {
-        const file = requestHeaders['x-scrypted-rtsp-file'];
+        const recordingFile = requestHeaders['x-scrypted-rtsp-file'];
 
-        if (!file)
+        if (!recordingFile)
             return this.respond(400, 'Bad Request', requestHeaders, {});
+
+        await fs.promises.mkdir(path.dirname(recordingFile), {
+            recursive: true,
+        });
 
         const truncate = requestHeaders['x-scrypted-rtsp-file-truncate'];
 
@@ -53,9 +59,10 @@ export class FileRtspServer extends RtspServer {
                 });
                 const fd = await d.promise;
                 try {
-                    await fs.promises.rename(truncate, file);
+                    await fs.promises.rename(truncate, recordingFile);
                     truncateWriteStream = fs.createWriteStream(undefined, {
                         fd,
+                        highWaterMark,
                     })
                     // this.writeConsole?.log('truncating', truncate);
                 }
@@ -72,7 +79,9 @@ export class FileRtspServer extends RtspServer {
         this.cleanup();
         this.segmentBytesWritten = 0;
 
-        this.writeStream = truncateWriteStream || fs.createWriteStream(file);
+        this.writeStream = truncateWriteStream || fs.createWriteStream(recordingFile, {
+            highWaterMark,
+        });
         this.writeStream.on('error', e => {
             this.writeConsole?.error('RTSP WRITE error', e);
         });

@@ -3,8 +3,8 @@
 # This common file will be used by both Docker and the linux
 # install script.
 ################################################################
-ARG BUILDPACK_DEPS_BASE="bullseye"
-FROM debian:${BUILDPACK_DEPS_BASE} as header
+ARG BASE="bullseye"
+FROM debian:${BASE} as header
 
 RUN apt-get update && apt-get -y install curl wget
 
@@ -78,11 +78,12 @@ RUN if [ "$(uname -m)" != "x86_64" ]; \
     fi
 
 # python pip
+RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
 RUN python3 -m pip install --upgrade pip
 # pyvips is broken on x86 due to mismatch ffi
 # https://stackoverflow.com/questions/62658237/it-seems-that-the-version-of-the-libffi-library-seen-at-runtime-is-different-fro
 RUN python3 -m pip install --force-reinstall --no-binary :all: cffi
-RUN python3 -m pip install aiofiles debugpy typing_extensions psutil
+RUN python3 -m pip install debugpy typing_extensions psutil
 
 ################################################################
 # End section generated from template/Dockerfile.full.header

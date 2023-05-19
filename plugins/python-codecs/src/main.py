@@ -46,6 +46,7 @@ class GstreamerGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFram
                     'vtdec_hw',
                     'nvh264dec',
                     'vaapih264dec',
+                    'vaapih264dec ! vaapipostproc ! {videocaps}',
                 ],
                 'combobox': True,
             }
@@ -128,6 +129,14 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider)
 def create_scrypted_plugin():
     return PythonCodecs()
 
+def multiprocess_exit():
+    import sys
+    if sys.platform == 'win32':
+        sys.exit()
+    else:
+        import os
+        os._exit(os.EX_OK)
+
 class CodecFork:
     async def generateVideoFramesGstreamer(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None, h264Decoder: str = None) -> scrypted_sdk.VideoFrame:
         start = time.time()
@@ -139,9 +148,7 @@ class CodecFork:
             raise
         finally:
             print('gstreamer finished after %s' % (time.time() - start))
-            import os
-            os._exit(os.EX_OK)
-            pass
+            asyncio.get_event_loop().call_later(1, multiprocess_exit)
 
     async def generateVideoFramesLibav(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
         start = time.time()
@@ -153,12 +160,7 @@ class CodecFork:
             raise
         finally:
             print('libav finished after %s' % (time.time() - start))
-            import sys
-            if sys.platform == 'win32':
-                sys.exit()
-            else:
-                import os
-                os._exit(os.EX_OK)
+            asyncio.get_event_loop().call_later(1, multiprocess_exit)
 
 
 async def fork():

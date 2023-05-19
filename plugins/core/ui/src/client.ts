@@ -1,5 +1,5 @@
 import Vue from "vue";
-import { checkScryptedClientLogin, connectScryptedClient, loginScryptedClient, redirectScryptedLogin } from '../../../../packages/client/src/index';
+import { checkScryptedClientLogin, connectScryptedClient, getCurrentBaseUrl, loginScryptedClient, redirectScryptedLogin } from '../../../../packages/client/src/index';
 import store from './store';
 
 function hasValue(state: any, property: string) {
@@ -22,7 +22,7 @@ function isValidDevice(id: string) {
 
 export function loginScrypted(username: string, password: string, change_password: string) {
     return loginScryptedClient({
-        baseUrl: undefined,
+        baseUrl: getCurrentBaseUrl(),
         username,
         password,
         change_password,
@@ -33,6 +33,8 @@ Vue.use(Vue => {
     Vue.prototype.$connectScrypted = () => {
         const clientPromise = connectScryptedClient({
             pluginId: '@scrypted/core',
+            // need this in case the scrypted server is proxied.
+            baseUrl: getCurrentBaseUrl(),
         });
 
         store.commit("setHasLogin", undefined);
@@ -40,11 +42,14 @@ Vue.use(Vue => {
         store.commit("setUsername", undefined);
         store.commit("setIsConnected", undefined);
 
-        return checkScryptedClientLogin()
+        return checkScryptedClientLogin({
+            baseUrl: getCurrentBaseUrl(),
+        })
             .then(response => {
                 if (response.redirect) {
                     redirectScryptedLogin({
                         redirect: response.redirect,
+                        baseUrl: getCurrentBaseUrl(),
                     });
                     return;
                 }

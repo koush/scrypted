@@ -500,7 +500,7 @@ class NotifierOptions(TypedDict):
 class ObjectDetectionGeneratorResult(TypedDict):
     __json_copy_serialize_children: Any
     detected: ObjectsDetected
-    videoFrame: Union[VideoFrame, MediaObject]
+    videoFrame: VideoFrame
     pass
 
 class ObjectDetectionGeneratorSession(TypedDict):
@@ -955,7 +955,7 @@ class OauthClient:
 class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         pass
-    async def generateObjectDetections(self, videoFrames: AsyncGenerator, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
+    async def generateObjectDetections(self, videoFrames: VideoFrame, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
         pass
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         pass
@@ -1198,7 +1198,7 @@ class VideoClips:
     pass
 
 class VideoFrameGenerator:
-    async def generateVideoFrames(self, mediaObject: MediaObject, options: VideoFrameGeneratorOptions = None, filter: Any = None) -> AsyncGenerator:
+    async def generateVideoFrames(self, mediaObject: MediaObject, options: VideoFrameGeneratorOptions = None, filter: Any = None) -> VideoFrame:
         pass
     pass
 
@@ -2585,16 +2585,11 @@ class HttpResponse:
     pass
 
 class VideoFrame:
-    format: ImageFormat
-    height: float
+    __json_copy_serialize_children: Any
+    image: Union[Image, MediaObject]
     queued: float
     timestamp: float
-    width: float
     async def flush(self, count: float = None) -> None:
-        pass
-    async def toBuffer(self, options: ImageOptions = None) -> bytearray:
-        pass
-    async def toImage(self, options: ImageOptions = None) -> Union[Image, MediaObject]:
         pass
     pass
 
@@ -2602,6 +2597,8 @@ class Image:
     format: ImageFormat
     height: float
     width: float
+    async def close(self) -> None:
+        pass
     async def toBuffer(self, options: ImageOptions = None) -> bytearray:
         pass
     async def toImage(self, options: ImageOptions = None) -> Union[Image, MediaObject]:

@@ -30,11 +30,12 @@
          "Settings"
       ],
       "pluginDependencies": [
-         "@scrypted/objectdetector"
+         "@scrypted/objectdetector",
+         "@scrypted/python-codecs"
       ]
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.79"
+   "version": "0.0.81"
 }

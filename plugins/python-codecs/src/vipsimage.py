@@ -1,4 +1,5 @@
 import scrypted_sdk
+import asyncio
 from typing import Any
 try:
     import pyvips
@@ -7,14 +8,19 @@ except:
     Image = None
     pyvips = None
 from thread import to_thread
-import time
 
-class VipsImage(scrypted_sdk.VideoFrame):
+class VipsImage(scrypted_sdk.Image):
     def __init__(self, vipsImage: Image) -> None:
         super().__init__()
         self.vipsImage = vipsImage
         self.width = vipsImage.width
         self.height = vipsImage.height
+
+    async def close(self):
+        vips = self.vipsImage
+        self.vipsImage = None
+        if vips:
+            vips.invalidate()
 
     async def toBuffer(self, options: scrypted_sdk.ImageOptions = None) -> bytearray:
         vipsImage: VipsImage = await self.toVipsImage(options)
@@ -25,7 +31,7 @@ class VipsImage(scrypted_sdk.VideoFrame):
             return await to_thread(format)
         elif options['format'] == 'rgba':
             def format():
-                if not vipsImage.vipsImage.hasalpha():
+                if not vipsImage.vipsImage.bands == 3:
                     rgba = vipsImage.vipsImage.addalpha()
                 else:
                     rgba = vipsImage.vipsImage
@@ -33,7 +39,7 @@ class VipsImage(scrypted_sdk.VideoFrame):
             return await to_thread(format)
         elif options['format'] == 'rgb':
             def format():
-                if vipsImage.vipsImage.hasalpha():
+                if vipsImage.vipsImage.bands == 4:
                     rgb = vipsImage.vipsImage.extract_band(0, n=vipsImage.vipsImage.bands - 1)
                 else:
                     rgb = vipsImage.vipsImage
@@ -45,7 +51,11 @@ class VipsImage(scrypted_sdk.VideoFrame):
                     return memoryview(vipsImage.vipsImage.write_to_memory())
             else:
                 def format():
-                    gray = vipsImage.vipsImage.colourspace("b-w")
+                    if vipsImage.vipsImage.bands == 4:
+                        gray = vipsImage.vipsImage.extract_band(0, n=vipsImage.vipsImage.bands - 1)
+                    else:
+                        gray = vipsImage.vipsImage
+                    gray = gray.colourspace("b-w")
                     return memoryview(gray.write_to_memory())
             return await to_thread(format)
 
@@ -91,7 +101,6 @@ def toVipsImage(vipsImageWrapper: VipsImage, options: scrypted_sdk.ImageOptions 
 
 async def createVipsMediaObject(image: VipsImage):
     ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
-        'timestamp': time.time() * 1000,
         'format': None,
         'width': image.width,
         'height': image.height,

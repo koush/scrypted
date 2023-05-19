@@ -23,10 +23,19 @@ async function example() {
     if (!backyard)
         throw new Error('Device not found');
 
-    backyard.listen(ScryptedInterface.ObjectDetector, (source, details, data) => {
+    backyard.listen(ScryptedInterface.ObjectDetector, async (source, details, data) => {
         const results = data as ObjectsDetected;
-        console.log(results);
-    })
+        console.log('detection results', results);
+        // detections that are flagged for retention will have a detectionId.
+        // tf etc won't retain automatically, and this requires a wrapping detector like Scrypted NVR Object Detection
+        // to decide which frames to keep. Otherwise saving all images would be extremely poor performance.
+        if (!results.detectionId)
+            return;
+
+        const media = await backyard.getDetectionInput(results.detectionId);
+        const jpeg = await sdk.mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
+        // do something with the buffer like save to disk or send to a service.
+    });
 }
 
 example();

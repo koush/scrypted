@@ -922,5 +922,14 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 console.error('error probing plugin devices', plugin._id, e);
             }
         }
+
+        if (process.env.SCRYPTED_INSTALL_PLUGIN && !plugins.find(plugin => plugin._id === process.env.SCRYPTED_INSTALL_PLUGIN)) {
+            try {
+                await this.installNpm(process.env.SCRYPTED_INSTALL_PLUGIN);
+            }
+            catch (e) {
+                console.error('failed to auto install plugin', process.env.SCRYPTED_INSTALL_PLUGIN);
+            }
+        }
     }
 }

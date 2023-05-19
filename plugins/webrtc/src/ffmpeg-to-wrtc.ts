@@ -4,7 +4,7 @@ import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { isPrivateIceTransport, logIsPrivateIceTransport } from "./werift-util";
+import { isLocalIceTransport, logIsLocalIceTransport } from "./werift-util";
 
 import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
@@ -33,14 +33,14 @@ function getDebugModeH264EncoderArgs() {
 
 export async function createTrackForwarder(options: {
     timeStart: number,
-    isPrivate: boolean, destinationId: string, ipv4: boolean,
+    isLocalNetwork: boolean, destinationId: string, ipv4: boolean,
     requestMediaStream: RequestMediaStream,
     videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver,
     maximumCompatibilityMode: boolean, clientOptions: RTCSignalingOptions,
 }) {
     const {
         timeStart,
-        isPrivate, destinationId,
+        isLocalNetwork, destinationId,
         requestMediaStream,
         videoTransceiver, audioTransceiver,
         maximumCompatibilityMode,
@@ -57,7 +57,7 @@ export async function createTrackForwarder(options: {
     if (transcodeBaseline) {
         requestDestination = 'medium-resolution';
     }
-    else if (!isPrivate) {
+    else if (!isLocalNetwork) {
         requestDestination = 'remote';
     }
 
@@ -139,7 +139,7 @@ export async function createTrackForwarder(options: {
     videoTranscodeArguments.push(...(ffmpegInput.h264FilterArguments || []));
 
     if (transcode) {
-        const conservativeDefaultBitrate = isPrivate ? 1000000 : 500000;
+        const conservativeDefaultBitrate = isLocalNetwork ? 1000000 : 500000;
         const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
         videoTranscodeArguments.push(
             // this seems to cause issues with presets i think.
@@ -429,7 +429,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         });
         logConnectionState(console, this.pc);
         waitConnected(this.pc)
-            .then(() => logIsPrivateIceTransport(this.console, this.pc)).catch(() => {});
+            .then(() => logIsLocalIceTransport(this.console, this.pc)).catch(() => {});
 
         this.weriftSignalingSession = new WeriftSignalingSession(console, this.pc);
     }
@@ -465,7 +465,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             createTrackForwarder: async (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) => {
                 const ret = await createTrackForwarder({
                     timeStart,
-                    ...isPrivateIceTransport(this.pc),
+                    ...isLocalIceTransport(this.pc),
                     requestMediaStream,
                     videoTransceiver,
                     audioTransceiver,

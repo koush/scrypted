@@ -20,7 +20,7 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";"
 
 
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install --upgrade pip
-py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install aiofiles debugpy typing_extensions typing opencv-python
+py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install debugpy typing_extensions typing opencv-python
 
 npx -y scrypted@latest install-server
 

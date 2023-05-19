@@ -1,5 +1,6 @@
 import { RTCIceServer, RTCPeerConnection, RTCSessionDescription } from "./werift";
 import ip from 'ip';
+import os from 'os';
 
 export function createRawResponse(response: RTCSessionDescription): RTCSessionDescriptionInit {
     return {
@@ -42,28 +43,37 @@ export function getWeriftIceServers(configuration: RTCConfiguration): RTCIceServ
     return ret;
 }
 
-export function isPrivateIceTransport(pc: RTCPeerConnection) {
-    let isPrivate = true;
+export function isLocalIceTransport(pc: RTCPeerConnection) {
+    let isLocalNetwork = true;
     let destinationId: string;
     for (const ice of pc.iceTransports) {
-        const [address, port] = (ice.connection as any).nominated[1].remoteAddr;
+        const { remoteAddr, localCandidate } = (ice.connection as any).nominated[1];
+        const [address, port] = remoteAddr;
         if (!destinationId)
             destinationId = address;
-        isPrivate = isPrivate && ip.isPrivate(address);
 
+        let sameNetwork = false;
+        try {
+            const localAddress = Object.values(os.networkInterfaces()).flat().find(nif => nif.address === localCandidate.host);
+            sameNetwork = ip.cidrSubnet(localAddress.cidr).contains(address);
+        }
+        catch (e) {
+        }
+
+        isLocalNetwork = isLocalNetwork && (ip.isPrivate(address) || sameNetwork);
     }
-    console.log('Connection is local network:', isPrivate);
+    console.log('Connection is local network:', isLocalNetwork);
     const ipv4 = ip.isV4Format(destinationId);
     return {
         ipv4,
-        isPrivate,
+        isLocalNetwork,
         destinationId,
     };
 }
 
-export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection) {
-    const ret = isPrivateIceTransport(pc);
+export function logIsLocalIceTransport(console: Console, pc: RTCPeerConnection) {
+    const ret = isLocalIceTransport(pc);
     console.log('ice transport', ret);
-    console.log('Connection is local network:', ret.isPrivate);
+    console.log('Connection is local network:', ret.isLocalNetwork);
     return ret;
 }

@@ -2,15 +2,15 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
-import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { closeQuiet, listenZeroSingleClient, ListenZeroSingleClientTimeoutError } from '@scrypted/common/src/listen-cluster';
+import { ParserOptions, ParserSession, handleRebroadcasterClient, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
+import { ListenZeroSingleClientTimeoutError, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, listenSingleRtspClient, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
+import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack, createRtspParser, findH264NaluType, getNaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
-import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, ChargeState, DeviceBase, DeviceProvider, DeviceState, EventListenerRegister, FFmpegInput, H264Info, MediaObject, MediaStreamDestination, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import { StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
+import sdk, { BufferConverter, ChargeState, DeviceProvider, DeviceState, EventListenerRegister, FFmpegInput, H264Info, MediaObject, MediaStreamDestination, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { once } from 'events';
@@ -24,7 +24,7 @@ import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { createStreamSettings } from './stream-settings';
-import { getTranscodeMixinProviderId, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
+import { TRANSCODE_MIXIN_PROVIDER_NATIVE_ID, TranscodeMixinProvider, getTranscodeMixinProviderId } from './transcode-settings';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -96,6 +96,7 @@ class PrebufferSession {
   inactivityTimeout: NodeJS.Timeout;
   audioConfigurationKey: string;
   ffmpegInputArgumentsKey: string;
+  ffmpegOutputArgumentsKey: string;
   lastDetectedAudioCodecKey: string;
   lastH264ProbeKey: string;
   rtspParserKey: string;
@@ -111,6 +112,7 @@ class PrebufferSession {
     this.mixinDevice = mixin.mixinDevice;
     this.audioConfigurationKey = 'audioConfiguration-' + this.streamId;
     this.ffmpegInputArgumentsKey = 'ffmpegInputArguments-' + this.streamId;
+    this.ffmpegOutputArgumentsKey = 'ffmpegOutputArguments-' + this.streamId;
     this.lastDetectedAudioCodecKey = 'lastDetectedAudioCodec-' + this.streamId;
     this.lastH264ProbeKey = 'lastH264Probe-' + this.streamId;
     this.rtspParserKey = 'rtspParser-' + this.streamId;
@@ -290,26 +292,6 @@ class PrebufferSession {
     const group = "Streams";
     const subgroup = `Stream: ${this.streamName}`;
 
-    const addFFmpegAudioSettings = () => {
-      settings.push(
-        {
-          title: 'Audio Codec Transcoding',
-          group,
-          subgroup,
-          description: 'Configuring your camera to output Opus, PCM, or AAC is recommended.',
-          type: 'string',
-          key: this.audioConfigurationKey,
-          value: this.storage.getItem(this.audioConfigurationKey) || DEFAULT_AUDIO,
-          choices: [
-            DEFAULT_AUDIO,
-            AAC_AUDIO_DESCRIPTION,
-            COMPATIBLE_AUDIO_DESCRIPTION,
-            TRANSCODE_AUDIO_DESCRIPTION,
-          ],
-        },
-      );
-    };
-
     const addFFmpegInputSettings = () => {
       settings.push(
         {
@@ -327,10 +309,22 @@ class PrebufferSession {
           ],
           combobox: true,
         },
+        {
+          title: 'FFmpeg Output Arguments Prefix',
+          group,
+          subgroup,
+          description: 'Optional/Advanced: Additional output arguments to pass to the ffmpeg command. These will be placed before the input arguments.',
+          key: this.ffmpegOutputArgumentsKey,
+          value: this.storage.getItem(this.ffmpegOutputArgumentsKey),
+          choices: [
+            '-vcodec h264 -bf 0'
+          ],
+          combobox: true,
+        },
       )
     }
 
-    let usingFFmpeg = false;
+    let usingFFmpeg = true;
 
     if (this.canUseRtspParser(this.advertisedMediaStreamOptions)) {
       const parser = this.getParser(this.advertisedMediaStreamOptions);
@@ -648,7 +642,9 @@ class PrebufferSession {
           ffmpegInput.inputArguments = ['-rtsp_transport', 'tcp', '-i', ffmpegInput.url];
         // create missing pts from dts so mpegts and mp4 muxing does not fail
         const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
+        const extraOutputArguments = this.storage.getItem(this.ffmpegOutputArgumentsKey) || '';
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
+        rbo.parsers.rtsp.outputArguments.push(...extraOutputArguments.split(' ').filter(d => !!d));
         session = await startParserSession(ffmpegInput, rbo);
       }
     }

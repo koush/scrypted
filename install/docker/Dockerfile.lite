@@ -1,5 +1,5 @@
-ARG BUILDPACK_DEPS_BASE="bullseye"
-FROM debian:${BUILDPACK_DEPS_BASE} as header
+ARG BASE="bullseye"
+FROM debian:${BASE} as header
 
 RUN apt-get update && apt-get -y install curl wget
 
@@ -14,6 +14,28 @@ RUN apt-get -y upgrade
 RUN apt-get -y install software-properties-common apt-utils
 RUN apt-get -y update
 
+# base development stuff
+RUN apt-get -y install \
+    build-essential \
+    cmake \
+    gcc \
+    libcairo2-dev \
+    libgirepository1.0-dev \
+    pkg-config
+
+# python native
+RUN apt-get -y install \
+    python3 \
+    python3-dev \
+    python3-pip \
+    python3-setuptools \
+    python3-wheel
+
+# python pip
+RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install debugpy typing_extensions psutil
+
 ENV SCRYPTED_DOCKER_SERVE="true"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
@@ -22,4 +44,4 @@ ENV SCRYPTED_INSTALL_PATH="/server"
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
 ENV SCRYPTED_BASE_VERSION=20230329
-ENV SCRYPTED_DOCKER_FLAVOR=thin
+ENV SCRYPTED_DOCKER_FLAVOR=lite

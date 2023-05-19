@@ -9,13 +9,13 @@ on:
     - cron:  '30 8 2 * *'
 
 jobs:
-  push_to_registry:
+  build:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     strategy:
       matrix:
         NODE_VERSION: ["18"]
-        BUILDPACK_DEPS_BASE: ["bullseye"]
+        BASE: ["bullseye", "bookworm"]
         FLAVOR: ["full", "lite", "thin"]
     steps:
       - name: Check out the repo
@@ -43,13 +43,15 @@ jobs:
       - name: Build and push Docker image (scrypted-common)
         uses: docker/build-push-action@v2
         with:
-          build-args: NODE_VERSION=${{ matrix.NODE_VERSION }}
-          context: docker/
-          file: docker/Dockerfile.${{ matrix.FLAVOR }}
+          build-args: |
+            NODE_VERSION=${{ matrix.NODE_VERSION }}
+            BASE=${{ matrix.BASE }}
+          context: install/docker/
+          file: install/docker/Dockerfile.${{ matrix.FLAVOR }}
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
-            koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BUILDPACK_DEPS_BASE }}-${{ matrix.FLAVOR }}
+            koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-${{ matrix.FLAVOR }}
 #            ${{ matrix.NODE_VERSION == '16-bullseye' && 'koush/scrypted-common:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

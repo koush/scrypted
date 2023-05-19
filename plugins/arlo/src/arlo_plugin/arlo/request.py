@@ -16,6 +16,8 @@
 
 import requests
 from requests.exceptions import HTTPError
+from requests_toolbelt.adapters import host_header_ssl
+import cloudscraper
 import time
 import uuid
 
@@ -27,8 +29,13 @@ import uuid
 class Request(object):
     """HTTP helper class"""
 
-    def __init__(self, timeout=5):
-        self.session = requests.Session()
+    def __init__(self, timeout=5, mode="cloudscraper"):
+        if mode == "cloudscraper":
+            from .arlo_async import USER_AGENTS
+            self.session = cloudscraper.CloudScraper(browser={"custom": USER_AGENTS["arlo"]})
+        elif mode == "ip":
+            self.session = requests.Session()
+            self.session.mount('https://', host_header_ssl.HostHeaderSSLAdapter())
         self.timeout = timeout
 
     def gen_event_id(self):
@@ -37,7 +44,7 @@ class Request(object):
     def get_time(self):
         return int(time.time_ns() / 1_000_000)
 
-    def _request(self, url, method='GET', params={}, headers={}, stream=False, raw=False):
+    def _request(self, url, method='GET', params={}, headers={}, raw=False, skip_event_id=False):
 
         ## uncomment for debug logging
         """
@@ -51,14 +58,13 @@ class Request(object):
         req_log.propagate = True
         #"""
 
-        url =  f'{url}?eventId={self.gen_event_id()}&time={self.get_time()}'
+        if not skip_event_id:
+            url = f'{url}?eventId={self.gen_event_id()}&time={self.get_time()}'
 
         if method == 'GET':
             #print('COOKIES: ', self.session.cookies.get_dict())
-            r = self.session.get(url, params=params, headers=headers, stream=stream, timeout=self.timeout)
+            r = self.session.get(url, params=params, headers=headers, timeout=self.timeout)
             r.raise_for_status()
-            if stream is True:
-                return r
         elif method == 'PUT':
             r = self.session.put(url, json=params, headers=headers, timeout=self.timeout)
             r.raise_for_status()
@@ -81,14 +87,14 @@ class Request(object):
             else:
                 raise HTTPError('Request ({0} {1}) failed: {2}'.format(method, url, r.json()), response=r)
 
-    def get(self, url, params={}, headers={}, stream=False, raw=False):
-        return self._request(url, 'GET', params=params, headers=headers, stream=stream, raw=raw)
+    def get(self, url, **kwargs):
+        return self._request(url, 'GET', **kwargs)
 
-    def put(self, url, params={}, headers={}, raw=False):
-        return self._request(url, 'PUT', params=params, headers=headers, raw=raw)
+    def put(self, url, **kwargs):
+        return self._request(url, 'PUT', **kwargs)
 
-    def post(self, url, params={}, headers={}, raw=False):
-        return self._request(url, 'POST', params=params, headers=headers, raw=raw)
+    def post(self, url, **kwargs):
+        return self._request(url, 'POST', **kwargs)
 
-    def options(self, url, headers={}, raw=False):
-        return self._request(url, 'OPTIONS', headers=headers, raw=raw)
+    def options(self, url, **kwargs):
+        return self._request(url, 'OPTIONS', **kwargs)

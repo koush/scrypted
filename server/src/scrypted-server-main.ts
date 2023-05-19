@@ -16,7 +16,7 @@ import semver from 'semver';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { Plugin, ScryptedUser, Settings } from './db-types';
-import level from './level';
+import level, { Level } from './level';
 import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { RPCResultError } from './rpc';
@@ -26,6 +26,8 @@ import { Info } from './services/info';
 import { setScryptedUserPassword } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
+import { once } from 'events';
+import util from 'util';
 
 export type Runtime = ScryptedRuntime;
 
@@ -41,13 +43,16 @@ process.on('unhandledRejection', error => {
     console.warn('unhandled rejection of RPC Result', error);
 });
 
-function listenServerPort(env: string, port: number, server: any) {
-    server.listen(port,);
-    server.on('error', (e: Error) => {
+async function listenServerPort(env: string, port: number, server: any) {
+    server.listen(port);
+    try {
+        await once(server, 'listening');
+    }
+    catch (e) {
         console.error(`Failed to listen on port ${port}. It may be in use.`);
         console.error(`Use the environment variable ${env} to change the port.`);
         throw e;
-    })
+    }
 }
 
 installSourceMapSupport({
@@ -91,7 +96,8 @@ const debugServer = net.createServer(async (socket) => {
     console.warn('debugger connect timed out');
     socket.destroy();
 })
-listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, debugServer);
+listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, debugServer)
+    .catch(() => { });
 
 const app = express();
 
@@ -112,7 +118,13 @@ async function start(mainFilename: string, options?: {
     const volumeDir = getScryptedVolume();
     mkdirp.sync(volumeDir);
     const dbPath = path.join(volumeDir, 'scrypted.db');
-    const db = level(dbPath);
+    const db = await new Promise<Level>((r, f) => {
+        const db = level(dbPath, undefined, (e) => {
+            if (e)
+                return f(e);
+            r(db);
+        });
+    })
     await db.open();
 
     let certSetting = await db.tryGet(Settings, 'certificate') as Settings;
@@ -192,15 +204,41 @@ async function start(mainFilename: string, options?: {
             return;
         }
 
+        // the remote address may be ipv6 prefixed so use a fuzzy match.
+        // eg ::ffff:192.168.2.124
+        if (process.env.SCRYPTED_ADMIN_USERNAME
+            && process.env.SCRYPTED_ADMIN_ADDRESS
+            && req.socket.remoteAddress?.endsWith(process.env.SCRYPTED_ADMIN_ADDRESS)) {
+            res.locals.username = process.env.SCRYPTED_ADMIN_USERNAME;
+            res.locals.aclId = undefined;
+            next();
+            return;
+        }
+
         // this is a trap for all auth.
         // only basic auth will fail with 401. it is up to the endpoints to manage
         // lack of login from cookie auth.
 
         const checkToken = (token: string) => {
-            if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_TOKEN === token) {
-                res.locals.username = process.env.SCRYPTED_ADMIN_USERNAME;
-                res.locals.aclId = undefined;
-                return;
+            if (process.env.SCRYPTED_ADMIN_TOKEN === token) {
+                let username = process.env.SCRYPTED_ADMIN_USERNAME;
+                if (!username) {
+                    const firstAdmin = [...scrypted.usersService.users.values()].find(u => !u.aclId);
+                    username = firstAdmin?._id;
+                }
+                if (username) {
+                    res.locals.username = username;
+                    res.locals.aclId = undefined;
+                    return;
+                }
+            }
+
+            for (const user of scrypted.usersService.users.values()) {
+                if (user.token === token) {
+                    res.locals.username = user._id;
+                    res.locals.aclId = user.aclId;
+                    break;
+                }
             }
 
             const [checkHash, ...tokenParts] = token.split('#');
@@ -278,13 +316,8 @@ async function start(mainFilename: string, options?: {
     await options?.onRuntimeCreated?.(scrypted);
     await scrypted.start();
 
-    listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
-    listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
-    const legacyInsecure = http.createServer(app);
-    legacyInsecure.listen(10080);
-    legacyInsecure.on('error', () => {
-        // can ignore.
-    });
+    await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
+    await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
 
     console.log('#######################################################');
     console.log(`Scrypted Volume           : ${volumeDir}`);
@@ -444,13 +477,13 @@ async function start(mainFilename: string, options?: {
             res.send({});
         }
         else {
-            res.redirect('/endpoint/@scrypted/core/public/');
+            res.redirect('./endpoint/@scrypted/core/public/');
         }
     });
 
     let hasLogin = await db.getCount(ScryptedUser) > 0;
 
-    if (process.env.SCRYPTED_ADMIN_USERNAME && process.env.SCRYPTED_ADMIN_TOKEN) {
+    if (process.env.SCRYPTED_ADMIN_USERNAME) {
         let user = await db.tryGet(ScryptedUser, process.env.SCRYPTED_ADMIN_USERNAME);
         if (!user) {
             user = await scrypted.usersService.addUserInternal(process.env.SCRYPTED_ADMIN_USERNAME, crypto.randomBytes(8).toString('hex'), undefined);
@@ -565,14 +598,15 @@ async function start(mainFilename: string, options?: {
         const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true)).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
 
         // env/header based admin login
-        if (res.locals.username && res.locals.username === process.env.SCRYPTED_ADMIN_USERNAME) {
-            const userToken = new UserToken(res.locals.username, undefined, Date.now());
+        if (res.locals.username) {
+            const user = scrypted.usersService.users.get(res.locals.username);
+            const userToken = new UserToken(res.locals.username, user.aclId, Date.now());
 
             res.send({
                 ...createTokens(userToken),
                 expiration: ONE_DAY_MILLISECONDS,
                 username: res.locals.username,
-                token: process.env.SCRYPTED_ADMIN_TOKEN,
+                token: user.token,
                 addresses,
                 hostname,
             });
@@ -639,7 +673,7 @@ async function start(mainFilename: string, options?: {
         }
     });
 
-    app.get('/', (_req, res) => res.redirect('/endpoint/@scrypted/core/public/'));
+    app.get('/', (_req, res) => res.redirect('./endpoint/@scrypted/core/public/'));
 
     return scrypted;
 }

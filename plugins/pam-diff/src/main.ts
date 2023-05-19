@@ -1,4 +1,4 @@
-import sdk, { MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionGeneratorResult, ObjectDetectionGeneratorSession, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, VideoFrame } from '@scrypted/sdk';
+import sdk, { MediaObject, ObjectDetection, ObjectDetectionGeneratorResult, ObjectDetectionGeneratorSession, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, VideoFrame } from '@scrypted/sdk';
 
 import PD from 'pam-diff';
 import P2P from 'pipe2pam';
@@ -70,8 +70,10 @@ TUPLTYPE RGB
 ENDHDR
 `;
 
-            const buffer = await videoFrame.toBuffer({
-                resize: (videoFrame.width !== width || videoFrame.height !== height) ? {
+            const { image } = videoFrame;
+
+            const buffer = await image.toBuffer({
+                resize: (image.width !== width || image.height !== height) ? {
                     width,
                     height,
                 } : undefined,
@@ -105,7 +107,7 @@ ENDHDR
         return this.generateObjectDetectionsInternal(videoFrames, session);
     }
 
-    async detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected> {
+    async detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected> {
         throw new Error('can not run motion detection on image')
     }
 

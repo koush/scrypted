@@ -4,6 +4,7 @@
 <script>
 import qs from 'query-string';
 import RPCInterface from "./RPCInterface.vue";
+import { getCurrentBaseUrl } from '../../../../../packages/client/src';
 
 export default {
   mixins: [RPCInterface],
@@ -16,9 +17,18 @@ export default {
         return true;
       }
     },
-    onClick: function () {
-      // https://stackoverflow.com/a/39387533
-      const windowReference = this.isIFrame() ? window.open(undefined, '_blank') : undefined;
+    onClick: async function () {
+      // must escape iframe for login.
+      if (this.isIFrame()) {
+        const endpointManager = this.$scrypted.endpointManager;
+        const ep = await endpointManager.getPublicLocalEndpoint();
+        const u = new URL(ep);
+        u.hash = window.location.hash;
+        u.pathname = '/endpoint/@scrypted/core/public/';
+        window.open(u.toString(), '_blank');
+        return;
+      }
+
       this.rpc()
         .getOauthUrl()
         .then(data => {
@@ -51,10 +61,7 @@ export default {
             r: window.location.toString(),
           });
           url.search = qs.stringify(querystring);
-          if (windowReference)
-            windowReference.location = url.toString();
-          else
-            window.location = url.toString();
+          window.location = url.toString();
         });
     }
   }
