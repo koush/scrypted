@@ -24,6 +24,7 @@ limitations under the License.
 # Import helper classes that are part of this library.
 
 from .request import Request
+from .host_picker import pick_host
 from .mqtt_stream_async import MQTTStream
 from .sse_stream_async import EventStream
 from .logging import logger
@@ -31,6 +32,7 @@ from .logging import logger
 # Import all of the other stuff.
 from datetime import datetime, timedelta
 from cachetools import cached, TTLCache
+import scrypted_arlo_go
 
 import asyncio
 import sys
@@ -38,6 +40,7 @@ import base64
 import math
 import random
 import time
+import uuid
 
 stream_class = MQTTStream
 
@@ -137,9 +140,7 @@ class Arlo(object):
         self.BASE_URL = 'myapi.arlo.com'
 
     def LoginMFA(self):
-        self.request = Request()
-
-        # Authenticate
+        device_id = str(uuid.uuid4())
         headers = {
             'DNT': '1',
             'schemaVersion': '1',
@@ -150,9 +151,35 @@ class Arlo(object):
             'Referer': f'https://{self.BASE_URL}/',
             'Source': 'arloCamWeb',
             'TE': 'Trailers',
+            'x-user-device-id': device_id,
+            'x-user-device-automation-name': 'QlJPV1NFUg==',
+            'x-user-device-type': 'BROWSER',
+            'Host': self.AUTH_URL,
         }
+
+        self.request = Request()
+        try:
+            auth_host = self.AUTH_URL
+            self.request.options(f'https://{auth_host}/api/auth', headers=headers)
+            logger.info("Using primary authentication host")
+        except Exception as e:
+            # in case cloudflare rejects our auth request...
+            logger.warning(f"Using fallback authentication host due to: {e}")
+
+            backup_hosts = list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
+            random.shuffle(backup_hosts)
+
+            auth_host = pick_host([
+                base64.b64decode(h.encode("utf-8")).decode("utf-8")
+                for h in backup_hosts
+            ], self.AUTH_URL, "/api/auth")
+
+            self.request = Request(mode="ip")
+
+        # Authenticate
+        self.request.options(f'https://{auth_host}/api/auth', headers=headers)
         auth_body = self.request.post(
-            f'https://{self.AUTH_URL}/api/auth',
+            f'https://{auth_host}/api/auth',
             params={
                 'email': self.username,
                 'password': str(base64.b64encode(self.password.encode('utf-8')), 'utf-8'),
@@ -167,7 +194,7 @@ class Arlo(object):
 
         # Retrieve MFA factor id
         factors_body = self.request.get(
-            f'https://{self.AUTH_URL}/api/getFactors',
+            f'https://{auth_host}/api/getFactors',
             params={'data': auth_body['data']['issued']},
             headers=headers,
             raw=True
@@ -180,7 +207,7 @@ class Arlo(object):
 
         # Start factor auth
         start_auth_body = self.request.post(
-            f'https://{self.AUTH_URL}/api/startAuth',
+            f'https://{auth_host}/api/startAuth',
             params={'factorId': factor_id},
             headers=headers,
             raw=True
@@ -191,7 +218,7 @@ class Arlo(object):
             nonlocal self, factor_auth_code, headers
 
             finish_auth_body = self.request.post(
-                f'https://{self.AUTH_URL}/api/finishAuth',
+                f'https://{auth_host}/api/finishAuth',
                 params={
                     'factorAuthCode': factor_auth_code,
                     'otp': code
@@ -199,6 +226,8 @@ class Arlo(object):
                 headers=headers,
                 raw=True
             )
+
+            self.request = Request()
 
             # Update Authorization code with new code
             headers = {
