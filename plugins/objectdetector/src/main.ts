@@ -270,10 +270,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       .catch(e => {
         this.console.error('Video Analysis ended with error', e);
       }).finally(() => {
-        if (!this.hasMotionType)
+        if (!this.hasMotionType) {
           this.plugin.objectDetectionEnded(this.console, options.snapshotPipeline);
-        else
+          this.console.log('Video Analysis object detection ended.');
+        }
+        else {
           this.console.log('Video Analysis motion detection ended.');
+        }
         signal.resolve();
       });
   }

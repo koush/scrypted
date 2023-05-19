@@ -37,6 +37,7 @@ async function createVipsMediaObject(image: VipsImage): Promise<Image & MediaObj
             const newImage = await image.toVipsImage(options);
             return createVipsMediaObject(newImage);
         },
+        close: () => image.close(),
     });
 
     return ret;
@@ -50,6 +51,11 @@ interface RawFrame {
 
 class VipsImage implements Image {
     constructor(public image: sharp.Sharp, public width: number, public height: number, public channels: number) {
+    }
+
+    async close(): Promise<void> {
+        this.image?.destroy();
+        this.image = undefined;
     }
 
     toImageInternal(options: ImageOptions) {

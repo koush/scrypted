@@ -19,6 +19,7 @@ async function createRawImageMediaObject(image: RawImage): Promise<Image & Media
         height: image.height,
         toBuffer: (options: ImageOptions) => image.toBuffer(options),
         toImage: (options: ImageOptions) => image.toImage(options),
+        close: () => image.close(),
     });
 
     return ret;
@@ -26,6 +27,10 @@ async function createRawImageMediaObject(image: RawImage): Promise<Image & Media
 
 class RawImage implements Image, RawFrame {
     constructor(public data: Buffer, public width: number, public height: number, public format: ImageFormat) {
+    }
+
+    async close(): Promise<void> {
+        this.data = undefined;
     }
 
     checkOptions(options: ImageOptions) {
