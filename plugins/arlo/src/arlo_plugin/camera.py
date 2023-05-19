@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import aiohttp
-from async_timeout import timeout
+from async_timeout import timeout as async_timeout
 from datetime import datetime, timedelta
 import json
 import threading
@@ -398,7 +398,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             if pic_url is None:
                 raise Exception("Error taking snapshot")
 
-            async with timeout(self.timeout):
+            async with async_timeout(self.timeout):
                 async with aiohttp.ClientSession() as session:
                     async with session.get(pic_url) as resp:
                         if resp.status != 200:
