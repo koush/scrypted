@@ -16,6 +16,7 @@
 
 import requests
 from requests.exceptions import HTTPError
+from requests_toolbelt.adapters import host_header_ssl
 import cloudscraper
 import time
 import uuid
@@ -28,8 +29,13 @@ import uuid
 class Request(object):
     """HTTP helper class"""
 
-    def __init__(self, timeout=5):
-        self.session = cloudscraper.CloudScraper()
+    def __init__(self, timeout=5, mode="cloudscraper"):
+        if mode == "cloudscraper":
+            from .arlo_async import USER_AGENTS
+            self.session = cloudscraper.CloudScraper(browser={"custom": USER_AGENTS["arlo"]})
+        elif mode == "ip":
+            self.session = requests.Session()
+            self.session.mount('https://', host_header_ssl.HostHeaderSSLAdapter())
         self.timeout = timeout
 
     def gen_event_id(self):
