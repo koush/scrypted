@@ -40,6 +40,9 @@ services:
             #   - /dev/ttyACM0:/dev/ttyACM0
             # all usb devices, such as coral tpu
             #   - /dev/bus/usb:/dev/bus/usb
+            # coral PCI devices
+            # - /dev/apex_0:/dev/apex_0
+            # - /dev/apex_1:/dev/apex_1
 
         volumes:
             - ~/.scrypted/volume:/server/volume
