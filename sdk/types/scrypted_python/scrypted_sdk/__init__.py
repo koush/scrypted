@@ -24,7 +24,7 @@ def fork() -> PluginFork:
 class ScryptedStatic:
     def __init__(self) -> None:
         self.systemManager: SystemManager = None
-        self.deviceManager: SystemManager = None
+        self.deviceManager: DeviceManager = None
         self.mediaManager: MediaManager = None
         self.zip: ZipFile = None
         self.remote: Any = None
@@ -32,7 +32,7 @@ class ScryptedStatic:
         self.fork: Callable[[], PluginFork]
         self.connectRPCObject: Callable[[Any], asyncio.Task[Any]]
 
-def sdk_init(z: ZipFile, r, sm: DeviceManager, dm: SystemManager, mm: MediaManager):
+def sdk_init(z: ZipFile, r, sm: SystemManager, dm: DeviceManager, mm: MediaManager):
     global zip
     global remote
     global systemManager
