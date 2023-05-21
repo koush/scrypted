@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import aiohttp
+from async_timeout import timeout as async_timeout
 from datetime import datetime, timedelta
 import json
 import threading
@@ -10,8 +12,9 @@ from typing import List, TYPE_CHECKING
 import scrypted_arlo_go
 
 import scrypted_sdk
-from scrypted_sdk.types import Setting, Settings, Device, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, Charger, ChargeState, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Setting, Settings, SettingValue, Device, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, Charger, ChargeState, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
+from .debug import EXPERIMENTAL
 from .base import ArloDeviceBase
 from .spotlight import ArloSpotlight, ArloFloodlight
 from .vss import ArloSirenVirtualSecuritySystem
@@ -75,9 +78,16 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     intercom_session = None
     light: ArloSpotlight = None
     vss: ArloSirenVirtualSecuritySystem = None
+    picture_lock: asyncio.Lock = None
+
+    # eco mode bookkeeping
+    last_picture: bytes = None
+    last_picture_time: datetime = datetime(1970, 1, 1)
 
     def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
+        self.picture_lock = asyncio.Lock()
+
         self.start_motion_subscription()
         self.start_audio_subscription()
         self.start_battery_subscription()
@@ -142,13 +152,14 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             ScryptedInterface.Settings.value,
         ])
 
-        if self.two_way_audio:
-            results.discard(ScryptedInterface.RTCSignalingChannel.value)
-            results.add(ScryptedInterface.Intercom.value)
+        if EXPERIMENTAL:
+            if self.two_way_audio:
+                results.discard(ScryptedInterface.RTCSignalingChannel.value)
+                results.add(ScryptedInterface.Intercom.value)
 
-        if self.webrtc_emulation:
-            results.add(ScryptedInterface.RTCSignalingChannel.value)
-            results.discard(ScryptedInterface.Intercom.value)
+            if self.webrtc_emulation:
+                results.add(ScryptedInterface.RTCSignalingChannel.value)
+                results.discard(ScryptedInterface.Intercom.value)
 
         if self.has_battery:
             results.add(ScryptedInterface.Battery.value)
@@ -163,9 +174,10 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         if self.has_cloud_recording:
             results.add(ScryptedInterface.VideoClips.value)
 
-        if not self._can_push_to_talk():
-            results.discard(ScryptedInterface.RTCSignalingChannel.value)
-            results.discard(ScryptedInterface.Intercom.value)
+        if EXPERIMENTAL:
+            if not self._can_push_to_talk():
+                results.discard(ScryptedInterface.RTCSignalingChannel.value)
+                results.discard(ScryptedInterface.Intercom.value)
 
         return list(results)
 
@@ -233,6 +245,21 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             return False
 
     @property
+    def eco_mode(self) -> bool:
+        if self.storage:
+            return True if self.storage.getItem("eco_mode") else False
+        else:
+            return False
+
+    @property
+    def snapshot_throttle_interval(self) -> bool:
+        interval = self.storage.getItem("snapshot_throttle_interval")
+        if interval is None:
+            interval = 60
+            self.storage.setItem("snapshot_throttle_interval", interval)
+        return int(interval)
+
+    @property
     def has_cloud_recording(self) -> bool:
         return self.provider.arlo.GetSmartFeatures(self.arlo_device).get("planFeatures", {}).get("eventRecording", False)
 
@@ -261,6 +288,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         if self.has_battery:
             result.append(
                 {
+                    "group": "General",
                     "key": "wired_to_power",
                     "title": "Plugged In to External Power",
                     "value": self.wired_to_power,
@@ -270,9 +298,35 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     "type": "boolean",
                 },
             )
-        if self._can_push_to_talk():
+        result.append(
+            {
+                "group": "General",
+                "key": "eco_mode",
+                "title": "Eco Mode",
+                "value": self.eco_mode,
+                "description": "Configures Scrypted to limit the number of requests made to this camera. " + \
+                               "Additional eco mode settings will appear when this is turned on.",
+                "type": "boolean",
+            }
+        )
+        if self.eco_mode:
+            result.append(
+                {
+                    "group": "Eco Mode",
+                    "key": "snapshot_throttle_interval",
+                    "title": "Snapshot Throttle Interval",
+                    "value": self.snapshot_throttle_interval,
+                    "description": "Time, in minutes, to throttle snapshot requests. " + \
+                                   "When eco mode is on, snapshot requests to the camera will be throttled for the given duration. " + \
+                                   "Cached snapshots may be returned if the time since the last snapshot has not exceeded the interval. " + \
+                                   "A value of 0 will disable throttling even when eco mode is on.",
+                    "type": "number",
+                }
+            )
+        if self._can_push_to_talk() and EXPERIMENTAL:
             result.extend([
                 {
+                    "group": "General",
                     "key": "two_way_audio",
                     "title": "(Experimental) Enable native two-way audio",
                     "value": self.two_way_audio,
@@ -280,6 +334,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     "type": "boolean",
                 },
                 {
+                    "group": "General",
                     "key": "webrtc_emulation",
                     "title": "(Highly Experimental) Emulate WebRTC Camera",
                     "value": self.webrtc_emulation,
@@ -291,10 +346,28 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         return result
 
     @async_print_exception_guard
-    async def putSetting(self, key, value) -> None:
+    async def putSetting(self, key: str, value: SettingValue) -> None:
+        if not self.validate_setting(key, value):
+            await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
+            return
+
         if key in ["webrtc_emulation", "two_way_audio", "wired_to_power"]:
             self.storage.setItem(key, value == "true" or value == True)
             await self.provider.discover_devices()
+        elif key in ["eco_mode"]:
+            self.storage.setItem(key, value == "true" or value == True)
+        else:
+            self.storage.setItem(key, value)
+        await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
+
+    def validate_setting(self, key: str, val: SettingValue) -> bool:
+        if key == "snapshot_throttle_interval":
+            try:
+                val = int(val)
+            except ValueError:
+                self.logger.error(f"Invalid snapshot throttle interval '{val}' - must be an integer")
+                return False
+        return True
 
     async def getPictureOptions(self) -> List[ResponsePictureOptions]:
         return []
@@ -313,13 +386,27 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                 self.logger.warning(f"Could not fetch from prebuffer due to: {e}")
                 self.logger.warning("Will try to fetch snapshot from Arlo cloud")
 
-        pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=self.timeout)
-        self.logger.debug(f"Got snapshot URL for at {pic_url}")
+        async with self.picture_lock:
+            if self.eco_mode and self.snapshot_throttle_interval > 0:
+                if datetime.now() - self.last_picture_time <= timedelta(minutes=self.snapshot_throttle_interval):
+                    self.logger.info("Using cached image")
+                    return await scrypted_sdk.mediaManager.createMediaObject(self.last_picture, "image/jpeg")
 
-        if pic_url is None:
-            raise Exception("Error taking snapshot")
+            pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=self.timeout)
+            self.logger.debug(f"Got snapshot URL for at {pic_url}")
 
-        return await scrypted_sdk.mediaManager.createMediaObject(str.encode(pic_url), ScryptedMimeTypes.Url.value)
+            if pic_url is None:
+                raise Exception("Error taking snapshot")
+
+            async with async_timeout(self.timeout):
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(pic_url) as resp:
+                        if resp.status != 200:
+                            raise Exception(f"Unexpected status downloading snapshot image: {resp.status}")
+                        self.last_picture = await resp.read()
+                        self.last_picture_time = datetime.now()
+
+            return await scrypted_sdk.mediaManager.createMediaObject(self.last_picture, "image/jpeg")
 
     async def getVideoStreamOptions(self) -> List[ResponseMediaStreamOptions]:
         return [
