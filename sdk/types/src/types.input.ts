@@ -1254,6 +1254,10 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
    */
   id?: string;
   /**
+   * The certainty that this is correct tracked object.
+   */
+  cost?: number;
+  /**
    * The detection class of the object.
    */
   className: ObjectDetectionClass;

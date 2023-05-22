@@ -252,6 +252,7 @@ class HttpResponseOptions(TypedDict):
 class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     className: str
+    cost: float
     history: ObjectDetectionHistory
     id: str
     movement: Union[ObjectDetectionHistory, Any]
