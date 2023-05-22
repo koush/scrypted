@@ -600,13 +600,13 @@ async function start(mainFilename: string, options?: {
         // env/header based admin login
         if (res.locals.username) {
             const user = scrypted.usersService.users.get(res.locals.username);
-            const userToken = new UserToken(res.locals.username, user.aclId, Date.now());
+            const userToken = new UserToken(res.locals.username, res.locals.aclId, Date.now());
 
             res.send({
                 ...createTokens(userToken),
                 expiration: ONE_DAY_MILLISECONDS,
                 username: res.locals.username,
-                token: user.token,
+                token: user?.token,
                 addresses,
                 hostname,
             });
