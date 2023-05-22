@@ -1353,6 +1353,7 @@ export interface ImageOptions {
   resize?: {
     width?: number,
     height?: number,
+    filter?: 'nearest' | 'bilinear' | 'lanczos' | 'mitchell',
   };
   format?: ImageFormat;
 }
