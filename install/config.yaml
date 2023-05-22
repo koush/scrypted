@@ -27,7 +27,7 @@ environment:
   SCRYPTED_NVR_VOLUME: "/data/scrypted_nvr"
   SCRYPTED_ADMIN_ADDRESS: "172.30.32.2"
   SCRYPTED_ADMIN_USERNAME: "homeassistant"
-  SCRYPTED_HOME_ASSISTANT: "true"
+  SCRYPTED_INSTALL_ENVIRONMENT: "ha"
 backup_exclude:
   - '/server/**'
   - '/data/scrypted_nvr/**'
