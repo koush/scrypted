@@ -76,10 +76,10 @@ async def createPipelineIterator(pipeline: str):
             finish()
 
 
-    def on_new_sample(sink, preroll):
+    def on_new_sample(sink):
         nonlocal hasFinished
 
-        sample = sink.emit('pull-preroll' if preroll else 'pull-sample')
+        sample = sink.emit('pull-sample')
 
         if hasFinished:
             return Gst.FlowReturn.OK
@@ -91,8 +91,7 @@ async def createPipelineIterator(pipeline: str):
             pass
         return Gst.FlowReturn.OK
 
-    appsink.connect('new-preroll', on_new_sample, True)
-    appsink.connect('new-sample', on_new_sample, False)
+    appsink.connect('new-sample', on_new_sample)
 
     gst.set_state(Gst.State.PLAYING)
     return gst, gen
