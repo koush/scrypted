@@ -153,7 +153,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         ])
 
         if EXPERIMENTAL:
-            if self.two_way_audio:
+            if self._can_push_to_talk():
                 results.add(ScryptedInterface.Intercom.value)
 
         if self.has_battery:
@@ -213,16 +213,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                 },
             ] + vss.get_builtin_child_device_manifests())
         return results
-
-    @property
-    def two_way_audio(self) -> bool:
-        if self.storage:
-            val = self.storage.getItem("two_way_audio")
-            if val is None:
-                val = True
-            return val
-        else:
-            return True
 
     @property
     def wired_to_power(self) -> bool:
@@ -310,17 +300,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     "type": "number",
                 }
             )
-        if self._can_push_to_talk() and EXPERIMENTAL:
-            result.extend([
-                {
-                    "group": "General",
-                    "key": "two_way_audio",
-                    "title": "(Experimental) Enable native two-way audio",
-                    "value": self.two_way_audio,
-                    "description": "Enables two-way audio for this device. Not yet completely functional on all audio senders.",
-                    "type": "boolean",
-                },
-            ])
         return result
 
     @async_print_exception_guard
@@ -329,7 +308,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
             return
 
-        if key in ["two_way_audio", "wired_to_power"]:
+        if key in ["wired_to_power"]:
             self.storage.setItem(key, value == "true" or value == True)
             await self.provider.discover_devices()
         elif key in ["eco_mode"]:
