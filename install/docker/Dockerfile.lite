@@ -36,7 +36,7 @@ RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install debugpy typing_extensions psutil
 
-ENV SCRYPTED_DOCKER_SERVE="true"
+ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
