@@ -627,7 +627,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             device = await self.getDevice_impl(nativeId)
             scrypted_interfaces = device.get_applicable_interfaces()
             manifest = device.get_device_manifest()
-            self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']}): {scrypted_interfaces}")
+            self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']} parent {camera['parentId']}): {scrypted_interfaces}")
 
             if camera["deviceId"] == camera["parentId"]:
                 provider_to_device_map.setdefault(None, []).append(manifest)
@@ -647,6 +647,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
         if len(cameras) != len(camera_devices):
             self.logger.info(f"Discovered {len(cameras)} cameras, but only {len(camera_devices)} are usable")
+            self.logger.info(f"Are all cameras shared with admin permissions?")
         else:
             self.logger.info(f"Discovered {len(cameras)} cameras")
 

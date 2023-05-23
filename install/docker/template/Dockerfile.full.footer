@@ -3,7 +3,7 @@
 ################################################################
 FROM header as base
 
-ENV SCRYPTED_DOCKER_SERVE="true"
+ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"

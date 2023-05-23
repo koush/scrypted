@@ -1254,6 +1254,10 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
    */
   id?: string;
   /**
+   * The certainty that this is correct tracked object.
+   */
+  cost?: number;
+  /**
    * The detection class of the object.
    */
   className: ObjectDetectionClass;
@@ -1349,6 +1353,7 @@ export interface ImageOptions {
   resize?: {
     width?: number,
     height?: number,
+    filter?: 'nearest' | 'bilinear' | 'lanczos' | 'mitchell',
   };
   format?: ImageFormat;
 }
