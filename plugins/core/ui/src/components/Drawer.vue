@@ -149,20 +149,31 @@ export default {
     getComponentViewPath,
     async checkUpdateAvailable() {
       await this.$connectingScrypted;
-      const info = await this.$scrypted.systemManager.getComponent("info");
-      const version = await info.getVersion();
-      this.currentVersion = version;
-      const { updateAvailable } = await checkUpdate(
-        "@scrypted/server",
-        version
+      const serviceControl = await this.$scrypted.systemManager.getComponent(
+        "service-control"
       );
-      this.updateAvailable = updateAvailable;
-      if (updateAvailable) {
+      try {
+        this.updateAvailable = await serviceControl.getUpdateAvailable();
+      }
+      catch (e) {
+        // old scrypted servers dont support this call, or it may be unimplemented
+        // in which case fall back and determine what the install type is.
+        const info = await this.$scrypted.systemManager.getComponent("info");
+        const version = await info.getVersion();
+        this.currentVersion = version;
+        const { updateAvailable } = await checkUpdate(
+          "@scrypted/server",
+          version
+        );
+        this.updateAvailable = updateAvailable;
+      }
+
+      if (this.updateAvailable) {
         const logger = this.$scrypted.deviceManager.getDeviceLogger();
         const u = new URL(window.location)
         u.hash = "#/component/settings";
         logger.clearAlerts();
-        logger.a(`Scrypted Server update available: ${updateAvailable}. ${u}`);
+        logger.a(`Scrypted Server update available: ${this.updateAvailable}. ${u}`);
       }
     },
     filterComponents: function (category) {
