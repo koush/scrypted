@@ -356,15 +356,23 @@ export class PluginHost {
             }
         });
 
+        const startupTime = Date.now();
         // the plugin is expected to send process stats every 10 seconds.
         // this can be used as a check for liveness.
         let lastStats: number;
         const statsInterval = setInterval(async () => {
-            // plugin may take a while to install, so wait
-            // for 1 stats report before starting the watchdog.
-            if (!lastStats)
+            const now = Date.now();
+            // plugin may take a while to install, so wait 10 minutes.
+            // after that, require 1 minute checkins.
+            if (!lastStats) {
+                if (now - startupTime > 10 * 60 * 1000) {
+                    const logger = await this.api.getLogger(undefined);
+                    logger.log('e', 'plugin failed to start in a timely manner. restarting.');
+                    this.api.requestRestart();
+                }
                 return;
-            if (!pluginDebug && (lastStats + 60000 < Date.now())) {
+            }
+            if (!pluginDebug && (lastStats + 60000 < now)) {
                 const logger = await this.api.getLogger(undefined);
                 logger.log('e', 'plugin is unresponsive. restarting.');
                 this.api.requestRestart();

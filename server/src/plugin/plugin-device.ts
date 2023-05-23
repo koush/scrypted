@@ -371,8 +371,11 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         if (found) {
             const { mixin, entry } = found;
             const { proxy } = entry;
-            if (!proxy)
-                throw new PluginError(`device is unavailable ${this.id} (mixin ${mixin.mixinProviderId})`);
+            if (!proxy) {
+                const pluginDevice = this.scrypted.findPluginDeviceById(this.id);
+                const name = pluginDevice ? 'Unknown Device' : getState(pluginDevice, ScryptedInterfaceProperty.name);
+                throw new PluginError(`device "${name}" is unavailable [id: ${this.id}] [mixin: ${mixin.mixinProviderId}]`);
+            }
             return proxy[method](...argArray);
         }
 
