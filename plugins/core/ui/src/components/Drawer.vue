@@ -50,6 +50,17 @@
           <v-list-item-title>Discord</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+
+      <v-list-item link href="https://www.reddit.com/r/Scrypted/" active-class="purple white--text tile">
+        <v-list-item-icon>
+          <v-icon small>fab fa-reddit</v-icon>
+        </v-list-item-icon>
+
+        <v-list-item-content>
+          <v-list-item-title>Reddit</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+
       <v-list-item link href="https://github.com/koush/scrypted" active-class="purple white--text tile">
         <v-list-item-icon>
           <v-icon small>fab fa-github</v-icon>
@@ -59,6 +70,7 @@
           <v-list-item-title>Github</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+
       <v-divider></v-divider>
       <v-list-item active-class="deep-purple accent-4 white--text">
         <v-list-item-icon>
