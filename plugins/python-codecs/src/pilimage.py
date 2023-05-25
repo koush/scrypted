@@ -2,6 +2,7 @@ import scrypted_sdk
 from typing import Any
 from thread import to_thread
 import io
+from generator_common import createImageMediaObject
 
 try:
     from PIL import Image
@@ -66,7 +67,7 @@ class PILImage(scrypted_sdk.Image):
         if options and options.get('format', None):
             raise Exception('format can only be used with toBuffer')
         newPILImage = await self.toPILImage(options)
-        return await createPILMediaObject(newPILImage)
+        return await createImageMediaObject(newPILImage)
 
 def toPILImage(pilImageWrapper: PILImage, options: scrypted_sdk.ImageOptions = None) -> PILImage:
     pilImage = pilImageWrapper.pilImage
@@ -94,16 +95,6 @@ def toPILImage(pilImageWrapper: PILImage, options: scrypted_sdk.ImageOptions = N
 
     return PILImage(pilImage)
 
-async def createPILMediaObject(image: PILImage):
-    ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
-        'format': None,
-        'width': image.width,
-        'height': image.height,
-        'toBuffer': lambda options = None: image.toBuffer(options),
-        'toImage': lambda options = None: image.toImage(options),
-    })
-    return ret
-
 class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter):
     def __init__(self, nativeId: str):
         super().__init__(nativeId)
@@ -114,7 +105,7 @@ class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
     async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: scrypted_sdk.MediaObjectOptions = None) -> Any:
         pil = Image.open(io.BytesIO(data))
         pil.load()
-        return await createPILMediaObject(PILImage(pil))
+        return await createImageMediaObject(PILImage(pil))
 
 class ImageWriter(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter):
     def __init__(self, nativeId: str):

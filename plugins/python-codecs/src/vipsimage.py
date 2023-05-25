@@ -1,5 +1,6 @@
 import scrypted_sdk
-import asyncio
+from generator_common import createImageMediaObject
+
 from typing import Any
 try:
     import pyvips
@@ -68,7 +69,7 @@ class VipsImage(scrypted_sdk.Image):
         if options and options.get('format', None):
             raise Exception('format can only be used with toBuffer')
         newVipsImage = await self.toVipsImage(options)
-        return await createVipsMediaObject(newVipsImage)
+        return await createImageMediaObject(newVipsImage)
 
 def toVipsImage(vipsImageWrapper: VipsImage, options: scrypted_sdk.ImageOptions = None) -> VipsImage:
     vipsImage = vipsImageWrapper.vipsImage
@@ -99,16 +100,6 @@ def toVipsImage(vipsImageWrapper: VipsImage, options: scrypted_sdk.ImageOptions 
 
     return VipsImage(vipsImage)
 
-async def createVipsMediaObject(image: VipsImage):
-    ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
-        'format': None,
-        'width': image.width,
-        'height': image.height,
-        'toBuffer': lambda options = None: image.toBuffer(options),
-        'toImage': lambda options = None: image.toImage(options),
-    })
-    return ret
-
 class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter):
     def __init__(self, nativeId: str):
         super().__init__(nativeId)
@@ -118,7 +109,7 @@ class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
 
     async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: scrypted_sdk.MediaObjectOptions = None) -> Any:
         vips = Image.new_from_buffer(data, '')
-        return await createVipsMediaObject(VipsImage(vips))
+        return await createImageMediaObject(VipsImage(vips))
 
 class ImageWriter(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter):
     def __init__(self, nativeId: str):
@@ -134,3 +125,6 @@ class ImageWriter(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
 
 def new_from_memory(data, width: int, height: int, bands: int):
     return Image.new_from_memory(data, width, height, bands, pyvips.BandFormat.UCHAR)
+
+def new_from_buffer(data, width: int, height: int, bands: int):
+    return Image.new_from_buffer(data, width, height, bands, pyvips.BandFormat.UCHAR)
