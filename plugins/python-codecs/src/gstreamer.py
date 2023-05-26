@@ -41,6 +41,9 @@ class GstImage(scrypted_sdk.Image):
 
     async def toImage(self, options: scrypted_sdk.ImageOptions = None):
         options = options or {}
+        # this is preferable currently because all detectors use rgb inputs
+        # as opposed to yuv or rgba.
+        # consider respecting the incoming format if provided?
         options["format"] = "rgb"
 
         gstsample = await toGstSample(
@@ -108,7 +111,7 @@ class GstImage(scrypted_sdk.Image):
             # pil = pilimage.new_from_memory(info.data, width, height, capsBands)
             # pil.convert('RGB').save('/server/volume/test.jpg')
 
-            stridePadding = width % 4
+            stridePadding = (width * capsBands) % 4
             if stridePadding:
                 if capsBands != 1:
                     raise Exception(
@@ -370,7 +373,7 @@ async def generateVideoFramesGstreamer(
     elif postProcessPipeline == "OpenGL (system memory)":
         pipeline += f" ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0 ! video/x-raw ! glupload"
     else:
-        pipeline += f" ! avdec_h264 ! video/x-raw {videorate} ! queue leaky=downstream max-size-buffers=0"
+        pipeline += f" ! {decoder} ! video/x-raw {videorate} ! queue leaky=downstream max-size-buffers=0"
         # disable the gstreamer post process because videocrop spams the log
         postProcessPipeline = "Default"
         # postProcessPipeline = None
