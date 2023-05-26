@@ -19,5 +19,9 @@
     "scrypted.pythonRemoteRoot": "${config:scrypted.serverRoot}/volume/plugin.zip",
     "python.analysis.extraPaths": [
         "./node_modules/@scrypted/sdk/types/scrypted_python"
-    ]
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "python.formatting.provider": "none"
 }

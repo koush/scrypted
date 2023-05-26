@@ -1,140 +1,125 @@
-from gst_generator import createPipelineIterator, Gst
-from gstreamer_postprocess import GstreamerPostProcess, AppleMediaPostProcess, VaapiPostProcess
-from util import optional_chain
-import scrypted_sdk
+import platform
+from asyncio import Future
 from typing import Any
 from urllib.parse import urlparse
-import vipsimage
+
+import scrypted_sdk
+
 import pilimage
-import platform
-from generator_common import createVideoFrame, createImageMediaObject
-from typing import Tuple
-import copy
+import vipsimage
+from generator_common import createImageMediaObject, createVideoFrame
+from gst_generator import Gst, createPipelineIterator
+from gstreamer_postprocess import (
+    GstreamerFormatPostProcess,
+    GstreamerPostProcess,
+    OpenGLPostProcess,
+    VaapiPostProcess,
+    getBands,
+)
+from util import optional_chain
 
-def getBands(caps):
-    capsFormat = caps.get_structure(0).get_value('format')
-
-    if capsFormat == 'RGB':
-        return 3
-    elif capsFormat == 'RGBA':
-        return 4
-    elif capsFormat == 'NV12' or capsFormat == 'I420':
-        return 1
-
-    raise Exception(f'unknown pixel format, please report this bug to @koush on Discord {capsFormat}')
 
 class GstSession:
     def __init__(self, gst) -> None:
         self.gst = gst
         self.reuse = []
 
+
 class GstImage(scrypted_sdk.Image):
     def __init__(self, gst: GstSession, sample, postProcessPipeline: str):
         super().__init__()
         caps = sample.get_caps()
-        self.width = caps.get_structure(0).get_value('width')
-        self.height = caps.get_structure(0).get_value('height')
+        self.width = caps.get_structure(0).get_value("width")
+        self.height = caps.get_structure(0).get_value("height")
         self.gst = gst
         self.sample = sample
         self.postProcessPipeline = postProcessPipeline
+        self.cached: Future[scrypted_sdk.Image] = None
 
     async def close(self):
         self.sample = None
 
     async def toImage(self, options: scrypted_sdk.ImageOptions = None):
-        copyOptions: scrypted_sdk.ImageOptions = None
-        needPostProcess = False
-        if not self.postProcessPipeline:
-            copyOptions = copy.deepcopy(options)
-            if options:
-                if options.get('crop') or options.get('resize'):
-                    needPostProcess = True
-                options['crop'] = None
-                options['resize'] = None
+        options = options or {}
+        options["format"] = "rgb"
 
-        gstsample = await toGstSample(self.gst, self.sample, options, self.postProcessPipeline)
+        gstsample = await toGstSample(
+            self.gst, self.sample, options, self.postProcessPipeline
+        )
         caps = gstsample.get_caps()
+        height = caps.get_structure(0).get_value("height")
+        width = caps.get_structure(0).get_value("width")
         capsBands = getBands(caps)
-        height = caps.get_structure(0).get_value('height')
-        width = caps.get_structure(0).get_value('width')
 
         gst_buffer = gstsample.get_buffer()
         result, info = gst_buffer.map(Gst.MapFlags.READ)
         if not result:
-            raise Exception('unable to map gst buffer')
+            raise Exception("unable to map gst buffer")
 
         try:
             if vipsimage.pyvips:
-                vips = vipsimage.new_from_memory(bytes(info.data), width, height, capsBands)
+                vips = vipsimage.new_from_memory(
+                    bytes(info.data), width, height, capsBands
+                )
                 image = vipsimage.VipsImage(vips)
             else:
-                pil = pilimage.new_from_memory(bytes(info.data), width, height, capsBands)
+                pil = pilimage.new_from_memory(
+                    bytes(info.data), width, height, capsBands
+                )
                 image = pilimage.PILImage(pil)
 
-            if needPostProcess:
-                image = await image.toImage(copyOptions)
             return await createImageMediaObject(image)
         finally:
             gst_buffer.unmap(info)
-    
+
     async def toBuffer(self, options: scrypted_sdk.ImageOptions = None):
-        format = options and options.get('format')
-        if format == 'rgb':
+        format = options and options.get("format")
+        if format == "rgb":
             bands = 3
-        elif format == 'rgba':
+        elif format == "rgba":
             bands = 4
-        elif format == 'gray':
+        elif format == "gray":
             bands = 1
-        elif format == 'jpg':
+        elif format == "jpg":
             bands = 0
         else:
-            raise Exception(f'invalid output format {format}')
+            raise Exception(f"invalid output format {format}")
 
-        copyOptions: scrypted_sdk.ImageOptions = None
-        needPostProcess = False
-        if not self.postProcessPipeline:
-            copyOptions = copy.deepcopy(options)
-            if options:
-                if options.get('crop') or options.get('resize'):
-                    needPostProcess = True
-                options['crop'] = None
-                options['resize'] = None
-
-        gstsample = await toGstSample(self.gst, self.sample, options, self.postProcessPipeline)
+        gstsample = await toGstSample(
+            self.gst, self.sample, options, self.postProcessPipeline
+        )
         caps = gstsample.get_caps()
-        height = caps.get_structure(0).get_value('height')
-        width = caps.get_structure(0).get_value('width')
-        capsFormat = caps.get_structure(0).get_value('format')
-
-        if capsFormat == 'RGB':
-            capsBands = 3
-        elif capsFormat == 'RGBA':
-            capsBands = 4
-        elif capsFormat == 'NV12' or capsFormat == 'I420':
+        height = caps.get_structure(0).get_value("height")
+        width = caps.get_structure(0).get_value("width")
+        # toGstSample may return the I420/NV12 image if there
+        # is no transformation necessary. ie, a low res stream being used
+        # for motion detection.
+        if format == 'gray' and self.sample == gstsample:
             capsBands = 1
         else:
-            raise Exception(f'unknown pixel format, please report this bug to @koush on Discord {capsFormat}')
+            capsBands = getBands(caps)
 
         gst_buffer = gstsample.get_buffer()
         result, info = gst_buffer.map(Gst.MapFlags.READ)
         if not result:
-            raise Exception('unable to map gst buffer')
+            raise Exception("unable to map gst buffer")
 
         try:
-            # print("~~~~~~~~~SAMPLE", width, height)
             # pil = pilimage.new_from_memory(info.data, width, height, capsBands)
             # pil.convert('RGB').save('/server/volume/test.jpg')
 
-            # format may have been previously specified and known to caller?
-
-            if not needPostProcess:
-                if not format:
-                    return bytes(info.data)
-
-                if format == 'gray' and capsBands == 1:
+            stridePadding = width % 4
+            if stridePadding:
+                if capsBands != 1:
+                    raise Exception(
+                        f"found stride in conversion. this should not be possible. {caps.to_string()}"
+                    )
+                width += stridePadding
+            else:
+                if format == "gray" and capsBands == 1:
                     buffer = bytes(info.data)
-                    return buffer[0:width * height]
-                
+                    return buffer[0 : width * height]
+
                 if bands == capsBands:
                     buffer = bytes(info.data)
                     return buffer
@@ -146,39 +131,69 @@ class GstImage(scrypted_sdk.Image):
                 pil = pilimage.new_from_memory(info.data, width, height, capsBands)
                 image = pilimage.PILImage(pil)
 
+            crop = None
+            if stridePadding:
+                crop = {
+                    "left": 0,
+                    "top": 0,
+                    "width": width - stridePadding,
+                    "height": height,
+                }
+            
+            reformat = None
+            if bands and bands != capsBands:
+                reformat = format
+
+            if reformat or crop:
+                colored = image
+                image = await image.toImageInternal(
+                    {
+                        "crop": crop,
+                        "format": reformat,
+                    }
+                )
+                await colored.close()
+
             try:
-                if not self.postProcessPipeline:
-                    return await image.toBuffer(copyOptions)
-                else:
-                    return await image.toBuffer({
-                        'format': options and options.get('format'),
-                    })
+                return await image.toBuffer(
+                    {
+                        "format": format,
+                    }
+                )
             finally:
                 await image.close()
         finally:
             gst_buffer.unmap(info)
 
-async def createResamplerPipeline(sample, gst: GstSession, options: scrypted_sdk.ImageOptions, postProcessPipeline: str):
+
+async def createResamplerPipeline(
+    sample,
+    gst: GstSession,
+    options: scrypted_sdk.ImageOptions,
+    postProcessPipeline: str,
+):
     if not sample:
-        raise Exception('Video Frame has been invalidated')
-    
+        raise Exception("Video Frame has been invalidated")
+
     resize = None
     if options:
-        resize = options.get('resize')
+        resize = options.get("resize")
         if resize:
-            resize = (resize.get('width'), resize.get('height'))
+            resize = (resize.get("width"), resize.get("height"))
 
     for check in gst.reuse:
         if check.resize == resize:
             gst.reuse.remove(check)
             return check
 
-    if postProcessPipeline == 'VAAPI':
+    if postProcessPipeline == "VAAPI":
         pp = VaapiPostProcess()
-    elif postProcessPipeline == 'OpenGL (GPU memory)':
-        pp = AppleMediaPostProcess()
-    elif postProcessPipeline == 'OpenGL (system memory)':
-        pp = AppleMediaPostProcess()
+    elif postProcessPipeline == "OpenGL (GPU memory)":
+        pp = OpenGLPostProcess()
+    elif postProcessPipeline == "OpenGL (system memory)":
+        pp = OpenGLPostProcess()
+    elif postProcessPipeline == None:
+        pp = GstreamerFormatPostProcess()
     else:
         # trap the pipeline before it gets here. videocrop
         # in the pipeline seems to spam the stdout??
@@ -187,65 +202,71 @@ async def createResamplerPipeline(sample, gst: GstSession, options: scrypted_sdk
 
     caps = sample.get_caps()
 
-    srcCaps = caps.to_string().replace(' ', '')
+    srcCaps = caps.to_string().replace(" ", "")
     pipeline = f"appsrc name=appsrc emit-signals=True is-live=True caps={srcCaps}"
     await pp.create(gst.gst, pipeline)
     pp.resize = resize
 
     return pp
 
-async def toGstSample(gst: GstSession, sample, options: scrypted_sdk.ImageOptions, postProcessPipeline: str) -> GstImage:
+
+async def toGstSample(
+    gst: GstSession,
+    sample,
+    options: scrypted_sdk.ImageOptions,
+    postProcessPipeline: str,
+) -> GstImage:
     if not sample:
-        raise Exception('Video Frame has been invalidated')
+        raise Exception("Video Frame has been invalidated")
     if not options:
         return sample
-    
-    crop = options.get('crop')
-    resize = options.get('resize')
-    format = options.get('format')
+
+    crop = options.get("crop")
+    resize = options.get("resize")
+    format = options.get("format")
 
     caps = sample.get_caps()
-    sampleWidth = caps.get_structure(0).get_value('width')
-    sampleHeight = caps.get_structure(0).get_value('height')
-    capsFormat = caps.get_structure(0).get_value('format')
+    sampleWidth = caps.get_structure(0).get_value("width")
+    sampleHeight = caps.get_structure(0).get_value("height")
+    capsFormat = caps.get_structure(0).get_value("format")
 
     # normalize format, eliminating it if possible
-    if format == 'jpg':
+    if format == "jpg":
         # get into a format suitable to be be handled by vips/pil
-        if capsFormat == 'RGB' or capsFormat == 'RGBA':
-            format = None
+        if capsFormat == "RGB" or capsFormat == "RGBA":
+            sinkFormat = None
         else:
-            format = 'RGBA'
-    elif format == 'rgb':
-        if capsFormat == 'RGB':
-            format = None
+            sinkFormat = "RGBA"
+    elif format == "rgb":
+        if capsFormat == "RGB":
+            sinkFormat = None
         else:
-            format = 'RGB'
-    elif format == 'rgba':
-        if capsFormat == 'RGBA':
-            format = None
+            sinkFormat = "RGB"
+    elif format == "rgba":
+        if capsFormat == "RGBA":
+            sinkFormat = None
         else:
-            format = 'RGBA'
-    elif format == 'gray':
+            sinkFormat = "RGBA"
+    elif format == "gray":
         # are there others? does the output format depend on GPU?
         # have only ever seen NV12
-        if capsFormat == 'NV12' or capsFormat == 'I420':
-            format = None
+        if capsFormat == "NV12" or capsFormat == "I420" or capsFormat == "GRAY8":
+            sinkFormat = None
         else:
-            format = 'NV12'
+            sinkFormat = "GRAY8"
     elif format:
-        raise Exception(f'invalid output format {format}')
+        raise Exception(f"invalid output format {format}")
 
-    if not crop and not resize and not format:
+    if not crop and not resize and not sinkFormat:
         return sample
 
     pp = await createResamplerPipeline(sample, gst, options, postProcessPipeline)
     try:
-        pp.update(caps, (sampleWidth, sampleHeight), options, format)
+        pp.update(caps, (sampleWidth, sampleHeight), options)
 
-        appsrc = pp.gst.get_by_name('appsrc')
-        srcCaps = caps.to_string().replace(' ', '')
-        appsrc.set_property('caps', caps.from_string(srcCaps))
+        appsrc = pp.gst.get_by_name("appsrc")
+        srcCaps = caps.to_string().replace(" ", "")
+        appsrc.set_property("caps", caps.from_string(srcCaps))
 
         appsrc.emit("push-sample", sample)
 
@@ -258,78 +279,101 @@ async def toGstSample(gst: GstSession, sample, options: scrypted_sdk.ImageOption
 
     return newSample
 
+
 async def createGstMediaObject(image: GstImage):
-    ret = await scrypted_sdk.mediaManager.createMediaObject(image, scrypted_sdk.ScryptedMimeTypes.Image.value, {
-        'format': None,
-        'width': image.width,
-        'height': image.height,
-        'toBuffer': lambda options = None: image.toBuffer(options),
-        'toImage': lambda options = None: image.toImage(options),
-    })
+    ret = await scrypted_sdk.mediaManager.createMediaObject(
+        image,
+        scrypted_sdk.ScryptedMimeTypes.Image.value,
+        {
+            "format": None,
+            "width": image.width,
+            "height": image.height,
+            "toBuffer": lambda options=None: image.toBuffer(options),
+            "toImage": lambda options=None: image.toImage(options),
+        },
+    )
     return ret
 
-async def generateVideoFramesGstreamer(mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None, h264Decoder: str = None, postProcessPipeline: str = None) -> scrypted_sdk.VideoFrame:
-    ffmpegInput: scrypted_sdk.FFmpegInput = await scrypted_sdk.mediaManager.convertMediaObjectToJSON(mediaObject, scrypted_sdk.ScryptedMimeTypes.FFmpegInput.value)
-    container = ffmpegInput.get('container', None)
-    pipeline = ffmpegInput.get('url')
-    videoCodec = optional_chain(ffmpegInput, 'mediaStreamOptions', 'video', 'codec')
 
-    if pipeline.startswith('tcp://'):
+async def generateVideoFramesGstreamer(
+    mediaObject: scrypted_sdk.MediaObject,
+    options: scrypted_sdk.VideoFrameGeneratorOptions = None,
+    filter: Any = None,
+    h264Decoder: str = None,
+    postProcessPipeline: str = None,
+) -> scrypted_sdk.VideoFrame:
+    ffmpegInput: scrypted_sdk.FFmpegInput = (
+        await scrypted_sdk.mediaManager.convertMediaObjectToJSON(
+            mediaObject, scrypted_sdk.ScryptedMimeTypes.FFmpegInput.value
+        )
+    )
+    container = ffmpegInput.get("container", None)
+    pipeline = ffmpegInput.get("url")
+    videoCodec = optional_chain(ffmpegInput, "mediaStreamOptions", "video", "codec")
+
+    if pipeline.startswith("tcp://"):
         parsed_url = urlparse(pipeline)
-        pipeline = 'tcpclientsrc port=%s host=%s' % (
-            parsed_url.port, parsed_url.hostname)
-        if container == 'mpegts':
-            pipeline += ' ! tsdemux'
-        elif container == 'sdp':
-            pipeline += ' ! sdpdemux'
+        pipeline = "tcpclientsrc port=%s host=%s" % (
+            parsed_url.port,
+            parsed_url.hostname,
+        )
+        if container == "mpegts":
+            pipeline += " ! tsdemux"
+        elif container == "sdp":
+            pipeline += " ! sdpdemux"
         else:
-            raise Exception('unknown container %s' % container)
-    elif pipeline.startswith('rtsp'):
-        pipeline = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0' % pipeline
-        if videoCodec == 'h264':
-            pipeline += ' ! rtph264depay ! h264parse'
+            raise Exception("unknown container %s" % container)
+    elif pipeline.startswith("rtsp"):
+        pipeline = (
+            "rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0" % pipeline
+        )
+        if videoCodec == "h264":
+            pipeline += " ! rtph264depay ! h264parse"
 
     decoder = None
+
     def setDecoderClearDefault(value: str):
         nonlocal decoder
         decoder = value
-        if decoder == 'Default':
+        if decoder == "Default":
             decoder = None
 
     setDecoderClearDefault(None)
 
-    if videoCodec == 'h264':
+    if videoCodec == "h264":
         setDecoderClearDefault(h264Decoder)
 
         if not decoder:
             # hw acceleration is "safe" to use on mac, but not
             # on other hosts where it may crash.
             # defaults must be safe.
-            if platform.system() == 'Darwin':
-                decoder = 'vtdec_hw'
+            if platform.system() == "Darwin":
+                decoder = "vtdec_hw"
             else:
-                decoder = 'avdec_h264'
+                decoder = "avdec_h264"
     else:
         # decodebin may pick a hardware accelerated decoder, which isn't ideal
         # so use a known software decoder for h264 and decodebin for anything else.
-        decoder = 'decodebin'
+        decoder = "decodebin"
 
-    fps = options and options.get('fps', None)
-    videorate = ''
+    fps = options and options.get("fps", None)
+    videorate = ""
     if fps:
-        videorate = f'! videorate max-rate={fps}'
+        videorate = f"! videorate max-rate={fps}"
 
-    if postProcessPipeline == 'VAAPI':
-        pipeline += f' ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0'
-    elif postProcessPipeline == 'OpenGL (GPU memory)':
-        pipeline += f' ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0 ! glupload'
-    elif postProcessPipeline == 'OpenGL (system memory)':
-        pipeline += f' ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0 ! video/x-raw ! glupload'
+    if postProcessPipeline == "VAAPI":
+        pipeline += (
+            f" ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0"
+        )
+    elif postProcessPipeline == "OpenGL (GPU memory)":
+        pipeline += f" ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0 ! glupload"
+    elif postProcessPipeline == "OpenGL (system memory)":
+        pipeline += f" ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0 ! video/x-raw ! glupload"
     else:
-        pipeline += f' ! {decoder} ! video/x-raw {videorate} ! queue leaky=downstream max-size-buffers=0'
+        pipeline += f" ! avdec_h264 ! video/x-raw {videorate} ! queue leaky=downstream max-size-buffers=0"
         # disable the gstreamer post process because videocrop spams the log
-        # postProcessPipeline = 'Default'
-        postProcessPipeline = None
+        postProcessPipeline = "Default"
+        # postProcessPipeline = None
 
     print(pipeline)
     mo: scrypted_sdk.MediaObject = None

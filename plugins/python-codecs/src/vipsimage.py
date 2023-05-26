@@ -24,7 +24,7 @@ class VipsImage(scrypted_sdk.Image):
             vips.invalidate()
 
     async def toBuffer(self, options: scrypted_sdk.ImageOptions = None) -> bytearray:
-        vipsImage: VipsImage = await self.toVipsImage(options)
+        vipsImage: VipsImage = await self.toImageInternal(options)
 
         if not options or not options.get('format', None):
             def format():
@@ -62,13 +62,13 @@ class VipsImage(scrypted_sdk.Image):
 
         return await to_thread(lambda: vipsImage.vipsImage.write_to_buffer('.' + options['format']))
 
-    async def toVipsImage(self, options: scrypted_sdk.ImageOptions = None):
+    async def toImageInternal(self, options: scrypted_sdk.ImageOptions = None):
        return await to_thread(lambda: toVipsImage(self, options))
 
     async def toImage(self, options: scrypted_sdk.ImageOptions = None) -> Any:
         if options and options.get('format', None):
             raise Exception('format can only be used with toBuffer')
-        newVipsImage = await self.toVipsImage(options)
+        newVipsImage = await self.toImageInternal(options)
         return await createImageMediaObject(newVipsImage)
 
 def toVipsImage(vipsImageWrapper: VipsImage, options: scrypted_sdk.ImageOptions = None) -> VipsImage:

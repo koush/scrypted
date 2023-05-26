@@ -24,7 +24,7 @@ class PILImage(scrypted_sdk.Image):
             pil.close()
 
     async def toBuffer(self, options: scrypted_sdk.ImageOptions = None) -> bytearray:
-        pilImage: PILImage = await self.toPILImage(options)
+        pilImage: PILImage = await self.toImageInternal(options)
 
         if not options or not options.get('format', None):
             def format():
@@ -60,13 +60,13 @@ class PILImage(scrypted_sdk.Image):
 
         return await to_thread(lambda: save())
 
-    async def toPILImage(self, options: scrypted_sdk.ImageOptions = None):
+    async def toImageInternal(self, options: scrypted_sdk.ImageOptions = None):
        return await to_thread(lambda: toPILImage(self, options))
 
     async def toImage(self, options: scrypted_sdk.ImageOptions = None) -> Any:
         if options and options.get('format', None):
             raise Exception('format can only be used with toBuffer')
-        newPILImage = await self.toPILImage(options)
+        newPILImage = await self.toImageInternal(options)
         return await createImageMediaObject(newPILImage)
 
 def toPILImage(pilImageWrapper: PILImage, options: scrypted_sdk.ImageOptions = None) -> PILImage:

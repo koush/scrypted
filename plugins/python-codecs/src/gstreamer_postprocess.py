@@ -2,9 +2,58 @@ import scrypted_sdk
 from typing import Tuple
 from gst_generator import createPipelineIterator
 
+def getCapsFormat(caps):
+    return caps.get_structure(0).get_value('format')
+
+def getBands(caps):
+    capsFormat = getCapsFormat(caps)
+
+    if capsFormat == 'RGB':
+        return 3
+    elif capsFormat == 'RGBA':
+        return 4
+    elif capsFormat == 'GRAY8':
+        return 1
+
+    raise Exception(f'unknown pixel format, please report this bug to @koush on Discord {capsFormat}')
+
+def toCapsFormat(options: scrypted_sdk.ImageOptions):
+    format = options.get('format')
+
+    if format == 'jpg':
+        return 'RGB'
+    elif format == 'rgb':
+        return 'RGB'
+    elif format == 'rgba':
+        return 'RGBA'
+    elif format == 'gray':
+        return 'GRAY8'
+    elif format:
+        raise Exception(f'invalid output format {format}')
+    else:
+        return None
+
+class GstreamerFormatPostProcess():
+    def __init__(self) -> None:
+        self.postprocess = ' ! videoconvert ! capsfilter name=capsfilter'
+        self.resize = None
+
+    async def create(self, gst, pipeline: str):
+        gst, gen = await createPipelineIterator(pipeline + self.postprocess, gst)
+        g = gen()
+        self.gst = gst
+        self.g = g
+        self.capsfilter = self.gst.get_by_name('capsfilter')
+
+    def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions):
+        sinkCaps = "video/x-raw"
+        if format:
+            sinkCaps += f",format={format}"
+        self.capsfilter.set_property('caps', caps.from_string(sinkCaps))
+
 class GstreamerPostProcess():
     def __init__(self) -> None:
-        self.postprocess = ' ! videoconvert ! videocrop name=videocrop ! videoscale ! capsfilter name=capsfilter'
+        self.postprocess = ' ! videocrop name=videocrop ! videoconvertscale ! capsfilter name=scaleCapsFilter'
         self.resize = None
 
     async def create(self, gst, pipeline: str):
@@ -13,9 +62,9 @@ class GstreamerPostProcess():
         self.gst = gst
         self.g = g
         self.videocrop = self.gst.get_by_name('videocrop')
-        self.capsfilter = self.gst.get_by_name('capsfilter')
+        self.scaleCapsFilter = self.gst.get_by_name('scaleCapsFilter')
 
-    def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions = None, format: str = None):
+    def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions):
         sampleWidth, sampleHeight = sampleSize
 
         crop = options.get('crop')
@@ -42,7 +91,7 @@ class GstreamerPostProcess():
         videocrop.set_property('right', right)
         videocrop.set_property('bottom', bottom)
 
-        sinkCaps = "video/x-raw"
+        scaleCaps = "video/x-raw,pixel-aspect-ratio=(fraction)1/1"
         if resize:
             width = resize.get('width')
             if width:
@@ -59,12 +108,24 @@ class GstreamerPostProcess():
             height = int(height)
 
             # pipeline += " ! videoscale"
-            sinkCaps += f",width={width},height={height}"
+            scaleCaps += f",width={width},height={height}"
 
-        if format:
-            sinkCaps += f",format={format}"
+        # gstreamer aligns stride to a 4 byte boundary.
+        # this makes it painful to get data out with RGB, NV12, or I420.
+        format = toCapsFormat(options)
+        if format != 'RGBA':
+            if not format:
+                format = 'RGBA'
+            elif format == 'RGB':
+                format = 'RGBA'
+            elif format == 'GRAY8':
+                pass
+            else:
+                raise Exception('unexpected target format returned from toCapsFormat')
 
-        self.capsfilter.set_property('caps', caps.from_string(sinkCaps))
+        scaleCaps += f",format={format}"
+
+        self.scaleCapsFilter.set_property('caps', caps.from_string(scaleCaps))
 
 class VaapiPostProcess():
     def __init__(self) -> None:
@@ -78,7 +139,7 @@ class VaapiPostProcess():
         self.g = g
         self.vaapipostproc = self.gst.get_by_name('vaapipostproc')
 
-    def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions = None, format: str = None):
+    def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions):
         sampleWidth, sampleHeight = sampleSize
 
         crop = options.get('crop')
@@ -110,12 +171,11 @@ class VaapiPostProcess():
         vaapipostproc.set_property('width', outputWidth)
         vaapipostproc.set_property('height', outputHeight)
 
-        if format:
-            if format == 'RGB':
-                format = 'RGBA'
+        # not sure vaapi supports non-rgba across all hardware...
+        # (11): rgba             - GST_VIDEO_FORMAT_RGBA
         vaapipostproc.set_property('format', 11)
 
-        if False and crop:
+        if crop:
             left = int(crop['left'])
             top = int(crop['top'])
             width = int(crop['width'])
@@ -136,7 +196,7 @@ class VaapiPostProcess():
         vaapipostproc.set_property('crop-right', right)
         vaapipostproc.set_property('crop-bottom', bottom)
 
-class AppleMediaPostProcess():
+class OpenGLPostProcess():
     def __init__(self) -> None:
         self.postprocess = ' ! glcolorconvert ! gltransformation name=gltransformation ! glcolorscale ! capsfilter name=glCapsFilter caps="video/x-raw(memory:GLMemory),format=RGBA" ! gldownload'
         self.resize = None
@@ -154,7 +214,7 @@ class AppleMediaPostProcess():
         # self.swCapsFilter = self.gst.get_by_name('swCapsFilter')
 
 
-    def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions = None, format: str = None):
+    def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions):
         # print(options)
         sampleWidth, sampleHeight = sampleSize
 
