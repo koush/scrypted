@@ -172,8 +172,14 @@ class VaapiPostProcess():
         vaapipostproc.set_property('height', outputHeight)
 
         # not sure vaapi supports non-rgba across all hardware...
-        # (11): rgba             - GST_VIDEO_FORMAT_RGBA
-        vaapipostproc.set_property('format', 11)
+        # GST_VIDEO_FORMAT_RGBA (11) – rgb with alpha channel last
+        # GST_VIDEO_FORMAT_GRAY8 (25) – 8-bit grayscale
+
+        format = toCapsFormat(options)
+        if format == 'GRAY8':
+            vaapipostproc.set_property('format', 25)
+        else:
+            vaapipostproc.set_property('format', 11)
 
         if crop:
             left = int(crop['left'])

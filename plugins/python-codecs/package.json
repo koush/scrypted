@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/python-codecs",
-   "version": "0.1.63",
+   "version": "0.1.64",
    "description": "Python Codecs for Scrypted",
    "keywords": [
       "scrypted",
