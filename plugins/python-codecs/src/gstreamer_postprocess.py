@@ -53,7 +53,7 @@ class GstreamerFormatPostProcess():
 
 class GstreamerPostProcess():
     def __init__(self) -> None:
-        self.postprocess = ' ! videocrop name=videocrop ! videoconvertscale ! capsfilter name=scaleCapsFilter'
+        self.postprocess = ' ! videocrop name=videocrop ! videoconvert ! videoscale ! capsfilter name=scaleCapsFilter'
         self.resize = None
 
     async def create(self, gst, pipeline: str):
@@ -210,12 +210,8 @@ class OpenGLPostProcess():
         self.gltransformation = self.gst.get_by_name('gltransformation')
         # sets the target texture size
         self.glCapsFilter = self.gst.get_by_name('glCapsFilter')
-        # sets output format to something other than RGBA if necessary since gl can't handle non-RGBA
-        # self.swCapsFilter = self.gst.get_by_name('swCapsFilter')
-
 
     def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions):
-        # print(options)
         sampleWidth, sampleHeight = sampleSize
 
         crop = options.get('crop')
@@ -237,7 +233,6 @@ class OpenGLPostProcess():
             width = int(width)
             height = int(height)
 
-            # pipeline += " ! videoscale"
             glCaps += f",width={width},height={height}"
 
         self.glCapsFilter.set_property('caps', caps.from_string(glCaps))
@@ -271,11 +266,3 @@ class OpenGLPostProcess():
         gltransformation.set_property('scale-y', scaleY)
         gltransformation.set_property('translation-x', translationX)
         gltransformation.set_property('translation-y', translationY)
-
-        # if format and format != 'RGBA':
-        #     swcaps = f'video/x-raw,format={format}'
-        #     print(swcaps)
-        #     self.swCapsFilter.set_property('caps', caps.from_string(swcaps))
-        # else:
-        #     self.swCapsFilter.set_property('caps', 'video/x-raw')
-        #     print('nc')

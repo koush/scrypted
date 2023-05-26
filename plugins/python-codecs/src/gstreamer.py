@@ -1,3 +1,4 @@
+import asyncio
 import platform
 from asyncio import Future
 from typing import Any
@@ -9,13 +10,9 @@ import pilimage
 import vipsimage
 from generator_common import createImageMediaObject, createVideoFrame
 from gst_generator import Gst, createPipelineIterator
-from gstreamer_postprocess import (
-    GstreamerFormatPostProcess,
-    GstreamerPostProcess,
-    OpenGLPostProcess,
-    VaapiPostProcess,
-    getBands,
-)
+from gstreamer_postprocess import (GstreamerFormatPostProcess,
+                                   GstreamerPostProcess, OpenGLPostProcess,
+                                   VaapiPostProcess, getBands)
 from util import optional_chain
 
 
@@ -155,7 +152,7 @@ class GstImage(scrypted_sdk.Image):
                         "format": reformat,
                     }
                 )
-                await colored.close()
+                asyncio.ensure_future(colored.close(), loop = asyncio.get_event_loop())
 
             try:
                 return await image.toBuffer(
@@ -206,7 +203,7 @@ async def createResamplerPipeline(
     caps = sample.get_caps()
 
     srcCaps = caps.to_string().replace(" ", "")
-    pipeline = f"appsrc name=appsrc emit-signals=True is-live=True caps={srcCaps}"
+    pipeline = f"appsrc name=appsrc format=time emit-signals=True is-live=True caps={srcCaps}"
     await pp.create(gst.gst, pipeline)
     pp.resize = resize
 
