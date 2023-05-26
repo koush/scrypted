@@ -81,7 +81,10 @@ USER_AGENTS = {
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
+    BACKUP_AUTH_HOSTS = list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
     TRANSID_PREFIX = 'web'
+
+    random.shuffle(BACKUP_AUTH_HOSTS)
 
     def __init__(self, username, password):
         self.username = username
@@ -166,12 +169,9 @@ class Arlo(object):
             # in case cloudflare rejects our auth request...
             logger.warning(f"Using fallback authentication host due to: {e}")
 
-            backup_hosts = list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
-            random.shuffle(backup_hosts)
-
             auth_host = pick_host([
                 base64.b64decode(h.encode("utf-8")).decode("utf-8")
-                for h in backup_hosts
+                for h in self.BACKUP_AUTH_HOSTS
             ], self.AUTH_URL, "/api/auth")
 
             self.request = Request(mode="ip")
@@ -200,10 +200,15 @@ class Arlo(object):
             raw=True
         )
         factor_id = next(
-            i for i in factors_body['data']['items']
-            if (i['factorType'] == 'EMAIL' or i['factorType'] == 'SMS')
-            and i['factorRole'] == "PRIMARY"
-        )['factorId']
+            [
+                i for i in factors_body['data']['items']
+                if (i['factorType'] == 'EMAIL' or i['factorType'] == 'SMS')
+                and i['factorRole'] == "PRIMARY"
+            ],
+            {}
+        ).get('factorId')
+        if not factor_id:
+            raise Exception("Could not find valid 2FA method - is the primary 2FA set to either Email or SMS?")
 
         # Start factor auth
         start_auth_body = self.request.post(
@@ -689,6 +694,10 @@ class Arlo(object):
             trigger,
             callback,
         )
+
+    def GetSIPInfo(self):
+        sip_info = self.request.get(f'https://{self.BASE_URL}/hmsweb/users/devices/sipInfo').get("data")
+        return sip_info
 
     def StartPushToTalk(self, basestation, camera):
         url = f'https://{self.BASE_URL}/hmsweb/users/devices/{self.user_id}_{camera.get("deviceId")}/pushtotalk'
