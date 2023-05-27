@@ -129,7 +129,7 @@ class GstreamerPostProcess():
 
 class VaapiPostProcess():
     def __init__(self) -> None:
-        self.postprocess = ' ! vaapipostproc name=vaapipostproc'
+        self.postprocess = ' ! vaapipostproc name=vaapipostproc ! capsfilter name=capsFilter'
         self.resize = None
 
     async def create(self, gst, pipeline: str):
@@ -138,6 +138,7 @@ class VaapiPostProcess():
         self.gst = gst
         self.g = g
         self.vaapipostproc = self.gst.get_by_name('vaapipostproc')
+        self.capsFilter = self.gst.get_by_name('capsFilter')
 
     def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions):
         sampleWidth, sampleHeight = sampleSize
@@ -171,15 +172,18 @@ class VaapiPostProcess():
         vaapipostproc.set_property('width', outputWidth)
         vaapipostproc.set_property('height', outputHeight)
 
+        # TODO: gray fast path?
         # not sure vaapi supports non-rgba across all hardware...
         # GST_VIDEO_FORMAT_RGBA (11) – rgb with alpha channel last
         # GST_VIDEO_FORMAT_GRAY8 (25) – 8-bit grayscale
 
-        format = toCapsFormat(options)
-        if format == 'GRAY8':
-            vaapipostproc.set_property('format', 25)
-        else:
-            vaapipostproc.set_property('format', 11)
+        # format = toCapsFormat(options)
+        # if format != 'GRAY8' and format != 'RGBA':
+        #     format = 'RGBA'
+
+        vaapipostproc.set_property('format', 11)
+        format = 'RGBA'
+        self.capsFilter.set_property('caps', caps.from_string(f"video/x-raw,format={format}"))
 
         if crop:
             left = int(crop['left'])
@@ -196,7 +200,6 @@ class VaapiPostProcess():
             right = 300
             bottom = 300
 
-        print(left, top, right, bottom)
         vaapipostproc.set_property('crop-left', left)
         vaapipostproc.set_property('crop-top', top)
         vaapipostproc.set_property('crop-right', right)
