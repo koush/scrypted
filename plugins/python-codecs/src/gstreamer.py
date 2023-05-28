@@ -144,6 +144,7 @@ class GstImage(scrypted_sdk.Image):
             if bands and bands != capsBands:
                 reformat = format
 
+            colored = None
             if reformat or crop:
                 colored = image
                 image = await image.toImageInternal(
@@ -152,8 +153,6 @@ class GstImage(scrypted_sdk.Image):
                         "format": reformat,
                     }
                 )
-                asyncio.ensure_future(colored.close(), loop = asyncio.get_event_loop())
-
             try:
                 return await image.toBuffer(
                     {
@@ -162,6 +161,8 @@ class GstImage(scrypted_sdk.Image):
                 )
             finally:
                 await image.close()
+                if colored:
+                    await colored.close()
         finally:
             gst_buffer.unmap(info)
 

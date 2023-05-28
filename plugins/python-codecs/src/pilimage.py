@@ -54,7 +54,14 @@ class PILImage(scrypted_sdk.Image):
 
         def save():
             bytesArray = io.BytesIO()
-            pilImage.pilImage.save(bytesArray, format='JPEG')
+            if pilImage.pilImage.mode == 'RGBA':
+                rgb = pilImage.pilImage.convert('RGB')
+                try:
+                    rgb.save(bytesArray, format='JPEG')
+                finally:
+                    rgb.close()
+            else:
+                pilImage.pilImage.save(bytesArray, format='JPEG')
             # pilImage.pilImage.save(bytesArray, format=options['format'])
             return bytesArray.getvalue()
 
