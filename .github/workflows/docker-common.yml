@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         NODE_VERSION: ["18"]
-        BASE: ["focal"]
+        BASE: ["jammy"]
         FLAVOR: ["full", "lite", "thin"]
     steps:
       - name: Check out the repo
