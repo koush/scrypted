@@ -4,7 +4,7 @@
 # install script.
 ################################################################
 ARG BASE="bullseye"
-FROM debian:${BASE} as header
+FROM ubuntu:${BASE} as header
 
 RUN apt-get update && apt-get -y install curl wget
 
