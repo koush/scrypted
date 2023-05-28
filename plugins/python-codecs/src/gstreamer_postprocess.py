@@ -169,21 +169,22 @@ class VaapiPostProcess():
             outputWidth = 0
             outputHeight = 0
 
-        vaapipostproc.set_property('width', outputWidth)
-        vaapipostproc.set_property('height', outputHeight)
+        # vaapipostproc.set_property('width', outputWidth)
+        # vaapipostproc.set_property('height', outputHeight)
 
         # TODO: gray fast path?
         # not sure vaapi supports non-rgba across all hardware...
         # GST_VIDEO_FORMAT_RGBA (11) – rgb with alpha channel last
         # GST_VIDEO_FORMAT_GRAY8 (25) – 8-bit grayscale
 
-        # format = toCapsFormat(options)
-        # if format != 'GRAY8' and format != 'RGBA':
-        #     format = 'RGBA'
+        format = toCapsFormat(options)
+        if format != 'GRAY8' and format != 'RGBA':
+            format = 'RGBA'
+        # should RGBA be forced? not sure all devices can handle gray8?
+        format = 'RGBA'
 
         vaapipostproc.set_property('format', 11)
-        format = 'RGBA'
-        self.capsFilter.set_property('caps', caps.from_string(f"video/x-raw,format={format}"))
+        self.capsFilter.set_property('caps', caps.from_string(f"video/x-raw,format={format},width={outputWidth},height={outputHeight}"))
 
         if crop:
             left = int(crop['left'])
