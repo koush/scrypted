@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        BASE: ["18-lunar-full", "18-lunar-lite", "18-lunar-thin"]
+        BASE: ["18-focal-full", "18-focal-lite", "18-focal-thin"]
         SUPERVISOR: ["", ".s6"]
     steps:
       - name: Check out the repo
