@@ -15,7 +15,7 @@ on:
 jobs:
   build:
     name: Push Docker image to Docker Hub
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     strategy:
       matrix:
         BASE: ["18-jammy-full", "18-jammy-lite", "18-jammy-thin"]
