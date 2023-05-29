@@ -625,8 +625,15 @@ class PluginRemote:
 
             sys.path.insert(0, zipPath)
             if platform.system() != 'Windows':
-                site_packages = os.path.join(
-                    python_prefix, 'lib', python_version, 'site-packages')
+                # local/lib/dist-packages seen on python3.10 on ubuntu.
+                # TODO: find a way to programatically get this value, or switch to venv.
+                dist_packages = os.path.join(
+                    python_prefix, 'local', 'lib', python_version, 'dist-packages')
+                if os.path.exists(dist_packages):
+                    site_packages = dist_packages
+                else:
+                    site_packages = os.path.join(
+                        python_prefix, 'lib', python_version, 'site-packages')
             else:
                 site_packages = os.path.join(
                     python_prefix, 'Lib', 'site-packages')
