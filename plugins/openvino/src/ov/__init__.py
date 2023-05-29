@@ -62,7 +62,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             {
                 'key': 'mode',
                 'title': 'Mode',
-                'desscription': 'AUTO, CPU, or GPU mode to use for detections. Requires plugin reload. Use CPU if the system has unreliable GPU drivers.',
+                'description': 'AUTO, CPU, or GPU mode to use for detections. Requires plugin reload. Use CPU if the system has unreliable GPU drivers.',
                 'choices': [
                     'AUTO',
                     'CPU',
