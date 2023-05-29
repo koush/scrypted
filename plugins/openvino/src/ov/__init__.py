@@ -9,6 +9,7 @@ from typing import Any, Tuple
 import openvino.runtime as ov
 import scrypted_sdk
 from PIL import Image
+from scrypted_sdk.other import SettingValue
 from scrypted_sdk.types import Setting
 
 from predict import PredictPlugin, Prediction, Rectangle
@@ -39,7 +40,15 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         mappingFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/FP16/ssd_mobilenet_v1_coco.mapping', 'ssd_mobilenet_v1_coco.mapping')
         labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/FP16/ssd_mobilenet_v1_coco.bin', 'ssd_mobilenet_v1_coco.bin')
 
-        self.compiled_model = self.core.compile_model(xmlFile, "AUTO")
+        mode = self.storage.getItem('mode') or 'AUTO'
+        try:
+            self.compiled_model = self.core.compile_model(xmlFile, mode)
+        except:
+            import traceback
+            traceback.print_exc()
+            print("Reverting to AUTO mode.")
+            self.storage.removeItem('mode')
+            asyncio.run_coroutine_threadsafe(scrypted_sdk.deviceManager.requestRestart(), asyncio.get_event_loop())
 
         labelsFile = self.downloadFile('https://raw.githubusercontent.com/google-coral/test_data/master/coco_labels.txt', 'coco_labels.txt')
         labels_contents = open(labelsFile, 'r').read()
@@ -48,7 +57,25 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="openvino", )
 
     async def getSettings(self) -> list[Setting]:
-        return []
+        mode = self.storage.getItem('mode') or 'AUTO'
+        return [
+            {
+                'key': 'mode',
+                'title': 'Mode',
+                'desscription': 'AUTO, CPU, or GPU mode to use for detections. Requires plugin reload. Use CPU if the system has unreliable GPU drivers.',
+                'choices': [
+                    'AUTO',
+                    'CPU',
+                    'GPU',
+                ],
+                'value': mode,
+            }
+        ]
+    
+    async def putSetting(self, key: str, value: SettingValue):
+        self.storage.setItem(key, value)
+        await self.onDeviceEvent(scrypted_sdk.ScryptedInterface.Settings.value, None)
+        await scrypted_sdk.deviceManager.requestRestart()
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
