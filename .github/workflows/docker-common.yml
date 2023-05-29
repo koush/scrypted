@@ -52,6 +52,5 @@ jobs:
           push: true
           tags: |
             koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-${{ matrix.FLAVOR }}
-#            ${{ matrix.NODE_VERSION == '16-bullseye' && 'koush/scrypted-common:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
