@@ -5,7 +5,6 @@ import aiohttp
 from async_timeout import timeout as async_timeout
 from datetime import datetime, timedelta
 import json
-import threading
 import time
 from typing import List, TYPE_CHECKING
 
@@ -14,6 +13,7 @@ import scrypted_arlo_go
 import scrypted_sdk
 from scrypted_sdk.types import Setting, Settings, SettingValue, Device, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, Charger, ChargeState, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
+from .arlo.arlo_async import USER_AGENTS
 from .experimental import EXPERIMENTAL
 from .base import ArloDeviceBase
 from .spotlight import ArloSpotlight, ArloFloodlight
@@ -76,6 +76,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     timeout: int = 30
     intercom_session = None
+    goSM = None
     light: ArloSpotlight = None
     vss: ArloSirenVirtualSecuritySystem = None
     picture_lock: asyncio.Lock = None
@@ -153,8 +154,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         ])
 
         if EXPERIMENTAL:
-            if self._can_push_to_talk():
-                results.add(ScryptedInterface.Intercom.value)
+            results.add(ScryptedInterface.Intercom.value)
 
         if self.has_battery:
             results.add(ScryptedInterface.Battery.value)
@@ -168,10 +168,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
         if self.has_cloud_recording:
             results.add(ScryptedInterface.VideoClips.value)
-
-        if EXPERIMENTAL:
-            if not self._can_push_to_talk():
-                results.discard(ScryptedInterface.Intercom.value)
 
         return list(results)
 
@@ -259,6 +255,10 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     @property
     def has_battery(self) -> bool:
         return not any([self.arlo_device["modelId"].lower().startswith(model) for model in ArloCamera.MODELS_WITHOUT_BATTERY])
+
+    @property
+    def uses_sip_push_to_talk(self) -> bool:
+        return self.arlo_device["deviceId"] == self.arlo_device["parentId"]
 
     async def getSettings(self) -> List[Setting]:
         result = []
@@ -407,21 +407,79 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         }
         return await scrypted_sdk.mediaManager.createFFmpegMediaObject(ffmpeg_input)
 
+    @async_print_exception_guard
     async def startIntercom(self, media) -> None:
         self.logger.info("Starting intercom")
-        self.intercom_session = ArloCameraIntercomSession(self)
-        await self.intercom_session.initialize_push_to_talk(media)
+
+        if self.uses_sip_push_to_talk:
+            sip_info = self.provider.arlo.GetSIPInfo()
+            sip_call_info = sip_info["sipCallInfo"]
+
+            ice_servers = [{"url": "stun:stun.l.google.com:19302"}]
+            self.logger.debug(f"Will use ice servers: {[ice['url'] for ice in ice_servers]}")
+
+            ice_servers = scrypted_arlo_go.Slice_webrtc_ICEServer([
+                scrypted_arlo_go.NewWebRTCICEServer(
+                    scrypted_arlo_go.go.Slice_string([ice['url']]),
+                    ice.get('username', ''),
+                    ice.get('credential', '')
+                )
+                for ice in ice_servers
+            ])
+            sip_cfg = scrypted_arlo_go.SIPInfo(
+                DeviceID=self.nativeId,
+                CallerURI=f"sip:{sip_call_info['id']}@{sip_call_info['domain']}:{sip_call_info['port']}",
+                CalleeURI=sip_call_info['calleeUri'],
+                Password=sip_call_info['password'],
+                UserAgent="SIP.js/0.20.1",
+                WebsocketURI="wss://livestream-z2-prod.arlo.com:7443",
+                WebsocketOrigin="https://my.arlo.com",
+                WebsocketHeaders=scrypted_arlo_go.HeadersMap({"User-Agent": USER_AGENTS["arlo"]}),
+            )
+
+            self.goSM = scrypted_arlo_go.NewSIPWebRTCManager("Arlo SIP "+self.nativeId, ice_servers, sip_cfg)
+
+            ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
+            self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
+            audio_port = self.goSM.InitializeAudioRTPListener(scrypted_arlo_go.WebRTCMimeTypeOpus)
+
+            ffmpeg_path = await scrypted_sdk.mediaManager.getFFmpegPath()
+            ffmpeg_args = [
+                "-y",
+                "-hide_banner",
+                "-loglevel", "error",
+                "-analyzeduration", "0",
+                "-fflags", "-nobuffer",
+                "-probesize", "500000",
+                *ffmpeg_params["inputArguments"],
+                "-vn",
+                "-acodec", "libopus",
+                "-f", "rtp",
+                "-flush_packets", "1",
+                f"rtp://localhost:{audio_port}?pkt_size={scrypted_arlo_go.UDP_PACKET_SIZE()}",
+            ]
+            self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with '{' '.join(ffmpeg_args)}'")
+
+            self.intercom_ffmpeg_subprocess = HeartbeatChildProcess("Arlo Subprocess "+self.logger_name, ffmpeg_path, *ffmpeg_args)
+            self.intercom_ffmpeg_subprocess.start()
+
+            self.goSM.Start()
+        else:
+            # we need to do signaling through arlo cloud apis
+            self.intercom_session = ArloCameraIntercomSession(self)
+            await self.intercom_session.initialize_push_to_talk(media)
+
         self.logger.info("Intercom ready")
 
+    @async_print_exception_guard
     async def stopIntercom(self) -> None:
         self.logger.info("Stopping intercom")
         if self.intercom_session is not None:
             await self.intercom_session.shutdown()
             self.intercom_session = None
-
-    def _can_push_to_talk(self) -> bool:
-        # Right now, only implement push to talk for basestation cameras
-        return self.arlo_device["deviceId"] != self.arlo_device["parentId"]
+        if self.goSM is not None:
+            self.goSM.Close()
+            self.goSM = None
 
     async def getVideoClip(self, videoId: str) -> MediaObject:
         self.logger.info(f"Getting video clip {videoId}")
@@ -577,17 +635,15 @@ class ArloCameraIntercomSession(BackgroundTaskMixin):
         session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
         self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
 
-        cfg = scrypted_arlo_go.WebRTCConfiguration(
-            ICEServers=scrypted_arlo_go.Slice_webrtc_ICEServer([
-                scrypted_arlo_go.NewWebRTCICEServer(
-                    scrypted_arlo_go.go.Slice_string([ice['url']]),
-                    ice.get('username', ''),
-                    ice.get('credential', '')
-                )
-                for ice in ice_servers
-            ])
-        )
-        self.arlo_pc = scrypted_arlo_go.NewWebRTCManager("Arlo "+self.camera.logger_name, cfg)
+        ice_servers = scrypted_arlo_go.Slice_webrtc_ICEServer([
+            scrypted_arlo_go.NewWebRTCICEServer(
+                scrypted_arlo_go.go.Slice_string([ice['url']]),
+                ice.get('username', ''),
+                ice.get('credential', '')
+            )
+            for ice in ice_servers
+        ])
+        self.arlo_pc = scrypted_arlo_go.NewWebRTCManager("Arlo WebRTC "+self.camera.logger_name, ice_servers)
 
         ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
         self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
@@ -610,7 +666,7 @@ class ArloCameraIntercomSession(BackgroundTaskMixin):
         ]
         self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with '{' '.join(ffmpeg_args)}'")
 
-        self.intercom_ffmpeg_subprocess = HeartbeatChildProcess("Arlo "+self.camera.logger_name, ffmpeg_path, *ffmpeg_args)
+        self.intercom_ffmpeg_subprocess = HeartbeatChildProcess("Arlo Subprocess "+self.camera.logger_name, ffmpeg_path, *ffmpeg_args)
         self.intercom_ffmpeg_subprocess.start()
 
         self.sdp_answered = False

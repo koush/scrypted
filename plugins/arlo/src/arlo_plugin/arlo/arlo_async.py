@@ -200,11 +200,11 @@ class Arlo(object):
             raw=True
         )
         factor_id = next(
-            [
+            iter([
                 i for i in factors_body['data']['items']
                 if (i['factorType'] == 'EMAIL' or i['factorType'] == 'SMS')
                 and i['factorRole'] == "PRIMARY"
-            ],
+            ]),
             {}
         ).get('factorId')
         if not factor_id:
@@ -696,8 +696,8 @@ class Arlo(object):
         )
 
     def GetSIPInfo(self):
-        sip_info = self.request.get(f'https://{self.BASE_URL}/hmsweb/users/devices/sipInfo').get("data")
-        return sip_info
+        resp = self.request.get(f'https://{self.BASE_URL}/hmsweb/users/devices/sipInfo')
+        return resp
 
     def StartPushToTalk(self, basestation, camera):
         url = f'https://{self.BASE_URL}/hmsweb/users/devices/{self.user_id}_{camera.get("deviceId")}/pushtotalk'
