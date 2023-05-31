@@ -153,7 +153,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             ScryptedInterface.Settings.value,
         ])
 
-        if EXPERIMENTAL:
+        if EXPERIMENTAL or not self.uses_sip_push_to_talk:
             results.add(ScryptedInterface.Intercom.value)
 
         if self.has_battery:
@@ -378,7 +378,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     "codec": 'aac',
                 },
                 "source": 'cloud',
-                "tool": 'scrypted',
+                "tool": 'ffmpeg',
                 "userConfigurable": False,
             }
         ]

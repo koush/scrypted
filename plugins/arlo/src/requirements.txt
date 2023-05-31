@@ -3,7 +3,7 @@ sseclient==0.0.22
 aiohttp==3.8.4
 requests==2.28.2
 cachetools==5.3.0
-scrypted-arlo-go==0.0.3
+scrypted-arlo-go==0.1.0
 cloudscraper==1.2.71
 cryptography==38.0.4
 async-timeout==4.0.2
