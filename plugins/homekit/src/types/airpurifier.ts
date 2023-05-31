@@ -17,7 +17,15 @@ addSupportedType({
 
         /* On/Off AND mode toggle */
         bindCharacteristic(device, ScryptedInterface.AirPurifier, service, Characteristic.Active,
-            () => (device.airPurifierState.status === AirPurifierStatus.Active) ? Characteristic.Active.ACTIVE : Characteristic.Active.INACTIVE);
+            () => {
+                switch(device.airPurifierState.status) {
+                    case AirPurifierStatus.Active:
+                        return Characteristic.Active.ACTIVE;
+                    case AirPurifierStatus.ActiveNightMode:
+                        return Characteristic.Active.ACTIVE;
+                }
+                return Characteristic.Active.INACTIVE;
+            });
 
         service.getCharacteristic(Characteristic.Active)
         .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -25,7 +33,7 @@ addSupportedType({
             device.setAirPurifierState({
                 status: (value as boolean) ? AirPurifierStatus.Active : AirPurifierStatus.Inactive,
             })
-        })
+        });
 
         /* Current State */
         bindCharacteristic(device, ScryptedInterface.AirPurifier, service, Characteristic.CurrentAirPurifierState,

@@ -15,3 +15,4 @@ import './vacuum';
 import './outlet';
 import './notifier';
 import './windowcovering'
+import './airpurifier'
