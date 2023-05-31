@@ -131,6 +131,7 @@ export enum ScryptedDeviceType {
   SecuritySystem = "SecuritySystem",
   WindowCovering = "WindowCovering",
   Siren = "Siren",
+  AirPurifier = "AirPurifier",
   Unknown = "Unknown",
 }
 /**
@@ -1181,6 +1182,36 @@ export interface Position {
 export interface PositionSensor {
   position?: Position;
 }
+export enum AirPurifierStatus {
+  Inactive = "Inactive",
+  Idle = "Idle",
+  Active = "Active",
+  ActiveNightMode = "ActiveNightMode",
+}
+
+export enum AirPurifierMode {
+  Manual = "Manual",
+  Automatic = "Automatic",
+}
+
+export interface AirPurifierState {
+  speed?: number;
+  status?: AirPurifierStatus,
+  mode?: AirPurifierMode,
+  lockPhysicalControls?: boolean,
+}
+
+export interface AirPurifier {
+  airPurifierState?: AirPurifierState;
+
+  setAirPurifierState(state: AirPurifierState): Promise<void>;
+}
+
+export interface FilterMaintenance {
+  filterLifeLevel?: number,
+  filterChangeIndication?: boolean,
+}
+
 export interface PM10Sensor {
   pm10Density?: number;
 }
@@ -1950,6 +1981,8 @@ export enum ScryptedInterface {
   NOXSensor = "NOXSensor",
   CO2Sensor = "CO2Sensor",
   AirQualitySensor = "AirQualitySensor",
+  AirPurifier = "AirPurifier",
+  FilterMaintenance = "FilterMaintenance",
   Readme = "Readme",
   OauthClient = "OauthClient",
   MixinProvider = "MixinProvider",
