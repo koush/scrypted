@@ -152,13 +152,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
     def arlo(self) -> Arlo:
         if self._arlo is not None:
             if self._arlo_mfa_complete_auth is not None:
-                if self._arlo_mfa_code == "":
+                if not self._arlo_mfa_code:
                     return None
 
                 self.logger.info("Completing Arlo MFA...")
-                self._arlo_mfa_complete_auth(self._arlo_mfa_code)
-                self._arlo_mfa_complete_auth = None
-                self._arlo_mfa_code = None
+                try:
+                    self._arlo_mfa_complete_auth(self._arlo_mfa_code)
+                finally:
+                    self._arlo_mfa_complete_auth = None
+                    self._arlo_mfa_code = None
                 self.logger.info("Arlo MFA done")
 
                 self.storage.setItem("arlo_auth_headers", json.dumps(dict(self._arlo.request.session.headers.items())))
@@ -178,7 +180,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             if headers:
                 self._arlo.UseExistingAuth(self.arlo_user_id, json.loads(headers))
                 self.logger.info(f"Initialized Arlo client, reusing stored auth headers")
-
                 self.create_task(self.do_arlo_setup())
                 return self._arlo
             else:
@@ -188,6 +189,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         except Exception as e:
             traceback.print_exc()
             self._arlo = None
+            self._arlo_mfa_complete_auth = None
             self._arlo_mfa_code = None
             return None
 

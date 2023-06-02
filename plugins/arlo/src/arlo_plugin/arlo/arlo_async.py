@@ -173,6 +173,7 @@ class Arlo(object):
                 base64.b64decode(h.encode("utf-8")).decode("utf-8")
                 for h in self.BACKUP_AUTH_HOSTS
             ], self.AUTH_URL, "/api/auth")
+            logger.debug(f"Selected backup authentication host {auth_host}")
 
             self.request = Request(mode="ip")
 
@@ -231,6 +232,9 @@ class Arlo(object):
                 headers=headers,
                 raw=True
             )
+
+            if finish_auth_body.get('data', {}).get('token') is None:
+                raise Exception("Could not complete 2FA, maybe invalid token? If the error persists, please try reloading the plugin and logging in again.")
 
             self.request = Request()
 
@@ -636,7 +640,7 @@ class Arlo(object):
         If you pass in a valid device type, as a string or a list, this method will return an array of just those devices that match that type. An example would be ['basestation', 'camera']
         To filter provisioned or unprovisioned devices pass in a True/False value for filter_provisioned. By default both types are returned.
         """
-        devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/v2/users/devices')
+        devices = self._getDevicesImpl()
         if device_type:
             devices = [ device for device in devices if device.get('deviceType') in device_type]
 
@@ -646,6 +650,11 @@ class Arlo(object):
             else:
                 devices = [ device for device in devices if device.get("state") != 'provisioned']
 
+        return devices
+
+    @cached(cache=TTLCache(maxsize=1, ttl=60))
+    def _getDevicesImpl(self):
+        devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/v2/users/devices')
         return devices
 
     async def StartStream(self, basestation, camera):
