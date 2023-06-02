@@ -378,7 +378,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     "codec": 'aac',
                 },
                 "source": 'cloud',
-                "tool": 'ffmpeg',
+                "tool": 'scrypted',
                 "userConfigurable": False,
             }
         ]

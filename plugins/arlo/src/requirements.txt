@@ -3,9 +3,8 @@ sseclient==0.0.22
 aiohttp==3.8.4
 requests==2.28.2
 cachetools==5.3.0
-scrypted-arlo-go==0.1.1
+scrypted-arlo-go==0.1.2
 cloudscraper==1.2.71
-cryptography==38.0.4
 async-timeout==4.0.2
 --extra-index-url=https://www.piwheels.org/simple/
 --extra-index-url=https://bjia56.github.io/scrypted-arlo-go/
