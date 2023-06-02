@@ -4,6 +4,7 @@ import { EventEmitter } from 'events';
 import { Server } from 'net';
 import { Duplex } from 'stream';
 import { cloneDeep } from './clone-deep';
+import { Deferred } from "./deferred";
 import { listenZeroSingleClient } from './listen-cluster';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from './media-helpers';
 import { createRtspParser } from "./rtsp-server";
@@ -228,6 +229,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     ffmpegLogInitialOutput(console, cp, undefined, options?.storage);
     cp.on('exit', () => kill(new Error('ffmpeg exited')));
 
+    const deferredStart = new Deferred<void>();
     // now parse the created pipes
     const start = () => {
         for (const p of startParsers) {
@@ -246,6 +248,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
                 const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
 
                 for await (const chunk of parser.parse(pipe as any, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
+                    await deferredStart.promise;
                     events.emit(container, chunk);
                     resetActivityTimer();
                 }
@@ -257,7 +260,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         });
     };
 
-    await parseVideoCodec(cp);
     const rtsp = (options.parsers as any).rtsp as ReturnType<typeof createRtspParser>;
     rtsp.sdp.then(sdp => {
         const parsed = parseSdp(sdp);
@@ -268,9 +270,12 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     });
 
     const sdp = rtsp.sdp.then(sdpString => [Buffer.from(sdpString)]);
+    start();
 
     return {
-        start,
+        start() {
+            deferredStart.resolve();
+        },
         sdp,
         get inputAudioCodec() {
             return inputAudioCodec;

@@ -707,6 +707,8 @@ class PrebufferSession {
       }, h264Oddities ? 60000 : 10000);
     }
 
+    await session.sdp;
+
     // complain to the user about the codec if necessary. upstream may send a audio
     // stream but report none exists (to request muting).
     if (!audioSoftMuted && advertisedAudioCodec && session.inputAudioCodec !== undefined
