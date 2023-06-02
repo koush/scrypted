@@ -6,7 +6,7 @@ export class VoicemailHandler extends SipRequestHandler {
     
     constructor( private sipCamera : BticinoSipCamera ) {
         super()
-        setTimeout( () => {
+        this.timeout = setTimeout( () => {
             // Delay a bit an run in a different thread in case this fails
             this.checkVoicemail()
         }, 10000 )
@@ -25,7 +25,7 @@ export class VoicemailHandler extends SipRequestHandler {
         this.timeout = setTimeout( () => this.checkVoicemail() , 5 * 60 * 1000 )
     }
 
-    cancelVoicemailCheck() {
+    cancelTimer() {
         if( this.timeout ) {
             clearTimeout(this.timeout)
         }

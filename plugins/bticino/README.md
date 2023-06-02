@@ -2,7 +2,9 @@
 
 The C300X Plugin for Scrypted allows viewing your C300X intercom with incoming video/audio.
 
-WARNING: You will need access to the device, see https://github.com/fquinto/bticinoClasse300x
+WARNING: You will need access to the device, see https://github.com/fquinto/bticinoClasse300x.
+
+You also need the **[c300x-controller](https://github.com/slyoldfox/c300x-controller)** and node (v17.9.1) running on your device which will expose an API for the intercom.
 
 ## Development instructions
 
@@ -17,11 +19,36 @@ $ num run scrypted-deploy 127.0.0.1
 
 After flashing a custom firmware you must at least:
 
+* Install [node](https://nodejs.org/download/release/latest-v17.x/node-v17.9.1-linux-armv7l.tar.gz) on your device and run the c300x-controller on the device
+* Install [/lib/libatomic.so.1](http://ftp.de.debian.org/debian/pool/main/g/gcc-10-cross/libatomic1-armhf-cross_10.2.1-6cross1_all.deb) in **/lib**
 * Allow access to the SIP server on port 5060
 * Allow your IP to authenticated with the SIP server
 * Add a SIP user for scrypted
 
 To do this use the guide below:
+
+## Installing node and c300x-controller
+
+```
+$ cd /home/bticino/cfg/extra/
+$ mkdir node
+$ cd node
+$ wget https://nodejs.org/download/release/latest-v17.x/node-v17.9.1-linux-armv7l.tar.gz
+$ tar xvfz node-v17.9.1-linux-armv7l.tar.gz
+```
+
+Node will require libatomic.so.1 which isn't shipped with the device, get the .deb file from http://ftp.de.debian.org/debian/pool/main/g/gcc-10-cross/libatomic1-armhf-cross_10.2.1-6cross1_all.deb 
+
+```
+$ ar x libatomic1-armhf-cross_10.2.1-6cross1_all.deb 
+```
+
+scp the `libatomic.so.1` to `/lib` and check that node works:
+
+```
+$ root@C3X-00-00-00-00-00--2222222:~# /home/bticino/cfg/extra/node/bin/node -v
+v17.9.1
+```
 
 ## Make flexisip listen on a reachable IP and add users to it
 
@@ -93,7 +120,7 @@ hashed-passwords=true
 reject-wrong-client-certificates=true
 ````
 
-Now we will add a `user agent` (user) that will be used by `baresip` to register itself with `flexisip`
+Now we will add a `user agent` (user) that will be used by `scrypted` to register itself with `flexisip`
 
 Edit the `/etc/flexisip/users/users.db.txt` file and create a new line by copy/pasting the c300x user.
 
@@ -101,7 +128,7 @@ For example:
 
 ````
 c300x@1234567.bs.iotleg.com md5:ffffffffffffffffffffffffffffffff ;
-baresip@1234567.bs.iotleg.com md5:ffffffffffffffffffffffffffffffff ;
+scrypted@1234567.bs.iotleg.com md5:ffffffffffffffffffffffffffffffff ;
 ````
 
 Leave the md5 as the same value - I use `fffff....` just for this example.
@@ -110,7 +137,7 @@ Edit the `/etc/flexisip/users/route.conf` file and add a new line to it, it spec
 Change the IP address to the place where you will run `baresip` (same as `trusted-hosts` above)
 
 ````
-<sip:baresip@1234567.bs.iotleg.com> <sip:192.168.0.XX>
+<sip:scrypted@1234567.bs.iotleg.com> <sip:192.168.0.XX>
 ````
 
 Edit the `/etc/flexisip/users/route_int.conf` file.
@@ -121,7 +148,7 @@ You can look at it as a group of users that is called when you call `alluser@123
 
 Add your username at the end (make sure you stay on the same line, NOT a new line!)
 ````
-<sip:alluser@1234567.bs.iotleg.com> ..., <sip:baresip@1234567.bs.iotleg.com>
+<sip:alluser@1234567.bs.iotleg.com> ..., <sip:scrypted@1234567.bs.iotleg.com>
 ````
 
 Reboot and verify flexisip is listening on the new IP address.

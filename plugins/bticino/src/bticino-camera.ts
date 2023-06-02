@@ -19,6 +19,7 @@ import { InviteHandler } from './bticino-inviteHandler';
 import { SipRequest } from '../../sip/src/sip-manager';
 
 import { get } from 'http'
+import { ControllerApi } from './c300x-controller-api';
 
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
@@ -35,8 +36,9 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     public requestHandlers: CompositeSipMessageHandler = new CompositeSipMessageHandler()
     public incomingCallRequest : SipRequest
     private settingsStorage: BticinoStorageSettings = new BticinoStorageSettings( this )
-    public voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
+    private voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
     private inviteHandler : InviteHandler = new InviteHandler(this)
+    private controllerApi : ControllerApi = new ControllerApi(this)
     //TODO: randomize this
     private keyAndSalt : string = "/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X"
     //private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
@@ -234,8 +236,6 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         }
 
         this.stopSession();
-
-
         const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient()
 
         const playbackUrl = clientUrl
@@ -244,6 +244,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             client.setKeepAlive(true, 10000)
             let sip: SipCallSession
             try {
+                await this.controllerApi.updateStreamEndpoint()
                 let rtsp: RtspServer;
                 const cleanup = () => {
                     client.destroy();
@@ -376,6 +377,9 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
+        this.voicemailHandler.cancelTimer()
+        this.persistentSipManager.cancelTimer()        
+        this.controllerApi.cancelTimer()
     }    
 
     reset() {
