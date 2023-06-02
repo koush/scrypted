@@ -87,6 +87,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
     @property
     def arlo_transport(self) -> str:
+        return "SSE"
+        # This code is here for posterity, however it looks that as of 06/01/2023
+        # Arlo has disabled the MQTT backend
         transport = self.storage.getItem("arlo_transport")
         if transport is None or transport not in ArloProvider.arlo_transport_choices:
             transport = "SSE"
@@ -455,9 +458,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 "group": "General",
                 "key": "arlo_transport",
                 "title": "Underlying Transport Protocol",
-                "description": "Select the underlying transport protocol used to connect to Arlo Cloud.",
+                "description": "Arlo Cloud currently only supports the SSE protocol.",
                 "value": self.arlo_transport,
-                "choices": self.arlo_transport_choices,
+                "readonly": True,
             },
             {
                 "group": "General",
