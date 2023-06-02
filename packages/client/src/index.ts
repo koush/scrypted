@@ -161,6 +161,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     const directAddress = response.headers['x-scrypted-direct-address'];
 
     return {
+        hostname: response.data.hostname as string,
         redirect: response.data.redirect as string,
         username: response.data.username as string,
         expiration: response.data.expiration as number,
