@@ -27,7 +27,7 @@ export class SipCallSession extends Subscribed {
     private sipManager: SipManager
   ) {
     super()
-    if( !sipManager ) {
+    if( !this.sipManager ) {
       this.sipManager = this.createSipManager( sipOptions )
     }
     //TODO: make this more clean
@@ -35,7 +35,7 @@ export class SipCallSession extends Subscribed {
       this.callEnded(false)
     } ))
     
-    sipManager.setSipOptions( sipOptions )
+    this.sipManager.setSipOptions( sipOptions )
   }
 
   static async createCallSession(console: Console, cameraName: string, sipOptions: SipOptions, sipManager?: SipManager ) {

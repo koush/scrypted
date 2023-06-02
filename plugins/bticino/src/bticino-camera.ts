@@ -2,7 +2,7 @@ import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/co
 import { sleep } from '@scrypted/common/src/sleep';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls } from '@scrypted/common/src/sdp-utils';
-import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, PictureOptions, Reboot, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
 import { SipCallSession } from '../../sip/src/sip-call-session';
 import { RtpDescription } from '../../sip/src/rtp-utils';
 import { VoicemailHandler } from './bticino-voicemailHandler';
@@ -19,11 +19,12 @@ import { InviteHandler } from './bticino-inviteHandler';
 import { SipRequest } from '../../sip/src/sip-manager';
 
 import { get } from 'http'
+import { ControllerApi } from './c300x-controller-api';
 
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
 
-export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler, VideoClips {
+export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler, VideoClips, Reboot {
 
     private session: SipCallSession
     private remoteRtpDescription: RtpDescription
@@ -35,8 +36,9 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     public requestHandlers: CompositeSipMessageHandler = new CompositeSipMessageHandler()
     public incomingCallRequest : SipRequest
     private settingsStorage: BticinoStorageSettings = new BticinoStorageSettings( this )
-    public voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
+    private voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
     private inviteHandler : InviteHandler = new InviteHandler(this)
+    private controllerApi : ControllerApi = new ControllerApi(this)
     //TODO: randomize this
     private keyAndSalt : string = "/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X"
     //private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
@@ -55,14 +57,24 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         })();
     }
 
+    reboot(): Promise<void> {
+        return new Promise<void>( (resolve,reject ) => {
+            let c300x = SipHelper.getIntercomIp(this)
+
+            get(`http://${c300x}:8080/reboot?now`, (res) => {
+                console.log("Reboot API result: " + res.statusCode)
+            });               
+        })
+    }
+
     getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
        return new Promise<VideoClip[]>(  (resolve,reject ) => {
             let c300x = SipHelper.getIntercomIp(this)
             if( !c300x ) return []
             get(`http://${c300x}:8080/videoclips?raw=true&startTime=${options.startTime/1000}&endTime=${options.endTime/1000}`, (res) => {
-            let rawData = '';
-            res.on('data', (chunk) => { rawData += chunk; });
-            res.on('end', () => {
+                let rawData = '';
+                res.on('data', (chunk) => { rawData += chunk; });
+                res.on('end', () => {
                 try {
                     const parsedData : [] = JSON.parse(rawData);
                     let videoClips : VideoClip[] = []
@@ -93,7 +105,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         return mediaManager.createMediaObjectFromUrl(url);        
     }
     getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject> {
-        let c300x = SipHelper.sipOptions(this)
+        let c300x = SipHelper.getIntercomIp(this)
         const url = `http://${c300x}:8080/voicemail?msg=${thumbnailId}/aswm.jpg&raw=true`;
         return mediaManager.createMediaObjectFromUrl(url);        
     }
@@ -224,8 +236,6 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         }
 
         this.stopSession();
-
-
         const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient()
 
         const playbackUrl = clientUrl
@@ -234,6 +244,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             client.setKeepAlive(true, 10000)
             let sip: SipCallSession
             try {
+                await this.controllerApi.updateStreamEndpoint()
                 let rtsp: RtspServer;
                 const cleanup = () => {
                     client.destroy();
@@ -366,6 +377,9 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
+        this.voicemailHandler.cancelTimer()
+        this.persistentSipManager.cancelTimer()        
+        this.controllerApi.cancelTimer()
     }    
 
     reset() {

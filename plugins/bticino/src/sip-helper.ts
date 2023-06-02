@@ -39,6 +39,15 @@ export class SipHelper {
          } 
     }    
     
+    public static getIdentifier( camera : BticinoSipCamera ) : string {
+        let to = camera.storage.getItem('sipfrom')?.trim();
+        const domain = camera.storage.getItem('sipdomain')?.trim()
+        if( to ) {
+            return to.split('@')[0] + '%40' + domain;
+        }
+        return     
+    }
+
     public static getIntercomIp( camera : BticinoSipCamera ): string {
         let to = camera.storage.getItem('sipto')?.trim();
         if( to  ) {

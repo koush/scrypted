@@ -14,10 +14,11 @@ export class PersistentSipManager {
     private sipManager : SipManager
     private lastRegistration : number = 0
     private expireInterval : number = 0
+    private timeout : NodeJS.Timeout
 
     constructor( private camera : BticinoSipCamera ) {
         // Give it a second and run in seperate thread to avoid failure on creation for from/to/domain check
-        setTimeout( () => this.enable() , CHECK_INTERVAL )
+        this.timeout = setTimeout( () => this.enable() , CHECK_INTERVAL )
     }
 
     async enable() : Promise<SipManager> {
@@ -56,13 +57,19 @@ export class PersistentSipManager {
             this.lastRegistration = now + (60 * 1000) - this.expireInterval
             throw e
         } finally {
-            setTimeout( () => this.register(), CHECK_INTERVAL )      
+            this.timeout = setTimeout( () => this.register(), CHECK_INTERVAL )      
         }
     }
 
     async session( sipOptions: SipOptions ) : Promise<SipCallSession> {
         let sm = await this.enable()
         return SipCallSession.createCallSession(this.camera.console, "Bticino", sipOptions, sm )
+    }
+
+    cancelTimer() {
+        if( this.timeout ) {
+            clearTimeout(this.timeout)
+        }
     }
 
     reloadSipOptions() {
