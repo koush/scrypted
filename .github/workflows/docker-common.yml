@@ -11,11 +11,11 @@ on:
 jobs:
   build:
     name: Push Docker image to Docker Hub
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     strategy:
       matrix:
         NODE_VERSION: ["18"]
-        BASE: ["bullseye", "bookworm"]
+        BASE: ["jammy"]
         FLAVOR: ["full", "lite", "thin"]
     steps:
       - name: Check out the repo
@@ -52,6 +52,5 @@ jobs:
           push: true
           tags: |
             koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-${{ matrix.FLAVOR }}
-#            ${{ matrix.NODE_VERSION == '16-bullseye' && 'koush/scrypted-common:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

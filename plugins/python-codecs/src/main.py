@@ -31,7 +31,7 @@ class GstreamerGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFram
     async def generateVideoFrames(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
         worker = scrypted_sdk.fork()
         forked: CodecFork = await worker.result
-        return await forked.generateVideoFramesGstreamer(mediaObject, options, filter, self.storage.getItem('h264Decoder'))
+        return await forked.generateVideoFramesGstreamer(mediaObject, options, filter, self.storage.getItem('h264Decoder'), self.storage.getItem('postProcessPipeline'))
     
     async def getSettings(self) -> List[Setting]:
         return [
@@ -46,9 +46,20 @@ class GstreamerGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFram
                     'vtdec_hw',
                     'nvh264dec',
                     'vaapih264dec',
-                    'vaapih264dec ! vaapipostproc ! {videocaps}',
                 ],
                 'combobox': True,
+            },
+            {
+                'key': 'postProcessPipeline',
+                'title': 'Post Process Pipeline',
+                'description': 'The Gstreamer pipeline to use to resize and scale frames.',
+                'value': self.storage.getItem('postProcessPipeline') or 'Default',
+                'choices': [
+                    'Default',
+                    'OpenGL (GPU memory)',
+                    'OpenGL (system memory)',
+                    'VAAPI',
+                ],
             }
         ]
     
@@ -138,10 +149,10 @@ def multiprocess_exit():
         os._exit(os.EX_OK)
 
 class CodecFork:
-    async def generateVideoFramesGstreamer(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None, h264Decoder: str = None) -> scrypted_sdk.VideoFrame:
+    async def generateVideoFramesGstreamer(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions, filter: Any, h264Decoder: str, postProcessPipeline: str) -> scrypted_sdk.VideoFrame:
         start = time.time()
         try:
-            async for data in gstreamer.generateVideoFramesGstreamer(mediaObject, options, filter, h264Decoder):
+            async for data in gstreamer.generateVideoFramesGstreamer(mediaObject, options, filter, h264Decoder, postProcessPipeline):
                 yield data
         except Exception as e:
             traceback.print_exc()

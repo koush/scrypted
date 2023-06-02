@@ -50,6 +50,17 @@
           <v-list-item-title>Discord</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+
+      <v-list-item link href="https://www.reddit.com/r/Scrypted/" active-class="purple white--text tile">
+        <v-list-item-icon>
+          <v-icon small>fab fa-reddit</v-icon>
+        </v-list-item-icon>
+
+        <v-list-item-content>
+          <v-list-item-title>Reddit</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+
       <v-list-item link href="https://github.com/koush/scrypted" active-class="purple white--text tile">
         <v-list-item-icon>
           <v-icon small>fab fa-github</v-icon>
@@ -59,6 +70,7 @@
           <v-list-item-title>Github</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+
       <v-divider></v-divider>
       <v-list-item active-class="deep-purple accent-4 white--text">
         <v-list-item-icon>
@@ -137,20 +149,31 @@ export default {
     getComponentViewPath,
     async checkUpdateAvailable() {
       await this.$connectingScrypted;
-      const info = await this.$scrypted.systemManager.getComponent("info");
-      const version = await info.getVersion();
-      this.currentVersion = version;
-      const { updateAvailable } = await checkUpdate(
-        "@scrypted/server",
-        version
+      const serviceControl = await this.$scrypted.systemManager.getComponent(
+        "service-control"
       );
-      this.updateAvailable = updateAvailable;
-      if (updateAvailable) {
+      try {
+        this.updateAvailable = await serviceControl.getUpdateAvailable();
+      }
+      catch (e) {
+        // old scrypted servers dont support this call, or it may be unimplemented
+        // in which case fall back and determine what the install type is.
+        const info = await this.$scrypted.systemManager.getComponent("info");
+        const version = await info.getVersion();
+        this.currentVersion = version;
+        const { updateAvailable } = await checkUpdate(
+          "@scrypted/server",
+          version
+        );
+        this.updateAvailable = updateAvailable;
+      }
+
+      if (this.updateAvailable) {
         const logger = this.$scrypted.deviceManager.getDeviceLogger();
         const u = new URL(window.location)
         u.hash = "#/component/settings";
         logger.clearAlerts();
-        logger.a(`Scrypted Server update available: ${updateAvailable}. ${u}`);
+        logger.a(`Scrypted Server update available: ${this.updateAvailable}. ${u}`);
       }
     },
     filterComponents: function (category) {

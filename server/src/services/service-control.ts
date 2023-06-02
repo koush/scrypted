@@ -15,6 +15,10 @@ export class ServiceControl {
         process.exit();
     }
 
+    async getUpdateAvailable(): Promise<string> {
+        throw new Error('getUpdateAvailable is not implemented. Updates will come out of band through Docker or npm.');
+    }
+
     async update() {
         const webhookUpdate = process.env.SCRYPTED_WEBHOOK_UPDATE;
         if (webhookUpdate) {

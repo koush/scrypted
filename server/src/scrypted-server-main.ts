@@ -325,7 +325,7 @@ async function start(mainFilename: string, options?: {
     for (const address of getHostAddresses(true, true)) {
         console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
     }
-    console.log(`Version:       : ${await new Info().getVersion()}`);
+    console.log(`Version:       : ${await scrypted.info.getVersion()}`);
     console.log('#######################################################');
     console.log('Scrypted insecure http service port:', SCRYPTED_INSECURE_PORT);
     console.log('Ports can be changed with environment variables.')

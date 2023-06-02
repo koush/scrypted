@@ -101,14 +101,29 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
             this.console.log(camera.name, 'onDoorbellPressed', e);
             this.triggerBinaryState();
         });
+        let motionTimeout: NodeJS.Timeout;
+        const resetTimeout = () => {
+            clearTimeout(motionTimeout);
+            motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
+        };
         camera.onMotionDetected?.subscribe(async motionDetected => {
-            if (motionDetected)
+            if (motionDetected) {
                 this.console.log(camera.name, 'onMotionDetected');
+                resetTimeout();
+            }
+            else {
+                clearTimeout(motionTimeout);
+            }
             this.motionDetected = motionDetected;
         });
         camera.onMotionDetectedPolling?.subscribe(async motionDetected => {
-            if (motionDetected)
+            if (motionDetected) {
                 this.console.log(camera.name, 'onMotionDetected');
+                resetTimeout();
+            }
+            else {
+                clearTimeout(motionTimeout);
+            }
             this.motionDetected = motionDetected;
         });
         camera.onBatteryLevel?.subscribe(async () => {

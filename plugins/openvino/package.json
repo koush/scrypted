@@ -33,11 +33,12 @@
       "runtime": "python",
       "type": "API",
       "interfaces": [
-         "ObjectDetection"
+         "ObjectDetection",
+         "Settings"
       ]
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.18"
+   "version": "0.1.22"
 }

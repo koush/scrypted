@@ -130,17 +130,28 @@ export default {
       const info = await this.$scrypted.systemManager.getComponent("info");
       const version = await info.getVersion();
       this.currentVersion = version;
-      const { updateAvailable } = await checkUpdate(
-        "@scrypted/server",
-        version
+
+      const serviceControl = await this.$scrypted.systemManager.getComponent(
+        "service-control"
       );
-      this.updateAvailable = updateAvailable;
+      try {
+        this.updateAvailable = await serviceControl.getUpdateAvailable();
+      }
+      catch (e) {
+        // old scrypted servers dont support this call, or it may be unimplemented
+        // in which case fall back and determine what the install type is.
+        const { updateAvailable } = await checkUpdate(
+          "@scrypted/server",
+          version
+        );
+        this.updateAvailable = updateAvailable;
+      }
     },
     async loadEnv() {
       const info = await this.$scrypted.systemManager.getComponent("info");
       const env = await info.getScryptedEnv();
       this.showRestart = !!env.SCRYPTED_CAN_RESTART;
-      this.canUpdate = !!env.SCRYPTED_NPM_SERVE || !!env.SCRYPTED_WEBHOOK_UPDATE;
+      this.canUpdate = !!env.SCRYPTED_NPM_SERVE || !!env.SCRYPTED_WEBHOOK_UPDATE || !!env.SCRYPTED_CAN_UPDATE;
     },
     async doRestart() {
       this.restartStatus = "Restarting...";
