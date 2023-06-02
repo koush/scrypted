@@ -5,6 +5,8 @@
         <v-card-text>
           <v-card-title style="justify-content: center;" class="headline text-uppercase">Scrypted
           </v-card-title>
+          <v-card-subtitle v-if="$store.state.hasLogin === false" style="justify-content: center;" class="text-uppercase">Create Account
+          </v-card-subtitle>
           <v-container grid-list-md>
             <v-layout wrap>
               <v-flex xs12>
@@ -34,12 +36,13 @@
         <v-card-actions>
           <v-tooltip bottom>
             <template v-slot:activator="{ on }">
-              <v-btn v-on="on" icon href="https://twitter.com/scryptedapp/">
-                <v-icon small>fab fa-twitter</v-icon>
+              <v-btn v-on="on" icon href="https://discord.gg/DcFzmBHYGq">
+                <v-icon small>fab fa-discord</v-icon>
               </v-btn>
             </template>
-            <span>Twitter</span>
+            <span>Discord</span>
           </v-tooltip>
+
           <v-tooltip bottom>
             <template v-slot:activator="{ on }">
               <v-btn v-on="on" icon href="https://www.reddit.com/r/Scrypted/">
@@ -48,6 +51,7 @@
             </template>
             <span>Reddit</span>
           </v-tooltip>
+
           <v-tooltip bottom>
             <template v-slot:activator="{ on }">
               <v-btn v-on="on" icon href="https://github.com/koush/scrypted">
@@ -56,14 +60,7 @@
             </template>
             <span>Github</span>
           </v-tooltip>
-          <v-tooltip bottom>
-            <template v-slot:activator="{ on }">
-              <v-btn v-on="on" icon href="https://discord.gg/DcFzmBHYGq">
-                <v-icon small>fab fa-discord</v-icon>
-              </v-btn>
-            </template>
-            <span>Discord</span>
-          </v-tooltip>
+
           <v-spacer></v-spacer>
           <v-btn type="submit" text @click.prevent="doLogin">Log In</v-btn>
         </v-card-actions>

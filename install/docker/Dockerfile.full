@@ -7,7 +7,7 @@
 # install script.
 ################################################################
 ARG BASE="bullseye"
-FROM debian:${BASE} as header
+FROM ubuntu:${BASE} as header
 
 RUN apt-get update && apt-get -y install curl wget
 
@@ -70,15 +70,13 @@ RUN apt-get -y install \
 # which causes weird behavior in python which looks at the arch version
 # which still reports 64bit, even if running in 32bit docker.
 # this scenario is not supported and will be reported at runtime.
-RUN if [ "$(uname -m)" != "x86_64" ]; \
-    then \
-        apt-get -y install \
-        python3-matplotlib \
-        python3-numpy \
-        python3-opencv \
-        python3-pil \
-        python3-skimage; \
-    fi
+# this bit is not necessary on amd64, but leaving it for consistency.
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y install \
+    python3-matplotlib \
+    python3-numpy \
+    python3-opencv \
+    python3-pil \
+    python3-skimage
 
 # python pip
 RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
@@ -96,14 +94,14 @@ RUN python3 -m pip install debugpy typing_extensions psutil
 ################################################################
 FROM header as base
 
-ENV SCRYPTED_DOCKER_SERVE="true"
+ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION=20230329
+ENV SCRYPTED_BASE_VERSION=20230527
 ENV SCRYPTED_DOCKER_FLAVOR=full
 
 ################################################################

@@ -1,15 +1,9 @@
-# @scrypted/vscode-python
+# Sample Scrypted Plugin
 
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
-
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
-
-## Visual Studio Code configuration
-
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
+1. npm install
+2. Open this plugin directory in VS Code.
+3. Edit `.vscode/settings.json` to point to the IP address of your Scrypted server. The default is `127.0.0.1`, your local machine. Also choose the appropriate debug target paths for remote debug source mapping.
+4. Press Launch (green arrow button in the Run and Debug sidebar) to start debugging.
+  * The VS Code `Terminal` area may show an authentication failure and prompt you to log in to the Scrypted Management Console with `npx scrypted login`. You will only need to do this once. You can then relaunch afterwards.
+ 
+<img width="538" alt="image" src="https://user-images.githubusercontent.com/73924/151676616-c730eb56-26dd-466d-b7f5-25783300b3bc.png">

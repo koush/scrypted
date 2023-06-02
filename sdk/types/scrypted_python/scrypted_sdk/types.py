@@ -9,6 +9,16 @@ from typing import Union, Any, Callable
 from .other import *
 
 
+class AirPurifierMode(Enum):
+    Automatic = "Automatic"
+    Manual = "Manual"
+
+class AirPurifierStatus(Enum):
+    Active = "Active"
+    ActiveNightMode = "ActiveNightMode"
+    Idle = "Idle"
+    Inactive = "Inactive"
+
 class AirQuality(Enum):
     Excellent = "Excellent"
     Fair = "Fair"
@@ -49,6 +59,7 @@ class PanTiltZoomMovement(Enum):
 
 class ScryptedDeviceType(Enum):
     API = "API"
+    AirPurifier = "AirPurifier"
     Automation = "Automation"
     Builtin = "Builtin"
     Camera = "Camera"
@@ -83,6 +94,7 @@ class ScryptedDeviceType(Enum):
     WindowCovering = "WindowCovering"
 
 class ScryptedInterface(Enum):
+    AirPurifier = "AirPurifier"
     AirQualitySensor = "AirQualitySensor"
     AmbientLightSensor = "AmbientLightSensor"
     AudioSensor = "AudioSensor"
@@ -106,6 +118,7 @@ class ScryptedInterface(Enum):
     EntrySensor = "EntrySensor"
     EventRecorder = "EventRecorder"
     Fan = "Fan"
+    FilterMaintenance = "FilterMaintenance"
     FloodSensor = "FloodSensor"
     HttpRequestHandler = "HttpRequestHandler"
     HumiditySensor = "HumiditySensor"
@@ -252,6 +265,7 @@ class HttpResponseOptions(TypedDict):
 class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     className: str
+    cost: float
     history: ObjectDetectionHistory
     id: str
     movement: Union[ObjectDetectionHistory, Any]
@@ -316,6 +330,13 @@ class MediaStreamTool(TypedDict):
 class AdoptDevice(TypedDict):
     nativeId: str
     settings: DeviceCreatorSettings
+    pass
+
+class AirPurifierState(TypedDict):
+    lockPhysicalControls: bool
+    mode: AirPurifierMode
+    speed: float
+    status: AirPurifierStatus
     pass
 
 class ColorHsv(TypedDict):
@@ -732,6 +753,12 @@ class VideoFrameGeneratorOptions(TypedDict):
 class TamperState(TypedDict):
     pass
 
+class AirPurifier:
+    airPurifierState: AirPurifierState
+    async def setAirPurifierState(self, state: AirPurifierState) -> None:
+        pass
+    pass
+
 class AirQualitySensor:
     airQuality: AirQuality
     pass
@@ -861,6 +888,11 @@ class Fan:
     fan: FanStatus
     async def setFan(self, fan: FanState) -> None:
         pass
+    pass
+
+class FilterMaintenance:
+    filterChangeIndication: bool
+    filterLifeLevel: float
     pass
 
 class FloodSensor:
@@ -1399,6 +1431,9 @@ class ScryptedInterfaceProperty(Enum):
     noxDensity = "noxDensity"
     co2ppm = "co2ppm"
     airQuality = "airQuality"
+    airPurifierState = "airPurifierState"
+    filterChangeIndication = "filterChangeIndication"
+    filterLifeLevel = "filterLifeLevel"
     humiditySetting = "humiditySetting"
     fan = "fan"
     applicationInfo = "applicationInfo"
@@ -1480,6 +1515,7 @@ class ScryptedInterfaceMethods(Enum):
     putSetting = "putSetting"
     armSecuritySystem = "armSecuritySystem"
     disarmSecuritySystem = "disarmSecuritySystem"
+    setAirPurifierState = "setAirPurifierState"
     getReadmeMarkdown = "getReadmeMarkdown"
     getOauthUrl = "getOauthUrl"
     onOauthCallback = "onOauthCallback"
@@ -1910,6 +1946,27 @@ class DeviceState:
     @airQuality.setter
     def airQuality(self, value: AirQuality):
         self.setScryptedProperty("airQuality", value)
+
+    @property
+    def airPurifierState(self) -> AirPurifierState:
+        return self.getScryptedProperty("airPurifierState")
+    @airPurifierState.setter
+    def airPurifierState(self, value: AirPurifierState):
+        self.setScryptedProperty("airPurifierState", value)
+
+    @property
+    def filterChangeIndication(self) -> bool:
+        return self.getScryptedProperty("filterChangeIndication")
+    @filterChangeIndication.setter
+    def filterChangeIndication(self, value: bool):
+        self.setScryptedProperty("filterChangeIndication", value)
+
+    @property
+    def filterLifeLevel(self) -> float:
+        return self.getScryptedProperty("filterLifeLevel")
+    @filterLifeLevel.setter
+    def filterLifeLevel(self, value: float):
+        self.setScryptedProperty("filterLifeLevel", value)
 
     @property
     def humiditySetting(self) -> HumiditySettingStatus:
@@ -2428,6 +2485,23 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "airQuality"
+    ]
+  },
+  "AirPurifier": {
+    "name": "AirPurifier",
+    "methods": [
+      "setAirPurifierState"
+    ],
+    "properties": [
+      "airPurifierState"
+    ]
+  },
+  "FilterMaintenance": {
+    "name": "FilterMaintenance",
+    "methods": [],
+    "properties": [
+      "filterChangeIndication",
+      "filterLifeLevel"
     ]
   },
   "Readme": {

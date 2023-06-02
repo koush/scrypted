@@ -8,12 +8,32 @@ import { probe } from './onoff-base';
 addSupportedType({
     type: ScryptedDeviceType.Fan,
     probe(device: DummyDevice) {
+        if (device.interfaces.includes(ScryptedInterface.OnOff))
+            return true;
         if (!device.interfaces.includes(ScryptedInterface.Fan))
             return false;
         return true;
     },
     getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff & Fan & HumiditySetting & AirQualitySensor & PM10Sensor & PM25Sensor & VOCSensor & NOXSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
+
+        // simple on/off fan.
+        if (!device.interfaces.includes(ScryptedInterface.Fan)) {
+            const fanService = accessory.addService(Service.Fan);
+            bindCharacteristic(device, ScryptedInterface.OnOff, fanService, Characteristic.On,
+                () => !!device.on);
+
+            fanService.getCharacteristic(Characteristic.On).on(CharacteristicEventTypes.SET, (value, callback) => {
+                callback();
+                if (value)
+                    device.turnOn();
+                else
+                    device.turnOff();
+            });
+
+            return accessory;
+        }
+
         const service = addFan(device, accessory);
         service.setPrimaryService();
 

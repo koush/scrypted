@@ -1,5 +1,5 @@
 ARG BASE="bullseye"
-FROM debian:${BASE} as header
+FROM ubuntu:${BASE} as header
 
 RUN apt-get update && apt-get -y install curl wget
 
@@ -14,12 +14,12 @@ RUN apt-get -y upgrade
 RUN apt-get -y install software-properties-common apt-utils
 RUN apt-get -y update
 
-ENV SCRYPTED_DOCKER_SERVE="true"
+ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION=20230329
+ENV SCRYPTED_BASE_VERSION=20230527
 ENV SCRYPTED_DOCKER_FLAVOR=thin

@@ -325,7 +325,7 @@ async function start(mainFilename: string, options?: {
     for (const address of getHostAddresses(true, true)) {
         console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
     }
-    console.log(`Version:       : ${await new Info().getVersion()}`);
+    console.log(`Version:       : ${await scrypted.info.getVersion()}`);
     console.log('#######################################################');
     console.log('Scrypted insecure http service port:', SCRYPTED_INSECURE_PORT);
     console.log('Ports can be changed with environment variables.')
@@ -600,13 +600,13 @@ async function start(mainFilename: string, options?: {
         // env/header based admin login
         if (res.locals.username) {
             const user = scrypted.usersService.users.get(res.locals.username);
-            const userToken = new UserToken(res.locals.username, user.aclId, Date.now());
+            const userToken = new UserToken(res.locals.username, res.locals.aclId, Date.now());
 
             res.send({
                 ...createTokens(userToken),
                 expiration: ONE_DAY_MILLISECONDS,
                 username: res.locals.username,
-                token: user.token,
+                token: user?.token,
                 addresses,
                 hostname,
             });

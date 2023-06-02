@@ -3,7 +3,7 @@ import scrypted_sdk
 from typing import Any
 import vipsimage
 import pilimage
-from generator_common import createVideoFrame
+from generator_common import createVideoFrame, createImageMediaObject
 
 av = None
 try:
@@ -54,7 +54,7 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
 
                 if not mo:
                     vipsImage = vipsimage.VipsImage(vips)
-                    mo = await vipsimage.createVipsMediaObject(vipsImage)
+                    mo = await createImageMediaObject(vipsImage)
 
                 vipsImage.vipsImage = vips
                 try:
@@ -75,7 +75,7 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
 
                 if not mo:
                     pilImage = pilimage.PILImage(pil)
-                    mo = await pilimage.createPILMediaObject(pilImage)
+                    mo = await createImageMediaObject(pilImage)
 
                 pilImage.pilImage = pil
                 try:

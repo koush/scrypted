@@ -707,6 +707,8 @@ class PrebufferSession {
       }, h264Oddities ? 60000 : 10000);
     }
 
+    await session.sdp;
+
     // complain to the user about the codec if necessary. upstream may send a audio
     // stream but report none exists (to request muting).
     if (!audioSoftMuted && advertisedAudioCodec && session.inputAudioCodec !== undefined
@@ -1416,7 +1418,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       const cloud = msos?.find(mso => mso.source === 'cloud');
       if (cloud) {
         this.storage.setItem('warnedCloud', 'true');
-        log.a(`${this.name} is a cloud camera. Prebuffering maintains a persistent stream and will not enabled by default. You must enable the Prebuffer stream manually.`)
+        log.a(`${this.name} is a cloud camera. Prebuffering maintains a persistent stream and will not be enabled by default. You must enable the Prebuffer stream manually.`)
       }
     }
 

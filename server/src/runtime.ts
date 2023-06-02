@@ -83,11 +83,12 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         },
     });
     pluginComponent = new PluginComponent(this);
-    servieControl = new ServiceControl(this);
+    serviceControl = new ServiceControl(this);
     alerts = new Alerts(this);
     corsControl = new CORSControl(this);
     addressSettings = new AddressSettings(this);
     usersService = new UsersService(this);
+    info = new Info();
     pluginHosts = new Map<string, RuntimeHost>();
 
     constructor(public mainFilename: string, datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
@@ -332,11 +333,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             case 'SCRYPTED_SECURE_PORT':
                 return SCRYPTED_SECURE_PORT;
             case 'info':
-                return new Info();
+                return this.info;
             case 'plugins':
                 return this.pluginComponent;
             case 'service-control':
-                return this.servieControl;
+                return this.serviceControl;
             case 'logger':
                 return this.logger;
             case 'alerts':
