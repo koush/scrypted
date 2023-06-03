@@ -41,6 +41,7 @@ import math
 import random
 import time
 import uuid
+from urllib.parse import urlparse, parse_qs
 
 stream_class = MQTTStream
 
@@ -657,20 +658,26 @@ class Arlo(object):
         devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/v2/users/devices')
         return devices
 
-    async def StartStream(self, basestation, camera):
+    async def StartStream(self, basestation, camera, mode="rtsp"):
         """
         This function returns the url of the rtsp video stream.
         This stream needs to be called within 30 seconds or else it becomes invalid.
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
+
+        If mode is set to "dash", returns the url to the mpd file for DASH streaming.
         """
         resource = f"cameras/{camera.get('deviceId')}"
+
+        if mode not in ["rtsp", "dash"]:
+            raise ValueError("mode must be 'rtsp' or 'dash'")
 
         # nonlocal variable hack for Python 2.x.
         class nl:
             stream_url_dict = None
 
         def trigger(self):
+            ua = USER_AGENTS['arlo'] if mode == "rtsp" else USER_AGENTS["firefox"]
             nl.stream_url_dict = self.request.post(
                 f'https://{self.BASE_URL}/hmsweb/users/devices/startStream',
                 params={
@@ -686,14 +693,17 @@ class Arlo(object):
                         "cameraId": camera.get('deviceId')
                     }
                 },
-                headers={"xcloudId":camera.get('xCloudId')}
+                headers={"xcloudId":camera.get('xCloudId'), 'User-Agent': ua}
             )
 
         def callback(self, event):
             #return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
             properties = event.get("properties", {})
             if properties.get("activityState") == "userStreamActive":
-                return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+                if mode == "rtsp":
+                    return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+                else:
+                    return nl.stream_url_dict['url'].replace(":80", "")
             return None
 
         return await self.TriggerAndHandleEvent(
@@ -703,6 +713,23 @@ class Arlo(object):
             trigger,
             callback,
         )
+
+    def GetMPDHeaders(self, url: str) -> dict:
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+
+        headers = {
+            "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
+            "DNT": "1",
+            "Egress-Token": query['egressToken'][0],
+            "Origin": "https://my.arlo.com",
+            "Referer": "https://my.arlo.com/",
+            "User-Agent": USER_AGENTS["firefox"],
+        }
+        return headers
 
     def GetSIPInfo(self):
         resp = self.request.get(f'https://{self.BASE_URL}/hmsweb/users/devices/sipInfo')

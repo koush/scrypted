@@ -11,7 +11,7 @@ from typing import List, TYPE_CHECKING
 import scrypted_arlo_go
 
 import scrypted_sdk
-from scrypted_sdk.types import Setting, Settings, SettingValue, Device, Camera, VideoCamera, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, Charger, ChargeState, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Setting, Settings, SettingValue, Device, Camera, VideoCamera, RequestMediaStreamOptions, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, Charger, ChargeState, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .arlo.arlo_async import USER_AGENTS
 from .experimental import EXPERIMENTAL
@@ -365,8 +365,8 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
             return await scrypted_sdk.mediaManager.createMediaObject(self.last_picture, "image/jpeg")
 
-    async def getVideoStreamOptions(self) -> List[ResponseMediaStreamOptions]:
-        return [
+    async def getVideoStreamOptions(self, container: str = None) -> List[ResponseMediaStreamOptions]:
+        options = [
             {
                 "id": 'default',
                 "name": 'Cloud RTSP',
@@ -380,29 +380,62 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                 "source": 'cloud',
                 "tool": 'scrypted',
                 "userConfigurable": False,
+            },
+            {
+                "id": 'dash',
+                "name": 'Cloud DASH',
+                "container": 'dash',
+                "video": {
+                    "codec": 'unknown',
+                },
+                "audio": None if self.arlo_device.get("modelId") == "VMC3030" else {
+                    "codec": 'unknown',
+                },
+                "source": 'cloud',
+                "tool": 'ffmpeg',
+                "userConfigurable": False,
             }
         ]
 
-    async def _getVideoStreamURL(self) -> str:
-        self.logger.info("Requesting stream")
-        rtsp_url = await asyncio.wait_for(self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device), timeout=self.timeout)
-        self.logger.debug(f"Got stream URL at {rtsp_url}")
-        return rtsp_url
+        if container is None:
+            return options
 
-    async def getVideoStream(self, options: dict = None) -> MediaObject:
+        return next(iter([o for o in options if o['container'] == container]))
+
+    async def _getVideoStreamURL(self, container: str) -> str:
+        self.logger.info(f"Requesting {container} stream")
+        url = await asyncio.wait_for(self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device, mode=container), timeout=self.timeout)
+        self.logger.debug(f"Got {container} stream URL at {url}")
+        return url
+
+    @async_print_exception_guard
+    async def getVideoStream(self, options: RequestMediaStreamOptions = None) -> MediaObject:
         self.logger.debug("Entered getVideoStream")
-        rtsp_url = await self._getVideoStreamURL()
 
-        mso = (await self.getVideoStreamOptions())[0]
+        container = "rtsp" if not options["id"] or options["id"] == "default" else options["id"]
+
+        url = await self._getVideoStreamURL(container)
+        additional_ffmpeg_args = []
+
+        if container == "dash":
+            headers = self.provider.arlo.GetMPDHeaders(url)
+            ffmpeg_headers = '\r\n'.join([
+                f'{k}: {v}'
+                for k, v in headers.items()
+            ])
+            additional_ffmpeg_args = ['-headers', ffmpeg_headers+'\r\n']
+
+        mso = await self.getVideoStreamOptions(container=container)
         mso['refreshAt'] = round(time.time() * 1000) + 30 * 60 * 1000
 
         ffmpeg_input = {
-            'url': rtsp_url,
-            'container': 'rtsp',
+            'url': url,
+            'container': container,
             'mediaStreamOptions': mso,
             'inputArguments': [
-                '-f', 'rtsp',
-                '-i', rtsp_url,
+                '-f', container,
+                *additional_ffmpeg_args,
+                '-i', url,
             ]
         }
         return await scrypted_sdk.mediaManager.createFFmpegMediaObject(ffmpeg_input)
