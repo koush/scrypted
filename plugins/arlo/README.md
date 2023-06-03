@@ -22,6 +22,6 @@ The plugin should work with any mailbox that supports IMAP, but so far has been 
 * It is highly recommended to enable the Rebroadcast plugin to allow multiple downstream plugins to pull the video feed within Scrypted.
 * If there is no audio on your camera, switch to the `FFmpeg (TCP)` parser under the `Cloud RTSP` settings.
 * Prebuffering should only be enabled if the camera is wired to a persistent power source, such as a wall outlet. Prebuffering will only work if your camera does not have a battery or `Plugged In to External Power` is selected.
-* Either RTSP or DASH streams can be pulled from Arlo Cloud. It is recommended to use RTSP for the lowest latency streams. DASH may require additional FFmpeg output arguments, e.g. `-vcodec h264 -bf 0`, since the container is not guaranteed to return video encoded in H264.
+* Either RTSP or DASH streams can be pulled from Arlo Cloud. It is recommended to use RTSP for the lowest latency streams. DASH returns finicky codecs and may require additional FFmpeg output arguments, e.g. `-vcodec h264 -bf 0`.
 
 Note that streaming cameras uses extra Internet bandwidth, since video and audio packets will need to travel from the camera through your network, out to Arlo Cloud, and then back to your network and into Scrypted.
