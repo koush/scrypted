@@ -198,6 +198,9 @@ export function parseRtpMap(mlineType: string, rtpmap: string) {
     else if (rtpmap?.includes('h265')) {
         codec = 'h265';
     }
+    else if (rtpmap?.includes('speex')) {
+        codec = 'speex';
+    }    
     else if (!rtpmap && mlineType === 'audio') {
         // ffmpeg seems to omit the rtpmap type for pcm alaw when creating sdp?
         // is this the default?
