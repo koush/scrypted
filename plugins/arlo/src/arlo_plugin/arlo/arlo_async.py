@@ -41,6 +41,7 @@ import math
 import random
 import time
 import uuid
+from urllib.parse import urlparse, parse_qs
 
 stream_class = MQTTStream
 
@@ -81,7 +82,10 @@ USER_AGENTS = {
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
+    BACKUP_AUTH_HOSTS = list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
     TRANSID_PREFIX = 'web'
+
+    random.shuffle(BACKUP_AUTH_HOSTS)
 
     def __init__(self, username, password):
         self.username = username
@@ -166,13 +170,11 @@ class Arlo(object):
             # in case cloudflare rejects our auth request...
             logger.warning(f"Using fallback authentication host due to: {e}")
 
-            backup_hosts = list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
-            random.shuffle(backup_hosts)
-
             auth_host = pick_host([
                 base64.b64decode(h.encode("utf-8")).decode("utf-8")
-                for h in backup_hosts
+                for h in self.BACKUP_AUTH_HOSTS
             ], self.AUTH_URL, "/api/auth")
+            logger.debug(f"Selected backup authentication host {auth_host}")
 
             self.request = Request(mode="ip")
 
@@ -200,10 +202,15 @@ class Arlo(object):
             raw=True
         )
         factor_id = next(
-            i for i in factors_body['data']['items']
-            if (i['factorType'] == 'EMAIL' or i['factorType'] == 'SMS')
-            and i['factorRole'] == "PRIMARY"
-        )['factorId']
+            iter([
+                i for i in factors_body['data']['items']
+                if (i['factorType'] == 'EMAIL' or i['factorType'] == 'SMS')
+                and i['factorRole'] == "PRIMARY"
+            ]),
+            {}
+        ).get('factorId')
+        if not factor_id:
+            raise Exception("Could not find valid 2FA method - is the primary 2FA set to either Email or SMS?")
 
         # Start factor auth
         start_auth_body = self.request.post(
@@ -226,6 +233,9 @@ class Arlo(object):
                 headers=headers,
                 raw=True
             )
+
+            if finish_auth_body.get('data', {}).get('token') is None:
+                raise Exception("Could not complete 2FA, maybe invalid token? If the error persists, please try reloading the plugin and logging in again.")
 
             self.request = Request()
 
@@ -282,14 +292,16 @@ class Arlo(object):
                 cameras[camera['deviceId']] = camera
 
             # filter out cameras without basestation, where they are their own basestations
-            # for now, keep doorbells and sirens in the list so they get pings
+            # this is so battery-powered devices do not drain due to pings
+            # for wired devices, keep doorbells, sirens, and arloq in the list so they get pings
             proper_basestations = {}
             for basestation in basestations.values():
-                if basestation['deviceId'] == basestation.get('parentId') and basestation['deviceType'] not in ['doorbell', 'siren']:
+                if basestation['deviceId'] == basestation.get('parentId') and \
+                    basestation['deviceType'] not in ['doorbell', 'siren', 'arloq', 'arloqs']:
                     continue
                 proper_basestations[basestation['deviceId']] = basestation
 
-            logger.info(f"Will send heartbeat to the following basestations: {list(proper_basestations.keys())}")
+            logger.info(f"Will send heartbeat to the following devices: {list(proper_basestations.keys())}")
 
             # start heartbeat loop with only basestations
             asyncio.get_event_loop().create_task(heartbeat(self, list(proper_basestations.values())))
@@ -629,7 +641,7 @@ class Arlo(object):
         If you pass in a valid device type, as a string or a list, this method will return an array of just those devices that match that type. An example would be ['basestation', 'camera']
         To filter provisioned or unprovisioned devices pass in a True/False value for filter_provisioned. By default both types are returned.
         """
-        devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/v2/users/devices')
+        devices = self._getDevicesImpl()
         if device_type:
             devices = [ device for device in devices if device.get('deviceType') in device_type]
 
@@ -641,20 +653,31 @@ class Arlo(object):
 
         return devices
 
-    async def StartStream(self, basestation, camera):
+    @cached(cache=TTLCache(maxsize=1, ttl=60))
+    def _getDevicesImpl(self):
+        devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/v2/users/devices')
+        return devices
+
+    async def StartStream(self, basestation, camera, mode="rtsp"):
         """
         This function returns the url of the rtsp video stream.
         This stream needs to be called within 30 seconds or else it becomes invalid.
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
+
+        If mode is set to "dash", returns the url to the mpd file for DASH streaming.
         """
         resource = f"cameras/{camera.get('deviceId')}"
+
+        if mode not in ["rtsp", "dash"]:
+            raise ValueError("mode must be 'rtsp' or 'dash'")
 
         # nonlocal variable hack for Python 2.x.
         class nl:
             stream_url_dict = None
 
         def trigger(self):
+            ua = USER_AGENTS['arlo'] if mode == "rtsp" else USER_AGENTS["firefox"]
             nl.stream_url_dict = self.request.post(
                 f'https://{self.BASE_URL}/hmsweb/users/devices/startStream',
                 params={
@@ -670,14 +693,17 @@ class Arlo(object):
                         "cameraId": camera.get('deviceId')
                     }
                 },
-                headers={"xcloudId":camera.get('xCloudId')}
+                headers={"xcloudId":camera.get('xCloudId'), 'User-Agent': ua}
             )
 
         def callback(self, event):
             #return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
             properties = event.get("properties", {})
             if properties.get("activityState") == "userStreamActive":
-                return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+                if mode == "rtsp":
+                    return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+                else:
+                    return nl.stream_url_dict['url'].replace(":80", "")
             return None
 
         return await self.TriggerAndHandleEvent(
@@ -687,6 +713,27 @@ class Arlo(object):
             trigger,
             callback,
         )
+
+    def GetMPDHeaders(self, url: str) -> dict:
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+
+        headers = {
+            "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
+            "DNT": "1",
+            "Egress-Token": query['egressToken'][0],
+            "Origin": "https://my.arlo.com",
+            "Referer": "https://my.arlo.com/",
+            "User-Agent": USER_AGENTS["firefox"],
+        }
+        return headers
+
+    def GetSIPInfo(self):
+        resp = self.request.get(f'https://{self.BASE_URL}/hmsweb/users/devices/sipInfo')
+        return resp
 
     def StartPushToTalk(self, basestation, camera):
         url = f'https://{self.BASE_URL}/hmsweb/users/devices/{self.user_id}_{camera.get("deviceId")}/pushtotalk'

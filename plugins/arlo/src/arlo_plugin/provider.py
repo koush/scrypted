@@ -87,6 +87,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
     @property
     def arlo_transport(self) -> str:
+        return "SSE"
+        # This code is here for posterity, however it looks that as of 06/01/2023
+        # Arlo has disabled the MQTT backend
         transport = self.storage.getItem("arlo_transport")
         if transport is None or transport not in ArloProvider.arlo_transport_choices:
             transport = "SSE"
@@ -149,13 +152,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
     def arlo(self) -> Arlo:
         if self._arlo is not None:
             if self._arlo_mfa_complete_auth is not None:
-                if self._arlo_mfa_code == "":
+                if not self._arlo_mfa_code:
                     return None
 
                 self.logger.info("Completing Arlo MFA...")
-                self._arlo_mfa_complete_auth(self._arlo_mfa_code)
-                self._arlo_mfa_complete_auth = None
-                self._arlo_mfa_code = None
+                try:
+                    self._arlo_mfa_complete_auth(self._arlo_mfa_code)
+                finally:
+                    self._arlo_mfa_complete_auth = None
+                    self._arlo_mfa_code = None
                 self.logger.info("Arlo MFA done")
 
                 self.storage.setItem("arlo_auth_headers", json.dumps(dict(self._arlo.request.session.headers.items())))
@@ -175,7 +180,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             if headers:
                 self._arlo.UseExistingAuth(self.arlo_user_id, json.loads(headers))
                 self.logger.info(f"Initialized Arlo client, reusing stored auth headers")
-
                 self.create_task(self.do_arlo_setup())
                 return self._arlo
             else:
@@ -185,6 +189,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         except Exception as e:
             traceback.print_exc()
             self._arlo = None
+            self._arlo_mfa_complete_auth = None
             self._arlo_mfa_code = None
             return None
 
@@ -455,9 +460,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 "group": "General",
                 "key": "arlo_transport",
                 "title": "Underlying Transport Protocol",
-                "description": "Select the underlying transport protocol used to connect to Arlo Cloud.",
+                "description": "Arlo Cloud currently only supports the SSE protocol.",
                 "value": self.arlo_transport,
-                "choices": self.arlo_transport_choices,
+                "readonly": True,
             },
             {
                 "group": "General",
@@ -627,7 +632,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             device = await self.getDevice_impl(nativeId)
             scrypted_interfaces = device.get_applicable_interfaces()
             manifest = device.get_device_manifest()
-            self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']}): {scrypted_interfaces}")
+            self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']} parent {camera['parentId']}): {scrypted_interfaces}")
 
             if camera["deviceId"] == camera["parentId"]:
                 provider_to_device_map.setdefault(None, []).append(manifest)
@@ -647,6 +652,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
         if len(cameras) != len(camera_devices):
             self.logger.info(f"Discovered {len(cameras)} cameras, but only {len(camera_devices)} are usable")
+            self.logger.info(f"Are all cameras shared with admin permissions?")
         else:
             self.logger.info(f"Discovered {len(cameras)} cameras")
 
