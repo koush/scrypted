@@ -365,7 +365,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
             return await scrypted_sdk.mediaManager.createMediaObject(self.last_picture, "image/jpeg")
 
-    async def getVideoStreamOptions(self, container: str = None) -> List[ResponseMediaStreamOptions]:
+    async def getVideoStreamOptions(self, id: str = None) -> List[ResponseMediaStreamOptions]:
         options = [
             {
                 "id": 'default',
@@ -397,10 +397,10 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             }
         ]
 
-        if container is None:
+        if id is None:
             return options
 
-        return next(iter([o for o in options if o['container'] == container]))
+        return next(iter([o for o in options if o['id'] == id]))
 
     async def _getVideoStreamURL(self, container: str) -> str:
         self.logger.info(f"Requesting {container} stream")
@@ -412,7 +412,9 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     async def getVideoStream(self, options: RequestMediaStreamOptions = None) -> MediaObject:
         self.logger.debug("Entered getVideoStream")
 
-        container = "rtsp" if not options["id"] or options["id"] == "default" else options["id"]
+        mso = await self.getVideoStreamOptions(id=options["id"])
+        mso['refreshAt'] = round(time.time() * 1000) + 30 * 60 * 1000
+        container = mso["container"]
 
         url = await self._getVideoStreamURL(container)
         additional_ffmpeg_args = []
@@ -424,9 +426,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                 for k, v in headers.items()
             ])
             additional_ffmpeg_args = ['-headers', ffmpeg_headers+'\r\n']
-
-        mso = await self.getVideoStreamOptions(container=container)
-        mso['refreshAt'] = round(time.time() * 1000) + 30 * 60 * 1000
 
         ffmpeg_input = {
             'url': url,
