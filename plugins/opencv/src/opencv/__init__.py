@@ -53,7 +53,7 @@ class OpenCVDetectionSession:
         self.lastFrame = 0
 
 
-defaultThreshold = 25
+defaultThreshold = 50
 defaultArea = 200
 defaultBlur = 5
 
