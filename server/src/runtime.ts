@@ -1,16 +1,17 @@
-import { Device, DeviceInformation, DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, ScryptedDevice, ScryptedInterface, ScryptedInterfaceMethod, ScryptedInterfaceProperty, ScryptedNativeId, ScryptedUser as SU } from '@scrypted/types';
+import { Device, DeviceInformation, DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceMethod, ScryptedInterfaceProperty, ScryptedNativeId, ScryptedUser as SU } from '@scrypted/types';
 import AdmZip from 'adm-zip';
 import axios from 'axios';
+import crypto from 'crypto';
 import * as io from 'engine.io';
 import { once } from 'events';
 import express, { Request, Response } from 'express';
 import { ParamsDictionary } from 'express-serve-static-core';
+import fs from 'fs';
 import http, { ServerResponse } from 'http';
 import https from 'https';
 import type { spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
 import path from 'path';
 import { ParsedQs } from 'qs';
-import rimraf from 'rimraf';
 import semver from 'semver';
 import { PassThrough } from 'stream';
 import tar from 'tar';
@@ -30,6 +31,9 @@ import { PluginHost } from './plugin/plugin-host';
 import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
+import { NodeForkWorker } from './plugin/runtime/node-fork-worker';
+import { PythonRuntimeWorker } from './plugin/runtime/python-worker';
+import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
@@ -39,10 +43,6 @@ import { PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
-import crypto from 'crypto';
-import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
-import { PythonRuntimeWorker } from './plugin/runtime/python-worker';
-import { NodeForkWorker } from './plugin/runtime/node-fork-worker';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -735,7 +735,9 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         if (!device.nativeId) {
             this.killPlugin(device.pluginId);
             await this.datastore.removeId(Plugin, device.pluginId);
-            rimraf.sync(getPluginVolume(device.pluginId));
+            await fs.promises.rm(getPluginVolume(device.pluginId), {
+                recursive: true,
+            });
         }
         else {
             try {

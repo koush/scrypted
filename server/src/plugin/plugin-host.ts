@@ -6,7 +6,6 @@ import fs from 'fs';
 import net from 'net';
 import os from 'os';
 import path from 'path';
-import rimraf from 'rimraf';
 import { Duplex } from 'stream';
 import WebSocket from 'ws';
 import { Plugin } from '../db-types';
@@ -204,8 +203,12 @@ export class PluginHost {
         {
             const zipDirTmp = zipDir + '.tmp';
             if (!fs.existsSync(zipFile)) {
-                rimraf.sync(zipDirTmp);
-                rimraf.sync(zipDir);
+                fs.rmSync(zipDirTmp, {
+                    recursive: true,
+                });
+                fs.rmSync(zipDir, {
+                    recursive: true,
+                });
                 fs.mkdirSync(zipDirTmp, {
                     recursive: true,
                 });
