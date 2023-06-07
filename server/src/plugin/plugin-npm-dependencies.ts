@@ -97,6 +97,7 @@ export async function installOptionalDependencies(console: Console, packageJson:
                 try {
                     await fs.promises.rm(filePath, {
                         recursive: true,
+                        force: true,
                     });
                 }
                 catch (e) {

@@ -205,9 +205,11 @@ export class PluginHost {
             if (!fs.existsSync(zipFile)) {
                 fs.rmSync(zipDirTmp, {
                     recursive: true,
+                    force: true,
                 });
                 fs.rmSync(zipDir, {
                     recursive: true,
+                    force: true,
                 });
                 fs.mkdirSync(zipDirTmp, {
                     recursive: true,

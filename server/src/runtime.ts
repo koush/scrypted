@@ -737,6 +737,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             await this.datastore.removeId(Plugin, device.pluginId);
             await fs.promises.rm(getPluginVolume(device.pluginId), {
                 recursive: true,
+                force: true,
             });
         }
         else {
