@@ -29,14 +29,6 @@ import { TRANSCODE_MIXIN_PROVIDER_NATIVE_ID, TranscodeMixinProvider, getTranscod
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
 const prebufferDurationMs = 10000;
-const DEFAULT_AUDIO = 'Default';
-const AAC_AUDIO = 'AAC or No Audio';
-const AAC_AUDIO_DESCRIPTION = `${AAC_AUDIO} (Copy)`;
-const COMPATIBLE_AUDIO = 'Compatible Audio'
-const COMPATIBLE_AUDIO_DESCRIPTION = `${COMPATIBLE_AUDIO} (Copy)`;
-const TRANSCODE_AUDIO = 'Other Audio';
-const TRANSCODE_AUDIO_DESCRIPTION = `${TRANSCODE_AUDIO} (Transcode)`;
-const COMPATIBLE_AUDIO_CODECS = ['aac', 'mp3', 'mp2', 'opus'];
 const DEFAULT_FFMPEG_INPUT_ARGUMENTS = '-fflags +genpts';
 
 const SCRYPTED_PARSER_TCP = 'Scrypted (TCP)';
@@ -44,12 +36,6 @@ const SCRYPTED_PARSER_UDP = 'Scrypted (UDP)';
 const FFMPEG_PARSER_TCP = 'FFmpeg (TCP)';
 const FFMPEG_PARSER_UDP = 'FFmpeg (UDP)';
 const STRING_DEFAULT = 'Default';
-
-const VALID_AUDIO_CONFIGS = [
-  AAC_AUDIO,
-  COMPATIBLE_AUDIO,
-  TRANSCODE_AUDIO,
-];
 
 interface PrebufferStreamChunk extends StreamChunk {
   time?: number;
@@ -221,27 +207,6 @@ class PrebufferSession {
     this.parserSessionPromise.then(pso => pso.killed.finally(() => this.parserSessionPromise = undefined));
   }
 
-  getAudioConfig(): {
-    isUsingDefaultAudioConfig: boolean,
-    aacAudio: boolean,
-    compatibleAudio: boolean,
-    reencodeAudio: boolean,
-  } {
-    let audioConfig = this.storage.getItem(this.audioConfigurationKey) || '';
-    if (!VALID_AUDIO_CONFIGS.find(config => audioConfig.startsWith(config)))
-      audioConfig = '';
-    const aacAudio = audioConfig.indexOf(AAC_AUDIO) !== -1;
-    const compatibleAudio = audioConfig.indexOf(COMPATIBLE_AUDIO) !== -1;
-    // reencode audio will be used if explicitly set.
-    const reencodeAudio = audioConfig.indexOf(TRANSCODE_AUDIO) !== -1;
-    return {
-      isUsingDefaultAudioConfig: !(aacAudio || compatibleAudio || reencodeAudio),
-      aacAudio,
-      compatibleAudio,
-      reencodeAudio,
-    }
-  }
-
   canUseRtspParser(mediaStreamOptions: MediaStreamOptions) {
     return mediaStreamOptions?.container?.startsWith('rtsp');
   }
@@ -398,7 +363,7 @@ class PrebufferSession {
           title: 'Detected Video/Audio Codecs',
           readonly: true,
           value: (session?.inputVideoCodec?.toString() || 'unknown') + '/' + (session?.inputAudioCodec?.toString() || 'unknown'),
-          description: 'Configuring your camera to H264 video and Opus, PCM, or AAC audio is recommended.'
+          description: 'Configuring your camera to H264 video, and audio to Opus or PCM-mulaw (G.711ulaw) is recommended.'
         },
         {
           key: 'detectedKeyframe',
@@ -467,85 +432,23 @@ class PrebufferSession {
     const audioSoftMuted = mso?.audio === null;
     const advertisedAudioCodec = mso?.audio?.codec;
 
-    const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio } = this.getAudioConfig();
-
     let detectedAudioCodec = this.storage.getItem(this.lastDetectedAudioCodecKey) || undefined;
     if (detectedAudioCodec === 'null')
       detectedAudioCodec = null;
 
-    // the assumed audio codec is the detected codec first and the reported codec otherwise.
-    const assumedAudioCodec = detectedAudioCodec === undefined
-      ? advertisedAudioCodec?.toLowerCase()
-      : detectedAudioCodec?.toLowerCase();
-
-
-    // after probing the audio codec is complete, alert the user with appropriate instructions.
-    // assume the codec is user configurable unless the camera explictly reports otherwise.
-    const audioIncompatible = !COMPATIBLE_AUDIO_CODECS.includes(assumedAudioCodec);
-
-
-    // aac needs to have the adts header stripped for mpegts and mp4.
-    // use this filter sparingly as it prevents ffmpeg from starting on a mismatch.
-    // however, not using it on an aac stream also prevents ffmpeg from parsing.
-    // so only use it when the detected or probe codec reports aac.
-    const aacFilters = ['-bsf:a', 'aac_adtstoasc'];
-    // compatible audio like mp3, mp2, opus can be muxed without issue.
-    const compatibleFilters = [];
-
     this.audioDisabled = false;
     let acodec: string[];
-
-    const detectedNoAudio = detectedAudioCodec === null;
-
-    // if the camera reports audio is incompatible and the user can't do anything about it
-    // enable transcoding by default. however, still allow the user to change the settings
-    // in case something changed.
-    let mustTranscode = false;
-
 
     if (audioSoftMuted) {
       // no audio? explicitly disable it.
       acodec = ['-an'];
       this.audioDisabled = true;
     }
-    else if (reencodeAudio || mustTranscode) {
-      acodec = [
-        '-bsf:a', 'aac_adtstoasc',
-        '-acodec', 'aac',
-        '-ar', `32k`,
-        '-b:a', `32k`,
-        '-ac', `1`,
-        '-profile:a', 'aac_low',
-        '-flags', '+global_header',
-      ];
-    }
-    else if (aacAudio || detectedNoAudio) {
-      // NOTE: If there is no audio track, the aac filters will still work fine without complaints
-      // from ffmpeg. This is why AAC and No Audio can be grouped into a single setting.
-      // This is preferred, because failure and recovery is preferable to
-      // permanently muting camera audio due to erroneous detection.
-      acodec = [
-        '-acodec',
-        'copy',
-      ];
-      acodec.push(...aacFilters);
-    }
-    else if (compatibleAudio) {
-      acodec = [
-        '-acodec',
-        'copy',
-      ];
-      acodec.push(...compatibleFilters);
-    }
     else {
       acodec = [
         '-acodec',
         'copy',
       ];
-
-      const filters = assumedAudioCodec === 'aac' ? aacFilters : compatibleFilters;
-
-      acodec.push(...filters);
     }
 
     const vcodec = [
@@ -724,12 +627,6 @@ class PrebufferSession {
 
     if (!session.inputAudioCodec) {
       this.console.log('No audio stream detected.');
-    }
-    else if (!COMPATIBLE_AUDIO_CODECS.includes(session.inputAudioCodec?.toLowerCase())) {
-      this.console.log('Detected audio codec is not mp4/mpegts compatible.', session.inputAudioCodec);
-    }
-    else {
-      this.console.log('Detected audio codec is mp4/mpegts compatible.', session.inputAudioCodec);
     }
 
     // set/update the detected codec, set it to null if no audio was found.
@@ -1117,17 +1014,8 @@ class PrebufferSession {
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
-    const { reencodeAudio } = this.getAudioConfig();
-
     if (this.audioDisabled) {
       mediaStreamOptions.audio = null;
-    }
-    else if (reencodeAudio) {
-      mediaStreamOptions.audio = {
-        codec: 'aac',
-        encoder: 'aac',
-        profile: 'aac_low',
-      }
     }
 
     if (session.inputVideoResolution?.width && session.inputVideoResolution?.height) {
