@@ -1,11 +1,10 @@
-import os from 'os';
 import { Device, EngineIOHandler } from '@scrypted/types';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
 import * as io from 'engine.io';
 import fs from 'fs';
-import mkdirp from 'mkdirp';
 import net from 'net';
+import os from 'os';
 import path from 'path';
 import rimraf from 'rimraf';
 import { Duplex } from 'stream';
@@ -207,7 +206,9 @@ export class PluginHost {
             if (!fs.existsSync(zipFile)) {
                 rimraf.sync(zipDirTmp);
                 rimraf.sync(zipDir);
-                mkdirp.sync(zipDirTmp);
+                fs.mkdirSync(zipDirTmp, {
+                    recursive: true,
+                });
                 fs.writeFileSync(path.join(zipDirTmp, zipFilename), zipBuffer);
                 const admZip = new AdmZip(zipBuffer);
                 admZip.extractAllTo(path.join(zipDirTmp, 'unzipped'), true);

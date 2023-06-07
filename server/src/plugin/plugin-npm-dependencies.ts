@@ -1,7 +1,6 @@
 import child_process from 'child_process';
 import { once } from 'events';
 import fs from 'fs';
-import mkdirp from "mkdirp";
 import os from 'os';
 import path from 'path';
 import process from 'process';
@@ -66,7 +65,9 @@ export async function installOptionalDependencies(console: Console, packageJson:
         delete reduced.devDependencies;
         delete reduced.scripts;
 
-        mkdirp.sync(nodePrefix);
+        await fs.promises.mkdir(nodePrefix, {
+            recursive: true,
+        })
         fs.writeFileSync(packageJsonPath, JSON.stringify(reduced));
 
         const cp = npmExecFunction(['--prefix', nodePrefix, 'install'], {

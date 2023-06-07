@@ -20,7 +20,7 @@ import { Plugin, PluginDevice, ScryptedAlert, ScryptedUser } from './db-types';
 import { createResponseInterface } from './http-interfaces';
 import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefault, getProvidedRoomOrDefault, getProvidedTypeOrDefault } from './infer-defaults';
 import { IOServer } from './io';
-import { Level } from './level';
+import Level from './level';
 import { LogEntry, Logger, makeAlertId } from './logger';
 import { getMixins, hasMixinCycle } from './mixin/mixin-cycle';
 import { AccessControls } from './plugin/acl';

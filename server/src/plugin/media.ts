@@ -4,13 +4,12 @@ import pathToFfmpeg from 'ffmpeg-static';
 import fs from 'fs';
 import https from 'https';
 import mimeType from 'mime';
-import mkdirp from "mkdirp";
 import Graph from 'node-dijkstra';
 import os from 'os';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
-import { MediaObjectRemote } from "./plugin-api";
 import { MediaObject } from "./mediaobject";
+import { MediaObjectRemote } from "./plugin-api";
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything
@@ -202,7 +201,9 @@ export abstract class MediaManagerBase implements MediaManager {
         if (!filesPath)
             throw new Error('SCRYPTED_PLUGIN_VOLUME env variable not set?');
         const ret = path.join(filesPath, 'files');
-        mkdirp.sync(ret);
+        await fs.promises.mkdir(ret, {
+            recursive: true,
+        });
         return ret;
     }
 

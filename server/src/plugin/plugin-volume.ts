@@ -1,6 +1,6 @@
+import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import mkdirp from 'mkdirp';
 
 export function getScryptedVolume() {
     const volumeDir = process.env.SCRYPTED_VOLUME || path.join(os.homedir(), '.scrypted', 'volume');
@@ -16,7 +16,9 @@ export function getPluginVolume(pluginId: string) {
 export function ensurePluginVolume(pluginId: string) {
     const pluginVolume = getPluginVolume(pluginId);
     try {
-        mkdirp.sync(pluginVolume);
+        fs.mkdirSync(pluginVolume, {
+            recursive: true,
+        })
     }
     catch (e) {
     }
