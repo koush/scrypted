@@ -105,10 +105,10 @@ class GstImage(scrypted_sdk.Image):
             raise Exception("unable to map gst buffer")
 
         try:
-            # pil = pilimage.new_from_memory(info.data, width, height, capsBands)
-            # pil.convert('RGB').save('/server/volume/test.jpg')
-
             stridePadding = (width * capsBands) % 4
+            if stridePadding:
+                stridePadding = 4 - stridePadding
+
             if stridePadding:
                 if capsBands != 1:
                     raise Exception(
@@ -130,6 +130,10 @@ class GstImage(scrypted_sdk.Image):
             else:
                 pil = pilimage.new_from_memory(info.data, width, height, capsBands)
                 image = pilimage.PILImage(pil)
+
+            # if bands == 1:
+            #     pil = pilimage.new_from_memory(info.data, width, height, capsBands)
+            #     pil.convert('RGB').save('/server/volume/test.jpg')
 
             crop = None
             if stridePadding:

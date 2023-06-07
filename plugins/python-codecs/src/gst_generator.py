@@ -16,7 +16,7 @@ except:
 
 async def createPipelineIterator(pipeline: str, gst = None):
     loop = asyncio.get_running_loop()
-    pipeline = '{pipeline} ! appsink name=appsink emit-signals=true sync=false max-buffers=-1 drop=true'.format(pipeline=pipeline)
+    pipeline = '{pipeline} ! appsink name=appsink emit-signals=true sync=false'.format(pipeline=pipeline)
     print(pipeline)
     finished = concurrent.futures.Future()
 
