@@ -300,6 +300,7 @@ export class PluginHost {
             throw new Error(`Unsupported Scrypted runtime: ${this.packageJson.scrypted.runtime}`);
 
         this.worker = workerHost(this.scrypted.mainFilename, this.pluginId, {
+            packageJson: this.packageJson,
             env,
             pluginDebug,
         });

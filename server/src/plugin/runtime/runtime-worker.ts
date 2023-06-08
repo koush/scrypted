@@ -4,6 +4,7 @@ import { Readable } from "stream";
 import net from "net";
 
 export interface RuntimeWorkerOptions {
+    packageJson: any;
     pluginDebug: PluginDebug;
     env: any;
 }

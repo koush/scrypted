@@ -50,10 +50,16 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         }
 
         let pythonPath = process.env.SCRYPTED_PYTHON_PATH;
+        const pluginPythonVersion = options.packageJson.scrypted.pythonVersion?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonVersion?.default;
+
         if (os.platform() === 'win32') {
             pythonPath ||= 'py.exe';
-            if (process.env.SCRYPTED_WINDOWS_PYTHON_VERSION)
-                args.unshift(process.env.SCRYPTED_WINDOWS_PYTHON_VERSION)
+            const windowsPythonVersion = pluginPythonVersion || process.env.SCRYPTED_WINDOWS_PYTHON_VERSION;
+            if (windowsPythonVersion)
+                args.unshift(windowsPythonVersion)
+        }
+        else if (pluginPythonVersion) {
+            pythonPath = `python${pluginPythonVersion}`;
         }
         else {
             pythonPath ||= 'python3';

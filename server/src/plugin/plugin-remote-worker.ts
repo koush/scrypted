@@ -308,6 +308,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             scrypted.fork = () => {
                 const ntw = new NodeThreadWorker(mainFilename, pluginId, {
+                    packageJson,
                     env: process.env,
                     pluginDebug: undefined,
                 });
