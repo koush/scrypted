@@ -34,6 +34,12 @@
          "@scrypted/objectdetector"
       ],
       "runtime": "python",
+      "pythonVersion": {
+         "default": "3.9",
+         "darwin": {
+            "arm64": "3.10"
+         }
+      },
       "type": "API",
       "interfaces": [
          "Settings",
@@ -43,5 +49,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.15"
+   "version": "0.1.16"
 }

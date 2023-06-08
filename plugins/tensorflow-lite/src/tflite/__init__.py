@@ -88,7 +88,6 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.interpreter_count, thread_name_prefix="tflite", )
 
     async def getSettings(self) -> list[Setting]:
-        ret = await super().getSettings()
         coral: Setting = {
             'title': 'Detected Edge TPU',
             'description': 'The device paths of the Coral Edge TPUs that will be used for detections.',
@@ -96,10 +95,7 @@ class TensorFlowLitePlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted
             'readonly': True,
             'key': 'coral',
         }
-
-        ret.append(coral)
-
-        return ret
+        return [coral]
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
