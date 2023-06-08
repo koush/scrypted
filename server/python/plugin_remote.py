@@ -611,12 +611,13 @@ class PluginRemote:
                     pipArgs = [
                         sys.executable,
                         '-m', 'pip', 'install', '-r', requirementstxt,
-                        # preevent uninstalling system packages
-                        '--ignore-installed',
                         '--prefix', python_prefix
                     ]
                     if pythonVersion:
                         print('Specific Python verison requested. Forcing reinstall.')
+                        # prevent uninstalling system packages.
+                        pipArgs.append('--ignore-installed')
+                        # force reinstall even if it exists in system packages.
                         pipArgs.append('--force-reinstall')
 
                     p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
