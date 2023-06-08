@@ -19,7 +19,7 @@ systemctl stop scrypted.service
 
 RUN() {
     # echo "Running: $@"
-    $@
+    "$@"
     if [ $? -ne 0 ]
     then
         echo 'Error during previous command.'
