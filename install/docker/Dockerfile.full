@@ -42,17 +42,6 @@ RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" |
 RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 RUN apt-get -y update && apt-get -y install libedgetpu1-std
 
-# intel opencl gpu for openvino
-RUN bash -c "if [ \"$(uname -m)\" == \"x86_64\" ]; \
-    then \
-        apt-get install -y gpg-agent && \
-        rm -f /usr/share/keyrings/intel-graphics.gpg && \
-        wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg && \
-        echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy arc' | tee  /etc/apt/sources.list.d/intel.gpu.jammy.list && \
-        apt-get -y install \
-        intel-opencl-icd; \
-    fi"
-
 # these are necessary for pillow-simd, additional on disk size is small
 # but could consider removing this.
 RUN apt-get -y install \
@@ -108,6 +97,17 @@ RUN for v in 3 3.9; \
 # Begin section generated from template/Dockerfile.full.footer
 ################################################################
 FROM header as base
+
+# intel opencl gpu for openvino
+RUN if [ \"$(uname -m)\" == \"x86_64\" ]; \
+    then \
+        apt-get install -y gpg-agent && \
+        rm -f /usr/share/keyrings/intel-graphics.gpg && \
+        wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg && \
+        echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy arc' | tee  /etc/apt/sources.list.d/intel.gpu.jammy.list && \
+        apt-get -y install \
+        intel-opencl-icd; \
+    fi
 
 ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
