@@ -42,7 +42,11 @@ RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" |
     apt-get -y update && apt-get -y install libedgetpu1-std
 
 # intel opencl gpu for openvino
-RUN if [ "$(uname -m)" = "x86_64" ]; then apt-get -y install intel-opencl-icd; fi
+RUN bash -c "if [ "$(uname -m)" == "x86_64" ]; \
+    then \
+        apt-get -y install \
+        intel-opencl-icd; \
+    fi"
 
 # these are necessary for pillow-simd, additional on disk size is small
 # but could consider removing this.
