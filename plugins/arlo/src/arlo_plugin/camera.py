@@ -28,11 +28,12 @@ if TYPE_CHECKING:
 
 class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, VideoClips, MotionSensor, AudioSensor, Battery, Charger):
     MODELS_WITH_SPOTLIGHTS = [
-        "vmc4040p",
         "vmc2030",
         "vmc2032",
+        "vmc4040p",
         "vmc4041p",
         "vmc4050p",
+        "vmc4060p",
         "vmc5040",
         "vml2030",
         "vml4030",
@@ -41,35 +42,36 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     MODELS_WITH_FLOODLIGHTS = ["fb1001"]
 
     MODELS_WITH_SIRENS = [
-        "vmc4040p",
         "fb1001",
-        "vmc2030",
         "vmc2020",
+        "vmc2030",
         "vmc2032",
+        "vmc4030",
+        "vmc4030p",
+        "vmc4040p",
         "vmc4041p",
         "vmc4050p",
         "vmc5040",
         "vml2030",
-        "vmc4030",
         "vml4030",
-        "vmc4030p",
     ]
 
     MODELS_WITH_AUDIO_SENSORS = [
-        "vmc4040p",
         "fb1001",
-        "vmc4041p",
-        "vmc4050p",
-        "vmc5040",
         "vmc3040",
         "vmc3040s",
         "vmc4030",
-        "vml4030",
         "vmc4030p",
+        "vmc4040p",
+        "vmc4041p",
+        "vmc4050p",
+        "vmc5040",
+        "vml4030",
     ]
 
     MODELS_WITHOUT_BATTERY = [
         "avd1001",
+        "vmc2040",
         "vmc3040",
         "vmc3040s",
     ]
