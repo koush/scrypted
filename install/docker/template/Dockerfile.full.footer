@@ -4,7 +4,7 @@
 FROM header as base
 
 # intel opencl gpu for openvino
-RUN if [ "$(uname -m)" = "x86_64" ]; \
+RUN bash -c "if [ \"$(uname -m)\" == \"x86_64\" ]; \
     then \
         apt-get update && apt-get install -y gpg-agent && \
         rm -f /usr/share/keyrings/intel-graphics.gpg && \
@@ -12,7 +12,7 @@ RUN if [ "$(uname -m)" = "x86_64" ]; \
         echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy arc' | tee  /etc/apt/sources.list.d/intel.gpu.jammy.list && \
         apt-get -y install \
         intel-opencl-icd; \
-    fi
+    fi"
 
 ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
