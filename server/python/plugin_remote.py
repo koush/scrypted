@@ -603,12 +603,23 @@ class PluginRemote:
                     f.write(requirements)
                     f.close()
 
-                    p = subprocess.Popen([
+                    try:
+                        pythonVersion = packageJson['scrypted']['pythonVersion']
+                    except:
+                        pythonVersion = None
+
+                    pipArgs = [
                         sys.executable,
                         '-m', 'pip', 'install', '-r', requirementstxt,
+                        # preevent uninstalling system packages
                         '--ignore-installed',
                         '--prefix', python_prefix
-                        ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    ]
+                    if pythonVersion:
+                        print('Specific Python verison requested. Forcing reinstall.')
+                        pipArgs.append('--force-reinstall')
+
+                    p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
                     while True:
                         line = p.stdout.readline()
