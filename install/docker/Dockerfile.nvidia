@@ -1,4 +1,4 @@
-FROM koush/18-bullseye-full.s6
+FROM koush/18-jammy-full.s6
 
 WORKDIR /
 
