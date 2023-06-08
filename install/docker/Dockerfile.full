@@ -56,7 +56,7 @@ RUN apt-get -y install \
     gstreamer1.0-vaapi
 
 # python3 gstreamer bindings
-RUN apt-get -y \
+RUN apt-get -y install \
     python3-gst-1.0
 
 # python 3.9 from ppa.
