@@ -29,7 +29,6 @@ jobs:
         with:
           host: 192.168.2.124
           private-key: ${{ secrets.KOUSHIK_MACSTUDIO_SSH_PRIVATE_KEY }}
-          private-key-name: koushik_macstudio
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
