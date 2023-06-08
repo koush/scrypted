@@ -4,9 +4,9 @@
 FROM header as base
 
 # intel opencl gpu for openvino
-RUN if [ \"$(uname -m)\" == \"x86_64\" ]; \
+RUN if [ "$(uname -m)" == "x86_64" ]; \
     then \
-        apt-get install -y gpg-agent && \
+        apt-get update && apt-get install -y gpg-agent && \
         rm -f /usr/share/keyrings/intel-graphics.gpg && \
         wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg && \
         echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy arc' | tee  /etc/apt/sources.list.d/intel.gpu.jammy.list && \
@@ -21,7 +21,7 @@ ENV SCRYPTED_INSTALL_PATH="/server"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION=20230527
+ENV SCRYPTED_BASE_VERSION=20230608
 ENV SCRYPTED_DOCKER_FLAVOR=full
 
 ################################################################
