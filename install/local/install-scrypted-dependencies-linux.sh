@@ -45,7 +45,7 @@ ARG() {
 }
 
 ENV() {
-    echo "ignoring ENV $1"
+    export $@
 }
 
 source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/template/Dockerfile.full.header)
