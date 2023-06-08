@@ -48,10 +48,11 @@ jobs:
             BASE=${{ matrix.BASE }}
           context: install/docker/
           file: install/docker/Dockerfile.${{ matrix.FLAVOR }}
-          platforms: linux/amd64,linux/armhf
           append: |
             - endpoint: ssh://192.168.2.124
               platforms: linux/arm64
+            - endpoint: unix:///var/run/docker.sock
+              platforms: linux/amd64,linux/armhf
           push: true
           tags: |
             koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-${{ matrix.FLAVOR }}
