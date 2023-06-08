@@ -603,8 +603,13 @@ class PluginRemote:
                     f.write(requirements)
                     f.close()
 
-                    p = subprocess.Popen([sys.executable, '-m', 'pip', 'install', '-r', requirementstxt,
-                                          '--prefix', python_prefix], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    p = subprocess.Popen([
+                        sys.executable,
+                        '-m', 'pip', 'install', '-r', requirementstxt,
+                        '--ignore-installed',
+                        '--prefix', python_prefix
+                        ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
                     while True:
                         line = p.stdout.readline()
                         if not line:
