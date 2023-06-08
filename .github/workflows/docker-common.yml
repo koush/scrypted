@@ -35,7 +35,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/armhf
           append: |
-            - endpoint: ssh://192.168.2.124
+            - endpoint: ssh://koush@192.168.2.124
               platforms: linux/arm64
 
       - name: Login to Docker Hub
