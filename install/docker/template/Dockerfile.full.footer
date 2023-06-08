@@ -4,7 +4,7 @@
 FROM header as base
 
 # intel opencl gpu for openvino
-RUN if [ "$(uname -m)" == "x86_64" ]; \
+RUN if [ "$(uname -m)" = "x86_64" ]; \
     then \
         apt-get update && apt-get install -y gpg-agent && \
         rm -f /usr/share/keyrings/intel-graphics.gpg && \
