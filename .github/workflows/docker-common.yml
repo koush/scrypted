@@ -43,7 +43,7 @@ jobs:
           append: |
             - endpoint: ssh://koush@192.168.2.124
               platforms: linux/arm64
-            - endpoint: ssh://pi@192.168.2.119
+            - endpoint: ssh://koush@192.168.2.119
               platforms: linux/armhf
 
       - name: Login to Docker Hub
