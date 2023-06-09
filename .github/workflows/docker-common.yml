@@ -2,11 +2,6 @@ name: Publish Scrypted Common
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
-  schedule:
-    # publish the common base once a month.
-    - cron:  '30 8 2 * *'
 
 jobs:
   build:
