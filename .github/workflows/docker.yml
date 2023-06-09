@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         BASE: ["18-jammy-full", "18-jammy-lite", "18-jammy-thin"]
-        SUPERVISOR: [".s6"]
+        SUPERVISOR: ["", ".s6"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
