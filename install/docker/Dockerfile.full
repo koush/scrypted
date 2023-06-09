@@ -112,7 +112,8 @@ RUN bash -c "if [ \"$(uname -m)\" == \"x86_64\" ]; \
         curl -L https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg && \
         echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy arc' | tee  /etc/apt/sources.list.d/intel.gpu.jammy.list && \
         apt-get -y install \
-        intel-opencl-icd; \
+        intel-opencl-icd && \
+        apt-get -y update && apt-get -y dist-upgrade; \
     fi"
 
 ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
