@@ -32,10 +32,12 @@ class Request(object):
     def __init__(self, timeout=5, mode="cloudscraper"):
         if mode == "cloudscraper":
             from .arlo_async import USER_AGENTS
-            self.session = cloudscraper.CloudScraper(browser={"custom": USER_AGENTS["arlo"]})
+            self.session = cloudscraper.CloudScraper(browser={"custom": USER_AGENTS["android"]})
         elif mode == "ip":
             self.session = requests.Session()
             self.session.mount('https://', host_header_ssl.HostHeaderSSLAdapter())
+        else:
+            self.session = requests.Session()
         self.timeout = timeout
 
     def gen_event_id(self):

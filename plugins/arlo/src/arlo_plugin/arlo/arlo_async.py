@@ -75,7 +75,12 @@ USER_AGENTS = {
         "Gecko/20100101 Firefox/85.0",
     "linux":
         "Mozilla/5.0 (X11; Linux x86_64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36"
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36",
+
+    # extracted from cloudscraper as a working UA for cloudflare
+    "android":
+        "Mozilla/5.0 (Linux; U; Android 8.1.0; zh-cn; PACM00 Build/O11019) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/8.8 Mobile Safari/537.36"
 }
 
 
@@ -150,7 +155,6 @@ class Arlo(object):
             'schemaVersion': '1',
             'Auth-Version': '2',
             'Content-Type': 'application/json; charset=UTF-8',
-            'User-Agent': USER_AGENTS['arlo'],
             'Origin': f'https://{self.BASE_URL}',
             'Referer': f'https://{self.BASE_URL}/',
             'Source': 'arloCamWeb',
@@ -161,7 +165,7 @@ class Arlo(object):
             'Host': self.AUTH_URL,
         }
 
-        self.request = Request()
+        self.request = Request(mode="cloudscraper")
         try:
             auth_host = self.AUTH_URL
             self.request.options(f'https://{auth_host}/api/auth', headers=headers)
