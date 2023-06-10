@@ -17,9 +17,9 @@ ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
 ENV S6_KEEP_ENV=1
 ARG TARGETARCH
 RUN case "${TARGETARCH}" in \
-    x86_64) S6_ARCH='amd64';; \
-    armv7l) S6_ARCH='arm';; \
-    aarch64) S6_ARCH='arm64';; \
+    amd64) S6_ARCH='x86_64';; \
+    arm) S6_ARCH='armhf';; \
+    arm64) S6_ARCH='aarch64';; \
     *) echo "Your system architecture isn't supported."; exit 1 ;; \
     esac \
   && cd /tmp \
