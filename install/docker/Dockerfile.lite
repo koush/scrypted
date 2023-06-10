@@ -1,27 +1,23 @@
-ARG BASE="bullseye"
+ARG BASE="jammy"
 FROM ubuntu:${BASE} as header
 
-RUN apt-get update && apt-get -y install curl wget
+ENV DEBIAN_FRONTEND=noninteractive
 
-# switch to nvm?
-ARG NODE_VERSION=18
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-RUN apt-get update
-RUN apt-get install -y nodejs
-
-RUN apt-get -y update
-RUN apt-get -y upgrade
-RUN apt-get -y install software-properties-common apt-utils
-RUN apt-get -y update
-
-# base development stuff
-RUN apt-get -y install \
+# base tools and development stuff
+RUN apt-get update && apt-get -y install \
+    curl software-properties-common apt-utils \
     build-essential \
     cmake \
     gcc \
     libcairo2-dev \
     libgirepository1.0-dev \
-    pkg-config
+    pkg-config && \
+    apt-get -y update && \
+    apt-get -y upgrade
+
+ARG NODE_VERSION=18
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+RUN apt-get update && apt-get install -y nodejs
 
 # python native
 RUN apt-get -y install \
@@ -43,5 +39,5 @@ ENV SCRYPTED_INSTALL_PATH="/server"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION=20230527
+ENV SCRYPTED_BASE_VERSION=20230608
 ENV SCRYPTED_DOCKER_FLAVOR=lite

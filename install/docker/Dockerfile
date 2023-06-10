@@ -1,4 +1,4 @@
-ARG BASE="18-bullseye-full"
+ARG BASE="18-jammy-full"
 FROM koush/scrypted-common:${BASE}
 
 WORKDIR /

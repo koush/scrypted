@@ -3,9 +3,9 @@ name: Test
 on:
   push:
     branches: ["main"]
-    paths: ["docker/**", ".github/workflows/test.yml"]
+    paths: ["install/**", ".github/workflows/test.yml"]
   pull_request:
-    paths: ["docker/**", ".github/workflows/test.yml"]
+    paths: ["install/**", ".github/workflows/test.yml"]
   workflow_dispatch:
   
 jobs:

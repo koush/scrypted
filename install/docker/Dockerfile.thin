@@ -1,18 +1,15 @@
-ARG BASE="bullseye"
+ARG BASE="jammy"
 FROM ubuntu:${BASE} as header
 
-RUN apt-get update && apt-get -y install curl wget
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -y update && \
+    apt-get -y upgrade && \
+    apt-get -y install curl software-properties-common apt-utils
 
 # switch to nvm?
 ARG NODE_VERSION=18
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-RUN apt-get update
-RUN apt-get install -y nodejs
-
-RUN apt-get -y update
-RUN apt-get -y upgrade
-RUN apt-get -y install software-properties-common apt-utils
-RUN apt-get -y update
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && apt-get update && apt-get install -y nodejs
 
 ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
@@ -21,5 +18,5 @@ ENV SCRYPTED_INSTALL_PATH="/server"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION=20230527
+ENV SCRYPTED_BASE_VERSION=20230608
 ENV SCRYPTED_DOCKER_FLAVOR=thin
