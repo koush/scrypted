@@ -1,6 +1,6 @@
 # Home Assistant Addon Configuration
 name: Scrypted
-version: "18-bullseye-full.s6-v0.39.1"
+version: "18-bullseye-full.s6-v0.39.4"
 slug: scrypted
 description: Scrypted is a high performance home video integration and automation platform
 url: "https://github.com/koush/scrypted"
