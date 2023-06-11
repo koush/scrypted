@@ -149,30 +149,33 @@ def multiprocess_exit():
         os._exit(os.EX_OK)
 
 class CodecFork:
-    async def generateVideoFramesGstreamer(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions, filter: Any, h264Decoder: str, postProcessPipeline: str) -> scrypted_sdk.VideoFrame:
+    async def generateVideoFrames(self, iter, src: str):
         start = time.time()
+        loop = asyncio.get_event_loop()
+        def timeoutExit():
+            print('Frame yield timed out, exiting pipeline.')
+            multiprocess_exit()
+
         try:
-            async for data in gstreamer.generateVideoFramesGstreamer(mediaObject, options, filter, h264Decoder, postProcessPipeline):
+            while True:
+                data = await asyncio.wait_for(iter.__anext__(), timeout=10)
+                timeout = loop.call_later(10, timeoutExit)
                 yield data
-        except Exception as e:
+                timeout.cancel()
+        except Exception:
             traceback.print_exc()
             raise
         finally:
-            print('gstreamer finished after %s' % (time.time() - start))
+            print('%s finished after %s' % (src, time.time() - start))
             asyncio.get_event_loop().call_later(1, multiprocess_exit)
+
+    async def generateVideoFramesGstreamer(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions, filter: Any, h264Decoder: str, postProcessPipeline: str) -> scrypted_sdk.VideoFrame:
+        async for data in self.generateVideoFrames(gstreamer.generateVideoFramesGstreamer(mediaObject, options, filter, h264Decoder, postProcessPipeline), "gstreamer"):
+            yield data
 
     async def generateVideoFramesLibav(self, mediaObject: scrypted_sdk.MediaObject, options: scrypted_sdk.VideoFrameGeneratorOptions = None, filter: Any = None) -> scrypted_sdk.VideoFrame:
-        start = time.time()
-        try:
-            async for data in libav.generateVideoFramesLibav(mediaObject, options, filter):
-                yield data
-        except Exception as e:
-            traceback.print_exc()
-            raise
-        finally:
-            print('libav finished after %s' % (time.time() - start))
-            asyncio.get_event_loop().call_later(1, multiprocess_exit)
-
+         async for data in self.generateVideoFrames(libav.generateVideoFramesLibav(mediaObject, options, filter), "libav"):
+            yield data
 
 async def fork():
    return CodecFork()

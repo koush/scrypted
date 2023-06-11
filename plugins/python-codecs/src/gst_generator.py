@@ -20,7 +20,6 @@ async def createPipelineIterator(pipeline: str, gst = None):
     print(pipeline)
     finished = concurrent.futures.Future()
 
-    newGst = not gst
     if gst:
         bin = Gst.parse_bin_from_description(pipeline, False)
         gst.add(bin)
