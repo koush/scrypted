@@ -36,11 +36,28 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         available_devices = self.core.available_devices
         print('available devices: %s' % available_devices)
 
-        xmlFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/FP16/ssd_mobilenet_v1_coco.xml', 'ssd_mobilenet_v1_coco.xml')
-        mappingFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/FP16/ssd_mobilenet_v1_coco.mapping', 'ssd_mobilenet_v1_coco.mapping')
-        labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/FP16/ssd_mobilenet_v1_coco.bin', 'ssd_mobilenet_v1_coco.bin')
+        mode = self.storage.getItem('mode')
+        if mode == 'Default':
+            mode = 'AUTO'
+        mode = mode or 'AUTO'
 
-        mode = self.storage.getItem('mode') or 'AUTO'
+        precision = self.storage.getItem('precision') or 'Default'
+        if precision == 'Default':
+            using_mode = mode
+            if using_mode == 'AUTO':
+                if 'GPU' in available_devices:
+                    using_mode = 'GPU'
+            if using_mode == 'GPU':
+                precision = 'FP16'
+            else:
+                precision = 'FP32'
+
+        print(f'mode/precision: {mode}/{precision}')
+
+        xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/{precision}/ssd_mobilenet_v1_coco.xml', '{floating_point}/ssd_mobilenet_v1_coco.xml')
+        mappingFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/{precision}/ssd_mobilenet_v1_coco.mapping', '{floating_point}/ssd_mobilenet_v1_coco.mapping')
+        labelsFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/{precision}/ssd_mobilenet_v1_coco.bin', '{floating_point}/ssd_mobilenet_v1_coco.bin')
+
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
         except:
@@ -57,18 +74,31 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="openvino", )
 
     async def getSettings(self) -> list[Setting]:
-        mode = self.storage.getItem('mode') or 'AUTO'
+        mode = self.storage.getItem('mode') or 'Default'
+        precision = self.storage.getItem('precision') or 'Default'
         return [
             {
                 'key': 'mode',
                 'title': 'Mode',
                 'description': 'AUTO, CPU, or GPU mode to use for detections. Requires plugin reload. Use CPU if the system has unreliable GPU drivers.',
                 'choices': [
+                    'Default',
                     'AUTO',
                     'CPU',
                     'GPU',
                 ],
                 'value': mode,
+            },
+            {
+                'key': 'precision',
+                'title': 'Precision',
+                'description': 'The model floating point precision. FP16 is recommended for GPU. FP32 is recommended for CPU.',
+                'choices': [
+                    'Default',
+                    'FP16',
+                    'FP32',
+                ],
+                'value': precision,
             }
         ]
     

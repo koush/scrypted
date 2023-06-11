@@ -122,7 +122,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         fullpath = os.path.join(filesPath, filename)
         if os.path.isfile(fullpath):
             return fullpath
-        os.makedirs(filesPath, exist_ok=True)
+        os.makedirs(os.path.dirname(fullpath), exist_ok=True)
         tmp = fullpath + '.tmp'
         urllib.request.urlretrieve(url, tmp)
         os.rename(tmp, fullpath)
