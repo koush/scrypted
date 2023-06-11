@@ -38,7 +38,7 @@ jobs:
           append: |
             - endpoint: ssh://koush@192.168.2.124
               # platforms: linux/arm64
-              platforms: linux/arm64,linux/armhf
+              platforms: linux/arm64
             # - endpoint: ssh://koush@192.168.2.119
             #   platforms: linux/armhf
 
