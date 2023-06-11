@@ -6,7 +6,8 @@ on:
 jobs:
   build:
     name: Push Docker image to Docker Hub
-    runs-on: self-hosted
+    # runs-on: self-hosted
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         NODE_VERSION: ["18"]
