@@ -13,6 +13,7 @@ RUN apt-get update && apt-get -y install \
     curl software-properties-common apt-utils \
     build-essential \
     cmake \
+    ffmpeg \
     gcc \
     libcairo2-dev \
     libgirepository1.0-dev \
