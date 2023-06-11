@@ -20,17 +20,17 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
-      - name: Set up SSH
-        uses: MrSquaare/ssh-setup-action@v2
-        with:
-          host: 192.168.2.124
-          private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
+      # - name: Set up SSH
+      #   uses: MrSquaare/ssh-setup-action@v2
+      #   with:
+      #     host: 192.168.2.124
+      #     private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
 
-      - name: Set up SSH
-        uses: MrSquaare/ssh-setup-action@v2
-        with:
-          host: 192.168.2.119
-          private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
+      # - name: Set up SSH
+      #   uses: MrSquaare/ssh-setup-action@v2
+      #   with:
+      #     host: 192.168.2.119
+      #     private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
