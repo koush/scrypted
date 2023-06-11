@@ -991,6 +991,10 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
   shouldUseSnapshotPipeline() {
     this.pruneOldStatistics();
 
+    // never use snapshot mode if its a single camera.
+    if (this.statsSnapshotConcurrent < 2)
+      return false;
+
     // find any concurrent cameras with as many or more that had passable results
     for (const [k, v] of this.objectDetectionStatistics.entries()) {
       if (v.dps > 2 && k >= this.statsSnapshotConcurrent)
