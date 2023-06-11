@@ -34,11 +34,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
-          platforms: linux/arm64, linux/armhf
+          platforms: linux/arm64,linux/armhf
           append: |
             - endpoint: ssh://koush@192.168.2.124
               # platforms: linux/arm64
-              platforms: linux/arm64, linux/armhf
+              platforms: linux/arm64,linux/armhf
             # - endpoint: ssh://koush@192.168.2.119
             #   platforms: linux/armhf
 
