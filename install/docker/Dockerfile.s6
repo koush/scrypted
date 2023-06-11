@@ -12,7 +12,7 @@ RUN apt-get update && apt-get -y install \
 COPY fs /
 
 # s6 process supervisor
-ARG S6_OVERLAY_VERSION=3.1.1.2
+ARG S6_OVERLAY_VERSION=3.1.5.0
 ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
 ENV S6_KEEP_ENV=1
 ARG TARGETARCH
