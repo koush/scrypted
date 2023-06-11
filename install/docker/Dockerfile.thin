@@ -15,7 +15,9 @@ ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
-ENV SCRYPTED_FFMPEG_PATH="ffmpeg"
+
+RUN test -f "/usr/bin/ffmpeg"
+ENV SCRYPTED_FFMPEG_PATH="/usr/bin/ffmpeg"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
