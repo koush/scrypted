@@ -54,9 +54,10 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
 
         print(f'mode/precision: {mode}/{precision}')
 
-        xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/{precision}/ssd_mobilenet_v1_coco.xml', '{floating_point}/ssd_mobilenet_v1_coco.xml')
-        mappingFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/{precision}/ssd_mobilenet_v1_coco.mapping', '{floating_point}/ssd_mobilenet_v1_coco.mapping')
-        labelsFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/ssd_mobilenet_v1_coco/{precision}/ssd_mobilenet_v1_coco.bin', '{floating_point}/ssd_mobilenet_v1_coco.bin')
+        model_name = 'ssdlite_mobilenet_v2'
+        model_version = 'v3'
+        xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model_name}/{precision}/{model_name}.xml', f'{model_version}/{precision}/{model_name}.xml')
+        labelsFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model_name}/{precision}/{model_name}.bin', f'{model_version}/{precision}/{model_name}.bin')
 
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
