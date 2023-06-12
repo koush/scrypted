@@ -55,6 +55,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         print(f'mode/precision: {mode}/{precision}')
 
         model_name = 'ssdlite_mobilenet_v2'
+        self.model_dim = 300
         model_version = 'v3'
         xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model_name}/{precision}/{model_name}.xml', f'{model_version}/{precision}/{model_name}.xml')
         labelsFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model_name}/{precision}/{model_name}.bin', f'{model_version}/{precision}/{model_name}.bin')
@@ -110,10 +111,10 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
-        return [300, 300, 3]
+        return [self.model_dim, self.model_dim, 3]
 
     def get_input_size(self) -> Tuple[int, int]:
-        return [300, 300]
+        return [self.model_dim, self.model_dim]
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         def predict():
@@ -132,7 +133,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                     break
 
                 def torelative(value: float):
-                    return value * 300
+                    return value * self.model_dim
 
                 l = torelative(l)
                 t = torelative(t)
