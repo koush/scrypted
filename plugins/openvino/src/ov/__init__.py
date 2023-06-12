@@ -14,6 +14,7 @@ from scrypted_sdk.types import Setting
 
 from predict import PredictPlugin, Prediction, Rectangle
 import numpy as np
+from . import yolo
 
 
 def parse_label_contents(contents: str):
@@ -52,24 +53,31 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             else:
                 precision = 'FP32'
 
-        print(f'mode/precision: {mode}/{precision}')
+        
+        model = self.storage.getItem('model') or 'Default'
+        if model == 'Default':
+            model = 'ssd_mobilenet_v1_coco'
+        self.yolo = model == 'yolo-v4-tiny-tf'
 
-        model_name = 'ssdlite_mobilenet_v2'
-        self.model_dim = 300
+        print(f'model/mode/precision: {model}/{mode}/{precision}')
+
+        self.model_dim = 416 if self.yolo else 300
         model_version = 'v3'
-        xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model_name}/{precision}/{model_name}.xml', f'{model_version}/{precision}/{model_name}.xml')
-        labelsFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model_name}/{precision}/{model_name}.bin', f'{model_version}/{precision}/{model_name}.bin')
+        xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.xml', f'{model_version}/{precision}/{model}.xml')
+        labelsFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.bin', f'{model_version}/{precision}/{model}.bin')
 
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
         except:
             import traceback
             traceback.print_exc()
-            print("Reverting to AUTO mode.")
+            print("Reverting all settings.")
             self.storage.removeItem('mode')
+            self.storage.removeItem('model')
+            self.storage.removeItem('precision')
             asyncio.run_coroutine_threadsafe(scrypted_sdk.deviceManager.requestRestart(), asyncio.get_event_loop())
 
-        labelsFile = self.downloadFile('https://raw.githubusercontent.com/google-coral/test_data/master/coco_labels.txt', 'coco_labels.txt')
+        labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/coco_80cl.txt', 'coco_80cl.txt')
         labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
 
@@ -77,8 +85,21 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
 
     async def getSettings(self) -> list[Setting]:
         mode = self.storage.getItem('mode') or 'Default'
+        model = self.storage.getItem('model') or 'Default'
         precision = self.storage.getItem('precision') or 'Default'
         return [
+            {
+                'key': 'model',
+                'title': 'Model',
+                'description': 'The detection model used to find objects.',
+                'choices': [
+                    'Default',
+                    'ssd_mobilenet_v1_coco',
+                    'ssdlite_mobilenet_v2',
+                    'yolo-v4-tiny-tf',
+                ],
+                'value': model,
+            },
             {
                 'key': 'mode',
                 'title': 'Mode',
@@ -119,14 +140,38 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         def predict():
             infer_request = self.compiled_model.create_infer_request()
-            input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0), shared_memory=True)
+            if self.yolo:
+                input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0).astype(np.float32), shared_memory=True)
+            else:
+                input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0), shared_memory=True)
             # Set input tensor for model with one input
             infer_request.set_input_tensor(input_tensor)
             infer_request.start_async()
             infer_request.wait()
-            output = infer_request.get_output_tensor()
 
             objs = []
+
+            if self.yolo:
+                out_blob = infer_request.outputs[0]
+                
+                objects = yolo.parse_yolo_region(out_blob, (input.width, input.height),(81,82, 135,169, 344,319))
+
+                for r in objects:
+                    obj = Prediction(r['classId'], r['confidence'], Rectangle(
+                        r['xmin'],
+                        r['ymin'],
+                        r['xmax'],
+                        r['ymax']
+                    ))
+                    objs.append(obj)
+
+                # what about output[1]?
+                # objects = yolo.parse_yolo_region(out_blob, (input.width, input.height), (,27, 37,58, 81,82))
+
+                return objs
+
+
+            output = infer_request.get_output_tensor(0)
             for values in output.data[0][0].astype(float):
                 valid, index, confidence, l, t, r, b = values
                 if valid == -1:
