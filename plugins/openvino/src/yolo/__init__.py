@@ -53,7 +53,7 @@ def parse_yolo_region(blob, original_im_shape, anchors):
         for row in range(blob.shape[1]):       # 13
             for col in range(blob.shape[2]):   # 13
                 #print(f"l {l}")
-                info_per_anchor = blob.data[0, row, col, oth:oth+85] #print("prob"+str(prob))
+                info_per_anchor = blob[0, row, col, oth:oth+85] #print("prob"+str(prob))
 
                 confidences = [sig(raw) for raw in info_per_anchor[5:]]
                 class_id = np.argmax(info_per_anchor[5:])

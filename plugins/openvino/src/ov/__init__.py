@@ -14,7 +14,7 @@ from scrypted_sdk.types import Setting
 
 from predict import PredictPlugin, Prediction, Rectangle
 import numpy as np
-from . import yolo
+import yolo
 
 
 def parse_label_contents(contents: str):
@@ -154,7 +154,8 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             if self.yolo:
                 out_blob = infer_request.outputs[0]
                 
-                objects = yolo.parse_yolo_region(out_blob, (input.width, input.height),(81,82, 135,169, 344,319))
+                # 13 13
+                objects = yolo.parse_yolo_region(out_blob.data, (input.width, input.height),(81,82, 135,169, 344,319))
 
                 for r in objects:
                     obj = Prediction(r['classId'], r['confidence'], Rectangle(
@@ -166,6 +167,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                     objs.append(obj)
 
                 # what about output[1]?
+                # 26 26
                 # objects = yolo.parse_yolo_region(out_blob, (input.width, input.height), (,27, 37,58, 81,82))
 
                 return objs
