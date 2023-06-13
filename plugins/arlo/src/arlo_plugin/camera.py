@@ -137,17 +137,19 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     @async_print_exception_guard
     async def create_tcp_logger_server(self) -> None:
-        @async_print_exception_guard
         async def callback(reader, writer):
-            while not reader.at_eof():
-                line = await reader.readline()
-                if not line:
-                    break
-                line = str(line, 'utf-8')
-                line = line.strip()
-                self.logger.info(line)
-            writer.close()
-            await writer.wait_closed()
+            try:
+                while not reader.at_eof():
+                    line = await reader.readline()
+                    if not line:
+                        break
+                    line = str(line, 'utf-8')
+                    line = line.strip()
+                    self.logger.info(line)
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                self.logger.exception("Logger server callback raised an exception")
 
         self.logger_server = await asyncio.start_server(callback, host='localhost', port=0, family=socket.AF_INET, flags=socket.SOCK_STREAM)
         self.logger_server_port = self.logger_server.sockets[0].getsockname()[1]
@@ -395,7 +397,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             self.logger.debug(f"Got snapshot URL for at {pic_url}")
 
             if pic_url is None:
-                raise Exception("Error taking snapshot")
+                raise Exception("Error taking snapshot: no url returned")
 
             async with async_timeout(self.timeout):
                 async with aiohttp.ClientSession() as session:
@@ -453,8 +455,6 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     @async_print_exception_guard
     async def getVideoStream(self, options: RequestMediaStreamOptions = None) -> MediaObject:
         self.logger.debug("Entered getVideoStream")
-
-        raise Exception("THIS IS A TEST")
 
         mso = await self.getVideoStreamOptions(id=options["id"])
         mso['refreshAt'] = round(time.time() * 1000) + 30 * 60 * 1000
