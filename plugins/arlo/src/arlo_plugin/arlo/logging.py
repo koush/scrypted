@@ -9,7 +9,7 @@ logger.setLevel(logging.INFO)
 ch = logging.StreamHandler(sys.stdout)
 
 # log formatting
-fmt = logging.Formatter("[Arlo] %(message)s")
+fmt = logging.Formatter("[Arlo]: %(message)s")
 ch.setFormatter(fmt)
 
 # configure handler to logger

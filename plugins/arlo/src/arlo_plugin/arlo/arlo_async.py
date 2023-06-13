@@ -702,6 +702,8 @@ class Arlo(object):
 
         def callback(self, event):
             #return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+            if "error" in event:
+                return None
             properties = event.get("properties", {})
             if properties.get("activityState") == "userStreamActive":
                 if mode == "rtsp":
@@ -796,6 +798,8 @@ class Arlo(object):
             )
 
         def callback(self, event):
+            if "error" in event:
+                return None
             properties = event.get("properties", {})
             url = properties.get("presignedFullFrameSnapshotUrl")
             if url:

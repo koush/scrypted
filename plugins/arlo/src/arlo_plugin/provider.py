@@ -43,7 +43,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
     def __init__(self, nativeId: str = None) -> None:
         super().__init__(nativeId=nativeId)
-        self.logger_name = "provider"
+        self.logger_name = "Provider"
 
         self.arlo_cameras = {}
         self.arlo_basestations = {}
