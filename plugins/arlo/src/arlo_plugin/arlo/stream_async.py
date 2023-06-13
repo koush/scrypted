@@ -177,22 +177,25 @@ class Stream:
 
         now = time.time()
         event = StreamEvent(response, now, now + self.expire)
+        self._queue_impl(key, event)
 
-        if key not in self.queues:
-            q = self.queues[key] = asyncio.Queue()
-        else:
-            q = self.queues[key]
-        q.put_nowait(event)
+        # specialized setup for error responses
+        if 'error' in response:
+            key = f"{resource}/error"
+            self._queue_impl(key, event)
 
         # for optimized lookups, notify listeners of individual properties
         properties = response.get('properties', {})
         for property in properties.keys():
             key = f"{resource}/{action}/{property}"
-            if key not in self.queues:
-                q = self.queues[key] = asyncio.Queue()
-            else:
-                q = self.queues[key]
-            q.put_nowait(event)
+            self._queue_impl(key, event)
+
+    def _queue_impl(self, key, event):
+        if key not in self.queues:
+            q = self.queues[key] = asyncio.Queue()
+        else:
+            q = self.queues[key]
+        q.put_nowait(event)
 
     def requeue(self, event, resource, action, property=None):
         if not property:

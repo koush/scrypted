@@ -106,6 +106,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
         self.picture_lock = asyncio.Lock()
 
+        self.start_error_subscription()
         self.start_motion_subscription()
         self.start_audio_subscription()
         self.start_battery_subscription()
@@ -155,6 +156,15 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         self.logger_server_port = self.logger_server.sockets[0].getsockname()[1]
 
         self.logger.info(f"Started logging server at localhost:{self.logger_server_port}")
+
+    def start_error_subscription(self) -> None:
+        def callback(code, message):
+            self.logger.error(f"Arlo returned error code {code} with message: {message}")
+            return self.stop_subscriptions
+
+        self.register_task(
+            self.provider.arlo.SubscribeToErrorEvents(self.arlo_basestation, self.arlo_device, callback)
+        )
 
     def start_motion_subscription(self) -> None:
         def callback(motionDetected):

@@ -400,12 +400,39 @@ class Arlo(object):
         basestation_id = basestation.get('deviceId')
         return self.Notify(basestation, {"action":"set","resource":"subscriptions/"+self.user_id+"_web","publishResponse":False,"properties":{"devices":[basestation_id]}})
 
+    def SubscribeToErrorEvents(self, basestation, camera, callback):
+        """
+        Use this method to subscribe to error events. You must provide a callback function which will get called once per error event.
+
+        The callback function should have the following signature:
+        def callback(code, message)
+
+        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
+        that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
+        """
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        def callbackwrapper(self, event):
+            error = event.get('error', {})
+            message = error.get('message')
+            code = error.get('code')
+            stop = callback(code, message)
+            if not stop:
+                return None
+            return stop
+
+        return asyncio.get_event_loop().create_task(
+            self.HandleEvents(basestation, resource, ['error'], callbackwrapper)
+        )
+
     def SubscribeToMotionEvents(self, basestation, camera, callback):
         """
         Use this method to subscribe to motion events. You must provide a callback function which will get called once per motion event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -432,7 +459,7 @@ class Arlo(object):
         Use this method to subscribe to audio events. You must provide a callback function which will get called once per audio event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -459,7 +486,7 @@ class Arlo(object):
         Use this method to subscribe to battery events. You must provide a callback function which will get called once per battery event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -486,7 +513,7 @@ class Arlo(object):
         Use this method to subscribe to doorbell events. You must provide a callback function which will get called once per doorbell event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -522,7 +549,7 @@ class Arlo(object):
         Use this method to subscribe to pushToTalk SDP answer events. You must provide a callback function which will get called once per SDP event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -550,7 +577,7 @@ class Arlo(object):
         Use this method to subscribe to pushToTalk ICE candidate answer events. You must provide a callback function which will get called once per candidate event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
