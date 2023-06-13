@@ -34,7 +34,7 @@ def scale_bbox(x, y, h, w, class_id, confidence, h_scale, w_scale):
     return dict(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, class_id=class_id, confidence=confidence)
 
 
-def parse_yolo_region(blob, original_im_shape, anchors):
+def parse_yolo_region(blob, original_im_shape, anchors, scoreSig = True):
     # ------------------------------------------ Validating output parameters ------------------------------------------
     _, out_blob_h, out_blob_w, _ = blob.shape   # [26, 26] and [13, 13]
     assert out_blob_w == out_blob_h, "Invalid size of output blob. It sould be in NCHW layout and height should " \
@@ -55,14 +55,17 @@ def parse_yolo_region(blob, original_im_shape, anchors):
                 #print(f"l {l}")
                 info_per_anchor = blob[0, row, col, oth:oth+85] #print("prob"+str(prob))
 
-                confidences = [sig(raw) for raw in info_per_anchor[5:]]
-                class_id = np.argmax(info_per_anchor[5:])
+                confidences = info_per_anchor[5:]
+                if scoreSig:
+                    confidences = [sig(raw) for raw in confidences]
+                class_id = np.argmax(confidences)
                 confidence = confidences[class_id]
                 if confidence < .2:
                     continue
 
                 raw_x, raw_y, width, height, box_confidence = info_per_anchor[:5]
-                box_confidence = sig(box_confidence)
+                if scoreSig:
+                    box_confidence = sig(box_confidence)
                 if box_confidence < .05:
                     continue
 
@@ -107,5 +110,5 @@ def parse_yolo_region(blob, original_im_shape, anchors):
             if intersection_over_union(objects[i], objects[j]) > .4:
                 objects[j]['confidence'] = 0
 
-    objects = filter(lambda o: o['confidence'] > 0, objects)
+    objects = list(filter(lambda o: o['confidence'] > 0, objects))
     return objects
