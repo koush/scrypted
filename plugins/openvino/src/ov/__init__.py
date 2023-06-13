@@ -57,7 +57,8 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         model = self.storage.getItem('model') or 'Default'
         if model == 'Default':
             model = 'ssd_mobilenet_v1_coco'
-        self.yolo = model == 'yolo-v4-tiny-tf'
+        self.yolo = 'yolo' in model
+        self.sigmoid = model == 'yolo-v4-tiny-tf'
 
         print(f'model/mode/precision: {model}/{mode}/{precision}')
 
@@ -96,6 +97,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                     'Default',
                     'ssd_mobilenet_v1_coco',
                     'ssdlite_mobilenet_v2',
+                    'yolo-v3-tiny-tf',
                     'yolo-v4-tiny-tf',
                 ],
                 'value': model,
@@ -152,10 +154,15 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             objs = []
 
             if self.yolo:
-                out_blob = infer_request.outputs[0]
+                # index 2 will always either be 13 or 26
+                # index 1 may be 13/26 or 255 depending on yolo 3 vs 4
+                if infer_request.outputs[0].data.shape[2] == 13:
+                    out_blob = infer_request.outputs[0]
+                else:
+                    out_blob = infer_request.outputs[1]
                 
                 # 13 13
-                objects = yolo.parse_yolo_region(out_blob.data, (input.width, input.height),(81,82, 135,169, 344,319))
+                objects = yolo.parse_yolo_region(out_blob.data, (input.width, input.height),(81,82, 135,169, 344,319), self.sigmoid)
 
                 for r in objects:
                     obj = Prediction(r['classId'], r['confidence'], Rectangle(

@@ -121,11 +121,13 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             else:
                 out_dict = self.model.predict({"input_1": input})
             out_blob = out_dict["Identity"]
+            # out_blob = out_dict["Identity_1"]
 
             objects = yolo.parse_yolo_region(
                 out_blob,
                 (input.width, input.height),
                 (81, 82, 135, 169, 344, 319),
+                #  (23,27, 37,58, 81,82),
                 False,
             )
 
@@ -144,7 +146,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
             # what about output[1]?
             # 26 26
-            # objects = yolo.parse_yolo_region(out_blob, (input.width, input.height), (,27, 37,58, 81,82))
+            # objects = yolo.parse_yolo_region(out_blob, (input.width, input.height), (23,27, 37,58, 81,82))
 
             ret = self.create_detection_result(objs, src_size, cvss)
             return ret

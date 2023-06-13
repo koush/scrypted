@@ -34,9 +34,20 @@ def scale_bbox(x, y, h, w, class_id, confidence, h_scale, w_scale):
     return dict(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, class_id=class_id, confidence=confidence)
 
 
-def parse_yolo_region(blob, original_im_shape, anchors, scoreSig = True):
+def parse_yolo_region(blob, original_im_shape, anchors, sigmoid = True):
     # ------------------------------------------ Validating output parameters ------------------------------------------
-    _, out_blob_h, out_blob_w, _ = blob.shape   # [26, 26] and [13, 13]
+    _, c1, c2, c3 = blob.shape   # [26, 26] and [13, 13]
+    if c1 == 255:
+        out_blob_h, out_blob_w = c2, c3
+        i_oth = 1
+        i_r = 2
+        i_c = 3
+    else:
+        i_oth = 3
+        i_r = 1
+        i_c = 2
+        out_blob_h, out_blob_w = c1, c2
+
     assert out_blob_w == out_blob_h, "Invalid size of output blob. It sould be in NCHW layout and height should " \
                                      "be equal to width. Current height = {}, current width = {}" \
                                      "".format(out_blob_h, out_blob_w)
@@ -49,28 +60,33 @@ def parse_yolo_region(blob, original_im_shape, anchors, scoreSig = True):
     cell_w = orig_im_w / out_blob_w
     cell_h = orig_im_h / out_blob_h
 
-    for oth in range(0, blob.shape[3], 85):    # 255
-        for row in range(blob.shape[1]):       # 13
-            for col in range(blob.shape[2]):   # 13
+    for oth in range(0, blob.shape[i_oth], 85):    # 255
+        for row in range(blob.shape[i_r]):       # 13
+            for col in range(blob.shape[i_c]):   # 13
                 #print(f"l {l}")
-                info_per_anchor = blob[0, row, col, oth:oth+85] #print("prob"+str(prob))
+                if i_oth == 3:
+                    info_per_anchor = blob[0, row, col, oth:oth+85] #print("prob"+str(prob))
+                else:
+                    info_per_anchor = blob[0, oth:oth+85, row, col] #print("prob"+str(prob))
 
                 confidences = info_per_anchor[5:]
-                if scoreSig:
+                if sigmoid:
                     confidences = [sig(raw) for raw in confidences]
                 class_id = np.argmax(confidences)
+
+                rel_cell_x, rel_cell_y, width, height, box_confidence = info_per_anchor[:5]
+                if sigmoid:
+                    box_confidence = sig(box_confidence)
+                if box_confidence < .2:
+                    continue
+
                 confidence = confidences[class_id]
                 if confidence < .2:
                     continue
 
-                raw_x, raw_y, width, height, box_confidence = info_per_anchor[:5]
-                if scoreSig:
-                    box_confidence = sig(box_confidence)
-                if box_confidence < .05:
-                    continue
-
-                rel_cell_x = sig(raw_x)
-                rel_cell_y = sig(raw_y)
+                if sigmoid:
+                    rel_cell_x = sig(rel_cell_x)
+                    rel_cell_y = sig(rel_cell_y)
 
                 x = (col + rel_cell_x) * cell_w
                 y = (row + rel_cell_y) * cell_h
@@ -92,12 +108,12 @@ def parse_yolo_region(blob, original_im_shape, anchors, scoreSig = True):
                 ymax = y + height /2 
                 objects.append(
                     {
-                        'xmin': xmin,
-                        'xmax': xmax,
-                        'ymin': ymin,
-                        'ymax': ymax,
-                        'confidence': confidence,
-                        'classId': class_id,
+                        'xmin': xmin.astype(float),
+                        'xmax': xmax.astype(float),
+                        'ymin': ymin.astype(float),
+                        'ymax': ymax.astype(float),
+                        'confidence': confidence.astype(float),
+                        'classId': class_id.astype(float),
                     }
                 )
 
@@ -107,7 +123,9 @@ def parse_yolo_region(blob, original_im_shape, anchors, scoreSig = True):
         if objects[i]['confidence'] == 0:
             continue
         for j in range(i + 1, len(objects)):
-            if intersection_over_union(objects[i], objects[j]) > .4:
+            if objects[i]['classId'] != objects[j]['classId']:
+                continue
+            if intersection_over_union(objects[i], objects[j]) > .2:
                 objects[j]['confidence'] = 0
 
     objects = list(filter(lambda o: o['confidence'] > 0, objects))
