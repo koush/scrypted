@@ -298,17 +298,20 @@ class Arlo(object):
             # filter out cameras without basestation, where they are their own basestations
             # this is so battery-powered devices do not drain due to pings
             # for wired devices, keep doorbells, sirens, and arloq in the list so they get pings
-            proper_basestations = {}
+            # we also add arlo baby devices (abc1000, abc1000a) since they are standalone-only
+            # and seem to want pings
+            devices_to_ping = {}
             for basestation in basestations.values():
                 if basestation['deviceId'] == basestation.get('parentId') and \
-                    basestation['deviceType'] not in ['doorbell', 'siren', 'arloq', 'arloqs']:
+                    basestation['deviceType'] not in ['doorbell', 'siren', 'arloq', 'arloqs'] and \
+                    basestation['modelId'].lower() not in ['abc1000', 'abc1000a']:
                     continue
-                proper_basestations[basestation['deviceId']] = basestation
+                devices_to_ping[basestation['deviceId']] = basestation
 
-            logger.info(f"Will send heartbeat to the following devices: {list(proper_basestations.keys())}")
+            logger.info(f"Will send heartbeat to the following devices: {list(devices_to_ping.keys())}")
 
-            # start heartbeat loop with only basestations
-            asyncio.get_event_loop().create_task(heartbeat(self, list(proper_basestations.values())))
+            # start heartbeat loop with only pingable devices
+            asyncio.get_event_loop().create_task(heartbeat(self, list(devices_to_ping.values())))
 
             # subscribe to all camera topics
             topics = [
