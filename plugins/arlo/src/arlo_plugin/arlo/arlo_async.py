@@ -414,8 +414,18 @@ class Arlo(object):
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
+        # Note: It looks like sometimes a message is returned as an 'is' action
+        # where a 'stateChangeReason' property contains the error message. This is
+        # a bit of a hack but we will listen to both events with an 'error' key as
+        # well as 'stateChangeReason' events.
+
         def callbackwrapper(self, event):
-            error = event.get('error', {})
+            if 'error' in event:
+                error = event['error']
+            elif 'properties' in event:
+                error = event['properties'].get('stateChangeReason', {})
+            else:
+                return None
             message = error.get('message')
             code = error.get('code')
             stop = callback(code, message)
@@ -424,7 +434,7 @@ class Arlo(object):
             return stop
 
         return asyncio.get_event_loop().create_task(
-            self.HandleEvents(basestation, resource, ['error'], callbackwrapper)
+            self.HandleEvents(basestation, resource, ['error', ('is', 'stateChangeReason')], callbackwrapper)
         )
 
     def SubscribeToMotionEvents(self, basestation, camera, callback):

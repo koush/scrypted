@@ -1,7 +1,5 @@
 import multiprocessing
-import socket
 import subprocess
-import sys
 import time
 import threading
 
