@@ -10,6 +10,7 @@ from PIL import Image
 import asyncio
 import concurrent.futures
 import yolo
+import numpy as np
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "CoreML-Predict")
 
@@ -33,8 +34,11 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         model = self.storage.getItem("model") or "Default"
         if model == "Default":
             model = "ssdlite_mobilenet_v2"
-        self.yolo = model == "yolov4-tiny"
+        self.yolo = 'yolo' in model
+        self.yolov8 = 'yolov8' in model
         model_version = "v1"
+
+        print(f'model: {model}')
 
         if not self.yolo:
             # todo convert these to mlpackage
@@ -44,23 +48,29 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             )
             modelFile = self.downloadFile(
                 f"https://github.com/koush/coreml-models/raw/main/{model}/{model}.mlmodel",
-                "{model}.mlmodel",
+                f"{model}.mlmodel",
             )
         else:
-            files = [
-                f"{model}/{model}.mlpackage/Data/com.apple.CoreML/FeatureDescriptions.json",
-                f"{model}/{model}.mlpackage/Data/com.apple.CoreML/Metadata.json",
-                f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
-                f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{model}.mlmodel",
-                f"{model}/{model}.mlpackage/Manifest.json",
-            ]
+            if self.yolov8:
+                    modelFile = self.downloadFile(
+                        f"https://github.com/koush/coreml-models/raw/main/{model}/{model}.mlmodel",
+                        f"{model}.mlmodel",
+                    )
+            else:
+                files = [
+                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/FeatureDescriptions.json",
+                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/Metadata.json",
+                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{model}.mlmodel",
+                    f"{model}/{model}.mlpackage/Manifest.json",
+                ]
 
-            for f in files:
-                p = self.downloadFile(
-                    f"https://github.com/koush/coreml-models/raw/main/{f}",
-                    f"{model_version}/{f}",
-                )
-                modelFile = os.path.dirname(p)
+                for f in files:
+                    p = self.downloadFile(
+                        f"https://github.com/koush/coreml-models/raw/main/{f}",
+                        f"{model_version}/{f}",
+                    )
+                    modelFile = os.path.dirname(p)
 
             labelsFile = self.downloadFile(
                 f"https://github.com/koush/coreml-models/raw/main/{model}/coco_80cl.txt",
@@ -92,6 +102,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     "Default",
                     "ssd_mobilenet_v1_coco",
                     "yolov4-tiny",
+                    "yolov8n",
                 ],
                 "value": model,
             },
@@ -114,14 +125,43 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         # run in executor if this is the plugin loop
         if self.yolo:
+            input_name = 'image' if self.yolov8 else 'input_1'
             if asyncio.get_event_loop() is self.loop:
                 out_dict = await asyncio.get_event_loop().run_in_executor(
-                    predictExecutor, lambda: self.model.predict({"input_1": input})
+                    predictExecutor, lambda: self.model.predict({input_name: input})
                 )
             else:
-                out_dict = self.model.predict({"input_1": input})
+                out_dict = self.model.predict({input_name: input})
+
+            if self.yolov8:
+                out_blob = out_dict["var_914"]
+                var_914 = out_dict['var_914']
+                results = var_914[0]
+                keep = np.argwhere(results[4:] > 0.2)
+                for indices in keep:
+                    class_id = indices[0]
+                    index = indices[1]
+                    confidence = results[class_id + 4, index]
+                    x = results[0][index].astype(float)
+                    y = results[1][index].astype(float)
+                    w = results[2][index].astype(float)
+                    h = results[3][index].astype(float)
+                    obj = Prediction(
+                        class_id,
+                        confidence.astype(float),
+                        Rectangle(
+                            x - w / 2,
+                            y - h / 2,
+                            x + w / 2,
+                            y + h / 2,
+                        ),
+                    )
+                    objs.append(obj)
+
+                ret = self.create_detection_result(objs, src_size, cvss)
+                return ret
+
             out_blob = out_dict["Identity"]
-            # out_blob = out_dict["Identity_1"]
 
             objects = yolo.parse_yolo_region(
                 out_blob,
