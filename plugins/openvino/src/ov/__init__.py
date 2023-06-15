@@ -92,7 +92,14 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
 
         model_version = 'v3'
         xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.xml', f'{model_version}/{precision}/{model}.xml')
-        labelsFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.bin', f'{model_version}/{precision}/{model}.bin')
+        binFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.bin', f'{model_version}/{precision}/{model}.bin')
+        if self.yolo:
+            labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/coco_80cl.txt', 'coco_80cl.txt')
+        else:
+            labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/coco_labels.txt', 'coco_labels.txt')
+
+        print(xmlFile, binFile, labelsFile)
+
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
         except:
@@ -104,7 +111,6 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             self.storage.removeItem('precision')
             asyncio.run_coroutine_threadsafe(scrypted_sdk.deviceManager.requestRestart(), asyncio.get_event_loop())
 
-        labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/coco_80cl.txt', 'coco_80cl.txt')
         labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
 
