@@ -16,7 +16,6 @@ from predict import PredictPlugin, Prediction, Rectangle
 import numpy as np
 import yolo
 
-
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
     ret = {}
@@ -126,7 +125,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                     'ssdlite_mobilenet_v2',
                     'yolo-v3-tiny-tf',
                     'yolo-v4-tiny-tf',
-                    # 'yolov8n',
+                    'yolov8n',
                 ],
                 'value': model,
             },
@@ -171,10 +170,12 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         def predict():
             infer_request = self.compiled_model.create_infer_request()
             if self.yolov8:
-                i  = np.array(input)
-                c = np.squeeze(np.split(i, i.shape[-1], -1), axis=-1)
-                d = np.expand_dims(c, axis=0)
-                input_tensor = ov.Tensor(array=d.astype(np.float32), shared_memory=True)
+                im = np.stack([input])
+                im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+                im = im.astype(np.float32) / 255.0
+                im = np.ascontiguousarray(im)  # contiguous
+                im = ov.Tensor(array=im, shared_memory=True)
+                input_tensor = im
             elif self.yolo:
                 input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0).astype(np.float32), shared_memory=True)
             else:
@@ -187,9 +188,8 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             objs = []
 
             if self.yolov8:
-                objs = yolo.parse_yolov8(infer_request.outputs[0].data)
-                ret = self.create_detection_result(objs, src_size, cvss)
-                return ret
+                objs = yolo.parse_yolov8(infer_request.outputs[0].data[0])
+                return objs
 
             if self.yolo:
                 # index 2 will always either be 13 or 26
