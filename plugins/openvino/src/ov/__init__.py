@@ -28,12 +28,33 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
+def param_to_string(parameters) -> str:
+    """Convert a list / tuple of parameters returned from IE to a string."""
+    if isinstance(parameters, (list, tuple)):
+        return ', '.join([str(x) for x in parameters])
+    else:
+        return str(parameters)
+
+def dump_device_properties(core):
+    print('Available devices:')
+    for device in core.available_devices:
+        print(f'{device} :')
+        print('\tSUPPORTED_PROPERTIES:')
+        for property_key in core.get_property(device, 'SUPPORTED_PROPERTIES'):
+            if property_key not in ('SUPPORTED_METRICS', 'SUPPORTED_CONFIG_KEYS', 'SUPPORTED_PROPERTIES'):
+                try:
+                    property_val = core.get_property(device, property_key)
+                except TypeError:
+                    property_val = 'UNSUPPORTED TYPE'
+                print(f'\t\t{property_key}: {param_to_string(property_val)}')
+        print('')
 
 class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
         self.core = ov.Core()
+        dump_device_properties(self.core)
         available_devices = self.core.available_devices
         print('available devices: %s' % available_devices)
 
@@ -58,15 +79,21 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         if model == 'Default':
             model = 'ssd_mobilenet_v1_coco'
         self.yolo = 'yolo' in model
+        self.yolov8 = "yolov8" in model
         self.sigmoid = model == 'yolo-v4-tiny-tf'
 
         print(f'model/mode/precision: {model}/{mode}/{precision}')
 
-        self.model_dim = 416 if self.yolo else 300
+        if self.yolov8:
+            self.model_dim = 640
+        elif self.yolo:
+            self.model_dim = 416
+        else:
+            self.model_dim = 300
+
         model_version = 'v3'
         xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.xml', f'{model_version}/{precision}/{model}.xml')
         labelsFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.bin', f'{model_version}/{precision}/{model}.bin')
-
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
         except:
@@ -99,6 +126,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                     'ssdlite_mobilenet_v2',
                     'yolo-v3-tiny-tf',
                     'yolo-v4-tiny-tf',
+                    # 'yolov8n',
                 ],
                 'value': model,
             },
@@ -142,7 +170,12 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         def predict():
             infer_request = self.compiled_model.create_infer_request()
-            if self.yolo:
+            if self.yolov8:
+                i  = np.array(input)
+                c = np.squeeze(np.split(i, i.shape[-1], -1), axis=-1)
+                d = np.expand_dims(c, axis=0)
+                input_tensor = ov.Tensor(array=d.astype(np.float32), shared_memory=True)
+            elif self.yolo:
                 input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0).astype(np.float32), shared_memory=True)
             else:
                 input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0), shared_memory=True)
@@ -152,6 +185,11 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             infer_request.wait()
 
             objs = []
+
+            if self.yolov8:
+                objs = yolo.parse_yolov8(infer_request.outputs[0].data)
+                ret = self.create_detection_result(objs, src_size, cvss)
+                return ret
 
             if self.yolo:
                 # index 2 will always either be 13 or 26

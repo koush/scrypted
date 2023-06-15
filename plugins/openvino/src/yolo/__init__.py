@@ -2,6 +2,33 @@ import sys
 from math import exp
 import numpy as np
 
+from predict import Prediction, Rectangle
+
+def parse_yolov8(results):
+    objs = []
+    keep = np.argwhere(results[4:] > 0.2)
+    for indices in keep:
+        class_id = indices[0]
+        index = indices[1]
+        confidence = results[class_id + 4, index]
+        x = results[0][index].astype(float)
+        y = results[1][index].astype(float)
+        w = results[2][index].astype(float)
+        h = results[3][index].astype(float)
+        obj = Prediction(
+            class_id,
+            confidence.astype(float),
+            Rectangle(
+                x - w / 2,
+                y - h / 2,
+                x + w / 2,
+                y + h / 2,
+            ),
+        )
+        objs.append(obj)
+
+    return objs
+
 def sig(x):
     return 1/(1 + np.exp(-x))
 

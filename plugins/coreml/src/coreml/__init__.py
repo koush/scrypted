@@ -145,27 +145,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 out_blob = out_dict["var_914"]
                 var_914 = out_dict["var_914"]
                 results = var_914[0]
-                keep = np.argwhere(results[4:] > 0.2)
-                for indices in keep:
-                    class_id = indices[0]
-                    index = indices[1]
-                    confidence = results[class_id + 4, index]
-                    x = results[0][index].astype(float)
-                    y = results[1][index].astype(float)
-                    w = results[2][index].astype(float)
-                    h = results[3][index].astype(float)
-                    obj = Prediction(
-                        class_id,
-                        confidence.astype(float),
-                        Rectangle(
-                            x - w / 2,
-                            y - h / 2,
-                            x + w / 2,
-                            y + h / 2,
-                        ),
-                    )
-                    objs.append(obj)
-
+                objs = yolo.parse_yolov8(results)
                 ret = self.create_detection_result(objs, src_size, cvss)
                 return ret
 
