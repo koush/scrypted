@@ -269,7 +269,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         inputAudioCodec = audio?.codec;
     });
 
-    const sdp = rtsp.sdp.then(sdpString => [Buffer.from(sdpString)]);
+    const sdp = new Promise<Buffer[]>((res, rej) => {
+        rtsp.sdp.then(sdpString => res([Buffer.from(sdpString)]));
+        killed.then(() => rej(new Error("ffmpeg killed before sdp could be parsed")));
+    });
     start();
 
     return {
