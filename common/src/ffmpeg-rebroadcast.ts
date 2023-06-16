@@ -269,7 +269,8 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         inputAudioCodec = audio?.codec;
     });
 
-    const sdp = rtsp.sdp.then(sdpString => [Buffer.from(sdpString)]);
+    // sdp might never get parsed if ffmpeg exits without printing anything
+    const sdp = Promise.any([rtsp.sdp.then(sdpString => [Buffer.from(sdpString)]), killed]) as Promise<Buffer[]>;
     start();
 
     return {
