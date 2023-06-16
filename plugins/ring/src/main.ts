@@ -44,6 +44,15 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             },
             noStore: true,
         },
+        polling: {
+            title: 'Polling',
+            description: 'Poll the Ring servers instead of using server delivered Push events. May fix issues with events not being delivered.',
+            type: 'boolean',
+            onPut: async() => {
+                await this.tryLogin();
+                await this.discoverDevices();
+            },
+        },
         refreshToken: {
             hide: true,
         },
@@ -68,10 +77,21 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             ],
             defaultValue: 'Disabled',
         },
+        pnc: {
+            hide: true,
+            json: true,
+        }
     });
 
     constructor() {
         super();
+
+        this.settingsStorage.settings.cameraDingsPollingSeconds.onGet = async () => {
+            return {
+                hide: !this.settingsStorage.values.polling,
+            };
+        }
+
         this.discoverDevices()
             .catch(e => this.console.error('discovery failure', e));
 
@@ -100,12 +120,14 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
         const cameraStatusPollingSeconds = 20;
 
         const createRingApi = async () => {
+            this.api?.disconnect();
+
             this.api = new RingBaseApi({
                 refreshToken: this.settingsStorage.values.refreshToken,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 locationIds,
                 cameraStatusPollingSeconds,
-                cameraDingsPollingSeconds: this.settingsStorage.values.cameraDingsPollingSeconds,
+                cameraDingsPollingSeconds: this.settingsStorage.values.polling ? this.settingsStorage.values.cameraDingsPollingSeconds : undefined,
                 systemId: this.settingsStorage.values.systemId,
             }, {
                 createPeerConnection: () => {
@@ -113,8 +135,12 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
                 },
             });
 
+            if (this.api.restClient.refreshToken && this.api.restClient.authConfig && this.settingsStorage.values.pnc)
+                this.api.restClient._internalOnly_pushNotificationCredentials = this.settingsStorage.values.pnc;
+
             this.api.onRefreshTokenUpdated.subscribe(({ newRefreshToken }) => {
                 this.settingsStorage.values.refreshToken = newRefreshToken;
+                this.settingsStorage.values.pnc = this.api.restClient._internalOnly_pushNotificationCredentials;
             });
         }
 
