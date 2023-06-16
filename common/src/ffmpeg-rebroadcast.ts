@@ -263,23 +263,23 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     const rtsp = (options.parsers as any).rtsp as ReturnType<typeof createRtspParser>;
     rtsp.sdp.then(sdp => {
         const parsed = parseSdp(sdp);
-        const audio = parsed.msections.find(msection=>msection.type === 'audio');
-        const video = parsed.msections.find(msection=>msection.type === 'video');
+        const audio = parsed.msections.find(msection => msection.type === 'audio');
+        const video = parsed.msections.find(msection => msection.type === 'video');
         inputVideoCodec = video?.codec;
         inputAudioCodec = audio?.codec;
     });
 
-    const sdp = new Promise<Buffer[]>((res, rej) => {
-        rtsp.sdp.then(sdpString => res([Buffer.from(sdpString)]));
-        killed.then(() => rej(new Error("ffmpeg killed before sdp could be parsed")));
-    });
+    const sdp = new Deferred<Buffer[]>();
+    rtsp.sdp.then(r => sdp.resolve([Buffer.from(r)]));
+    killed.then(() => sdp.reject(new Error("ffmpeg killed before sdp could be parsed")));
+
     start();
 
     return {
         start() {
             deferredStart.resolve();
         },
-        sdp,
+        sdp: sdp.promise,
         get inputAudioCodec() {
             return inputAudioCodec;
         },
