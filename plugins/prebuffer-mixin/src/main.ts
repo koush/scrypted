@@ -485,7 +485,7 @@ class PrebufferSession {
       // the rtsp parser should always stream copy unless audio is soft muted.
       acodec: audioSoftMuted ? acodec : ['-acodec', 'copy'],
     });
-    this.sdp = null;
+    this.sdp = parser.sdp;
     rbo.parsers.rtsp = parser;
 
     const mo = await this.mixinDevice.getVideoStream(mso);
@@ -508,6 +508,7 @@ class PrebufferSession {
       const { url, sdp, mediaStreamOptions } = json;
 
       session = startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, rbo);
+      this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
     }
     else {
       const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
@@ -535,6 +536,7 @@ class PrebufferSession {
           audioSoftMuted,
           rtspRequestTimeout: 10000,
         });
+        this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
       }
       else {
         if (parser === FFMPEG_PARSER_UDP)
@@ -608,11 +610,7 @@ class PrebufferSession {
       }, h264Oddities ? 60000 : 10000);
     }
 
-    this.sdp = session.sdp.then(buffers => buffers ? Buffer.concat(buffers).toString() : null);
-    const sdp = await session.sdp;
-    if (!sdp) {
-      this.console.warn('no sdp returned by parser')
-    }
+    await session.sdp;
 
     // complain to the user about the codec if necessary. upstream may send a audio
     // stream but report none exists (to request muting).
@@ -899,9 +897,6 @@ class PrebufferSession {
 
     const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
     let sdp = await this.sdp;
-    if (!sdp) {
-      throw Error("parser returned empty sdp");
-    }
     if (!mediaStreamOptions.video?.h264Info && this.usingScryptedParser) {
       mediaStreamOptions.video ||= {};
       mediaStreamOptions.video.h264Info = this.getLastH264Probe();
@@ -1102,11 +1097,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             prebufferSession = session;
             prebufferSession.ensurePrebufferSession();
             await prebufferSession.parserSessionPromise;
-            const sdp = await prebufferSession.sdp;
-            if (!sdp) {
-              throw Error('prebuffer returned empty sdp');
-            }
-            server.sdp = sdp;
+            server.sdp = await prebufferSession.sdp;
             return true;
           }
           if (u.pathname === '/' + session.rtspServerMutedPath) {
@@ -1114,13 +1105,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             prebufferSession = session;
             prebufferSession.ensurePrebufferSession();
             await prebufferSession.parserSessionPromise;
-            const sdp = await prebufferSession.sdp;
-            if (!sdp) {
-              throw Error('prebuffer returned empty sdp')
-            }
-            const parsedSdp = parseSdp(sdp);
-            parsedSdp.msections = parsedSdp.msections.filter(msection => msection.type === 'video');
-            server.sdp = parsedSdp.toSdp();
+            const sdp = parseSdp(await prebufferSession.sdp);
+            sdp.msections = sdp.msections.filter(msection => msection.type === 'video');
+            server.sdp = sdp.toSdp();
             return true;
           }
         }
