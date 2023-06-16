@@ -39,7 +39,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         if model == "Default":
             # model = "ssdlite_mobilenet_v2"
             if "arm" in platform.processor():
-                model = "yolov8"
+                model = "yolov8n"
             else:
                 model = "ssdlite_mobilenet_v2"
         self.yolo = "yolo" in model
