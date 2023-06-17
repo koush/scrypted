@@ -58,32 +58,39 @@ class TensorFlowLitePlugin(
             edge_tpus = None
             pass
 
-        model = self.storage.getItem("model") or "Default"
-        if model == "Default":
-            if edge_tpus:
-                model = "yolov8n_full_integer_quant"
-            else:
-                model = "ssd_mobilenet_v2_coco_quant_postprocess"
-        self.yolo = "yolo" in model
-        self.yolov8 = "yolov8" in model
-
-        print(f'model: {model}')
-
         model_version = "v5"
+        model = self.storage.getItem("model") or "Default"
+        defaultModel = model == "Default"
 
-        if self.yolo:
-            labelsFile = self.downloadFile(
-                "https://raw.githubusercontent.com/koush/tflite-models/main/coco_80cl.txt",
-                f"{model_version}/coco_80cl.txt",
-            )
-        else:
-            labelsFile = self.downloadFile(
-                "https://raw.githubusercontent.com/koush/tflite-models/main/coco_labels.txt",
-                f"{model_version}/coco_labels.txt",
-            )
+        labelsFile = None
+        def configureModel():
+            nonlocal labelsFile
+            nonlocal model
 
-        labels_contents = open(labelsFile, "r").read()
-        self.labels = parse_label_contents(labels_contents)
+            if defaultModel:
+                if edge_tpus:
+                    model = "yolov8n_full_integer_quant"
+                else:
+                    model = "ssd_mobilenet_v2_coco_quant_postprocess"
+            self.yolo = "yolo" in model
+            self.yolov8 = "yolov8" in model
+
+            print(f'model: {model}')
+
+            if self.yolo:
+                labelsFile = self.downloadFile(
+                    "https://raw.githubusercontent.com/koush/tflite-models/main/coco_80cl.txt",
+                    f"{model_version}/coco_80cl.txt",
+                )
+            else:
+                labelsFile = self.downloadFile(
+                    "https://raw.githubusercontent.com/koush/tflite-models/main/coco_labels.txt",
+                    f"{model_version}/coco_labels.txt",
+                )
+
+            labels_contents = open(labelsFile, "r").read()
+            self.labels = parse_label_contents(labels_contents)
+
         self.interpreters = queue.Queue()
         self.interpreter_count = 0
 
@@ -95,6 +102,7 @@ class TensorFlowLitePlugin(
 
         try:
             if edge_tpus:
+                configureModel()
                 suffix = "_edgetpu"
                 modelFile = downloadModel()
                 self.edge_tpu_found = str(edge_tpus)
@@ -117,8 +125,10 @@ class TensorFlowLitePlugin(
             else:
                 raise Exception()
         except Exception as e:
+            edge_tpus = None
             self.edge_tpu_found = "Edge TPU not found"
             suffix = ""
+            configureModel()
             modelFile = downloadModel()
             interpreter = tflite.Interpreter(model_path=modelFile)
             interpreter.allocate_tensors()
