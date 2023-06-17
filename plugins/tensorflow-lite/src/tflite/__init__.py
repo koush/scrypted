@@ -69,7 +69,12 @@ class TensorFlowLitePlugin(
 
             if defaultModel:
                 if edge_tpus:
-                    model = "yolov8n_full_integer_quant"
+                    usb_tpus = list(filter(lambda t: t['type'] == 'usb', edge_tpus))
+                    if not len(usb_tpus):
+                        model = "yolov8n_full_integer_quant"
+                    else:
+                        print('USB EdgeTPU is not compatible with YOLOv8. Falling back to SSDLite MobileNet V2.')
+                        model = "ssd_mobilenet_v2_coco_quant_postprocess"
                 else:
                     model = "ssd_mobilenet_v2_coco_quant_postprocess"
             self.yolo = "yolo" in model
