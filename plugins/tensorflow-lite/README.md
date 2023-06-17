@@ -9,12 +9,16 @@ benefits to HomeKit, which does its own detection processing.
 
 To use a Coral EdgeTPU within docker, the docker host must install the EdgeTPU drivers:
 
-* USB: https://coral.ai/docs/accelerator/get-started/
-* M.2 or PCIe: https://coral.ai/docs/m2/get-started/
+* EdgeTPU USB Drivers: https://coral.ai/docs/accelerator/get-started/
+* EdgeTPU M.2 or PCIe Drivers: https://coral.ai/docs/m2/get-started/
 
-Then bring the container down and back up:
+<br/>
+Then bring the container down and back up on the host:
+<br/>
+<br/>
 
-```sh
+
+```
 cd ~/.scrypted
 docker compose down
 docker compose up -d
