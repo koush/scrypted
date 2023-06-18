@@ -68,6 +68,7 @@ class TensorFlowLitePlugin(
             nonlocal model
 
             if defaultModel:
+                # model = "ssd_mobilenet_v2_coco_quant_postprocess"
                 if edge_tpus:
                     usb_tpus = list(filter(lambda t: t['type'] == 'usb', edge_tpus))
                     if not len(usb_tpus):
@@ -194,7 +195,14 @@ class TensorFlowLitePlugin(
                     im = np.stack([input])
                     i = interpreter.get_input_details()[0]
                     if i['dtype'] == np.int8:
+                        # scale, zero_point = i['quantization']
+                        # im = im.astype(np.float32) / 255.0
+                        # im = (im / scale + zero_point).astype(np.int8)  # de-scale
+
+                        # this is the same conversion as above.
+                        # unfortunately does not use standard signed int bitwise wrapping.
                         im = im.view(np.int8)
+                        im -= 128
                     else:
                         im = im.astype(np.float32) / 255.0
                     interpreter.set_tensor(tensor_index, im)
