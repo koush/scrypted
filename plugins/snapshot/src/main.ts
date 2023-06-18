@@ -213,6 +213,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     method: "GET",
                     responseType: 'arraybuffer',
                     url: this.storageSettings.values.snapshotUrl,
+                    timeout: 60000,
                 }).then(async (response: { data: any; }) => response.data);
             }
             else if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
