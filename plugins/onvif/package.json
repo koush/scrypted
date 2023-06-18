@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/onvif",
-   "version": "0.0.121",
+   "version": "0.0.122",
    "description": "ONVIF Camera Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -40,14 +40,14 @@
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "base-64": "^1.0.0",
-      "http-auth-utils": "^3.0.2",
+      "http-auth-utils": "^3.0.5",
       "md5": "^2.3.0",
-      "onvif": "^0.6.7",
+      "onvif": "^0.6.8",
       "xml2js": "^0.4.23"
    },
    "devDependencies": {
-      "@types/md5": "^2.3.1",
-      "@types/node": "^18.15.11",
-      "@types/xml2js": "^0.4.9"
+      "@types/md5": "^2.3.2",
+      "@types/node": "^18.16.18",
+      "@types/xml2js": "^0.4.11"
    }
 }

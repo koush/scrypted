@@ -1,4 +1,4 @@
-openvino==2022.3.0
+openvino==2023.0.0
 
 # pillow for anything not intel linux, pillow-simd is available on x64 linux
 Pillow>=5.4.1; sys_platform != 'linux' or platform_machine != 'x86_64'

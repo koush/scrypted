@@ -40,7 +40,7 @@
           <v-btn v-on="on" small>
             <v-icon x-small>fa fa-calendar-alt</v-icon>
             &nbsp;
-            {{ new Date(date).getFullYear() }}-{{ new Date(date).getMonth() }}-{{ new Date(date).getDate() }}
+            {{ new Date(date).getFullYear() }}-{{ new Date(date).getMonth() + 1 }}-{{ new Date(date).getDate() }}
           </v-btn>
         </template>
         <v-card>

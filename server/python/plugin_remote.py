@@ -614,7 +614,7 @@ class PluginRemote:
                         '--prefix', python_prefix
                     ]
                     if pythonVersion:
-                        print('Specific Python verison requested. Forcing reinstall.')
+                        print('Specific Python version requested. Forcing reinstall.')
                         # prevent uninstalling system packages.
                         pipArgs.append('--ignore-installed')
                         # force reinstall even if it exists in system packages.

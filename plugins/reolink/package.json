@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/reolink",
-   "version": "0.0.23",
+   "version": "0.0.24",
    "description": "Reolink Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -36,12 +36,12 @@
    },
    "dependencies": {
       "@koush/axios-digest-auth": "^0.8.5",
-      "@scrypted/sdk": "file:../../sdk",
       "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
       "@types/multiparty": "^0.0.33",
-      "multiparty": "^4.2.2"
+      "multiparty": "^4.2.3"
    },
    "devDependencies": {
-      "@types/node": "^16.11.0"
+      "@types/node": "^18.16.18"
    }
 }

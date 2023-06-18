@@ -71,6 +71,7 @@ export class AmcrestCameraClient {
             method: "GET",
             responseType: 'arraybuffer',
             url: `http://${this.ip}/cgi-bin/snapshot.cgi`,
+            timeout: 60000,
         });
 
         return Buffer.from(response.data);

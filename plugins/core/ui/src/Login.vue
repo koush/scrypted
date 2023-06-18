@@ -5,7 +5,7 @@
         <v-card-text>
           <v-card-title style="justify-content: center;" class="headline text-uppercase">Scrypted
           </v-card-title>
-          <v-card-subtitle v-if="$store.state.hasLogin === false" style="justify-content: center;" class="text-uppercase">Create Account
+          <v-card-subtitle v-if="$store.state.hasLogin === false" style="display: flex; justify-content: center;" class="text-uppercase">Create Account
           </v-card-subtitle>
           <v-container grid-list-md>
             <v-layout wrap>
