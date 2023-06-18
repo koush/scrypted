@@ -636,7 +636,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         raise Exception("deleting Arlo video clips is not implemented by this plugin - please delete clips through the Arlo app")
 
     async def getDevice(self, nativeId: str) -> ArloDeviceBase:
-        if (nativeId.endswith("spotlight") and self.has_spotlight) or (nativeId.endswith("floodlight") and self.has_floodlight):
+        if (nativeId.endswith("spotlight") and self.has_spotlight) or (nativeId.endswith("floodlight") and self.has_floodlight) or (nativeId.endswith("nightlight") and self.has_nightlight):
             return self.get_or_create_light()
         if nativeId.endswith("vss") and self.has_siren:
             return self.get_or_create_vss()
