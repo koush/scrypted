@@ -108,7 +108,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 "description": "The detection model used to find objects.",
                 "choices": [
                     "Default",
-                    "ssd_mobilenet_v1_coco",
+                    "ssdlite_mobilenet_v2",
                     "yolov4-tiny",
                     "yolov8n",
                 ],
