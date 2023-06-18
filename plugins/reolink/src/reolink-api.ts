@@ -72,6 +72,7 @@ export class ReolinkCameraClient {
             url: url.toString(),
             responseType: 'arraybuffer',
             httpsAgent: reolinkHttpsAgent,
+            timeout: 60000,
         });
 
         return Buffer.from(response.data);

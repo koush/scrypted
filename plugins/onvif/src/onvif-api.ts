@@ -284,6 +284,7 @@ export class OnvifCameraAPI {
             url: snapshotUri,
             responseType: 'arraybuffer',
             httpsAgent,
+            timeout: 60000,
         });
 
         return Buffer.from(response.data);

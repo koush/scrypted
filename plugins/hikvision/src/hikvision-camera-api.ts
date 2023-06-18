@@ -117,6 +117,7 @@ export class HikvisionCameraAPI {
             method: "GET",
             responseType: 'arraybuffer',
             url: url,
+            timeout: 60000,
         });
 
         return Buffer.from(response.data);
