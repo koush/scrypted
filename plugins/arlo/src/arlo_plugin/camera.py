@@ -19,7 +19,7 @@ from scrypted_sdk.types import Setting, Settings, SettingValue, Device, Camera, 
 from .arlo.arlo_async import USER_AGENTS
 from .experimental import EXPERIMENTAL
 from .base import ArloDeviceBase
-from .spotlight import ArloSpotlight, ArloFloodlight
+from .spotlight import ArloSpotlight, ArloFloodlight, ArloNightlight
 from .vss import ArloSirenVirtualSecuritySystem
 from .child_process import HeartbeatChildProcess
 from .util import BackgroundTaskMixin, async_print_exception_guard
@@ -89,7 +89,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     timeout: int = 30
     intercom_session = None
-    goSM = None
+    goSM = None  # WIP
     light: ArloSpotlight = None
     vss: ArloSirenVirtualSecuritySystem = None
 
@@ -230,8 +230,8 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     def get_builtin_child_device_manifests(self) -> List[Device]:
         results = []
-        if self.has_spotlight or self.has_floodlight:
-            light = self.get_or_create_spotlight_or_floodlight()
+        if self.has_spotlight or self.has_floodlight or self.has_nightlight:
+            light = self.get_or_create_light()
             results.append({
                 "info": {
                     "model": f"{self.arlo_device['modelId']} {self.arlo_device['properties'].get('hwVersion', '')}".strip(),
@@ -637,12 +637,12 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     async def getDevice(self, nativeId: str) -> ArloDeviceBase:
         if (nativeId.endswith("spotlight") and self.has_spotlight) or (nativeId.endswith("floodlight") and self.has_floodlight):
-            return self.get_or_create_spotlight_or_floodlight()
+            return self.get_or_create_light()
         if nativeId.endswith("vss") and self.has_siren:
             return self.get_or_create_vss()
         return None
 
-    def get_or_create_spotlight_or_floodlight(self) -> ArloSpotlight:
+    def get_or_create_light(self) -> ArloSpotlight:
         if self.has_spotlight:
             light_id = f'{self.arlo_device["deviceId"]}.spotlight'
             if not self.light:
@@ -651,6 +651,10 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             light_id = f'{self.arlo_device["deviceId"]}.floodlight'
             if not self.light:
                 self.light = ArloFloodlight(light_id, self.arlo_device, self.arlo_basestation, self.provider, self)
+        elif self.has_nightlight:
+            light_id = f'{self.arlo_device["deviceId"]}.nightlight'
+            if not self.light:
+                self.light = ArloNightlight(light_id, self.arlo_device, self.provider, self)
         return self.light
 
     def get_or_create_vss(self) -> ArloSirenVirtualSecuritySystem:

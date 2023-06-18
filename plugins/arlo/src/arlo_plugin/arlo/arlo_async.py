@@ -965,6 +965,32 @@ class Arlo(object):
             },
         })
 
+    def NightlightOn(self, basestation):
+        resource = f"cameras/{basestation.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "nightLight": {
+                    "enabled": True
+                }
+            }
+        })
+
+    def NightlightOff(self, basestation):
+        resource = f"cameras/{basestation.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "nightLight": {
+                    "enabled": False
+                }
+            }
+        })
+
     def GetLibrary(self, device, from_date: datetime, to_date: datetime):
         """
         This call returns the following:
