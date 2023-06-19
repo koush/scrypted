@@ -57,8 +57,7 @@ class ArloFloodlight(ArloSpotlight):
 class ArloNightlight(ArloSpotlight):
 
     def __init__(self, nativeId: str, arlo_device: dict, provider: ArloProvider, camera: ArloCamera) -> None:
-        super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_device, provider=provider)
-        self.camera = camera
+        super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_device, provider=provider, camera=camera)
 
     @async_print_exception_guard
     async def turnOn(self) -> None:
