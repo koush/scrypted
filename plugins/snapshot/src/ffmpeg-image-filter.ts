@@ -89,7 +89,7 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
 
 export function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpegImageFilterOptions) {
     const inputArguments = [
-        '-f', 'jpeg_pipe',
+        '-f', 'image2pipe',
         '-i', 'pipe:4',
     ];
 
