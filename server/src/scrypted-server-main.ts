@@ -137,11 +137,6 @@ async function start(mainFilename: string, options?: {
         realm: 'Scrypted',
     }, async (username, password, callback) => {
         const user = await db.tryGet(ScryptedUser, username);
-        // disallow basic auth for non-admin as it can deploy plugins, etc.
-        if (!user || user.aclId) {
-            callback(false);
-            return;
-        }
 
         const salted = user.salt + password;
         const hash = crypto.createHash('sha256');
@@ -297,7 +292,7 @@ async function start(mainFilename: string, options?: {
         next();
     })
 
-    // verify all plugin related requests have some sort of auth
+    // verify all plugin related requests have admin auth
     app.all('/web/component/*', (req, res, next) => {
         if (!res.locals.username || res.locals.aclId) {
             res.status(401);
@@ -360,20 +355,6 @@ async function start(mainFilename: string, options?: {
         }
         catch (e) {
             console.error('plugin installation failed', e);
-            res.status(500);
-            res.end();
-        }
-    });
-
-    app.get('/web/component/script/search', async (req, res) => {
-        try {
-            const query = new URLSearchParams({
-                text: req.query.text.toString(),
-            })
-            const response = await axios(`https://registry.npmjs.org/-/v1/search?${query}`);
-            res.send(response.data);
-        }
-        catch (e) {
             res.status(500);
             res.end();
         }

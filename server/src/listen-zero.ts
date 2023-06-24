@@ -17,15 +17,18 @@ export async function listenZeroSingleClient(hostname?: string) {
     const server = new net.Server();
     const port = await listenZero(server, hostname);
 
+    let cancel: () => void;
     const clientPromise = new Promise<net.Socket>((resolve, reject) => {
         const timeout = setTimeout(() => {
             server.close();
             reject(new ListenZeroSingleClientTimeoutError());
-        }, 30000)
-        server.on('connection', client => {
-            server.close();
+        }, 30000);
+        cancel = () => {
             clearTimeout(timeout);
-
+            server.close();
+        };
+        server.on('connection', client => {
+            cancel();
             resolve(client);
         });
     });
@@ -38,6 +41,7 @@ export async function listenZeroSingleClient(hostname?: string) {
 
     return {
         server,
+        cancel,
         url: `tcp://${host}:${port}`,
         host,
         port,
