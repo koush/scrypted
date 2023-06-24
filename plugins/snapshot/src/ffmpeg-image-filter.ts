@@ -89,6 +89,7 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
 
 export function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpegImageFilterOptions) {
     const inputArguments = [
+        '-f', 'image2pipe',
         '-i', 'pipe:4',
     ];
 
@@ -198,7 +199,7 @@ export async function ffmpegFilterImageStream(cp: ChildProcess, options: FFmpegI
                 ++count;
                 last = jpeg;
             });
-    
+
             await once(pipe, 'jpeg');
             await Promise.any([once(cp, 'exit'), sleep(options.time)]).catch(() => {});
             if (!last)
