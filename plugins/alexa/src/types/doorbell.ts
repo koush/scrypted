@@ -6,11 +6,11 @@ import { supportedTypes } from ".";
 supportedTypes.set(ScryptedDeviceType.Doorbell, {
     async discover(device: ScryptedDevice): Promise<Partial<DiscoveryEndpoint>> {
         let capabilities: any[] = [];
-        let category: DisplayCategory = 'DOORBELL';
+        const displayCategories: DisplayCategory[] = ['DOORBELL'];
 
         if (device.interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
             capabilities = await getCameraCapabilities(device);
-            category = 'CAMERA';
+            displayCategories.push('CAMERA');
         }
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
@@ -25,7 +25,7 @@ supportedTypes.set(ScryptedDeviceType.Doorbell, {
         }
 
         return {
-            displayCategories: [category],
+            displayCategories,
             capabilities
         };
     },
