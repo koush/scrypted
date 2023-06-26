@@ -184,7 +184,7 @@ class PrebufferSession {
   release() {
     this.clearPrebuffers();
     this.parserSessionPromise?.then(parserSession => {
-      this.console.log('prebuffer session released');
+      this.console.log(this.streamName, 'prebuffer session released');
       parserSession.kill(new Error('rebroadcast disabled'));
       this.clearPrebuffers();
     });
@@ -203,8 +203,14 @@ class PrebufferSession {
       return;
     this.console.log(this.streamName, 'prebuffer session started');
     this.parserSessionPromise = this.startPrebufferSession();
-    this.parserSessionPromise.catch(e => this.parserSessionPromise = undefined);
-    this.parserSessionPromise.then(pso => pso.killed.finally(() => this.parserSessionPromise = undefined));
+    this.parserSessionPromise.catch(e => {
+      this.console.error(this.streamName, 'prebuffer session ended with error', e);
+      this.parserSessionPromise = undefined;
+    });
+    this.parserSessionPromise.then(pso => pso.killed.finally(() => {
+      this.console.error(this.streamName, 'prebuffer session ended');
+      this.parserSessionPromise = undefined;
+    }));
   }
 
   canUseRtspParser(mediaStreamOptions: MediaStreamOptions) {
@@ -1359,17 +1365,14 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
           session.ensurePrebufferSession();
           let wasActive = false;
           try {
-            this.console.log('prebuffer session starting');
+            this.console.log(name, 'prebuffer session starting');
             const ps = await session.parserSessionPromise;
-            this.console.log('prebuffer session started');
             active++;
             wasActive = true;
             this.online = !!active;
             await ps.killed;
-            this.console.error('prebuffer session ended');
           }
           catch (e) {
-            this.console.error('prebuffer session ended with error', e);
           }
           finally {
             if (wasActive)
@@ -1377,10 +1380,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             wasActive = false;
             this.online = !!active;
           }
-          this.console.log('restarting prebuffer session in 5 seconds');
+          this.console.log(this.name, 'restarting prebuffer session in 5 seconds');
           await new Promise(resolve => setTimeout(resolve, 5000));
         }
-        this.console.log('exiting prebuffer session (released or restarted with new configuration)');
+        this.console.log(name, 'exiting prebuffer session (released or restarted with new configuration)');
       })();
     }
 
@@ -1490,7 +1493,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.settingsListener.removeListener();
     this.online = true;
     super.release();
-    this.console.log('prebuffer session releasing if started');
+    this.console.log('prebuffer sessions releasing if started');
     this.released = true;
     for (const session of this.sessions.values()) {
       session?.release();
