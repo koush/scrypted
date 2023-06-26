@@ -5,10 +5,8 @@ import aiohttp
 from async_timeout import timeout as async_timeout
 from datetime import datetime, timedelta
 import json
-import os
 import socket
 import time
-import threading
 from typing import List, TYPE_CHECKING
 
 import scrypted_arlo_go
@@ -17,7 +15,6 @@ import scrypted_sdk
 from scrypted_sdk.types import Setting, Settings, SettingValue, Device, Camera, VideoCamera, RequestMediaStreamOptions, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, Charger, ChargeState, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
 from .arlo.arlo_async import USER_AGENTS
-from .experimental import EXPERIMENTAL
 from .base import ArloDeviceBase
 from .spotlight import ArloSpotlight, ArloFloodlight, ArloNightlight
 from .vss import ArloSirenVirtualSecuritySystem
@@ -145,7 +142,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     if not line:
                         break
                     line = str(line, 'utf-8')
-                    line = line.strip()
+                    line = line.rstrip()
                     self.logger.info(line)
                 writer.close()
                 await writer.wait_closed()
@@ -207,8 +204,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             ScryptedInterface.Settings.value,
         ])
 
-        if EXPERIMENTAL or not self.uses_sip_push_to_talk:
-            results.add(ScryptedInterface.Intercom.value)
+        results.add(ScryptedInterface.Intercom.value)
 
         if self.has_battery:
             results.add(ScryptedInterface.Battery.value)
@@ -542,8 +538,16 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                 "-fflags", "-nobuffer",
                 "-probesize", "500000",
                 *ffmpeg_params["inputArguments"],
-                "-vn",
                 "-acodec", "libopus",
+                "-flags", "+global_header",
+                "-vbr", "off",
+                "-ar", "48k",
+                "-b:a", "32k",
+                "-bufsize", "96k",
+                "-ac", "2",
+                "-application", "lowdelay",
+                "-dn", "-sn", "-vn",
+                "-frame_duration", "20",
                 "-f", "rtp",
                 "-flush_packets", "1",
                 f"rtp://localhost:{audio_port}?pkt_size={scrypted_arlo_go.UDP_PACKET_SIZE()}",
