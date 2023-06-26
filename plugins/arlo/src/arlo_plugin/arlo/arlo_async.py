@@ -702,6 +702,16 @@ class Arlo(object):
         devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/v2/users/devices')
         return devices
 
+    def GetDeviceCapabilities(self, device: dict) -> dict:
+        return self._getDeviceCapabilitiesImpl(device['modelId'].lower(), device['interfaceVersion'])
+
+    @cached(cache=TTLCache(maxsize=64, ttl=60))
+    def _getDeviceCapabilitiesImpl(self, model_id: str, interface_version: str) -> dict:
+        return self.request.get(
+            f'https://{self.BASE_URL}/resources/capabilities/{model_id}/{model_id}_{interface_version}.json',
+            raw=True
+        )
+
     async def StartStream(self, basestation, camera, mode="rtsp"):
         """
         This function returns the url of the rtsp video stream.
@@ -709,7 +719,8 @@ class Arlo(object):
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
 
-        If mode is set to "dash", returns the url to the mpd file for DASH streaming.
+        If mode is set to "dash", returns the url to the mpd file for DASH streaming. Note that DASH
+        has very specific header requirements - see GetMPDHeaders()
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
@@ -766,11 +777,11 @@ class Arlo(object):
 
         headers = {
             "Accept": "*/*",
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": "gzip, deflate",
             "Accept-Language": "en-US,en;q=0.9",
             "Connection": "keep-alive",
             "DNT": "1",
-            "Egress-Token": query['egressToken'][0],
+            "Egress-Token": query['egressToken'][0],  # this is very important
             "Origin": "https://my.arlo.com",
             "Referer": "https://my.arlo.com/",
             "User-Agent": USER_AGENTS["firefox"],
