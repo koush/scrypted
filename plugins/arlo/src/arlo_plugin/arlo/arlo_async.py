@@ -87,7 +87,7 @@ USER_AGENTS = {
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
-    BACKUP_AUTH_HOSTS = list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
+    BACKUP_AUTH_HOSTS = ["NTIuMjEyLjIwNS4xNDU="] # list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
     TRANSID_PREFIX = 'web'
 
     random.shuffle(BACKUP_AUTH_HOSTS)
