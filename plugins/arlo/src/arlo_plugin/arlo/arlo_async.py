@@ -83,6 +83,11 @@ USER_AGENTS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/8.8 Mobile Safari/537.36"
 }
 
+# user agents for media players, e.g. the android app
+MEDIA_USER_AGENTS = {
+    "android": "ijkplayer-android-4.5_28538"
+}
+
 
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
