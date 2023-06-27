@@ -75,14 +75,24 @@ USER_AGENTS = {
         "Gecko/20100101 Firefox/85.0",
     "linux":
         "Mozilla/5.0 (X11; Linux x86_64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36"
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36",
+
+    # extracted from cloudscraper as a working UA for cloudflare
+    "android":
+        "Mozilla/5.0 (Linux; U; Android 8.1.0; zh-cn; PACM00 Build/O11019) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/8.8 Mobile Safari/537.36"
+}
+
+# user agents for media players, e.g. the android app
+MEDIA_USER_AGENTS = {
+    "android": "ijkplayer-android-4.5_28538"
 }
 
 
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
-    BACKUP_AUTH_HOSTS = list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
+    BACKUP_AUTH_HOSTS = ["NTIuMjEyLjIwNS4xNDU="] # list(scrypted_arlo_go.BACKUP_AUTH_HOSTS())
     TRANSID_PREFIX = 'web'
 
     random.shuffle(BACKUP_AUTH_HOSTS)
@@ -150,7 +160,6 @@ class Arlo(object):
             'schemaVersion': '1',
             'Auth-Version': '2',
             'Content-Type': 'application/json; charset=UTF-8',
-            'User-Agent': USER_AGENTS['arlo'],
             'Origin': f'https://{self.BASE_URL}',
             'Referer': f'https://{self.BASE_URL}/',
             'Source': 'arloCamWeb',
@@ -161,7 +170,7 @@ class Arlo(object):
             'Host': self.AUTH_URL,
         }
 
-        self.request = Request()
+        self.request = Request(mode="cloudscraper")
         try:
             auth_host = self.AUTH_URL
             self.request.options(f'https://{auth_host}/api/auth', headers=headers)
@@ -294,17 +303,20 @@ class Arlo(object):
             # filter out cameras without basestation, where they are their own basestations
             # this is so battery-powered devices do not drain due to pings
             # for wired devices, keep doorbells, sirens, and arloq in the list so they get pings
-            proper_basestations = {}
+            # we also add arlo baby devices (abc1000, abc1000a) since they are standalone-only
+            # and seem to want pings
+            devices_to_ping = {}
             for basestation in basestations.values():
                 if basestation['deviceId'] == basestation.get('parentId') and \
-                    basestation['deviceType'] not in ['doorbell', 'siren', 'arloq', 'arloqs']:
+                    basestation['deviceType'] not in ['doorbell', 'siren', 'arloq', 'arloqs'] and \
+                    basestation['modelId'].lower() not in ['abc1000', 'abc1000a']:
                     continue
-                proper_basestations[basestation['deviceId']] = basestation
+                devices_to_ping[basestation['deviceId']] = basestation
 
-            logger.info(f"Will send heartbeat to the following devices: {list(proper_basestations.keys())}")
+            logger.info(f"Will send heartbeat to the following devices: {list(devices_to_ping.keys())}")
 
-            # start heartbeat loop with only basestations
-            asyncio.get_event_loop().create_task(heartbeat(self, list(proper_basestations.values())))
+            # start heartbeat loop with only pingable devices
+            asyncio.get_event_loop().create_task(heartbeat(self, list(devices_to_ping.values())))
 
             # subscribe to all camera topics
             topics = [
@@ -396,12 +408,49 @@ class Arlo(object):
         basestation_id = basestation.get('deviceId')
         return self.Notify(basestation, {"action":"set","resource":"subscriptions/"+self.user_id+"_web","publishResponse":False,"properties":{"devices":[basestation_id]}})
 
+    def SubscribeToErrorEvents(self, basestation, camera, callback):
+        """
+        Use this method to subscribe to error events. You must provide a callback function which will get called once per error event.
+
+        The callback function should have the following signature:
+        def callback(code, message)
+
+        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
+        that has a big switch statement in it to handle all the various events Arlo produces.
+
+        Returns the Task object that contains the subscription loop.
+        """
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        # Note: It looks like sometimes a message is returned as an 'is' action
+        # where a 'stateChangeReason' property contains the error message. This is
+        # a bit of a hack but we will listen to both events with an 'error' key as
+        # well as 'stateChangeReason' events.
+
+        def callbackwrapper(self, event):
+            if 'error' in event:
+                error = event['error']
+            elif 'properties' in event:
+                error = event['properties'].get('stateChangeReason', {})
+            else:
+                return None
+            message = error.get('message')
+            code = error.get('code')
+            stop = callback(code, message)
+            if not stop:
+                return None
+            return stop
+
+        return asyncio.get_event_loop().create_task(
+            self.HandleEvents(basestation, resource, ['error', ('is', 'stateChangeReason')], callbackwrapper)
+        )
+
     def SubscribeToMotionEvents(self, basestation, camera, callback):
         """
         Use this method to subscribe to motion events. You must provide a callback function which will get called once per motion event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -428,7 +477,7 @@ class Arlo(object):
         Use this method to subscribe to audio events. You must provide a callback function which will get called once per audio event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -455,7 +504,7 @@ class Arlo(object):
         Use this method to subscribe to battery events. You must provide a callback function which will get called once per battery event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -482,7 +531,7 @@ class Arlo(object):
         Use this method to subscribe to doorbell events. You must provide a callback function which will get called once per doorbell event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -518,7 +567,7 @@ class Arlo(object):
         Use this method to subscribe to pushToTalk SDP answer events. You must provide a callback function which will get called once per SDP event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -546,7 +595,7 @@ class Arlo(object):
         Use this method to subscribe to pushToTalk ICE candidate answer events. You must provide a callback function which will get called once per candidate event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -658,6 +707,16 @@ class Arlo(object):
         devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/v2/users/devices')
         return devices
 
+    def GetDeviceCapabilities(self, device: dict) -> dict:
+        return self._getDeviceCapabilitiesImpl(device['modelId'].lower(), device['interfaceVersion'])
+
+    @cached(cache=TTLCache(maxsize=64, ttl=60))
+    def _getDeviceCapabilitiesImpl(self, model_id: str, interface_version: str) -> dict:
+        return self.request.get(
+            f'https://{self.BASE_URL}/resources/capabilities/{model_id}/{model_id}_{interface_version}.json',
+            raw=True
+        )
+
     async def StartStream(self, basestation, camera, mode="rtsp"):
         """
         This function returns the url of the rtsp video stream.
@@ -665,7 +724,8 @@ class Arlo(object):
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
 
-        If mode is set to "dash", returns the url to the mpd file for DASH streaming.
+        If mode is set to "dash", returns the url to the mpd file for DASH streaming. Note that DASH
+        has very specific header requirements - see GetMPDHeaders()
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
@@ -698,6 +758,8 @@ class Arlo(object):
 
         def callback(self, event):
             #return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+            if "error" in event:
+                return None
             properties = event.get("properties", {})
             if properties.get("activityState") == "userStreamActive":
                 if mode == "rtsp":
@@ -720,11 +782,11 @@ class Arlo(object):
 
         headers = {
             "Accept": "*/*",
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": "gzip, deflate",
             "Accept-Language": "en-US,en;q=0.9",
             "Connection": "keep-alive",
             "DNT": "1",
-            "Egress-Token": query['egressToken'][0],
+            "Egress-Token": query['egressToken'][0],  # this is very important
             "Origin": "https://my.arlo.com",
             "Referer": "https://my.arlo.com/",
             "User-Agent": USER_AGENTS["firefox"],
@@ -733,6 +795,16 @@ class Arlo(object):
 
     def GetSIPInfo(self):
         resp = self.request.get(f'https://{self.BASE_URL}/hmsweb/users/devices/sipInfo')
+        return resp
+
+    def GetSIPInfoV2(self, camera):
+        resp = self.request.get(
+            f'https://{self.BASE_URL}/hmsweb/users/devices/sipInfo/v2',
+            headers={
+                "xcloudId": camera.get('xCloudId'),
+                "cameraId": camera.get('deviceId'),
+            }
+        )
         return resp
 
     def StartPushToTalk(self, basestation, camera):
@@ -792,6 +864,8 @@ class Arlo(object):
             )
 
         def callback(self, event):
+            if "error" in event:
+                return None
             properties = event.get("properties", {})
             url = properties.get("presignedFullFrameSnapshotUrl")
             if url:
@@ -915,6 +989,32 @@ class Arlo(object):
                     "on": False,
                 },
             },
+        })
+
+    def NightlightOn(self, basestation):
+        resource = f"cameras/{basestation.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "nightLight": {
+                    "enabled": True
+                }
+            }
+        })
+
+    def NightlightOff(self, basestation):
+        resource = f"cameras/{basestation.get('deviceId')}"
+        return self.Notify(basestation, {
+            "action": "set",
+            "resource": resource,
+            "publishResponse": True,
+            "properties": {
+                "nightLight": {
+                    "enabled": False
+                }
+            }
         })
 
     def GetLibrary(self, device, from_date: datetime, to_date: datetime):

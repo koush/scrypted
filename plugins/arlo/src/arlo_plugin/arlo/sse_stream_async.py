@@ -3,7 +3,7 @@ import json
 import sseclient
 import threading
 
-from .stream_async import Stream 
+from .stream_async import Stream
 from .logging import logger
 
 
@@ -28,7 +28,7 @@ class EventStream(Stream):
                     continue
 
                 try:
-                    response = json.loads(event.data)
+                    response = json.loads(event.data.strip())
                 except json.JSONDecodeError:
                     continue
 

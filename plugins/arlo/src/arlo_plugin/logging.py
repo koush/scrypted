@@ -23,7 +23,7 @@ def createScryptedLogger(scrypted_device, name):
     sh = ScryptedDeviceLoggingWrapper(scrypted_device)
 
     # log formatting
-    fmt = logging.Formatter("[Arlo %(name)s] %(message)s")
+    fmt = logging.Formatter("[Arlo %(name)s]: %(message)s")
     sh.setFormatter(fmt)
 
     # configure handler to logger
