@@ -796,7 +796,7 @@ class ArloCameraSIPIntercomSession(ArloCameraIntercomSession):
             for ice in ice_servers
         ])
         sip_cfg = scrypted_arlo_go.SIPInfo(
-            DeviceID=self.nativeId,
+            DeviceID=self.camera.nativeId,
             CallerURI=f"sip:{sip_call_info['id']}@{sip_call_info['domain']}:{sip_call_info['port']}",
             CalleeURI=sip_call_info['calleeUri'],
             Password=sip_call_info['password'],
@@ -837,7 +837,7 @@ class ArloCameraSIPIntercomSession(ArloCameraIntercomSession):
         ]
         self.logger.debug(f"Starting ffmpeg at {ffmpeg_path} with '{' '.join(ffmpeg_args)}'")
 
-        self.intercom_ffmpeg_subprocess = HeartbeatChildProcess("FFmpeg", self.logger_server_port, ffmpeg_path, *ffmpeg_args)
+        self.intercom_ffmpeg_subprocess = HeartbeatChildProcess("FFmpeg", self.camera.logger_server_port, ffmpeg_path, *ffmpeg_args)
         self.intercom_ffmpeg_subprocess.start()
 
         self.arlo_sip.Start()
