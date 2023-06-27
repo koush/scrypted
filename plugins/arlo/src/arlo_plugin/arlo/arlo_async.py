@@ -792,6 +792,16 @@ class Arlo(object):
         resp = self.request.get(f'https://{self.BASE_URL}/hmsweb/users/devices/sipInfo')
         return resp
 
+    def GetSIPInfoV2(self, camera):
+        resp = self.request.get(
+            f'https://{self.BASE_URL}/hmsweb/users/devices/sipInfo/v2',
+            headers={
+                "xcloudId": camera.get('xCloudId'),
+                "cameraId": camera.get('deviceId'),
+            }
+        )
+        return resp
+
     def StartPushToTalk(self, basestation, camera):
         url = f'https://{self.BASE_URL}/hmsweb/users/devices/{self.user_id}_{camera.get("deviceId")}/pushtotalk'
         resp = self.request.get(url)
