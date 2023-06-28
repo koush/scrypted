@@ -34,6 +34,11 @@ def async_print_exception_guard(fn):
         try:
             return await fn(*args, **kwargs)
         except Exception:
-            traceback.print_exc()
+            # hack to detect if the applied function is actually a method
+            # on a scrypted object
+            if len(args) > 0 and hasattr(args[0], "logger"):
+                getattr(args[0], "logger").exception(f"{fn.__qualname__} raised an exception")
+            else:
+                traceback.print_exc()
             raise
     return wrapped

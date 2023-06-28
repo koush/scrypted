@@ -18,6 +18,7 @@ class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTa
     nativeId: str = None
     arlo_device: dict = None
     arlo_basestation: dict = None
+    arlo_capabilities: dict = None
     provider: ArloProvider = None
     stop_subscriptions: bool = False
 
@@ -31,6 +32,12 @@ class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTa
         self.arlo_basestation = arlo_basestation
         self.provider = provider
         self.logger.setLevel(self.provider.get_current_log_level())
+
+        try:
+            self.arlo_capabilities = self.provider.arlo.GetDeviceCapabilities(self.arlo_device)
+        except Exception as e:
+            self.logger.warning(f"Could not load device capabilities: {e}")
+            self.arlo_capabilities = {}
 
     def __del__(self) -> None:
         self.stop_subscriptions = True

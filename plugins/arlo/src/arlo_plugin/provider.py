@@ -43,7 +43,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
     def __init__(self, nativeId: str = None) -> None:
         super().__init__(nativeId=nativeId)
-        self.logger_name = "provider"
+        self.logger_name = "Provider"
 
         self.arlo_cameras = {}
         self.arlo_basestations = {}
@@ -659,22 +659,30 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         for provider_id in provider_to_device_map.keys():
             if provider_id is None:
                 continue
+
+            if len(provider_to_device_map[provider_id]) > 0:
+                self.logger.debug(f"Sending {provider_id} and children to scrypted server")
+            else:
+                self.logger.debug(f"Sending {provider_id} to scrypted server")
+
             await scrypted_sdk.deviceManager.onDevicesChanged({
                 "devices": provider_to_device_map[provider_id],
                 "providerNativeId": provider_id,
             })
 
         # ensure devices at the root match all that was discovered
+        self.logger.debug("Sending top level devices to scrypted server")
         await scrypted_sdk.deviceManager.onDevicesChanged({
             "devices": provider_to_device_map[None]
         })
+        self.logger.debug("Done discovering devices")
 
     async def getDevice(self, nativeId: str) -> ArloDeviceBase:
         async with self.device_discovery_lock:
             return await self.getDevice_impl(nativeId)
 
     async def getDevice_impl(self, nativeId: str) -> ArloDeviceBase:
-        ret = self.scrypted_devices.get(nativeId, None)
+        ret = self.scrypted_devices.get(nativeId)
         if ret is None:
             ret = self.create_device(nativeId)
             if ret is not None:
