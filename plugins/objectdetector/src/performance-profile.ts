@@ -1,6 +1,6 @@
 import os from 'os';
 
-let maxObservedSpeed = 0;
+let totalGigahertz = 0;
 
 export function getMaxConcurrentObjectDetectionSessions() {
     const cpus = os.cpus();
@@ -20,11 +20,7 @@ export function getMaxConcurrentObjectDetectionSessions() {
         speed += cpu.speed || 600;
     }
 
-    maxObservedSpeed = Math.max(speed, maxObservedSpeed);
-
-    // this is not exactly accurate because intel chips have e-cores
-    // so the cpus are not uniform performance.
-    const totalGigahertz = maxObservedSpeed * cpus.length;
+    totalGigahertz = Math.max(speed, totalGigahertz);
 
     // a wyse 5070 self reports in description as 1.5ghz and has 4 cores and can comfortably handle
     // two 2k detections at the same time.
