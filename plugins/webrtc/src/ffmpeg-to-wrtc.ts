@@ -533,18 +533,24 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         const ret = new WebRTCTrack(this, videoTransceiver, audioTransceiver, intercom);
 
         this.negotiation.then(async () => {
-            this.console.log('waiting ice connected');
-            if (this.pc.remoteIsBundled)
-                await waitConnected(this.pc);
-            else
-                await waitIceConnected(this.pc);
-            if (ret.removed.finished)
-                return;
-            this.console.log('done waiting ice connected');
-            const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
-            ret.attachForwarder(f);
-            waitClosed(this.pc).finally(() => f?.kill());
-            ret.removed.promise.finally(() => f?.kill());
+            try {
+                this.console.log('waiting ice connected');
+                if (this.pc.remoteIsBundled)
+                    await waitConnected(this.pc);
+                else
+                    await waitIceConnected(this.pc);
+                if (ret.removed.finished)
+                    return;
+                this.console.log('done waiting ice connected');
+                const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
+                ret.attachForwarder(f);
+                waitClosed(this.pc).finally(() => f?.kill());
+                ret.removed.promise.finally(() => f?.kill());
+            }
+            catch (e) {
+                this.console.error('Error starting playback for WebRTC track.', e);
+                // todo: report this to the client somehow.
+            }
         });
 
         return ret;
