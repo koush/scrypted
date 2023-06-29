@@ -1,19 +1,65 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, MediaObject, PictureOptions, Reboot, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import { Camera, DeviceCreatorSettings, DeviceInformation, Intercom, MediaObject, PictureOptions, Reboot, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { OnvifCameraAPI, connectCameraAPI } from './onvif-api';
+import { listenEvents } from './onvif-events';
+import { OnvifIntercom } from './onvif-intercom';
 import { ReolinkCameraClient } from './reolink-api';
 
-const { mediaManager } = sdk;
-
-class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot {
+class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom {
     client: ReolinkCameraClient;
+    onvifClient: OnvifCameraAPI;
+    onvifIntercom = new OnvifIntercom(this);
+
+    storageSettings = new StorageSettings(this, {
+        doorbell: {
+            title: 'Doorbell',
+            description: 'This camera is a Reolink Doorbell.',
+            type: 'boolean',
+        },
+        rtmpPort: {
+            subgroup: 'Advanced',
+            title: 'RTMP Port Override',
+            placeholder: '1935',
+            type: 'number',
+        }
+    });
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
         this.updateManagementUrl();
-        this.provider.updateDevice(this.nativeId, this.name, this.provider.getInterfaces(), this.providedType);
+        this.updateDevice();
+    }
+    
+    async startIntercom(media: MediaObject): Promise<void> {
+        if (!this.onvifIntercom.url) {
+            const client = await this.getOnvifClient();
+            const streamUrl = await client.getStreamUrl();
+            this.onvifIntercom.url = streamUrl;
+        }
+        return this.onvifIntercom.startIntercom(media);
+    }
+
+    stopIntercom(): Promise<void> {
+        return this.onvifIntercom.stopIntercom();
+    }
+
+    updateDevice() {
+        const interfaces = this.provider.getInterfaces();
+        let type = ScryptedDeviceType.Camera;
+        let name = 'Reolink Camera';
+        if (this.storageSettings.values.doorbell) {
+            interfaces.push(
+                ScryptedInterface.BinarySensor,
+                ScryptedInterface.Intercom
+            );
+            type = ScryptedDeviceType.Doorbell;
+            name = 'Reolink Doorbell';
+        }
+        this.provider.updateDevice(this.nativeId, name, interfaces, type);
     }
 
     async reboot() {
@@ -38,7 +84,21 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot {
         return this.client;
     }
 
+
+    async getOnvifClient() {
+        if (!this.onvifClient)
+            this.onvifClient = await this.createOnvifClient();
+        return this.onvifClient;
+    }
+
+    createOnvifClient() {
+        return connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, this.storage.getItem('onvifDoorbellEvent'));
+    }
+
     async listenEvents() {
+        if (this.storageSettings.values.doorbell)
+            return listenEvents(this, await this.getOnvifClient());
+
         const client = this.getClient();
         let killed = false;
         const events = new EventEmitter();
@@ -186,6 +246,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot {
     async putSetting(key: string, value: string) {
         this.client = undefined;
         super.putSetting(key, value);
+        this.updateDevice();
         this.updateManagementUrl();
     }
 
@@ -193,12 +254,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot {
         return false;
     }
 
-    getRtspPortOverrideSettings(): Setting[] {
-        if (!this.showRtspPortOverride()) {
-            return [];
-        }
+    async getRtspPortOverrideSettings(): Promise<Setting[]> {
         return [
-            ...super.getRtspPortOverrideSettings(),
+            ...await super.getRtspPortOverrideSettings(),
+            ...await this.storageSettings.getSettings(),
             {
                 key: 'rtmpPort',
                 subgroup: 'Advanced',
@@ -231,6 +290,7 @@ class ReolinkProider extends RtspProvider {
 
         const username = settings.username?.toString();
         const password = settings.password?.toString();
+        const doorbell = settings.doorbell?.toString();
         const skipValidate = settings.skipValidate === 'true';
         const rtspChannel = parseInt(settings.rtspChannel?.toString()) || 0;
         if (!skipValidate) {
@@ -252,6 +312,7 @@ class ReolinkProider extends RtspProvider {
         device.info = info;
         device.putSetting('username', username);
         device.putSetting('password', password);
+        device.putSetting('doorbell', doorbell)
         device.setIPAddress(settings.ip?.toString());
         device.putSetting('rtspChannel', settings.rtspChannel?.toString());
         device.setHttpPortOverride(settings.httpPort?.toString());
@@ -273,6 +334,12 @@ class ReolinkProider extends RtspProvider {
                 key: 'ip',
                 title: 'IP Address',
                 placeholder: '192.168.2.222',
+            },
+            {
+                key: 'doorbell',
+                title: 'Doorbell',
+                description: 'This camera is a Reolink Doorbell.',
+                type: 'boolean',
             },
             {
                 key: 'rtspChannel',
