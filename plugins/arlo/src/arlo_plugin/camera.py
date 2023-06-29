@@ -536,7 +536,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             self.intercom_session = ArloCameraWebRTCIntercomSession(self)
         await self.intercom_session.initialize_push_to_talk(media)
 
-        self.logger.info("Intercom ready")
+        self.logger.info("Intercom initialized")
 
     @async_print_exception_guard
     async def stopIntercom(self) -> None:
@@ -746,17 +746,23 @@ class ArloCameraWebRTCIntercomSession(ArloCameraIntercomSession):
             session_id, offer_sdp
         )
 
-        candidates = self.arlo_pc.WaitAndGetICECandidates()
-        self.logger.debug(f"Gathered {len(candidates)} candidates")
-        for candidate in candidates:
-            candidate = scrypted_arlo_go.WebRTCICECandidateInit(
-                scrypted_arlo_go.WebRTCICECandidate(handle=candidate).ToJSON()
-            ).Candidate
-            self.logger.debug(f"Sending candidate to Arlo: {candidate}")
-            self.provider.arlo.NotifyPushToTalkCandidate(
-                self.arlo_basestation, self.arlo_device,
-                session_id, candidate,
-            )
+        async def trickle_candidates():
+            try:
+                candidates = self.arlo_pc.WaitAndGetICECandidates()
+                self.logger.debug(f"Gathered {len(candidates)} candidates")
+                for candidate in candidates:
+                    candidate = scrypted_arlo_go.WebRTCICECandidateInit(
+                        scrypted_arlo_go.WebRTCICECandidate(handle=candidate).ToJSON()
+                    ).Candidate
+                    self.logger.debug(f"Sending candidate to Arlo: {candidate}")
+                    self.provider.arlo.NotifyPushToTalkCandidate(
+                        self.arlo_basestation, self.arlo_device,
+                        session_id, candidate,
+                    )
+            except Exception:
+                self.logger.exception("Exception while processing trickle candidates")
+
+        self.create_task(trickle_candidates())
 
     @async_print_exception_guard
     async def shutdown(self) -> None:
@@ -840,7 +846,13 @@ class ArloCameraSIPIntercomSession(ArloCameraIntercomSession):
         self.intercom_ffmpeg_subprocess = HeartbeatChildProcess("FFmpeg", self.camera.logger_server_port, ffmpeg_path, *ffmpeg_args)
         self.intercom_ffmpeg_subprocess.start()
 
-        self.arlo_sip.Start()
+        async def start():
+            try:
+                self.arlo_sip.Start()
+            except Exception:
+                self.logger.exception("Exception starting sip call")
+
+        self.create_task(start())
 
     @async_print_exception_guard
     async def shutdown(self) -> None:
