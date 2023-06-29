@@ -476,6 +476,8 @@ export class H264Repacketizer {
                         this.updatePps(payload);
                     else if (nalType === NAL_TYPE_SEI)
                         this.updateSei(payload);
+                    else if (nalType === NAL_TYPE_DELIMITER) {
+                    }
                     else
                         this.console.warn('Skipped a stapa type. Please report this to @koush on Discord.', nalType)
                 });

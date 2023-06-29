@@ -95,9 +95,17 @@ export async function createTrackForwarder(options: {
     const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
     const { mediaStreamOptions } = ffmpegInput;
 
+    // this transcode fallback is for low power devices like the echo show that
+    // will crap out if fed a high resolution stream.
     if (isMediumResolution && !transcodeBaseline) {
-        const width = ffmpegInput?.mediaStreamOptions?.video?.width;
-        transcodeBaseline = !width || width > 1280;
+        // don't transcode on cheapo windows laptops with tiny screens
+        // which are capable of handling high resolution streams.
+        // this transcode fallback should only be used on Linux devices.
+        // But it may not report itself as Linux, so do a non-Windows check.
+        if (!options?.clientOptions?.userAgent?.includes('Windows')) {
+            const width = ffmpegInput?.mediaStreamOptions?.video?.width;
+            transcodeBaseline = !width || width > 1280;
+        }
     }
 
     console.log('Client Stream Profile', {

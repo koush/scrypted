@@ -184,6 +184,11 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             if (!videoSection)
                 throw new Error(`advertised video codec ${videoCodec} not found in sdp.`);
 
+            if (!videoSection.codec) {
+                console.warn('Unable to determine sdpvideo codec? Please report this to @koush on Discord.');
+                console.warn(rtspSdp);
+            }
+
             videoSectionDeferred.resolve(videoSection);
 
             let channel = 0;
@@ -309,7 +314,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         }
     }
     else {
-        console.log('video codec/container not matched, transcoding:', videoCodec);
+        console.log('video codec/container not matched, transcoding:', videoCodec, JSON.stringify(ffmpegInput));
     }
 
     const reportTranscodedSections = (sdp: string) => {
