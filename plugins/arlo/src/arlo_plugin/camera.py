@@ -291,7 +291,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             return False
 
     @property
-    def snapshot_throttle_interval(self) -> bool:
+    def snapshot_throttle_interval(self) -> int:
         interval = self.storage.getItem("snapshot_throttle_interval")
         if interval is None:
             interval = 60
