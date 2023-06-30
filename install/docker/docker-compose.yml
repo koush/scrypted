@@ -33,13 +33,13 @@ services:
         network_mode: host
 
         devices:
+            # all usb devices, such as coral tpu
+            - /dev/bus/usb:/dev/bus/usb
             # hardware accelerated video decoding, opencl, etc.
-            - /dev/dri:/dev/dri
+            # - /dev/dri:/dev/dri
             # uncomment below as necessary.
             # zwave usb serial device
-            #   - /dev/ttyACM0:/dev/ttyACM0
-            # all usb devices, such as coral tpu
-            #   - /dev/bus/usb:/dev/bus/usb
+            # - /dev/ttyACM0:/dev/ttyACM0
             # coral PCI devices
             # - /dev/apex_0:/dev/apex_0
             # - /dev/apex_1:/dev/apex_1
