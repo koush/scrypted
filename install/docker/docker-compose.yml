@@ -3,9 +3,10 @@ version: "3.5"
 # The Scrypted docker-compose.yml file typically resides at:
 # ~/.scrypted/docker-compose.yml
 
+
+# Scrypted NVR Storage (Optional Network Volume: Part 1 of 3)
 # Example volumes SMB (CIFS) and NFS.
 # Uncomment only one.
-
 # volumes:
 #     nvr:
 #         driver_opts:
@@ -20,18 +21,46 @@ version: "3.5"
 
 services:
     scrypted:
-        image: koush/scrypted
         environment:
+            # Scrypted NVR Storage (Part 2 of 3)
+
+            # Uncomment the next line to configure the NVR plugin to store recordings
+            # use the /nvr directory within the container. This can also be configured
+            # within the plugin manually.
+            # The drive or network share will ALSO need to be configured in the volumes
+            # section below.
+            # - SCRYPTED_NVR_VOLUME=/nvr
+
             - SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION=Bearer SET_THIS_TO_SOME_RANDOM_TEXT
             - SCRYPTED_WEBHOOK_UPDATE=http://localhost:10444/v1/update
-            # nvidia support
+
+            # Uncomment next 3 lines for Nvidia GPU support.
             # - NVIDIA_VISIBLE_DEVICES=all
             # - NVIDIA_DRIVER_CAPABILITIES=all
         # runtime: nvidia
-        container_name: scrypted
-        restart: unless-stopped
-        network_mode: host
 
+        volumes:
+            # Scrypted NVR Storage (Part 3 of 3)
+
+            # Modify to add the additional volume for Scrypted NVR.
+            # The following example would mount the /mnt/sda/video path on the host
+            # to the /nvr path inside the docker container.
+            # - /mnt/sda/video:/nvr
+
+            # Or use a network mount from one of the CIFS/NFS examples at the top of this file.
+            # - type: volume
+            #   source: nvr
+            #   target: /nvr
+            #   volume:
+            #     nocopy: true
+
+            # uncomment the following lines to expose Avahi, an mDNS advertiser.
+            # make sure Avahi is running on the host machine, otherwise this will not work.
+            # - /var/run/dbus:/var/run/dbus
+            # - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
+
+            # Default volume for the Scrypted database. Typically should not be changed.
+            - ~/.scrypted/volume:/server/volume
         devices:
             # all usb devices, such as coral tpu
             - /dev/bus/usb:/dev/bus/usb
@@ -44,24 +73,11 @@ services:
             # - /dev/apex_0:/dev/apex_0
             # - /dev/apex_1:/dev/apex_1
 
-        volumes:
-            - ~/.scrypted/volume:/server/volume
-            # modify and add the additional volume for Scrypted NVR
-            # the following example would mount the /mnt/sda/video path on the host
-            # to the /nvr path inside the docker container.
-            # - /mnt/sda/video:/nvr
+        container_name: scrypted
+        restart: unless-stopped
+        network_mode: host
+        image: koush/scrypted
 
-            # or use a network mount from one of the examples above
-            # - type: volume
-            #   source: nvr
-            #   target: /nvr
-            #   volume:
-            #     nocopy: true
-
-            # uncomment the following lines to expose Avahi, an mDNS advertiser.
-            # make sure Avahi is running on the host machine, otherwise this will not work.
-            # - /var/run/dbus:/var/run/dbus
-            # - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
         # logging is noisy and will unnecessarily wear on flash storage.
         # scrypted has per device in memory logging that is preferred.
         logging:
