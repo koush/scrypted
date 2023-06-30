@@ -405,7 +405,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       await sdk.connectRPCObject(
         await this.objectDetection.generateObjectDetections(
           await this.createFrameGenerator(signal, options, updatePipelineStatus), {
-          settings: this.getCurrentSettings(),
+          settings: {
+            ...this.getCurrentSettings(),
+            analyzeMode: !!this.analyzeStop,
+          },
           sourceId: this.id,
           zones,
         }))) {
