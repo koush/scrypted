@@ -928,6 +928,14 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
       title: 'Max Concurrent Detections',
       description: `The max number concurrent cameras that will perform object detection while their motion sensor is triggered. Older sessions will be terminated when the limit is reached. The default value is ${getMaxConcurrentObjectDetectionSessions()}.`,
       defaultValue: 'Default',
+      combobox: true,
+      choices: [
+        'Default',
+        ...[2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => i.toString()),
+      ],
+      mapPut: (o, v) => {
+        return parseInt(v) || 'Default';
+      }
     },
     activeMotionDetections: {
       title: 'Active Motion Detection Sessions',
@@ -1017,7 +1025,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     this.statsSnapshotConcurrent++;
 
     let maxConcurrent = this.storageSettings.values.maxConcurrentDetections || 'Default';
-    maxConcurrent = parseInt(maxConcurrent) || getMaxConcurrentObjectDetectionSessions();
+    maxConcurrent = Math.max(parseInt(maxConcurrent)) || getMaxConcurrentObjectDetectionSessions();
 
     const objectDetections = [...this.currentMixins.values()]
       .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
