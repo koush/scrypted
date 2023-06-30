@@ -31,6 +31,14 @@ function getDebugModeH264EncoderArgs() {
     ];
 }
 
+const fullResolutionAllowList = [
+    'Windows',
+    'Macintosh',
+    'iPhone',
+    'iPad',
+    'iOS',
+];
+
 export async function createTrackForwarder(options: {
     timeStart: number,
     isLocalNetwork: boolean, destinationId: string, ipv4: boolean,
@@ -101,8 +109,12 @@ export async function createTrackForwarder(options: {
         // don't transcode on cheapo windows laptops with tiny screens
         // which are capable of handling high resolution streams.
         // this transcode fallback should only be used on Linux devices.
-        // But it may not report itself as Linux, so do a non-Windows check.
-        if (!options?.clientOptions?.userAgent?.includes('Windows')) {
+        // But it may not report itself as Linux, so do a non-Windows/Mac/iOS check.
+        let found = false;
+        for (const allow of fullResolutionAllowList) {
+            found ||= options?.clientOptions?.userAgent?.includes(allow);
+        }
+        if (!found) {
             const width = ffmpegInput?.mediaStreamOptions?.video?.width;
             transcodeBaseline = !width || width > 1280;
         }
