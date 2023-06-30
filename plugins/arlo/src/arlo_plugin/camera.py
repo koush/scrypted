@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import json
 import socket
 import time
+import threading
 from typing import List, TYPE_CHECKING
 
 import scrypted_arlo_go
@@ -111,8 +112,9 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     last_picture_time: datetime = datetime(1970, 1, 1)
 
     # socket logger
-    logger_server = None
-    logger_server_port = 0
+    logger_loop: asyncio.AbstractEventLoop = None
+    logger_server: asyncio.AbstractServer = None
+    logger_server_port: int = 0
 
     def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
@@ -126,7 +128,11 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     def __del__(self) -> None:
         super().__del__()
-        self.logger_server.close()
+        def logger_exit_callback():
+            self.logger_server.close()
+            self.logger_loop.stop()
+            self.logger_loop.close()
+        self.logger_loop.call_soon_threadsafe(logger_exit_callback)
 
     async def delayed_init(self) -> None:
         await self.create_tcp_logger_server()
@@ -150,24 +156,41 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     @async_print_exception_guard
     async def create_tcp_logger_server(self) -> None:
-        async def callback(reader, writer):
-            try:
-                while not reader.at_eof():
-                    line = await reader.readline()
-                    if not line:
-                        break
-                    line = str(line, 'utf-8')
-                    line = line.rstrip()
-                    self.logger.info(line)
-                writer.close()
-                await writer.wait_closed()
-            except Exception:
-                self.logger.exception("Logger server callback raised an exception")
+        self.logger_loop = asyncio.new_event_loop()
 
-        self.logger_server = await asyncio.start_server(callback, host='localhost', port=0, family=socket.AF_INET, flags=socket.SOCK_STREAM)
-        self.logger_server_port = self.logger_server.sockets[0].getsockname()[1]
+        def thread_main():
+            asyncio.set_event_loop(self.logger_loop)
+            self.logger_loop.run_forever()
 
-        self.logger.info(f"Started logging server at localhost:{self.logger_server_port}")
+        logger_thread = threading.Thread(target=thread_main)
+        logger_thread.start()
+
+        # this is a bit convoluted since we need the async functions to run in the
+        # logger loop thread instead of in the current thread
+        def setup_callback():
+            async def callback(reader, writer):
+                try:
+                    while not reader.at_eof():
+                        line = await reader.readline()
+                        if not line:
+                            break
+                        line = str(line, 'utf-8')
+                        line = line.rstrip()
+                        self.logger.info(line)
+                    writer.close()
+                    await writer.wait_closed()
+                except Exception:
+                    self.logger.exception("Logger server callback raised an exception")
+
+            async def setup():
+                self.logger_server = await asyncio.start_server(callback, host='localhost', port=0, family=socket.AF_INET, flags=socket.SOCK_STREAM)
+                self.logger_server_port = self.logger_server.sockets[0].getsockname()[1]
+                self.logger.info(f"Started logging server at localhost:{self.logger_server_port}")
+
+            self.logger_loop.create_task(setup())
+
+        self.logger_loop.call_soon_threadsafe(setup_callback)
+
 
     def start_error_subscription(self) -> None:
         def callback(code, message):
@@ -762,6 +785,8 @@ class ArloCameraWebRTCIntercomSession(ArloCameraIntercomSession):
             except Exception:
                 self.logger.exception("Exception while processing trickle candidates")
 
+        # we can trickle candidates asynchronously so the caller to startIntercom
+        # knows we are ready to receive packets
         self.create_task(trickle_candidates())
 
     @async_print_exception_guard
