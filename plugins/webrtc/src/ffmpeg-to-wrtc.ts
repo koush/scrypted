@@ -31,6 +31,14 @@ function getDebugModeH264EncoderArgs() {
     ];
 }
 
+const fullResolutionAllowList = [
+    'Windows',
+    'Macintosh',
+    'iPhone',
+    'iPad',
+    'iOS',
+];
+
 export async function createTrackForwarder(options: {
     timeStart: number,
     isLocalNetwork: boolean, destinationId: string, ipv4: boolean,
@@ -95,9 +103,21 @@ export async function createTrackForwarder(options: {
     const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
     const { mediaStreamOptions } = ffmpegInput;
 
+    // this transcode fallback is for low power devices like the echo show that
+    // will crap out if fed a high resolution stream.
     if (isMediumResolution && !transcodeBaseline) {
-        const width = ffmpegInput?.mediaStreamOptions?.video?.width;
-        transcodeBaseline = !width || width > 1280;
+        // don't transcode on cheapo windows laptops with tiny screens
+        // which are capable of handling high resolution streams.
+        // this transcode fallback should only be used on Linux devices.
+        // But it may not report itself as Linux, so do a non-Windows/Mac/iOS check.
+        let found = false;
+        for (const allow of fullResolutionAllowList) {
+            found ||= options?.clientOptions?.userAgent?.includes(allow);
+        }
+        if (!found) {
+            const width = ffmpegInput?.mediaStreamOptions?.video?.width;
+            transcodeBaseline = !width || width > 1280;
+        }
     }
 
     console.log('Client Stream Profile', {
@@ -533,18 +553,24 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         const ret = new WebRTCTrack(this, videoTransceiver, audioTransceiver, intercom);
 
         this.negotiation.then(async () => {
-            this.console.log('waiting ice connected');
-            if (this.pc.remoteIsBundled)
-                await waitConnected(this.pc);
-            else
-                await waitIceConnected(this.pc);
-            if (ret.removed.finished)
-                return;
-            this.console.log('done waiting ice connected');
-            const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
-            ret.attachForwarder(f);
-            waitClosed(this.pc).finally(() => f?.kill());
-            ret.removed.promise.finally(() => f?.kill());
+            try {
+                this.console.log('waiting ice connected');
+                if (this.pc.remoteIsBundled)
+                    await waitConnected(this.pc);
+                else
+                    await waitIceConnected(this.pc);
+                if (ret.removed.finished)
+                    return;
+                this.console.log('done waiting ice connected');
+                const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
+                ret.attachForwarder(f);
+                waitClosed(this.pc).finally(() => f?.kill());
+                ret.removed.promise.finally(() => f?.kill());
+            }
+            catch (e) {
+                this.console.error('Error starting playback for WebRTC track.', e);
+                // todo: report this to the client somehow.
+            }
         });
 
         return ret;

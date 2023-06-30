@@ -6,14 +6,14 @@ import { parseHTTPHeadersQuotedKeyValueSet } from 'http-auth-utils/dist/utils';
 import net from 'net';
 import { Duplex, Readable, Writable } from 'stream';
 import tls from 'tls';
+import { URL } from 'url';
 import { Deferred } from './deferred';
-import { closeQuiet, createBindUdp, createBindZero, listenZeroSingleClient } from './listen-cluster';
+import { closeQuiet, createBindZero, createSquentialBindZero, listenZeroSingleClient } from './listen-cluster';
 import { timeoutPromise } from './promise-utils';
 import { readLength, readLine } from './read-stream';
 import { MSection, parseSdp } from './sdp-utils';
 import { sleep } from './sleep';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
-import { URL } from 'url';
 
 const REQUIRED_WWW_AUTHENTICATE_KEYS = ['realm', 'nonce'];
 
@@ -964,8 +964,7 @@ export class RtspServer {
             const match = transport.match(/.*?client_port=([0-9]+)-([0-9]+)/);
             const [_, rtp, rtcp] = match;
 
-            const rtpServer = await createBindZero();
-            const rtcpServer = await createBindUdp(rtpServer.port + 1);
+            const [rtpServer, rtcpServer] = await createSquentialBindZero();
             this.client.on('close', () => closeQuiet(rtpServer.server));
             this.client.on('close', () => closeQuiet(rtcpServer.server));
             this.setupTracks[msection.control] = {

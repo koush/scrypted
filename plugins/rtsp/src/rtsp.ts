@@ -160,7 +160,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
-        this.listenLoop();
+        process.nextTick(() => this.listenLoop());
     }
 
     resetSensors(): void {
@@ -262,7 +262,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
                 value: this.storage.getItem('ip'),
             },
             ...this.getHttpPortOverrideSettings(),
-            ...this.getRtspPortOverrideSettings(),
+            ...await this.getRtspPortOverrideSettings(),
         ];
 
         if (this.showRtspUrlOverride()) {
@@ -299,7 +299,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return true;
     }
 
-    getRtspPortOverrideSettings(): Setting[] {
+    async getRtspPortOverrideSettings(): Promise<Setting[]> {
         if (!this.showRtspPortOverride()) {
             return [];
         }

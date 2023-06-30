@@ -3,17 +3,17 @@ import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { BufferConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import ip from 'ip';
 import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
-import { createRTCPeerConnectionSink, createTrackForwarder, RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement } from "./ffmpeg-to-wrtc";
+import { RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement, createRTCPeerConnectionSink, createTrackForwarder } from "./ffmpeg-to-wrtc";
 import { stunServer, turnServer, weriftStunServer, weriftTurnServer } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
-import { defaultPeerConfig, InterfaceAddresses, MediaStreamTrack, PeerConfig, RTCPeerConnection } from './werift';
+import { InterfaceAddresses, MediaStreamTrack, PeerConfig, RTCPeerConnection, defaultPeerConfig } from './werift';
 import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 import { createZygote } from './zygote';
@@ -451,55 +451,56 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
     async onConnection(request: HttpRequest, webSocketUrl: string) {
         const cleanup = new Deferred<string>();
-        cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
-
-        const ws = new WebSocket(webSocketUrl);
-        cleanup.promise.finally(() => ws.close());
-
-        if (request.isPublicEndpoint) {
-            ws.close();
-            return;
-        }
-
-        const client = await listenZeroSingleClient();
-        cleanup.promise.finally(() => {
-            client.clientPromise.then(cp => cp.destroy());
-        });
-
-        const message = await new Promise<{
-            connectionManagementId: string,
-            updateSessionId: string,
-        } & ConnectOptions>((resolve, reject) => {
-            const close = () => {
-                const str = 'Connection closed while waiting for message';
-                reject(new Error(str));
-                cleanup.resolve(str);
-            };
-            ws.addEventListener('close', close);
-
-            ws.onmessage = message => {
-                ws.removeEventListener('close', close);
-                resolve(JSON.parse(message.data));
-            }
-        });
-
-        message.username = request.username;
-
-        const { connectionManagementId, updateSessionId } = message;
-        if (connectionManagementId) {
-            cleanup.promise.finally(async () => {
-                const plugins = await systemManager.getComponent('plugins');
-                plugins.setHostParam('@scrypted/webrtc', connectionManagementId);
-            });
-        }
-        if (updateSessionId) {
-            cleanup.promise.finally(async () => {
-                const plugins = await systemManager.getComponent('plugins');
-                plugins.setHostParam('@scrypted/webrtc', updateSessionId);
-            });
-        }
+        cleanup.promise.then(e => this.console.log('cleaning up rtc connection:', e));
 
         try {
+            const ws = new WebSocket(webSocketUrl);
+            cleanup.promise.finally(() => ws.close());
+
+            if (request.isPublicEndpoint) {
+                cleanup.resolve('public endpoint not supported');
+                return;
+            }
+
+            const client = await listenZeroSingleClient();
+            cleanup.promise.finally(() => {
+                client.cancel();
+                client.clientPromise.then(cp => cp.destroy()).catch(() => {});
+            });
+
+            const message = await new Promise<{
+                connectionManagementId: string,
+                updateSessionId: string,
+            } & ConnectOptions>((resolve, reject) => {
+                const close = () => {
+                    const str = 'Connection closed while waiting for message';
+                    reject(new Error(str));
+                    cleanup.resolve(str);
+                };
+                ws.addEventListener('close', close);
+
+                ws.onmessage = message => {
+                    ws.removeEventListener('close', close);
+                    resolve(JSON.parse(message.data));
+                }
+            });
+
+            message.username = request.username;
+
+            const { connectionManagementId, updateSessionId } = message;
+            if (connectionManagementId) {
+                cleanup.promise.finally(async () => {
+                    const plugins = await systemManager.getComponent('plugins');
+                    plugins.setHostParam('@scrypted/webrtc', connectionManagementId);
+                });
+            }
+            if (updateSessionId) {
+                cleanup.promise.finally(async () => {
+                    const plugins = await systemManager.getComponent('plugins');
+                    plugins.setHostParam('@scrypted/webrtc', updateSessionId);
+                });
+            }
+
             const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
             const clientOptions = await session.getOptions();
 
@@ -526,17 +527,11 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
             const cp = await client.clientPromise;
             cp.on('close', () => cleanup.resolve('socket client closed'));
-            // TODO: remove process.send hack
-            // 12/16/2022
-            if (sdk.connect)
-                sdk.connect(cp, message);
-            else
-                process.send(message, cp);
+            sdk.connect(cp, message);
         }
         catch (e) {
             console.error("error negotiating browser RTCC signaling", e);
             cleanup.resolve('error');
-            throw e;
         }
     }
 }

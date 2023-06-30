@@ -7,6 +7,7 @@ import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } fro
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
 import { OnvifIntercom } from "./onvif-intercom";
 import { OnvifPTZMixinProvider } from "./onvif-ptz";
+import { listenEvents } from "./onvif-events";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -241,17 +242,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
 
 
     async listenEvents() {
-        let motionTimeout: NodeJS.Timeout;
-        let binaryTimeout: NodeJS.Timeout;
-
         const client = await this.createClient();
-        try {
-            await client.supportsEvents();
-        }
-        catch (e) {
-        }
-        await client.createSubscription();
-
         try {
             const eventTypes = await client.getEventTypes();
             if (eventTypes?.length && this.storage.getItem('onvifDetector') !== 'true') {
@@ -261,61 +252,8 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         }
         catch (e) {
         }
-        this.console.log('listening events');
-        const events = client.listenEvents();
-        events.on('event', (event, className) => {
-            if (event === OnvifEvent.MotionBuggy) {
-                this.motionDetected = true;
-                clearTimeout(motionTimeout);
-                motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
-                return;
-            }
-            if (event === OnvifEvent.BinaryRingEvent) {
-                this.binaryState = true;
-                clearTimeout(binaryTimeout);
-                binaryTimeout = setTimeout(() => this.binaryState = false, 30000);
-                return;
-            }
 
-            if (event === OnvifEvent.MotionStart)
-                this.motionDetected = true;
-            else if (event === OnvifEvent.MotionStop)
-                this.motionDetected = false;
-            else if (event === OnvifEvent.AudioStart)
-                this.audioDetected = true;
-            else if (event === OnvifEvent.AudioStop)
-                this.audioDetected = false;
-            else if (event === OnvifEvent.BinaryStart)
-                this.binaryState = true;
-            else if (event === OnvifEvent.BinaryStop)
-                this.binaryState = false;
-            else if (event === OnvifEvent.Detection) {
-                const d: ObjectsDetected = {
-                    timestamp: Date.now(),
-                    detections: [
-                        {
-                            score: undefined,
-                            className,
-                        }
-                    ]
-                }
-                this.onDeviceEvent(ScryptedInterface.ObjectDetector, d);
-            }
-        });
-
-        const ret: Destroyable = {
-            destroy() {
-                client.unsubscribe();
-            },
-            on(eventName: string | symbol, listener: (...args: any[]) => void) {
-                return events.on(eventName, listener);
-            },
-            emit(eventName: string | symbol, ...args: any[]) {
-                return events.emit(eventName, ...args);
-            },
-        };
-
-        return ret;
+        return listenEvents(this, client);
     }
 
     createClient() {

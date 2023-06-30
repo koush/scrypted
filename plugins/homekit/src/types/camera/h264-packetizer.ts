@@ -64,15 +64,14 @@ export class H264Repacketizer {
     extraPackets = 0;
     fuaMax: number;
     pendingFuA: RtpPacket[];
-    // log whether a stapa sps/pps has been seen.
-    // resets on every idr frame, to trigger codec information
-    // to be resent.
-    seenStapASps = false;
+    // the stapa packet that will be sent before an idr frame.
+    stapa: RtpPacket;
     fuaMin: number;
 
     constructor(public console: Console, public maxPacketSize: number, public codecInfo: {
         sps: Buffer,
         pps: Buffer,
+        sei?: Buffer,
     }, public jitterBuffer = new JitterBuffer(console, 4)) {
         // 12 is the rtp/srtp header size.
         this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;
@@ -96,6 +95,11 @@ export class H264Repacketizer {
     updatePps(pps: Buffer) {
         this.ensureCodecInfo();
         this.codecInfo.pps = pps;
+    }
+
+    updateSei(sei: Buffer) {
+        this.ensureCodecInfo();
+        this.codecInfo.sei = sei;
     }
 
     shouldFilter(nalType: number) {
@@ -266,7 +270,7 @@ export class H264Repacketizer {
                 }
                 else {
                     if (splitNaluType === NAL_TYPE_IDR)
-                        this.maybeSendSpsPps(first, ret);
+                        this.maybeSendStapACodecInfo(first, ret);
 
                     this.fragment(first, ret, {
                         payload: split,
@@ -319,11 +323,21 @@ export class H264Repacketizer {
         });
     }
 
-    maybeSendSpsPps(packet: RtpPacket, ret: RtpPacket[]) {
+    maybeSendStapACodecInfo(packet: RtpPacket, ret: RtpPacket[]) {
+        if (this.stapa) {
+            const newStapa = this.createPacket(packet, this.stapa.payload, this.stapa.header.marker);
+            this.extraPackets++;
+            ret.push(newStapa);
+            return;
+        }
+
         if (!this.codecInfo?.sps || !this.codecInfo?.pps)
             return;
 
-        const aggregates = this.packetizeStapA([this.codecInfo.sps, this.codecInfo.pps]);
+        const agg = [this.codecInfo.sps, this.codecInfo.pps];
+        if (this.codecInfo?.sei)
+            agg.push(this.codecInfo.sei);
+        const aggregates = this.packetizeStapA(agg);
         if (aggregates.length !== 1) {
             this.console.error('expected only 1 packet for sps/pps stapa');
             return;
@@ -406,9 +420,7 @@ export class H264Repacketizer {
                 // the stream may not contain codec information in stapa or may be sending it
                 // in separate sps/pps packets which is not supported by homekit.
                 if (originalNalType === NAL_TYPE_IDR) {
-                    if (!this.seenStapASps)
-                        this.maybeSendSpsPps(packet, ret);
-                    this.seenStapASps = false;
+                    this.maybeSendStapACodecInfo(packet, ret);
                 }
 
             }
@@ -451,26 +463,24 @@ export class H264Repacketizer {
         else if (nalType === NAL_TYPE_STAP_A) {
             this.flushPendingFuA(ret);
 
+            this.stapa = packet;
+            this.extraPackets--;
+
             // break the aggregated packet up and send it.
-            const depacketized = depacketizeStapA(packet.payload)
-                .filter(payload => {
+            depacketizeStapA(packet.payload)
+                .forEach(payload => {
                     const nalType = payload[0] & 0x1F;
-                    this.seenStapASps = this.seenStapASps || (nalType === NAL_TYPE_SPS);
-                    if (this.shouldFilter(nalType)) {
-                        return false;
-                    }
                     if (nalType === NAL_TYPE_SPS)
                         this.updateSps(payload);
-                    if (nalType === NAL_TYPE_PPS)
+                    else if (nalType === NAL_TYPE_PPS)
                         this.updatePps(payload);
-                    return true;
+                    else if (nalType === NAL_TYPE_SEI)
+                        this.updateSei(payload);
+                    else if (nalType === NAL_TYPE_DELIMITER) {
+                    }
+                    else
+                        this.console.warn('Skipped a stapa type. Please report this to @koush on Discord.', nalType)
                 });
-            if (depacketized.length === 0) {
-                this.extraPackets--;
-                return;
-            }
-            const aggregates = this.packetizeStapA(depacketized);
-            this.createRtpPackets(packet, aggregates, ret);
         }
         else if (nalType >= 1 && nalType < 24) {
             this.flushPendingFuA(ret);
@@ -491,6 +501,11 @@ export class H264Repacketizer {
                 this.updatePps(packet.payload);
                 return;
             }
+            else if (nalType === NAL_TYPE_SEI) {
+                this.extraPackets--;
+                this.updateSei(packet.payload);
+                return;
+            }
 
             if (this.shouldFilter(nalType)) {
                 this.extraPackets--;
@@ -500,9 +515,7 @@ export class H264Repacketizer {
             if (nalType === NAL_TYPE_IDR) {
                 // if this is an idr frame, but no sps has been sent, dummy one up.
                 // the stream may not contain sps.
-                if (!this.seenStapASps)
-                    this.maybeSendSpsPps(packet, ret);
-                this.seenStapASps = false;
+                this.maybeSendStapACodecInfo(packet, ret);
             }
 
             this.fragment(packet, ret);

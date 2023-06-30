@@ -1,6 +1,6 @@
-import net from 'net';
-import { once } from 'events';
 import dgram, { SocketType } from 'dgram';
+import { once } from 'events';
+import net from 'net';
 
 export async function closeQuiet(socket: dgram.Socket | net.Server) {
     if (!socket)
@@ -37,6 +37,23 @@ export async function createBindZero(socketType?: SocketType) {
     return createBindUdp(0, socketType);
 }
 
+export async function createSquentialBindZero(socketType?: SocketType) {
+    let attempts = 0;
+    while (true) {
+        const rtpServer = await createBindZero(socketType);
+        try {
+            const rtcpServer = await createBindUdp(rtpServer.port + 1, socketType);
+            return [rtpServer, rtcpServer];
+        }
+        catch (e) {
+            attempts++;
+            closeQuiet(rtpServer.server);
+        }
+        if (attempts === 10)
+            throw new Error('unable to reserve sequential udp ports')
+    }
+}
+
 export async function reserveUdpPort() {
     const udp = await createBindZero();
     await new Promise(resolve => udp.server.close(() => resolve(undefined)));
@@ -62,4 +79,4 @@ export async function bind(server: dgram.Socket, port: number) {
     }
 }
 
-export { listenZero, listenZeroSingleClient, ListenZeroSingleClientTimeoutError } from "@scrypted/server/src/listen-zero";
+export { ListenZeroSingleClientTimeoutError, listenZero, listenZeroSingleClient } from "@scrypted/server/src/listen-zero";
