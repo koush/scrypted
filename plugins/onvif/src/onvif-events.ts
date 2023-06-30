@@ -57,7 +57,12 @@ export async function listenEvents(thisDevice: ScryptedDeviceBase, client: Onvif
 
     const ret: Destroyable = {
         destroy() {
-            client.unsubscribe();
+            try {
+                client.unsubscribe();
+            }
+            catch (e) {
+                console.warn('Error unsubscribing', e);
+            }
         },
         on(eventName: string | symbol, listener: (...args: any[]) => void) {
             return events.on(eventName, listener);
