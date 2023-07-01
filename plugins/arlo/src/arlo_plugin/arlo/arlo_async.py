@@ -311,6 +311,9 @@ class Arlo(object):
                     basestation['deviceType'] not in ['doorbell', 'siren', 'arloq', 'arloqs'] and \
                     basestation['modelId'].lower() not in ['abc1000', 'abc1000a']:
                     continue
+                # avd2001 is the battery doorbell, and we don't want to drain its battery, so disable pings
+                if basestation['modelId'].lower().startswith('avd2001'):
+                    continue
                 devices_to_ping[basestation['deviceId']] = basestation
 
             logger.info(f"Will send heartbeat to the following devices: {list(devices_to_ping.keys())}")
