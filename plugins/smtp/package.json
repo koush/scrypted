@@ -30,14 +30,14 @@
       ]
    },
    "dependencies": {
-      "@types/node": "^16.6.1",
-      "mailparser": "^3.5.0",
-      "smtp-server": "^3.11.0"
+      "@scrypted/sdk": "file:../../sdk",
+      "mailparser": "^3.6.4",
+      "smtp-server": "^3.12.0"
    },
    "devDependencies": {
-      "@scrypted/sdk": "file:../../sdk",
-      "@types/mailparser": "^3.0.3",
+      "@types/node": "^18.16.19",
+      "@types/mailparser": "^3.4.0",
       "@types/smtp-server": "^3.5.7"
    },
-   "version": "0.0.11"
+   "version": "0.0.12"
 }

@@ -1,15 +1,9 @@
-# @scrypted/smtp
+# Mail Server (SMTP) Triggers for Scrypted
 
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
+The SMTP plugin can be used to create email address that can be used to turn Scrypted devices on and off when it receives mail.
 
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
+This plugin is typically used in conjuction with the Dummy Switch plugin, and a camera that can send mail on motion.
 
-## Visual Studio Code configuration
-
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
+1. Use the Dummy Switch Plygin to create a Dummy Switch activated motion sensor.
+2. Enable SMTP/Mail on the Dummy Switch and set up the inbox.
+3. Configure the camera to send mail to that mail address ie, camera@server-ip.
