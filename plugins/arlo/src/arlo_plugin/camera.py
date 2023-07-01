@@ -37,10 +37,10 @@ class ArloCameraIntercomSession(BackgroundTaskMixin):
         self.arlo_basestation = camera.arlo_basestation
 
     async def initialize_push_to_talk(self, media: MediaObject) -> None:
-        raise Exception("not implemented")
+        raise NotImplementedError("not implemented")
 
     async def shutdown(self) -> None:
-        raise Exception("not implemented")
+        raise NotImplementedError("not implemented")
 
 
 class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, VideoClips, MotionSensor, AudioSensor, Battery, Charger):
@@ -162,8 +162,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             asyncio.set_event_loop(self.logger_loop)
             self.logger_loop.run_forever()
 
-        logger_thread = threading.Thread(target=thread_main)
-        logger_thread.start()
+        threading.Thread(target=thread_main).start()
 
         # this is a bit convoluted since we need the async functions to run in the
         # logger loop thread instead of in the current thread
@@ -769,25 +768,31 @@ class ArloCameraWebRTCIntercomSession(ArloCameraIntercomSession):
             session_id, offer_sdp
         )
 
-        async def trickle_candidates():
+        def trickle_candidates():
+            count = 0
             try:
-                candidates = self.arlo_pc.WaitAndGetICECandidates()
-                self.logger.debug(f"Gathered {len(candidates)} candidates")
-                for candidate in candidates:
+                while True:
+                    candidate = self.arlo_pc.GetNextICECandidate()
                     candidate = scrypted_arlo_go.WebRTCICECandidateInit(
-                        scrypted_arlo_go.WebRTCICECandidate(handle=candidate).ToJSON()
+                        scrypted_arlo_go.WebRTCICECandidate(handle=candidate.handle).ToJSON()
                     ).Candidate
                     self.logger.debug(f"Sending candidate to Arlo: {candidate}")
                     self.provider.arlo.NotifyPushToTalkCandidate(
                         self.arlo_basestation, self.arlo_device,
                         session_id, candidate,
                     )
+                    count += 1
+            except RuntimeError as e:
+                if str(e) == "no more candidates":
+                    self.logger.debug(f"End of candidates, found {count} candidate(s)")
+                else:
+                    self.logger.exception("Exception while processing trickle candidates")
             except Exception:
                 self.logger.exception("Exception while processing trickle candidates")
 
         # we can trickle candidates asynchronously so the caller to startIntercom
         # knows we are ready to receive packets
-        self.create_task(trickle_candidates())
+        threading.Thread(target=trickle_candidates).start()
 
     @async_print_exception_guard
     async def shutdown(self) -> None:
@@ -871,13 +876,15 @@ class ArloCameraSIPIntercomSession(ArloCameraIntercomSession):
         self.intercom_ffmpeg_subprocess = HeartbeatChildProcess("FFmpeg", self.camera.logger_server_port, ffmpeg_path, *ffmpeg_args)
         self.intercom_ffmpeg_subprocess.start()
 
-        async def start():
+        def sip_start():
             try:
                 self.arlo_sip.Start()
             except Exception:
                 self.logger.exception("Exception starting sip call")
 
-        self.create_task(start())
+        # do remaining setup asynchronously so the caller to startIntercom
+        # can start sending packets
+        threading.Thread(target=sip_start).start()
 
     @async_print_exception_guard
     async def shutdown(self) -> None:
