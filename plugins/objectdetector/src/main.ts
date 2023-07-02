@@ -279,7 +279,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
-  getCurrrentFrameGenerator(snapshotPipeline: boolean) {
+  getCurrentFrameGenerator(snapshotPipeline: boolean) {
     let frameGenerator: string = this.frameGenerator;
     if (!this.hasMotionType && snapshotPipeline) {
       frameGenerator = 'Snapshot';
@@ -356,18 +356,24 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         // ask rebroadcast to mute audio, not needed.
         audio: null,
       });
+      updatePipelineStatus('generateVideoFrames');
 
-      return await videoFrameGenerator.generateVideoFrames(stream, {
-        queue: 0,
-        fps: this.hasMotionType ? 4 : undefined,
-        // this seems to be unused now?
-        resize: this.model?.inputSize ? {
-          width: this.model.inputSize[0],
-          height: this.model.inputSize[1],
-        } : undefined,
-        // this seems to be unused now?
-        format: this.model?.inputFormat,
-      });
+      try {
+        return await videoFrameGenerator.generateVideoFrames(stream, {
+          queue: 0,
+          fps: this.hasMotionType ? 4 : undefined,
+          // this seems to be unused now?
+          resize: this.model?.inputSize ? {
+            width: this.model.inputSize[0],
+            height: this.model.inputSize[1],
+          } : undefined,
+          // this seems to be unused now?
+          format: this.model?.inputFormat,
+        });
+      }
+      finally {
+        updatePipelineStatus('waiting first result');
+      }
     }
   }
 
@@ -419,7 +425,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     let longObjectDetectionWarning = false;
 
-    const frameGenerator = this.getCurrrentFrameGenerator(options.snapshotPipeline);
+    const frameGenerator = this.getCurrentFrameGenerator(options.snapshotPipeline);
     for await (const detected of
       await sdk.connectRPCObject(
         await this.objectDetection.generateObjectDetections(
