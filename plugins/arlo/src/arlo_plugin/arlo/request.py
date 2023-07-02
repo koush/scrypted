@@ -14,12 +14,27 @@
 # limitations under the License.
 ##
 
+from functools import partialmethod
 import requests
 from requests.exceptions import HTTPError
 from requests_toolbelt.adapters import host_header_ssl
 import cloudscraper
 import time
 import uuid
+
+from .logging import logger
+
+
+try:
+    from curl_cffi import requests as curl_cffi_requests
+    HAS_CURL_CFFI = True
+
+    # upstream curl_cffi doesn't have OPTIONS support, so this is
+    # a bit of a hack to add it
+    class CurlCffiSession(curl_cffi_requests.Session):
+        options = partialmethod(curl_cffi_requests.Session.request, "OPTIONS")
+except:
+    HAS_CURL_CFFI = False
 
 #from requests_toolbelt.utils import dump
 #def print_raw_http(response):
@@ -29,14 +44,20 @@ import uuid
 class Request(object):
     """HTTP helper class"""
 
-    def __init__(self, timeout=5, mode="cloudscraper"):
-        if mode == "cloudscraper":
+    def __init__(self, timeout=5, mode="curl" if HAS_CURL_CFFI else "cloudscraper"):
+        if mode == "curl":
+            logger.debug("HTTP helper using curl_cffi")
+            self.session = CurlCffiSession(impersonate="chrome110")
+        elif mode == "cloudscraper":
+            logger.debug("HTTP helper using cloudscraper")
             from .arlo_async import USER_AGENTS
             self.session = cloudscraper.CloudScraper(browser={"custom": USER_AGENTS["android"]})
         elif mode == "ip":
+            logger.debug("HTTP helper using requests with HostHeaderSSLAdapter")
             self.session = requests.Session()
             self.session.mount('https://', host_header_ssl.HostHeaderSSLAdapter())
         else:
+            logger.debug("HTTP helper using requests")
             self.session = requests.Session()
         self.timeout = timeout
 

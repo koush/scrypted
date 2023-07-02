@@ -101,7 +101,7 @@ class Arlo(object):
         self.username = username
         self.password = password
         self.event_stream = None
-        self.request = Request()
+        self.request = None
 
     def to_timestamp(self, dt):
         if sys.version[0] == '2':
@@ -150,6 +150,7 @@ class Arlo(object):
         self.user_id = user_id
         headers['Content-Type'] = 'application/json; charset=UTF-8'
         headers['User-Agent'] = USER_AGENTS['arlo']
+        self.request = Request(mode="cloudscraper")
         self.request.session.headers.update(headers)
         self.BASE_URL = 'myapi.arlo.com'
 
@@ -170,7 +171,7 @@ class Arlo(object):
             'Host': self.AUTH_URL,
         }
 
-        self.request = Request(mode="cloudscraper")
+        self.request = Request()
         try:
             auth_host = self.AUTH_URL
             self.request.options(f'https://{auth_host}/api/auth', headers=headers)
@@ -246,7 +247,7 @@ class Arlo(object):
             if finish_auth_body.get('data', {}).get('token') is None:
                 raise Exception("Could not complete 2FA, maybe invalid token? If the error persists, please try reloading the plugin and logging in again.")
 
-            self.request = Request()
+            self.request = Request(mode="cloudscraper")
 
             # Update Authorization code with new code
             headers = {

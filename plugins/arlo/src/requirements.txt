@@ -5,6 +5,7 @@ requests==2.28.2
 cachetools==5.3.0
 scrypted-arlo-go==0.4.0
 cloudscraper==1.2.71
+curl-cffi==0.5.6; platform_machine != 'armv7l'
 async-timeout==4.0.2
 --extra-index-url=https://www.piwheels.org/simple/
 --extra-index-url=https://bjia56.github.io/scrypted-arlo-go/
