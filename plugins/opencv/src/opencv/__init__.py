@@ -125,7 +125,7 @@ class OpenCVPlugin(DetectPlugin):
         detection_result['detections'] = detections
         detection_result['inputDimensions'] = src_size
 
-        if session.previous_frame is None:
+        if session.previous_frame is None or session.previous_frame.shape != session.curFrame.shape:
             session.previous_frame = session.curFrame
             session.curFrame = None
             return detection_result
