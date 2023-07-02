@@ -1079,12 +1079,25 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     this.delayStart();
 
-    this.startRtspServer();
+    (async () => {
+      let retry = 1000;
+      while (true) {
+        try {
+          await this.startRtspServer();
+          break;
+        }
+        catch (e) {
+          this.console.warn('Error starting RTSP Rebroadcast Server. Retrying shortly. If this problem persists, consider assigning a different port. This warning can be ignored if the rebroadcast URL is not in use.', e);
+          await sleep(retry);
+          retry = Math.min(60000, retry * 2);
+        }
+      }
+    })();
 
     this.settingsListener = systemManager.listenDevice(this.id, ScryptedInterface.Settings, () => this.ensurePrebufferSessions());
   }
 
-  startRtspServer() {
+  async startRtspServer() {
     closeQuiet(this.rtspServer);
 
     this.rtspServer = new net.Server(async (client) => {
@@ -1159,10 +1172,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     this.rtspServer.listen(this.streamSettings.storageSettings.values.rebroadcastPort || 0);
 
-    once(this.rtspServer, 'listening').then(() => {
+    await once(this.rtspServer, 'listening').then(() => {
       const port = (this.rtspServer.address() as AddressInfo).port;
       this.streamSettings.storageSettings.values.rebroadcastPort = port;
-    })
+    });
   }
 
   delayStart() {
@@ -1490,6 +1503,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   async release() {
+    closeQuiet(this.rtspServer);
     this.settingsListener.removeListener();
     this.online = true;
     super.release();
