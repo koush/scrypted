@@ -1,11 +1,12 @@
+import { sleep } from '@scrypted/common/src/sleep';
 import sdk, { Device, DeviceProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
+import crypto from 'crypto';
 import { RingLocationDevice } from './location';
-import { generateUuid, Location, RingBaseApi, RingRestClient } from './ring-client-api';
-import { sleep } from '@scrypted/common/src/sleep';
+import { Location, RingBaseApi, RingRestClient } from './ring-client-api';
 
 const { deviceManager, mediaManager } = sdk;
-
+  
 class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings {
     loginClient: RingRestClient;
     api: RingBaseApi;
@@ -92,11 +93,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             };
         }
 
+        if (!this.settingsStorage.values.systemId)
+            this.settingsStorage.values.systemId = crypto.createHash('sha256').update(crypto.randomBytes(32)).digest('hex');
+
         this.discoverDevices()
             .catch(e => this.console.error('discovery failure', e));
-
-        if (!this.settingsStorage.values.systemId)
-            this.settingsStorage.values.systemId = generateUuid();
     }
 
     waiting = false;
@@ -123,6 +124,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             this.api?.disconnect();
 
             this.api = new RingBaseApi({
+                controlCenterDisplayName: 'scrypted-ring',
                 refreshToken: this.settingsStorage.values.refreshToken,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 locationIds,
