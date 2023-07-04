@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import json
 import socket
 import time
+import threading
 from typing import List, TYPE_CHECKING
 
 import scrypted_arlo_go
@@ -36,10 +37,10 @@ class ArloCameraIntercomSession(BackgroundTaskMixin):
         self.arlo_basestation = camera.arlo_basestation
 
     async def initialize_push_to_talk(self, media: MediaObject) -> None:
-        raise Exception("not implemented")
+        raise NotImplementedError("not implemented")
 
     async def shutdown(self) -> None:
-        raise Exception("not implemented")
+        raise NotImplementedError("not implemented")
 
 
 class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, VideoClips, MotionSensor, AudioSensor, Battery, Charger):
@@ -111,8 +112,9 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
     last_picture_time: datetime = datetime(1970, 1, 1)
 
     # socket logger
-    logger_server = None
-    logger_server_port = 0
+    logger_loop: asyncio.AbstractEventLoop = None
+    logger_server: asyncio.AbstractServer = None
+    logger_server_port: int = 0
 
     def __init__(self, nativeId: str, arlo_device: dict, arlo_basestation: dict, provider: ArloProvider) -> None:
         super().__init__(nativeId=nativeId, arlo_device=arlo_device, arlo_basestation=arlo_basestation, provider=provider)
@@ -126,7 +128,11 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     def __del__(self) -> None:
         super().__del__()
-        self.logger_server.close()
+        def logger_exit_callback():
+            self.logger_server.close()
+            self.logger_loop.stop()
+            self.logger_loop.close()
+        self.logger_loop.call_soon_threadsafe(logger_exit_callback)
 
     async def delayed_init(self) -> None:
         await self.create_tcp_logger_server()
@@ -150,24 +156,40 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     @async_print_exception_guard
     async def create_tcp_logger_server(self) -> None:
-        async def callback(reader, writer):
-            try:
-                while not reader.at_eof():
-                    line = await reader.readline()
-                    if not line:
-                        break
-                    line = str(line, 'utf-8')
-                    line = line.rstrip()
-                    self.logger.info(line)
-                writer.close()
-                await writer.wait_closed()
-            except Exception:
-                self.logger.exception("Logger server callback raised an exception")
+        self.logger_loop = asyncio.new_event_loop()
 
-        self.logger_server = await asyncio.start_server(callback, host='localhost', port=0, family=socket.AF_INET, flags=socket.SOCK_STREAM)
-        self.logger_server_port = self.logger_server.sockets[0].getsockname()[1]
+        def thread_main():
+            asyncio.set_event_loop(self.logger_loop)
+            self.logger_loop.run_forever()
 
-        self.logger.info(f"Started logging server at localhost:{self.logger_server_port}")
+        threading.Thread(target=thread_main).start()
+
+        # this is a bit convoluted since we need the async functions to run in the
+        # logger loop thread instead of in the current thread
+        def setup_callback():
+            async def callback(reader, writer):
+                try:
+                    while not reader.at_eof():
+                        line = await reader.readline()
+                        if not line:
+                            break
+                        line = str(line, 'utf-8')
+                        line = line.rstrip()
+                        self.logger.info(line)
+                    writer.close()
+                    await writer.wait_closed()
+                except Exception:
+                    self.logger.exception("Logger server callback raised an exception")
+
+            async def setup():
+                self.logger_server = await asyncio.start_server(callback, host='localhost', port=0, family=socket.AF_INET, flags=socket.SOCK_STREAM)
+                self.logger_server_port = self.logger_server.sockets[0].getsockname()[1]
+                self.logger.info(f"Started logging server at localhost:{self.logger_server_port}")
+
+            self.logger_loop.create_task(setup())
+
+        self.logger_loop.call_soon_threadsafe(setup_callback)
+
 
     def start_error_subscription(self) -> None:
         def callback(code, message):
@@ -291,7 +313,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             return False
 
     @property
-    def snapshot_throttle_interval(self) -> bool:
+    def snapshot_throttle_interval(self) -> int:
         interval = self.storage.getItem("snapshot_throttle_interval")
         if interval is None:
             interval = 60
@@ -536,7 +558,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             self.intercom_session = ArloCameraWebRTCIntercomSession(self)
         await self.intercom_session.initialize_push_to_talk(media)
 
-        self.logger.info("Intercom ready")
+        self.logger.info("Intercom initialized")
 
     @async_print_exception_guard
     async def stopIntercom(self) -> None:
@@ -746,17 +768,31 @@ class ArloCameraWebRTCIntercomSession(ArloCameraIntercomSession):
             session_id, offer_sdp
         )
 
-        candidates = self.arlo_pc.WaitAndGetICECandidates()
-        self.logger.debug(f"Gathered {len(candidates)} candidates")
-        for candidate in candidates:
-            candidate = scrypted_arlo_go.WebRTCICECandidateInit(
-                scrypted_arlo_go.WebRTCICECandidate(handle=candidate).ToJSON()
-            ).Candidate
-            self.logger.debug(f"Sending candidate to Arlo: {candidate}")
-            self.provider.arlo.NotifyPushToTalkCandidate(
-                self.arlo_basestation, self.arlo_device,
-                session_id, candidate,
-            )
+        def trickle_candidates():
+            count = 0
+            try:
+                while True:
+                    candidate = self.arlo_pc.GetNextICECandidate()
+                    candidate = scrypted_arlo_go.WebRTCICECandidateInit(
+                        scrypted_arlo_go.WebRTCICECandidate(handle=candidate.handle).ToJSON()
+                    ).Candidate
+                    self.logger.debug(f"Sending candidate to Arlo: {candidate}")
+                    self.provider.arlo.NotifyPushToTalkCandidate(
+                        self.arlo_basestation, self.arlo_device,
+                        session_id, candidate,
+                    )
+                    count += 1
+            except RuntimeError as e:
+                if str(e) == "no more candidates":
+                    self.logger.debug(f"End of candidates, found {count} candidate(s)")
+                else:
+                    self.logger.exception("Exception while processing trickle candidates")
+            except Exception:
+                self.logger.exception("Exception while processing trickle candidates")
+
+        # we can trickle candidates asynchronously so the caller to startIntercom
+        # knows we are ready to receive packets
+        threading.Thread(target=trickle_candidates).start()
 
     @async_print_exception_guard
     async def shutdown(self) -> None:
@@ -840,7 +876,15 @@ class ArloCameraSIPIntercomSession(ArloCameraIntercomSession):
         self.intercom_ffmpeg_subprocess = HeartbeatChildProcess("FFmpeg", self.camera.logger_server_port, ffmpeg_path, *ffmpeg_args)
         self.intercom_ffmpeg_subprocess.start()
 
-        self.arlo_sip.Start()
+        def sip_start():
+            try:
+                self.arlo_sip.Start()
+            except Exception:
+                self.logger.exception("Exception starting sip call")
+
+        # do remaining setup asynchronously so the caller to startIntercom
+        # can start sending packets
+        threading.Thread(target=sip_start).start()
 
     @async_print_exception_guard
     async def shutdown(self) -> None:
