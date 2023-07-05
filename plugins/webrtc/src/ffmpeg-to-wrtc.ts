@@ -569,7 +569,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             }
             catch (e) {
                 this.console.error('Error starting playback for WebRTC track.', e);
-                // todo: report this to the client somehow.
+                ret.cleanup(false);
             }
         });
 
