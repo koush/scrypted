@@ -1855,7 +1855,7 @@ export interface HttpResponseOptions {
   headers?: object;
 }
 export interface EngineIOHandler {
-  onConnection(request: HttpRequest, webScoket: WebSocket): Promise<void>;
+  onConnection(request: HttpRequest, webSocket: WebSocket): Promise<void>;
 
 }
 /**
