@@ -151,7 +151,7 @@ seen.add('RTCSignalingSession');
 seen.add('RTCSignalingChannel');
 seen.add('RTCSignalingClient');
 
-function getDocstring(td: any, includePass: boolean = false) {
+function toDocstring(td: any, includePass: boolean = false) {
     const suffix = includePass ? `    pass` : '';
     const comments: any[] = ((td.comment ?? {}).summary ?? []).filter((item: any) => item.kind === "text");
     if (comments.length === 0) {
@@ -173,7 +173,7 @@ function getDocstring(td: any, includePass: boolean = false) {
 
 }
 
-function getComment(td: any) {
+function toComment(td: any) {
     const comments: any[] = ((td.comment ?? {}).summary ?? []).filter((item: any) => item.kind === "text");
     if (comments.length === 0) {
         return '';
@@ -193,18 +193,18 @@ function addNonDictionaryType(td: any) {
     seen.add(td.name);
     python += `
 class ${td.name}:
-${getDocstring(td)}
+${toDocstring(td)}
 `;
 
     const properties = td.children.filter((child: any) => child.kindString === 'Property');
     const methods = td.children.filter((child: any) => child.kindString === 'Method');
     for (const property of properties) {
-        python += `    ${property.name}: ${toPythonType(property.type)}${getComment(property)}
+        python += `    ${property.name}: ${toPythonType(property.type)}${toComment(property)}
 `
     }
     for (const method of methods) {
         python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${toPythonReturnType(method.signatures[0].type)}:
-        ${getDocstring(method, true)}
+        ${toDocstring(method, true)}
 
 `
     }
@@ -220,7 +220,7 @@ let pythonEnums = ''
 for (const e of enums) {
     pythonEnums += `
 class ${e.name}(str, Enum):
-${getDocstring(e)}
+${toDocstring(e)}
 `
     for (const val of e.children) {
         pythonEnums += `    ${val.name} = "${val.type.value}"
@@ -292,12 +292,12 @@ while (discoveredTypes.size) {
         }
         pythonUnknowns += `
 class ${td.name}(TypedDict):
-${getDocstring(td)}
+${toDocstring(td)}
 `;
 
         const properties = td.children?.filter((child: any) => child.kindString === 'Property') || [];
         for (const property of properties) {
-            pythonUnknowns += `    ${property.name}: ${toPythonType(property.type)}${getComment(property)}
+            pythonUnknowns += `    ${property.name}: ${toPythonType(property.type)}${toComment(property)}
 `
         }
         if (properties.length === 0) {
