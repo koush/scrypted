@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import asyncio
+from contextlib import nullcontext
 import engineio
 import os
 import aiohttp
 import rpc_reader
 import plugin_remote
-from plugin_remote import SystemManager, MediaManager
+from plugin_remote import DeviceManager, SystemManager, MediaManager
 from scrypted_python.scrypted_sdk import ScryptedStatic
 
 class EioRpcTransport(rpc_reader.RpcTransport):
@@ -35,57 +38,62 @@ class EioRpcTransport(rpc_reader.RpcTransport):
 
 
 async def connect_scrypted_client(
-    base_url: str, username: str, password: str, plugin_id: str = "@scrypted/core"
-):
+    transport: EioRpcTransport, base_url: str, username: str, password: str, plugin_id: str = "@scrypted/core", session: aiohttp.ClientSession | None = None
+) -> ScryptedStatic:
     login_url = f"{base_url}/login"
     login_body = {
         "username": username,
         "password": password,
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
+    if session:
+        cm = nullcontext(session)
+    else:
+        cm = aiohttp.ClientSession()
+
+    async with cm as _session:
+        async with _session.post(
             login_url, verify_ssl=False, json=login_body
         ) as response:
             login_response = await response.json()
 
-            headers = {"Authorization": login_response["authorization"]}
+        headers = {"Authorization": login_response["authorization"]}
 
-            loop = asyncio.get_event_loop()
-            transport = EioRpcTransport(loop)
+        await transport.eio.connect(
+            base_url,
+            headers=headers,
+            engineio_path=f"/endpoint/{plugin_id}/engine.io/api/",
+        )
+        
+        ret = asyncio.Future[ScryptedStatic](loop=transport.loop)
+        peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(transport.loop, transport)
+        peer.params['print'] = print
+        def callback(api, pluginId, hostInfo):
+            remote = plugin_remote.PluginRemote(peer, api, pluginId, hostInfo, transport.loop)
+            wrapped = remote.setSystemState
+            async def remoteSetSystemState(systemState):
+                await wrapped(systemState)
+                async def resolve():
+                    sdk = ScryptedStatic()
+                    sdk.api = api
+                    sdk.remote = remote
+                    sdk.systemManager = SystemManager(api, remote.systemState)
+                    sdk.deviceManager = DeviceManager(remote.nativeIds, sdk.systemManager)
+                    sdk.mediaManager = MediaManager(await api.getMediaManager())
+                    ret.set_result(sdk)
+                asyncio.run_coroutine_threadsafe(resolve(), transport.loop)
+            remote.setSystemState = remoteSetSystemState
+            return remote
+        peer.params['getRemote'] = callback
+        asyncio.run_coroutine_threadsafe(peerReadLoop(), transport.loop)
 
-            await transport.eio.connect(
-                base_url,
-                headers=headers,
-                engineio_path=f"/endpoint/{plugin_id}/engine.io/api/",
-            )
-            
-            ret = asyncio.Future[ScryptedStatic](loop=loop)
-            peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(loop, transport)
-            peer.params['print'] = print
-            def callback(api, pluginId, hostInfo):
-                remote = plugin_remote.PluginRemote(peer, api, pluginId, hostInfo, loop)
-                wrapped = remote.setSystemState
-                async def remoteSetSystemState(systemState):
-                    await wrapped(systemState)
-                    async def resolve():
-                        sdk = ScryptedStatic()
-                        sdk.api = api
-                        sdk.remote = remote
-                        sdk.systemManager = SystemManager(api, remote.systemState)
-                        sdk.mediaManager = MediaManager(await api.getMediaManager())
-                        ret.set_result(sdk)
-                    asyncio.run_coroutine_threadsafe(resolve(), loop)
-                remote.setSystemState = remoteSetSystemState
-                return remote
-            peer.params['getRemote'] = callback
-            asyncio.run_coroutine_threadsafe(peerReadLoop(), loop)
-
-            sdk = await ret
-            return sdk
+        sdk = await ret
+        return sdk
 
 async def main():
+    transport = EioRpcTransport(asyncio.get_event_loop())
     sdk = await connect_scrypted_client(
+        transport,
         "https://localhost:10443",
         os.environ["SCRYPTED_USERNAME"],
         os.environ["SCRYPTED_PASSWORD"],
@@ -94,6 +102,8 @@ async def main():
     for id in sdk.systemManager.getSystemState():
         device = sdk.systemManager.getDeviceById(id)
         print(device.name)
+
+    await transport.eio.disconnect()
     os._exit(0)
 
 loop = asyncio.new_event_loop()
