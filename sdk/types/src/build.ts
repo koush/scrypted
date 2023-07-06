@@ -152,8 +152,7 @@ seen.add('RTCSignalingChannel');
 seen.add('RTCSignalingClient');
 
 function getDocstring(td: any, includePass: boolean = false) {
-    const indent = '    ';
-    const suffix = includePass ? `${indent}pass` : '';
+    const suffix = includePass ? `    pass` : '';
     const comments: any[] = ((td.comment ?? {}).summary ?? []).filter((item: any) => item.kind === "text");
     if (comments.length === 0) {
         if (includePass) {
@@ -162,14 +161,14 @@ function getDocstring(td: any, includePass: boolean = false) {
         return '';
     }
     if (comments.length === 1) {
-        return `${indent}"""${comments[0].text.replaceAll('\n', ' ')}"""\n${suffix}`;
+        return `    """${comments[0].text.replaceAll('\n', ' ')}"""\n${suffix}`;
     }
-    let text = `${indent}"""\n`;
+    let text = `    """\n`;
     for (const comment of comments) {
-        text += `${indent}${comment.text.replaceAll('\n', ' ')}\n\n`;
+        text += `    ${comment.text.replaceAll('\n', ' ')}\n\n`;
     }
     text = text.slice(0,text.length - 2)
-    text += `${indent}"""\n${suffix}`;
+    text += `    """\n${suffix}`;
     return text
 
 }
