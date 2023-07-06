@@ -133,7 +133,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 usePrebufferSnapshots = false;
                 break;
             default:
-                if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera))
+                // default behavior is to use a prebuffer snapshot if there's no camera interface and
+                // no explicit snapshot url.
+                if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera) && !this.storageSettings.values.snapshotUrl)
                     usePrebufferSnapshots = true;
                 break;
         }
