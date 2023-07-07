@@ -463,11 +463,30 @@ class Arlo(object):
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
+        reset_motion_task: asyncio.Task = None
+        async def reset_motion():
+            await asyncio.sleep(60)
+            callback(False)
+
         def callbackwrapper(self, event):
+            nonlocal reset_motion_task
             properties = event.get('properties', {})
+
             stop = None
             if 'motionDetected' in properties:
                 stop = callback(properties['motionDetected'])
+
+                if properties['motionDetected']:
+                    # if motionDetected = True, schedule a callback to reset the motion
+                    # sensor if we somehow miss the motionDetected = False event
+                    if reset_motion_task:
+                        reset_motion_task.cancel()
+                    reset_motion_task = asyncio.get_event_loop().create_task(reset_motion())
+                else:
+                    if reset_motion_task:
+                        reset_motion_task.cancel()
+                        reset_motion_task = None
+
             if not stop:
                 return None
             return stop
@@ -490,11 +509,30 @@ class Arlo(object):
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
+        reset_audio_task: asyncio.Task = None
+        async def reset_audio():
+            await asyncio.sleep(60)
+            callback(False)
+
         def callbackwrapper(self, event):
+            nonlocal reset_audio_task
             properties = event.get('properties', {})
+
             stop = None
             if 'audioDetected' in properties:
                 stop = callback(properties['audioDetected'])
+
+                if properties['audioDetected']:
+                    # if audioDetected = True, schedule a callback to reset the audio
+                    # sensor if we somehow miss the audioDetected = False event
+                    if reset_audio_task:
+                        reset_audio_task.cancel()
+                    reset_audio_task = asyncio.get_event_loop().create_task(reset_audio())
+                else:
+                    if reset_audio_task:
+                        reset_audio_task.cancel()
+                        reset_audio_task = None
+
             if not stop:
                 return None
             return stop
