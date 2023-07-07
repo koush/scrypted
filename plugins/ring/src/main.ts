@@ -128,7 +128,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
                 refreshToken: this.settingsStorage.values.refreshToken,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 locationIds,
-                cameraStatusPollingSeconds,
+                cameraStatusPollingSeconds: this.settingsStorage.values.polling ? cameraStatusPollingSeconds : undefined,
                 cameraDingsPollingSeconds: this.settingsStorage.values.polling ? this.settingsStorage.values.cameraDingsPollingSeconds : undefined,
                 systemId: this.settingsStorage.values.systemId,
             }, {
