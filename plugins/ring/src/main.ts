@@ -19,6 +19,10 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             description: 'Used to provide client uniqueness for retrieving the latest set of events.',
             hide: true,
         },
+        controlCenterDisplayName: {
+            hide: true,
+            defaultValue: 'scrypted-ring',
+        },
         email: {
             title: 'Email',
             onPut: async () => {
@@ -124,7 +128,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             this.api?.disconnect();
 
             this.api = new RingBaseApi({
-                controlCenterDisplayName: 'scrypted-ring',
+                controlCenterDisplayName: this.settingsStorage.values.controlCenterDisplayName,
                 refreshToken: this.settingsStorage.values.refreshToken,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 locationIds,
