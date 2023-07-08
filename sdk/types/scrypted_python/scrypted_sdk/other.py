@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import AbstractSet, Any, Callable, Literal
+from typing import AbstractSet, Any, Callable, Literal, Union
 try:
     from typing import TypedDict
 except:
@@ -9,7 +9,7 @@ except:
 
 SettingValue = str
 EventListener = Callable[[Any, Any, Any], None]
-VibratePattern = int | list[int]
+VibratePattern = Union[int, list[int]]
 
 
 class Console:
