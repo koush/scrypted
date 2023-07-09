@@ -365,7 +365,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 # finish login
                 if old_arlo:
                     old_arlo.Unsubscribe()
-                _ = self.arlo
+
+                try:
+                    _ = self.arlo
+                except Exception:
+                    self.logger.error("Unrecoverable login error")
+                    self.logger.error("Will request a plugin restart")
+                    await scrypted_sdk.deviceManager.requestRestart()
+                    return
 
             # continue by sleeping/waiting for a signal
             interval = self.imap_mfa_interval * 24 * 60 * 60  # convert interval days to seconds
