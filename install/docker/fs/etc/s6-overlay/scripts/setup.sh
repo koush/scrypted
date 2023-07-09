@@ -1,5 +1,15 @@
 #!/bin/bash
 
+if [[ "${SCRYPTED_DOCKER_AVAHI}" != "true" ]]; then
+  echo "SCRYPTED_DOCKER_AVAHI != true, won't manage dbus nor avahi-daemon" >/dev/stderr
+  exit 0
+fi
+
+if grep -qE " ((/var)?/run/dbus|(/var)?/run/avahi-daemon(/socket)?) " /proc/mounts; then
+  echo "dbus and/or avahi-daemon volumes are bind mounted, won't touch them" >/dev/stderr
+  exit 0
+fi
+
 # make run folders
 mkdir -p /var/run/dbus
 mkdir -p /var/run/avahi-daemon

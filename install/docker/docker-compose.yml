@@ -37,6 +37,11 @@ services:
             # Uncomment next 3 lines for Nvidia GPU support.
             # - NVIDIA_VISIBLE_DEVICES=all
             # - NVIDIA_DRIVER_CAPABILITIES=all
+
+            # Uncomment next line to run avahi-daemon inside the container
+            # Don't use if dbus and avahi run on the host and are bind-mounted
+            # (see below under "volumes")
+            # - SCRYPTED_DOCKER_AVAHI=true
         # runtime: nvidia
 
         volumes:
@@ -56,6 +61,7 @@ services:
 
             # uncomment the following lines to expose Avahi, an mDNS advertiser.
             # make sure Avahi is running on the host machine, otherwise this will not work.
+            # not compatible with Avahi enabled via SCRYPTED_DOCKER_AVAHI=true
             # - /var/run/dbus:/var/run/dbus
             # - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
 
