@@ -82,10 +82,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             ],
             defaultValue: 'Disabled',
         },
-        pnc: {
-            hide: true,
-            json: true,
-        }
     });
 
     constructor() {
@@ -141,12 +137,8 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
                 },
             });
 
-            if (this.api.restClient.refreshToken && this.api.restClient.authConfig && this.settingsStorage.values.pnc)
-                this.api.restClient._internalOnly_pushNotificationCredentials = this.settingsStorage.values.pnc;
-
             this.api.onRefreshTokenUpdated.subscribe(({ newRefreshToken }) => {
                 this.settingsStorage.values.refreshToken = newRefreshToken;
-                this.settingsStorage.values.pnc = this.api.restClient._internalOnly_pushNotificationCredentials;
             });
         }
 
