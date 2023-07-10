@@ -206,6 +206,14 @@ export class H264Repacketizer {
             return datas.shift();
         }
 
+        // a single nalu stapa is unnecessary, return the nalu itself.
+        // this can happen when trying to packetize multiple nalus into a stapa
+        // and the last nalu does not fit into the first stapa, and ends up in
+        // a new stapa.
+        if (counter === 1) {
+            return payload[1];
+        }
+
         payload.unshift(Buffer.from([stapHeader]));
         return Buffer.concat(payload);
     }
@@ -463,10 +471,10 @@ export class H264Repacketizer {
         else if (nalType === NAL_TYPE_STAP_A) {
             this.flushPendingFuA(ret);
 
-            this.stapa = packet;
-            this.extraPackets--;
+            // this.stapa = packet;
+            // this.extraPackets--;
 
-            // break the aggregated packet up and send it.
+            // break the aggregated packet up to update codec information.
             depacketizeStapA(packet.payload)
                 .forEach(payload => {
                     const nalType = payload[0] & 0x1F;
@@ -478,9 +486,14 @@ export class H264Repacketizer {
                         this.updateSei(payload);
                     else if (nalType === NAL_TYPE_DELIMITER) {
                     }
+                    else if (nalType === NAL_TYPE_NON_IDR) {
+                    }
                     else
                         this.console.warn('Skipped a stapa type. Please report this to @koush on Discord.', nalType)
                 });
+
+            const stapa = this.packetizeStapA(depacketizeStapA(packet.payload));
+            this.createRtpPackets(packet, stapa, ret, packet.header.marker);
         }
         else if (nalType >= 1 && nalType < 24) {
             this.flushPendingFuA(ret);
