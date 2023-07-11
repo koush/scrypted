@@ -6,7 +6,7 @@ import { RingLocationDevice } from './location';
 import { Location, RingBaseApi, RingRestClient } from './ring-client-api';
 
 const { deviceManager, mediaManager } = sdk;
-  
+
 class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings {
     loginClient: RingRestClient;
     api: RingBaseApi;
@@ -18,6 +18,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             title: 'System ID',
             description: 'Used to provide client uniqueness for retrieving the latest set of events.',
             hide: true,
+            persistedDefaultValue: crypto.createHash('sha256').update(crypto.randomBytes(32)).digest('hex'),
         },
         controlCenterDisplayName: {
             hide: true,
@@ -53,10 +54,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             title: 'Polling',
             description: 'Poll the Ring servers instead of using server delivered Push events. May fix issues with events not being delivered.',
             type: 'boolean',
-            onPut: async() => {
+            onPut: async () => {
                 await this.tryLogin();
                 await this.discoverDevices();
             },
+            defaultValue: true,
         },
         refreshToken: {
             hide: true,
@@ -92,9 +94,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
                 hide: !this.settingsStorage.values.polling,
             };
         }
-
-        if (!this.settingsStorage.values.systemId)
-            this.settingsStorage.values.systemId = crypto.createHash('sha256').update(crypto.randomBytes(32)).digest('hex');
 
         this.discoverDevices()
             .catch(e => this.console.error('discovery failure', e));
@@ -137,7 +136,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
                 },
             });
 
-            this.api.onRefreshTokenUpdated.subscribe(({ newRefreshToken }) => {
+            this.api.onRefreshTokenUpdated.subscribe(({ newRefreshToken, oldRefreshToken }) => {
                 this.settingsStorage.values.refreshToken = newRefreshToken;
             });
         }
@@ -156,6 +155,8 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             this.loginClient = new RingRestClient({
                 email: this.settingsStorage.values.email,
                 password: this.settingsStorage.values.password,
+                controlCenterDisplayName: this.settingsStorage.values.controlCenterDisplayName,
+                systemId: this.settingsStorage.values.systemId,
             });
             try {
                 const auth = await this.loginClient.getCurrentAuth();
