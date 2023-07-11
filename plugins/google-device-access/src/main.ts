@@ -161,7 +161,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
             },
 
             setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
-                const offerSdp = description.sdp.replace('a=ice-options:trickle\r\n', '');
+                const offerSdp = description.sdp.replace('a=ice-options:trickle\r\n', '').replaceAll('sendrecv', 'recvonly');
 
                 const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
                     command: "sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream",
