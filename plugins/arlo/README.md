@@ -8,6 +8,8 @@ The account you use for this plugin must have either SMS or email set as the def
 
 If you experience any trouble logging in, clear the username and password boxes, reload the plugin, and try again.
 
+If you are unable to see shared cameras in your separate Arlo account, ensure that both your primary and secondary accoutns are upgraded according to this [forum post](https://web.archive.org/web/20230710141914/https://community.arlo.com/t5/Arlo-Secure/Invited-friend-cannot-see-devices-on-their-dashboard-Arlo-Pro-2/m-p/1889396#M1813). Verify the sharing worked by logging in via the Arlo web dashboard.
+
 ## General Setup Notes
 
 * Ensure that your Arlo account's default 2FA option is set to either SMS or email.

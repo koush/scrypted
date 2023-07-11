@@ -295,7 +295,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             self.storage.setItem("arlo_user_id", "")
 
             # initialize login and prompt for MFA
-            _ = self.arlo
+            try:
+                _ = self.arlo
+            except Exception:
+                self.logger.exception("Unrecoverable login error")
+                self.logger.error("Will request a plugin restart")
+                await scrypted_sdk.deviceManager.requestRestart()
+                return
 
             # do imap lookup
             # adapted from https://github.com/twrecked/pyaarlo/blob/77c202b6f789c7104a024f855a12a3df4fc8df38/pyaarlo/tfa.py
@@ -369,7 +375,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 try:
                     _ = self.arlo
                 except Exception:
-                    self.logger.error("Unrecoverable login error")
+                    self.logger.exception("Unrecoverable login error")
                     self.logger.error("Will request a plugin restart")
                     await scrypted_sdk.deviceManager.requestRestart()
                     return
