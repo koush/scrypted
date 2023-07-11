@@ -1,6 +1,6 @@
 # Scrypted
 
-Scrypted is a high performance home video integration platform and NVR with smart detections. [Instant, low latency, streaming](https://www.reddit.com/r/homebridge/comments/r34k6b/if_youre_using_homebridge_for_cameras_ditch_it/) to HomeKit, Google Home, and Alexa. Supports most cameras. [Learn more](https://docs.scrypted.app).
+Scrypted is a high performance home video integration platform and NVR with smart detections. [Instant, low latency, streaming](https://streamable.com/xbxn7z) to HomeKit, Google Home, and Alexa. Supports most cameras. [Learn more](https://docs.scrypted.app).
 
 <img src="https://github.com/koush/scrypted/assets/73924/57e1d556-cd3d-4448-81f9-a6c51b6513de">
 
