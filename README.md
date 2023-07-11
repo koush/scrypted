@@ -12,6 +12,10 @@ Scrypted is a high performance home video integration and automation platform.
 
 Installation and camera onboarding instructions can be found in the [docs](https://docs.scrypted.app).
 
+## Community
+
+Scrypted has active communities on [Discord](https://discord.gg/DcFzmBHYGq), [Reddit](https://reddit.com/r/scrypted), and [Github](https://github.com/koush/scrypted). Check them out if you have questions!
+
 ## Development
 
 ## Debug Scrypted Plugins in VS Code
