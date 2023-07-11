@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [ -z "$SCRYPTED_DOCKER_AVAHI" ]
-then
+if [[ "${SCRYPTED_DOCKER_AVAHI}" != "true" ]]; then
+  echo "SCRYPTED_DOCKER_AVAHI != true, not starting avahi-daemon" >/dev/stderr
   while true
   do
     sleep 1000
