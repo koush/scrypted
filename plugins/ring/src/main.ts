@@ -151,13 +151,14 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             throw new Error('refresh token, username, and password are missing.');
         }
 
+        this.loginClient = new RingRestClient({
+            email: this.settingsStorage.values.email,
+            password: this.settingsStorage.values.password,
+            controlCenterDisplayName: this.settingsStorage.values.controlCenterDisplayName,
+            systemId: this.settingsStorage.values.systemId,
+        });
+
         if (!code) {
-            this.loginClient = new RingRestClient({
-                email: this.settingsStorage.values.email,
-                password: this.settingsStorage.values.password,
-                controlCenterDisplayName: this.settingsStorage.values.controlCenterDisplayName,
-                systemId: this.settingsStorage.values.systemId,
-            });
             try {
                 const auth = await this.loginClient.getCurrentAuth();
                 this.settingsStorage.values.refreshToken = auth.refresh_token;
