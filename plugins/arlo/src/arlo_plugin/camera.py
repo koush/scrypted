@@ -206,7 +206,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             return self.stop_subscriptions
 
         self.register_task(
-            self.provider.arlo.SubscribeToMotionEvents(self.arlo_basestation, self.arlo_device, callback)
+            self.provider.arlo.SubscribeToMotionEvents(self.arlo_basestation, self.arlo_device, callback, self.logger)
         )
 
     def start_audio_subscription(self) -> None:
@@ -218,7 +218,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             return self.stop_subscriptions
 
         self.register_task(
-            self.provider.arlo.SubscribeToAudioEvents(self.arlo_basestation, self.arlo_device, callback)
+            self.provider.arlo.SubscribeToAudioEvents(self.arlo_basestation, self.arlo_device, callback, self.logger)
         )
 
     def start_battery_subscription(self) -> None:

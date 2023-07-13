@@ -191,7 +191,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             self._arlo = None
             self._arlo_mfa_complete_auth = None
             self._arlo_mfa_code = None
-            return None
+            raise
 
     async def do_arlo_setup(self) -> None:
         try:
