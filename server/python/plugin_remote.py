@@ -146,7 +146,7 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
     async def listen(self, callback: scrypted_python.scrypted_sdk.EventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
         return await self.api.listen(callback)
 
-    async def listenDevice(self, id: str, event: str | scrypted_python.scrypted_sdk.EventListenerOptions, callback: scrypted_python.scrypted_sdk.EventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
+    async def listenDevice(self, id: str, event: str | scrypted_python.scrypted_sdk.EventListenerOptions, callback: scrypted_python.scrypted_sdk.DeviceEventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
         return await self.api.listenDevice(id, event, callback)
 
     async def removeDevice(self, id: str) -> None:

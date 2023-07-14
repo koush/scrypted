@@ -12,8 +12,9 @@ if TYPE_CHECKING:
     from .types import DeviceManifest, Device, EventDetails, EventListenerOptions, EventListenerRegister, MediaManager, ScryptedDevice, ScryptedInterfaceProperty
 
 SettingValue = str
-EventListener = Callable[[Any, Any, Any], None]
-VibratePattern = list[int]
+EventListener = Callable[[str, EventDetails, Any], None]
+DeviceEventListener = Callable[[EventDetails, Any], None]
+VibratePattern = Union[int, list[int]]
 
 
 class Console:
@@ -145,10 +146,10 @@ class PluginAPI:
     async def removeDevice(self, id: str) -> None:
         pass
 
-    async def listen(self, callback: Callable[[str, "EventDetails", Any], None]) -> "EventListenerRegister":
+    async def listen(self, callback: EventListener) -> "EventListenerRegister":
         pass
 
-    async def listenDevice(self, id: str, event: str | "EventListenerOptions", callback: Callable[["EventDetails", Any], None]) -> "EventListenerRegister":
+    async def listenDevice(self, id: str, event: str | "EventListenerOptions", callback: DeviceEventListener) -> "EventListenerRegister":
         pass
 
 
