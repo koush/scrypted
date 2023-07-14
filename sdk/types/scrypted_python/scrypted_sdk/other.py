@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import AbstractSet, Any, Callable, Literal, TYPE_CHECKING
-
+from typing import AbstractSet, Any, Callable, Literal, Union, TYPE_CHECKING
 try:
     from typing import TypedDict
 except ImportError:
@@ -125,7 +124,7 @@ class PluginLogger:
 
 
 class PluginAPI:
-    async def setState(nativeId: str | None, key: str, value: Any) -> None:
+    async def setState(self, nativeId: str | None, key: str, value: Any) -> None:
         pass
 
     async def onDevicesChanged(self, deviceManifest: "DeviceManifest") -> None:

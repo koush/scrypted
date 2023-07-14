@@ -22,7 +22,7 @@ from typing import Any, Optional, Set, Tuple
 import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
-                                                EventDetails,
+                                                EventDetails, PluginAPI,
                                                 ScryptedInterfaceMethods,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
