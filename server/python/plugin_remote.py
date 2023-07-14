@@ -22,7 +22,7 @@ from typing import Any, Optional, Set, Tuple
 import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
-                                                EventDetails,
+                                                EventDetails, PluginAPI,
                                                 ScryptedInterfaceMethods,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
@@ -88,7 +88,7 @@ class DeviceProxy(object):
 class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
     deviceProxies: Mapping[str, DeviceProxy]
 
-    def __init__(self, api: Any, systemState: Mapping[str, Mapping[str, SystemDeviceState]]) -> None:
+    def __init__(self, api: PluginAPI, systemState: Mapping[str, Mapping[str, SystemDeviceState]]) -> None:
         super().__init__()
         self.api = api
         self.systemState = systemState
@@ -144,10 +144,10 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
                 return self.getDeviceById(check)
 
     async def listen(self, callback: scrypted_python.scrypted_sdk.EventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
-        self.api.listen(callback)
+        return await self.api.listen(callback)
 
     async def listenDevice(self, id: str, event: str | scrypted_python.scrypted_sdk.EventListenerOptions, callback: scrypted_python.scrypted_sdk.EventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
-        return self.api.listenDevice(id, event, callback)
+        return await self.api.listenDevice(id, event, callback)
 
     async def removeDevice(self, id: str) -> None:
         return await self.api.removeDevice(id)
