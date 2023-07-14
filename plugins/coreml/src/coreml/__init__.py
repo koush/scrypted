@@ -44,7 +44,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 model = "ssdlite_mobilenet_v2"
         self.yolo = "yolo" in model
         self.yolov8 = "yolov8" in model
-        model_version = "v1"
+        model_version = "v2"
 
         print(f"model: {model}")
 

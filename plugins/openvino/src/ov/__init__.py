@@ -90,7 +90,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         else:
             self.model_dim = 300
 
-        model_version = 'v3'
+        model_version = 'v4'
         xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.xml', f'{model_version}/{precision}/{model}.xml')
         binFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.bin', f'{model_version}/{precision}/{model}.bin')
         if self.yolo:
