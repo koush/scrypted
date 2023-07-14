@@ -100,16 +100,16 @@ class ScryptedInterfaceDescriptor:
 
 
 class PluginLogger:
-    async def log(level: str, message: str) -> None:
+    async def log(self, level: str, message: str) -> None:
         pass
 
-    async def clear() -> None:
+    async def clear(self) -> None:
         pass
 
-    async def clearAlert(message: str) -> None:
+    async def clearAlert(self, message: str) -> None:
         pass
 
-    async def clearAlerts() -> None:
+    async def clearAlerts(self) -> None:
         pass
 
 
@@ -118,51 +118,51 @@ class PluginAPI:
     async def setState(nativeId: str | None, key: str, value: Any) -> None:
         pass
 
-    async def onDevicesChanged(deviceManifest: "DeviceManifest") -> None:
+    async def onDevicesChanged(self, deviceManifest: "DeviceManifest") -> None:
         pass
 
-    async def onDeviceDiscovered(device: "Device") -> None:
+    async def onDeviceDiscovered(self, device: "Device") -> None:
         pass
 
-    async def onDeviceEvent(nativeId: str | None, eventInterface: str, eventData: Any) -> None:
+    async def onDeviceEvent(self, nativeId: str | None, eventInterface: str, eventData: Any) -> None:
         pass
 
-    async def onMixinEvent(id: str, nativeId: str | None, eventInterface: str, eventData: Any) -> None:
+    async def onMixinEvent(self, id: str, nativeId: str | None, eventInterface: str, eventData: Any) -> None:
         pass
 
-    async def onDeviceRemoved(nativeId: str) -> None:
+    async def onDeviceRemoved(self, nativeId: str) -> None:
         pass
 
-    async def setStorage(nativeId: str, storage: dict[str, Any]) -> None:
+    async def setStorage(self, nativeId: str, storage: dict[str, Any]) -> None:
         pass
 
-    async def getDeviceById(id: str) -> "ScryptedDevice":
+    async def getDeviceById(self, id: str) -> "ScryptedDevice":
         pass
 
-    async def setDeviceProperty(id: str, property: "ScryptedInterfaceProperty", value: Any) -> None:
+    async def setDeviceProperty(self, id: str, property: "ScryptedInterfaceProperty", value: Any) -> None:
         pass
 
-    async def removeDevice(id: str) -> None:
+    async def removeDevice(self, id: str) -> None:
         pass
 
-    async def listen(callback: Callable[[str, "EventDetails", Any], None]) -> "EventListenerRegister":
+    async def listen(self, callback: Callable[[str, "EventDetails", Any], None]) -> "EventListenerRegister":
         pass
 
-    async def listenDevice(id: str, event: str | "EventListenerOptions", callback: Callable[["EventDetails", Any], None]) -> "EventListenerRegister":
+    async def listenDevice(self, id: str, event: str | "EventListenerOptions", callback: Callable[["EventDetails", Any], None]) -> "EventListenerRegister":
         pass
 
 
-    async def getLogger(nativeId: str | None) -> PluginLogger:
+    async def getLogger(self, nativeId: str | None) -> PluginLogger:
         pass
 
-    async def getComponent(id: str) -> Any:
+    async def getComponent(self, id: str) -> Any:
         pass
 
-    async def getMediaManager() -> "MediaManager":
+    async def getMediaManager(self) -> "MediaManager":
         pass
 
-    async def requestRestart() -> None:
+    async def requestRestart(self) -> None:
         pass
 
-    async def setScryptedInterfaceDescriptors(typesVersion: str, descriptors: dict[str, ScryptedInterfaceDescriptor]) -> None:
+    async def setScryptedInterfaceDescriptors(self, typesVersion: str, descriptors: dict[str, ScryptedInterfaceDescriptor]) -> None:
         pass
