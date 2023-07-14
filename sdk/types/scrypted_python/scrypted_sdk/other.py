@@ -148,7 +148,7 @@ class PluginAPI:
     async def listen(callback: Callable[[str, "EventDetails", Any], None]) -> "EventListenerRegister":
         pass
 
-    async def listenDevice(id: str, event: str | "EventListenerOptions", callback: Callable[["EventDetails", Any], None]) -> EventListenerRegister:
+    async def listenDevice(id: str, event: str | "EventListenerOptions", callback: Callable[["EventDetails", Any], None]) -> "EventListenerRegister":
         pass
 
 
