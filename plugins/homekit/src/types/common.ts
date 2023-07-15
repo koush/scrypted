@@ -1,4 +1,4 @@
-import sdk, { Fan, AirQuality, AirQualitySensor, CO2Sensor, NOXSensor, PM10Sensor, PM25Sensor, ScryptedDevice, ScryptedInterface, VOCSensor, FanMode, OnOff, DeviceProvider, ScryptedDeviceType } from "@scrypted/sdk";
+import sdk, { AirQuality, AirQualitySensor, CO2Sensor, DeviceProvider, Fan, FanMode, NOXSensor, OnOff, PM10Sensor, PM25Sensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VOCSensor } from "@scrypted/sdk";
 import { bindCharacteristic } from "../common";
 import { Accessory, Characteristic, CharacteristicEventTypes, Service, uuid } from '../hap';
 import type { HomeKitPlugin } from "../main";
@@ -6,10 +6,30 @@ import { getService as getOnOffService } from "./onoff-base";
 
 const { deviceManager, systemManager } = sdk;
 
+export function getSafeMdnsName(device: ScryptedDevice) {
+    // Valid domains can include 0-9, a-z (case insensitive), dash, and period.
+    // However, period must filtered because this is an mdns subdomain.
+
+    // The underlying mdns advertisers also support spaces (allegedly, since it seems to work already, but I have not looked closely).
+
+    let newName = '';
+    let name = device.name || 'Scrypted';
+    for (const c of name) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c === '-' || c === ' ') {
+            newName += c
+        }
+    }
+
+    if (!newName)
+        newName = 'Scrypted';
+
+    return newName;
+}
+
 export function makeAccessory(device: ScryptedDevice, homekitPlugin: HomeKitPlugin, suffix?: string): Accessory {
     const mixinStorage = deviceManager.getMixinStorage(device.id, homekitPlugin.nativeId);
     const resetId = mixinStorage.getItem('resetAccessory') || '';
-    return new Accessory(device.name, uuid.generate(resetId + device.id + (suffix ? '-' + suffix : '')));
+    return new Accessory(getSafeMdnsName(device), uuid.generate(resetId + device.id + (suffix ? '-' + suffix : '')));
 }
 
 export function getChildDevices(device: ScryptedDevice & DeviceProvider): ScryptedDevice[] {
