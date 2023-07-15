@@ -141,6 +141,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         return self.storage.getItem("imap_mfa_password")
 
     @property
+    def imap_mfa_sender(self) -> str:
+        sender = self.storage.getItem("imap_mfa_sender")
+        if sender is None or sender == "":
+            sender = "do_not_reply@arlo.com"
+            self.storage.setItem("imap_mfa_sender", sender)
+        return sender
+
+    @property
     def imap_mfa_interval(self) -> int:
         interval = self.storage.getItem("imap_mfa_interval")
         if interval is None:
@@ -310,7 +318,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                     self.logger.info("Checking IMAP for MFA codes")
 
                     self.imap.check()
-                    res, emails = self.imap.search(None, "FROM", "do_not_reply@arlo.com")
+                    res, emails = self.imap.search(None, "FROM", self.imap_mfa_sender)
                     if res.lower() != "ok":
                         raise Exception("IMAP error: {res}")
 
@@ -463,6 +471,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                     "title": "IMAP Password",
                     "type": "password",
                     "value": self.imap_mfa_password,
+                },
+                {
+                    "group": "IMAP 2FA",
+                    "key": "imap_mfa_sender",
+                    "title": "IMAP Email Sender",
+                    "value": self.imap_mfa_sender,
+                    "description": "The sender email address to search for when loading 2FA codes. See plugin README for more details.",
                 },
                 {
                     "group": "IMAP 2FA",
