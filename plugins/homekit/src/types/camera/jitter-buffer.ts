@@ -95,7 +95,7 @@ export class JitterBuffer {
 
         // missed/late bunch of packets
         if (packetDistance > this.jitterSize) {
-            this.console.log('jitter buffer skipped packets:', packetDistance);
+            // this.console.log('jitter buffer skipped packets:', packetDistance);
             const { lastSequenceNumber } = this;
             this.lastSequenceNumber = sequenceNumber - this.jitterSize;
             // use the previous sequence number to flush any packets that are too old compared
