@@ -58,7 +58,7 @@ class TensorFlowLitePlugin(
             edge_tpus = None
             pass
 
-        model_version = "v5"
+        model_version = "v6"
         model = self.storage.getItem("model") or "Default"
         defaultModel = model == "Default"
 

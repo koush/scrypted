@@ -458,6 +458,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
       // apply the zones to the detections and get a shallow copy list of detections after
       // exclusion zones have applied
+      const originalDetections = detected.detected.detections;
       const zonedDetections = this.applyZones(detected.detected);
       detected.detected.detections = zonedDetections;
 
@@ -465,6 +466,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
       if (!this.hasMotionType) {
         this.plugin.trackDetection();
+
+        const numZonedDetections = zonedDetections.filter(d => d.className !== 'motion').length;
+        const numOriginalDetections = originalDetections.filter(d => d.className !== 'motion').length;
+        if (numZonedDetections !== numOriginalDetections)
+          this.console.log('Zone filtered detections:', numZonedDetections - numOriginalDetections);
 
         for (const d of detected.detected.detections) {
           currentDetections.add(d.className);

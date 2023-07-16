@@ -151,25 +151,63 @@ seen.add('RTCSignalingSession');
 seen.add('RTCSignalingChannel');
 seen.add('RTCSignalingClient');
 
+function toDocstring(td: any, includePass: boolean = false) {
+    const suffix = includePass ? `    pass` : '';
+    const comments: any[] = ((td.comment ?? {}).summary ?? []).filter((item: any) => item.kind === "text");
+    if (comments.length === 0) {
+        if (includePass) {
+            return `pass`;
+        }
+        return '';
+    }
+    if (comments.length === 1) {
+        return `    """${comments[0].text.replaceAll('\n', ' ')}"""\n${suffix}`;
+    }
+    let text = `    """\n`;
+    for (const comment of comments) {
+        text += `    ${comment.text.replaceAll('\n', ' ')}\n\n`;
+    }
+    text = text.slice(0,text.length - 2)
+    text += `    """\n${suffix}`;
+    return text
+
+}
+
+function toComment(td: any) {
+    const comments: any[] = ((td.comment ?? {}).summary ?? []).filter((item: any) => item.kind === "text");
+    if (comments.length === 0) {
+        return '';
+    }
+    if (comments.length === 1) {
+        return `  # ${comments[0].text.replaceAll('\n', ' ')}`;
+    }
+    let text = `  # `;
+    for (const comment of comments) {
+        text += `${comment.text.replaceAll('\n', ' ')} `;
+    }
+    return text.slice(0,text.length - 1)
+
+}
+
 function addNonDictionaryType(td: any) {
     seen.add(td.name);
     python += `
 class ${td.name}:
+${toDocstring(td)}
 `;
 
     const properties = td.children.filter((child: any) => child.kindString === 'Property');
     const methods = td.children.filter((child: any) => child.kindString === 'Method');
     for (const property of properties) {
-        python += `    ${property.name}: ${toPythonType(property.type)}
+        python += `    ${property.name}: ${toPythonType(property.type)}${toComment(property)}
 `
     }
     for (const method of methods) {
         python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${toPythonReturnType(method.signatures[0].type)}:
-        pass
+        ${toDocstring(method, true)}
+
 `
     }
-    python += `    pass
-`;
 }
 
 for (const td of interfaces) {
@@ -181,7 +219,8 @@ for (const td of interfaces) {
 let pythonEnums = ''
 for (const e of enums) {
     pythonEnums += `
-class ${e.name}(Enum):
+class ${e.name}(str, Enum):
+${toDocstring(e)}
 `
     for (const val of e.children) {
         pythonEnums += `    ${val.name} = "${val.type.value}"
@@ -190,7 +229,7 @@ class ${e.name}(Enum):
 }
 
 python += `
-class ScryptedInterfaceProperty(Enum):
+class ScryptedInterfaceProperty(str, Enum):
 `
 for (const val of properties) {
     python += `    ${val} = "${val}"
@@ -198,7 +237,7 @@ for (const val of properties) {
 }
 
 python += `
-class ScryptedInterfaceMethods(Enum):
+class ScryptedInterfaceMethods(str, Enum):
 `
 for (const val of methods) {
     python += `    ${val} = "${val}"
@@ -207,10 +246,13 @@ for (const val of methods) {
 
 python += `
 class DeviceState:
+
     def getScryptedProperty(self, property: str) -> Any:
         pass
+
     def setScryptedProperty(self, property: str, value: Any):
         pass
+
 `
 for (const [val, type] of Object.entries(allProperties)) {
     if (val === 'nativeId')
@@ -219,6 +261,7 @@ for (const [val, type] of Object.entries(allProperties)) {
     @property
     def ${val}(self) -> ${toPythonType(type)}:
         return self.getScryptedProperty("${val}")
+
     @${val}.setter
     def ${val}(self, value: ${toPythonType(type)}):
         self.setScryptedProperty("${val}", value)
@@ -249,15 +292,19 @@ while (discoveredTypes.size) {
         }
         pythonUnknowns += `
 class ${td.name}(TypedDict):
+${toDocstring(td)}
 `;
 
         const properties = td.children?.filter((child: any) => child.kindString === 'Property') || [];
         for (const property of properties) {
-            pythonUnknowns += `    ${property.name}: ${toPythonType(property.type)}
+            pythonUnknowns += `    ${property.name}: ${toPythonType(property.type)}${toComment(property)}
 `
         }
-        pythonUnknowns += `    pass
+        if (properties.length === 0) {
+            pythonUnknowns += `    pass
+
 `;
+        }
     }
 
     python = pythonUnknowns + python;
@@ -270,7 +317,7 @@ try:
     from typing import TypedDict
 except:
     from typing_extensions import TypedDict
-from typing import Union, Any, Callable
+from typing import Union, Any
 
 from .other import *
 

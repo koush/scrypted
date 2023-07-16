@@ -1,8 +1,9 @@
+import { sleep } from '@scrypted/common/src/sleep';
 import sdk, { Device, DeviceProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
+import crypto from 'crypto';
 import { RingLocationDevice } from './location';
-import { generateUuid, Location, RingBaseApi, RingRestClient } from './ring-client-api';
-import { sleep } from '@scrypted/common/src/sleep';
+import { Location, RingBaseApi, RingRestClient } from './ring-client-api';
 
 const { deviceManager, mediaManager } = sdk;
 
@@ -17,6 +18,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             title: 'System ID',
             description: 'Used to provide client uniqueness for retrieving the latest set of events.',
             hide: true,
+            persistedDefaultValue: crypto.createHash('sha256').update(crypto.randomBytes(32)).digest('hex'),
+        },
+        controlCenterDisplayName: {
+            hide: true,
+            defaultValue: 'scrypted-ring',
         },
         email: {
             title: 'Email',
@@ -48,10 +54,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             title: 'Polling',
             description: 'Poll the Ring servers instead of using server delivered Push events. May fix issues with events not being delivered.',
             type: 'boolean',
-            onPut: async() => {
+            onPut: async () => {
                 await this.tryLogin();
                 await this.discoverDevices();
             },
+            defaultValue: true,
         },
         refreshToken: {
             hide: true,
@@ -77,10 +84,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             ],
             defaultValue: 'Disabled',
         },
-        pnc: {
-            hide: true,
-            json: true,
-        }
     });
 
     constructor() {
@@ -94,9 +97,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
 
         this.discoverDevices()
             .catch(e => this.console.error('discovery failure', e));
-
-        if (!this.settingsStorage.values.systemId)
-            this.settingsStorage.values.systemId = generateUuid();
     }
 
     waiting = false;
@@ -123,10 +123,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             this.api?.disconnect();
 
             this.api = new RingBaseApi({
+                controlCenterDisplayName: this.settingsStorage.values.controlCenterDisplayName,
                 refreshToken: this.settingsStorage.values.refreshToken,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 locationIds,
-                cameraStatusPollingSeconds,
+                cameraStatusPollingSeconds: this.settingsStorage.values.polling ? cameraStatusPollingSeconds : undefined,
                 cameraDingsPollingSeconds: this.settingsStorage.values.polling ? this.settingsStorage.values.cameraDingsPollingSeconds : undefined,
                 systemId: this.settingsStorage.values.systemId,
             }, {
@@ -135,12 +136,8 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
                 },
             });
 
-            if (this.api.restClient.refreshToken && this.api.restClient.authConfig && this.settingsStorage.values.pnc)
-                this.api.restClient._internalOnly_pushNotificationCredentials = this.settingsStorage.values.pnc;
-
-            this.api.onRefreshTokenUpdated.subscribe(({ newRefreshToken }) => {
+            this.api.onRefreshTokenUpdated.subscribe(({ newRefreshToken, oldRefreshToken }) => {
                 this.settingsStorage.values.refreshToken = newRefreshToken;
-                this.settingsStorage.values.pnc = this.api.restClient._internalOnly_pushNotificationCredentials;
             });
         }
 
@@ -154,11 +151,14 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             throw new Error('refresh token, username, and password are missing.');
         }
 
+        this.loginClient = new RingRestClient({
+            email: this.settingsStorage.values.email,
+            password: this.settingsStorage.values.password,
+            controlCenterDisplayName: this.settingsStorage.values.controlCenterDisplayName,
+            systemId: this.settingsStorage.values.systemId,
+        });
+
         if (!code) {
-            this.loginClient = new RingRestClient({
-                email: this.settingsStorage.values.email,
-                password: this.settingsStorage.values.password,
-            });
             try {
                 const auth = await this.loginClient.getCurrentAuth();
                 this.settingsStorage.values.refreshToken = auth.refresh_token;
