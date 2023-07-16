@@ -1,7 +1,8 @@
 {
    "name": "@scrypted/arlo",
-   "version": "0.8.4",
+   "version": "0.8.11",
    "description": "Arlo Plugin for Scrypted",
+   "license": "Apache",
    "keywords": [
       "scrypted",
       "plugin",

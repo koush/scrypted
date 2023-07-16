@@ -28,11 +28,6 @@ from .logging import logger
 try:
     from curl_cffi import requests as curl_cffi_requests
     HAS_CURL_CFFI = True
-
-    # upstream curl_cffi doesn't have OPTIONS support, so this is
-    # a bit of a hack to add it
-    class CurlCffiSession(curl_cffi_requests.Session):
-        options = partialmethod(curl_cffi_requests.Session.request, "OPTIONS")
 except:
     HAS_CURL_CFFI = False
 
@@ -47,7 +42,7 @@ class Request(object):
     def __init__(self, timeout=5, mode="curl" if HAS_CURL_CFFI else "cloudscraper"):
         if mode == "curl":
             logger.debug("HTTP helper using curl_cffi")
-            self.session = CurlCffiSession(impersonate="chrome110")
+            self.session = curl_cffi_requests.Session(impersonate="chrome110")
         elif mode == "cloudscraper":
             logger.debug("HTTP helper using cloudscraper")
             from .arlo_async import USER_AGENTS
