@@ -7,6 +7,7 @@ scrypted-arlo-go==0.4.0
 cloudscraper==1.2.71
 curl-cffi==0.5.7; platform_machine != 'armv7l'
 async-timeout==4.0.2
+beautifulsoup4==4.12.2
 --extra-index-url=https://www.piwheels.org/simple/
 --extra-index-url=https://bjia56.github.io/scrypted-arlo-go/
 --prefer-binary

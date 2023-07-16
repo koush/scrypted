@@ -1,4 +1,5 @@
 import asyncio
+from bs4 import BeautifulSoup
 import email
 import functools
 import imaplib
@@ -269,7 +270,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             self.logger.exception("IMAP initialization error")
 
             if try_count >= 10:
-                raise Exception("Tried to connect to IMAP too many times. A plugin reload may be necessary.")
+                self.logger.error("Tried to connect to IMAP too many times. Will request a plugin restart.")
+                self.create_task(scrypted_sdk.deviceManager.requestRestart())
 
             asyncio.get_event_loop().call_later(try_count*try_count, functools.partial(self.initialize_imap, try_count=try_count+1))
         else:
@@ -314,8 +316,19 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             # do imap lookup
             # adapted from https://github.com/twrecked/pyaarlo/blob/77c202b6f789c7104a024f855a12a3df4fc8df38/pyaarlo/tfa.py
             try:
+                try_count = 0
                 while True:
-                    self.logger.info("Checking IMAP for MFA codes")
+                    try_count += 1
+
+                    sleep_duration = 1
+                    if try_count > 5:
+                        sleep_duration = 2
+                    elif try_count > 10:
+                        sleep_duration = 5
+                    elif try_count > 20:
+                        sleep_duration = 10
+
+                    self.logger.info(f"Checking IMAP for MFA codes (attempt {try_count})")
 
                     self.imap.check()
                     res, emails = self.imap.search(None, "FROM", self.imap_mfa_sender)
@@ -324,7 +337,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
                     if emails == self.imap_skip_emails:
                         self.logger.info("No new emails found, will sleep and retry")
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(sleep_duration)
                         continue
 
                     skip_emails = self.imap_skip_emails[0].split()
@@ -341,8 +354,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                                 if part.get_content_type() != "text/html":
                                     continue
                                 try:
-                                    for line in part.get_payload(decode=True).splitlines():
-                                        code = re.match(r"^\W+(\d{6})\W*$", line.decode())
+                                    soup = BeautifulSoup(part.get_payload(decode=True), 'html.parser')
+                                    for line in soup.get_text().splitlines():
+                                        code = re.match(r"^\W*(\d{6})\W*$", line)
                                         if code is not None:
                                             return code.group(1)
                                 except:
@@ -363,7 +377,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                         break
 
                     self.logger.info("No MFA code found, will sleep and retry")
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(sleep_duration)
             except Exception:
                 self.logger.exception("Error while checking for MFA codes")
 

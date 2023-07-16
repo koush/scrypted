@@ -30,6 +30,12 @@ The plugin should work with any mailbox that supports IMAP, but so far has been 
 
 The plugin searches for emails sent by Arlo's `do_not_reply@arlo.com` address when looking for 2FA codes. If you are using a service to forward emails to the mailbox registered with this plugin (e.g. a service like iCloud's Hide My Email), it is possible that Arlo's email sender address has been overwritten by the mail forwarder. Check the email registered with this plugin to see what address the mail forwarder uses to replace Arlo's sender address, and update that in the IMAP 2FA settings.
 
+## Virtual Security System for Arlo Sirens
+
+In external integrations like Homekit, sirens are exposed as simple on-off switches. This makes it easy to accidentally hit the switch when using the Home app. The Arlo Plugin creates a "virtual" security system device per siren to allow Scrypted to arm or disarm the siren switch to protect against accidental triggers. This fake security system device will be synced into Homekit as a separate accessory from the camera, with the siren itself merged into the security system accessory.
+
+Note that the virtual security system is NOT tied to your Arlo account at all, and will not make any changes such as switching your device's motion alert armed/disarmed modes. For more information, please see the README on the virtual security system device in Scrypted.
+
 ## Video Clips
 
 The Arlo Plugin will show video clips available in Arlo Cloud for cameras with cloud recording enabled. These clips are not downloaded onto your Scrypted server, but rather streamed on-demand. Deleting clips is not available in Scrypted and should be done through the Arlo app or the Arlo web dashboard.
