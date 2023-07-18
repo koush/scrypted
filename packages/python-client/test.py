@@ -131,7 +131,7 @@ async def main():
     transport = EioRpcTransport(asyncio.get_event_loop())
     sdk = await connect_scrypted_client(
         transport,
-        "https://localhost:10443",
+        os.environ.get("SCRYPTED_URL", "https://localhost:10443"),
         os.environ["SCRYPTED_USERNAME"],
         os.environ["SCRYPTED_PASSWORD"],
     )
@@ -147,5 +147,4 @@ async def main():
 
 
 loop = asyncio.new_event_loop()
-asyncio.run_coroutine_threadsafe(main(), loop)
-loop.run_forever()
+loop.run_until_complete(main())
