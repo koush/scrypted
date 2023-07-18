@@ -36,6 +36,7 @@ class EventStream(Stream):
                     if self.event_stream_stop_event.is_set() or \
                         self.shutting_down_stream is event_stream:
                         logger.info(f"SSE {id(event_stream)} disconnected")
+                        self.shutting_down_stream = None
                         return None
                 elif response.get('status') == 'connected':
                     if not self.connected:
@@ -59,10 +60,10 @@ class EventStream(Stream):
         self.shutting_down_stream = self.event_stream
         self.event_stream = None
         await self.start()
-        # give it an extra sleep to ensure any previous connections have disconnected properly
-        # this is so we can mark reconnecting to False properly
-        await asyncio.sleep(1)
-        self.shutting_down_stream = None
+        while self.shutting_down_stream is not None:
+            # ensure any previous connections have disconnected properly
+            # this is so we can mark reconnecting to False properly
+            await asyncio.sleep(1)
         self.reconnecting = False
 
     def subscribe(self, topics):

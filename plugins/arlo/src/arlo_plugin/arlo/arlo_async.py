@@ -449,7 +449,7 @@ class Arlo(object):
             self.HandleEvents(basestation, resource, ['error', ('is', 'stateChangeReason')], callbackwrapper)
         )
 
-    def SubscribeToMotionEvents(self, basestation, camera, callback):
+    def SubscribeToMotionEvents(self, basestation, camera, callback, logger) -> asyncio.Task:
         """
         Use this method to subscribe to motion events. You must provide a callback function which will get called once per motion event.
 
@@ -461,22 +461,9 @@ class Arlo(object):
 
         Returns the Task object that contains the subscription loop.
         """
-        resource = f"cameras/{camera.get('deviceId')}"
+        return self._subscribe_to_motion_or_audio_events(basestation, camera, callback, logger, "motionDetected")
 
-        def callbackwrapper(self, event):
-            properties = event.get('properties', {})
-            stop = None
-            if 'motionDetected' in properties:
-                stop = callback(properties['motionDetected'])
-            if not stop:
-                return None
-            return stop
-
-        return asyncio.get_event_loop().create_task(
-            self.HandleEvents(basestation, resource, [('is', 'motionDetected')], callbackwrapper)
-        )
-
-    def SubscribeToAudioEvents(self, basestation, camera, callback):
+    def SubscribeToAudioEvents(self, basestation, camera, callback, logger):
         """
         Use this method to subscribe to audio events. You must provide a callback function which will get called once per audio event.
 
@@ -488,19 +475,72 @@ class Arlo(object):
 
         Returns the Task object that contains the subscription loop.
         """
+        return self._subscribe_to_motion_or_audio_events(basestation, camera, callback, logger, "audioDetected")
+
+    def _subscribe_to_motion_or_audio_events(self, basestation, camera, callback, logger, event_key) -> asyncio.Task:
+        """
+        Helper class to implement force reset of events (when event end signal is dropped) and delay of end
+        of event signals (when the sensor turns off and on quickly)
+
+        event_key is either motionDetected or audioDetected
+        """
+
         resource = f"cameras/{camera.get('deviceId')}"
 
+        # if we somehow miss the *Detected = False event, this task
+        # is used to force the caller to register the end of the event
+        force_reset_event_task: asyncio.Task = None
+
+        # when we receive a normal *Detected = False event, this
+        # task is used to delay the delivery in case the sensor
+        # registers an event immediately afterwards
+        delayed_event_end_task: asyncio.Task = None
+
+        async def reset_event(sleep_duration: float) -> None:
+            nonlocal force_reset_event_task, delayed_event_end_task
+            await asyncio.sleep(sleep_duration)
+
+            logger.debug(f"{event_key}: delivering False")
+            callback(False)
+
+            force_reset_event_task = None
+            delayed_event_end_task = None
+
         def callbackwrapper(self, event):
+            nonlocal force_reset_event_task, delayed_event_end_task
             properties = event.get('properties', {})
+
             stop = None
-            if 'audioDetected' in properties:
-                stop = callback(properties['audioDetected'])
+            if event_key in properties:
+                event_detected = properties[event_key]
+                delivery_delay = 10
+
+                logger.debug(f"{event_key}: {event_detected} {'will delay delivery by ' + str(delivery_delay) + 's' if not event_detected else ''}".rstrip())
+
+                if force_reset_event_task:
+                    logger.debug(f"{event_key}: cancelling previous force reset task")
+                    force_reset_event_task.cancel()
+                    force_reset_event_task = None
+                if delayed_event_end_task:
+                    logger.debug(f"{event_key}: cancelling previous delay event task")
+                    delayed_event_end_task.cancel()
+                    delayed_event_end_task = None
+
+                if event_detected:
+                    stop = callback(event_detected)
+
+                    # schedule a callback to reset the sensor
+                    # if we somehow miss the *Detected = False event
+                    force_reset_event_task = asyncio.get_event_loop().create_task(reset_event(60))
+                else:
+                    delayed_event_end_task = asyncio.get_event_loop().create_task(reset_event(delivery_delay))
+
             if not stop:
                 return None
             return stop
 
         return asyncio.get_event_loop().create_task(
-            self.HandleEvents(basestation, resource, [('is', 'audioDetected')], callbackwrapper)
+            self.HandleEvents(basestation, resource, [('is', event_key)], callbackwrapper)
         )
 
     def SubscribeToBatteryEvents(self, basestation, camera, callback):

@@ -8,6 +8,8 @@ The account you use for this plugin must have either SMS or email set as the def
 
 If you experience any trouble logging in, clear the username and password boxes, reload the plugin, and try again.
 
+If you are unable to see shared cameras in your separate Arlo account, ensure that both your primary and secondary accounts are upgraded according to this [forum post](https://web.archive.org/web/20230710141914/https://community.arlo.com/t5/Arlo-Secure/Invited-friend-cannot-see-devices-on-their-dashboard-Arlo-Pro-2/m-p/1889396#M1813). Verify the sharing worked by logging in via the Arlo web dashboard.
+
 ## General Setup Notes
 
 * Ensure that your Arlo account's default 2FA option is set to either SMS or email.
@@ -25,6 +27,14 @@ Note that streaming cameras uses extra Internet bandwidth, since video and audio
 The Arlo Plugin supports using the IMAP protocol to check an email mailbox for Arlo 2FA codes. This requires you to specify an email 2FA option as the default in your Arlo account settings.
 
 The plugin should work with any mailbox that supports IMAP, but so far has been tested with Gmail. To configure a Gmail mailbox, see [here](https://support.google.com/mail/answer/7126229?hl=en) to see the Gmail IMAP settings, and [here](https://support.google.com/accounts/answer/185833?hl=en) to create an App Password. Enter the App Password in place of your normal Gmail password.
+
+The plugin searches for emails sent by Arlo's `do_not_reply@arlo.com` address when looking for 2FA codes. If you are using a service to forward emails to the mailbox registered with this plugin (e.g. a service like iCloud's Hide My Email), it is possible that Arlo's email sender address has been overwritten by the mail forwarder. Check the email registered with this plugin to see what address the mail forwarder uses to replace Arlo's sender address, and update that in the IMAP 2FA settings.
+
+## Virtual Security System for Arlo Sirens
+
+In external integrations like Homekit, sirens are exposed as simple on-off switches. This makes it easy to accidentally hit the switch when using the Home app. The Arlo Plugin creates a "virtual" security system device per siren to allow Scrypted to arm or disarm the siren switch to protect against accidental triggers. This fake security system device will be synced into Homekit as a separate accessory from the camera, with the siren itself merged into the security system accessory.
+
+Note that the virtual security system is NOT tied to your Arlo account at all, and will not make any changes such as switching your device's motion alert armed/disarmed modes. For more information, please see the README on the virtual security system device in Scrypted.
 
 ## Video Clips
 

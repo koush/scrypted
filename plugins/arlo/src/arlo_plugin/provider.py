@@ -1,11 +1,12 @@
 import asyncio
+from bs4 import BeautifulSoup
 import email
+import functools
 import imaplib
 import json
 import logging
 import re
 import requests
-import traceback
 from typing import List
 
 import scrypted_sdk
@@ -141,6 +142,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         return self.storage.getItem("imap_mfa_password")
 
     @property
+    def imap_mfa_sender(self) -> str:
+        sender = self.storage.getItem("imap_mfa_sender")
+        if sender is None or sender == "":
+            sender = "do_not_reply@arlo.com"
+            self.storage.setItem("imap_mfa_sender", sender)
+        return sender
+
+    @property
     def imap_mfa_interval(self) -> int:
         interval = self.storage.getItem("imap_mfa_interval")
         if interval is None:
@@ -186,12 +195,12 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 self._arlo_mfa_complete_auth = self._arlo.LoginMFA()
                 self.logger.info(f"Initialized Arlo client, waiting for MFA code")
                 return None
-        except Exception as e:
-            traceback.print_exc()
+        except Exception:
+            self.logger.exception("Error initializing Arlo client")
             self._arlo = None
             self._arlo_mfa_complete_auth = None
             self._arlo_mfa_code = None
-            return None
+            raise
 
     async def do_arlo_setup(self) -> None:
         try:
@@ -201,15 +210,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             ])
 
             self.arlo.event_stream.set_refresh_interval(self.refresh_interval)
-        except requests.exceptions.HTTPError as e:
-            traceback.print_exc()
-            self.logger.error(f"Error logging in, will retry with fresh login")
+        except requests.exceptions.HTTPError:
+            self.logger.exception("Error logging in")
+            self.logger.error("Will retry with fresh login")
             self._arlo = None
             self._arlo_mfa_code = None
             self.storage.setItem("arlo_auth_headers", None)
             _ = self.arlo
-        except Exception as e:
-            traceback.print_exc()
+        except Exception:
+            self.logger.exception("Error logging in")
 
     def invalidate_arlo_client(self) -> None:
         if self._arlo is not None:
@@ -235,7 +244,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         self.print(f"Setting plugin transport to {self.arlo_transport}")
         change_stream_class(self.arlo_transport)
 
-    def initialize_imap(self) -> None:
+    def initialize_imap(self, try_count=1) -> None:
         if not self.imap_mfa_host or not self.imap_mfa_port or \
             not self.imap_mfa_username or not self.imap_mfa_password or \
             not self.imap_mfa_interval:
@@ -243,7 +252,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
         self.exit_imap()
         try:
-            self.logger.info("Trying connect to IMAP")
+            self.logger.info(f"Trying connect to IMAP (attempt {try_count})")
             self.imap = imaplib.IMAP4_SSL(self.imap_mfa_host, port=self.imap_mfa_port)
 
             res, _ = self.imap.login(self.imap_mfa_username, self.imap_mfa_password)
@@ -257,9 +266,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             res, self.imap_skip_emails = self.imap.search(None, "FROM", "do_not_reply@arlo.com")
             if res.lower() != "ok":
                 raise Exception(f"IMAP failed to fetch old Arlo emails: {res}")
-        except Exception as e:
-            traceback.print_exc()
-            self.exit_imap()
+        except Exception:
+            self.logger.exception("IMAP initialization error")
+
+            if try_count >= 10:
+                self.logger.error("Tried to connect to IMAP too many times. Will request a plugin restart.")
+                self.create_task(scrypted_sdk.deviceManager.requestRestart())
+
+            asyncio.get_event_loop().call_later(try_count*try_count, functools.partial(self.initialize_imap, try_count=try_count+1))
         else:
             self.logger.info("Connected to IMAP")
             self.imap_signal = asyncio.Queue()
@@ -291,22 +305,39 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             self.storage.setItem("arlo_user_id", "")
 
             # initialize login and prompt for MFA
-            _ = self.arlo
+            try:
+                _ = self.arlo
+            except Exception:
+                self.logger.exception("Unrecoverable login error")
+                self.logger.error("Will request a plugin restart")
+                await scrypted_sdk.deviceManager.requestRestart()
+                return
 
             # do imap lookup
             # adapted from https://github.com/twrecked/pyaarlo/blob/77c202b6f789c7104a024f855a12a3df4fc8df38/pyaarlo/tfa.py
             try:
+                try_count = 0
                 while True:
-                    self.logger.info("Checking IMAP for MFA codes")
+                    try_count += 1
+
+                    sleep_duration = 1
+                    if try_count > 5:
+                        sleep_duration = 2
+                    elif try_count > 10:
+                        sleep_duration = 5
+                    elif try_count > 20:
+                        sleep_duration = 10
+
+                    self.logger.info(f"Checking IMAP for MFA codes (attempt {try_count})")
 
                     self.imap.check()
-                    res, emails = self.imap.search(None, "FROM", "do_not_reply@arlo.com")
+                    res, emails = self.imap.search(None, "FROM", self.imap_mfa_sender)
                     if res.lower() != "ok":
                         raise Exception("IMAP error: {res}")
 
                     if emails == self.imap_skip_emails:
                         self.logger.info("No new emails found, will sleep and retry")
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(sleep_duration)
                         continue
 
                     skip_emails = self.imap_skip_emails[0].split()
@@ -323,8 +354,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                                 if part.get_content_type() != "text/html":
                                     continue
                                 try:
-                                    for line in part.get_payload(decode=True).splitlines():
-                                        code = re.match(r"^\W+(\d{6})\W*$", line.decode())
+                                    soup = BeautifulSoup(part.get_payload(decode=True), 'html.parser')
+                                    for line in soup.get_text().splitlines():
+                                        code = re.match(r"^\W*(\d{6})\W*$", line)
                                         if code is not None:
                                             return code.group(1)
                                 except:
@@ -345,20 +377,30 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                         break
 
                     self.logger.info("No MFA code found, will sleep and retry")
-                    await asyncio.sleep(1)
-            except Exception as e:
-                traceback.print_exc()
-                self.logger.error("Will retry on next IMAP interval")
+                    await asyncio.sleep(sleep_duration)
+            except Exception:
+                self.logger.exception("Error while checking for MFA codes")
+
                 self._arlo = old_arlo
                 self.storage.setItem("arlo_auth_headers", old_headers)
                 self.storage.setItem("arlo_user_id", old_user_id)
                 self._arlo_mfa_code = None
                 self._arlo_mfa_complete_auth = None
+
+                self.logger.error("Will reload IMAP connection")
+                asyncio.get_event_loop().call_soon(self.initialize_imap)
             else:
                 # finish login
                 if old_arlo:
                     old_arlo.Unsubscribe()
-                _ = self.arlo
+
+                try:
+                    _ = self.arlo
+                except Exception:
+                    self.logger.exception("Unrecoverable login error")
+                    self.logger.error("Will request a plugin restart")
+                    await scrypted_sdk.deviceManager.requestRestart()
+                    return
 
             # continue by sleeping/waiting for a signal
             interval = self.imap_mfa_interval * 24 * 60 * 60  # convert interval days to seconds
@@ -443,6 +485,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                     "title": "IMAP Password",
                     "type": "password",
                     "value": self.imap_mfa_password,
+                },
+                {
+                    "group": "IMAP 2FA",
+                    "key": "imap_mfa_sender",
+                    "title": "IMAP Email Sender",
+                    "value": self.imap_mfa_sender,
+                    "description": "The sender email address to search for when loading 2FA codes. See plugin README for more details.",
                 },
                 {
                     "group": "IMAP 2FA",
