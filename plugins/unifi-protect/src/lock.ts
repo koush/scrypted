@@ -7,6 +7,7 @@ export class UnifiLock extends ScryptedDeviceBase implements Lock {
         super(nativeId);
 
         this.updateState(protectLock);
+        this.console.log(protectLock);
     }
 
     async lock(): Promise<void> {

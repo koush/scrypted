@@ -7,6 +7,7 @@ export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, Humi
         super(nativeId);
         this.temperatureUnit = TemperatureUnit.C;
         this.updateState(protectSensor);
+        this.console.log(protectSensor);
     }
 
     findSensor() {

@@ -8,6 +8,7 @@ export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness,
         this.temperatureUnit = TemperatureUnit.C;
 
         this.updateState(protectLight);
+        this.console.log(protectLight);
     }
     async turnOff(): Promise<void> {
         const result = await this.protect.api.updateLight(this.findLight(), { lightOnSettings: { isLedForceOn: false } });

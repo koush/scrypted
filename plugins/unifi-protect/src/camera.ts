@@ -14,11 +14,12 @@ const { log, deviceManager, mediaManager } = sdk;
 export const defaultSensorTimeout = 30;
 
 export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor {
-    constructor(public camera: UnifiCamera, nativeId: string) {
+    constructor(public protectCamera: UnifiCamera, nativeId: string) {
         super(nativeId);
+        this.console.log(protectCamera);
     }
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
-        const buffer = await this.camera.getSnapshot(options, 'package-snapshot?');
+        const buffer = await this.protectCamera.getSnapshot(options, 'package-snapshot?');
         return this.createMediaObject(buffer, 'image/jpeg');
     }
     async getPictureOptions(): Promise<ResponsePictureOptions[]> {
@@ -30,10 +31,10 @@ export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, Vi
     }
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const o = (await this.getVideoStreamOptions())[0];
-        return this.camera.getVideoStream(o);
+        return this.protectCamera.getVideoStream(o);
     }
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
-        const options = await this.camera.getVideoStreamOptions();
+        const options = await this.protectCamera.getVideoStreamOptions();
         return [options[options.length - 1]];
     }
 }
@@ -59,6 +60,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         }
 
         this.updateState(protectCamera);
+        this.console.log(protectCamera);
     }
 
     async ptzCommand(command: PanTiltZoomCommand): Promise<void> {
