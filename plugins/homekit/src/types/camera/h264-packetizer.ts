@@ -333,9 +333,8 @@ export class H264Repacketizer {
 
     maybeSendStapACodecInfo(packet: RtpPacket, ret: RtpPacket[]) {
         if (this.stapa) {
-            const newStapa = this.createPacket(packet, this.stapa.payload, this.stapa.header.marker);
-            this.extraPackets++;
-            ret.push(newStapa);
+            // stapa with codec information was sent recently, no need to send codec info.
+            this.stapa = undefined;
             return;
         }
 
@@ -471,29 +470,43 @@ export class H264Repacketizer {
         else if (nalType === NAL_TYPE_STAP_A) {
             this.flushPendingFuA(ret);
 
-            // this.stapa = packet;
-            // this.extraPackets--;
+            let hasSps = false;
+            let hasPps = false;
 
             // break the aggregated packet up to update codec information.
             depacketizeStapA(packet.payload)
                 .forEach(payload => {
                     const nalType = payload[0] & 0x1F;
-                    if (nalType === NAL_TYPE_SPS)
+                    if (nalType === NAL_TYPE_SPS) {
+                        hasSps = true;
                         this.updateSps(payload);
-                    else if (nalType === NAL_TYPE_PPS)
+                    }
+                    else if (nalType === NAL_TYPE_PPS) {
+                        hasPps = true;
                         this.updatePps(payload);
-                    else if (nalType === NAL_TYPE_SEI)
+                    }
+                    else if (nalType === NAL_TYPE_SEI) {
                         this.updateSei(payload);
+                    }
                     else if (nalType === NAL_TYPE_DELIMITER) {
+                        // this is uncommon but has been seen. seems to be a no-op nalu.
                     }
                     else if (nalType === NAL_TYPE_NON_IDR) {
+                        // this is uncommon but has been seen. oddly, on reolink this non-idr was sent
+                        // after the codec information. so codec information can be changed between
+                        // idr and non-idr? maybe it is not applied until next idr?
                     }
-                    else
+                    else {
                         this.console.warn('Skipped a stapa type. Please report this to @koush on Discord.', nalType)
+                    }
                 });
 
+            // log that a stapa with codec info was sent
+            if (hasSps && hasPps)
+                this.stapa = packet;
+
             const stapa = this.packetizeStapA(depacketizeStapA(packet.payload));
-            this.createRtpPackets(packet, stapa, ret, packet.header.marker);
+            this.createRtpPackets(packet, stapa, ret);
         }
         else if (nalType >= 1 && nalType < 24) {
             this.flushPendingFuA(ret);
