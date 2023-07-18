@@ -355,11 +355,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         ScryptedInterface.VideoCameraConfiguration,
                         ScryptedInterface.MotionSensor,
                     ],
-                    type: camera.featureFlags.hasChime
+                    type: camera.featureFlags.isDoorbell
                         ? ScryptedDeviceType.Doorbell
                         : ScryptedDeviceType.Camera,
                 };
-                if (camera.featureFlags.hasChime) {
+                if (camera.featureFlags.isDoorbell) {
                     d.interfaces.push(ScryptedInterface.BinarySensor);
                 }
                 if (camera.featureFlags.hasSpeaker) {
