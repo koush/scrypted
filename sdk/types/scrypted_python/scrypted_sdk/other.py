@@ -12,8 +12,8 @@ if TYPE_CHECKING:
     from .types import DeviceManifest, Device, EventDetails, EventListenerOptions, EventListenerRegister, MediaManager, ScryptedDevice, ScryptedInterfaceProperty
 
 SettingValue = str
-EventListener = Callable[[str, EventDetails, Any], None]
-DeviceEventListener = Callable[[EventDetails, Any], None]
+EventListener = Callable[[str, "EventDetails", Any], None]
+DeviceEventListener = Callable[["EventDetails", Any], None]
 VibratePattern = Union[int, list[int]]
 
 
