@@ -137,6 +137,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   resetMotionTimeout() {
     this.clearMotionTimeout();
     this.motionTimeout = setTimeout(() => {
+      this.console.log('Motion timed out.');
       this.motionDetected = false;
       // if (this.motionSensorSupplementation === BUILTIN_MOTION_SENSOR_ASSIST) {
       //   this.console.log(`${this.objectDetection.name} timed out confirming motion, stopping video detection.`)
@@ -273,6 +274,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!shouldSleep || signal.finished)
         return;
       this.console.log('Suspending motion processing during active motion timeout.');
+      this.resetMotionTimeout();
       // sleep until a moment before motion duration to start peeking again
       // to have an opporunity to reset the motion timeout.
       await sleep(this.storageSettings.values.motionDuration * 1000 - 4000);
@@ -467,10 +469,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!this.hasMotionType) {
         this.plugin.trackDetection();
 
-        const numZonedDetections = zonedDetections.filter(d => d.className !== 'motion').length;
-        const numOriginalDetections = originalDetections.filter(d => d.className !== 'motion').length;
-        if (numZonedDetections !== numOriginalDetections)
-          this.console.log('Zone filtered detections:', numZonedDetections - numOriginalDetections);
+        // const numZonedDetections = zonedDetections.filter(d => d.className !== 'motion').length;
+        // const numOriginalDetections = originalDetections.filter(d => d.className !== 'motion').length;
+        // if (numZonedDetections !== numOriginalDetections)
+        //   this.console.log('Zone filtered detections:', numZonedDetections - numOriginalDetections);
 
         for (const d of detected.detected.detections) {
           currentDetections.add(d.className);
@@ -500,10 +502,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.setDetection(detected.detected, mo);
         // this.console.log('image saved', detected.detected.detections);
       }
-      this.reportObjectDetections(detected.detected);
+      const motionFound = this.reportObjectDetections(detected.detected);
       if (this.hasMotionType) {
         // if motion is detected, stop processing and exit loop allowing it to sleep.
-        if (this.motionDetected) {
+        if (motionFound) {
           // however, when running in analyze mode, continue to allow viewing motion boxes for test purposes.
           if (!this.analyzeStop || Date.now() > this.analyzeStop) {
             this.analyzeStop = undefined;
@@ -599,12 +601,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   reportObjectDetections(detection: ObjectsDetected) {
+    let motionFound = false;
     if (this.hasMotionType) {
-      const found = detection.detections?.find(d => d.className === 'motion');
-      if (found) {
+      motionFound = !!detection.detections?.find(d => d.className === 'motion');
+      if (motionFound) {
         if (!this.motionDetected)
           this.motionDetected = true;
-        this.resetMotionTimeout();
 
         // if (this.motionSensorSupplementation === BUILTIN_MOTION_SENSOR_ASSIST) {
         //   if (!this.motionDetected) {
@@ -627,6 +629,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
+    return motionFound;
   }
 
   setDetection(detection: ObjectsDetected, detectionInput: MediaObject) {
