@@ -27,7 +27,7 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 
 3) If HomeKit requested the video, but nothing showed up in the timeline:
   * HomeKit may have decided the motion wasn't worth recording. Set your HomeKit recording options to all motion when testing.
-  * The recordings are in a bad format that can't be used by HomeKit. See below for optimal HomeKit Codec Settings. Enabling Transcode Debug Mode in the HomeKit settings for that camera may fix this for testing purposes, but long term usage is not recommended as it reduces quality and increases CPU load.
+  * The recordings are in a bad format that can't be used by HomeKit. See below for optimal HomeKit Codec Settings. Enabling `Debug Mode` (select `Transcode Video` and `Transcode Audio`) in the HomeKit settings for that camera may fix this for testing purposes, but long term usage is not recommended as it reduces quality and increases CPU load.
   * Try rebooting your Home Hubs (HomePods and AppleTVs). Make sure they are fully up to date.
 
 ### HomeKit Discovery and Pairing Issues
