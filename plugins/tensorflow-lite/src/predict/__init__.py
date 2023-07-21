@@ -17,6 +17,7 @@ from detect import DetectPlugin
 from .rectangle import (Rectangle, combine_rect, from_bounding_box,
                         intersect_area, intersect_rect, to_bounding_box)
 
+
 # vips is already multithreaded, but needs to be kicked off the python asyncio thread.
 toThreadExecutor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="image")
 
@@ -223,11 +224,22 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
 
         sw = int(w / s)
         sh = int(h / s)
-        first_crop = (0, 0, sw, sh)
-
 
         ow = iw - sw
         oh = ih - sh
+
+        sx = s
+        sy = s
+
+        # ultra wide lens
+        if ow > sw:
+            ow = int(iw / 2)
+            sw = ow
+            sx = w / ow
+
+        first_crop = (0, 0, sw, sh)
+
+
         second_crop = (ow, oh, ow + sw, oh + sh)
 
         firstData, secondData = await asyncio.gather(
@@ -265,9 +277,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         )
 
         def cvss1(point):
-            return point[0] / s, point[1] / s
+            return point[0] / sx, point[1] / sy
         def cvss2(point):
-            return point[0] / s + ow, point[1] / s + oh
+            return point[0] / sx + ow, point[1] / sy + oh
 
         ret1 = await self.detect_once(first, settings, src_size, cvss1)
         first.close()
@@ -285,12 +297,12 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
                 return False, None
 
             r1 = from_bounding_box(d1['boundingBox'])
-            m1 = intersect_rect(two_intersect, r1)
+            m1 = two_intersect and intersect_rect(two_intersect, r1)
             if not m1:
                 return False, None
 
             r2 = from_bounding_box(d2['boundingBox'])
-            m2 = intersect_rect(two_intersect, r2)
+            m2 = two_intersect and intersect_rect(two_intersect, r2)
             if not m2:
                 return False, None
 
