@@ -27,10 +27,10 @@ from .base import ArloDeviceBase
 class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     arlo_cameras = None
     arlo_basestations = None
-    all_device_ids: List[str] = None
+    all_device_ids: set = set()
     _arlo_mfa_code = None
     scrypted_devices = None
-    _arlo = None
+    _arlo: Arlo = None
     _arlo_mfa_complete_auth = None
     device_discovery_lock: asyncio.Lock = None
 
@@ -165,6 +165,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             hidden = []
             self.storage.setItem("hidden_devices", hidden)
         return hidden
+
+    @property
+    def hidden_device_ids(self) -> List[str]:
+        ids = []
+        for id in self.hidden_devices:
+            m = re.match(r".*\((.*)\)$", id)
+            if m is not None:
+                ids.append(m.group(1))
+        return ids
 
     @property
     def arlo(self) -> Arlo:
@@ -546,10 +555,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 "description": "Select the Arlo devices to hide in this plugin. Hidden devices will be removed from Scrypted and will "
                                "not be re-added when the plugin reloads.",
                 "value": self.hidden_devices,
-                "type": "string",
                 "multiple": True,
-                "combobox": True,
-                "choices": self.all_device_ids,
+                "choices": [id for id in self.all_device_ids],
             },
         ])
 
@@ -593,6 +600,11 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 skip_arlo_client = True
             elif key.startswith("imap_mfa"):
                 self.initialize_imap()
+                skip_arlo_client = True
+            elif key == "hidden_devices":
+                if self._arlo is not None and self._arlo.logged_in:
+                    self._arlo.Unsubscribe()
+                    await self.do_arlo_setup()
                 skip_arlo_client = True
             else:
                 # force arlo client to be invalidated and reloaded
@@ -639,12 +651,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             return await self.discover_devices_impl()
 
     async def discover_devices_impl(self) -> None:
-        if not self.arlo:
+        if not self._arlo or not self._arlo.logged_in:
             raise Exception("Arlo client not connected, cannot discover devices")
 
         self.logger.info("Discovering devices...")
         self.arlo_cameras = {}
         self.arlo_basestations = {}
+        self.all_device_ids = set()
         self.scrypted_devices = {}
 
         camera_devices = []
@@ -653,12 +666,19 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         basestations = self.arlo.GetDevices(['basestation', 'siren'])
         for basestation in basestations:
             nativeId = basestation["deviceId"]
+            self.all_device_ids.add(f"{basestation['deviceName']} ({nativeId})")
+
             self.logger.debug(f"Adding {nativeId}")
 
             if nativeId in self.arlo_basestations:
                 self.logger.info(f"Skipping basestation {nativeId} ({basestation['modelId']}) as it has already been added")
                 continue
+
             self.arlo_basestations[nativeId] = basestation
+
+            if nativeId in self.hidden_device_ids:
+                self.logger.info(f"Skipping manifest for basestation {nativeId} ({basestation['modelId']}) as it is hidden")
+                continue
 
             device = await self.getDevice_impl(nativeId)
             scrypted_interfaces = device.get_applicable_interfaces()
@@ -678,11 +698,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 await scrypted_sdk.deviceManager.onDeviceDiscovered(child_manifest)
                 provider_to_device_map.setdefault(child_manifest["providerNativeId"], []).append(child_manifest)
 
-        self.logger.info(f"Discovered {len(basestations)} basestations")
+        self.logger.info(f"Discovered {len(self.arlo_basestations)} basestations")
 
         cameras = self.arlo.GetDevices(['camera', "arloq", "arloqs", "doorbell"])
         for camera in cameras:
             nativeId = camera["deviceId"]
+            self.all_device_ids.add(f"{camera['deviceName']} ({nativeId})")
+
             self.logger.debug(f"Adding {nativeId}")
 
             if camera["deviceId"] != camera["parentId"] and camera["parentId"] not in self.arlo_basestations:
@@ -692,6 +714,11 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             if nativeId in self.arlo_cameras:
                 self.logger.info(f"Skipping camera {nativeId} ({camera['modelId']}) as it has already been added")
                 continue
+
+            if nativeId in self.hidden_device_ids:
+                self.logger.info(f"Skipping camera {camera['deviceId']} ({camera['modelId']}) because it is hidden")
+                continue
+ 
             self.arlo_cameras[nativeId] = camera
 
             if camera["deviceId"] == camera["parentId"]:
@@ -704,7 +731,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             manifest = device.get_device_manifest()
             self.logger.debug(f"Interfaces for {nativeId} ({camera['modelId']} parent {camera['parentId']}): {scrypted_interfaces}")
 
-            if camera["deviceId"] == camera["parentId"]:
+            if camera["deviceId"] == camera["parentId"] or camera["parentId"] in self.hidden_device_ids:
                 provider_to_device_map.setdefault(None, []).append(manifest)
             else:
                 provider_to_device_map.setdefault(camera["parentId"], []).append(manifest)
@@ -722,7 +749,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
 
         if len(cameras) != len(camera_devices):
             self.logger.info(f"Discovered {len(cameras)} cameras, but only {len(camera_devices)} are usable")
-            self.logger.info(f"Are all cameras shared with admin permissions?")
+            self.logger.info("This could be because some cameras are hidden.")
+            self.logger.info("If a camera is not hidden but is still missing, ensure all cameras shared with "
+                             "admin permissions in the Arlo app.")
         else:
             self.logger.info(f"Discovered {len(cameras)} cameras")
 
@@ -747,7 +776,11 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
         })
         self.logger.debug("Done discovering devices")
 
+        # force a settings refresh so the hidden devices list can be updated
+        await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
+
     async def getDevice(self, nativeId: str) -> ArloDeviceBase:
+        self.logger.debug(f"Scrypted requested to load device {nativeId}")
         async with self.device_discovery_lock:
             return await self.getDevice_impl(nativeId)
 
