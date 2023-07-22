@@ -1413,7 +1413,7 @@ export interface VideoFrameGeneratorOptions extends ImageOptions {
   fps?: number;
 }
 export interface VideoFrameGenerator {
-  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame>>;
+  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame, void>>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
