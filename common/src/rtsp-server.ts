@@ -215,23 +215,10 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
                     continue;
                 }
 
-                if (findH264NaluType(streamChunk, H264_NAL_TYPE_SPS))
+                if (findH264NaluType(streamChunk, H264_NAL_TYPE_SPS) || findH264NaluType(streamChunk, H264_NAL_TYPE_IDR)) {
                     foundIndex = prebufferIndex;
-            }
-
-            if (foundIndex !== undefined)
-                return createSyncFrame();
-
-            nonVideo = {};
-            // some streams don't contain codec info, so find an idr frame instead.
-            for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
-                const streamChunk = streamChunks[prebufferIndex];
-                if (streamChunk.type !== 'h264') {
-                    nonVideo[streamChunk.type] = streamChunk;
-                    continue;
+                    break;
                 }
-                if (findH264NaluType(streamChunk, H264_NAL_TYPE_IDR))
-                    foundIndex = prebufferIndex;
             }
 
             if (foundIndex !== undefined)
