@@ -27,6 +27,7 @@ from .base import ArloDeviceBase
 class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceLoggerMixin, BackgroundTaskMixin):
     arlo_cameras = None
     arlo_basestations = None
+    all_device_ids: List[str] = None
     _arlo_mfa_code = None
     scrypted_devices = None
     _arlo = None
@@ -156,6 +157,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
             interval = 7
             self.storage.setItem("imap_mfa_interval", interval)
         return int(interval)
+
+    @property
+    def hidden_devices(self) -> List[str]:
+        hidden = self.storage.getItem("hidden_devices")
+        if hidden is None:
+            hidden = []
+            self.storage.setItem("hidden_devices", hidden)
+        return hidden
 
     @property
     def arlo(self) -> Arlo:
@@ -529,6 +538,18 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, ScryptedDeviceL
                 "description": "Enable this option to show debug messages, including events received from connected Arlo cameras.",
                 "value": self.plugin_verbosity == "Verbose",
                 "type": "boolean",
+            },
+            {
+                "group": "General",
+                "key": "hidden_devices",
+                "title": "Hidden Devices",
+                "description": "Select the Arlo devices to hide in this plugin. Hidden devices will be removed from Scrypted and will "
+                               "not be re-added when the plugin reloads.",
+                "value": self.hidden_devices,
+                "type": "string",
+                "multiple": True,
+                "combobox": True,
+                "choices": self.all_device_ids,
             },
         ])
 
