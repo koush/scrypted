@@ -195,34 +195,16 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             '-f', 'rtsp',
         ],
         findSyncFrame(streamChunks: StreamChunk[]) {
-            let foundIndex: number;
-            let nonVideo: {
-                [codec: string]: StreamChunk,
-            } = {};
-
-            const createSyncFrame = () => {
-                const ret = streamChunks.slice(foundIndex);
-                // for (const nv of Object.values(nonVideo)) {
-                //     ret.unshift(nv);
-                // }
-                return ret;
-            }
-
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
                 if (streamChunk.type !== 'h264') {
-                    nonVideo[streamChunk.type] = streamChunk;
                     continue;
                 }
 
                 if (findH264NaluType(streamChunk, H264_NAL_TYPE_SPS) || findH264NaluType(streamChunk, H264_NAL_TYPE_IDR)) {
-                    foundIndex = prebufferIndex;
-                    break;
+                    return streamChunks.slice(prebufferIndex);
                 }
             }
-
-            if (foundIndex !== undefined)
-                return createSyncFrame();
 
             // oh well!
         },
