@@ -109,7 +109,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             self.storage.removeItem('mode')
             self.storage.removeItem('model')
             self.storage.removeItem('precision')
-            asyncio.run_coroutine_threadsafe(scrypted_sdk.deviceManager.requestRestart(), asyncio.get_event_loop())
+            self.requestRestart()
 
         labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
@@ -163,7 +163,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
     async def putSetting(self, key: str, value: SettingValue):
         self.storage.setItem(key, value)
         await self.onDeviceEvent(scrypted_sdk.ScryptedInterface.Settings.value, None)
-        await scrypted_sdk.deviceManager.requestRestart()
+        self.requestRestart()
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:

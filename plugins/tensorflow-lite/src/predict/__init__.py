@@ -13,6 +13,7 @@ from scrypted_sdk.types import (ObjectDetectionResult, ObjectDetectionSession,
                                 ObjectsDetected, Setting)
 
 from detect import DetectPlugin
+import traceback
 
 from .rectangle import (Rectangle, combine_rect, from_bounding_box,
                         intersect_area, intersect_rect, to_bounding_box)
@@ -187,6 +188,18 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         pass
 
+    async def safe_detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
+        try:
+            f = self.detect_once(input, settings, src_size, cvss)
+            return await asyncio.wait_for(f, 60)
+        except:
+            traceback.print_exc()
+            print(
+                "encountered an error while detecting. requesting plugin restart."
+            )
+            self.requestRestart()
+            raise
+
     async def run_detection_image(self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession) -> ObjectsDetected:
         settings = detection_session and detection_session.get('settings')
         src_size = image.width, image.height
@@ -217,7 +230,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
             })
             single = await ensureRGBData(data, (w, h), image.format)
             try:
-                ret = await self.detect_once(single, settings, src_size, cvss)
+                ret = await self.safe_detect_once(single, settings, src_size, cvss)
                 return ret
             finally:
                 single.close()
@@ -281,9 +294,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         def cvss2(point):
             return point[0] / sx + ow, point[1] / sy + oh
 
-        ret1 = await self.detect_once(first, settings, src_size, cvss1)
+        ret1 = await self.safe_detect_once(first, settings, src_size, cvss1)
         first.close()
-        ret2 = await self.detect_once(second, settings, src_size, cvss2)
+        ret2 = await self.safe_detect_once(second, settings, src_size, cvss2)
         second.close()
 
         two_intersect = intersect_rect(Rectangle(*first_crop), Rectangle(*second_crop))
