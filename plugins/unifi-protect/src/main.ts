@@ -335,6 +335,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
                 const managementUrl = `https://${this.storage.getItem('ip')}/protect/timelapse/${camera.id}`;
 
+                const isDoorbell = camera.featureFlags.isDoorbell || camera.featureFlags.hasChime;
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: camera.name,
@@ -355,11 +356,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         ScryptedInterface.VideoCameraConfiguration,
                         ScryptedInterface.MotionSensor,
                     ],
-                    type: camera.featureFlags.isDoorbell
+                    type: isDoorbell
                         ? ScryptedDeviceType.Doorbell
                         : ScryptedDeviceType.Camera,
                 };
-                if (camera.featureFlags.isDoorbell) {
+                if (isDoorbell) {
                     d.interfaces.push(ScryptedInterface.BinarySensor);
                 }
                 if (camera.featureFlags.hasSpeaker) {
