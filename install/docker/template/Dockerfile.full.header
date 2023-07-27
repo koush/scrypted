@@ -33,12 +33,6 @@ RUN apt-get -y install \
     python3-setuptools \
     python3-wheel
 
-# Coral Edge TPU
-# https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
-RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-RUN apt-get -y update && apt-get -y install libedgetpu1-std
-
 # these are necessary for pillow-simd, additional on disk size is small
 # but could consider removing this.
 RUN apt-get -y install \
