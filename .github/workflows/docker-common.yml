@@ -23,13 +23,13 @@ jobs:
       - name: Set up SSH
         uses: MrSquaare/ssh-setup-action@v2
         with:
-          host: 192.168.2.124
+          host: Koushik-MacStudio
           private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
 
       - name: Set up SSH
         uses: MrSquaare/ssh-setup-action@v2
         with:
-          host: 192.168.2.119
+          host: raspberrypi
           private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
 
       - name: Set up Docker Buildx
@@ -37,11 +37,10 @@ jobs:
         with:
           platforms: linux/arm64,linux/armhf
           append: |
-            - endpoint: ssh://koush@192.168.2.124
-              # platforms: linux/arm64
+            - endpoint: ssh://koush@Koushik-MacStudio
               platforms: linux/arm64
-            # - endpoint: ssh://koush@192.168.2.119
-            #   platforms: linux/armhf
+            - endpoint: ssh://koush@raspberrypi
+              platforms: linux/armhf
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
