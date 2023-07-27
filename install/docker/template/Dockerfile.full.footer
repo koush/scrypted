@@ -23,6 +23,9 @@ RUN add-apt-repository ppa:deadsnakes/ppa && \
     python3.9-dev \
     python3.9-distutils
 
+# allow pip to install to system
+RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
+
 RUN python3.9 -m pip install --upgrade pip
 RUN python3.9 -m pip install --force-reinstall --no-binary :all: cffi
 RUN python3.9 -m pip install debugpy typing_extensions psutil
