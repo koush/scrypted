@@ -21,17 +21,27 @@ export class AddressSettings {
 
         const ret: string[] = [];
         const networkInterfaces = os.networkInterfaces();
+        const allAddresses = new Set(Object.values(networkInterfaces)
+            .flat().map(ni => ni.address));
         for (const addressOrInterface of settings.value) {
             const nif = networkInterfaces[addressOrInterface];
-            if (!raw && nif) {
-                for (const addr of nif) {
-                    if (!addr.address || addr.address.startsWith('169.254.') || addr.address.toLowerCase().startsWith('fe80:'))
-                        continue;
-                    ret.push(addr.address);
-                }
+            if (raw) {
+                ret.push(addressOrInterface);
             }
             else {
-                ret.push(addressOrInterface);
+                if (nif) {
+                    for (const addr of nif) {
+                        if (!addr.address || addr.address.startsWith('169.254.') || addr.address.toLowerCase().startsWith('fe80:'))
+                            continue;
+                        ret.push(addr.address);
+                    }
+                }
+                else {
+                    if (allAddresses.has(addressOrInterface))
+                        ret.push(addressOrInterface);
+                    else
+                        console.warn("invalid local address", addressOrInterface)
+                }
             }
         }
         return ret;

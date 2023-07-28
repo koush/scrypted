@@ -229,13 +229,6 @@ class TensorFlowLitePlugin(
                         interpreter, score_threshold=0.2, image_scale=(1, 1)
                     )
                 return objs
-            except:
-                traceback.print_exc()
-                print(
-                    "tensorflow-lite encountered an error while detecting. requesting plugin restart."
-                )
-                self.requestRestart()
-                raise e
             finally:
                 self.interpreters.put(interpreter)
 

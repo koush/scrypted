@@ -23,9 +23,18 @@ RUN add-apt-repository ppa:deadsnakes/ppa && \
     python3.9-dev \
     python3.9-distutils
 
+# allow pip to install to system
+RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
+
 RUN python3.9 -m pip install --upgrade pip
 RUN python3.9 -m pip install --force-reinstall --no-binary :all: cffi
 RUN python3.9 -m pip install debugpy typing_extensions psutil
+
+# Coral Edge TPU
+# https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
+RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list
+RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+RUN apt-get -y update && apt-get -y install libedgetpu1-std
 
 ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
@@ -37,7 +46,7 @@ ENV SCRYPTED_FFMPEG_PATH="/usr/bin/ffmpeg"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION="20230608"
+ENV SCRYPTED_BASE_VERSION="20230727"
 ENV SCRYPTED_DOCKER_FLAVOR="full"
 
 ################################################################
