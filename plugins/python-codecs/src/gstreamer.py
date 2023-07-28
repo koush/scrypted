@@ -366,16 +366,20 @@ async def generateVideoFramesGstreamer(
     if fps:
         videorate = f"! videorate max-rate={fps}"
 
+    queue = "! queue leaky=downstream max-size-buffers=0"
+    if options and options.get('firstFrameOnly'):
+        queue = ""
+
     if postProcessPipeline == "VAAPI":
         pipeline += (
-            f" ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0"
+            f" ! {decoder} {videorate} {queue}"
         )
     elif postProcessPipeline == "OpenGL (GPU memory)":
-        pipeline += f" ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0 ! glupload"
+        pipeline += f" ! {decoder} {videorate} {queue} ! glupload"
     elif postProcessPipeline == "OpenGL (system memory)":
-        pipeline += f" ! {decoder} {videorate} ! queue leaky=downstream max-size-buffers=0 ! video/x-raw ! glupload"
+        pipeline += f" ! {decoder} {videorate} {queue} ! video/x-raw ! glupload"
     else:
-        pipeline += f" ! {decoder} ! video/x-raw {videorate} ! queue leaky=downstream max-size-buffers=0"
+        pipeline += f" ! {decoder} ! video/x-raw {videorate} {queue}"
         # disable the gstreamer post process because videocrop spams the log
         postProcessPipeline = "Default"
         # postProcessPipeline = None

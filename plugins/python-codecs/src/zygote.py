@@ -9,7 +9,7 @@ def createZygote():
 
     def next():
         while True:
-            cur = queue.pop()
+            cur = queue.pop(0)
             queue.append(scrypted_sdk.fork())
             yield cur
 
