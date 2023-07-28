@@ -92,7 +92,7 @@ MEDIA_USER_AGENTS = {
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
-    BACKUP_AUTH_HOSTS = ['NTIuMjEwLjMuMTIx', 'MzQuMjU1LjkyLjIxMg==', 'MzQuMjUxLjE3Ny45MA==', 'NTQuMjQ2LjE3MS4x']
+    BACKUP_AUTH_HOSTS = ["MzQuMjUxLjE3Ny45MA==","MzQuMjQzLjE3Ljkw","NTIuMzEuMTg1LjE4NQ==","MzQuMjQzLjIyMi4zNg=="]
     TRANSID_PREFIX = 'web'
 
     random.shuffle(BACKUP_AUTH_HOSTS)
