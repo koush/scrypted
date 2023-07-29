@@ -57,6 +57,9 @@ class ArloDeviceBase(ScryptedDeviceBase, ScryptedDeviceLoggerMixin, BackgroundTa
         if self.arlo_device.get("parentId") and self.arlo_device["parentId"] != self.arlo_device["deviceId"]:
             parent = self.arlo_device["parentId"]
 
+        if parent in self.provider.hidden_device_ids:
+            parent = None
+
         return {
             "info": {
                 "model": f"{self.arlo_device['modelId']} {self.arlo_device['properties'].get('hwVersion', '')}".strip(),

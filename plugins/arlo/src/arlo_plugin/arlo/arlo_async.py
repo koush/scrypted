@@ -92,7 +92,7 @@ MEDIA_USER_AGENTS = {
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
-    BACKUP_AUTH_HOSTS = ['NTIuMjEwLjMuMTIx', 'MzQuMjU1LjkyLjIxMg==', 'MzQuMjUxLjE3Ny45MA==', 'NTQuMjQ2LjE3MS4x']
+    BACKUP_AUTH_HOSTS = ["MzQuMjQzLjE3Ljkw","MzQuMjQ4Ljg2LjQ2","MzQuMjQwLjI0Ny4xODY=","NTIuMzEuMTg1LjE4NQ=="]
     TRANSID_PREFIX = 'web'
 
     random.shuffle(BACKUP_AUTH_HOSTS)
@@ -102,6 +102,7 @@ class Arlo(object):
         self.password = password
         self.event_stream = None
         self.request = None
+        self.logged_in = False
 
     def to_timestamp(self, dt):
         if sys.version[0] == '2':
@@ -153,6 +154,7 @@ class Arlo(object):
         self.request = Request(mode="cloudscraper")
         self.request.session.headers.update(headers)
         self.BASE_URL = 'myapi.arlo.com'
+        self.logged_in = True
 
     def LoginMFA(self):
         device_id = str(uuid.uuid4())
@@ -258,6 +260,7 @@ class Arlo(object):
             }
             self.request.session.headers.update(headers)
             self.BASE_URL = 'myapi.arlo.com'
+            self.logged_in = True
 
         return complete_auth
 
