@@ -803,6 +803,13 @@ class Arlo(object):
                 headers={"xcloudId":camera.get('xCloudId'), 'User-Agent': ua}
             )
 
+        trigger(self)
+
+        if mode == "rtsp":
+            return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+        else:
+            return nl.stream_url_dict['url'].replace(":80", "")
+
         def callback(self, event):
             #return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
             if "error" in event:
