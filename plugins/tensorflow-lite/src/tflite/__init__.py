@@ -172,6 +172,8 @@ class TensorFlowLitePlugin(
                 "choices": [
                     "Default",
                     "ssd_mobilenet_v2_coco_quant_postprocess",
+                    "tf2_ssd_mobilenet_v2_coco17_ptq",
+                    "ssdlite_mobiledet_coco_qat_postprocess",
                     "yolov8n_full_integer_quant",
                     "efficientdet_lite0_320_ptq",
                     "efficientdet_lite1_384_ptq",
