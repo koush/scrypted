@@ -516,10 +516,10 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         return url
 
     @async_print_exception_guard
-    async def getVideoStream(self, options: RequestMediaStreamOptions = None) -> MediaObject:
+    async def getVideoStream(self, options: RequestMediaStreamOptions = {}) -> MediaObject:
         self.logger.debug("Entered getVideoStream")
 
-        mso = await self.getVideoStreamOptions(id=options["id"])
+        mso = await self.getVideoStreamOptions(id=options.get("id", "default"))
         mso['refreshAt'] = round(time.time() * 1000) + 30 * 60 * 1000
         container = mso["container"]
 

@@ -10,6 +10,8 @@ If you experience any trouble logging in, clear the username and password boxes,
 
 If you are unable to see shared cameras in your separate Arlo account, ensure that both your primary and secondary accounts are upgraded according to this [forum post](https://web.archive.org/web/20230710141914/https://community.arlo.com/t5/Arlo-Secure/Invited-friend-cannot-see-devices-on-their-dashboard-Arlo-Pro-2/m-p/1889396#M1813). Verify the sharing worked by logging in via the Arlo web dashboard.
 
+**If you add or remove cameras from your main Arlo account, or share/un-share/re-share cameras with the Arlo account used with this plugin, ensure that you reload this plugin to get the updated camera state from Arlo Cloud.**
+
 ## General Setup Notes
 
 * Ensure that your Arlo account's default 2FA option is set to either SMS or email.
