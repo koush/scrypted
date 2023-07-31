@@ -21,7 +21,7 @@
         -webkit-transform-style: preserve-3d;
       " playsinline autoplay></video>
 
-      <svg :viewBox="`0 0 ${svgWidth} ${svgHeight}`" ref="svg" style="
+      <svg width="100%" height="100%" preserveAspectRatio="none" ref="svg" style="
         top: 0;
         left: 0;
         position: absolute;
@@ -141,15 +141,23 @@ export default {
 
       let contents = "";
 
+      const toPercent=  (v, d) => {
+        return `${v / d * 100}%`;
+      }
+
       for (const detection of this.lastDetection.detections || []) {
         if (!detection.boundingBox) continue;
-        const svgScale = this.svgWidth / 1080;
-        const sw = 2 * svgScale;
         const s = "red";
-        const x = detection.boundingBox[0];
-        const y = detection.boundingBox[1];
-        const w = detection.boundingBox[2];
-        const h = detection.boundingBox[3];
+        let x = detection.boundingBox[0];
+        let y = detection.boundingBox[1];
+        let w = detection.boundingBox[2];
+        let h = detection.boundingBox[3];
+
+        x = toPercent(x, this.lastDetection?.inputDimensions?.[0] || 1920);
+        y = toPercent(y, this.lastDetection?.inputDimensions?.[1] || 1080);
+        w = toPercent(w, this.lastDetection?.inputDimensions?.[0] || 1920);
+        h = toPercent(h, this.lastDetection?.inputDimensions?.[1] || 1080);
+
         let t = ``;
         let toffset = 0;
         if (detection.score && detection.className !== 'motion') {
@@ -159,11 +167,11 @@ export default {
         const tname = detection.className + (detection.id ? `: ${detection.id}` : '')
         t += `<tspan x='${x}' dy='${toffset}em'>${tname}</tspan>`
 
-        const fs = 20 * svgScale;
+        const fs = 20;
 
-        const box = `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="${sw}" fill="none" />
-        <text x="${x}" y="${y - 5}" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
-        <text x="${x}" y="${y - 5}" font-size="${fs}" fill="white">${t}</text>
+        const box = `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="2" fill="none" />
+        <text x="${x}" y="${y}" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
+        <text x="${x}" y="${y}" font-size="${fs}" fill="white">${t}</text>
       `;
         contents += box;
       }
