@@ -58,6 +58,9 @@ brew unpin gst-python
 
 ### END HACK WORKAROUND
 
+# seems to be necessary for python-codecs' pycairo dependency or something?
+RUN_IGNORE gobject-introspection libffi pkg-config
+
 # gstreamer plugins
 RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-libav
 # gst python bindings
