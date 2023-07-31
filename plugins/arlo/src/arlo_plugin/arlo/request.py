@@ -19,17 +19,13 @@ import requests
 from requests.exceptions import HTTPError
 from requests_toolbelt.adapters import host_header_ssl
 import cloudscraper
+from curl_cffi import requests as curl_cffi_requests
 import time
 import uuid
 
 from .logging import logger
 
 
-try:
-    from curl_cffi import requests as curl_cffi_requests
-    HAS_CURL_CFFI = True
-except:
-    HAS_CURL_CFFI = False
 
 #from requests_toolbelt.utils import dump
 #def print_raw_http(response):
@@ -39,7 +35,7 @@ except:
 class Request(object):
     """HTTP helper class"""
 
-    def __init__(self, timeout=5, mode="curl" if HAS_CURL_CFFI else "cloudscraper"):
+    def __init__(self, timeout=5, mode="curl"):
         if mode == "curl":
             logger.debug("HTTP helper using curl_cffi")
             self.session = curl_cffi_requests.Session(impersonate="chrome110")

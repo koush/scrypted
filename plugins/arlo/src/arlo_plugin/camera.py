@@ -313,6 +313,13 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             return False
 
     @property
+    def disable_eager_streams(self) -> bool:
+        if self.storage:
+            return True if self.storage.getItem("disable_eager_streams") else False
+        else:
+            return False
+
+    @property
     def snapshot_throttle_interval(self) -> int:
         interval = self.storage.getItem("snapshot_throttle_interval")
         if interval is None:
@@ -371,7 +378,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     "type": "boolean",
                 },
             )
-        result.append(
+        result.extend([
             {
                 "group": "General",
                 "key": "eco_mode",
@@ -380,8 +387,17 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                 "description": "Configures Scrypted to limit the number of requests made to this camera. " + \
                                "Additional eco mode settings will appear when this is turned on.",
                 "type": "boolean",
-            }
-        )
+            },
+            {
+                "group": "General",
+                "key": "disable_eager_streams",
+                "title": "Disable Eager Streams",
+                "value": self.disable_eager_streams,
+                "description": "If eager streams are disabled, Scrypted will wait for Arlo Cloud to report that " + \
+                               "the camera stream has started before passing the stream URL to downstream consumers.",
+                "type": "boolean",
+            },
+        ])
         if self.eco_mode:
             result.append(
                 {
@@ -416,7 +432,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         if key in ["wired_to_power"]:
             self.storage.setItem(key, value == "true" or value == True)
             await self.provider.discover_devices()
-        elif key in ["eco_mode"]:
+        elif key in ["eco_mode", "disable_eager_streams"]:
             self.storage.setItem(key, value == "true" or value == True)
         elif key == "print_debug":
             self.logger.info(f"Device Capabilities: {self.arlo_capabilities}")
@@ -457,7 +473,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                     return await scrypted_sdk.mediaManager.createMediaObject(self.last_picture, "image/jpeg")
 
             pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=self.timeout)
-            self.logger.debug(f"Got snapshot URL for at {pic_url}")
+            self.logger.debug(f"Got snapshot URL at {pic_url}")
 
             if pic_url is None:
                 raise Exception("Error taking snapshot: no url returned")
@@ -511,7 +527,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
 
     async def _getVideoStreamURL(self, container: str) -> str:
         self.logger.info(f"Requesting {container} stream")
-        url = await asyncio.wait_for(self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device, mode=container), timeout=self.timeout)
+        url = await asyncio.wait_for(self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device, mode=container, eager=not self.disable_eager_streams), timeout=self.timeout)
         self.logger.debug(f"Got {container} stream URL at {url}")
         return url
 
