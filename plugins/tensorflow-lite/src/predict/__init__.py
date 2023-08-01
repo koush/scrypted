@@ -49,60 +49,6 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
-def is_same_box(bb1, bb2, threshold = .7):
-    r1 = from_bounding_box(bb1)
-    r2 = from_bounding_box(bb2)
-    ia = intersect_area(r1, r2)
-
-    if not ia:
-        return False, None
-
-    a1 = bb1[2] * bb1[3]
-    a2 = bb2[2] * bb2[3]
-
-    # if area intersect area is too small, these are different boxes
-    if ia / a1 < threshold or ia / a2 < threshold:
-        return False, None
-
-    l = min(bb1[0], bb2[0])
-    t = min(bb1[1], bb2[1])
-    r = max(bb1[0] + bb1[2], bb2[0] + bb2[2])
-    b = max(bb1[1] + bb1[3], bb2[1] + bb2[3])
-
-    w = r - l
-    h = b - t
-
-    return True, (l, t, w, h)
-
-def is_same_detection(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
-    if d1['className'] != d2['className']:
-        return False, None
-
-    return is_same_box(d1['boundingBox'], d2['boundingBox'])
-
-def dedupe_detections(input: List[ObjectDetectionResult], is_same_detection = is_same_detection):
-    input = input.copy()
-    detections = []
-    while len(input):
-        d = input.pop()
-        found = False
-        for c in detections:
-            same, box = is_same_detection(d, c)
-            if same:
-                # encompass this box and score
-                d['boundingBox'] = box
-                d['score'] = max(d['score'], c['score'])
-                # remove from current detections list
-                detections = list(filter(lambda r: r != c, detections))
-                # run dedupe again with this new larger item
-                input.append(d)
-                found = True
-                break
-
-        if not found:
-            detections.append(d)
-    return detections
-
 class Prediction:
     def __init__(self, id: int, score: float, bbox: Tuple[float, float, float, float]):
         self.id = id
@@ -202,129 +148,28 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
 
     async def run_detection_image(self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession) -> ObjectsDetected:
         settings = detection_session and detection_session.get('settings')
-        src_size = image.width, image.height
+        iw, ih = image.width, image.height
         w, h = self.get_input_size()
-        input_aspect_ratio = w / h
-        iw, ih = src_size
-        src_aspect_ratio = iw / ih
-        ws = w / iw
-        hs = h / ih
-        s = max(ws, hs)
 
-        # image is already correct aspect ratio, so it can be processed in a single pass.
-        if input_aspect_ratio == src_aspect_ratio:
-            def cvss(point):
-                return point[0] / s, point[1] / s
+        resize = None
+        xs = w / iw
+        ys = h / ih
+        def cvss(point):
+            return point[0] / xs, point[1] / ys
 
-            # aspect ratio matches, but image must be scaled.
-            resize = None
-            if ih != w:
-                resize = {
-                    'width': w,
-                    'height': h,
-                }
+        if iw != w or ih != h:
+            resize = {
+                'width': w,
+                'height': h,
+            }
 
-            data = await image.toBuffer({
-                'resize': resize,
-                'format': image.format or 'rgb',
-            })
-            single = await ensureRGBData(data, (w, h), image.format)
-            try:
-                ret = await self.safe_detect_once(single, settings, src_size, cvss)
-                return ret
-            finally:
-                single.close()
-
-        sw = int(w / s)
-        sh = int(h / s)
-
-        ow = iw - sw
-        oh = ih - sh
-
-        sx = s
-        sy = s
-
-        # ultra wide lens
-        if ow > sw:
-            ow = int(iw / 2)
-            sw = ow
-            sx = w / ow
-
-        first_crop = (0, 0, sw, sh)
-
-
-        second_crop = (ow, oh, ow + sw, oh + sh)
-
-        firstData, secondData = await asyncio.gather(
-            image.toBuffer({
-                'resize': {
-                    'width': w,
-                    'height': h,
-                },
-                'crop': {
-                    'left': 0,
-                    'top': 0,
-                    'width': sw,
-                    'height': sh,
-                },
-                'format': image.format or 'rgb',
-            }),
-            image.toBuffer({
-                'resize': {
-                    'width': w,
-                    'height': h,
-                },
-                'crop': {
-                    'left': ow,
-                    'top': oh,
-                    'width': sw,
-                    'height': sh,
-                },
-                'format': image.format or 'rgb',
-            })
-        )
-
-        first, second = await asyncio.gather(
-            ensureRGBData(firstData, (w, h), image.format),
-            ensureRGBData(secondData, (w, h), image.format)
-        )
-
-        def cvss1(point):
-            return point[0] / sx, point[1] / sy
-        def cvss2(point):
-            return point[0] / sx + ow, point[1] / sy + oh
-
-        ret1 = await self.safe_detect_once(first, settings, src_size, cvss1)
-        first.close()
-        ret2 = await self.safe_detect_once(second, settings, src_size, cvss2)
-        second.close()
-
-        two_intersect = intersect_rect(Rectangle(*first_crop), Rectangle(*second_crop))
-
-        def is_same_detection_middle(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
-            same, ret = is_same_detection(d1, d2)
-            if same:
-                return same, ret
-
-            if d1['className'] != d2['className']:
-                return False, None
-
-            r1 = from_bounding_box(d1['boundingBox'])
-            m1 = two_intersect and intersect_rect(two_intersect, r1)
-            if not m1:
-                return False, None
-
-            r2 = from_bounding_box(d2['boundingBox'])
-            m2 = two_intersect and intersect_rect(two_intersect, r2)
-            if not m2:
-                return False, None
-
-            same, ret = is_same_box(to_bounding_box(m1), to_bounding_box(m2))
-            if not same:
-                return False, None
-            c = to_bounding_box(combine_rect(r1, r2))
-            return True, c
-
-        ret = ret1
-        ret['detections'] = dedupe_detections(ret1['detections'] + ret2['detections'], is_same_detection=is_same_detection_middle)
-        return ret
+        b = await image.toBuffer({
+            'resize': resize,
+            'format': image.format or 'rgb',
+        })
+        data = await ensureRGBData(b, (w, h), image.format)
+        try:
+            ret = await self.safe_detect_once(data, settings, (iw, ih), cvss)
+            return ret
+        finally:
+            data.close()

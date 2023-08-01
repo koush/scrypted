@@ -18,7 +18,6 @@ import asyncio
 import concurrent.futures
 import queue
 import re
-import traceback
 from typing import Any, Tuple
 
 import scrypted_sdk
@@ -58,9 +57,10 @@ class TensorFlowLitePlugin(
             edge_tpus = None
             pass
 
-        model_version = "v6"
+        model_version = "v11"
         model = self.storage.getItem("model") or "Default"
         defaultModel = model == "Default"
+        branch = "main"
 
         labelsFile = None
         def configureModel():
@@ -68,16 +68,7 @@ class TensorFlowLitePlugin(
             nonlocal model
 
             if defaultModel:
-                # model = "ssd_mobilenet_v2_coco_quant_postprocess"
-                if edge_tpus:
-                    usb_tpus = list(filter(lambda t: t['type'] == 'usb', edge_tpus))
-                    if not len(usb_tpus):
-                        model = "yolov8n_full_integer_quant"
-                    else:
-                        print('USB EdgeTPU is not compatible with YOLOv8. Falling back to SSDLite MobileNet V2.')
-                        model = "ssd_mobilenet_v2_coco_quant_postprocess"
-                else:
-                    model = "ssd_mobilenet_v2_coco_quant_postprocess"
+                model = "yolov8n_full_integer_quant_320"
             self.yolo = "yolo" in model
             self.yolov8 = "yolov8" in model
 
@@ -85,12 +76,12 @@ class TensorFlowLitePlugin(
 
             if self.yolo:
                 labelsFile = self.downloadFile(
-                    "https://raw.githubusercontent.com/koush/tflite-models/main/coco_80cl.txt",
+                    f"https://raw.githubusercontent.com/koush/tflite-models/{branch}/coco_80cl.txt",
                     f"{model_version}/coco_80cl.txt",
                 )
             else:
                 labelsFile = self.downloadFile(
-                    "https://raw.githubusercontent.com/koush/tflite-models/main/coco_labels.txt",
+                    f"https://raw.githubusercontent.com/koush/tflite-models/{branch}/coco_labels.txt",
                     f"{model_version}/coco_labels.txt",
                 )
 
@@ -102,7 +93,7 @@ class TensorFlowLitePlugin(
 
         def downloadModel():
             return self.downloadFile(
-                f"https://github.com/koush/tflite-models/raw/main/{model}/{model}{suffix}.tflite",
+                f"https://github.com/koush/tflite-models/raw/{branch}/{model}/{model}{suffix}.tflite",
                 f"{model_version}/{model}{suffix}.tflite",
             )
 
@@ -175,6 +166,7 @@ class TensorFlowLitePlugin(
                     "tf2_ssd_mobilenet_v2_coco17_ptq",
                     "ssdlite_mobiledet_coco_qat_postprocess",
                     "yolov8n_full_integer_quant",
+                    "yolov8n_full_integer_quant_320",
                     "efficientdet_lite0_320_ptq",
                     "efficientdet_lite1_384_ptq",
                     "efficientdet_lite2_448_ptq",
@@ -202,33 +194,31 @@ class TensorFlowLitePlugin(
                     im = np.stack([input])
                     i = interpreter.get_input_details()[0]
                     if i['dtype'] == np.int8:
-                        # scale, zero_point = i['quantization']
-                        # im = im.astype(np.float32) / 255.0
-                        # im = (im / scale + zero_point).astype(np.int8)  # de-scale
-
-                        # this is the same conversion as above.
-                        # unfortunately does not use standard signed int bitwise wrapping.
-                        im = im.view(np.int8)
-                        im -= 128
+                        scale, zero_point = i['quantization']
+                        if scale == 0.003986024297773838 and zero_point == -128:
+                            # fast path for quantization 1/255 = 0.003986024297773838
+                            im = im.view(np.int8)
+                            im -= 128
+                        else:
+                            im = im.astype(np.float32) / (255.0 * scale)
+                            im = (im + zero_point).astype(np.int8)  # de-scale
                     else:
+                        # this code path is unused.
                         im = im.astype(np.float32) / 255.0
                     interpreter.set_tensor(tensor_index, im)
                     interpreter.invoke()
                     output_details = interpreter.get_output_details()
-                    y = []
-                    for output in output_details:
-                        x = interpreter.get_tensor(output['index'])
-                        if output['dtype'] == np.int8:
-                            scale, zero_point = output['quantization']
-                            x = (x.astype(np.float32) - zero_point) * scale  # re-scale
-                        y.append(x)
-
-                    if len(y) == 2:  # segment with (det, proto) output order reversed
-                        if len(y[1].shape) != 4:
-                            y = list(reversed(y))  # should be y = (1, 116, 8400), (1, 160, 160, 32)
-                        y[1] = np.transpose(y[1], (0, 3, 1, 2))  # should be y = (1, 116, 8400), (1, 32, 160, 160)
-                    y = [x if isinstance(x, np.ndarray) else x.numpy() for x in y]
-                    objs = yolo.parse_yolov8(y[0][0], scale=640)
+                    output = output_details[0]
+                    x = interpreter.get_tensor(output['index'])
+                    input_scale = self.get_input_details()[0]
+                    if x.dtype == np.int8:
+                        scale, zero_point = output['quantization']
+                        threshold = yolo.defaultThreshold / scale + zero_point
+                        combined_scale = scale * input_scale
+                        objs = yolo.parse_yolov8(x[0], threshold, scale=lambda v: (v - zero_point) * combined_scale, confidence_scale=lambda v: (v - zero_point) * scale)
+                    else:
+                        # this code path is unused.
+                        objs = yolo.parse_yolov8(x[0], scale=lambda v: v * input_scale)
                 else:
                     common.set_input(interpreter, input)
                     interpreter.invoke()

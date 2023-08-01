@@ -4,20 +4,29 @@ import numpy as np
 
 from predict import Prediction, Rectangle
 
-def parse_yolov8(results, scale = 1):
+defaultThreshold = .2
+
+def parse_yolov8(results, threshold = defaultThreshold, scale = None, confidence_scale  = None):
     objs = []
-    keep = np.argwhere(results[4:] > .2)
+    keep = np.argwhere(results[4:] > threshold)
     for indices in keep:
         class_id = indices[0]
         index = indices[1]
-        confidence = results[class_id + 4, index]
-        x = results[0][index].astype(float) * scale
-        y = results[1][index].astype(float) * scale
-        w = results[2][index].astype(float) * scale
-        h = results[3][index].astype(float) * scale
+        confidence = results[class_id + 4, index].astype(float)
+        x = results[0][index].astype(float)
+        y = results[1][index].astype(float)
+        w = results[2][index].astype(float)
+        h = results[3][index].astype(float)
+        if scale:
+            x = scale(x)
+            y = scale(y)
+            w = scale(w)
+            h = scale(h)
+        if confidence_scale:
+            confidence = confidence_scale(confidence)
         obj = Prediction(
             int(class_id),
-            confidence.astype(float),
+            confidence,
             Rectangle(
                 x - w / 2,
                 y - h / 2,

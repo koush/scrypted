@@ -76,19 +76,12 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         
         model = self.storage.getItem('model') or 'Default'
         if model == 'Default':
-            model = 'ssd_mobilenet_v1_coco'
+            model = 'yolov8n_320'
         self.yolo = 'yolo' in model
         self.yolov8 = "yolov8" in model
         self.sigmoid = model == 'yolo-v4-tiny-tf'
 
         print(f'model/mode/precision: {model}/{mode}/{precision}')
-
-        if self.yolov8:
-            self.model_dim = 640
-        elif self.yolo:
-            self.model_dim = 416
-        else:
-            self.model_dim = 300
 
         model_version = 'v4'
         xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.xml', f'{model_version}/{precision}/{model}.xml')
@@ -111,6 +104,12 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             self.storage.removeItem('precision')
             self.requestRestart()
 
+        # mobilenet 1,300,300,3
+        # yolov3/4 1,416,416,3
+        # yolov8 1,3,320,320
+        # second dim is always good.
+        self.model_dim = self.compiled_model.inputs[0].shape[2]
+
         labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
 
@@ -132,6 +131,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                     'yolo-v3-tiny-tf',
                     'yolo-v4-tiny-tf',
                     'yolov8n',
+                    'yolov8n_320',
                 ],
                 'value': model,
             },
@@ -175,17 +175,19 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         def predict():
             infer_request = self.compiled_model.create_infer_request()
+            # the input_tensor can be created with the shared_memory=True parameter,
+            # but that seems to cause issues on some platforms.
             if self.yolov8:
                 im = np.stack([input])
                 im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
                 im = im.astype(np.float32) / 255.0
                 im = np.ascontiguousarray(im)  # contiguous
-                im = ov.Tensor(array=im, shared_memory=True)
+                im = ov.Tensor(array=im)
                 input_tensor = im
             elif self.yolo:
-                input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0).astype(np.float32), shared_memory=True)
+                input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0).astype(np.float32))
             else:
-                input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0), shared_memory=True)
+                input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0))
             # Set input tensor for model with one input
             infer_request.set_input_tensor(input_tensor)
             infer_request.start_async()

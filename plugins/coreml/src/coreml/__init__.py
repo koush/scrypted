@@ -37,11 +37,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         model = self.storage.getItem("model") or "Default"
         if model == "Default":
-            # model = "ssdlite_mobilenet_v2"
-            if "arm" in platform.processor():
-                model = "yolov8n"
-            else:
-                model = "ssdlite_mobilenet_v2"
+            model = "yolov8n_320"
         self.yolo = "yolo" in model
         self.yolov8 = "yolov8" in model
         model_version = "v2"
@@ -111,6 +107,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     "ssdlite_mobilenet_v2",
                     "yolov4-tiny",
                     "yolov8n",
+                    "yolov8n_320",
                 ],
                 "value": model,
             },

@@ -53,7 +53,7 @@ class GstreamerFormatPostProcess():
 
 class GstreamerPostProcess():
     def __init__(self) -> None:
-        self.postprocess = ' ! videocrop name=videocrop ! videoconvert ! videoscale ! capsfilter name=scaleCapsFilter'
+        self.postprocess = ' ! videocrop name=videocrop ! videoconvert ! videoscale add-borders=false ! capsfilter name=scaleCapsFilter'
         self.resize = None
 
     async def create(self, gst, pipeline: str):
