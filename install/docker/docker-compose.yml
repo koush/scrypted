@@ -67,17 +67,25 @@ services:
 
             # Default volume for the Scrypted database. Typically should not be changed.
             - ~/.scrypted/volume:/server/volume
-        devices:
+        devices: [
+            # uncomment the common systems devices to pass
+            # them through to docker.
+
             # all usb devices, such as coral tpu
-            - /dev/bus/usb:/dev/bus/usb
+            # "/dev/bus/usb:/dev/bus/usb",
+
             # hardware accelerated video decoding, opencl, etc.
-            # - /dev/dri:/dev/dri
+            # "/dev/dri:/dev/dri",
+
             # uncomment below as necessary.
             # zwave usb serial device
-            # - /dev/ttyACM0:/dev/ttyACM0
+
+            # "/dev/ttyACM0:/dev/ttyACM0",
+
             # coral PCI devices
-            # - /dev/apex_0:/dev/apex_0
-            # - /dev/apex_1:/dev/apex_1
+            # "/dev/apex_0:/dev/apex_0",
+            # "/dev/apex_1:/dev/apex_1",
+        ]
 
         container_name: scrypted
         restart: unless-stopped
