@@ -5,12 +5,14 @@ import { sleep } from "@scrypted/common/src/sleep";
 
 export class WeriftSignalingSession implements RTCSignalingSession {
     remoteDescription: Promise<any>;
+    __proxy_props: { options: {}; };
+    options: RTCSignalingOptions = {};
 
     constructor(public console: Console, public pc: RTCPeerConnection) {
     }
 
     async getOptions(): Promise<RTCSignalingOptions> {
-        return;
+        return {};
     }
 
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {

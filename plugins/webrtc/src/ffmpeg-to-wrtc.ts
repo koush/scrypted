@@ -7,7 +7,7 @@ import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codec
 import { isLocalIceTransport, logIsLocalIceTransport } from "./werift-util";
 
 import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
-import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
+import { connectRTCSignalingClients, legacyGetSignalingSessionOptions } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
 import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
@@ -604,7 +604,7 @@ export async function createRTCPeerConnectionSink(
     weriftConfiguration: Partial<PeerConfig>,
     clientOffer = true,
 ) {
-    const clientOptions = await clientSignalingSession.getOptions();
+    const clientOptions = await legacyGetSignalingSessionOptions(clientSignalingSession);
     // console.log('remote options', clientOptions);
 
     const connection = new WebRTCConnectionManagement(console, clientSignalingSession, maximumCompatibilityMode, clientOptions, {

@@ -54,8 +54,13 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
             throw new Error('Browser client is not connected. Click "Stream Web Camera".');
 
         class CompletedSession implements RTCSignalingSession {
+            __proxy_props = { 
+                options: {},
+            };
+            options: {};
+
             async getOptions(): Promise<RTCSignalingOptions> {
-                return;
+                return {};
             }
             createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
                 return session.createLocalDescription(type, setup, sendIceCandidate);

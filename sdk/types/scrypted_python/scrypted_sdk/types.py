@@ -783,6 +783,7 @@ class VideoClipThumbnailOptions(TypedDict):
 class VideoFrameGeneratorOptions(TypedDict):
 
     crop: Any
+    firstFrameOnly: bool
     format: ImageFormat
     fps: float
     queue: float
