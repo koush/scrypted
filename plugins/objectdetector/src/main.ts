@@ -246,17 +246,17 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       snapshotPipeline: this.plugin.shouldUseSnapshotPipeline(),
     };
 
+    const session = crypto.randomBytes(4).toString('hex');
+    const typeName = this.hasMotionType ? 'motion': 'object';
+    this.console.log(`Video Analysis ${typeName} detection session ${session} started.`);
+
     this.runPipelineAnalysisLoop(signal, options)
       .catch(e => {
         this.console.error('Video Analysis ended with error', e);
       }).finally(() => {
-        if (!this.hasMotionType) {
+        if (!this.hasMotionType)
           this.plugin.objectDetectionEnded(this.console, options.snapshotPipeline);
-          this.console.log('Video Analysis object detection ended.');
-        }
-        else {
-          this.console.log('Video Analysis motion detection ended.');
-        }
+        this.console.log(`Video Analysis ${typeName} detection session ${session} ended.`);
         signal.resolve();
       });
   }
@@ -1075,7 +1075,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
       .sort((a, b) => a.detectionStartTime - b.detectionStartTime);
 
     while (objectDetections.length > maxConcurrent) {
-      const old = objectDetections.pop();
+      const old = objectDetections.shift();
       // allow exceeding the concurrency limit if user interaction triggered analyze.
       if (old.analyzeStop)
         continue;
