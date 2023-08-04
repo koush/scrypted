@@ -281,7 +281,19 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     }
 
     const tryAddresses = !!addresses.length;
-    const tryWebrtc = !!globalThis.RTCPeerConnection && (scryptedCloud && options.webrtc === undefined) || options.webrtc;
+    const webrtcLastFailedKey = 'webrtcLastFailed';
+    let tryWebrtc = globalThis.RTCPeerConnection && options.webrtc;
+    if (!tryWebrtc && globalThis.localStorage && options.webrtc === undefined) {
+        tryWebrtc = true;
+        const webrtcLastFailed = parseFloat(localStorage.getItem(webrtcLastFailedKey));
+        // if webrtc has failed in the past day, dont attempt to use it.
+        const now = Date.now();
+        if (webrtcLastFailed > now - 1 * 24 * 60 * 60 * 1000) {
+            tryWebrtc = false;
+            console.warn('WebRTC API connection recently failed. Skipping.')
+        }
+    }
+
     console.log({
         tryLocalAddressess: tryAddresses,
         tryWebrtc,
@@ -458,7 +470,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const p2pPromises = [...promises];
 
     promises.push((async () => {
-        const waitDuration = tryWebrtc ? 3000 : (tryAddresses ? 1000 : 0);
+        const waitDuration = tryWebrtc ? 10000 : (tryAddresses ? 1000 : 0);
         console.log('waiting', waitDuration);
         if (waitDuration) {
             // give the peer to peers a second, but then try connecting directly.
@@ -484,6 +496,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
     const any = Promise.any(promises);
     let { ready, connectionType, address, rpcPeer } = await any;
+
+    if (tryWebrtc && connectionType !== 'webrtc')
+        localStorage.setItem(webrtcLastFailedKey, Date.now().toString());
 
     console.log('connected', connectionType, address)
 
