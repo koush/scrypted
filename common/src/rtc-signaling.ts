@@ -80,7 +80,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
     microphone: RTCRtpSender;
     micEnabled = false;
     onPeerConnection: (pc: RTCPeerConnection) => Promise<void>;
-    __proxy_props= { options: createOptions() };
+    __proxy_props = { options: createOptions() };
     options = createOptions();
 
     constructor() {
