@@ -80,7 +80,8 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
 
         for (let i = 0; i < inputs.length; i++) {
             ffmpegInput.inputArguments.push(...inputs[i].inputArguments);
-            filter.push(`[${i}:v] scale=-1:${h},pad=${w}:ih:(ow-iw)/2 [pos${i}];`)
+            // https://superuser.com/a/891478
+            filter.push(`[${i}:v] scale=(iw*sar)*min(${w}/(iw*sar)\\,${h}/ih):ih*min(${w}/(iw*sar)\\,${h}/ih),pad=${w}:${h}:(${w}-iw*min(${w}/iw\\,${h}/ih))/2:(${h}-ih*min(${w}/iw\\,${h}/ih))/2 [pos${i}];`)
         }
         for (let i = inputs.length; i < dim * dim; i++) {
             ffmpegInput.inputArguments.push(
