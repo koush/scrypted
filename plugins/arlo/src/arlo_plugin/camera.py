@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from aioice import Candidate
+from aiortc import RTCSessionDescription, RTCIceGatherer, RTCIceServer
+from aiortc.rtcicetransport import candidate_to_aioice, candidate_from_aioice
 import asyncio
 import aiohttp
 from async_timeout import timeout as async_timeout
@@ -21,6 +24,7 @@ from .spotlight import ArloSpotlight, ArloFloodlight, ArloNightlight
 from .vss import ArloSirenVirtualSecuritySystem
 from .child_process import HeartbeatChildProcess
 from .util import BackgroundTaskMixin, async_print_exception_guard
+from .rtcpeerconnection import BackgroundRTCPeerConnection
 
 if TYPE_CHECKING:
     # https://adamj.eu/tech/2021/05/13/python-type-hints-how-to-fix-circular-imports/
@@ -571,7 +575,7 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             self.intercom_session = ArloCameraSIPIntercomSession(self)
         else:
             # we need to do signaling through arlo cloud apis
-            self.intercom_session = ArloCameraWebRTCIntercomSession(self)
+            self.intercom_session = ArloCameraPyAVIntercomSession(self) #ArloCameraWebRTCIntercomSession(self)
         await self.intercom_session.initialize_push_to_talk(media)
 
         self.logger.info("Intercom initialized")
@@ -918,3 +922,102 @@ class ArloCameraSIPIntercomSession(ArloCameraIntercomSession):
         if self.arlo_sip is not None:
             self.arlo_sip.Close()
             self.arlo_sip = None
+
+class ArloCameraPyAVIntercomSession(ArloCameraWebRTCIntercomSession):
+    def start_sdp_answer_subscription(self) -> None:
+        def callback(sdp):
+            if self.arlo_pc and not self.arlo_sdp_answered:
+                if "a=mid:" not in sdp:
+                    # arlo appears to not return a mux id in the response, which
+                    # doesn't play nicely with our webrtc peers. let's add it
+                    sdp += "a=mid:0\r\n"
+                self.logger.info(f"Arlo response sdp:\n{sdp}")
+
+                sdp = RTCSessionDescription(sdp=sdp, type="answer")
+                self.create_task(self.arlo_pc.setRemoteDescription(sdp))
+                self.arlo_sdp_answered = True
+            return self.stop_subscriptions
+
+        self.register_task(
+            self.provider.arlo.SubscribeToSDPAnswers(self.arlo_basestation, self.arlo_device, callback)
+        )
+
+    def start_candidate_answer_subscription(self) -> None:
+        def callback(candidate):
+            if self.arlo_pc:
+                prefix = "a=candidate:"
+                if candidate.startswith(prefix):
+                    candidate = candidate[len(prefix):]
+                candidate = candidate.strip()
+                self.logger.info(f"Arlo response candidate: {candidate}")
+
+                candidate = candidate_from_aioice(Candidate.from_sdp(candidate))
+                if candidate.sdpMid is None:
+                    # arlo appears to not return a mux id in the response, which
+                    # doesn't play nicely with aiortc. let's add it
+                    candidate.sdpMid = 0
+                self.create_task(self.arlo_pc.addIceCandidate(candidate))
+            return self.stop_subscriptions
+
+        self.register_task(
+            self.provider.arlo.SubscribeToCandidateAnswers(self.arlo_basestation, self.arlo_device, callback)
+        )
+
+    @async_print_exception_guard
+    async def initialize_push_to_talk(self, media: MediaObject) -> None:
+        self.logger.info("Initializing push to talk")
+
+        ffmpeg_params = json.loads(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput.value))
+        self.logger.debug(f"Received ffmpeg params: {ffmpeg_params}")
+
+        session_id, ice_servers = self.provider.arlo.StartPushToTalk(self.arlo_basestation, self.arlo_device)
+        self.logger.debug(f"Received ice servers: {[ice['url'] for ice in ice_servers]}")
+
+        ice_servers = [
+            RTCIceServer(urls=ice["url"], credential=ice.get("credential"), username=ice.get("username"))
+            for ice in ice_servers
+        ]
+        ice_gatherer = RTCIceGatherer(ice_servers)
+        await ice_gatherer.gather()
+
+        local_candidates = [
+            f"candidate:{Candidate.to_sdp(candidate_to_aioice(candidate))}"
+            for candidate in ice_gatherer.getLocalCandidates()
+        ]
+
+        log_candidates = '\n'.join(local_candidates)
+        self.logger.info(f"Local candidates:\n{log_candidates}")
+
+        # MediaPlayer/PyAV will block until the intercom stream starts, and it seems that scrypted waits
+        # for startIntercom to exit before sending data. So, let's do the remaining setup in a coroutine
+        # so this function can return early.
+        # This is required even if we use BackgroundRTCPeerConnection, since setting up MediaPlayer may
+        # block the background thread's event loop and prevent other async functions from running.
+        async def async_setup():
+            pc = self.arlo_pc = BackgroundRTCPeerConnection(self.logger)
+            self.sdp_answered = False
+
+            pc.add_rtsp_audio(ffmpeg_params["url"])
+
+            offer = await pc.createOffer()
+            self.logger.info(f"Arlo offer sdp:\n{offer.sdp}")
+
+            await pc.setLocalDescription(offer)
+
+            self.provider.arlo.NotifyPushToTalkSDP(
+                self.arlo_basestation, self.arlo_device,
+                session_id, offer.sdp
+            )
+            for candidate in local_candidates:
+                self.provider.arlo.NotifyPushToTalkCandidate(
+                    self.arlo_basestation, self.arlo_device,
+                    session_id, candidate
+                )
+
+        self.create_task(async_setup())
+
+    @async_print_exception_guard
+    async def shutdown(self) -> None:
+        if self.arlo_pc is not None:
+            await self.arlo_pc.close()
+            self.arlo_pc = None

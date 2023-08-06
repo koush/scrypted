@@ -8,6 +8,10 @@ cloudscraper==1.2.71
 curl-cffi==0.5.7
 async-timeout==4.0.2
 beautifulsoup4==4.12.2
+aiortc==1.5.0; platform_machine != 'armv7l'
+https://github.com/bjia56/scrypted-python-wheels/releases/download/v1/aiortc-1.3.2-cp310-cp310-manylinux_2_17_armv7l.manylinux2014_armv7l.whl; platform_machine == 'armv7l'
+av==9.2.0; platform_machine != 'armv7l'
+https://github.com/bjia56/scrypted-python-wheels/releases/download/v1/av-9.2.0-cp310-cp310-manylinux_2_17_armv7l.manylinux2014_armv7l.whl; platform_machine == 'armv7l'
 --extra-index-url=https://bjia56.github.io/armv7l-wheels/
 --extra-index-url=https://bjia56.github.io/scrypted-arlo-go/
 --prefer-binary
