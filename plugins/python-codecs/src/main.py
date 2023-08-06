@@ -2,7 +2,7 @@ import traceback
 import asyncio
 import scrypted_sdk
 from scrypted_sdk import Setting, SettingValue
-from typing import Any, List
+from typing import Any, List, Union
 import gstreamer
 import libav
 import vipsimage
@@ -24,7 +24,7 @@ except:
 
 
 class LibavGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGenerator):
-    def __init__(self, nativeId: str | None, z):
+    def __init__(self, nativeId: Union[str, None], z):
         super().__init__(nativeId)
         self.zygote = z
 
@@ -43,7 +43,7 @@ class GstreamerGenerator(
     scrypted_sdk.VideoFrameGenerator,
     scrypted_sdk.Settings,
 ):
-    def __init__(self, nativeId: str | None, z):
+    def __init__(self, nativeId: Union[str, None], z):
         super().__init__(nativeId)
         self.zygote = z
 
