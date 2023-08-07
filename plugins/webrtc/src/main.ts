@@ -18,6 +18,7 @@ import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 import { createZygote } from './zygote';
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
+import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -523,6 +524,11 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             });
             cleanup.promise.finally(() => connection.close().catch(() => { }));
             connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
+
+            timeoutPromise(60000, connection.waitConnected())
+            .catch(() => {
+                cleanup.resolve('timeout');
+            });
 
             await connection.negotiateRTCSignalingSession();
 
