@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import AbstractSet, Any, Callable, Literal, Union, TYPE_CHECKING
+from typing import AbstractSet, Any, Callable, Literal, TYPE_CHECKING
+
 try:
     from typing import TypedDict
 except ImportError:
