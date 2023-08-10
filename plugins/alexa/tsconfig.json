@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "module": "commonjs",
+        "module": "Node16",
         "target": "ES2021",
         "resolveJsonModule": true,
         "moduleResolution": "Node16",
