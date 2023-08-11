@@ -17,6 +17,7 @@ import tls from 'tls';
 import Url from 'url';
 import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { PushManager } from './push';
+import { readLine } from '../../../common/src/read-stream';
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -139,6 +140,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     upnpStatus = 'Starting';
     securePort: number;
     randomBytes = crypto.randomBytes(16).toString('base64');
+    reverseConnections = new Set<Duplex>();
 
     constructor() {
         super();
@@ -598,9 +600,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.proxy.web(req, res, { headers }, (err) => console.error(err));
         }
 
-        const wsHandler = (req: http.IncomingMessage, socket: Duplex, head: Buffer) => this.proxy.ws(req, socket, head, { target: wsTarget.toString(), ws: true, secure: false, headers }, (err) => console.error(err));
+        const wsHandler = (req: http.IncomingMessage, socket: Duplex, head: Buffer) => {
+            this.console.log(req.socket?.remoteAddress, req.url);
+            this.proxy.ws(req, socket, head, { target: wsTarget.toString(), ws: true, secure: false, headers }, (err) => console.error(err))
+        };
 
         this.server = http.createServer(handler);
+        this.server.keepAliveTimeout = 0;
         this.server.on('upgrade', wsHandler);
         // this can be localhost because this is a server initiated loopback proxy through bpmux
         this.server.listen(0, '127.0.0.1');
@@ -620,7 +626,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.upnpInterval = setInterval(() => this.refreshPortForward(), 30 * 60 * 1000);
         this.refreshPortForward();
 
+        const agent = new http.Agent({ maxSockets: Number.MAX_VALUE, keepAlive: true });
         this.proxy = HttpProxy.createProxy({
+            agent,
             target: httpTarget,
             secure: false,
         });
@@ -653,14 +661,21 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 backoff = Date.now();
                 const random = Math.random().toString(36).substring(2);
                 this.console.log('scrypted server requested a connection:', random);
+
+                const registrationId = await this.manager.registrationId;
+                this.ensureReverseConnections(registrationId);
+
                 const client = tls.connect(4001, SCRYPTED_SERVER, {
                     rejectUnauthorized: false,
                 });
                 client.on('close', () => this.console.log('scrypted server connection ended:', random));
-                const registrationId = await this.manager.registrationId;
                 client.write(registrationId + '\n');
                 const mux: any = new bpmux.BPMux(client as any);
                 mux.on('handshake', async (socket: Duplex) => {
+                    this.ensureReverseConnections(registrationId);
+
+                    this.console.warn('mux connection required');
+
                     let local: any;
 
                     await new Promise(resolve => process.nextTick(resolve));
@@ -677,7 +692,43 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
     }
 
+    ensureReverseConnections(registrationId: string) {
+        while (this.reverseConnections.size < 10) {
+            this.createReverseConnection(registrationId);
+        }
+    }
 
+    async createReverseConnection(registrationId: string) {
+        const client = tls.connect(4001, SCRYPTED_SERVER, {
+            rejectUnauthorized: false,
+        });
+        this.reverseConnections.add(client);
+        const random = Math.random().toString(36).substring(2);
+        let claimed = false;
+        client.on('close', () => {
+            this.console.log('scrypted server reverse connection ended:', random);
+            this.reverseConnections.delete(client);
+
+            if (claimed)
+                this.createReverseConnection(registrationId);
+        });
+        client.write(`reverse:${registrationId}\n`);
+
+        const read = await readLine(client);
+        claimed = true;
+        let local: any;
+
+        await new Promise(resolve => process.nextTick(resolve));
+        const port = (this.server.address() as any).port;
+
+        local = net.connect({
+            port,
+            host: '127.0.0.1',
+        });
+        await new Promise(resolve => process.nextTick(resolve));
+
+        client.pipe(local).pipe(client);
+    }
 
     async oauthCallback(req: http.IncomingMessage, res: http.ServerResponse) {
         const reqUrl = new URL(req.url, 'https://localhost');
