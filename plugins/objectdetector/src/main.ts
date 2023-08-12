@@ -57,7 +57,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       },
       onPut: () => {
         this.endObjectDetection();
-        this.maybeStartMotionDetection();
+        this.maybeStartDetection();
       },
       defaultValue: 'Default',
     },
@@ -72,7 +72,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       defaultValue: "Default",
       onPut: () => {
         this.endObjectDetection();
-        this.maybeStartMotionDetection();
+        this.maybeStartDetection();
       }
     },
     detectionDurationDEPRECATED: {
@@ -121,11 +121,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.detectionIntervalTimeout = setInterval(async () => {
       if (this.released)
         return;
-      if (!this.hasMotionType)
-        return;
-      if (this.motionSensorSupplementation !== BUILTIN_MOTION_SENSOR_REPLACE)
-        return;
-      this.startPipelineAnalysis();
+      this.maybeStartDetection();
     }, 60000);
   }
 
@@ -162,12 +158,17 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return ret;
   }
 
-  async maybeStartMotionDetection() {
-    if (!this.hasMotionType)
+  maybeStartDetection() {
+    if (!this.hasMotionType) {
+      // object detection may be restarted if there are slots available.
+      if (this.cameraDevice.motionDetected && this.plugin.canStartObjectDetection())
+        this.startPipelineAnalysis();
       return;
-    if (this.motionSensorSupplementation !== BUILTIN_MOTION_SENSOR_REPLACE)
-      return;
-    this.startPipelineAnalysis();
+    }
+  
+    // motion sensor should only be started when in replace mode
+    if (this.motionSensorSupplementation === BUILTIN_MOTION_SENSOR_REPLACE)
+      this.startPipelineAnalysis();
   }
 
   endObjectDetection() {
@@ -180,7 +181,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     this.endObjectDetection();
 
-    this.maybeStartMotionDetection();
+    this.maybeStartDetection();
   }
 
   async register() {
@@ -247,7 +248,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     };
 
     const session = crypto.randomBytes(4).toString('hex');
-    const typeName = this.hasMotionType ? 'motion': 'object';
+    const typeName = this.hasMotionType ? 'motion' : 'object';
     this.console.log(`Video Analysis ${typeName} detection session ${session} started.`);
 
     this.runPipelineAnalysisLoop(signal, options)
@@ -1061,13 +1062,29 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     this.statsSnapshotDetections++;
   }
 
+  get maxConcurrent() {
+    let maxConcurrent = this.storageSettings.values.maxConcurrentDetections || 'Default';
+    maxConcurrent = Math.max(parseInt(maxConcurrent)) || getMaxConcurrentObjectDetectionSessions();
+    return maxConcurrent;
+  }
+
+  canStartObjectDetection() {
+    const maxConcurrent = this.maxConcurrent;
+
+    const objectDetections = [...this.currentMixins.values()]
+      .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
+      .filter(c => c.detectorRunning)
+      .sort((a, b) => a.detectionStartTime - b.detectionStartTime);
+
+    return objectDetections.length < maxConcurrent;
+  }
+
   objectDetectionStarted(name: string, console: Console) {
     this.resetStats(console);
 
     this.statsSnapshotConcurrent++;
 
-    let maxConcurrent = this.storageSettings.values.maxConcurrentDetections || 'Default';
-    maxConcurrent = Math.max(parseInt(maxConcurrent)) || getMaxConcurrentObjectDetectionSessions();
+    const maxConcurrent = this.maxConcurrent;
 
     const objectDetections = [...this.currentMixins.values()]
       .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
@@ -1088,6 +1105,14 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     this.resetStats(console, snapshotPipeline);
 
     this.statsSnapshotConcurrent--;
+
+    const objectDetections = [...this.currentMixins.values()]
+    .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
+    .filter(c => !c.detectorRunning);
+    
+    for (const notRunning of objectDetections) {
+      notRunning.maybeStartDetection();
+    }
   }
 
   resetStats(console: Console, snapshotPipeline?: boolean) {
