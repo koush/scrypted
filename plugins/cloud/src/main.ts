@@ -710,7 +710,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.reverseConnections.delete(client);
 
             if (claimed)
-                this.createReverseConnection(registrationId);
+                this.ensureReverseConnections(registrationId);
         });
         client.write(`reverse:${registrationId}\n`);
 
