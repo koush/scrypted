@@ -6,4 +6,4 @@ fs
 src
 .vscode
 dist/*.js
-node-nat-upnp
+external
