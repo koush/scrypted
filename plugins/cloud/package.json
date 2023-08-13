@@ -42,18 +42,13 @@
       "@scrypted/sdk": "file:../../sdk",
       "axios": "^1.4.0",
       "bpmux": "^8.2.1",
-      "debug": "^4.3.4",
       "http-proxy": "^1.18.1",
-      "lodash": "^4.17.21",
-      "nat-upnp": "file:./external/node-nat-upnp",
-      "query-string": "^6.14.1"
+      "nat-upnp": "file:./external/node-nat-upnp"
    },
    "devDependencies": {
-      "@types/debug": "^4.1.8",
       "@types/http-proxy": "^1.17.11",
-      "@types/lodash": "^4.14.196",
       "@types/nat-upnp": "^1.1.2",
       "@types/node": "^20.4.5"
    },
-   "version": "0.1.23"
+   "version": "0.1.24"
 }

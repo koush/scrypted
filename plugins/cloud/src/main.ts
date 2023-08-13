@@ -11,13 +11,12 @@ import upnp from 'nat-upnp';
 import net from 'net';
 import os from 'os';
 import path from 'path';
-import qs from 'query-string';
 import { Duplex } from 'stream';
 import tls from 'tls';
-import Url from 'url';
 import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { PushManager } from './push';
 import { readLine } from '../../../common/src/read-stream';
+import { qsparse, qsstringify } from "./qs";
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -343,21 +342,21 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer> {
-        const local = Url.parse(localUrl);
+        const local = new URL(localUrl);
 
         if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname) {
-            return Buffer.from(`${baseUrl}${local.path}`);
+            return Buffer.from(`${baseUrl}${local.pathname}`);
         }
 
-        if (this.whitelisted.has(local.path)) {
-            return Buffer.from(this.whitelisted.get(local.path));
+        if (this.whitelisted.has(local.pathname)) {
+            return Buffer.from(this.whitelisted.get(local.pathname));
         }
 
         const { token_info } = this.storageSettings.values;
         if (!token_info)
             throw new Error('@scrypted/cloud is not logged in.');
-        const q = qs.stringify({
-            scope: local.path,
+        const q = qsstringify({
+            scope: local.pathname,
             ttl,
         })
         const scope = await axios(`https://${this.getHostname()}/_punch/scope?${q}`, {
@@ -367,13 +366,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         })
 
         const { userToken, userTokenSignature } = scope.data;
-        const tokens = qs.stringify({
+        const tokens = qsstringify({
             user_token: userToken,
             user_token_signature: userTokenSignature
         })
 
-        const url = `${baseUrl}${local.path}?${tokens}`;
-        this.whitelisted.set(local.path, url);
+        const url = `${baseUrl}${local.pathname}?${tokens}`;
+        this.whitelisted.set(local.pathname, url);
         return Buffer.from(url);
     }
 
@@ -415,7 +414,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const { upnp_port, hostname } = this.getAuthority();
         const registration_secret = this.storageSettings.values.registrationSecret || crypto.randomBytes(8).toString('base64');
 
-        const q = qs.stringify({
+        const q = qsstringify({
             upnp_port,
             registration_id,
             sender_id: DEFAULT_SENDER_ID,
@@ -520,7 +519,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async getOauthUrl(): Promise<string> {
-        const args = qs.stringify({
+        const args = qsstringify({
             hostname: os.hostname(),
             registration_id: await this.manager.registrationId,
             sender_id: DEFAULT_SENDER_ID,
@@ -555,9 +554,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const handler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
             this.console.log(req.socket?.remoteAddress, req.url);
 
-            const url = Url.parse(req.url);
-            if (url.path.startsWith('/web/oauth/callback') && url.query) {
-                const query = qs.parse(url.query);
+            const url = new URL(req.url, 'https://localhost');
+            if (url.pathname.startsWith('/web/oauth/callback') && url.search) {
+                const query = qsparse(url.searchParams);
                 if (!query.callback_url && query.token_info && query.user_info) {
                     this.storageSettings.values.token_info = query.token_info;
                     this.storageSettings.values.lastPersistedRegistrationId = await this.manager.registrationId;
@@ -571,7 +570,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     return;
                 }
             }
-            else if (url.path === '/web/') {
+            else if (url.pathname === '/web/') {
                 if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
                     res.setHeader('Location', `https://${this.storageSettings.values.hostname}/endpoint/@scrypted/core/public/`);
                 else
@@ -580,7 +579,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 res.end();
                 return;
             }
-            else if (url.path === '/web/component/home/endpoint') {
+            else if (url.pathname === '/web/component/home/endpoint') {
                 this.proxy.web(req, res, {
                     target: googleHomeTarget.toString(),
                     ignorePath: true,
@@ -588,7 +587,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 });
                 return;
             }
-            else if (url.path === '/web/component/alexa/endpoint') {
+            else if (url.pathname === '/web/component/alexa/endpoint') {
                 this.proxy.web(req, res, {
                     target: alexaTarget.toString(),
                     ignorePath: true,
