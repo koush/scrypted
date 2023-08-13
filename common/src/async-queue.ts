@@ -23,7 +23,7 @@ export function createAsyncQueue<T>() {
         return deferred.promise;
     }
 
-    const submit = (item: T, dequeued?: Deferred<void>) => {
+    const submit = (item: T, dequeued?: Deferred<void>, signal?: AbortSignal) => {
         if (ended)
             return false;
 
@@ -34,9 +34,18 @@ export function createAsyncQueue<T>() {
             return true;
         }
 
-        queued!.push({
+        const qi = {
             item,
             dequeued,
+        };
+        queued!.push(qi);
+
+        signal?.addEventListener('abort', () => {
+            const index = queued.indexOf(qi);
+            if (index === -1)
+                return;
+            queued.splice(index, 1);
+            dequeued?.reject(new Error('abort'));
         });
 
         return true;
@@ -82,8 +91,8 @@ export function createAsyncQueue<T>() {
                 callback(i as any);
             }
         },
-        submit(item: T) {
-            return submit(item);
+        submit(item: T, signal?: AbortSignal) {
+            return submit(item, undefined, signal);
         },
         end(e?: Error) {
             if (ended)
@@ -93,9 +102,9 @@ export function createAsyncQueue<T>() {
             clear(e);
             return true;
         },
-        async enqueue(item: T) {
+        async enqueue(item: T, signal?: AbortSignal) {
             const dequeued = new Deferred<void>();
-            if (!submit(item, dequeued))
+            if (!submit(item, dequeued, signal))
                 return false;
             await dequeued.promise;
             return true;
