@@ -18,6 +18,9 @@ import { PushManager } from './push';
 import { readLine } from '../../../common/src/read-stream';
 import { qsparse, qsstringify } from "./qs";
 
+
+console.warn('webpack', require('@greenlock/manager'), require('greenlock-store-fs'), require('acme-dns-01-duckdns'));
+
 const { deviceManager, endpointManager, systemManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
@@ -82,6 +85,16 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             description: 'The hostname to reach this Scrypted server on https port 443. Requires a valid SSL certificate.',
             placeholder: 'my-server.dyndns.com',
             onPut: () => this.scheduleRefreshPortForward(),
+        },
+        duckDnsToken: {
+            title: 'Duck DNS Token',
+            placeholder: 'xxxxx123456',
+            onPut: () => this.log.a('Reload the Scrypted Cloud Plugin to apply the Duck DNS change.'),
+        },
+        duckDnsHostname: {
+            title: 'Duck DNS Hostname',
+            placeholder: 'my-scrypted.duckdns.org',
+            onPut: () => this.log.a('Reload the Scrypted Cloud Plugin to apply the Duck DNS change.'),
         },
         securePort: {
             title: 'Local HTTPS Port',
@@ -182,6 +195,20 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
         };
 
+        this.storageSettings.settings.duckDnsToken.onGet = async () => {
+            return {
+                hide: this.storageSettings.values.forwardingMode === 'Custom Domain'
+                    || this.storageSettings.values.forwardingMode === 'Disabled',
+            }
+        };
+
+        this.storageSettings.settings.duckDnsHostname.onGet = async () => {
+            return {
+                hide: this.storageSettings.values.forwardingMode === 'Custom Domain'
+                    || this.storageSettings.values.forwardingMode === 'Disabled',
+            }
+        };
+
         this.log.clearAlerts();
 
         this.storageSettings.settings.securePort.onPut = (ov, nv) => {
@@ -230,12 +257,94 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.storageSettings.values.upnpPort = upnpPort;
 
         // scrypted cloud will replace localhost with requesting ip.
-        const ip = this.storageSettings.values.forwardingMode === 'Custom Domain'
-            ? this.storageSettings.values.hostname?.toString()
-            : (await axios(`https://${SCRYPTED_SERVER}/_punch/ip`)).data.ip;
+        let ip: string;
+        if (this.storageSettings.values.forwardingMode === 'Custom Domain') {
+            ip = this.storageSettings.values.hostname?.toString();
+            if (!ip)
+                throw new Error('Hostname is required for port Custom Domain setup.');
+        }
+        else if (this.storageSettings.values.duckDnsHostname && this.storageSettings.values.duckDnsToken) {
+            try {
+                const url = new URL('https://www.duckdns.org/update');
+                url.searchParams.set('domains', this.storageSettings.values.duckDnsHostname);
+                url.searchParams.set('token', this.storageSettings.values.duckDnsToken);
+                await axios(url.toString());
+            }
+            catch (e) {
+                this.console.error('Duck DNS Erorr', e);
+                throw new Error('Duck DNS Error. See Console Logs.');
+            }
+            try {
+                const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
+                const greenlockD = path.join(pluginVolume, 'greenlock.d');
 
-        if (!ip)
-            throw new Error('Hostname is required for port Custom Domain setup.');
+                // const dns01 = require('acme-dns-01-duckdns').create({
+                //     baseUrl: 'https://www.duckdns.org/update',
+                //     token: 'abcd',// this.storageSettings.values.duckDnsToken,
+                // });
+                // hack
+                // dns01.module = 'acme-dns-01-duckdns';
+                // dns01.token = this.storageSettings.values.duckDnsToken;
+
+                const Greenlock = require('@koush/greenlock');
+                const greenlock = Greenlock.create({
+                    packageRoot: process.env.NODE_PATH,
+                    configDir: greenlockD,
+                    packageAgent: 'Scrypted/1.0',
+                    maintainerEmail: 'koushd@gmail.com',
+                    staging: true,
+                    notify: function (event, details) {
+                        if ('error' === event) {
+                            // `details` is an error object in this case
+                            console.error(details);
+                        }
+                    }
+                });
+
+                await greenlock.manager
+                    .defaults({
+                        challenges: {
+                            'dns-01': {
+                                module: 'acme-dns-01-duckdns',
+                                token: this.storageSettings.values.duckDnsToken,
+                            },
+                        },
+                        agreeToTerms: true,
+                        subscriberEmail: 'koushd@gmail.com',
+                    });
+
+                const altnames = [this.storageSettings.values.duckDnsHostname];
+
+                const r = await greenlock
+                    .add({
+                        subject: altnames[0],
+                        altnames: altnames
+                    });
+
+                const result = await greenlock
+                    .get({ servername: this.storageSettings.values.duckDnsHostname });
+
+                const { pems } = result;
+                const certificate = this.storageSettings.values.certificate;
+                if (certificate.certificate !== pems.cert || certificate.serviceKey !== pems.privkey) {
+                    certificate.certificate = pems.cert;
+                    certificate.serviceKey = pems.privkey;
+                    this.storageSettings.values.certificate = certificate;
+                    deviceManager.requestRestart();
+                }
+
+                this.console.log(r);
+            }
+            catch (e) {
+                this.console.error("Let's Encrypt Error", e);
+                throw new Error("Let's Encrypt Error. See Console Logs.");
+            }
+
+            ip = this.storageSettings.values.duckDnsHostname;
+        }
+        else {
+            ip = (await axios(`https://${SCRYPTED_SERVER}/_punch/ip`)).data.ip;
+        }
 
         if (this.storageSettings.values.forwardingMode === 'Custom Domain')
             upnpPort = 443;
@@ -279,6 +388,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.log.a(`Port Forward Test Failed: ${e}`);
         }
     }
+
+    // async maybeUpdateDuckDns(upnpPort: number) {
+    //     if (!this.storageSettings.values.duckDnsToken || !this.storageSettings.duckDnsHostname)
+    //         return this.updatePortForward(upnpPort);
+    //     const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
+    //     const greenlockD = path.join(pluginVolume, 'greenlock.d');
+    //     return this.updatePortForward(upnpPort);
+    // }
 
     async refreshPortForward() {
         if (this.storageSettings.values.forwardingMode === 'Disabled') {
@@ -394,7 +511,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     getAuthority() {
         const upnp_port = this.storageSettings.values.forwardingMode === 'Custom Domain' ? 443 : this.storageSettings.values.upnpPort;
-        const hostname = this.storageSettings.values.forwardingMode === 'Custom Domain' ? this.storageSettings.values.hostname : undefined;
+        const hostname = this.storageSettings.values.forwardingMode === 'Custom Domain'
+            ? this.storageSettings.values.hostname
+            : this.storageSettings.values.duckDnsToken && this.storageSettings.values.duckDnsHostname;
 
         if (upnp_port === 443 && !hostname) {
             const error = this.storageSettings.values.forwardingMode === 'Custom Domain'
