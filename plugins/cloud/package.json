@@ -27,7 +27,6 @@
    "scrypted": {
       "name": "Scrypted Cloud",
       "type": "API",
-      "realfs": true,
       "interfaces": [
          "SystemSettings",
          "BufferConverter",
@@ -36,12 +35,6 @@
          "DeviceProvider",
          "HttpRequestHandler"
       ]
-   },
-   "optionalDependencies": {
-      "@greenlock/manager": "^3.1.0",
-      "@koush/greenlock": "^4.0.9",
-      "acme-dns-01-duckdns": "^3.0.1",
-      "greenlock-store-fs": "^3.2.2"
    },
    "dependencies": {
       "@eneris/push-receiver": "^3.1.4",
@@ -57,5 +50,5 @@
       "@types/nat-upnp": "^1.1.2",
       "@types/node": "^20.4.5"
    },
-   "version": "0.1.27"
+   "version": "0.1.24"
 }
