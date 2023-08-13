@@ -714,7 +714,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
         client.write(`reverse:${registrationId}\n`);
 
-        const read = await readLine(client);
+        try {
+            const read = await readLine(client);
+        }
+        catch (e) {
+            return;
+        }
         claimed = true;
         let local: any;
 
