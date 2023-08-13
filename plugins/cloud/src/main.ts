@@ -37,9 +37,9 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
     }
 
     async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer> {
-        if (this.cloud.storageSettings.values.forwardingMode === 'Custom Domain' && this.cloud.storageSettings.values.hostname) {
-            return Buffer.from(`https://${this.cloud.getHostname()}${await this.cloud.getCloudMessagePath()}/${data}`);
-        }
+        const validDomain = this.cloud.getSSLHostname();
+        if (validDomain)
+            return Buffer.from(`https://${validDomain}${await this.cloud.getCloudMessagePath()}/${data}`);
 
         const url = `http://127.0.0.1/push/${data}`;
         return this.cloud.whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.cloud.getHostname()}${SCRYPTED_CLOUD_MESSAGE_PATH}`);
@@ -89,12 +89,22 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         duckDnsToken: {
             title: 'Duck DNS Token',
             placeholder: 'xxxxx123456',
-            onPut: () => this.log.a('Reload the Scrypted Cloud Plugin to apply the Duck DNS change.'),
+            onPut: () => {
+                this.storageSettings.values.duckDnsCertValid = false;
+                this.log.a('Reload the Scrypted Cloud Plugin to apply the Duck DNS change.');
+            }
         },
         duckDnsHostname: {
             title: 'Duck DNS Hostname',
             placeholder: 'my-scrypted.duckdns.org',
-            onPut: () => this.log.a('Reload the Scrypted Cloud Plugin to apply the Duck DNS change.'),
+            onPut: () => {
+                this.storageSettings.values.duckDnsCertValid = false;
+                this.log.a('Reload the Scrypted Cloud Plugin to apply the Duck DNS change.');
+            }
+        },
+        duckDnsCertValid: {
+            type: 'boolean',
+            hide: true,
         },
         securePort: {
             title: 'Local HTTPS Port',
@@ -324,6 +334,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 const result = await greenlock
                     .get({ servername: this.storageSettings.values.duckDnsHostname });
 
+
+                this.storageSettings.values.duckDnsCertValid = true;
                 const { pems } = result;
                 const certificate = this.storageSettings.values.certificate;
                 if (certificate.certificate !== pems.cert || certificate.serviceKey !== pems.privkey) {
@@ -389,14 +401,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    // async maybeUpdateDuckDns(upnpPort: number) {
-    //     if (!this.storageSettings.values.duckDnsToken || !this.storageSettings.duckDnsHostname)
-    //         return this.updatePortForward(upnpPort);
-    //     const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
-    //     const greenlockD = path.join(pluginVolume, 'greenlock.d');
-    //     return this.updatePortForward(upnpPort);
-    // }
-
     async refreshPortForward() {
         if (this.storageSettings.values.forwardingMode === 'Disabled') {
             this.updatePortForward(0);
@@ -461,7 +465,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer> {
         const local = new URL(localUrl);
 
-        if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname) {
+        if (this.getSSLHostname()) {
             return Buffer.from(`${baseUrl}${local.pathname}`);
         }
 
@@ -599,10 +603,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
+    getSSLHostname() {
+        const validDomain = (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
+            || (this.storageSettings.values.duckDnsCertValid && this.storageSettings.values.duckDnsHostname && this.storageSettings.values.upnpPort && `${this.storageSettings.values.duckDnsHostname}:${this.storageSettings.values.upnpPort}`);
+        return validDomain;
+    }
+
     getHostname() {
-        if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
-            return this.storageSettings.values.hostname;
-        return SCRYPTED_SERVER;
+        return this.getSSLHostname() || SCRYPTED_SERVER;
     }
 
     async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
@@ -690,10 +698,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 }
             }
             else if (url.pathname === '/web/') {
-                if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
-                    res.setHeader('Location', `https://${this.storageSettings.values.hostname}/endpoint/@scrypted/core/public/`);
-                else
+                const validDomain = this.getSSLHostname();
+                if (validDomain) {
+                    res.setHeader('Location', `https://${validDomain}/endpoint/@scrypted/core/public/`);
+                }
+                else {
                     res.setHeader('Location', '/endpoint/@scrypted/core/public/');
+                }
                 res.writeHead(302);
                 res.end();
                 return;
