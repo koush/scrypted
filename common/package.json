@@ -1,5 +1,6 @@
 {
   "name": "@scrypted/common",
+  "private": true,
   "version": "1.0.1",
   "description": "",
   "main": "index.js",

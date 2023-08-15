@@ -33,5 +33,5 @@
 	path = plugins/sample-cameraprovider
 	url = ../../koush/scrypted-sample-cameraprovider
 [submodule "plugins/cloud/node-nat-upnp"]
-	path = plugins/cloud/node-nat-upnp
+	path = plugins/cloud/external/node-nat-upnp
 	url = ../../koush/node-nat-upnp.git

@@ -180,8 +180,11 @@ export async function createRTCPeerConnectionSource(options: {
         }
 
         class SignalingSession implements RTCSignalingSession {
-            getOptions(): Promise<RTCSignalingOptions> {
-                return;
+            __proxy_props = { options: {} };
+            options: RTCSignalingOptions = {};
+
+            async getOptions(): Promise<RTCSignalingOptions> {
+                return {};
             }
 
             async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {

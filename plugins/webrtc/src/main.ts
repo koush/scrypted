@@ -17,6 +17,8 @@ import { InterfaceAddresses, MediaStreamTrack, PeerConfig, RTCPeerConnection, de
 import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 import { createZygote } from './zygote';
+import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
+import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -108,7 +110,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
 
         // but, maybe we should always proxy?
 
-        const options = await session.getOptions();
+        const options = await legacyGetSignalingSessionOptions(session);
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.RTCSignalingChannel) && !options?.proxy)
             return this.mixinDevice.startRTCSignalingSession(session);
 
@@ -465,7 +467,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const client = await listenZeroSingleClient();
             cleanup.promise.finally(() => {
                 client.cancel();
-                client.clientPromise.then(cp => cp.destroy()).catch(() => {});
+                client.clientPromise.then(cp => cp.destroy()).catch(() => { });
             });
 
             const message = await new Promise<{
@@ -502,7 +504,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             }
 
             const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
-            const clientOptions = await session.getOptions();
+            const clientOptions = await legacyGetSignalingSessionOptions(session);
 
             const result = zygote();
             this.activeConnections++;
@@ -522,6 +524,11 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             });
             cleanup.promise.finally(() => connection.close().catch(() => { }));
             connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
+
+            timeoutPromise(60000, connection.waitConnected())
+            .catch(() => {
+                cleanup.resolve('timeout');
+            });
 
             await connection.negotiateRTCSignalingSession();
 
@@ -595,7 +602,7 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
     async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
         const session = data as RTCSignalingSession;
         const maximumCompatibilityMode = !!this.plugin.storageSettings.values.maximumCompatibilityMode;
-        const clientOptions = await session.getOptions();
+        const clientOptions = await legacyGetSignalingSessionOptions(session);
 
         const result = zygote();
 

@@ -9,7 +9,7 @@ except:
 
 SettingValue = str
 EventListener = Callable[[Any, Any, Any], None]
-VibratePattern = Union[int, list[int]]
+VibratePattern = list[int]
 
 
 class Console:

@@ -60,6 +60,12 @@ export function splitH264NaluStartCode(data: Buffer) {
     return ret;
 }
 
+export interface H264CodecInfo {
+    sps: Buffer;
+    pps: Buffer;
+    sei?: Buffer;
+}
+
 export class H264Repacketizer {
     extraPackets = 0;
     fuaMax: number;
@@ -68,11 +74,7 @@ export class H264Repacketizer {
     stapa: RtpPacket;
     fuaMin: number;
 
-    constructor(public console: Console, public maxPacketSize: number, public codecInfo: {
-        sps: Buffer,
-        pps: Buffer,
-        sei?: Buffer,
-    }, public jitterBuffer = new JitterBuffer(console, 4)) {
+    constructor(public console: Console, public maxPacketSize: number, public codecInfo: H264CodecInfo, public jitterBuffer = new JitterBuffer(console, 4)) {
         // 12 is the rtp/srtp header size.
         this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;
         this.fuaMin = Math.round(maxPacketSize * .8);

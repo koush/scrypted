@@ -1,1 +1,2 @@
-../../../common/src/deferred.ts
+export * from './deferred';
+export * from './async-queue';

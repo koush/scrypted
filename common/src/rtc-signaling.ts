@@ -51,14 +51,8 @@ function silence() {
     return ret;
 }
 
-export class BrowserSignalingSession implements RTCSignalingSession {
-    private pc: RTCPeerConnection;
-    pcDeferred = new Deferred<RTCPeerConnection>();
-    dcDeferred = new Deferred<RTCDataChannel>();
-    microphone: RTCRtpSender;
-    micEnabled = false;
-    onPeerConnection: (pc: RTCPeerConnection) => Promise<void>;
-    options: RTCSignalingOptions = {
+function createOptions() {
+    const options: RTCSignalingOptions = {
         userAgent: getUserAgent(),
         capabilities: {
             audio: RTCRtpReceiver.getCapabilities?.('audio') || {
@@ -76,6 +70,18 @@ export class BrowserSignalingSession implements RTCSignalingSession {
             height: screen.height,
         },
     };
+    return options;
+}
+
+export class BrowserSignalingSession implements RTCSignalingSession {
+    private pc: RTCPeerConnection;
+    pcDeferred = new Deferred<RTCPeerConnection>();
+    dcDeferred = new Deferred<RTCDataChannel>();
+    microphone: RTCRtpSender;
+    micEnabled = false;
+    onPeerConnection: (pc: RTCPeerConnection) => Promise<void>;
+    __proxy_props = { options: createOptions() };
+    options = createOptions();
 
     constructor() {
     }
@@ -284,6 +290,10 @@ function createCandidateQueue(console: Console, type: string, session: RTCSignal
     }
 }
 
+export async function legacyGetSignalingSessionOptions(session: RTCSignalingSession) {
+    return typeof session.options === 'object' ? session.options : await session.getOptions();
+}
+
 export async function connectRTCSignalingClients(
     console: Console,
     offerClient: RTCSignalingSession,
@@ -291,8 +301,8 @@ export async function connectRTCSignalingClients(
     answerClient: RTCSignalingSession,
     answerSetup: Partial<RTCAVSignalingSetup>
 ) {
-    const offerOptions = await offerClient.getOptions();
-    const answerOptions = await answerClient.getOptions();
+    const offerOptions = await legacyGetSignalingSessionOptions(offerClient);
+    const answerOptions = await legacyGetSignalingSessionOptions(answerClient);
     const disableTrickle = offerOptions?.disableTrickle || answerOptions?.disableTrickle;
 
     if (offerOptions?.offer && answerOptions?.offer)

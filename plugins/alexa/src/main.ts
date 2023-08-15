@@ -392,14 +392,21 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         })
     }
 
+    private setReauthenticateAlert() {
+        const msg: string = "Please reauthenticate by following the directions below.";
+        this.log.a(msg);
+    }
+
     getAccessToken(): Promise<string> {
         if (this.accessToken)
             return this.accessToken;
 
+        this.log.clearAlerts();
+
         const { tokenInfo } = this.storageSettings.values;
 
         if (tokenInfo === undefined) {
-            this.log.e("Please reauthenticate by following the directions below.");
+            this.setReauthenticateAlert();
             throw new Error("'tokenInfo' is undefined");
         }
 
@@ -432,19 +439,19 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
                     case 'invalid_grant':
                     case 'unauthorized_client':
                         self.console.error(error?.response?.data);
-                        self.log.e(error?.response?.data?.error_description);
+                        self.log.a(error?.response?.data?.error_description);
                         self.storageSettings.values.tokenInfo = undefined;
                         self.accessToken = undefined;
                         break;
 
                     case 'authorization_pending':
                         self.console.warn(error?.response?.data);
-                        self.log.w(error?.response?.data?.error_description);
+                        self.log.a(error?.response?.data?.error_description);
                         break;
                     
                     case 'expired_token':
                         self.console.warn(error?.response?.data);
-                        self.log.w(error?.response?.data?.error_description);
+                        self.log.a(error?.response?.data?.error_description);
                         self.accessToken = undefined;
                         break;
 
@@ -488,6 +495,8 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         });
 
         if (accessToken !== undefined) {
+            this.log.clearAlerts();
+            
             try {
                 response.send({
                     "event": {

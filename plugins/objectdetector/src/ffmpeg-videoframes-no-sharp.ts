@@ -55,8 +55,8 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
     async *generateVideoFramesInternal(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): AsyncGenerator<VideoFrame, any, unknown> {
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
         const gray = options?.format === 'gray';
-        const channels = gray ? 1 : 3;
-        const format: ImageFormat = gray ? 'gray' : 'rgb';
+        const format = options?.format || 'rgb';
+        const channels = gray ? 1 : (format === 'rgb' ? 3 : 4);
         const vf: string[] = [];
         if (options?.fps)
             vf.push(`fps=${options.fps}`);
@@ -67,7 +67,7 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
             //'-hwaccel', 'auto',
             ...ffmpegInput.inputArguments,
             '-vcodec', 'pam',
-            '-pix_fmt', gray ? 'gray' : 'rgb24',
+            '-pix_fmt', gray ? 'gray' : (format === 'rgb' ? 'rgb24' : 'rgba'),
             ...vf.length ? [
                 '-vf',
                 vf.join(','),
@@ -103,7 +103,7 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                     }
 
 
-                    if (headers['TUPLTYPE'] !== 'RGB' && headers['TUPLTYPE'] !== 'GRAYSCALE')
+                    if (headers['TUPLTYPE'] !== 'RGB' && headers['TUPLTYPE'] !== 'RGB_ALPHA' && headers['TUPLTYPE'] !== 'GRAYSCALE')
                         throw new Error(`Unexpected TUPLTYPE in PAM stream: ${headers['TUPLTYPE']}`);
 
                     const width = parseInt(headers['WIDTH']);

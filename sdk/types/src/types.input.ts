@@ -1054,7 +1054,7 @@ export interface Charger {
 }
 
 export interface Reboot {
-  reboot(): Promise<void>;  
+  reboot(): Promise<void>;
 }
 /**
  * Refresh indicates that this device has properties that are not automatically updated, and must be periodically refreshed via polling. Device implementations should never implement their own underlying polling algorithm, and instead implement Refresh to allow Scrypted to manage polling intelligently.
@@ -1411,6 +1411,7 @@ export interface VideoFrame {
 export interface VideoFrameGeneratorOptions extends ImageOptions {
   queue?: number;
   fps?: number;
+  firstFrameOnly?: boolean;
 }
 export interface VideoFrameGenerator {
   generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame, void>>;
@@ -2014,9 +2015,17 @@ export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => P
  * @category WebRTC Reference
  */
 export interface RTCSignalingSession {
+  __proxy_props: {
+    options: RTCSignalingOptions;
+  };
+  options: RTCSignalingOptions;
+
   createLocalDescription(type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined | RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit>;
   setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void>;
   addIceCandidate(candidate: RTCIceCandidateInit): Promise<void>;
+  /**
+   * @deprecated
+   */
   getOptions(): Promise<RTCSignalingOptions>;
 }
 
