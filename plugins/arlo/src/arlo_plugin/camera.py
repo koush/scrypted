@@ -18,6 +18,7 @@ import scrypted_arlo_go
 import scrypted_sdk
 from scrypted_sdk.types import Setting, Settings, SettingValue, Device, Camera, VideoCamera, RequestMediaStreamOptions, VideoClips, VideoClip, VideoClipOptions, MotionSensor, AudioSensor, Battery, Charger, ChargeState, DeviceProvider, MediaObject, ResponsePictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, ScryptedInterface, ScryptedDeviceType
 
+from .experimental import EXPERIMENTAL
 from .arlo.arlo_async import USER_AGENTS
 from .base import ArloDeviceBase
 from .spotlight import ArloSpotlight, ArloFloodlight, ArloNightlight
@@ -103,6 +104,11 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
         "vmc2040",
         "vmc3040",
         "vmc3040s",
+    ]
+
+    PTT_IMPL_CHOICES = [
+        "scrypted-arlo-go",
+        "aiortc",
     ]
 
     timeout: int = 30
@@ -324,6 +330,14 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             return False
 
     @property
+    def ptt_impl(self) -> str:
+        impl = self.storage.getItem("ptt_impl")
+        if impl is None:
+            impl = ArloCamera.PTT_IMPL_CHOICES[0]
+            #self.storage.setItem("ptt_impl", impl)
+        return impl
+
+    @property
     def snapshot_throttle_interval(self) -> int:
         interval = self.storage.getItem("snapshot_throttle_interval")
         if interval is None:
@@ -402,6 +416,15 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
                 "type": "boolean",
             },
         ])
+        if self.has_push_to_talk and EXPERIMENTAL:
+            result.append({
+                "group": "General",
+                "key": "ptt_impl",
+                "title": "Two Way Audio Implementation",
+                "value": self.ptt_impl,
+                "description": "Implementation used to perform two-way audio negotiation.",
+                "choices": ArloCamera.PTT_IMPL_CHOICES,
+            })
         if self.eco_mode:
             result.append(
                 {
@@ -575,7 +598,10 @@ class ArloCamera(ArloDeviceBase, Settings, Camera, VideoCamera, DeviceProvider, 
             self.intercom_session = ArloCameraSIPIntercomSession(self)
         else:
             # we need to do signaling through arlo cloud apis
-            self.intercom_session = ArloCameraPyAVIntercomSession(self) #ArloCameraWebRTCIntercomSession(self)
+            if self.ptt_impl == "scrypted-arlo-go":
+                self.intercom_session = ArloCameraWebRTCIntercomSession(self)
+            else:
+                self.intercom_session = ArloCameraPyAVIntercomSession(self)
         await self.intercom_session.initialize_push_to_talk(media)
 
         self.logger.info("Intercom initialized")
