@@ -302,7 +302,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     configDir: greenlockD,
                     packageAgent: 'Scrypted/1.0',
                     maintainerEmail: 'koushd@gmail.com',
-                    staging: true,
                     notify: function (event, details) {
                         if ('error' === event) {
                             // `details` is an error object in this case
@@ -338,8 +337,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.storageSettings.values.duckDnsCertValid = true;
                 const { pems } = result;
                 const certificate = this.storageSettings.values.certificate;
-                if (certificate.certificate !== pems.cert || certificate.serviceKey !== pems.privkey) {
-                    certificate.certificate = pems.cert;
+                const chain = pems.cert.trim() + '\n' + pems.chain.trim();
+                if (certificate.certificate !== chain || certificate.serviceKey !== pems.privkey) {
+                    certificate.certificate = chain;
                     certificate.serviceKey = pems.privkey;
                     this.storageSettings.values.certificate = certificate;
                     deviceManager.requestRestart();
