@@ -37,6 +37,7 @@ Vue.use(Vue => {
             baseUrl: getCurrentBaseUrl(),
         });
 
+        store.commit("setLoginHostname", undefined);
         store.commit("setHasLogin", undefined);
         store.commit("setIsLoggedIn", undefined);
         store.commit("setUsername", undefined);
@@ -53,6 +54,7 @@ Vue.use(Vue => {
                     });
                     return;
                 }
+                store.commit("setLoginHostname", response.hostname);
                 if (!response.expiration) {
                     store.commit("setHasLogin", response.hasLogin);
                     throw new Error("Login failed.");

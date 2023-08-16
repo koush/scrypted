@@ -3,9 +3,9 @@
   "private": true,
   "scripts": {
     "dev": "concurrently --names 'server,client' --prefix-colors 'gray,white.bold' --prefix '{time} ({name})\t' --timestamp-format 'HH:mm:ss.SSS' --kill-others npm:serve-server npm:serve",
-    "serve": "vue-cli-service serve --open",
+    "serve": "NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve --open",
     "serve-server": "cd ../../../server && npm run serve",
-    "build": "vue-cli-service build --dest ../fs/dist",
+    "build": "NODE_OPTIONS=--openssl-legacy-provider vue-cli-service build --dest ../fs/dist",
     "lint": "vue-cli-service lint"
   },
   "dependencies": {

@@ -16,7 +16,8 @@ const store = new Vuex.Store({
     isLoggedIn: undefined,
     isLoggedIntoCloud: undefined,
     isConnected: undefined,
-    hasLogin: undefined
+    hasLogin: undefined,
+    loginHostname: undefined,
   },
   mutations: {
     setSystemState: function (store, systemState) {
@@ -64,6 +65,9 @@ const store = new Vuex.Store({
     },
     setHasLogin(store, hasLogin) {
       store.hasLogin = hasLogin;
+    },
+    setLoginHostname(store, hostname) {
+      store.loginHostname = hostname;
     },
     setVersion(store, version) {
       store.version = version;

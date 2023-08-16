@@ -10,10 +10,18 @@
                     <v-card width="300px" class="elevation-24">
                         <v-card-title style="justify-content: center;" class="headline text-uppercase">Scrypted
                         </v-card-title>
-                        <v-card-subtitle style="text-align: center;">{{ $store.state.version }}</v-card-subtitle>
+                        <v-card-subtitle v-if="$store.state.loginHostname"
+                            style="text-align: center; font-weight: 300; font-size: .75rem !important; font-family: Quicksand, sans-serif!important;"
+                            class="text-subtitle-2 text-uppercase">
+                            {{ $store.state.version }}
+                            <br />
+                            Logged into: {{ $store.state.loginHostname
+                            }}
+                        </v-card-subtitle>
+                        <v-card-subtitle v-else style="text-align: center;">{{ $store.state.version }}</v-card-subtitle>
                         <v-list class="transparent">
-                            <v-list-item v-for="application in applications" :key="application.name"
-                                :to="application.to" :href="application.href">
+                            <v-list-item v-for="application in applications" :key="application.name" :to="application.to"
+                                :href="application.href">
                                 <v-icon small>{{ application.icon }}</v-icon>
                                 <v-list-item-title style="text-align: center;">{{ application.name }}
                                 </v-list-item-title>
