@@ -165,80 +165,88 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
         const ret: UrlMediaStreamOptions[] = [];
 
         const rtmpPreviews = [
-            `main.bcs`,
-            `ext.bcs`,
-            `sub.bcs`,
+            {
+                ext: `main.bcs`,
+                video: {
+                    width: 2560,
+                    height: 1920,
+                }
+            },            
+            {
+                ext: `ext.bcs`,
+                video: {
+                    width: 896,
+                    height: 672,
+                }
+            },
+            {
+                ext: `sub.bcs`,
+                video: {
+                    width: 640,
+                    height: 480,
+                }
+            },
+            {
+                ext: `autotrack.bcs`,
+                video: {
+                    width: 896,
+                    height: 512,
+                }
+            }
         ];
         for (const preview of rtmpPreviews) {
-            const url = new URL(`rtmp://${this.getRtmpAddress()}/bcs/channel${this.getRtspChannel()}_${preview}`);
+            const url = new URL(`rtmp://${this.getRtmpAddress()}/bcs/channel${this.getRtspChannel()}_${preview.ext}`);
             const params = url.searchParams;
             params.set('channel', this.getRtspChannel().toString());
             params.set('stream', '0');
             params.set('user', this.getUsername());
             params.set('password', this.getPassword());
             ret.push({
-                name: `RTMP ${preview}`,
+                container: 'rtmp',
+                video: preview.video,
+                name: `RTMP ${preview.ext}`,
                 id: preview,
                 url: url.toString(),
             });
         }
 
-        // rough guesses for rebroadcast stream selection.
-        ret[0].container = 'rtmp';
-        ret[0].video = {
-            width: 2560,
-            height: 1920,
-        }
-        ret[1].container = 'rtmp';
-        ret[1].video = {
-            width: 896,
-            height: 672,
-        }
-        ret[2].container = 'rtmp';
-        ret[2].video = {
-            width: 640,
-            height: 480,
-        }
-
         const channel = (this.getRtspChannel() + 1).toString().padStart(2, '0');
         const rtspPreviews = [
-            `h264Preview_${channel}_main`,
-            `h264Preview_${channel}_sub`,
-            `h265Preview_${channel}_main`,
+            {
+                ext: 'main',
+                video: {
+                    codec: 'h264',
+                    width: 2560,
+                    height: 1920,
+                },
+            },
+            {
+                ext: 'sub',
+                video: {
+                    codec: 'h264',
+                    width: 896,
+                    height: 672,
+                },
+            },
+            {
+                ext: 'main',
+                video: {
+                    codec: 'h265',
+                    width: 896,
+                    height: 672,
+                },
+            }
         ];
         for (const preview of rtspPreviews) {
+            title = `${preview.video.codec}Preview_${channel}_${preview.ext}`
             ret.push({
-                name: `RTSP ${preview}`,
-                id: preview,
-                url: `rtsp://${this.getRtspAddress()}/${preview}`,
+                name: `RTSP ${title}`,
+                id: title,
+                url: `rtsp://${this.getRtspAddress()}/${title}`,
                 container: 'rtsp',
-                video: {
-                    codec: preview.substring(0, 4),
-                },
+                video: preview.video
             });
         }
-
-        // rough guesses for h264
-        ret[3].container = 'rtsp';
-        ret[3].video = {
-            codec: 'h264',
-            width: 2560,
-            height: 1920,
-        }
-        ret[4].container = 'rtsp';
-        ret[4].video = {
-            codec: 'h264',
-            width: 896,
-            height: 672,
-        }
-
-        ret[5].container = 'rtsp';
-        ret[5].video = {
-            codec: 'h265',
-            width: 896,
-            height: 672,
-        }
-
 
         return ret;
     }
