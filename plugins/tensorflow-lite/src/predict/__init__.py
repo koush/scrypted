@@ -92,6 +92,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
     def getModelSettings(self, settings: Any = None) -> list[Setting]:
         return []
 
+    def get_input_format(self) -> str:
+        return 'rgb'
+
     def create_detection_result(self, objs: List[Prediction], size, convert_to_src_size=None) -> ObjectsDetected:
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
