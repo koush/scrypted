@@ -17,9 +17,7 @@ import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { PushManager } from './push';
 import { readLine } from '../../../common/src/read-stream';
 import { qsparse, qsstringify } from "./qs";
-
-
-console.warn('webpack', require('@greenlock/manager'), require('greenlock-store-fs'), require('acme-dns-01-duckdns'));
+import { registerDuckDns } from "./greenlock";
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -284,58 +282,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.console.error('Duck DNS Erorr', e);
                 throw new Error('Duck DNS Error. See Console Logs.');
             }
+
             try {
-                const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
-                const greenlockD = path.join(pluginVolume, 'greenlock.d');
-
-                // const dns01 = require('acme-dns-01-duckdns').create({
-                //     baseUrl: 'https://www.duckdns.org/update',
-                //     token: 'abcd',// this.storageSettings.values.duckDnsToken,
-                // });
-                // hack
-                // dns01.module = 'acme-dns-01-duckdns';
-                // dns01.token = this.storageSettings.values.duckDnsToken;
-
-                const Greenlock = require('@koush/greenlock');
-                const greenlock = Greenlock.create({
-                    packageRoot: process.env.NODE_PATH,
-                    configDir: greenlockD,
-                    packageAgent: 'Scrypted/1.0',
-                    maintainerEmail: 'koushd@gmail.com',
-                    notify: function (event, details) {
-                        if ('error' === event) {
-                            // `details` is an error object in this case
-                            console.error(details);
-                        }
-                    }
-                });
-
-                await greenlock.manager
-                    .defaults({
-                        challenges: {
-                            'dns-01': {
-                                module: 'acme-dns-01-duckdns',
-                                token: this.storageSettings.values.duckDnsToken,
-                            },
-                        },
-                        agreeToTerms: true,
-                        subscriberEmail: 'koushd@gmail.com',
-                    });
-
-                const altnames = [this.storageSettings.values.duckDnsHostname];
-
-                const r = await greenlock
-                    .add({
-                        subject: altnames[0],
-                        altnames: altnames
-                    });
-
-                const result = await greenlock
-                    .get({ servername: this.storageSettings.values.duckDnsHostname });
-
-
+                const pems = await registerDuckDns(this.storageSettings.values.duckDnsHostname, this.storageSettings.values.duckDnsToken);
                 this.storageSettings.values.duckDnsCertValid = true;
-                const { pems } = result;
                 const certificate = this.storageSettings.values.certificate;
                 const chain = pems.cert.trim() + '\n' + pems.chain.trim();
                 if (certificate.certificate !== chain || certificate.serviceKey !== pems.privkey) {
@@ -344,8 +294,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     this.storageSettings.values.certificate = certificate;
                     deviceManager.requestRestart();
                 }
-
-                this.console.log(r);
             }
             catch (e) {
                 this.console.error("Let's Encrypt Error", e);
