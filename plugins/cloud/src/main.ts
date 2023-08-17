@@ -17,6 +17,11 @@ import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { PushManager } from './push';
 import { readLine } from '../../../common/src/read-stream';
 import { qsparse, qsstringify } from "./qs";
+import * as cloudflared from 'cloudflared';
+import fs, { mkdirSync } from 'fs';
+import { backOff } from "exponential-backoff";
+import ip from 'ip';
+
 // import { registerDuckDns } from "./greenlock";
 
 const { deviceManager, endpointManager, systemManager } = sdk;
@@ -45,6 +50,7 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
 }
 
 class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider, HttpRequestHandler {
+    cloudflareTunnel: string;
     manager = new PushManager(DEFAULT_SENDER_ID);
     server: http.Server;
     secureServer: https.Server;
@@ -313,7 +319,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         if (this.storageSettings.values.forwardingMode === 'Custom Domain')
             upnpPort = 443;
 
-        this.console.log(`Mapped port https://127.0.0.1:${this.securePort} to https://${ip}:${upnpPort}`);
+        this.console.log(`Scrypted Cloud mapped https://${ip}:${upnpPort} to https://127.0.0.1:${this.securePort}`);
 
         // the ip is not sent, but should be checked to see if it changed.
         if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort || ip !== this.storageSettings.values.lastPersistedIp) {
@@ -717,7 +723,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.proxy.on('proxyRes', (res, req) => {
             res.headers['X-Scrypted-Cloud'] = req.headers['x-scrypted-cloud'];
             res.headers['X-Scrypted-Direct-Address'] = req.headers['x-scrypted-direct-address'];
-            res.headers['Access-Control-Expose-Headers'] = 'X-Scrypted-Cloud, X-Scrypted-Direct-Address';
+            res.headers['X-Scrypted-Cloud-Address'] = this.cloudflareTunnel;
+            res.headers['Access-Control-Expose-Headers'] = 'X-Scrypted-Cloud, X-Scrypted-Direct-Address, X-Scrypted-Cloud-Address';
         });
 
         let backoff = 0;
@@ -769,6 +776,30 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
                     socket.pipe(local).pipe(socket);
                 });
+            }
+        });
+
+
+        backOff(async () => {
+            try {
+                const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
+                const cloudflareD = path.join(pluginVolume, 'cloudflare.d');
+                mkdirSync(cloudflareD, {
+                    recursive: true,
+                })
+                process.chdir(cloudflareD);
+
+                if (!fs.existsSync(cloudflared.bin))
+                    await cloudflared.install(cloudflared.bin);
+                const insecureUrl = `http://127.0.0.1:${port}`;
+                const cloudflareTunnel = cloudflared.tunnel({
+                    '--url': insecureUrl,
+                });
+                this.cloudflareTunnel = await cloudflareTunnel.url;
+                this.console.log(`cloudflare url mapped ${this.cloudflareTunnel} to ${insecureUrl}`);
+            }
+            catch (e) {
+                this.cloudflareTunnel = undefined;
             }
         });
     }
