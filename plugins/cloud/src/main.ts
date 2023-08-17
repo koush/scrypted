@@ -21,6 +21,7 @@ import * as cloudflared from 'cloudflared';
 import fs, { mkdirSync } from 'fs';
 import { backOff } from "exponential-backoff";
 import ip from 'ip';
+import { Deferred } from "@scrypted/common/src/deferred";
 
 // import { registerDuckDns } from "./greenlock";
 
@@ -51,6 +52,7 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
 
 class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider, HttpRequestHandler {
     cloudflareTunnel: string;
+    cloudflared: Awaited<ReturnType<typeof cloudflared.tunnel>>;
     manager = new PushManager(DEFAULT_SENDER_ID);
     server: http.Server;
     secureServer: https.Server;
@@ -123,7 +125,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         },
         securePort: {
             title: 'Forward Port',
-            description: 'The internal network port used by the Scrypted Cloud plugin. The router must forward connections on the From Port using UPNP or port forwarding to this port.',
+            description: 'The internal https port used by the Scrypted Cloud plugin. The router must forward connections to this port number on this server\'s internal IP address.',
             type: 'number',
             onPut: (ov, nv) => {
                 if (ov && ov !== nv)
@@ -163,6 +165,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             onPut: () => this.testPortForward(),
             description: 'Test the port forward connection from Scrypted Cloud.',
         },
+        cloudflaredTunnelToken: {
+            group: 'Advanced',
+            title: 'Cloudflare Tunnel Token',
+            description: 'Optional: Enter the Cloudflare token from the Cloudflare Dashbaord to track and manage the tunnel remotely.',
+            onPut: () => {
+                this.cloudflared?.child.kill();
+            },
+        }
     });
     upnpInterval: NodeJS.Timeout;
     upnpClient = upnp.createClient();
@@ -779,10 +789,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
         });
 
+        this.startCloudflared();
+    }
 
-        backOff(async () => {
-            while (true) {
-                try {
+    async startCloudflared() {
+        while (true) {
+            try {
+                this.console.log('starting cloudflared');
+                this.cloudflared = await backOff(async () => {
                     const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
                     const cloudflareD = path.join(pluginVolume, 'cloudflare.d');
                     mkdirSync(cloudflareD, {
@@ -792,22 +806,78 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
                     if (!fs.existsSync(cloudflared.bin))
                         await cloudflared.install(cloudflared.bin);
-                    const insecureUrl = `http://127.0.0.1:${port}`;
-                    const cloudflareTunnel = cloudflared.tunnel({
-                        '--url': insecureUrl,
+                    const secureUrl = `https://127.0.0.1:${this.securePort}`;
+                    const args: any = {};
+                    if (this.storageSettings.values.cloudflaredTunnelToken) {
+                        args['run'] = null;
+                        args['--token'] = this.storageSettings.values.cloudflaredTunnelToken;
+                    }
+                    else {
+                        args['--no-tls-verify'] = null;
+                        args['--url'] = secureUrl;
+                    }
+
+                    const deferred = new Deferred<string>();
+                    const cloudflareTunnel = cloudflared.tunnel(args);
+                    cloudflareTunnel.child.stdout.on('data', data => this.console.log(data.toString()));
+                    cloudflareTunnel.child.stderr.on('data', data => {
+                        const string: string = data.toString();
+                        this.console.error(string);
+
+                        const lines = string.split('\n');
+                        for (const line of lines) {
+                            if (line.includes('hostname'))
+                                this.console.log(line);
+                            const config = line.split(' ').find(part => part.startsWith('config='));
+                            if (config) {
+                                const [, json] = config.split('config=');
+                                this.console.log(json);
+                                try {
+                                    // the config is already json stringified and needs to be double parsed.
+                                    // "{\"ingress\":[{\"hostname\":\"tunnel.example.com\",\"originRequest\":{\"noTLSVerify\":true},\"service\":\"https://localhost:52960\"},{\"service\":\"http_status:404\"}],\"warp-routing\":{\"enabled\":false}}"
+                                    const parsed = JSON.parse(JSON.parse(json));
+                                    const hostname = parsed.ingress?.[0]?.hostname;
+                                    if (!hostname)
+                                        deferred.resolve(undefined)
+                                    else
+                                        deferred.resolve(`https://${hostname}`)
+                                }
+                                catch (e) {
+                                    this.console.error("Error parsing config", e);
+                                }
+                            }
+                        }
                     });
-                    this.cloudflareTunnel = await cloudflareTunnel.url;
-                    this.console.log(`cloudflare url mapped ${this.cloudflareTunnel} to ${insecureUrl}`);
-                    await once(cloudflareTunnel.child, 'exit');
-                    throw new Error('cloudflared exited.');
-                }
-                catch (e) {
-                    this.console.error('cloudlfared failed', e);
-                    this.cloudflareTunnel = undefined;
-                    throw e;
-                }
+                    cloudflareTunnel.child.on('exit', () => deferred.resolve(undefined));
+                    try {
+                        this.cloudflareTunnel = await Promise.any([deferred.promise, cloudflareTunnel.url]);
+                        if (!this.cloudflareTunnel)
+                            throw new Error('cloudflared exited, the provided cloudflare tunnel token may be invalid.')
+                    }
+                    catch (e) {
+                        this.console.error('cloudflared error', e);
+                        throw e;
+                    }
+                    this.console.log(`cloudflare url mapped ${this.cloudflareTunnel} to ${secureUrl}`);
+                    return cloudflareTunnel;
+                }, {
+                    startingDelay: 60000,
+                    timeMultiple: 1.2,
+                    numOfAttempts: 1000,
+                    maxDelay: 300000,
+                });
+
+                await once(this.cloudflared.child, 'exit');
+                throw new Error('cloudflared exited.');
             }
-        });
+            catch (e) {
+                this.console.error('cloudflared error', e);
+            }
+            finally {
+                this.cloudflared = undefined;
+                this.cloudflareTunnel = undefined;
+            }
+        }
     }
 
     ensureReverseConnections(registrationId: string) {
