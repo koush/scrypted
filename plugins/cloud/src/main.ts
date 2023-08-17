@@ -781,25 +781,31 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
 
         backOff(async () => {
-            try {
-                const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
-                const cloudflareD = path.join(pluginVolume, 'cloudflare.d');
-                mkdirSync(cloudflareD, {
-                    recursive: true,
-                })
-                process.chdir(cloudflareD);
+            while (true) {
+                try {
+                    const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
+                    const cloudflareD = path.join(pluginVolume, 'cloudflare.d');
+                    mkdirSync(cloudflareD, {
+                        recursive: true,
+                    })
+                    process.chdir(cloudflareD);
 
-                if (!fs.existsSync(cloudflared.bin))
-                    await cloudflared.install(cloudflared.bin);
-                const insecureUrl = `http://127.0.0.1:${port}`;
-                const cloudflareTunnel = cloudflared.tunnel({
-                    '--url': insecureUrl,
-                });
-                this.cloudflareTunnel = await cloudflareTunnel.url;
-                this.console.log(`cloudflare url mapped ${this.cloudflareTunnel} to ${insecureUrl}`);
-            }
-            catch (e) {
-                this.cloudflareTunnel = undefined;
+                    if (!fs.existsSync(cloudflared.bin))
+                        await cloudflared.install(cloudflared.bin);
+                    const insecureUrl = `http://127.0.0.1:${port}`;
+                    const cloudflareTunnel = cloudflared.tunnel({
+                        '--url': insecureUrl,
+                    });
+                    this.cloudflareTunnel = await cloudflareTunnel.url;
+                    this.console.log(`cloudflare url mapped ${this.cloudflareTunnel} to ${insecureUrl}`);
+                    await once(cloudflareTunnel.child, 'exit');
+                    throw new Error('cloudflared exited.');
+                }
+                catch (e) {
+                    this.console.error('cloudlfared failed', e);
+                    this.cloudflareTunnel = undefined;
+                    throw e;
+                }
             }
         });
     }
