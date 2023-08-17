@@ -31,5 +31,7 @@ The following steps are only necessary if you want to associate the tunnel with 
 4. Add a `Public Hostname` to the tunnel.
     * Choose a (sub)domain.
     * Service `Type` is `HTTPS` and `URL` is `localhost:port`. Replace the port with `Forward Port` from Cloud Plugin Settings.
+    * Expand `Additional Application Settings` -> `TLS` menus and enable `No TLS Verify`.
+
 5. Reload Cloud Plugin.
 6. Verify Cloudflare successfully connected by observing the `Console` Logs.
