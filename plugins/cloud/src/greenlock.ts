@@ -1,5 +1,12 @@
 import path from 'path';
 
+// "optionalDependencies": {
+//     "@greenlock/manager": "^3.1.0",
+//     "@koush/greenlock": "^4.0.9",
+//     "acme-dns-01-duckdns": "^3.0.1",
+//     "greenlock-store-fs": "^3.2.2"
+//  },
+
 export async function registerDuckDns(duckDnsHostname: string, duckDnsToken: string): Promise<{
     cert: string;
     chain: string;

@@ -17,7 +17,7 @@ import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { PushManager } from './push';
 import { readLine } from '../../../common/src/read-stream';
 import { qsparse, qsstringify } from "./qs";
-import { registerDuckDns } from "./greenlock";
+// import { registerDuckDns } from "./greenlock";
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -85,6 +85,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             onPut: () => this.scheduleRefreshPortForward(),
         },
         duckDnsToken: {
+            hide: true,
             title: 'Duck DNS Token',
             placeholder: 'xxxxx123456',
             onPut: () => {
@@ -93,6 +94,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
         },
         duckDnsHostname: {
+            hide: true,
             title: 'Duck DNS Hostname',
             placeholder: 'my-scrypted.duckdns.org',
             onPut: () => {
@@ -104,22 +106,23 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             type: 'boolean',
             hide: true,
         },
-        securePort: {
-            title: 'Local HTTPS Port',
-            description: 'The Scrypted Cloud plugin listens on this port for for cloud connections. The router must use UPNP, port forwarding, or a reverse proxy to send requests to this port.',
-            type: 'number',
-            onPut: (ov, nv) => {
-                if (ov && ov !== nv)
-                    this.log.a('Reload the Scrypted Cloud Plugin to apply the port change.');
-            }
-        },
         upnpPort: {
-            title: 'External HTTPS Port',
+            title: 'From Port',
+            description: "The external network port on router used by port forwarding.",
             type: 'number',
             onPut: (ov, nv) => {
                 if (ov !== nv)
                     this.scheduleRefreshPortForward();
             },
+        },
+        securePort: {
+            title: 'Forward Port',
+            description: 'The internal network port used by the Scrypted Cloud plugin. The router must forward connections on the From Port using UPNP or port forwarding to this port.',
+            type: 'number',
+            onPut: (ov, nv) => {
+                if (ov && ov !== nv)
+                    this.log.a('Reload the Scrypted Cloud Plugin to apply the port change.');
+            }
         },
         upnpStatus: {
             title: 'UPNP Status',
@@ -203,19 +206,19 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
         };
 
-        this.storageSettings.settings.duckDnsToken.onGet = async () => {
-            return {
-                hide: this.storageSettings.values.forwardingMode === 'Custom Domain'
-                    || this.storageSettings.values.forwardingMode === 'Disabled',
-            }
-        };
+        // this.storageSettings.settings.duckDnsToken.onGet = async () => {
+        //     return {
+        //         hide: this.storageSettings.values.forwardingMode === 'Custom Domain'
+        //             || this.storageSettings.values.forwardingMode === 'Disabled',
+        //     }
+        // };
 
-        this.storageSettings.settings.duckDnsHostname.onGet = async () => {
-            return {
-                hide: this.storageSettings.values.forwardingMode === 'Custom Domain'
-                    || this.storageSettings.values.forwardingMode === 'Disabled',
-            }
-        };
+        // this.storageSettings.settings.duckDnsHostname.onGet = async () => {
+        //     return {
+        //         hide: this.storageSettings.values.forwardingMode === 'Custom Domain'
+        //             || this.storageSettings.values.forwardingMode === 'Disabled',
+        //     }
+        // };
 
         this.log.clearAlerts();
 
@@ -284,16 +287,17 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
 
             try {
-                const pems = await registerDuckDns(this.storageSettings.values.duckDnsHostname, this.storageSettings.values.duckDnsToken);
-                this.storageSettings.values.duckDnsCertValid = true;
-                const certificate = this.storageSettings.values.certificate;
-                const chain = pems.cert.trim() + '\n' + pems.chain.trim();
-                if (certificate.certificate !== chain || certificate.serviceKey !== pems.privkey) {
-                    certificate.certificate = chain;
-                    certificate.serviceKey = pems.privkey;
-                    this.storageSettings.values.certificate = certificate;
-                    deviceManager.requestRestart();
-                }
+                throw new Error('not implemented');
+                // const pems = await registerDuckDns(this.storageSettings.values.duckDnsHostname, this.storageSettings.values.duckDnsToken);
+                // this.storageSettings.values.duckDnsCertValid = true;
+                // const certificate = this.storageSettings.values.certificate;
+                // const chain = pems.cert.trim() + '\n' + pems.chain.trim();
+                // if (certificate.certificate !== chain || certificate.serviceKey !== pems.privkey) {
+                //     certificate.certificate = chain;
+                //     certificate.serviceKey = pems.privkey;
+                //     this.storageSettings.values.certificate = certificate;
+                //     deviceManager.requestRestart();
+                // }
             }
             catch (e) {
                 this.console.error("Let's Encrypt Error", e);
