@@ -294,13 +294,16 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
     const tryAddresses = !!addresses.length;
     const webrtcLastFailedKey = 'webrtcLastFailed';
-    let tryWebrtc = globalThis.RTCPeerConnection && options.webrtc;
-    if (!tryWebrtc && globalThis.localStorage && options.webrtc === undefined) {
+    const canUseWebrtc = !!globalThis.RTCPeerConnection;
+    let tryWebrtc = canUseWebrtc && options.webrtc;
+    // try webrtc by default on scrypted cloud.
+    // but webrtc takes a while to fail, so backoff if it fails to prevent continual slow starts.
+    if (scryptedCloud && canUseWebrtc && globalThis.localStorage && options.webrtc === undefined) {
         tryWebrtc = true;
         const webrtcLastFailed = parseFloat(localStorage.getItem(webrtcLastFailedKey));
         // if webrtc has failed in the past day, dont attempt to use it.
         const now = Date.now();
-        if (webrtcLastFailed > now - 1 * 24 * 60 * 60 * 1000) {
+        if (webrtcLastFailed < now && webrtcLastFailed > now - 1 * 24 * 60 * 60 * 1000) {
             tryWebrtc = false;
             console.warn('WebRTC API connection recently failed. Skipping.')
         }
