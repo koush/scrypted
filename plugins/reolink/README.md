@@ -14,6 +14,6 @@ Some Reolink cameras support the ONVIF protocol. It may be worth experimenting w
 
 ## Camera Setup
 
-Ensure that all `Server Settings` are enabled.
+Ensure that the following `Server Settings` are enabled. HTTPS **must** be disabled due to Reolink not handling https redirects properly.
 
-<img width="806" alt="image" src="https://github.com/koush/scrypted/assets/73924/81a71c11-e66a-4312-800b-7abbf34ece57">
+<img width="806" alt="image" src="https://github.com/koush/scrypted/assets/73924/61d712a8-ddf9-4092-a0aa-cbec4e888766">
