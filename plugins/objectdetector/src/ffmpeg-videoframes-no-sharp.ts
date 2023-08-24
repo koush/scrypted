@@ -34,10 +34,8 @@ class RawImage implements Image, RawFrame {
     }
 
     checkOptions(options: ImageOptions) {
-        if (options?.resize || options?.crop)
-            throw new Error('resize and crop are not supported');
-        if (options?.format && options?.format !== this.format)
-            throw new Error('format not supported');
+        if (options?.resize || options?.crop || (options?.format && options?.format !== this.format))
+            throw new Error('resize, crop, and color conversion are not supported. Install the Python Codecs plugin if it is missing, and ensure FFmpeg Frame Generator is not selected.');
     }
 
     async toBuffer(options: ImageOptions) {
