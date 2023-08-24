@@ -2,7 +2,7 @@ import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
 import { createMapPromiseDebouncer, RefreshPromise, singletonPromise, TimeoutError } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, MediaObjectOptions, Camera, FFmpegInput, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, DeviceProvider } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, FFmpegInput, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios, { AxiosInstance } from "axios";
 import https from 'https';
@@ -235,7 +235,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                         return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
                     }
 
-                    // full resolution setging ignores resize.
+                    // full resolution setting ignores resize.
                     if (this.storageSettings.values.snapshotResolution === 'Full Resolution') {
                         if (options)
                             options.picture = undefined;
@@ -257,14 +257,21 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                         return internalTakePicture();
                     }
 
-                    //  determine see if that can be handled by camera hardware
-                    try {
-                        const psos = await this.getPictureOptions();
-                        if (!psos?.[0]?.canResize) {
-                            needSoftwareResize = true;
+                    // camera hardware may support software resize, but the plugin ignores it
+                    // to be able to cache the full resolution image for other requests.
+                    if (false) {
+                        // determine see if that can be handled by camera hardware
+                        try {
+                            const psos = await this.getPictureOptions();
+                            if (!psos?.[0]?.canResize) {
+                                needSoftwareResize = true;
+                            }
+                        }
+                        catch (e) {
                         }
                     }
-                    catch (e) {
+                    else {
+                        needSoftwareResize = true;
                     }
 
                     if (needSoftwareResize)
@@ -297,10 +304,31 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const pendingPicture = this.snapshotDebouncer(options, async () => {
             let picture: Buffer;
             try {
-                picture = await takePicture(options ? {
-                    ...options,
-                } : undefined);
-                picture = await this.cropAndScale(picture);
+                try {
+                    picture = await takePicture(options ? {
+                        ...options,
+                    } : undefined);
+                    picture = await this.cropAndScale(picture);
+                    this.clearCachedPictures();
+                    this.currentPicture = picture;
+                    this.lastAvailablePicture = picture;
+                }
+                catch (e) {
+                    // event snapshot requests must not use cache since they're for realtime processing by homekit and nvr.
+                    if (eventSnapshot || !this.currentPicture)
+                        throw e;
+                    this.console.warn('Snapshot failed, but recovered from cache', e);
+                    picture = this.currentPicture;
+                }
+                setTimeout(() => {
+                    if (this.currentPicture === picture) {
+                        // only clear the current picture after it times out,
+                        // the plugin shouldn't invalidate error, timeout, progress
+                        // images unless the current picture is updated.
+                        this.currentPicture = undefined;
+                    }
+                }, 1 * 60 * 60 * 1000);
+
                 if (needSoftwareResize) {
                     picture = await ffmpegFilterImageBuffer(picture, {
                         console: this.debugConsole,
@@ -309,17 +337,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                         timeout: 10000,
                     });
                 }
-                this.clearCachedPictures();
-                this.currentPicture = picture;
-                this.lastAvailablePicture = picture;
-                setTimeout(() => {
-                    if (this.currentPicture === picture) {
-                        // only clear the current picture after it times out,
-                        // the plugin shouldn't invalidate error, timeout, progress
-                        // images unless the current picture is updated.
-                        this.currentPicture = undefined;
-                    }
-                }, 60000);
             }
             catch (e) {
                 this.console.error('Snapshot failed', e);
