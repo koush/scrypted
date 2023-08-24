@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import os
+import json
 import re
 from typing import Any, Tuple
 
@@ -55,6 +55,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         self.core = ov.Core()
         dump_device_properties(self.core)
         available_devices = self.core.available_devices
+        self.available_devices = available_devices
         print('available devices: %s' % available_devices)
 
         mode = self.storage.getItem('mode')
@@ -120,6 +121,13 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         model = self.storage.getItem('model') or 'Default'
         precision = self.storage.getItem('precision') or 'Default'
         return [
+            {
+                "title": "Available Devices",
+                "description": "The devices that will be used for detection.",
+                "value": json.dumps(self.available_devices),
+                "readonly": True,
+                "key": "available_devices",
+            },
             {
                 'key': 'model',
                 'title': 'Model',

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from PIL import Image
 from pycoral.adapters import detect
 
@@ -102,7 +104,7 @@ class TensorFlowLitePlugin(
                 configureModel()
                 suffix = "_edgetpu"
                 modelFile = downloadModel()
-                self.edge_tpu_found = str(edge_tpus)
+                self.edge_tpu_found = json.dumps(edge_tpus)
                 for idx, edge_tpu in enumerate(edge_tpus):
                     try:
                         interpreter = make_interpreter(modelFile, ":%s" % idx)
