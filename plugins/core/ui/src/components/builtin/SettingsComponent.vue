@@ -101,7 +101,7 @@
   </v-layout>
 </template>
 <script>
-import { checkUpdate } from "../plugin/plugin";
+import { checkServerUpdate } from "../plugin/plugin";
 import Settings from "../../interfaces/Settings.vue"
 import {createSystemSettingsDevice} from './system-settings';
 
@@ -140,10 +140,8 @@ export default {
       catch (e) {
         // old scrypted servers dont support this call, or it may be unimplemented
         // in which case fall back and determine what the install type is.
-        const { updateAvailable } = await checkUpdate(
-          "@scrypted/server",
-          version
-        );
+        const scryptedEnv = await info.getScryptedEnv();
+        const { updateAvailable } = await checkServerUpdate(version, scryptedEnv.SCRYPTED_INSTALL_ENVIRONMENT);
         this.updateAvailable = updateAvailable;
       }
     },

@@ -87,7 +87,7 @@
 
 <script>
 import { getComponentViewPath } from "./helpers";
-import { checkUpdate } from "./plugin/plugin";
+import { checkServerUpdate } from "./plugin/plugin";
 
 export default {
   props: {
@@ -160,11 +160,9 @@ export default {
         // in which case fall back and determine what the install type is.
         const info = await this.$scrypted.systemManager.getComponent("info");
         const version = await info.getVersion();
+        const scryptedEnv = await info.getScryptedEnv();
         this.currentVersion = version;
-        const { updateAvailable } = await checkUpdate(
-          "@scrypted/server",
-          version
-        );
+        const { updateAvailable } = await checkServerUpdate(version, scryptedEnv.SCRYPTED_INSTALL_ENVIRONMENT);
         this.updateAvailable = updateAvailable;
       }
 

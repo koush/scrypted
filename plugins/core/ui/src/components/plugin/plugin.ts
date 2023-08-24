@@ -12,6 +12,7 @@ const pluginSnapshot = require("!!raw-loader!./plugin-snapshot.ts").default.spli
 
 export interface PluginUpdateCheck {
     updateAvailable?: string;
+    updatePublished?: Date;
     versions: any;
 }
 
@@ -29,11 +30,17 @@ export async function checkUpdate(npmPackage: string, npmPackageVersion: string)
     const { data } = response;
     const versions = Object.values(data.versions).sort((a: any, b: any) => semver.compare(a.version, b.version)).reverse();
     let updateAvailable: any;
+    let updatePublished: any;
     let latest: any;
     if (data["dist-tags"]) {
         latest = data["dist-tags"].latest;
         if (npmPackageVersion && semver.gt(latest, npmPackageVersion)) {
             updateAvailable = latest;
+            try {
+                updatePublished = new Date(data["time"][latest]);
+            } catch {
+                updatePublished = null;
+            }
         }
     }
     for (const [k, v] of Object.entries(data['dist-tags'])) {
@@ -54,8 +61,34 @@ export async function checkUpdate(npmPackage: string, npmPackageVersion: string)
     }
     return {
         updateAvailable,
+        updatePublished,
         versions,
     };
+}
+
+export async function checkServerUpdate(version: string, installEnvironment: string): Promise<PluginUpdateCheck> {
+    const { updateAvailable, updatePublished, versions } = await checkUpdate(
+        "@scrypted/server",
+        version
+    );
+
+    if (installEnvironment == "docker" && updatePublished) {
+        console.log(`New scrypted server version published ${updatePublished}`);
+
+        // check if there is a new docker image available, using 'latest' tag
+        // this is done so newer server versions in npm are not immediately
+        // displayed until a docker image has been published
+        let response: AxiosResponse<any> = await axios.get("https://corsproxy.io?https://hub.docker.com/v2/namespaces/koush/repositories/scrypted/tags/latest");
+        const { data } = response;
+        const imagePublished = new Date(data.last_updated);
+        console.log(`Latest docker image published ${imagePublished}`);
+
+        if (imagePublished < updatePublished) {
+            // docker image is not yet published
+            return { updateAvailable: null, updatePublished: null, versions: null }
+        }
+    }
+    return { updateAvailable, updatePublished, versions };
 }
 
 export async function installNpm(systemManager: SystemManager, npmPackage: string, version?: string): Promise<string> {
