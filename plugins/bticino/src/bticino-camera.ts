@@ -27,7 +27,7 @@ const { mediaManager } = sdk;
 export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler, VideoClips, Reboot {
 
     private session: SipCallSession
-    private remoteRtpDescription: RtpDescription
+    private remoteRtpDescription: Promise<RtpDescription>
     private audioOutForwarder: dgram.Socket
     private audioOutProcess: ChildProcess
     private currentMedia: FFmpegInput | MediaStreamUrl
@@ -158,9 +158,10 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
         const audioOutForwarder = await createBindZero()
         this.audioOutForwarder = audioOutForwarder.server
+        let address = (await this.remoteRtpDescription).address
         audioOutForwarder.server.on('message', message => {
             if( this.session )
-                this.session.audioSplitter.send(message, 40004, this.remoteRtpDescription.address)
+                this.session.audioSplitter.send(message, 40004, address)
             return null
         });
 
@@ -244,7 +245,12 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             client.setKeepAlive(true, 10000)
             let sip: SipCallSession
             try {
-                await this.controllerApi.updateStreamEndpoint()
+                if( !this.incomingCallRequest ) {
+                    // If this is a "view" call, update the stream endpoint to send it only to "us"
+                    // In case of an incoming doorbell event, the C300X is already streaming video to all registered endpoints
+                    await this.controllerApi.updateStreamEndpoint()
+                }
+
                 let rtsp: RtspServer;
                 const cleanup = () => {
                     client.destroy();
@@ -271,7 +277,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 sip.onCallEnded.subscribe(cleanup)
 
                 // Call the C300X
-                this.remoteRtpDescription = await sip.callOrAcceptInvite(
+                this.remoteRtpDescription = sip.callOrAcceptInvite(
                     ( audio ) => {
                     return [
                         //TODO: Payload types are hardcoded
