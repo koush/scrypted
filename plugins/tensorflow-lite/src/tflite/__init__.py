@@ -59,7 +59,7 @@ class TensorFlowLitePlugin(
             edge_tpus = None
             pass
 
-        model_version = "v11"
+        model_version = "v12"
         model = self.storage.getItem("model") or "Default"
         defaultModel = model == "Default"
         branch = "main"
