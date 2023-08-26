@@ -87,6 +87,7 @@ import {
   faTimeline,
   faMobile,
   faBoltLightning,
+  faFileText,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -180,6 +181,7 @@ const icons: IconDefinition[] =[
   faTimeline,
   faMobile,
   faBoltLightning,
+  faFileText,
 ];
 
 for (var icon in icons) {

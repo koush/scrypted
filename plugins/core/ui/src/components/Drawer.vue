@@ -25,7 +25,8 @@
         </v-list-item-content>
       </v-list-item>
 
-      <div dense nav v-for="category in categories" :key="category">
+      <v-divider></v-divider>
+      <template v-for="category in categories" >
         <v-subheader>{{ category }}</v-subheader>
 
         <v-list-item v-for="item in filterComponents(category)" :key="item.id" link :to="getComponentViewPath(item.id)"
@@ -39,7 +40,7 @@
           </v-list-item-content>
         </v-list-item>
         <v-divider></v-divider>
-      </div>
+      </template>
       <v-subheader>Social</v-subheader>
       <v-list-item link href="https://discord.gg/DcFzmBHYGq" active-class="purple white--text tile">
         <v-list-item-icon>
@@ -72,6 +73,16 @@
       </v-list-item>
 
       <v-divider></v-divider>
+      <v-subheader>Other</v-subheader>
+      <v-list-item link href="https://docs.scrypted.app" active-class="purple white--text tile">
+        <v-list-item-icon>
+          <v-icon small>fa fa-file-text</v-icon>
+        </v-list-item-icon>
+
+        <v-list-item-content>
+          <v-list-item-title>Documentation</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
       <v-list-item active-class="deep-purple accent-4 white--text">
         <v-list-item-icon>
           <v-icon small>fa-code-branch</v-icon>
@@ -204,6 +215,4 @@ export default {
   },
 };
 </script>
-<style scoped>
-
-</style>
+<style scoped></style>
