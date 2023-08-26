@@ -1953,6 +1953,7 @@ export enum ScryptedInterface {
   Display = "Display",
   VideoCamera = "VideoCamera",
   VideoRecorder = "VideoRecorder",
+  VideoRecorderManagement = "VideoRecorderManagement",
   PanTiltZoom = "PanTiltZoom",
   EventRecorder = "EventRecorder",
   VideoClips = "VideoClips",

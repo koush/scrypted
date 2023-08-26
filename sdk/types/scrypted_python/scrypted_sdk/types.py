@@ -183,6 +183,7 @@ class ScryptedInterface(str, Enum):
     VideoClips = "VideoClips"
     VideoFrameGenerator = "VideoFrameGenerator"
     VideoRecorder = "VideoRecorder"
+    VideoRecorderManagement = "VideoRecorderManagement"
 
 class ScryptedMimeTypes(str, Enum):
 
@@ -379,6 +380,12 @@ class ColorRgb(TypedDict):
     b: float
     g: float
     r: float
+
+class DeleteRecordingStreamOptions(TypedDict):
+
+    destination: MediaStreamDestination
+    duration: float
+    startTime: float
 
 class Device(TypedDict):
     """Device objects are created by DeviceProviders when new devices are discover and synced to Scrypted via the DeviceManager."""
@@ -1422,6 +1429,12 @@ class VideoRecorder:
         pass
 
 
+class VideoRecorderManagement:
+
+    async def deleteRecordingStream(self, options: DeleteRecordingStreamOptions) -> None:
+        pass
+
+
 class Logger:
     """Logger is exposed via log.* to allow writing to the Scrypted log."""
 
@@ -1714,6 +1727,7 @@ class ScryptedInterfaceMethods(str, Enum):
     getRecordingStreamCurrentTime = "getRecordingStreamCurrentTime"
     getRecordingStreamOptions = "getRecordingStreamOptions"
     getRecordingStreamThumbnail = "getRecordingStreamThumbnail"
+    deleteRecordingStream = "deleteRecordingStream"
     ptzCommand = "ptzCommand"
     getRecordedEvents = "getRecordedEvents"
     getVideoClip = "getVideoClip"
@@ -2485,6 +2499,13 @@ ScryptedInterfaceDescriptors = {
       "getRecordingStreamCurrentTime",
       "getRecordingStreamOptions",
       "getRecordingStreamThumbnail"
+    ],
+    "properties": []
+  },
+  "VideoRecorderManagement": {
+    "name": "VideoRecorderManagement",
+    "methods": [
+      "deleteRecordingStream"
     ],
     "properties": []
   },
