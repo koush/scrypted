@@ -1,31 +1,50 @@
 <template>
-  <GmapMap
+  <l-map
     :center="center"
     :zoom="zoom"
-    ref="mapRef"
-    style="height: 400px"
+    style="height: 400px;"
     :options="{
-   mapTypeControl: false,
-   fullscreenControl: false,
- }"
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      scrollWheelZoom: false,
+    }"
   >
-    <GmapMarker v-if="position" :position="position" :label="lazyValue.name" />
-  </GmapMap>
+    <l-tile-layer :url="url" :attribution="attribution"></l-tile-layer>
+    <l-marker :lat-lng="position" :icon="icon"></l-marker>
+    <l-control-attribution position="bottomright" :prefix="prefix"></l-control-attribution>
+  </l-map>
 </template>
 
 <script>
+import { latLng, icon } from "leaflet";
+import { LMap, LTileLayer, LMarker, LControlAttribution } from "vue2-leaflet";
+import 'leaflet/dist/leaflet.css';
 import RPCInterface from "../RPCInterface.vue";
 
 export default {
   mixins: [RPCInterface],
+  components: {
+    LMap,
+    LTileLayer,
+    LMarker,
+    LControlAttribution,
+  },
+  data () {
+    return {
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      prefix: '<a target="blank" href="https://leafletjs.com/">Leaflet</a>',
+      attribution: '&copy; <a target="_blank" href="http://osm.org/copyright">OpenStreetMap</a> contributors',
+      icon: icon({
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      }),
+    };
+  },
   computed: {
     center() {
-      if (!this.position) {
-        return {
-          lat: 0,
-          lng: 0
-        };
-      }
       return this.position;
     },
     zoom() {
@@ -33,12 +52,9 @@ export default {
     },
     position() {
       if (!this.lazyValue.position) {
-        return;
+        return latLng(0, 0);
       }
-      return {
-        lat: this.lazyValue.position.latitude,
-        lng: this.lazyValue.position.longitude
-      };
+      return latLng(this.lazyValue.position.latitude, this.lazyValue.position.longitude);
     }
   }
 };
