@@ -35,6 +35,7 @@ backup_exclude:
 map:
   - config:rw
   - media:rw
+  - share:rw
 devices:
   - /dev/mem
   - /dev/dri/renderD128
