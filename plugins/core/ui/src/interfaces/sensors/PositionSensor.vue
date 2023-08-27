@@ -10,6 +10,7 @@
       doubleClickZoom: false,
       boxZoom: false,
       scrollWheelZoom: false,
+      touchZoom: false,
     }"
   >
     <l-tile-layer :url="url" :attribution="attribution"></l-tile-layer>
