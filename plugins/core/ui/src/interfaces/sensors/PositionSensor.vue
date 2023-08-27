@@ -24,6 +24,7 @@ import { LMap, LTileLayer, LMarker, LControlAttribution } from "vue2-leaflet";
 import 'leaflet/dist/leaflet.css';
 import RPCInterface from "../RPCInterface.vue";
 
+// https://vue2-leaflet.netlify.app/quickstart/#marker-icons-are-missing
 delete Icon.Default.prototype._getIconUrl;
 Icon.Default.mergeOptions({
   iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
