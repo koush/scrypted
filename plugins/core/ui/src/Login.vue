@@ -7,6 +7,9 @@
           </v-card-title>
           <v-card-subtitle v-if="$store.state.hasLogin === false" style="display: flex; justify-content: center;" class="text-uppercase">Create Account
           </v-card-subtitle>
+          <v-card-subtitle v-if="$store.state.loginHostname"
+                    style="text-align: center; font-weight: 300; font-size: .75rem !important; font-family: Quicksand, sans-serif!important;"
+                    class="text-subtitle-2 text-uppercase">Log into: {{ $store.state.loginHostname }}</v-card-subtitle>
           <v-container grid-list-md>
             <v-layout wrap>
               <v-flex xs12>

@@ -8,19 +8,27 @@
                 <v-card-actions>
                     <v-tooltip bottom>
                         <template v-slot:activator="{ on }">
-                            <v-btn v-on="on" icon href="https://github.com/koush/scrypted">
-                                <v-icon small>fab fa-github</v-icon>
-                            </v-btn>
-                        </template>
-                        <span>Github</span>
-                    </v-tooltip>
-                    <v-tooltip bottom>
-                        <template v-slot:activator="{ on }">
                             <v-btn v-on="on" icon href="https://discord.gg/DcFzmBHYGq">
                                 <v-icon small>fab fa-discord</v-icon>
                             </v-btn>
                         </template>
                         <span>Discord</span>
+                    </v-tooltip>
+                    <v-tooltip bottom>
+                        <template v-slot:activator="{ on }">
+                            <v-btn v-on="on" icon href="https://www.reddit.com/r/Scrypted/">
+                                <v-icon small>fab fa-reddit</v-icon>
+                            </v-btn>
+                        </template>
+                        <span>Reddit</span>
+                    </v-tooltip>
+                    <v-tooltip bottom>
+                        <template v-slot:activator="{ on }">
+                            <v-btn v-on="on" icon href="https://docs.scrypted.app">
+                                <v-icon small>fa fa-file-text</v-icon>
+                            </v-btn>
+                        </template>
+                        <span>Documentation</span>
                     </v-tooltip>
                     <v-spacer></v-spacer>
                     <v-btn text @click="reconnect">Reconnect</v-btn>

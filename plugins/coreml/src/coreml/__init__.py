@@ -3,12 +3,10 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import os
-import platform
 import re
 from typing import Any, Tuple
 
 import coremltools as ct
-import numpy as np
 import scrypted_sdk
 from PIL import Image
 from scrypted_sdk import Setting, SettingValue

@@ -27,6 +27,7 @@
    "scrypted": {
       "name": "Scrypted Cloud",
       "type": "API",
+      "realfs": true,
       "interfaces": [
          "SystemSettings",
          "BufferConverter",
@@ -42,13 +43,16 @@
       "@scrypted/sdk": "file:../../sdk",
       "axios": "^1.4.0",
       "bpmux": "^8.2.1",
+      "cloudflared": "^0.4.0",
+      "exponential-backoff": "^3.1.1",
       "http-proxy": "^1.18.1",
       "nat-upnp": "file:./external/node-nat-upnp"
    },
    "devDependencies": {
       "@types/http-proxy": "^1.17.11",
+      "@types/ip": "^1.1.0",
       "@types/nat-upnp": "^1.1.2",
       "@types/node": "^20.4.5"
    },
-   "version": "0.1.24"
+   "version": "0.1.33"
 }

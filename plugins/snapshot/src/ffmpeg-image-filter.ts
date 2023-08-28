@@ -144,6 +144,8 @@ export function ffmpegFilterImage(inputArguments: string[], options: FFmpegImage
 
     const args: string[] = [
         '-hide_banner',
+        '-err_detect', 'aggressive',
+        '-fflags', 'discardcorrupt',
         '-y',
         ...inputArguments,
 

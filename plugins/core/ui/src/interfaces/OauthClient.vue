@@ -1,13 +1,37 @@
 <template>
-  <v-btn text color="primary" @click="onClick">Login</v-btn>
+  <div>
+    <v-dialog v-model="loginDialog" max-width="300px">
+      <v-card>
+        <v-card-title>Login Required</v-card-title>
+        <v-card-text>Scrypted Management Console is currently inside a browser iframe. For web security, a new tab will be
+          opened, and the
+          browser may prompt to log into this server again.
+          <br />
+          <br />
+          <b>Home Assistant Addon installations must create a new Administrator user</b> within the Scrypted Users sidebar menu to log in from outside of Home Assistant.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer>
+          </v-spacer>
+          <v-btn icon @click="loginDialog = false">Cancel</v-btn>
+          <v-btn icon @click="onClickContinue">OK</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    <v-btn text color="primary" @click="onClick">Login</v-btn>
+  </div>
 </template>
 <script>
 import qs from 'query-string';
 import RPCInterface from "./RPCInterface.vue";
-import { getCurrentBaseUrl } from '../../../../../packages/client/src';
 
 export default {
   mixins: [RPCInterface],
+  data() {
+    return {
+      loginDialog: false,
+    };
+  },
   methods: {
     onChange() { },
     isIFrame() {
@@ -17,15 +41,18 @@ export default {
         return true;
       }
     },
+    onClickContinue: async function () {
+      const endpointManager = this.$scrypted.endpointManager;
+      const ep = await endpointManager.getPublicLocalEndpoint();
+      const u = new URL(ep);
+      u.hash = window.location.hash;
+      u.pathname = '/endpoint/@scrypted/core/public/';
+      window.open(u.toString(), '_blank');
+    },
     onClick: async function () {
       // must escape iframe for login.
       if (this.isIFrame()) {
-        const endpointManager = this.$scrypted.endpointManager;
-        const ep = await endpointManager.getPublicLocalEndpoint();
-        const u = new URL(ep);
-        u.hash = window.location.hash;
-        u.pathname = '/endpoint/@scrypted/core/public/';
-        window.open(u.toString(), '_blank');
+        this.loginDialog = true;
         return;
       }
 

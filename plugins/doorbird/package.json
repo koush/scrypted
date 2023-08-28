@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/doorbird",
-   "version": "0.0.1",
+   "version": "0.0.2",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -29,7 +29,6 @@
       ],
       "pluginDependencies": [
          "@scrypted/prebuffer-mixin",
-         "@scrypted/pam-diff",
          "@scrypted/snapshot"
       ]
    },

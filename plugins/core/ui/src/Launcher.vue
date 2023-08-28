@@ -10,10 +10,18 @@
                     <v-card width="300px" class="elevation-24">
                         <v-card-title style="justify-content: center;" class="headline text-uppercase">Scrypted
                         </v-card-title>
-                        <v-card-subtitle style="text-align: center;">{{ $store.state.version }}</v-card-subtitle>
+                        <v-card-subtitle v-if="$store.state.loginHostname"
+                            style="text-align: center; font-weight: 300; font-size: .75rem !important; font-family: Quicksand, sans-serif!important;"
+                            class="text-subtitle-2 text-uppercase">
+                            {{ $store.state.version }}
+                            <br />
+                            Logged into: {{ $store.state.loginHostname
+                            }}
+                        </v-card-subtitle>
+                        <v-card-subtitle v-else style="text-align: center;">{{ $store.state.version }}</v-card-subtitle>
                         <v-list class="transparent">
-                            <v-list-item v-for="application in applications" :key="application.name"
-                                :to="application.to" :href="application.href">
+                            <v-list-item v-for="application in applications" :key="application.name" :to="application.to"
+                                :href="application.href">
                                 <v-icon small>{{ application.icon }}</v-icon>
                                 <v-list-item-title style="text-align: center;">{{ application.name }}
                                 </v-list-item-title>
@@ -27,11 +35,11 @@
                         <v-card-actions>
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon href="https://twitter.com/scryptedapp/">
-                                        <v-icon small>fab fa-twitter</v-icon>
+                                    <v-btn v-on="on" icon href="https://discord.gg/DcFzmBHYGq">
+                                        <v-icon small>fab fa-discord</v-icon>
                                     </v-btn>
                                 </template>
-                                <span>Twitter</span>
+                                <span>Discord</span>
                             </v-tooltip>
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
@@ -43,19 +51,11 @@
                             </v-tooltip>
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon href="https://github.com/koush/scrypted">
-                                        <v-icon small>fab fa-github</v-icon>
+                                    <v-btn v-on="on" icon href="https://docs.scrypted.app">
+                                        <v-icon small>fa fa-file-text</v-icon>
                                     </v-btn>
                                 </template>
-                                <span>Github</span>
-                            </v-tooltip>
-                            <v-tooltip bottom>
-                                <template v-slot:activator="{ on }">
-                                    <v-btn v-on="on" icon href="https://discord.gg/DcFzmBHYGq">
-                                        <v-icon small>fab fa-discord</v-icon>
-                                    </v-btn>
-                                </template>
-                                <span>Discord</span>
+                                <span>Documentation</span>
                             </v-tooltip>
                             <v-spacer></v-spacer>
                             <v-tooltip bottom>

@@ -19,11 +19,11 @@
                 "-r",
                 "ts-node/register"
             ],
+            "preLaunchTask": "npm: build",
             "args": [
                 "ffplay",
-                "Kitchen",
-                "getRecordingStream",
-                "{\"startTime\":1677699495709}"
+                "Baby Camera@192.168.2.109",
+                "getVideoStream",
             ],
             "sourceMaps": true,
             "resolveSourceMapLocations": [

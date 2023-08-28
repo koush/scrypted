@@ -17,7 +17,7 @@ const STAP_A_HEADER_SIZE = NAL_HEADER_SIZE + LENGTH_FIELD_SIZE;
 
 
 // a stap a packet is a packet that aggregates multiple nals
-function depacketizeStapA(data: Buffer) {
+export function depacketizeStapA(data: Buffer) {
     const ret: Buffer[] = [];
     let lastPos: number;
     let pos = NAL_HEADER_SIZE;
@@ -74,7 +74,7 @@ export class H264Repacketizer {
     stapa: RtpPacket;
     fuaMin: number;
 
-    constructor(public console: Console, public maxPacketSize: number, public codecInfo: H264CodecInfo, public jitterBuffer = new JitterBuffer(console, 4)) {
+    constructor(public console: Console, public maxPacketSize: number, public codecInfo?: H264CodecInfo, public jitterBuffer = new JitterBuffer(console, 4)) {
         // 12 is the rtp/srtp header size.
         this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;
         this.fuaMin = Math.round(maxPacketSize * .8);

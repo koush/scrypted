@@ -172,8 +172,11 @@ async function main() {
                 ffmpegInput.inputArguments = ffmpegInput.inputArguments.map(i => i === ffmpegInput.url ? ffmpegInput.urls?.[0] : i);
             }
         }
-        console.log('ffplay', ...ffmpegInput.inputArguments);
-        child_process.spawn('ffplay', ffmpegInput.inputArguments, {
+        const args = [...ffmpegInput.inputArguments];
+        if (ffmpegInput.h264FilterArguments)
+            args.push(...ffmpegInput.h264FilterArguments);
+        console.log('ffplay', ...args);
+        child_process.spawn('ffplay', args, {
             stdio: 'inherit',
         });
         sdk.disconnect();

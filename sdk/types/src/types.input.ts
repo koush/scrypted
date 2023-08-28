@@ -666,6 +666,12 @@ export interface RequestRecordingStreamOptions extends RequestMediaStreamOptions
   playbackRate?: number;
 }
 
+export interface DeleteRecordingStreamOptions {
+  destination?: MediaStreamDestination;
+  startTime: number;
+  duration: number;
+}
+
 export interface RecordingStreamThumbnailOptions {
   detectionId?: string;
   resize?: {
@@ -696,6 +702,10 @@ export interface VideoRecorder {
   getRecordingStreamCurrentTime(recordingStream: MediaObject): Promise<number>;
   getRecordingStreamOptions(): Promise<ResponseMediaStreamOptions[]>;
   getRecordingStreamThumbnail(time: number, options?: RecordingStreamThumbnailOptions): Promise<MediaObject>;
+}
+
+export interface VideoRecorderManagement {
+  deleteRecordingStream(options: DeleteRecordingStreamOptions): Promise<void>;
 }
 
 export interface RecordedEvent {
@@ -1943,6 +1953,7 @@ export enum ScryptedInterface {
   Display = "Display",
   VideoCamera = "VideoCamera",
   VideoRecorder = "VideoRecorder",
+  VideoRecorderManagement = "VideoRecorderManagement",
   PanTiltZoom = "PanTiltZoom",
   EventRecorder = "EventRecorder",
   VideoClips = "VideoClips",

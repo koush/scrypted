@@ -138,6 +138,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
     // should maybe move this into the cloud server itself.
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
     const directAddress = response.headers['x-scrypted-direct-address'];
+    const cloudAddress = response.headers['x-scrypted-cloud-address'];
 
     return {
         error: response.data.error as string,
@@ -147,6 +148,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
         addresses,
         scryptedCloud,
         directAddress,
+        cloudAddress,
     };
 }
 
@@ -159,6 +161,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     });
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
     const directAddress = response.headers['x-scrypted-direct-address'];
+    const cloudAddress = response.headers['x-scrypted-cloud-address'];
 
     return {
         hostname: response.data.hostname as string,
@@ -173,6 +176,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         addresses: response.data.addresses as string[],
         scryptedCloud,
         directAddress,
+        cloudAddress,
     };
 }
 
@@ -218,6 +222,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let localAddresses: string[];
     let scryptedCloud: boolean;
     let directAddress: string;
+    let cloudAddress: string;
 
     console.log('@scrypted/client', packageJson.version);
 
@@ -227,6 +232,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             extraHeaders['Authorization'] = loginResult.authorization;
         localAddresses = loginResult.addresses;
         scryptedCloud = loginResult.scryptedCloud;
+        directAddress = loginResult.directAddress;
+        cloudAddress = loginResult.cloudAddress;
         authorization = loginResult.authorization;
         queryToken = loginResult.queryToken;
         console.log('login result', Date.now() - start, loginResult);
@@ -240,6 +247,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         localAddresses = loginCheck.addresses;
         scryptedCloud = loginCheck.scryptedCloud;
         directAddress = loginCheck.directAddress;
+        cloudAddress = loginCheck.cloudAddress;
         username = loginCheck.username;
         authorization = loginCheck.authorization;
         queryToken = loginCheck.queryToken;
@@ -280,15 +288,22 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         addresses.push(directAddress);
     }
 
+    if (((scryptedCloud && options.direct === undefined) || options.direct) && cloudAddress) {
+        addresses.push(cloudAddress);
+    }
+
     const tryAddresses = !!addresses.length;
     const webrtcLastFailedKey = 'webrtcLastFailed';
-    let tryWebrtc = globalThis.RTCPeerConnection && options.webrtc;
-    if (!tryWebrtc && globalThis.localStorage && options.webrtc === undefined) {
+    const canUseWebrtc = !!globalThis.RTCPeerConnection;
+    let tryWebrtc = canUseWebrtc && options.webrtc;
+    // try webrtc by default on scrypted cloud.
+    // but webrtc takes a while to fail, so backoff if it fails to prevent continual slow starts.
+    if (scryptedCloud && canUseWebrtc && globalThis.localStorage && options.webrtc === undefined) {
         tryWebrtc = true;
         const webrtcLastFailed = parseFloat(localStorage.getItem(webrtcLastFailedKey));
         // if webrtc has failed in the past day, dont attempt to use it.
         const now = Date.now();
-        if (webrtcLastFailed > now - 1 * 24 * 60 * 60 * 1000) {
+        if (webrtcLastFailed < now && webrtcLastFailed > now - 1 * 24 * 60 * 60 * 1000) {
             tryWebrtc = false;
             console.warn('WebRTC API connection recently failed. Skipping.')
         }

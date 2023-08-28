@@ -355,7 +355,7 @@ async def generateVideoFramesGstreamer(
             if platform.system() == "Darwin":
                 decoder = "vtdec_hw"
             else:
-                decoder = "avdec_h264"
+                decoder = "avdec_h264 output-corrupt=false"
     else:
         # decodebin may pick a hardware accelerated decoder, which isn't ideal
         # so use a known software decoder for h264 and decodebin for anything else.

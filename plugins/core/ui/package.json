@@ -3,9 +3,9 @@
   "private": true,
   "scripts": {
     "dev": "concurrently --names 'server,client' --prefix-colors 'gray,white.bold' --prefix '{time} ({name})\t' --timestamp-format 'HH:mm:ss.SSS' --kill-others npm:serve-server npm:serve",
-    "serve": "vue-cli-service serve --open",
+    "serve": "NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve --open",
     "serve-server": "cd ../../../server && npm run serve",
-    "build": "vue-cli-service build --dest ../fs/dist",
+    "build": "NODE_OPTIONS=--openssl-legacy-provider vue-cli-service build --dest ../fs/dist",
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
@@ -26,6 +26,7 @@
     "draggabilly": "^2.3.0",
     "engine.io-client": "^5.2.0",
     "feather-icons": "^4.28.0",
+    "leaflet": "^1.9.4",
     "lodash": "^4.17.21",
     "md5": "^2.3.0",
     "monaco-editor": "^0.27.0",
@@ -49,7 +50,7 @@
     "vue-script2": "^2.1.0",
     "vue-slider-component": "^3.2.11",
     "vue-swatches": "^1.0.4",
-    "vue2-google-maps": "^0.10.7",
+    "vue2-leaflet": "^2.7.1",
     "vuetify": "^2.6.13",
     "vuex": "^3.6.2",
     "webpack-dev-server": "^4.9.2",
@@ -58,6 +59,8 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-class-properties": "^7.13.0",
+    "@babel/plugin-proposal-object-rest-spread": "^7.20.7",
+    "@babel/plugin-proposal-optional-catch-binding": "^7.18.6",
     "@babel/plugin-proposal-optional-chaining": "^7.13.8",
     "@babel/plugin-transform-modules-commonjs": "^7.13.8",
     "@babel/plugin-transform-typescript": "^7.13.0",

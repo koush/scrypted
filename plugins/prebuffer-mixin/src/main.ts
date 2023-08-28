@@ -125,7 +125,7 @@ class PrebufferSession {
   }
 
   get canPrebuffer() {
-    return this.advertisedMediaStreamOptions.container !== 'rawvideo' && this.advertisedMediaStreamOptions.container !== 'ffmpeg';
+    return (this.advertisedMediaStreamOptions.container !== 'rawvideo' && this.advertisedMediaStreamOptions.container !== 'ffmpeg') || this.storage.getItem(this.ffmpegOutputArgumentsKey);
   }
 
   getLastH264Probe(): H264Info {
@@ -288,7 +288,7 @@ class PrebufferSession {
           key: this.ffmpegOutputArgumentsKey,
           value: this.storage.getItem(this.ffmpegOutputArgumentsKey),
           choices: [
-            '-vcodec h264 -bf 0'
+            '-c:v libx264 -pix_fmt yuvj420p -preset ultrafast -bf 0'
           ],
           combobox: true,
         },
@@ -443,39 +443,6 @@ class PrebufferSession {
       detectedAudioCodec = null;
 
     this.audioDisabled = false;
-    let acodec: string[];
-
-    if (audioSoftMuted) {
-      // no audio? explicitly disable it.
-      acodec = ['-an'];
-      this.audioDisabled = true;
-    }
-    else {
-      acodec = [
-        '-acodec',
-        'copy',
-      ];
-    }
-
-    const vcodec = [
-      '-vcodec', 'copy',
-      // 3/6/2022
-      // Add SPS/PPS to all keyframes. Not all cameras do this!
-      // This isn't really necessary for a few reasons:
-      // MPEG-TS and MP4 will automatically do this, since there's no out of band
-      // way to get the SPS/PPS.
-      // RTSP mode may send the SPS/PPS out of band via the sdp, and then may not have
-      // SPS/PPS in the bit stream.
-      // Adding this argument isn't strictly necessary, but it normalizes the bitstream
-      // so consumers that expect the SPS/PPS will have it. Ran into an issue where
-      // the HomeKit plugin was blasting RTP packets out from RTSP mode,
-      // but the bitstream had no SPS/PPS information, resulting in the video never loading
-      // in the Home app.
-      // 3/7/2022
-      // I believe this is causing errors in recordings and possibly streaming as well
-      // for some users. This may need to be a homekit specific transcoding argument.
-      // '-bsf:v', 'dump_extra',
-    ];
 
     const rbo: ParserOptions<PrebufferParsers> = {
       console: this.console,
@@ -484,15 +451,6 @@ class PrebufferSession {
       },
     };
     this.parsers = rbo.parsers;
-
-
-    const parser = createRtspParser({
-      vcodec,
-      // the rtsp parser should always stream copy unless audio is soft muted.
-      acodec: audioSoftMuted ? acodec : ['-acodec', 'copy'],
-    });
-    this.sdp = parser.sdp;
-    rbo.parsers.rtsp = parser;
 
     const mo = await this.mixinDevice.getVideoStream(mso);
     const isRfc4571 = mo.mimeType === 'x-scrypted/x-rfc4571';
@@ -537,6 +495,9 @@ class PrebufferSession {
       }
 
       if (this.usingScryptedParser) {
+        const rtspParser = createRtspParser();
+        rbo.parsers.rtsp = rtspParser;
+
         session = await startRtspSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
           useUdp: parser === SCRYPTED_PARSER_UDP,
           audioSoftMuted,
@@ -545,6 +506,26 @@ class PrebufferSession {
         this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
       }
       else {
+        let acodec: string[];
+
+        if (audioSoftMuted) {
+          // no audio? explicitly disable it.
+          acodec = ['-an'];
+          this.audioDisabled = true;
+        }
+        else {
+          acodec = [
+            '-acodec',
+            'copy',
+          ];
+        }
+
+        let vcodec = [
+          '-vcodec', 'copy',
+        ];
+
+        acodec = audioSoftMuted ? acodec : ['-acodec', 'copy'];
+
         if (parser === FFMPEG_PARSER_UDP)
           ffmpegInput.inputArguments = ['-rtsp_transport', 'udp', '-i', ffmpegInput.url];
         else if (parser === FFMPEG_PARSER_TCP)
@@ -553,7 +534,22 @@ class PrebufferSession {
         const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
         const extraOutputArguments = this.storage.getItem(this.ffmpegOutputArgumentsKey) || '';
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
-        rbo.parsers.rtsp.outputArguments.push(...extraOutputArguments.split(' ').filter(d => !!d));
+
+        // extraOutputArguments must contain full codec information
+        if (extraOutputArguments) {
+          vcodec = [...extraOutputArguments.split(' ').filter(d => !!d)];
+        }
+        if (ffmpegInput.h264FilterArguments)
+          vcodec.push(...ffmpegInput.h264FilterArguments)
+
+        const rtspParser = createRtspParser({
+          vcodec,
+          // the rtsp parser should always stream copy unless audio is soft muted.
+          acodec,
+        });
+        this.sdp = rtspParser.sdp;
+        rbo.parsers.rtsp = rtspParser;
+
         session = await startParserSession(ffmpegInput, rbo);
       }
     }

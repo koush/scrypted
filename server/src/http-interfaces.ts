@@ -1,9 +1,9 @@
 import { HttpResponse, HttpResponseOptions } from "@scrypted/types";
 import { Response } from "express";
-import { RpcPeer } from "./rpc";
-import { join as pathJoin } from 'path';
 import fs from 'fs';
 import net from 'net';
+import { join as pathJoin } from 'path';
+import { RpcPeer } from "./rpc";
 
 const mime = require('mime/lite');
 
@@ -15,6 +15,17 @@ export function createResponseInterface(res: Response, unzippedDir: string, file
             'sendSocket',
         ];
 
+        #setHeaders(options?: HttpResponseOptions) {
+            if (!options?.headers)
+                return;
+            for (const header of Object.keys(options.headers)) {
+                const val = (options.headers as any)[header];
+                // null-ish headers will cause something to fail downstream.
+                if (val != null)
+                    res.setHeader(header, val);
+            }
+        }
+
         send(body: string): void;
         send(body: string, options: HttpResponseOptions): void;
         send(body: Buffer): void;
@@ -22,11 +33,7 @@ export function createResponseInterface(res: Response, unzippedDir: string, file
         send(body: any, options?: any) {
             if (options?.code)
                 res.status(options.code);
-            if (options?.headers) {
-                for (const header of Object.keys(options.headers)) {
-                    res.setHeader(header, (options.headers as any)[header]);
-                }
-            }
+            this.#setHeaders(options);
 
             res.send(body);
         }
@@ -36,11 +43,7 @@ export function createResponseInterface(res: Response, unzippedDir: string, file
         sendFile(path: any, options?: HttpResponseOptions) {
             if (options?.code)
                 res.status(options.code);
-            if (options?.headers) {
-                for (const header of Object.keys(options.headers)) {
-                    res.setHeader(header, (options.headers as any)[header]);
-                }
-            }
+            this.#setHeaders(options);
 
             if (!res.getHeader('Content-Type')) {
                 const type = mime.getType(path);
@@ -71,11 +74,7 @@ export function createResponseInterface(res: Response, unzippedDir: string, file
         sendSocket(socket: net.Socket, options: HttpResponseOptions) {
             if (options?.code)
                 res.status(options.code);
-            if (options?.headers) {
-                for (const header of Object.keys(options.headers)) {
-                    res.setHeader(header, (options.headers as any)[header]);
-                }
-            }
+            this.#setHeaders(options);
             socket.pipe(res);
         }
     }
