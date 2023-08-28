@@ -23,7 +23,9 @@ class EventStream(Stream):
                 try:
                     event = event_stream.Next()
                 except:
-                    logger.info(f"SSE {id(event_stream)} appears to be broken")
+                    logger.info(f"SSE {event_stream.UUID} exited")
+                    if self.shutting_down_stream is event_stream:
+                        self.shutting_down_stream = None
                     return None
 
                 logger.debug(f"Received event: {event}")
@@ -39,13 +41,13 @@ class EventStream(Stream):
                 if response.get('action') == 'logout':
                     if self.event_stream_stop_event.is_set() or \
                         self.shutting_down_stream is event_stream:
-                        logger.info(f"SSE {id(event_stream)} disconnected")
+                        logger.info(f"SSE {event_stream.UUID} disconnected")
                         self.shutting_down_stream = None
                         event_stream.Close()
                         return None
                 elif response.get('status') == 'connected':
                     if not self.connected:
-                        logger.info(f"SSE {id(event_stream)} connected")
+                        logger.info(f"SSE {event_stream.UUID} connected")
                         self.initializing = False
                         self.connected = True
                 else:
@@ -67,6 +69,7 @@ class EventStream(Stream):
         self.reconnecting = True
         self.connected = False
         self.shutting_down_stream = self.event_stream
+        self.shutting_down_stream.Close()
         self.event_stream = None
         await self.start()
         while self.shutting_down_stream is not None:
