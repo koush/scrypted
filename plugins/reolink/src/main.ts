@@ -30,7 +30,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
-        this.updateManagementUrl();
+        this.updateDeviceInfo();
         this.updateDevice();
     }
     
@@ -67,7 +67,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
         await client.reboot();
     }
 
-    updateManagementUrl() {
+    updateDeviceInfo() {
         const ip = this.storage.getItem('ip');
         if (!ip)
             return;
@@ -247,7 +247,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
         this.client = undefined;
         super.putSetting(key, value);
         this.updateDevice();
-        this.updateManagementUrl();
+        this.updateDeviceInfo();
     }
 
     showRtspUrlOverride() {
@@ -316,6 +316,7 @@ class ReolinkProider extends RtspProvider {
         device.setIPAddress(settings.ip?.toString());
         device.putSetting('rtspChannel', settings.rtspChannel?.toString());
         device.setHttpPortOverride(settings.httpPort?.toString());
+        device.updateDeviceInfo();
         return nativeId;
     }
 
