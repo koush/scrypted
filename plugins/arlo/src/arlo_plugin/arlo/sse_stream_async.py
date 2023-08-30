@@ -24,9 +24,7 @@ class EventStream(Stream):
                     event = event_stream.Next()
                 except:
                     logger.info(f"SSE {event_stream.UUID} exited")
-                    if self.shutting_down_stream is None and not self.event_stream_stop_event.is_set():
-                        self.event_loop.call_soon_threadsafe(lambda: self.event_loop.create_task(self.start()))
-                    elif self.shutting_down_stream is event_stream:
+                    if self.shutting_down_stream is event_stream:
                         self.shutting_down_stream = None
                     return None
 
