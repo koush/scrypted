@@ -33,24 +33,6 @@ def toCapsFormat(options: scrypted_sdk.ImageOptions):
     else:
         return None
 
-class GstreamerFormatPostProcess():
-    def __init__(self) -> None:
-        self.postprocess = ' ! videoconvert ! capsfilter name=capsfilter'
-        self.resize = None
-
-    async def create(self, gst, pipeline: str):
-        gst, gen = await createPipelineIterator(pipeline + self.postprocess, gst)
-        g = gen()
-        self.gst = gst
-        self.g = g
-        self.capsfilter = self.gst.get_by_name('capsfilter')
-
-    def update(self, caps, sampleSize: Tuple[int, int], options: scrypted_sdk.ImageOptions):
-        sinkCaps = "video/x-raw"
-        if format:
-            sinkCaps += f",format={format}"
-        self.capsfilter.set_property('caps', caps.from_string(sinkCaps))
-
 class GstreamerPostProcess():
     def __init__(self) -> None:
         self.postprocess = ' ! videocrop name=videocrop ! videoconvert ! videoscale add-borders=false ! capsfilter name=scaleCapsFilter'
