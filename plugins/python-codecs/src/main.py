@@ -9,6 +9,7 @@ import vipsimage
 import pilimage
 import time
 import zygote
+import os
 
 Gst = None
 try:
@@ -101,12 +102,22 @@ class GstreamerGenerator(
         )
 
 
+def restart():
+    asyncio.ensure_future(
+        scrypted_sdk.deviceManager.requestRestart(), loop=asyncio.get_event_loop()
+    )
+
+
 class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider):
     def __init__(self, nativeId=None):
         super().__init__(nativeId)
 
         self.zygote = None
         asyncio.ensure_future(self.initialize())
+
+        # 8/30/2023 clear out process leaks on various systems that i can't track down.
+        # 8/31/2023 this might be fixed.
+        asyncio.get_event_loop().call_later(24 * 60 * 60, restart)
 
     async def initialize(self):
         manifest: scrypted_sdk.DeviceManifest = {
@@ -185,14 +196,7 @@ def create_scrypted_plugin():
 
 
 def multiprocess_exit():
-    import sys
-
-    if sys.platform == "win32":
-        sys.exit()
-    else:
-        import os
-
-        os._exit(os.EX_OK)
+    os._exit(0)
 
 
 class CodecFork:
