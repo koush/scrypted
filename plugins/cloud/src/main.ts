@@ -11,14 +11,14 @@ import upnp from 'nat-upnp';
 import net from 'net';
 import os from 'os';
 import path from 'path';
-import { Duplex } from 'stream';
+import { Duplex, Readable } from 'stream';
 import tls from 'tls';
 import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { PushManager } from './push';
 import { readLine } from '../../../common/src/read-stream';
 import { qsparse, qsstringify } from "./qs";
 import * as cloudflared from 'cloudflared';
-import fs, { mkdirSync } from 'fs';
+import fs, { mkdirSync, renameSync, rmSync } from 'fs';
 import { backOff } from "exponential-backoff";
 import ip from 'ip';
 import { Deferred } from "@scrypted/common/src/deferred";
@@ -798,14 +798,35 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.console.log('starting cloudflared');
                 this.cloudflared = await backOff(async () => {
                     const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
-                    const cloudflareD = path.join(pluginVolume, 'cloudflare.d');
+                    const version = 'v1';
+                    const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `${process.platform}-${process.arch}-${version}`);
                     mkdirSync(cloudflareD, {
                         recursive: true,
                     })
                     process.chdir(cloudflareD);
 
-                    if (!fs.existsSync(cloudflared.bin))
-                        await cloudflared.install(cloudflared.bin);
+                    if (!fs.existsSync(cloudflared.bin)) {
+                        if (process.platform === 'darwin' && process.arch === 'arm64') {
+                            mkdirSync(path.dirname(cloudflared.bin), {
+                                recursive: true,
+                            })
+                            const tmp = `${cloudflared.bin}.tmp`;
+                            rmSync(tmp, {
+                                force: true,
+                                recursive: true,
+                            });
+                            const stream = await axios('https://github.com/scryptedapp/cloudflared/releases/download/2023.8.2/cloudflared-darwin-arm64', {
+                                responseType: 'stream',
+                            });
+                            const write = stream.data.pipe(fs.createWriteStream(cloudflared.bin));
+                            await once(write, 'close');
+                            renameSync(tmp, cloudflared.bin);
+                            fs.chmodSync(cloudflared.bin, 0o777)
+                        }
+                        else {
+                            await cloudflared.install(cloudflared.bin);
+                        }
+                    }
                     const secureUrl = `https://127.0.0.1:${this.securePort}`;
                     const args: any = {};
                     if (this.storageSettings.values.cloudflaredTunnelToken) {
@@ -828,13 +849,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                         for (const line of lines) {
                             if (line.includes('hostname'))
                                 this.console.log(line);
-                            const config = line.split(' ').find(part => part.startsWith('config='));
-                            if (config) {
-                                const [, json] = config.split('config=');
+                            const match = /config=(".*?}")/gm.exec(line)
+                            if (match) {
+                                const json = match[1];
                                 this.console.log(json);
                                 try {
                                     // the config is already json stringified and needs to be double parsed.
-                                    // "{\"ingress\":[{\"hostname\":\"tunnel.example.com\",\"originRequest\":{\"noTLSVerify\":true},\"service\":\"https://localhost:52960\"},{\"service\":\"http_status:404\"}],\"warp-routing\":{\"enabled\":false}}"
+                                    // '2023-09-02T21:18:10Z INF Updated to new configuration config="{\"ingress\":[{\"hostname\":\"tunneltest.example.com\", \"originRequest\":{\"noTLSVerify\":true}, \"service\":\"https://localhost:52960\"}, {\"service\":\"http_status:404\"}], \"warp-routing\":{\"enabled\":false}}" version=6'
                                     const parsed = JSON.parse(JSON.parse(json));
                                     const hostname = parsed.ingress?.[0]?.hostname;
                                     if (!hostname)
@@ -872,6 +893,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
             catch (e) {
                 this.console.error('cloudflared error', e);
+                throw e;
             }
             finally {
                 this.cloudflared = undefined;
