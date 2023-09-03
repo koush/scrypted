@@ -10,9 +10,12 @@ import pilimage
 import vipsimage
 from generator_common import createImageMediaObject, createVideoFrame
 from gst_generator import Gst, createPipelineIterator
-from gstreamer_postprocess import (GstreamerFormatPostProcess,
-                                   GstreamerPostProcess, OpenGLPostProcess,
-                                   VaapiPostProcess, getBands)
+from gstreamer_postprocess import (
+    GstreamerPostProcess,
+    OpenGLPostProcess,
+    VaapiPostProcess,
+    getBands,
+)
 from util import optional_chain
 
 
@@ -94,8 +97,10 @@ class GstImage(scrypted_sdk.Image):
         # toGstSample may return the I420/NV12 image if there
         # is no transformation necessary. ie, a low res stream being used
         # for motion detection.
-        if format == 'gray' and self.sample == gstsample:
+        if format == "gray" and self.sample == gstsample:
             capsBands = 1
+        elif format == "jpg":
+            pass
         else:
             capsBands = getBands(caps)
 
@@ -103,6 +108,10 @@ class GstImage(scrypted_sdk.Image):
         result, info = gst_buffer.map(Gst.MapFlags.READ)
         if not result:
             raise Exception("unable to map gst buffer")
+
+        if format == "jpg":
+            buffer = bytes(info.data)
+            return buffer
 
         try:
             stridePadding = (width * capsBands) % 4
@@ -143,7 +152,7 @@ class GstImage(scrypted_sdk.Image):
                     "width": width - stridePadding,
                     "height": height,
                 }
-            
+
             reformat = None
             if bands and bands != capsBands:
                 reformat = format
@@ -180,11 +189,15 @@ async def createResamplerPipeline(
     if not sample:
         raise Exception("Video Frame has been invalidated")
 
-    resize = None
-    if options:
-        resize = options.get("resize")
-        if resize:
-            resize = (resize.get("width"), resize.get("height"))
+    jpg = options and options.get("format") == "jpg"
+    resize = options and options.get("resize")
+
+    if resize:
+        resize = [resize.get("width"), resize.get("height")]
+
+    if jpg:
+        resize = resize or []
+        resize.append("jpg")
 
     for check in gst.reuse:
         if check.resize == resize:
@@ -197,18 +210,20 @@ async def createResamplerPipeline(
         pp = OpenGLPostProcess()
     elif postProcessPipeline == "OpenGL (system memory)":
         pp = OpenGLPostProcess()
-    elif postProcessPipeline == None:
-        pp = GstreamerFormatPostProcess()
     else:
         # trap the pipeline before it gets here. videocrop
         # in the pipeline seems to spam the stdout??
         # use the legacy vips/pil post process.
         pp = GstreamerPostProcess()
 
-    caps = sample.get_caps()
+    if jpg:
+        pp.postprocess += " ! videoconvert ! jpegenc"
 
+    caps = sample.get_caps()
     srcCaps = caps.to_string().replace(" ", "")
-    pipeline = f"appsrc name=appsrc format=time emit-signals=True is-live=True caps={srcCaps}"
+    pipeline = (
+        f"appsrc name=appsrc format=time emit-signals=True is-live=True caps={srcCaps}"
+    )
     await pp.create(gst.gst, pipeline)
     pp.resize = resize
 
@@ -237,11 +252,7 @@ async def toGstSample(
 
     # normalize format, eliminating it if possible
     if format == "jpg":
-        # get into a format suitable to be be handled by vips/pil
-        if capsFormat == "RGB" or capsFormat == "RGBA":
-            sinkFormat = None
-        else:
-            sinkFormat = "RGBA"
+        sinkFormat = "JPEG"
     elif format == "rgb":
         if capsFormat == "RGB":
             sinkFormat = None
@@ -367,22 +378,18 @@ async def generateVideoFramesGstreamer(
         videorate = f"! videorate max-rate={fps}"
 
     queue = "! queue leaky=downstream max-size-buffers=0"
-    if options and options.get('firstFrameOnly'):
+    if options and options.get("firstFrameOnly"):
         queue = ""
 
     if postProcessPipeline == "VAAPI":
-        pipeline += (
-            f" ! {decoder} {videorate} {queue}"
-        )
+        pipeline += f" ! {decoder} {videorate} {queue}"
     elif postProcessPipeline == "OpenGL (GPU memory)":
         pipeline += f" ! {decoder} {videorate} {queue} ! glupload"
     elif postProcessPipeline == "OpenGL (system memory)":
         pipeline += f" ! {decoder} {videorate} {queue} ! video/x-raw ! glupload"
     else:
         pipeline += f" ! {decoder} ! video/x-raw {videorate} {queue}"
-        # disable the gstreamer post process because videocrop spams the log
         postProcessPipeline = "Default"
-        # postProcessPipeline = None
 
     print(pipeline)
     mo: scrypted_sdk.MediaObject = None

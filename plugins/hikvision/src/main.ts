@@ -570,6 +570,7 @@ class HikvisionProvider extends RtspProvider {
         device.setHttpPortOverride(settings.httpPort?.toString());
         if (twoWayAudio)
             device.putSetting('twoWayAudio', twoWayAudio);
+        device.updateDeviceInfo();
         return nativeId;
     }
 

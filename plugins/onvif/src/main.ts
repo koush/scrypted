@@ -531,6 +531,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         device.putSetting('password', password);
         device.setIPAddress(settings.ip?.toString());
         device.setHttpPortOverride(settings.httpPort?.toString());
+        device.updateDeviceInfo();
 
         const intercom = new OnvifIntercom(device);
         try {
