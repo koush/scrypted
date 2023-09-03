@@ -92,7 +92,8 @@ MEDIA_USER_AGENTS = {
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
-    BACKUP_AUTH_HOSTS = ["MzQuMjQxLjE4OC4xODY=","My4yNDguMTI4Ljc3","MzQuMjQ4LjE1My42OQ==","MzQuMjQ1LjI0NC4xMzg="]
+    BACKUP_AUTH_HOSTS = ["NTIuMzEuMTU3LjE4MQ==","MzQuMjQ4LjE1My42OQ==","My4yNDguMTI4Ljc3","MzQuMjQ2LjE0LjI5"]
+    #BACKUP_AUTH_HOSTS = BACKUP_AUTH_HOSTS[2:3]
     TRANSID_PREFIX = 'web'
 
     random.shuffle(BACKUP_AUTH_HOSTS)
@@ -175,6 +176,7 @@ class Arlo(object):
 
         self.request = Request()
         try:
+            #raise Exception("testing backup hosts")
             auth_host = self.AUTH_URL
             self.request.options(f'https://{auth_host}/api/auth', headers=headers)
             logger.info("Using primary authentication host")
