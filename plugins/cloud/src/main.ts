@@ -798,35 +798,38 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.console.log('starting cloudflared');
                 this.cloudflared = await backOff(async () => {
                     const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
-                    const version = 'v1';
-                    const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `${process.platform}-${process.arch}-${version}`);
-                    mkdirSync(cloudflareD, {
-                        recursive: true,
-                    })
-                    process.chdir(cloudflareD);
+                    const version = 2;
+                    const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `v${version}`, `${process.platform}-${process.arch}`);
 
                     if (!fs.existsSync(cloudflared.bin)) {
-                        if (process.platform === 'darwin' && process.arch === 'arm64') {
-                            mkdirSync(path.dirname(cloudflared.bin), {
-                                recursive: true,
-                            })
-                            const tmp = `${cloudflared.bin}.tmp`;
-                            rmSync(tmp, {
+                        for (let i = 0; i <= version; i++) {
+                            const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `v${version}`);
+                            rmSync(cloudflareD, {
                                 force: true,
                                 recursive: true,
                             });
+                        }
+                        if (process.platform === 'darwin' && process.arch === 'arm64') {
+                            const bin = path.join(cloudflareD, cloudflared.bin);
+                            mkdirSync(path.dirname(bin), {
+                                recursive: true,
+                            });
+                            const tmp = `${bin}.tmp`;
+
                             const stream = await axios('https://github.com/scryptedapp/cloudflared/releases/download/2023.8.2/cloudflared-darwin-arm64', {
                                 responseType: 'stream',
                             });
-                            const write = stream.data.pipe(fs.createWriteStream(cloudflared.bin));
+                            const write = stream.data.pipe(fs.createWriteStream(tmp));
                             await once(write, 'close');
                             renameSync(tmp, cloudflared.bin);
-                            fs.chmodSync(cloudflared.bin, 0o777)
+                            fs.chmodSync(cloudflared.bin, 0o0755)
                         }
                         else {
                             await cloudflared.install(cloudflared.bin);
                         }
                     }
+                    process.chdir(cloudflareD);
+
                     const secureUrl = `https://127.0.0.1:${this.securePort}`;
                     const args: any = {};
                     if (this.storageSettings.values.cloudflaredTunnelToken) {
