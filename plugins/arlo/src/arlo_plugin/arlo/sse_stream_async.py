@@ -1,7 +1,8 @@
 import asyncio
 import json
-import sseclient
 import threading
+
+import scrypted_arlo_go
 
 from .stream_async import Stream
 from .logging import logger
@@ -18,35 +19,45 @@ class EventStream(Stream):
 
         def thread_main(self):
             event_stream = self.event_stream
-            for event in event_stream:
-                logger.debug(f"Received event: {event}")
-                if event is None:
-                    logger.info(f"SSE {id(event_stream)} appears to be broken")
+            while True:
+                try:
+                    event = event_stream.Next()
+                except:
+                    logger.info(f"SSE {event_stream.UUID} exited")
+                    if self.shutting_down_stream is event_stream:
+                        self.shutting_down_stream = None
                     return None
 
-                if event.data.strip() == "":
+                logger.debug(f"Received event: {event}")
+
+                if event.strip() == "":
                     continue
 
                 try:
-                    response = json.loads(event.data.strip())
+                    response = json.loads(event.strip())
                 except json.JSONDecodeError:
                     continue
 
                 if response.get('action') == 'logout':
                     if self.event_stream_stop_event.is_set() or \
                         self.shutting_down_stream is event_stream:
-                        logger.info(f"SSE {id(event_stream)} disconnected")
+                        logger.info(f"SSE {event_stream.UUID} disconnected")
                         self.shutting_down_stream = None
+                        event_stream.Close()
                         return None
                 elif response.get('status') == 'connected':
                     if not self.connected:
-                        logger.info(f"SSE {id(event_stream)} connected")
+                        logger.info(f"SSE {event_stream.UUID} connected")
                         self.initializing = False
                         self.connected = True
                 else:
                     self.event_loop.call_soon_threadsafe(self._queue_response, response)
 
-        self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization'), session=self.arlo.request.session)
+        self.event_stream = scrypted_arlo_go.NewSSEClient(
+            'https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization'),
+            scrypted_arlo_go.HeadersMap(self.arlo.request.session.headers)
+        )
+        self.event_stream.Start()
         self.event_stream_thread = threading.Thread(name="EventStream", target=thread_main, args=(self, ))
         self.event_stream_thread.setDaemon(True)
         self.event_stream_thread.start()
@@ -58,6 +69,7 @@ class EventStream(Stream):
         self.reconnecting = True
         self.connected = False
         self.shutting_down_stream = self.event_stream
+        self.shutting_down_stream.Close()
         self.event_stream = None
         await self.start()
         while self.shutting_down_stream is not None:

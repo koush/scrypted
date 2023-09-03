@@ -92,7 +92,8 @@ MEDIA_USER_AGENTS = {
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
-    BACKUP_AUTH_HOSTS = ["MzQuMjQzLjE3Ljkw","MzQuMjQ4Ljg2LjQ2","MzQuMjQwLjI0Ny4xODY=","NTIuMzEuMTg1LjE4NQ=="]
+    BACKUP_AUTH_HOSTS = ["NTIuMzEuMTU3LjE4MQ==","MzQuMjQ4LjE1My42OQ==","My4yNDguMTI4Ljc3","MzQuMjQ2LjE0LjI5"]
+    #BACKUP_AUTH_HOSTS = BACKUP_AUTH_HOSTS[2:3]
     TRANSID_PREFIX = 'web'
 
     random.shuffle(BACKUP_AUTH_HOSTS)
@@ -175,6 +176,7 @@ class Arlo(object):
 
         self.request = Request()
         try:
+            #raise Exception("testing backup hosts")
             auth_host = self.AUTH_URL
             self.request.options(f'https://{auth_host}/api/auth', headers=headers)
             logger.info("Using primary authentication host")
@@ -764,7 +766,7 @@ class Arlo(object):
             raw=True
         )
 
-    async def StartStream(self, basestation, camera, mode="rtsp"):
+    async def StartStream(self, basestation, camera, mode="rtsp", eager=True):
         """
         This function returns the url of the rtsp video stream.
         This stream needs to be called within 30 seconds or else it becomes invalid.
@@ -773,6 +775,9 @@ class Arlo(object):
 
         If mode is set to "dash", returns the url to the mpd file for DASH streaming. Note that DASH
         has very specific header requirements - see GetMPDHeaders()
+
+        If 'eager' is True, will return the stream url without waiting for Arlo to report that
+        the stream has started.
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
@@ -802,6 +807,14 @@ class Arlo(object):
                 },
                 headers={"xcloudId":camera.get('xCloudId'), 'User-Agent': ua}
             )
+            if mode == "rtsp":
+                nl.stream_url_dict['url'] = nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
+            else:
+                nl.stream_url_dict['url'] = nl.stream_url_dict['url'].replace(":80", "")
+
+        if eager:
+            trigger(self)
+            return nl.stream_url_dict['url']
 
         def callback(self, event):
             #return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
@@ -809,10 +822,7 @@ class Arlo(object):
                 return None
             properties = event.get("properties", {})
             if properties.get("activityState") == "userStreamActive":
-                if mode == "rtsp":
-                    return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
-                else:
-                    return nl.stream_url_dict['url'].replace(":80", "")
+                return nl.stream_url_dict['url']
             return None
 
         return await self.TriggerAndHandleEvent(
