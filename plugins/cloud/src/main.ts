@@ -821,8 +821,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                             });
                             const write = stream.data.pipe(fs.createWriteStream(tmp));
                             await once(write, 'close');
-                            renameSync(tmp, cloudflared.bin);
-                            fs.chmodSync(cloudflared.bin, 0o0755)
+                            renameSync(tmp, bin);
+                            fs.chmodSync(bin, 0o0755)
                         }
                         else {
                             await cloudflared.install(cloudflared.bin);
