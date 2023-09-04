@@ -54,5 +54,5 @@
       "@types/nat-upnp": "^1.1.2",
       "@types/node": "^20.4.5"
    },
-   "version": "0.1.37"
+   "version": "0.1.38"
 }

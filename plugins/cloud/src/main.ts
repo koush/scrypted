@@ -800,8 +800,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
                     const version = 2;
                     const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `v${version}`, `${process.platform}-${process.arch}`);
+                    const bin = path.join(cloudflareD, cloudflared.bin);
 
-                    if (!fs.existsSync(cloudflared.bin)) {
+                    if (!fs.existsSync(bin)) {
                         for (let i = 0; i <= version; i++) {
                             const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `v${version}`);
                             rmSync(cloudflareD, {
@@ -809,7 +810,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                                 recursive: true,
                             });
                         }
-                        const bin = path.join(cloudflareD, cloudflared.bin);
                         if (process.platform === 'darwin' && process.arch === 'arm64') {
                             const bin = path.join(cloudflareD, cloudflared.bin);
                             mkdirSync(path.dirname(bin), {
