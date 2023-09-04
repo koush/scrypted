@@ -1,3 +1,4 @@
+import ip from 'ip';
 import axios from 'axios';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
@@ -333,8 +334,9 @@ async function start(mainFilename: string, options?: {
         if (owner)
             endpoint = `@${owner}/${endpoint}`;
         try {
-            const response = await axios(`https://registry.npmjs.org/${endpoint}`);
-            res.send(response.data);
+            const response = await fetch(`https://registry.npmjs.org/${endpoint}`);
+            const json = await response.json();
+            res.send(json);
         }
         catch (e) {
             res.status(500);
@@ -473,11 +475,21 @@ async function start(mainFilename: string, options?: {
         res.send(200);
     });
 
+    const getAddresses = async () => {
+        const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true))
+            .map(address => {
+                if (ip.isV6Format(address))
+                    address = `[${address}]`;
+                return `https://${address}:${SCRYPTED_SECURE_PORT}`
+            });
+        return addresses;
+    }
+
     app.post('/login', async (req, res) => {
         const { username, password, change_password, maxAge: maxAgeRequested } = req.body;
         const timestamp = Date.now();
         const maxAge = parseInt(maxAgeRequested) || ONE_DAY_MILLISECONDS;
-        const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true)).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
+        const addresses = await getAddresses();
 
         if (hasLogin) {
             const user = await db.tryGet(ScryptedUser, username);
@@ -571,7 +583,7 @@ async function start(mainFilename: string, options?: {
         await checkResetLogin();
 
         const hostname = os.hostname()?.split('.')?.[0];
-        const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true)).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
+        const addresses = await getAddresses();
 
         // env/header based admin login
         if (res.locals.username) {
