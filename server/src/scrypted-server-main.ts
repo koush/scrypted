@@ -1,5 +1,4 @@
 import ip from 'ip';
-import axios from 'axios';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
@@ -28,6 +27,7 @@ import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 import { once } from 'events';
 import util from 'util';
+import { getNpmPackageInfo } from './fetch-helpers';
 
 export type Runtime = ScryptedRuntime;
 
@@ -334,8 +334,7 @@ async function start(mainFilename: string, options?: {
         if (owner)
             endpoint = `@${owner}/${endpoint}`;
         try {
-            const response = await fetch(`https://registry.npmjs.org/${endpoint}`);
-            const json = await response.json();
+            const json = await getNpmPackageInfo(endpoint);
             res.send(json);
         }
         catch (e) {

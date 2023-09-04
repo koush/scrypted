@@ -1,11 +1,11 @@
 import { ScryptedInterfaceProperty, ScryptedNativeId } from "@scrypted/types";
-import { ScryptedRuntime } from "../runtime";
-import { Plugin } from '../db-types';
-import { getState } from "../state";
-import axios from 'axios';
 import semver from 'semver';
-import { sleep } from "../sleep";
+import { Plugin } from '../db-types';
+import { getNpmPackageInfo } from "../fetch-helpers";
 import { hasMixinCycle } from "../mixin/mixin-cycle";
+import { ScryptedRuntime } from "../runtime";
+import { sleep } from "../sleep";
+import { getState } from "../state";
 
 export class PluginComponent {
     scrypted: ScryptedRuntime;
@@ -110,8 +110,7 @@ export class PluginComponent {
     }
 
     async npmInfo(endpoint: string) {
-        const response = await axios(`https://registry.npmjs.org/${endpoint}`);
-        return response.data;
+        return getNpmPackageInfo(endpoint);
     }
 
     async updatePlugins() {

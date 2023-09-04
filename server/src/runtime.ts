@@ -1,6 +1,5 @@
 import { Device, DeviceInformation, DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceMethod, ScryptedInterfaceProperty, ScryptedNativeId, ScryptedUser as SU } from '@scrypted/types';
 import AdmZip from 'adm-zip';
-import axios from 'axios';
 import crypto from 'crypto';
 import * as io from 'engine.io';
 import { once } from 'events';
@@ -18,6 +17,7 @@ import tar from 'tar';
 import { URL } from "url";
 import WebSocket, { Server as WebSocketServer } from "ws";
 import { Plugin, PluginDevice, ScryptedAlert, ScryptedUser } from './db-types';
+import { fetchBuffer, getNpmPackageInfo } from './fetch-helpers';
 import { createResponseInterface } from './http-interfaces';
 import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefault, getProvidedRoomOrDefault, getProvidedTypeOrDefault } from './infer-defaults';
 import { IOServer } from './io';
@@ -504,15 +504,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             return;
         installedSet.add(pkg);
 
-        const registry = (await axios(`https://registry.npmjs.org/${pkg}`)).data;
+        const registry = await getNpmPackageInfo(pkg);
         if (!version) {
             version = registry['dist-tags'].latest;
         }
         console.log('installing package', pkg, version);
 
-        const tarball = (await axios(`${registry.versions[version].dist.tarball}`, {
-            responseType: 'arraybuffer'
-        })).data;
+        const tarball = await fetchBuffer(`${registry.versions[version].dist.tarball}`);
         console.log('downloaded tarball', tarball?.length);
         const parse = new (tar.Parse as any)();
         const files: { [name: string]: Buffer } = {};
@@ -561,7 +559,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         })();
 
         const pt = new PassThrough();
-        pt.write(Buffer.from(tarball));
+        pt.write(tarball);
         pt.push(null);
         pt.pipe(parse);
         return ret;

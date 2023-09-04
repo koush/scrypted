@@ -1,5 +1,4 @@
 import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject as MediaObjectInterface, MediaObjectOptions, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
-import axios from 'axios';
 import pathToFfmpeg from 'ffmpeg-static';
 import fs from 'fs';
 import https from 'https';
@@ -51,12 +50,9 @@ export abstract class MediaManagerBase implements MediaManager {
                 fromMimeType: ScryptedMimeTypes.SchemePrefix + h,
                 toMimeType: ScryptedMimeTypes.MediaObject,
                 convert: async (data, fromMimeType, toMimeType) => {
-                    const ab = await axios.get(data.toString(), {
-                        responseType: 'arraybuffer',
-                        httpsAgent,
-                    });
-                    const mimeType = ab.headers['content-type'] || toMimeType;
-                    const mo = this.createMediaObject(Buffer.from(ab.data), mimeType);
+                    const ab = await fetch(data.toString());
+                    const mimeType = ab.headers.get('Content-type') || toMimeType;
+                    const mo = this.createMediaObject(Buffer.from(await ab.arrayBuffer()), mimeType);
                     return mo;
                 }
             });

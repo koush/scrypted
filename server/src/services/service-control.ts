@@ -1,6 +1,6 @@
-import { ScryptedRuntime } from "../runtime";
 import fs from 'fs';
-import axios from "axios";
+import { fetchJSON } from "../fetch-helpers";
+import { ScryptedRuntime } from "../runtime";
 
 export class ServiceControl {
     constructor(public scrypted: ScryptedRuntime) {
@@ -23,12 +23,12 @@ export class ServiceControl {
         const webhookUpdate = process.env.SCRYPTED_WEBHOOK_UPDATE;
         if (webhookUpdate) {
             const webhookUpdateAuthorization = process.env.SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION;
-            const response = await axios.get(webhookUpdate, {
+            const json = await fetchJSON(webhookUpdate, {
                 headers: {
                     Authorization: webhookUpdateAuthorization,
                 }
             });
-            return response.data;
+            return json;
         }
         else {
             fs.writeFileSync('.update', '');
