@@ -809,6 +809,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                                 recursive: true,
                             });
                         }
+                        const bin = path.join(cloudflareD, cloudflared.bin);
                         if (process.platform === 'darwin' && process.arch === 'arm64') {
                             const bin = path.join(cloudflareD, cloudflared.bin);
                             mkdirSync(path.dirname(bin), {
@@ -825,7 +826,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                             fs.chmodSync(bin, 0o0755)
                         }
                         else {
-                            await cloudflared.install(cloudflared.bin);
+                            await cloudflared.install(bin);
                         }
                     }
                     process.chdir(cloudflareD);
