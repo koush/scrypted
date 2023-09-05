@@ -2,6 +2,7 @@ import { RTCIceCandidate, RTCPeerConnection } from "./werift";
 import { RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession } from '@scrypted/sdk';
 import { createRawResponse } from "./werift-util";
 import { sleep } from "@scrypted/common/src/sleep";
+import ip from 'ip';
 
 export class WeriftSignalingSession implements RTCSignalingSession {
     remoteDescription: Promise<any>;
@@ -59,8 +60,12 @@ export class WeriftSignalingSession implements RTCSignalingSession {
         // werift seems to choose whatever candidate pair results in the fastest connection.
         // this makes it sometimes choose the STUN or TURN candidate even when
         // on the local network.
-        if (candidate.candidate?.includes('relay'))
-            await sleep(500);
+        if (candidate.candidate?.includes('relay')) {
+            // but consider ipv6 relay candidates immediately because
+            // 6to4 gateway candidates from tmobile may be unreliable.
+            if (!ip.isV6Format(candidate.candidate?.split(' ')?.[4]))
+                await sleep(500);
+        }
         else if (candidate.candidate?.includes('srflx'))
             await sleep(250);
         await this.pc.addIceCandidate(new RTCIceCandidate(candidate));

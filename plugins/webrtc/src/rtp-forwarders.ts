@@ -286,7 +286,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         let rtspServer: RtspServer;
                         audioClient.clientPromise.then(async client => {
                             const r = new RtspServer(client, audioSdp, !clientIsTcp);
-                            killDeferred.promise.finally(() => rtspServer.destroy());
+                            killDeferred.promise.finally(() => r.destroy());
                             await r.handlePlayback();
                             rtspServer = r;
                         });
