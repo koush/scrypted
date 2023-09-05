@@ -4,6 +4,10 @@ import { createRawResponse } from "./werift-util";
 import { sleep } from "@scrypted/common/src/sleep";
 import ip from 'ip';
 
+function isV6Only(address: string) {
+    return !ip.isV4Format(address) && ip.isV6Format(address);
+}
+
 export class WeriftSignalingSession implements RTCSignalingSession {
     remoteDescription: Promise<any>;
     __proxy_props: { options: {}; };
@@ -16,12 +20,16 @@ export class WeriftSignalingSession implements RTCSignalingSession {
         return {};
     }
 
+    localHasV6 = false;
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
         // werift turn does not seem to work? maybe? sometimes it does? we ignore it here, and that's fine as only 1 side
         // needs turn.
         // stun candidates will come through here, if connection is slow to establish.
         this.pc.onIceCandidate.subscribe(candidate => {
+            this.localHasV6 ||= isV6Only(candidate.candidate?.split(' ')?.[4]);
+
             // this.console.log('local candidate', candidate.candidate);
+
             sendIceCandidate?.({
                 candidate: candidate.candidate,
                 sdpMid: candidate.sdpMid,
@@ -55,19 +63,26 @@ export class WeriftSignalingSession implements RTCSignalingSession {
         this.remoteDescription = this.pc.setRemoteDescription(description as any);
     }
 
+    remoteHasV6 = false;
     async addIceCandidate(candidate: RTCIceCandidateInit) {
+        this.remoteHasV6 ||= isV6Only(candidate.candidate?.split(' ')?.[4]);
+
         // todo: fix this in werift or verify it still occurs at later point
         // werift seems to choose whatever candidate pair results in the fastest connection.
         // this makes it sometimes choose the STUN or TURN candidate even when
         // on the local network.
         if (candidate.candidate?.includes('relay')) {
-            // but consider ipv6 relay candidates immediately because
-            // 6to4 gateway candidates from tmobile may be unreliable.
-            if (!ip.isV6Format(candidate.candidate?.split(' ')?.[4]))
+            if (this.remoteHasV6 && !this.localHasV6) {
+                this.console.log('Possible mobile network IPv6to4 translation detected.');
+            }
+            else {
                 await sleep(500);
+            }
         }
-        else if (candidate.candidate?.includes('srflx'))
+        else if (candidate.candidate?.includes('srflx')) {
             await sleep(250);
+        }
+
         await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
     }
 }
