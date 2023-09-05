@@ -1,4 +1,4 @@
-import ip from 'ip';
+import ip, { isV4Format } from 'ip';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
@@ -477,7 +477,7 @@ async function start(mainFilename: string, options?: {
     const getAddresses = async () => {
         const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true))
             .map(address => {
-                if (ip.isV6Format(address))
+                if (ip.isV6Format(address) && !isV4Format(address))
                     address = `[${address}]`;
                 return `https://${address}:${SCRYPTED_SECURE_PORT}`
             });
