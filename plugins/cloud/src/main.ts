@@ -151,6 +151,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             hide: true,
             json: true,
         },
+        cloudflaredTunnelToken: {
+            group: 'Advanced',
+            title: 'Cloudflare Tunnel Token',
+            description: 'Optional: Enter the Cloudflare token from the Cloudflare Dashbaord to track and manage the tunnel remotely.',
+            onPut: () => {
+                this.cloudflared?.child.kill();
+            },
+        },
         register: {
             group: 'Advanced',
             title: 'Register',
@@ -165,14 +173,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             onPut: () => this.testPortForward(),
             description: 'Test the port forward connection from Scrypted Cloud.',
         },
-        cloudflaredTunnelToken: {
-            group: 'Advanced',
-            title: 'Cloudflare Tunnel Token',
-            description: 'Optional: Enter the Cloudflare token from the Cloudflare Dashbaord to track and manage the tunnel remotely.',
-            onPut: () => {
-                this.cloudflared?.child.kill();
-            },
-        }
     });
     upnpInterval: NodeJS.Timeout;
     upnpClient = upnp.createClient();
@@ -212,7 +212,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         this.storageSettings.settings.securePort.onGet = async () => {
             return {
-                hide: this.storageSettings.values.forwardingMode === 'Disabled',
+                group: this.storageSettings.values.forwardingMode === 'Disabled' ? 'Advanced' : undefined,
+                title: this.storageSettings.values.forwardingMode === 'Disabled' ? 'Cloudflare Port' : 'Forward Port',
             }
         };
 
