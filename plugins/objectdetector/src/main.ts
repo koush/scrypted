@@ -165,7 +165,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.startPipelineAnalysis();
       return;
     }
-  
+
     // motion sensor should only be started when in replace mode
     if (this.motionSensorSupplementation === BUILTIN_MOTION_SENSOR_REPLACE)
       this.startPipelineAnalysis();
@@ -697,7 +697,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     const pipelines = getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator));
-    const webcodec = pipelines.find(p => p.nativeId === 'webcodec');
+    const webcodec = process.env.SCRYPTED_INSTALL_ENVIRONMENT === 'electron' ? pipelines.find(p => p.nativeId === 'webcodec') : undefined;
     const gstreamer = pipelines.find(p => p.nativeId === 'gstreamer');
     const libav = pipelines.find(p => p.nativeId === 'libav');
     const ffmpeg = pipelines.find(p => p.nativeId === 'ffmpeg');
@@ -1107,9 +1107,9 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     this.statsSnapshotConcurrent--;
 
     const objectDetections = [...this.currentMixins.values()]
-    .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
-    .filter(c => !c.detectorRunning);
-    
+      .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
+      .filter(c => !c.detectorRunning);
+
     for (const notRunning of objectDetections) {
       notRunning.maybeStartDetection();
     }
