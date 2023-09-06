@@ -125,7 +125,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         },
         securePort: {
             title: 'Forward Port',
-            description: 'The internal https port used by the Scrypted Cloud plugin. The router must forward connections to this port number on this server\'s internal IP address.',
+            description: 'The internal https port used by the Scrypted Cloud plugin. Connections must be forwarded to this port on this server\'s internal IP address.',
             type: 'number',
             onPut: (ov, nv) => {
                 if (ov && ov !== nv)
