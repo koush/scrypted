@@ -86,8 +86,9 @@ interface RpcLocalProxyValue {
 }
 
 interface Deferred {
-    resolve: any;
-    reject: any;
+    resolve: (value: any) => void;
+    reject: (e: Error) => void;
+    method: string;
 }
 
 export interface PrimitiveProxyHandler<T extends object> extends ProxyHandler<T> {
@@ -198,7 +199,7 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
             return Promise.resolve();
         }
 
-        const pendingResult = this.peer.createPendingResult((id, reject) => {
+        const pendingResult = this.peer.createPendingResult(method, (id, reject) => {
             rpcApply.id = id;
             this.peer.send(rpcApply, reject, serializationContext);
         });
@@ -409,7 +410,7 @@ export class RpcPeer {
 
     constructor(public selfName: string, public peerName: string, public send: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
         this.killed = new Promise<string>((resolve, reject) => {
-            this.killedDeferred = { resolve, reject };
+            this.killedDeferred = { resolve, reject, method: undefined };
         }).catch(e => e.message || 'Unknown Error');
     }
 
@@ -421,13 +422,13 @@ export class RpcPeer {
         return !value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.transportSafeArgumentTypes.has(value.constructor?.name));
     }
 
-    createPendingResult(cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
+    createPendingResult(method: string, cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
         if (Object.isFrozen(this.pendingResults))
             return Promise.reject(new RPCResultError(this, 'RpcPeer has been killed (createPendingResult)'));
 
         const promise = new Promise((resolve, reject) => {
             const id = (this.idCounter++).toString();
-            this.pendingResults[id] = { resolve, reject };
+            this.pendingResults[id] = { resolve, reject, method };
 
             cb(id, e => reject(new RPCResultError(this, e.message, e)));
         });
@@ -476,7 +477,7 @@ export class RpcPeer {
     }
 
     async getParam(param: string) {
-        return this.createPendingResult((id, reject) => {
+        return this.createPendingResult('getParam', (id, reject) => {
             const paramMessage: RpcParam = {
                 id,
                 type: 'param',
