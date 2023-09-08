@@ -6,7 +6,7 @@ import { supportedTypes } from ".";
 supportedTypes.set(ScryptedDeviceType.Doorbell, {
     async discover(device: ScryptedDevice): Promise<Partial<DiscoveryEndpoint>> {
         let capabilities: any[] = [];
-        const displayCategories: DisplayCategory[] = ['DOORBELL'];
+        const displayCategories: DisplayCategory[] = [];
 
         if (device.interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
             capabilities = await getCameraCapabilities(device);
@@ -24,6 +24,9 @@ supportedTypes.set(ScryptedDeviceType.Doorbell, {
             );
         }
 
+        //  Important: If your device is a video doorbell, make sure that you list CAMERA before DOORBELL in the displayCategories list.
+        displayCategories.push('DOORBELL');
+
         return {
             displayCategories,
             capabilities
@@ -38,6 +41,9 @@ supportedTypes.set(ScryptedDeviceType.Doorbell, {
         if (response)
             return response;
         
+        if (eventDetails.eventInterface === ScryptedInterface.BinarySensor && eventData === false)
+            return {};
+
         if (eventDetails.eventInterface === ScryptedInterface.BinarySensor && eventData === true)
             return {
                 event: {
