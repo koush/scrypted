@@ -120,7 +120,7 @@ export async function getCameraCapabilities(device: ScryptedDevice): Promise<Dis
             "interface": "Alexa.RTCSessionController",
             "version": "3",
             "configuration": {
-                isFullDuplexAudioSupported: true,
+                "isFullDuplexAudioSupported": true,
             }
         } as DiscoveryCapability
     ];

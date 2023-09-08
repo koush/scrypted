@@ -7,7 +7,19 @@ import { Response, WebRTCAnswerGeneratedForSessionEvent, WebRTCSessionConnectedE
 
 export class AlexaSignalingSession implements RTCSignalingSession {
     constructor(public response: AlexaHttpResponse, public directive: any) {
-        this.options = {
+        this.options = this.createOptions();
+        this.__proxy_props = { options: this.createOptions() };
+    }
+
+    __proxy_props: { options: RTCSignalingOptions; };
+    options: RTCSignalingOptions;
+    
+    async getOptions(): Promise<RTCSignalingOptions> {
+        return this.options;
+    }
+
+    private createOptions() {
+        const options: RTCSignalingOptions = {
             proxy: true,
             offer: {
                 type: 'offer',
@@ -21,14 +33,9 @@ export class AlexaSignalingSession implements RTCSignalingSession {
                 width: 1280,
                 height: 720
             }
-        }
-    }
+        };
 
-    __proxy_props: { options: RTCSignalingOptions; };
-    options: RTCSignalingOptions;
-
-    async getOptions(): Promise<RTCSignalingOptions> {
-        return this.options;
+        return options;
     }
 
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
