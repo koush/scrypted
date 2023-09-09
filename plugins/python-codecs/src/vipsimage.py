@@ -60,7 +60,7 @@ class VipsImage(scrypted_sdk.Image):
                     return memoryview(gray.write_to_memory())
             return await to_thread(format)
 
-        return await to_thread(lambda: vipsImage.vipsImage.write_to_buffer('.' + options['format']))
+        return await to_thread(lambda: vipsImage.vipsImage.write_to_buffer(f'.{options["format"]}[Q=80]'))
 
     async def toImageInternal(self, options: scrypted_sdk.ImageOptions = None):
        return await to_thread(lambda: toVipsImage(self, options))
