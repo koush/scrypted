@@ -1114,8 +1114,12 @@ class ObjectDetection:
 class ObjectDetectionGenerator:
 
 
+    pass
+
 class ObjectDetectionPreview:
 
+
+    pass
 
 class ObjectDetector:
     """ObjectDetector is found on Cameras that have smart detection capabilities."""

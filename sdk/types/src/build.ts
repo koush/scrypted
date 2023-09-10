@@ -210,6 +210,10 @@ ${toDocstring(td)}
 
 `
     }
+    if (!td.children)
+        python += `
+    pass
+`
 }
 
 for (const td of interfaces) {
