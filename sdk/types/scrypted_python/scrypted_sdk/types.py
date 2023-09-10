@@ -146,6 +146,7 @@ class ScryptedInterface(str, Enum):
     Notifier = "Notifier"
     OauthClient = "OauthClient"
     ObjectDetection = "ObjectDetection"
+    ObjectDetectionGenerator = "ObjectDetectionGenerator"
     ObjectDetector = "ObjectDetector"
     ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
@@ -1107,6 +1108,9 @@ class ObjectDetection:
 
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         pass
+
+
+class ObjectDetectionGenerator:
 
 
 class ObjectDetector:
@@ -2911,6 +2915,11 @@ ScryptedInterfaceDescriptors = {
       "generateObjectDetections",
       "getDetectionModel"
     ],
+    "properties": []
+  },
+  "ObjectDetectionGenerator": {
+    "name": "ObjectDetectionGenerator",
+    "methods": [],
     "properties": []
   },
   "HumiditySetting": {

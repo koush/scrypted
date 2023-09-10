@@ -21,15 +21,16 @@ function toTypescriptType(type: any): string {
 
 for (const name of Object.values(ScryptedInterface)) {
     const td = schema.children.find((child: any) => child.name === name);
-    const properties = td.children.filter((child: any) => child.kindString === 'Property').map((child: any) => child.name);
-    const methods = td.children.filter((child: any) => child.kindString === 'Method').map((child: any) => child.name);
+    const children = td.children || [];
+    const properties = children.filter((child: any) => child.kindString === 'Property').map((child: any) => child.name);
+    const methods = children.filter((child: any) => child.kindString === 'Method').map((child: any) => child.name);
     ScryptedInterfaceDescriptors[name] = {
         name,
         methods,
         properties,
     };
 
-    for (const p of td.children.filter((child: any) => child.kindString === 'Property')) {
+    for (const p of children.filter((child: any) => child.kindString === 'Property')) {
         allProperties[p.name] = p.type;
     }
 }
@@ -196,8 +197,9 @@ class ${td.name}:
 ${toDocstring(td)}
 `;
 
-    const properties = td.children.filter((child: any) => child.kindString === 'Property');
-    const methods = td.children.filter((child: any) => child.kindString === 'Method');
+    const children = td.children || [];
+    const properties = children.filter((child: any) => child.kindString === 'Property');
+    const methods = children.filter((child: any) => child.kindString === 'Method');
     for (const property of properties) {
         python += `    ${property.name}: ${toPythonType(property.type)}${toComment(property)}
 `
