@@ -27,7 +27,8 @@
       "name": "PAM Diff Motion Detection",
       "type": "API",
       "interfaces": [
-         "ObjectDetection"
+         "ObjectDetection",
+         "ObjectDetectionGenerator"
       ],
       "pluginDependencies": [
          "@scrypted/objectdetector"
@@ -43,5 +44,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.23"
+   "version": "0.0.24"
 }

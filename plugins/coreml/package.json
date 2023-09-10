@@ -34,11 +34,12 @@
       "type": "API",
       "interfaces": [
          "Settings",
-         "ObjectDetection"
+         "ObjectDetection",
+         "ObjectDetectionPreview"
       ]
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.26"
+   "version": "0.1.27"
 }
