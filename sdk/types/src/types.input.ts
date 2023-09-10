@@ -1383,7 +1383,8 @@ export interface ObjectDetection {
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
-
+export interface ObjectDetectionPreview {
+}
 export interface ObjectDetectionGenerator {
 }
 export type ImageFormat = 'gray' | 'rgba' | 'rgb' | 'jpg';
@@ -2009,6 +2010,7 @@ export enum ScryptedInterface {
   ObjectTracker = "ObjectTracker",
   ObjectDetector = "ObjectDetector",
   ObjectDetection = "ObjectDetection",
+  ObjectDetectionPreview = "ObjectDetectionPreview",
   ObjectDetectionGenerator = "ObjectDetectionGenerator",
   HumiditySetting = "HumiditySetting",
   Fan = "Fan",

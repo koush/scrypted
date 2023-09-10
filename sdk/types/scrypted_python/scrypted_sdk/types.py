@@ -147,6 +147,7 @@ class ScryptedInterface(str, Enum):
     OauthClient = "OauthClient"
     ObjectDetection = "ObjectDetection"
     ObjectDetectionGenerator = "ObjectDetectionGenerator"
+    ObjectDetectionPreview = "ObjectDetectionPreview"
     ObjectDetector = "ObjectDetector"
     ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
@@ -1111,6 +1112,9 @@ class ObjectDetection:
 
 
 class ObjectDetectionGenerator:
+
+
+class ObjectDetectionPreview:
 
 
 class ObjectDetector:
@@ -2915,6 +2919,11 @@ ScryptedInterfaceDescriptors = {
       "generateObjectDetections",
       "getDetectionModel"
     ],
+    "properties": []
+  },
+  "ObjectDetectionPreview": {
+    "name": "ObjectDetectionPreview",
+    "methods": [],
     "properties": []
   },
   "ObjectDetectionGenerator": {
