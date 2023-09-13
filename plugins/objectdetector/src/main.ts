@@ -1022,6 +1022,12 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
         return value;
       },
     },
+    developerMode: {
+      group: 'Advanced',
+      title: 'Developer Mode',
+      description: 'Developer mode enables usage of the raw detector object detectors. Using raw object detectors (ie, outside of Scrypted NVR) can cause severe performance degradation.',
+      type: 'boolean',
+    }
   });
 
   shouldUseSnapshotPipeline() {
@@ -1179,6 +1185,8 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
     if (!interfaces.includes(ScryptedInterface.ObjectDetection))
+      return;
+    if (!this.storageSettings.values.developerMode && !interfaces.includes(ScryptedInterface.ObjectDetectionGenerator))
       return;
     return [ScryptedInterface.MixinProvider];
   }
