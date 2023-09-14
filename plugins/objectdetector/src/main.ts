@@ -1149,7 +1149,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
   }
 
   constructor(nativeId?: ScryptedNativeId) {
-    super(nativeId);
+    super(nativeId, 'v5');
 
     process.nextTick(() => {
       sdk.deviceManager.onDevicesChanged({
