@@ -159,6 +159,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.cloudflared?.child.kill();
             },
         },
+        cloudflaredTunnelUrl: {
+            group: 'Advanced',
+            title: 'Cloudflare Tunnel URL',
+            description: 'Cloudflare Tunnel URL is a randomized cloud connection, unless a Cloudflare Tunnel Token is provided.',
+            readonly: true,
+            mapGet: () =>  this.cloudflareTunnel || 'Unavailable',
+        },
         register: {
             group: 'Advanced',
             title: 'Register',
