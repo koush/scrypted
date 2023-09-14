@@ -187,7 +187,7 @@ export class OnvifIntercom implements Intercom {
         let pending: RtpPacket;
         let seqNumber = 0;
 
-        const forwarder = await startRtpForwarderProcess(console, ffmpegInput, {
+        const forwarder = await startRtpForwarderProcess(this.camera.console, ffmpegInput, {
             audio: {
                 onRtp: (rtp) => {
                     // if (true) {
