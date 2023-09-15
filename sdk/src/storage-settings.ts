@@ -161,7 +161,7 @@ export class StorageSettings<T extends string> implements Settings {
         this.device.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
-    private getItemInternal(key: T, setting: StorageSetting, rawDevice?: boolean): any {
+    getItemInternal(key: T, setting: StorageSetting, rawDevice?: boolean): any {
         if (!setting)
             return this.device.storage.getItem(key);
         const readDefaultValue = () => {
