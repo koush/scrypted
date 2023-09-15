@@ -161,7 +161,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   maybeStartDetection() {
     if (!this.hasMotionType) {
       // object detection may be restarted if there are slots available.
-      if (this.cameraDevice.motionDetected && this.plugin.canStartObjectDetection())
+      if (this.cameraDevice.motionDetected && this.plugin.canStartObjectDetection(this))
         this.startPipelineAnalysis();
       return;
     }
@@ -1074,15 +1074,27 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     return maxConcurrent;
   }
 
-  canStartObjectDetection() {
+  canStartObjectDetection(mixin: ObjectDetectionMixin) {
     const maxConcurrent = this.maxConcurrent;
 
-    const objectDetections = [...this.currentMixins.values()]
+    const runningDetections = [...this.currentMixins.values()]
       .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
       .filter(c => c.detectorRunning)
       .sort((a, b) => a.detectionStartTime - b.detectionStartTime);
 
-    return objectDetections.length < maxConcurrent;
+    // already running
+    if (runningDetections.find(o => o.id === mixin.id))
+      return false;
+
+    if (runningDetections.length < maxConcurrent)
+      return true;
+
+    const [first] = runningDetections;
+    if (Date.now() - first.detectionStartTime > 30000)
+      return true;
+
+    mixin.console.log(`Not starting object detection to continue processing recent activity on ${first.name}.`);
+    return false;
   }
 
   objectDetectionStarted(name: string, console: Console) {
