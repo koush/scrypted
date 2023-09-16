@@ -128,8 +128,8 @@ else {
         out = path.resolve(cwd, 'out');
 
     if (!entry) {
-        console.error('unable to locate src/main.js or src/main.ts');
-        return 1;
+        console.warn('unable to locate src/main.js or src/main.ts');
+        console.warn('if a custom webpack config is used, will fall back to an entry configured there');
     }
 
     var webpackCmd = path.resolve(cwd, 'node_modules/.bin/webpack-cli');
@@ -177,9 +177,25 @@ else {
                 process.env.SCRYPTED_DEFAULT_WEBPACK_CONFIG = defaultWebpackConfig;
 
                 const config = require(webpackConfig);
-                config.entry = {
-                    main: entry,
-                };
+                if (entry) {
+                    // a standard entrypoint was found
+                    config.entry = {
+                        main: entry,
+                    };
+                } else {
+                    // try to use an entrypoint specified in the webpack config
+                    if (!config?.entry?.main) {
+                        console.error("webpack config does not supply an entry file");
+                        return 1;
+                    }
+                    var resolved = path.resolve(cwd, config.entry.main);
+                    if (fs.existsSync(resolved)) {
+                        config.entry.main = resolved
+                    } else {
+                        console.error("entry file specified in webpack config does not exist");
+                        return 1;
+                    }
+                }
                 config.output.path = out;
                 config.output.filename = runtime.output;
 
