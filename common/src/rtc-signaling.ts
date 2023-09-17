@@ -221,7 +221,9 @@ export class BrowserSignalingSession implements RTCSignalingSession {
             await set;
             await gatheringPromise;
             offer = this.pc.localDescription;
+            console.log("localDescription", offer);
             if (!offer) {
+                console.log("need to createOffer again");
                 offer = await this.pc.createOffer({
                     offerToReceiveAudio: !!setup.audio,
                     offerToReceiveVideo: !!setup.video,
