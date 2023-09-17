@@ -183,6 +183,15 @@ export class BrowserSignalingSession implements RTCSignalingSession {
     }
 
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) {
+        try {
+            return this.createLocalDescriptionImpl(type, setup, sendIceCandidate);
+        } catch (e) {
+            console.log(e);
+            throw e;
+        }
+    }
+
+    async createLocalDescriptionImpl(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) {
         await this.createPeerConnection(setup);
 
         const gatheringPromise = new Promise(resolve => {
@@ -211,7 +220,12 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         }
 
         if (type === 'offer') {
-            let offer = await this.pc.createOffer({
+            let offer: RTCSessionDescriptionInit = this.pc.localDescription;
+            if (offer) {
+                console.log("early localDescription", offer);
+                return toDescription(this.pc.localDescription);
+            }
+            offer = await this.pc.createOffer({
                 offerToReceiveAudio: !!setup.audio,
                 offerToReceiveVideo: !!setup.video,
             });
