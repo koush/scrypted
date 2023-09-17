@@ -183,21 +183,12 @@ export class BrowserSignalingSession implements RTCSignalingSession {
     }
 
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) {
-        try {
-            return this.createLocalDescriptionImpl(type, setup, sendIceCandidate);
-        } catch (e) {
-            console.log(e);
-            throw e;
-        }
-    }
-
-    async createLocalDescriptionImpl(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) {
         await this.createPeerConnection(setup);
 
         const gatheringPromise = new Promise(resolve => {
             this.pc.onicecandidate = ev => {
-                console.log("local candidate", ev.candidate);
                 if (ev.candidate) {
+                    // console.log("local candidate", ev.candidate);
                     sendIceCandidate?.(JSON.parse(JSON.stringify(ev.candidate)));
                 }
                 else {
@@ -222,7 +213,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         if (type === 'offer') {
             let offer: RTCSessionDescriptionInit = this.pc.localDescription;
             if (offer) {
-                console.log("early localDescription", offer);
+                // fast path for duplicate calls to createLocalDescription
                 return toDescription(this.pc.localDescription);
             }
             offer = await this.pc.createOffer({
@@ -234,15 +225,10 @@ export class BrowserSignalingSession implements RTCSignalingSession {
                 return toDescription(offer);
             await set;
             await gatheringPromise;
-            offer = this.pc.localDescription;
-            console.log("localDescription", offer);
-            if (!offer) {
-                console.log("need to createOffer again");
-                offer = await this.pc.createOffer({
-                    offerToReceiveAudio: !!setup.audio,
-                    offerToReceiveVideo: !!setup.video,
-                });
-            }
+            offer = this.pc.localDescription || await this.pc.createOffer({
+                offerToReceiveAudio: !!setup.audio,
+                offerToReceiveVideo: !!setup.video,
+            });
             return toDescription(offer);
         }
         else {
