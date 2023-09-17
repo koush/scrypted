@@ -220,10 +220,13 @@ export class BrowserSignalingSession implements RTCSignalingSession {
                 return toDescription(offer);
             await set;
             await gatheringPromise;
-            offer = await this.pc.createOffer({
-                offerToReceiveAudio: !!setup.audio,
-                offerToReceiveVideo: !!setup.video,
-            });
+            offer = this.pc.localDescription;
+            if (!offer) {
+                offer = await this.pc.createOffer({
+                    offerToReceiveAudio: !!setup.audio,
+                    offerToReceiveVideo: !!setup.video,
+                });
+            }
             return toDescription(offer);
         }
         else {
