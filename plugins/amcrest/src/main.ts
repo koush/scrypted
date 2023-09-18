@@ -401,11 +401,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                             ?.replace('.', '')?.toLowerCase()?.trim();
                         if (audioCodec?.includes('aac'))
                             audioCodec = 'aac';
-                        else if (audioCodec.includes('g711a'))
+                        else if (audioCodec?.includes('g711a'))
                             audioCodec = 'pcm_alaw';
-                        else if (audioCodec.includes('g711u'))
+                        else if (audioCodec?.includes('g711u'))
                             audioCodec = 'pcm_ulaw';
-                        else if (audioCodec.includes('g711'))
+                        else if (audioCodec?.includes('g711'))
                             audioCodec = 'pcm';
 
                         if (vso.audio)
