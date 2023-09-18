@@ -95,6 +95,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         for (const element of deviceParameters) {
             try {
                 const response = await this.getClient().digestAuth.request({
+                    httpsAgent: amcrestHttpsAgent,
                     url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=${element.action}`
                 });
 
@@ -147,6 +148,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             return;
 
         const response = await this.getClient().digestAuth.request({
+            httpsAgent: amcrestHttpsAgent,
             url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&${params}`
         });
         this.console.log('reconfigure result', response.data);
@@ -190,14 +192,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 || event === AmcrestEvent.PhoneCallDetectStart
                 || event === AmcrestEvent.AlarmIPCStart
                 || event === AmcrestEvent.DahuaTalkInvite) {
-                if (event === AmcrestEvent.DahuaTalkInvite && payload && multipleCallIds)
-                {
-                    if (payload.includes(callerId))
-                    {
+                if (event === AmcrestEvent.DahuaTalkInvite && payload && multipleCallIds) {
+                    if (payload.includes(callerId)) {
                         this.binaryState = true;
                     }
-                } else 
-                {
+                } else {
                     this.binaryState = true;
                 }
             }
@@ -259,25 +258,23 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         if (!twoWayAudio)
             twoWayAudio = isDoorbell ? 'Amcrest' : 'None';
-        
-        
-        if (doorbellType == DAHUA_DOORBELL_TYPE)
-        {
+
+
+        if (doorbellType == DAHUA_DOORBELL_TYPE) {
             ret.push(
-               {
-                title: 'Multiple Call Buttons',
-                key: 'multipleCallIds',
-                description: 'Some Dahua Doorbells integrate multiple Call Buttons for apartment buildings.',
-                type: 'boolean',
-                value: (this.storage.getItem('multipleCallIds') === 'true').toString(),
-               } 
+                {
+                    title: 'Multiple Call Buttons',
+                    key: 'multipleCallIds',
+                    description: 'Some Dahua Doorbells integrate multiple Call Buttons for apartment buildings.',
+                    type: 'boolean',
+                    value: (this.storage.getItem('multipleCallIds') === 'true').toString(),
+                }
             );
         }
 
         const multipleCallIds = this.storage.getItem('multipleCallIds');
 
-        if (multipleCallIds)
-        {
+        if (multipleCallIds) {
             ret.push(
                 {
                     title: 'Caller ID',
@@ -288,7 +285,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 }
             )
         }
-        
+
 
         ret.push(
             {
@@ -309,11 +306,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         );
 
         return ret;
-        
+
     }
-    
-    
-    
+
+
+
 
     async takeSmartCameraPicture(option?: PictureOptions): Promise<MediaObject> {
         return this.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
@@ -490,7 +487,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.videoStreamOptions = undefined;
 
         super.putSetting(key, value);
-       
+
         this.updateDevice();
         this.updateDeviceInfo();
     }
