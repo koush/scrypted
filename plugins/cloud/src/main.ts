@@ -364,6 +364,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async testPortForward() {
         try {
+            if (this.storageSettings.values.forwardingMode === 'Disabled')
+                throw new Error('Port forwarding is disabled.');
+
             const pluginPath = await endpointManager.getPath(undefined, {
                 public: true,
             });
