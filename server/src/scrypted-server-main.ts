@@ -623,13 +623,13 @@ async function start(mainFilename: string, options?: {
                 basicChecker(req, res);
             });
 
-            const user = await db.tryGet(ScryptedUser, username);
+            const user = await db.tryGet(ScryptedUser, username) as ScryptedUser;
             if (!user.token) {
                 user.token = crypto.randomBytes(16).toString('hex');
                 await db.upsert(user);
             }
 
-            const userToken = new UserToken(res.locals.username, res.locals.aclId, Date.now());
+            const userToken = new UserToken(user._id, user.aclId, Date.now());
 
             res.send({
                 ...createTokens(userToken),
