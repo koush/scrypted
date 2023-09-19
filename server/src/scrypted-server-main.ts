@@ -593,6 +593,7 @@ async function start(mainFilename: string, options?: {
                 ...createTokens(userToken),
                 expiration: ONE_DAY_MILLISECONDS,
                 username: res.locals.username,
+                // TODO: do not return the token from a short term auth mechanism?
                 token: user?.token,
                 addresses,
                 hostname,
