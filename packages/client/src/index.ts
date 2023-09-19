@@ -167,6 +167,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     const cloudAddress = response.headers['x-scrypted-cloud-address'];
 
     return {
+        baseUrl,
         hostname: response.data.hostname as string,
         redirect: response.data.redirect as string,
         username: response.data.username as string,
@@ -254,7 +255,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     else {
         const urlsToCheck = new Set<string>();
         for (const u of [
-            baseUrl,
             ...options?.previousLoginResult?.localAddresses || [],
             options?.previousLoginResult?.directAddress,
             options?.previousLoginResult?.cloudAddress,
@@ -263,6 +263,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 urlsToCheck.add(u);
         }
 
+        // the alternate urls must have a valid response.
         const loginCheckPromises = [...urlsToCheck].map(async baseUrl => {
             const loginCheck = await checkScryptedClientLogin({
                 baseUrl,
@@ -270,7 +271,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             });
 
             if (loginCheck.error || loginCheck.redirect)
-                return loginCheck;
+                throw new Error('login error');
 
             if (!loginCheck.authorization || !loginCheck.username || !loginCheck.queryToken) {
                 console.error(loginCheck);
@@ -280,7 +281,18 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             return loginCheck;
         });
 
-        const loginCheck = await Promise.any(loginCheckPromises);
+        const baseUrlCheck = checkScryptedClientLogin({
+            baseUrl,
+        });
+        loginCheckPromises.push(baseUrlCheck);
+
+        let loginCheck: Awaited<ReturnType<typeof checkScryptedClientLogin>>;
+        try {
+            loginCheck = await Promise.any(loginCheckPromises);
+        }
+        catch (e) {
+            loginCheck = await baseUrlCheck;
+        }
 
         if (loginCheck.error || loginCheck.redirect)
             throw new ScryptedClientLoginError(loginCheck);
