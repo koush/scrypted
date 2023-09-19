@@ -627,7 +627,11 @@ async function start(mainFilename: string, options?: {
                 user.token = crypto.randomBytes(16).toString('hex');
                 await db.upsert(user);
             }
+
+            const userToken = new UserToken(res.locals.username, res.locals.aclId, Date.now());
+
             res.send({
+                ...createTokens(userToken),
                 username,
                 token: user.token,
                 addresses,
