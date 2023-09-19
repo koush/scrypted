@@ -1,5 +1,5 @@
 import { MediaObjectOptions, RTCConnectionManagement, RTCSignalingSession, ScryptedStatic } from "@scrypted/types";
-import axios, { AxiosRequestConfig } from 'axios';
+import axios, { AxiosRequestConfig, AxiosRequestHeaders } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
 import { Deferred } from "../../../common/src/deferred";
@@ -8,7 +8,6 @@ import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceCon
 import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-debouncer";
 import type { IOSocket } from '../../../server/src/io';
 import { MediaObject } from '../../../server/src/plugin/mediaobject';
-import type { MediaObjectRemote } from '../../../server/src/plugin/plugin-api';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
@@ -48,9 +47,8 @@ export interface ScryptedClientStatic extends ScryptedStatic {
     browserSignalingSession?: BrowserSignalingSession;
     address?: string;
     connectionType: ScryptedClientConnectionType;
-    authorization?: string;
-    queryToken?: { [parameter: string]: string };
-    rpcPeer: RpcPeer,
+    rpcPeer: RpcPeer;
+    loginResult: ScryptedClientLoginResult;
 }
 
 export interface ScryptedConnectionOptions {
@@ -59,6 +57,7 @@ export interface ScryptedConnectionOptions {
     webrtc?: boolean;
     baseUrl?: string;
     axiosConfig?: AxiosRequestConfig;
+    previousLoginResult?: ScryptedClientLoginResult;
 }
 
 export interface ScryptedLoginOptions extends ScryptedConnectionOptions {
@@ -155,8 +154,12 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
 export async function checkScryptedClientLogin(options?: ScryptedConnectionOptions) {
     let { baseUrl } = options || {};
     const url = combineBaseUrl(baseUrl, 'login');
+    const headers: AxiosRequestHeaders = {};
+    if (options?.previousLoginResult?.authorization)
+        headers.Authorization = options?.previousLoginResult?.authorization;
     const response = await axios.get(url, {
         withCredentials: true,
+        headers,
         ...options?.axiosConfig,
     });
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
@@ -178,6 +181,15 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         directAddress,
         cloudAddress,
     };
+}
+
+export interface ScryptedClientLoginResult {
+    authorization: string;
+    queryToken: { [parameter: string]: string };
+    localAddresses: string[];
+    scryptedCloud: boolean;
+    directAddress: string;
+    cloudAddress: string;
 }
 
 export class ScryptedClientLoginError extends Error {
@@ -215,16 +227,17 @@ export async function redirectScryptedLogout(baseUrl?: string) {
 export async function connectScryptedClient(options: ScryptedClientOptions): Promise<ScryptedClientStatic> {
     const start = Date.now();
     let { baseUrl, pluginId, clientName, username, password } = options;
+
     let authorization: string;
     let queryToken: any;
-
-    const extraHeaders: { [header: string]: string } = {};
     let localAddresses: string[];
     let scryptedCloud: boolean;
     let directAddress: string;
     let cloudAddress: string;
 
     console.log('@scrypted/client', packageJson.version);
+
+    const extraHeaders: { [header: string]: string } = {};
 
     if (username && password) {
         const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);
@@ -239,9 +252,24 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         console.log('login result', Date.now() - start, loginResult);
     }
     else {
-        const loginCheck = await checkScryptedClientLogin({
+        const urlsToCheck = new Set<string>();
+        for (const u of [
             baseUrl,
-        });
+            ...options?.previousLoginResult?.localAddresses || [],
+            options?.previousLoginResult?.directAddress,
+            options?.previousLoginResult?.cloudAddress,
+        ]) {
+            if (u)
+                urlsToCheck.add(u);
+        }
+
+        const loginCheckPromises = [...urlsToCheck].map(baseUrl => checkScryptedClientLogin({
+            baseUrl,
+            previousLoginResult: options?.previousLoginResult,
+        }));
+
+        const loginCheck = await Promise.any(loginCheckPromises);
+
         if (loginCheck.error || loginCheck.redirect)
             throw new ScryptedClientLoginError(loginCheck);
         localAddresses = loginCheck.addresses;
@@ -632,9 +660,15 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             pluginHostAPI: undefined,
             rtcConnectionManagement,
             browserSignalingSession,
-            authorization,
-            queryToken,
             rpcPeer,
+            loginResult: {
+                directAddress,
+                localAddresses,
+                scryptedCloud,
+                queryToken,
+                authorization,
+                cloudAddress,
+            }
         }
 
         socket.on('close', () => {
