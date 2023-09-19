@@ -270,7 +270,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             options?.previousLoginResult?.directAddress,
             options?.previousLoginResult?.cloudAddress,
         ]) {
-            if (u)
+            if (u && options?.previousLoginResult?.token)
                 urlsToCheck.add(u);
         }
 
@@ -299,6 +299,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
         let loginCheck: Awaited<ReturnType<typeof checkScryptedClientLogin>>;
         try {
+            throw new Error();
             loginCheck = await Promise.any(loginCheckPromises);
         }
         catch (e) {
