@@ -10,7 +10,7 @@ jobs:
 #     runs-on: ubuntu-latest
     strategy:
       matrix:
-        NODE_VERSION: ["18"]
+        NODE_VERSION: ["18", "20"]
         BASE: ["jammy"]
         FLAVOR: ["full", "lite", "thin"]
     steps:
