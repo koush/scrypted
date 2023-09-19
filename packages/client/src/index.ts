@@ -263,10 +263,22 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 urlsToCheck.add(u);
         }
 
-        const loginCheckPromises = [...urlsToCheck].map(baseUrl => checkScryptedClientLogin({
-            baseUrl,
-            previousLoginResult: options?.previousLoginResult,
-        }));
+        const loginCheckPromises = [...urlsToCheck].map(async baseUrl => {
+            const loginCheck = await checkScryptedClientLogin({
+                baseUrl,
+                previousLoginResult: options?.previousLoginResult,
+            });
+
+            if (loginCheck.error || loginCheck.redirect)
+                return loginCheck;
+
+            if (!loginCheck.authorization || !loginCheck.username || !loginCheck.queryToken) {
+                console.error(loginCheck);
+                throw new Error('malformed login result');
+            }
+
+            return loginCheck;
+        });
 
         const loginCheck = await Promise.any(loginCheckPromises);
 
