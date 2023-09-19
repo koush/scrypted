@@ -153,10 +153,17 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
 
 export async function checkScryptedClientLogin(options?: ScryptedConnectionOptions) {
     let { baseUrl } = options || {};
-    const url = combineBaseUrl(baseUrl, 'login');
+    let url = combineBaseUrl(baseUrl, 'login');
     const headers: AxiosRequestHeaders = {};
-    if (options?.previousLoginResult?.authorization)
-        headers.Authorization = options?.previousLoginResult?.authorization;
+    if (options?.previousLoginResult?.queryToken) {
+        // headers.Authorization = options?.previousLoginResult?.authorization;
+        // const search = new URLSearchParams(options.previousLoginResult.queryToken);
+        // url += '?' + search.toString();
+        const token = options?.previousLoginResult.username + ":" + options.previousLoginResult.token;
+        const hash = Buffer.from(token).toString('base64');
+
+        headers.Authorization = `Basic ${hash}`;
+    }
     const response = await axios.get(url, {
         withCredentials: true,
         headers,
@@ -185,6 +192,8 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
 }
 
 export interface ScryptedClientLoginResult {
+    username: string;
+    token: string;
     authorization: string;
     queryToken: { [parameter: string]: string };
     localAddresses: string[];
@@ -235,6 +244,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let scryptedCloud: boolean;
     let directAddress: string;
     let cloudAddress: string;
+    let token: string;
 
     console.log('@scrypted/client', packageJson.version);
 
@@ -250,6 +260,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         cloudAddress = loginResult.cloudAddress;
         authorization = loginResult.authorization;
         queryToken = loginResult.queryToken;
+        token = loginResult.token;
         console.log('login result', Date.now() - start, loginResult);
     }
     else {
@@ -303,6 +314,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         username = loginCheck.username;
         authorization = loginCheck.authorization;
         queryToken = loginCheck.queryToken;
+        token = loginCheck.token;
         console.log('login checked', Date.now() - start, loginCheck);
     }
 
@@ -686,6 +698,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             browserSignalingSession,
             rpcPeer,
             loginResult: {
+                username,
+                token,
                 directAddress,
                 localAddresses,
                 scryptedCloud,
