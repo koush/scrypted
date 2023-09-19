@@ -15,7 +15,6 @@
             "preLaunchTask": "npm: build",
             "program": "${workspaceFolder}/bin/scrypted-serve",
             "runtimeArgs": [
-                "--dns-result-order=ipv4first",
                 "--trace-warnings",
                 "--nolazy",
             ],

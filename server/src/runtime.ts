@@ -510,7 +510,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
         console.log('installing package', pkg, version);
 
-        const tarball = await fetchBuffer(`${registry.versions[version].dist.tarball}`);
+        const { body: tarball } = await fetchBuffer(`${registry.versions[version].dist.tarball}`, {
+            // force ipv4 in case of busted ipv6.
+            family: 4,
+        });
         console.log('downloaded tarball', tarball?.length);
         const parse = new (tar.Parse as any)();
         const files: { [name: string]: Buffer } = {};
