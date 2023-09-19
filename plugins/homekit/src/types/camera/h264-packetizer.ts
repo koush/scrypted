@@ -498,6 +498,9 @@ export class H264Repacketizer {
                         // after the codec information. so codec information can be changed between
                         // idr and non-idr? maybe it is not applied until next idr?
                     }
+                    else if (nalType === 0) {
+                        // nal delimiter or something. usually empty.
+                    }
                     else {
                         this.console.warn('Skipped a stapa type. Please report this to @koush on Discord.', nalType)
                     }
