@@ -474,21 +474,24 @@ async function start(mainFilename: string, options?: {
         res.send(200);
     });
 
-    const getAddresses = async () => {
+    const getAlternateAddresses = async () => {
         const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true))
             .map(address => {
                 if (ip.isV6Format(address) && !isV4Format(address))
                     address = `[${address}]`;
                 return `https://${address}:${SCRYPTED_SECURE_PORT}`
             });
-        return addresses;
+        return {
+            externalAddresses: [...new Set(Object.values(scrypted.addressSettings.externalAddresses).flat())],
+            addresses,
+        };
     }
 
     app.post('/login', async (req, res) => {
         const { username, password, change_password, maxAge: maxAgeRequested } = req.body;
         const timestamp = Date.now();
         const maxAge = parseInt(maxAgeRequested) || ONE_DAY_MILLISECONDS;
-        const addresses = await getAddresses();
+        const alternateAddresses = await getAlternateAddresses();
 
         if (hasLogin) {
             const user = await db.tryGet(ScryptedUser, username);
@@ -530,7 +533,7 @@ async function start(mainFilename: string, options?: {
                 ...createTokens(userToken),
                 username,
                 expiration: maxAge,
-                addresses,
+                ...alternateAddresses,
             });
 
             return;
@@ -561,7 +564,7 @@ async function start(mainFilename: string, options?: {
             username,
             token: user.token,
             expiration: maxAge,
-            addresses,
+            ...alternateAddresses,
         });
     });
 
@@ -582,7 +585,7 @@ async function start(mainFilename: string, options?: {
         await checkResetLogin();
 
         const hostname = os.hostname()?.split('.')?.[0];
-        const addresses = await getAddresses();
+        const alternateAddresses = await getAlternateAddresses();
 
         // env/header based admin login
         if (res.locals.username) {
@@ -595,7 +598,7 @@ async function start(mainFilename: string, options?: {
                 username: res.locals.username,
                 // TODO: do not return the token from a short term auth mechanism?
                 token: user?.token,
-                addresses,
+                ...alternateAddresses,
                 hostname,
             });
             return;
@@ -606,7 +609,7 @@ async function start(mainFilename: string, options?: {
             res.send({
                 expiration: ONE_DAY_MILLISECONDS,
                 username: 'anonymous',
-                addresses,
+                ...alternateAddresses,
                 hostname,
             })
             return;
@@ -635,7 +638,7 @@ async function start(mainFilename: string, options?: {
                 ...createTokens(userToken),
                 username,
                 token: user.token,
-                addresses,
+                ...alternateAddresses,
                 hostname,
             });
             return;
@@ -651,7 +654,7 @@ async function start(mainFilename: string, options?: {
                 ...createTokens(userToken),
                 expiration: (userToken.timestamp + userToken.duration) - Date.now(),
                 username: userToken.username,
-                addresses,
+                ...alternateAddresses,
                 hostname,
             })
         }
@@ -659,7 +662,7 @@ async function start(mainFilename: string, options?: {
             res.send({
                 error: e?.message || 'Unknown Error.',
                 hasLogin,
-                addresses,
+                ...alternateAddresses,
                 hostname,
             })
         }

@@ -3,7 +3,19 @@ import { ScryptedRuntime } from "../runtime";
 import os from 'os';
 
 export class AddressSettings {
+    externalAddresses: {
+        [id: string]: string[],
+    } = {};
+
     constructor(public scrypted: ScryptedRuntime) {
+    }
+
+    async getExternalAddresses(id: string): Promise<string[]> {
+        return this.externalAddresses[id] || [];
+    }
+
+    async setExternalAddresses(id: string, addresses: string[]) {
+        this.externalAddresses[id] = addresses;
     }
 
     async setLocalAddresses(addresses: string[]) {
