@@ -277,7 +277,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             options?.previousLoginResult?.directAddress,
             options?.previousLoginResult?.cloudAddress,
         ]) {
-            if (u && options?.previousLoginResult?.token && isNotChromeOrIsInstalledApp)
+            if (u && options?.previousLoginResult?.token && (isNotChromeOrIsInstalledApp || options.direct))
                 urlsToCheck.add(u);
         }
 
