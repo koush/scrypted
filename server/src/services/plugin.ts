@@ -1,7 +1,7 @@
 import { ScryptedInterfaceProperty, ScryptedNativeId } from "@scrypted/types";
 import semver from 'semver';
 import { Plugin } from '../db-types';
-import { getNpmPackageInfo } from "../fetch-helpers";
+import { getNpmPackageInfo } from "../http-fetch-helpers";
 import { hasMixinCycle } from "../mixin/mixin-cycle";
 import { ScryptedRuntime } from "../runtime";
 import { sleep } from "../sleep";

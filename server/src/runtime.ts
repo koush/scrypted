@@ -17,7 +17,7 @@ import tar from 'tar';
 import { URL } from "url";
 import WebSocket, { Server as WebSocketServer } from "ws";
 import { Plugin, PluginDevice, ScryptedAlert, ScryptedUser } from './db-types';
-import { fetchBuffer, getNpmPackageInfo } from './fetch-helpers';
+import { fetchBuffer, getNpmPackageInfo } from './http-fetch-helpers';
 import { createResponseInterface } from './http-interfaces';
 import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefault, getProvidedRoomOrDefault, getProvidedTypeOrDefault } from './infer-defaults';
 import { IOServer } from './io';

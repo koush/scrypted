@@ -27,7 +27,7 @@ import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 import { once } from 'events';
 import util from 'util';
-import { getNpmPackageInfo } from './fetch-helpers';
+import { getNpmPackageInfo } from './http-fetch-helpers';
 
 export type Runtime = ScryptedRuntime;
 

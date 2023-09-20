@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { fetchJSON } from "../fetch-helpers";
+import { fetchJSON } from "../http-fetch-helpers";
 import { ScryptedRuntime } from "../runtime";
 
 export class ServiceControl {
