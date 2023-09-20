@@ -250,6 +250,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
     const extraHeaders: { [header: string]: string } = {};
 
+    // Chrome will complain about websites making xhr requests to self signed https sites, even
+    // if the cert has been accepted. Other browsers seem fine.
+    // So the default is not to connect to IP addresses on Chrome, but do so on other browsers.
+    const isChrome = globalThis.navigator?.userAgent.includes('Chrome');
+    const isNotChromeOrIsInstalledApp = !isChrome || isInstalledApp();
+    let tryAlternateAddresses = false;
+
     if (username && password) {
         const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);
         if (loginResult.authorization)
@@ -270,7 +277,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             options?.previousLoginResult?.directAddress,
             options?.previousLoginResult?.cloudAddress,
         ]) {
-            if (u && options?.previousLoginResult?.token)
+            if (u && options?.previousLoginResult?.token && isNotChromeOrIsInstalledApp)
                 urlsToCheck.add(u);
         }
 
@@ -299,12 +306,15 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
         let loginCheck: Awaited<ReturnType<typeof checkScryptedClientLogin>>;
         try {
-            throw new Error();
             loginCheck = await Promise.any(loginCheckPromises);
+            tryAlternateAddresses ||= loginCheck.baseUrl !== baseUrl;
         }
         catch (e) {
             loginCheck = await baseUrlCheck;
         }
+
+        if (tryAlternateAddresses)
+            console.log('Found direct login. Allowing alternate addresses.')
 
         if (loginCheck.error || loginCheck.redirect)
             throw new ScryptedClientLoginError(loginCheck);
@@ -336,24 +346,21 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     // watch for this flush.
     const flush = new Deferred<void>();
 
-    // Chrome will complain about websites making xhr requests to self signed https sites, even
-    // if the cert has been accepted. Other browsers seem fine.
-    // So the default is not to connect to IP addresses on Chrome, but do so on other browsers.
-    const isChrome = globalThis.navigator?.userAgent.includes('Chrome');
-    const isNotChromeOrIsInstalledApp = !isChrome || isInstalledApp();
-
     const addresses: string[] = [];
     const localAddressDefault = isNotChromeOrIsInstalledApp;
-    if (((scryptedCloud && options.local === undefined && localAddressDefault) || options.local) && localAddresses) {
+
+    tryAlternateAddresses ||= scryptedCloud;
+
+    if (((tryAlternateAddresses && options.local === undefined && localAddressDefault) || options.local) && localAddresses) {
         addresses.push(...localAddresses);
     }
 
     const directAddressDefault = directAddress && (isNotChromeOrIsInstalledApp || !isIPAddress(directAddress));
-    if (((scryptedCloud && options.direct === undefined && directAddressDefault) || options.direct) && directAddress) {
+    if (((tryAlternateAddresses && options.direct === undefined && directAddressDefault) || options.direct) && directAddress) {
         addresses.push(directAddress);
     }
 
-    if (((scryptedCloud && options.direct === undefined) || options.direct) && cloudAddress) {
+    if (((tryAlternateAddresses && options.direct === undefined) || options.direct) && cloudAddress) {
         addresses.push(cloudAddress);
     }
 
