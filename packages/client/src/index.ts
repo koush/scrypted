@@ -577,6 +577,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         await once(check, 'open');
         return {
             ready: check,
+            address: explicitBaseUrl,
             connectionType: 'http',
         };
     })());
