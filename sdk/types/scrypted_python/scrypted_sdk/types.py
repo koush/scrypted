@@ -1530,7 +1530,7 @@ class SystemManager:
     async def getComponent(self, id: str) -> Any:
         pass
 
-    def getDeviceById(self, id: str) -> ScryptedDevice:
+    async def getDeviceById(self, id: str) -> ScryptedDevice:
         pass
 
     def getDeviceByName(self, name: str) -> ScryptedDevice:
@@ -2993,7 +2993,7 @@ ScryptedInterfaceDescriptors = {
 class EventListenerRegister:
     """Returned when an event listener is attached to an EventEmitter. Call removeListener to unregister from events."""
 
-    def removeListener(self) -> None:
+    async def removeListener(self) -> None:
         pass
 
 

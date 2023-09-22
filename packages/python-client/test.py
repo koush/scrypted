@@ -26,7 +26,7 @@ class EioRpcTransport(rpc_reader.RpcTransport):
         def on_message(data):
             self.read_queue.put_nowait(data)
 
-        asyncio.run_coroutine_threadsafe(self.send_loop(), self.loop)
+        asyncio.create_task(self.send_loop())
 
     async def read(self):
         return await self.read_queue.get()
@@ -47,6 +47,17 @@ class EioRpcTransport(rpc_reader.RpcTransport):
                 if self.write_error:
                     raise self.write_error
                 self.write_queue.put_nowait(buffer)
+            except Exception as e:
+                reject(e)
+
+        asyncio.create_task(send())
+
+    def writeJSON(self, json, reject):
+        async def send():
+            try:
+                if self.write_error:
+                    raise self.write_error
+                self.write_queue.put_nowait(json)
             except Exception as e:
                 reject(e)
 
@@ -90,9 +101,7 @@ async def connect_scrypted_client(
         )
 
         ret = asyncio.Future[ScryptedStatic](loop=transport.loop)
-        peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(
-            transport.loop, transport
-        )
+        peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(transport)
         peer.params["print"] = print
 
         def callback(api, pluginId, hostInfo):
@@ -115,13 +124,13 @@ async def connect_scrypted_client(
                     sdk.mediaManager = MediaManager(await api.getMediaManager())
                     ret.set_result(sdk)
 
-                asyncio.run_coroutine_threadsafe(resolve(), transport.loop)
+                asyncio.create_task(resolve())
 
             remote.setSystemState = remoteSetSystemState
             return remote
 
         peer.params["getRemote"] = callback
-        asyncio.run_coroutine_threadsafe(peerReadLoop(), transport.loop)
+        asyncio.create_task(peerReadLoop())
 
         sdk = await ret
         return sdk
@@ -138,7 +147,14 @@ async def main():
 
     for id in sdk.systemManager.getSystemState():
         device = sdk.systemManager.getDeviceById(id)
+        if ScryptedInterface.Camera not in device.interfaces:
+            continue
         print(device.name)
+        print(device.id)
+        print(device.interfaces)
+        # print(device.providedInterfaces)
+        stream = await device.getVideoStreamOptions()
+        print(stream)
         if ScryptedInterface.OnOff.value in device.interfaces:
             print(f"OnOff: device is {device.on}")
 
