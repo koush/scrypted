@@ -1530,7 +1530,7 @@ class SystemManager:
     async def getComponent(self, id: str) -> Any:
         pass
 
-    async def getDeviceById(self, id: str) -> ScryptedDevice:
+    def getDeviceById(self, id: str) -> ScryptedDevice:
         pass
 
     def getDeviceByName(self, name: str) -> ScryptedDevice:
@@ -1542,10 +1542,10 @@ class SystemManager:
     def getSystemState(self) -> Any:
         pass
 
-    def listen(self, callback: EventListener) -> EventListenerRegister:
+    async def listen(self, callback: EventListener) -> EventListenerRegister:
         pass
 
-    def listenDevice(self, id: str, event: str | EventListenerOptions, callback: EventListener) -> EventListenerRegister:
+    async def listenDevice(self, id: str, event: str | EventListenerOptions, callback: EventListener) -> EventListenerRegister:
         pass
 
     async def removeDevice(self, id: str) -> None:

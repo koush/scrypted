@@ -1783,12 +1783,12 @@ export interface SystemManager {
   /**
    * Passively (without polling) listen to property changed events.
    */
-  listen(callback: EventListener): EventListenerRegister;
+  listen(callback: EventListener): Promise<EventListenerRegister>;
 
   /**
    * Subscribe to events from a specific interface on a device id, such as 'OnOff' or 'Brightness'. This is a convenience method for ScryptedDevice.listen.
    */
-  listenDevice(id: string, event: ScryptedInterface | string | EventListenerOptions, callback: EventListener): EventListenerRegister;
+  listenDevice(id: string, event: ScryptedInterface | string | EventListenerOptions, callback: EventListener): Promise<EventListenerRegister>
 
   /**
    * Remove a device from Scrypted. Plugins should use DeviceManager.onDevicesChanged or DeviceManager.onDeviceRemoved to remove their own devices
