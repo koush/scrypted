@@ -53,17 +53,6 @@ class EioRpcTransport(rpc_reader.RpcTransport):
         asyncio.create_task(send())
 
     def writeJSON(self, json, reject):
-        async def send():
-            try:
-                if self.write_error:
-                    raise self.write_error
-                self.write_queue.put_nowait(json)
-            except Exception as e:
-                reject(e)
-
-        asyncio.run_coroutine_threadsafe(send(), self.loop)
-
-    def writeJSON(self, json, reject):
         return self.writeBuffer(json, reject)
 
 
