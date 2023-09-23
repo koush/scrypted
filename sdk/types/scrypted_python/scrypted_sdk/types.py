@@ -1542,10 +1542,10 @@ class SystemManager:
     def getSystemState(self) -> Any:
         pass
 
-    async def listen(self, callback: EventListener) -> EventListenerRegister:
+    def listen(self, callback: EventListener) -> EventListenerRegister:
         pass
 
-    async def listenDevice(self, id: str, event: str | EventListenerOptions, callback: EventListener) -> EventListenerRegister:
+    def listenDevice(self, id: str, event: str | EventListenerOptions, callback: EventListener) -> EventListenerRegister:
         pass
 
     async def removeDevice(self, id: str) -> None:
