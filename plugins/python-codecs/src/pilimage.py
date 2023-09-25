@@ -98,7 +98,7 @@ def toPILImage(pilImageWrapper: PILImage, options: scrypted_sdk.ImageOptions = N
             if not width:
                 width = pilImage.width * yscale
 
-        pilImage = pilImage.resize((width, height), resample=Image.BILINEAR)
+        pilImage = pilImage.resize((int(width), int(height)), resample=Image.BILINEAR)
 
     return PILImage(pilImage)
 
