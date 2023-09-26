@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import concurrent.futures
 import json
 import re
 from typing import Any, Tuple
@@ -96,6 +94,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
 
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
+            print("EXECUTION_DEVICES", self.compiled_model.get_property("EXECUTION_DEVICES"))
         except:
             import traceback
             traceback.print_exc()
@@ -113,8 +112,6 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
 
         labels_contents = open(labelsFile, 'r').read()
         self.labels = parse_label_contents(labels_contents)
-
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="openvino", )
 
     async def getSettings(self) -> list[Setting]:
         mode = self.storage.getItem('mode') or 'Default'
@@ -181,7 +178,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         return [self.model_dim, self.model_dim]
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        def predict():
+        async def predict():
             infer_request = self.compiled_model.create_infer_request()
             # the input_tensor can be created with the shared_memory=True parameter,
             # but that seems to cause issues on some platforms.
@@ -259,7 +256,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             return objs
 
         try:
-            objs = await asyncio.get_event_loop().run_in_executor(self.executor, predict)
+            objs = await predict()
         except:
             import traceback
             traceback.print_exc()
