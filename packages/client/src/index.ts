@@ -420,7 +420,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         // It is probably better to simply prompt and redirect to the LAN address
         // if it is reacahble.
 
-        for (const address of addresses) {
+        for (const address of new Set(addresses)) {
             console.log('trying', address);
             const check = new eio.Socket(address, localEioOptions);
             sockets.push(check);
