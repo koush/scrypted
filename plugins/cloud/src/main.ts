@@ -164,7 +164,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             title: 'Cloudflare Tunnel URL',
             description: 'Cloudflare Tunnel URL is a randomized cloud connection, unless a Cloudflare Tunnel Token is provided.',
             readonly: true,
-            mapGet: () =>  this.cloudflareTunnel || 'Unavailable',
+            mapGet: () => this.cloudflareTunnel || 'Unavailable',
         },
         register: {
             group: 'Advanced',
@@ -501,6 +501,17 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         catch (e) {
             this.console.error('error updating cors, is your scrypted server up to date?', e);
         }
+    }
+
+    async updateExternalAddresses() {
+        const addresses = await systemManager.getComponent('addresses');
+        const cloudAddresses: string[] = [];
+        if (this.storageSettings.values.hostname)
+            cloudAddresses.push(this.storageSettings.values.hostname);
+        if (this.cloudflareTunnel)
+            cloudAddresses.push(new URL(this.cloudflareTunnel).hostname);
+
+        await addresses.setExternalAddresses('@scrypted/cloud', cloudAddresses);
     }
 
     getAuthority() {
@@ -898,6 +909,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     cloudflareTunnel.child.on('exit', () => deferred.resolve(undefined));
                     try {
                         this.cloudflareTunnel = await Promise.any([deferred.promise, cloudflareTunnel.url]);
+                        this.updateExternalAddresses();
                         if (!this.cloudflareTunnel)
                             throw new Error('cloudflared exited, the provided cloudflare tunnel token may be invalid.')
                     }
@@ -924,6 +936,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             finally {
                 this.cloudflared = undefined;
                 this.cloudflareTunnel = undefined;
+                this.updateExternalAddresses();
             }
         }
     }
