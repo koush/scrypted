@@ -132,22 +132,18 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
     if (response.status !== 200)
         throw new Error('status ' + response.status);
 
-    const addresses = response.data.addresses as string[] || [];
-    // the cloud plugin will include this header.
-    // should maybe move this into the cloud server itself.
-    const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
-    const directAddress = response.headers['x-scrypted-direct-address'];
-    const cloudAddress = response.headers['x-scrypted-cloud-address'];
-
     return {
         error: response.data.error as string,
         authorization: response.data.authorization as string,
         queryToken: response.data.queryToken as any,
         token: response.data.token as string,
-        addresses,
-        scryptedCloud,
-        directAddress,
-        cloudAddress,
+        addresses: response.data.addresses as string[],
+        externalAddresses: response.data.externalAddresses as string[],
+        // the cloud plugin will include this header.
+        // should maybe move this into the cloud server itself.
+        scryptedCloud: response.headers['x-scrypted-cloud'] === 'true',
+        directAddress: response.headers['x-scrypted-direct-address'],
+        cloudAddress: response.headers['x-scrypted-cloud-address'],
     };
 }
 
@@ -169,9 +165,6 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         headers,
         ...options?.axiosConfig,
     });
-    const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
-    const directAddress = response.headers['x-scrypted-direct-address'];
-    const cloudAddress = response.headers['x-scrypted-cloud-address'];
 
     return {
         baseUrl,
@@ -185,9 +178,12 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         queryToken: response.data.queryToken as any,
         token: response.data.token as string,
         addresses: response.data.addresses as string[],
-        scryptedCloud,
-        directAddress,
-        cloudAddress,
+        externalAddresses: response.data.externalAddresses as string[],
+        // the cloud plugin will include this header.
+        // should maybe move this into the cloud server itself.
+        scryptedCloud: response.headers['x-scrypted-cloud'] === 'true',
+        directAddress: response.headers['x-scrypted-direct-address'],
+        cloudAddress: response.headers['x-scrypted-cloud-address'],
     };
 }
 
@@ -197,6 +193,7 @@ export interface ScryptedClientLoginResult {
     authorization: string;
     queryToken: { [parameter: string]: string };
     localAddresses: string[];
+    externalAddresses: string[];
     scryptedCloud: boolean;
     directAddress: string;
     cloudAddress: string;
@@ -241,6 +238,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let authorization: string;
     let queryToken: any;
     let localAddresses: string[];
+    let externalAddresses: string[];
     let scryptedCloud: boolean;
     let directAddress: string;
     let cloudAddress: string;
@@ -262,6 +260,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         if (loginResult.authorization)
             extraHeaders['Authorization'] = loginResult.authorization;
         localAddresses = loginResult.addresses;
+        externalAddresses = loginResult.externalAddresses;
         scryptedCloud = loginResult.scryptedCloud;
         directAddress = loginResult.directAddress;
         cloudAddress = loginResult.cloudAddress;
@@ -272,13 +271,21 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     }
     else {
         const urlsToCheck = new Set<string>();
-        for (const u of [
-            ...options?.previousLoginResult?.localAddresses || [],
-            options?.previousLoginResult?.directAddress,
-            options?.previousLoginResult?.cloudAddress,
-        ]) {
-            if (u && options?.previousLoginResult?.token && (isNotChromeOrIsInstalledApp || options.direct))
-                urlsToCheck.add(u);
+        if (options?.previousLoginResult?.token) {
+            for (const u of [
+                ...options?.previousLoginResult?.localAddresses || [],
+                options?.previousLoginResult?.directAddress,
+            ]) {
+                if (u && (isNotChromeOrIsInstalledApp || options.direct))
+                    urlsToCheck.add(u);
+            }
+            for (const u of [
+                ...options?.previousLoginResult?.externalAddresses || [],
+                options?.previousLoginResult?.cloudAddress,
+            ]) {
+                if (u)
+                    urlsToCheck.add(u);
+            }
         }
 
         // the alternate urls must have a valid response.
@@ -319,6 +326,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         if (loginCheck.error || loginCheck.redirect)
             throw new ScryptedClientLoginError(loginCheck);
         localAddresses = loginCheck.addresses;
+        externalAddresses = loginCheck.externalAddresses;
         scryptedCloud = loginCheck.scryptedCloud;
         directAddress = loginCheck.directAddress;
         cloudAddress = loginCheck.cloudAddress;
@@ -360,8 +368,12 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         addresses.push(directAddress);
     }
 
-    if (((tryAlternateAddresses && options.direct === undefined) || options.direct) && cloudAddress) {
-        addresses.push(cloudAddress);
+    if ((tryAlternateAddresses && options.direct === undefined) || options.direct) {
+        if (cloudAddress)
+            addresses.push(cloudAddress);
+        for (const externalAddress of externalAddresses || []) {
+            addresses.push(externalAddress);
+        }
     }
 
     const tryAddresses = !!addresses.length;
@@ -711,6 +723,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 token,
                 directAddress,
                 localAddresses,
+                externalAddresses,
                 scryptedCloud,
                 queryToken,
                 authorization,
