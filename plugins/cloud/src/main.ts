@@ -507,9 +507,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const addresses = await systemManager.getComponent('addresses');
         const cloudAddresses: string[] = [];
         if (this.storageSettings.values.hostname)
-            cloudAddresses.push(this.storageSettings.values.hostname);
+            cloudAddresses.push(`https://${this.storageSettings.values.hostname}`);
         if (this.cloudflareTunnel)
-            cloudAddresses.push(new URL(this.cloudflareTunnel).hostname);
+            cloudAddresses.push(this.cloudflareTunnel);
 
         await addresses.setExternalAddresses('@scrypted/cloud', cloudAddresses);
     }
