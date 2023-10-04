@@ -151,6 +151,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             hide: true,
             json: true,
         },
+        cloudflareEnabled: {
+            group: 'Advanced',
+            title: 'Cloudflare',
+            type: 'boolean',
+            description: 'Optional: Create a Cloudflare Tunnel to this server at a random domain name. Providing a Cloudflare token will allow usage of a custom domain name.',
+            defaultValue: true,
+            onPut: () => deviceManager.requestRestart(),
+        },
         cloudflaredTunnelToken: {
             group: 'Advanced',
             title: 'Cloudflare Tunnel Token',
@@ -259,6 +267,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         //             || this.storageSettings.values.forwardingMode === 'Disabled',
         //     }
         // };
+
+        this.storageSettings.settings.cloudflaredTunnelToken.onGet =
+            this.storageSettings.settings.cloudflaredTunnelUrl.onGet = async () => {
+                return {
+                    hide: !this.storageSettings.values.cloudflareEnabled,
+                }
+            };
 
         this.log.clearAlerts();
 
@@ -839,6 +854,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async startCloudflared() {
+        if (!this.storageSettings.values.cloudflareEnabled) {
+            this.console.log('cloudflared is disabled.');
+            return;
+        }
+
         while (true) {
             try {
                 this.console.log('starting cloudflared');
