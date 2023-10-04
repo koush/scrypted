@@ -400,14 +400,15 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async refreshPortForward() {
-        if (this.storageSettings.values.forwardingMode === 'Disabled') {
-            this.updatePortForward(0);
-            return;
-        }
-
         let { upnpPort } = this.storageSettings.values;
+
         if (!upnpPort)
             upnpPort = Math.round(Math.random() * 30000 + 20000);
+
+        if (this.storageSettings.values.forwardingMode === 'Disabled') {
+            this.updatePortForward(upnpPort);
+            return;
+        }
 
         if (upnpPort === 443) {
             this.upnpStatus = 'Error: Port 443 Not Allowed';
