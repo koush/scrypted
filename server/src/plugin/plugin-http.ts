@@ -55,6 +55,7 @@ export abstract class PluginHttp<T> {
                 socket.destroy();
             }
             else {
+                res.header('Content-Type', 'text/plain');
                 res.status(code);
                 res.send(message);
             }
@@ -122,6 +123,7 @@ export abstract class PluginHttp<T> {
                 });
             }
             catch (e) {
+                res.header('Content-Type', 'text/plain');
                 res.status(500);
                 res.send(e.toString());
                 console.error(e);
@@ -132,6 +134,7 @@ export abstract class PluginHttp<T> {
                 handler(req, res, httpRequest, pluginData);
             }
             catch (e) {
+                res.header('Content-Type', 'text/plain');
                 res.status(500);
                 res.send(e.toString());
                 console.error(e);
