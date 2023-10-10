@@ -280,7 +280,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
                 const mainChannel = camera.channels[0];
                 const w = options.picture.width;
                 const h = fitHeightToWidth(mainChannel.width, mainChannel.height, w);
-
+ 
                 size = `&w=${w}&h=${h}`;
             }
         }
@@ -317,7 +317,9 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const rtspChannel = camera.channels.find(check => check.id.toString() === vso.id);
 
         const { rtspAlias } = rtspChannel;
-        const u = `rtsps://${camera.connectionHost}:7441/${rtspAlias}`
+        // Use the camera's host from the api, otherwise fallback to user-configured nvr ip
+        const cameraHost = camera.connectionHost || this.protect.getSetting('ip');
+        const u = `rtsps://${cameraHost}:7441/${rtspAlias}`
 
         const data = Buffer.from(JSON.stringify({
             url: u,
