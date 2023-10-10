@@ -280,7 +280,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
                 const mainChannel = camera.channels[0];
                 const w = options.picture.width;
                 const h = fitHeightToWidth(mainChannel.width, mainChannel.height, w);
- 
+
                 size = `&w=${w}&h=${h}`;
             }
         }
