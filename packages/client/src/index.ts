@@ -340,8 +340,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let socket: IOClientSocket;
     const eioPath = `endpoint/${pluginId}/engine.io/api`;
     const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
+    // https://github.com/socketio/engine.io/issues/690
+    const cacehBust = Math.random().toString(36).substring(3, 10);
     const eioOptions: Partial<SocketOptions> = {
         path: eioEndpoint,
+        query: {
+            cacehBust,
+        },
         withCredentials: true,
         extraHeaders,
         rejectUnauthorized: false,
@@ -439,6 +444,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         console.log('trying webrtc');
         const webrtcEioOptions: Partial<SocketOptions> = {
             path: '/endpoint/@scrypted/webrtc/engine.io/',
+            query: {
+                cacehBust,
+            },
             withCredentials: true,
             extraHeaders,
             rejectUnauthorized: false,
