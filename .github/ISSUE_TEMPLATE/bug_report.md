@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 **Describe the bug**
-A clear and concise description of what the bug is.
+A clear and concise description of what the bug is. The issue tracker is only for reporting bugs in Scrypted, for general support check Discord. Hardrware support requests or assistance requests will be immediately closed.
 
 **To Reproduce**
 Steps to reproduce the behavior:
