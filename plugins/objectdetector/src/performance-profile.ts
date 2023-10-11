@@ -28,5 +28,5 @@ export function getMaxConcurrentObjectDetectionSessions() {
     // the total mhz would be 10000 in this case.
     // observed idle per cpu speed is 800.
     // not sure how hyperthreading plays into this.
-    return Math.max(2, totalGigahertz / 4000);
+    return Math.max(2, Math.round(totalGigahertz / 4000));
 }
