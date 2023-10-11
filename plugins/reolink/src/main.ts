@@ -6,12 +6,13 @@ import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } fro
 import { OnvifCameraAPI, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
-import { ReolinkCameraClient } from './reolink-api';
+import { Enc, ReolinkCameraClient } from './reolink-api';
 
 class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom {
     client: ReolinkCameraClient;
     onvifClient: OnvifCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
+    videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
 
     storageSettings = new StorageSettings(this, {
         doorbell: {
@@ -33,7 +34,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
         this.updateDeviceInfo();
         this.updateDevice();
     }
-    
+
     async startIntercom(media: MediaObject): Promise<void> {
         if (!this.onvifIntercom.url) {
             const client = await this.getOnvifClient();
@@ -162,7 +163,25 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
     }
 
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
+        this.videoStreamOptions ||= this.getConstructedVideoStreamOptionsInternal().catch(e => {
+            this.constructedVideoStreamOptions = undefined;
+            throw e;
+        });
+
+        return this.videoStreamOptions;
+    }
+
+    async getConstructedVideoStreamOptionsInternal(): Promise<UrlMediaStreamOptions[]> {
         const ret: UrlMediaStreamOptions[] = [];
+
+        let encoderConfig: Enc;
+        try {
+            const client = this.getClient();
+            encoderConfig = await client.getEncoderConfiguration();
+        }
+        catch (e) {
+            this.console.error("Codec query failed. Falling back to known defaults.", e);
+        }
 
         const rtmpPreviews = [
             `main.bcs`,
@@ -184,6 +203,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
         }
 
         // rough guesses for rebroadcast stream selection.
+        const rtmpMainIndex = 0;
+        const rtmpMain = ret[rtmpMainIndex];
         ret[0].container = 'rtmp';
         ret[0].video = {
             width: 2560,
@@ -219,6 +240,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
         }
 
         // rough guesses for h264
+        const rtspMainIndex = 3;
+        const rtspMain = ret[rtspMainIndex];
         ret[3].container = 'rtsp';
         ret[3].video = {
             codec: 'h264',
@@ -239,6 +262,23 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
             height: 672,
         }
 
+        if (encoderConfig) {
+            const { mainStream } = encoderConfig;
+            if (mainStream?.width && mainStream?.height) {
+                rtmpMain.video.width = mainStream.width;
+                rtmpMain.video.height = mainStream.height;
+                rtspMain.video.width = mainStream.width;
+                rtspMain.video.height = mainStream.height;
+                // 4k h265 rtmp is seemingly nonfunctional, but rtsp works. swap them so there is a functional stream.
+                if (mainStream.vType === 'h265' || mainStream.vType === 'hevc') {
+                    this.console.warn('Detected h265. Change the camera configuration to use 2k mode to force h264. https://docs.scrypted.app/camera-preparation.html#h-264-video-codec')
+                    rtmpMain.video.codec = 'h265';
+                    rtspMain.video.codec = 'h265';
+                    ret[rtmpMainIndex] = rtspMain;
+                    ret[rtspMainIndex] = rtmpMain;
+                }
+            }
+        }
 
         return ret;
     }
