@@ -243,7 +243,7 @@ export class OnvifIntercom implements Intercom {
     }
 
     async stopIntercom() {
-        this.intercomClient?.client?.destroy();
+        this.intercomClient?.safeTeardown();
         this.intercomClient = undefined;
     }
 }
