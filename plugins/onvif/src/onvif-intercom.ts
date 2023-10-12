@@ -237,7 +237,7 @@ export class OnvifIntercom implements Intercom {
         });
 
         intercomClient.client.on('close', () => forwarder.kill());
-        forwarder.killPromise.finally(() => intercomClient?.client.destroy());
+        forwarder.killPromise.finally(() => intercomClient.safeTeardown());
 
         this.camera.console.log('intercom playing');
     }
