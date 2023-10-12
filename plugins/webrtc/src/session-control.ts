@@ -12,9 +12,20 @@ export class ScryptedSessionControl implements RTCSessionControl {
     killed = new Deferred<void>();
 
     constructor(public intercom: Intercom, public audioTransceiver: RTCRtpTransceiver) {
+        this.killed.promise.finally(async () => {
+            this.rtspServer?.client.destroy();
+            try {
+                await this.intercom?.stopIntercom();
+            }
+            catch (e) {
+            }
+        });
     }
 
     async setPlayback(options: { audio: boolean; video: boolean; }) {
+        if (this.killed.finished)
+            return;
+
         if (!this.intercom)
             return;
 
@@ -87,7 +98,6 @@ export class ScryptedSessionControl implements RTCSessionControl {
     }
 
     async endSession() {
-        this.rtspServer?.client.destroy();
         this.killed.resolve(undefined);
     }
 }

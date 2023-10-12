@@ -397,7 +397,7 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         if (this.removed.finished)
             return;
         this.removed.resolve(undefined);
-        this.control.killed.resolve(undefined);
+        this.control.endSession();
         this.video.sender.onRtcp.allUnsubscribe();
 
         if (cleanupTrackOnly)
