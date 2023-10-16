@@ -45,26 +45,11 @@ RUN brew install libvips
 # dlib
 RUN brew install cmake
 
-### HACK WORKAROUND
-### https://github.com/koush/scrypted/issues/544
-
-brew unpin gstreamer
-brew unpin gst-plugins-base
-brew unpin gst-plugins-good
-brew unpin gst-plugins-bad
-brew unpin gst-plugins-ugly
-brew unpin gst-libav
-brew unpin gst-python
-
-### END HACK WORKAROUND
-
 # seems to be necessary for python-codecs' pycairo dependency or something?
 RUN_IGNORE gobject-introspection libffi pkg-config
 
 # gstreamer plugins
-RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-libav
-# gst python bindings
-RUN_IGNORE brew install gst-python
+RUN_IGNORE brew install gstreamer
 
 ARCH=$(arch)
 if [ "$ARCH" = "arm64" ]
