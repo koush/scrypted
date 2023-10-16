@@ -43,6 +43,13 @@ export function getWeriftIceServers(configuration: RTCConfiguration): RTCIceServ
     return ret;
 }
 
+// node-ip is missing this range.
+// https://en.wikipedia.org/wiki/Reserved_IP_addresses
+const additionalPrivate = ip.cidrSubnet('198.18.0.0/15');
+function isPrivate(address: string) {
+    return ip.isPrivate(address) || additionalPrivate.contains(address);
+}
+
 export function isLocalIceTransport(pc: RTCPeerConnection) {
     let isLocalNetwork = true;
     let destinationId: string;
@@ -60,7 +67,7 @@ export function isLocalIceTransport(pc: RTCPeerConnection) {
         catch (e) {
         }
 
-        isLocalNetwork = isLocalNetwork && (ip.isPrivate(address) || sameNetwork);
+        isLocalNetwork = isLocalNetwork && (isPrivate(address) || sameNetwork);
     }
     const ipv4 = ip.isV4Format(destinationId);
     return {

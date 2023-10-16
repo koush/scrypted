@@ -4,7 +4,7 @@ import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { isLocalIceTransport, logIsLocalIceTransport } from "./werift-util";
+import { logIsLocalIceTransport } from "./werift-util";
 
 import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients, legacyGetSignalingSessionOptions } from "@scrypted/common/src/rtc-signaling";
