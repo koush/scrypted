@@ -62,7 +62,6 @@ export function isLocalIceTransport(pc: RTCPeerConnection) {
 
         isLocalNetwork = isLocalNetwork && (ip.isPrivate(address) || sameNetwork);
     }
-    console.log('Connection is local network:', isLocalNetwork);
     const ipv4 = ip.isV4Format(destinationId);
     return {
         ipv4,
@@ -73,7 +72,6 @@ export function isLocalIceTransport(pc: RTCPeerConnection) {
 
 export function logIsLocalIceTransport(console: Console, pc: RTCPeerConnection) {
     const ret = isLocalIceTransport(pc);
-    console.log('ice transport', ret);
-    console.log('Connection is local network:', ret.isLocalNetwork);
+    console.log('Connection is local network:', ret.isLocalNetwork, ret.destinationId, ret);
     return ret;
 }

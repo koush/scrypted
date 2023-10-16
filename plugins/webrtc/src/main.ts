@@ -1,7 +1,9 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
+import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import sdk, { BufferConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
@@ -17,8 +19,6 @@ import { InterfaceAddresses, MediaStreamTrack, PeerConfig, RTCPeerConnection, de
 import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 import { createZygote } from './zygote';
-import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
-import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -223,6 +223,19 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         debugLog: {
             title: 'Debug Log',
             type: 'boolean',
+        },
+        ipv4Ban: {
+            group: 'Advanced',
+            title: '6to4 Ban',
+            description: 'The following IP addresses will trigger forcing an IPv6 connection. The default list includes T-Mobile\'s 6to4 gateway.',
+            defaultValue: [
+                // '192.0.0.4',
+            ],
+            choices: [
+                '192.0.0.4',
+            ],
+            combobox: true,
+            multiple: true,
         }
     });
     bridge: WebRTCBridge;
@@ -521,14 +534,15 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                 this.storageSettings.values.maximumCompatibilityMode, clientOptions, {
                 configuration: this.getRTCConfiguration(),
                 weriftConfiguration: await this.getWeriftConfiguration(),
+                ipv4Ban: this.storageSettings.values.ipv4Ban,
             });
             cleanup.promise.finally(() => connection.close().catch(() => { }));
             connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
 
             timeoutPromise(60000, connection.waitConnected())
-            .catch(() => {
-                cleanup.resolve('timeout');
-            });
+                .catch(() => {
+                    cleanup.resolve('timeout');
+                });
 
             await connection.negotiateRTCSignalingSession();
 
@@ -545,7 +559,50 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
 export async function fork() {
     return {
-        async createConnection(message: any, port: number, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, clientOptions: RTCSignalingOptions, options: { disableIntercom?: boolean; configuration: RTCConfiguration, weriftConfiguration: Partial<PeerConfig>; }) {
+        async createConnection(message: any,
+            port: number,
+            clientSession: RTCSignalingSession,
+            maximumCompatibilityMode: boolean,
+            clientOptions: RTCSignalingOptions,
+            options: {
+                disableIntercom?: boolean;
+                configuration: RTCConfiguration;
+                weriftConfiguration: Partial<PeerConfig>;
+                ipv4Ban?: string[];
+            }) {
+
+            // T-Mobile has a bad 6to4 gateway. When 192.0.0.4 is detected, all ipv4 addresses, besides relay addresses for ipv6 addresses, should be ignored.
+            // thus, the candidate should only be configured if the remote host or relatedAddress is IPv6.
+
+            // a=candidate:2099470302 1 udp 2113937151 192.0.0.4 54018 typ host generation 0 network-cost 999
+            // a=candidate:2171408532 1 udp 2113939711 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 43501 typ host generation 0 network-cost 999
+            // a=candidate:1759977254 1 udp 1677729535 172.59.218.164 24868 typ srflx raddr 192.0.0.4 rport 54018 generation 0 network-cost 999
+            // a=candidate:1759256926 1 udp 1677732095 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 43501 typ srflx raddr 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 rport 43501 generation 0 network-cost 999
+            // a=candidate:821872401 1 udp 33565183 2604:2dc0:200:26d:: 62773 typ relay raddr 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 rport 43501 generation 0 network-cost 999
+            // a=candidate:3452552806 1 udp 33562623 147.135.36.109 61385 typ relay raddr 172.59.218.164 rport 24868 generation 0 network-cost 999
+
+            let banned = false;
+            options.weriftConfiguration.iceFilterCandidatePair = (pair) => {
+                // console.log('pair', pair.protocol.type, pair.localCandidate.host, pair.remoteCandidate.host, pair.remoteCandidate.relatedAddress);
+
+                const wasBanned = banned;
+                banned ||= options.ipv4Ban?.includes(pair.remoteCandidate.host);
+                banned ||= options.ipv4Ban?.includes(pair.remoteCandidate.relatedAddress);
+
+                if (!wasBanned && banned) {
+                    console.warn('Banned 6to4 gateway detected, forcing IPv6.', pair.remoteCandidate.host, pair.remoteCandidate.relatedAddress);
+                }
+
+                if (!banned)
+                    return true;
+
+                if (!ip.isV4Format(pair.remoteCandidate.host))
+                    return true;
+                if (!ip.isV4Format(pair.remoteCandidate.relatedAddress))
+                    return true;
+                return false;
+            }
+
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
             cleanup.promise.finally(() => setTimeout(() => process.exit(), 10000));
@@ -624,6 +681,7 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
             {
                 configuration: this.plugin.getRTCConfiguration(),
                 weriftConfiguration: await this.plugin.getWeriftConfiguration(),
+                ipv4Ban: this.plugin.storageSettings.values.ipv4Ban,
             }
         );
         cleanup.promise.finally(() => connection.close().catch(() => { }));

@@ -486,7 +486,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             createTrackForwarder: async (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) => {
                 const ret = await createTrackForwarder({
                     timeStart,
-                    ...isLocalIceTransport(this.pc),
+                    ...logIsLocalIceTransport(console, this.pc),
                     requestMediaStream,
                     videoTransceiver,
                     audioTransceiver,
