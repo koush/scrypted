@@ -316,6 +316,7 @@ async def generateVideoFramesGstreamer(
     options: scrypted_sdk.VideoFrameGeneratorOptions = None,
     filter: Any = None,
     h264Decoder: str = None,
+    h265Decoder: str = None,
     postProcessPipeline: str = None,
 ) -> scrypted_sdk.VideoFrame:
     ffmpegInput: scrypted_sdk.FFmpegInput = (
@@ -367,6 +368,17 @@ async def generateVideoFramesGstreamer(
                 decoder = "vtdec_hw"
             else:
                 decoder = "avdec_h264 output-corrupt=false"
+    elif videoCodec == "h265":
+        setDecoderClearDefault(h265Decoder)
+
+        if not decoder:
+            # hw acceleration is "safe" to use on mac, but not
+            # on other hosts where it may crash.
+            # defaults must be safe.
+            if platform.system() == "Darwin":
+                decoder = "vtdec_hw"
+            else:
+                decoder = "avdec_h265 output-corrupt=false"
     else:
         # decodebin may pick a hardware accelerated decoder, which isn't ideal
         # so use a known software decoder for h264 and decodebin for anything else.

@@ -62,6 +62,7 @@ class GstreamerGenerator(
             options,
             filter,
             self.storage.getItem("h264Decoder"),
+            self.storage.getItem("h265Decoder"),
             self.storage.getItem("postProcessPipeline"),
         )
 
@@ -78,6 +79,20 @@ class GstreamerGenerator(
                     "vtdec_hw",
                     "nvh264dec",
                     "vaapih264dec",
+                ],
+                "combobox": True,
+            },
+            {
+                "key": "h265Decoder",
+                "title": "H25 Decoder",
+                "description": "The Gstreamer pipeline to use to decode H265 video.",
+                "value": self.storage.getItem("h265Decoder") or "Default",
+                "choices": [
+                    "Default",
+                    "decodebin",
+                    "vtdec_hw",
+                    "nvh265dec",
+                    "vaapih265dec",
                 ],
                 "combobox": True,
             },
@@ -229,11 +244,12 @@ class CodecFork:
         options: scrypted_sdk.VideoFrameGeneratorOptions,
         filter: Any,
         h264Decoder: str,
+        h265Decoder: str,
         postProcessPipeline: str,
     ) -> scrypted_sdk.VideoFrame:
         async for data in self.generateVideoFrames(
             gstreamer.generateVideoFramesGstreamer(
-                mediaObject, options, filter, h264Decoder, postProcessPipeline
+                mediaObject, options, filter, h264Decoder, h265Decoder, postProcessPipeline
             ),
             "gstreamer",
             options and options.get("firstFrameOnly"),
