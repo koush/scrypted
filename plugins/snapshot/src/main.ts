@@ -336,16 +336,39 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         return this.createMediaObject(picture, 'image/jpeg');
     }
 
-    async cropAndScale(buffer: Buffer) {
+    async cropAndScale(picture: Buffer) {
         if (!this.storageSettings.values.snapshotCropScale?.length)
-            return buffer;
+            return picture;
 
         const xmin = Math.min(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
         const ymin = Math.min(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
         const xmax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
-        return ffmpegFilterImageBuffer(buffer, {
+        try {
+            const mo = await mediaManager.createMediaObject(picture, 'image/jpeg');
+            const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
+            const left = image.width * xmin;
+            const width = image.width * (xmax - xmin);
+            const top = image.height * ymin;
+            const height = image.height * (ymax - ymin);
+
+            return await image.toBuffer({
+                crop: {
+                    left,
+                    width,
+                    top,
+                    height,
+                },
+                format: 'jpg',
+            });
+        }
+        catch (e) {
+            if (!e.message?.includes('no converter found'))
+                throw e;
+        }
+
+        return ffmpegFilterImageBuffer(picture, {
             console: this.debugConsole,
             ffmpegPath: await mediaManager.getFFmpegPath(),
             crop: {
