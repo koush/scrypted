@@ -65,6 +65,9 @@ export class OpusRepacketizer {
     depacketized: Buffer[] = [];
     extraPackets = 0;
 
+    // framesPerPacket argument is buggy in that it assumes that the frame durations are always 20.
+    // the frame duration can be determined from the config in the opus header above.
+    // however, frames of duration 20 seems to always be the case from the various test devices.
     constructor(public framesPerPacket: number) {
     }
 
