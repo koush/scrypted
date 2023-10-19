@@ -317,7 +317,8 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const rtspChannel = camera.channels.find(check => check.id.toString() === vso.id);
 
         const { rtspAlias } = rtspChannel;
-        const u = `rtsps://${this.protect.getSetting('ip')}:7441/${rtspAlias}`
+        const ip = (this.protect.getSetting('useConnectionHost') !== 'false' && camera.connectionHost) || this.protect.getSetting('ip');
+        const u = `rtsps://${ip}:7441/${rtspAlias}`
 
         const data = Buffer.from(JSON.stringify({
             url: u,
