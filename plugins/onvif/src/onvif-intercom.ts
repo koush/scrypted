@@ -8,64 +8,7 @@ import { nextSequenceNumber } from "../../homekit/src/types/camera/jitter-buffer
 import { RtspSmartCamera } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 
-
 const { mediaManager } = sdk;
-
-interface SupportedCodec {
-    ffmpegCodec: string;
-    sdpName: string;
-}
-
-const supportedCodecs: SupportedCodec[] = [];
-function addSupportedCodec(ffmpegCodec: string, sdpName: string) {
-    supportedCodecs.push({
-        ffmpegCodec,
-        sdpName,
-    });
-}
-
-// a=rtpmap:97 L16/8000
-// a=rtpmap:100 L16/16000
-// a=rtpmap:101 L16/48000
-// a=rtpmap:8 PCMA/8000
-// a=rtpmap:102 PCMA/16000
-// a=rtpmap:103 PCMA/48000
-// a=rtpmap:0 PCMU/8000
-// a=rtpmap:104 PCMU/16000
-// a=rtpmap:105 PCMU/48000
-// a=rtpmap:106 /0
-// a=rtpmap:107 /0
-// a=rtpmap:108 /0
-// a=rtpmap:109 MPEG4-GENERIC/8000
-// a=rtpmap:110 MPEG4-GENERIC/16000
-// a=rtpmap:111 MPEG4-GENERIC/48000
-
-// this order is irrelevant, the order of preference is the sdp.
-addSupportedCodec('pcm_mulaw', 'PCMU');
-addSupportedCodec('pcm_alaw', 'PCMA');
-addSupportedCodec('pcm_s16be', 'L16');
-addSupportedCodec('adpcm_g726', 'G726');
-addSupportedCodec('aac', 'MPEG4-GENERIC');
-
-interface CodecMatch {
-    payloadType: string;
-    sdpName: string;
-    sampleRate: string;
-    channels: string;
-}
-
-const codecRegex = /a=rtpmap:\s*(\d+) (.*?)\/(\d+)/g
-function* parseCodecs(audioSection: string): Generator<CodecMatch> {
-    for (const match of audioSection.matchAll(codecRegex)) {
-        const [_, payloadType, sdpName, sampleRate, _skip, channels] = match;
-        yield {
-            payloadType,
-            sdpName,
-            sampleRate,
-            channels,
-        }
-    }
-}
 
 const Require = 'www.onvif.org/ver20/backchannel';
 
@@ -153,18 +96,10 @@ export class OnvifIntercom implements Intercom {
         }
         this.camera.console.log('backchannel transport', transportDict);
 
-        const availableCodecs = [...parseCodecs(audioBackchannel.contents)];
-        let match: CodecMatch;
-        let codec: SupportedCodec;
-        for (const supported of availableCodecs) {
-            codec = supportedCodecs.find(check => check.sdpName?.toLowerCase() === supported.sdpName.toLowerCase());
-            if (codec) {
-                match = supported;
-                break;
-            }
-        }
+        const availableMatches = audioBackchannel.rtpmaps.filter(rtpmap => rtpmap.ffmpegEncoder);
+        const defaultMatch = audioBackchannel.rtpmaps.find(rtpmap => rtpmap.ffmpegEncoder);
 
-        if (!match)
+        if (!defaultMatch)
             throw new Error('no supported codec was found for back channel');
 
         let ssrcBuffer: Buffer;
@@ -178,7 +113,7 @@ export class OnvifIntercom implements Intercom {
         const ssrc = ssrcBuffer.readInt32BE(0);
         const ssrcUnsigned = ssrcBuffer.readUint32BE(0);
 
-        const payloadType = parseInt(match.payloadType);
+        let { payloadType } = defaultMatch;
 
         await intercomClient.play({
             Require,
@@ -189,16 +124,25 @@ export class OnvifIntercom implements Intercom {
 
         const forwarder = await startRtpForwarderProcess(this.camera.console, ffmpegInput, {
             audio: {
-                onRtp: (rtp) => {
-                    // if (true) {
-                    //     const p = RtpPacket.deSerialize(rtp);
-                    //     p.header.payloadType = payloadType;
-                    //     p.header.ssrc = ssrcUnsigned;
-                    //     p.header.marker = true;
-                    //     rtpServer.server.send(p.serialize(), serverRtp, ip);
-                    //     return;
-                    // }
+                negotiate: async msection => {
+                    const check = msection.rtpmap;
+                    const channels = check.channels || 1;
 
+                    return !!availableMatches.find(rtpmap => {
+                        if (check.codec !== rtpmap.codec)
+                            return false;
+                        if (channels !== (rtpmap.channels || 1))
+                            return false;
+                        if (check.clock !== rtpmap.clock)
+                            return false;
+                        payloadType = check.payloadType;
+                        // this default check should maybe be in sdp-utils.ts.
+                        if (payloadType === undefined)
+                            payloadType = 8;
+                        return true;
+                    });
+                },
+                onRtp: rtp => {
                     const p = RtpPacket.deSerialize(rtp);
 
                     if (!pending) {
@@ -206,7 +150,8 @@ export class OnvifIntercom implements Intercom {
                         return;
                     }
 
-                    if (pending.payload.length + p.payload.length < 1024) {
+                    const elapsedRtpTimeMs = Math.abs(pending.header.timestamp - p.header.timestamp) / 8000 * 1000;
+                    if (elapsedRtpTimeMs <= 60) {
                         pending.payload = Buffer.concat([pending.payload, p.payload]);
                         return;
                     }
@@ -224,14 +169,14 @@ export class OnvifIntercom implements Intercom {
 
                     pending = p;
                 },
-                codecCopy: codec.ffmpegCodec,
+                codecCopy: 'ffmpeg',
                 payloadType,
                 ssrc,
                 packetSize: 1024,
                 encoderArguments: [
-                    '-acodec', codec.ffmpegCodec,
-                    '-ar', match.sampleRate,
-                    '-ac', match.channels || '1',
+                    '-acodec', defaultMatch.ffmpegEncoder,
+                    '-ar', defaultMatch.clock.toString(),
+                    '-ac', defaultMatch.channels?.toString() || '1',
                 ],
             }
         });
