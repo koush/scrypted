@@ -1,7 +1,7 @@
 import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "./werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCInputMediaObjectTrack, RTCMediaObjectTrack, RTCOutputMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { logIsLocalIceTransport } from "./werift-util";
@@ -362,7 +362,7 @@ export function parseOptions(options: RTCSignalingOptions) {
     };
 }
 
-class WebRTCTrack implements RTCMediaObjectTrack {
+class WebRTCTrack implements RTCOutputMediaObjectTrack, RTCInputMediaObjectTrack {
     control: ScryptedSessionControl;
     removed = new Deferred<void>();
 
@@ -414,8 +414,8 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         return this.cleanup(false);
     }
 
-    setPlayback(options: { audio: boolean; video: boolean; }): Promise<void> {
-        return this.control.setPlayback(options);
+    setPlayback(options: { audio: boolean; video: boolean; }): Promise<MediaObject> {
+        return this.control.setPlaybackInternal(options);
     }
 }
 
@@ -532,9 +532,16 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         }
     }
 
+    addInputTrack(options: { videoMid?: string; audioMid?: string; }): Promise<RTCInputMediaObjectTrack> {
+        throw new Error('not implemented');
+    }
+
     async addTrack(mediaObject: MediaObject, options?: {
         videoMid?: string,
         audioMid?: string,
+        /**
+         * @deprecated
+         */
         intercomId?: string,
     }) {
         const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject, options?.intercomId);

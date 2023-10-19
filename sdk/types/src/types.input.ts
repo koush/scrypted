@@ -1,5 +1,5 @@
-import type { Worker as NodeWorker } from 'worker_threads';
 import type { Socket as NodeNetSocket } from 'net';
+import type { Worker as NodeWorker } from 'worker_threads';
 
 export type ScryptedNativeId = string | undefined;
 
@@ -2105,12 +2105,24 @@ export interface RTCSessionControl {
  */
 export interface RTCMediaObjectTrack {
   onStop(): Promise<void>;
-  replace(mediaObject: MediaObject): Promise<void>;
   stop(): Promise<void>;
+}
+
+/**
+ * @category WebRTC Reference
+ */
+export interface RTCOutputMediaObjectTrack extends RTCMediaObjectTrack{
+  replace(mediaObject: MediaObject): Promise<void>;
+}
+
+/**
+ * @category WebRTC Reference
+ */
+export interface RTCInputMediaObjectTrack extends RTCMediaObjectTrack{
   setPlayback(options: {
     audio: boolean,
     video: boolean,
-  }): Promise<void>;
+  }): Promise<MediaObject>;
 }
 
 /**
@@ -2121,8 +2133,15 @@ export interface RTCConnectionManagement {
   addTrack(mediaObject: MediaObject, options?: {
     videoMid?: string,
     audioMid?: string,
+    /**
+     * @deprecated
+     */
     intercomId?: string,
-  }): Promise<RTCMediaObjectTrack>;
+  }): Promise<RTCOutputMediaObjectTrack>;
+  addInputTrack(options: {
+    videoMid?: string,
+    audioMid?: string,
+  }): Promise<RTCInputMediaObjectTrack>;
   close(): Promise<void>;
   probe(): Promise<void>;
 }

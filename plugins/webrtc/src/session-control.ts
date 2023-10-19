@@ -3,7 +3,7 @@ import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
-import sdk, { FFmpegInput, Intercom, RTCSessionControl } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Intercom, MediaObject, RTCSessionControl } from "@scrypted/sdk";
 
 const { mediaManager } = sdk;
 
@@ -22,7 +22,11 @@ export class ScryptedSessionControl implements RTCSessionControl {
         });
     }
 
-    async setPlayback(options: { audio: boolean; video: boolean; }) {
+    async setPlayback(options: { audio: boolean; video: boolean; }): Promise<void> {
+        await this.setPlaybackInternal(options);
+    }
+
+    async setPlaybackInternal(options: { audio: boolean; video: boolean; }): Promise<MediaObject> {
         if (this.killed.finished)
             return;
 
@@ -52,7 +56,9 @@ export class ScryptedSessionControl implements RTCSessionControl {
                 video: null,
             },
             inputArguments: [
-                '-rtsp_transport', 'udp',
+                '-analyzeduration', '0',
+                '-probesize', '512',
+                '-rtsp_transport', 'tcp',
                 '-i', url,
             ],
         };
@@ -79,7 +85,7 @@ export class ScryptedSessionControl implements RTCSessionControl {
         sdp = createSdpInput(0, 0, sdp);
 
 
-        const rtspServer = new RtspServer(client, sdp, true);
+        const rtspServer = new RtspServer(client, sdp);
         this.rtspServer = rtspServer;
         // rtspServer.console = console;
         await rtspServer.handlePlayback();
@@ -90,6 +96,8 @@ export class ScryptedSessionControl implements RTCSessionControl {
             rtpPacket.header.payloadType = 110;
             rtspServer.sendTrack(audioTrack, rtpPacket.serialize(), false);
         });
+        
+        return mo;
     }
 
     async getRefreshAt() {
