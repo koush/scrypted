@@ -27,7 +27,7 @@ See below for additional recommendations.
 4. **Set Up Port Forwarding Rule**
    - Use the port number you chose in Step 1 (e.g 11443) to set up a new Port Forwarding rule on your router.
 
-4. **Change Port Forwarding Mode in Scrypted**
+5. **Change Port Forwarding Mode in Scrypted**
    - Go back to Scrypted and navigate to the "General" tab in the Cloud plugin.
    - Select "Router Forward" from the "Port Forwarding Mode" dropdown menu.
   
