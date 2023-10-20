@@ -215,6 +215,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
             width: 896,
             height: 672,
         }
+        const rtmpSubIndex = 2;
         ret[2].container = 'rtmp';
         ret[2].video = {
             width: 640,
@@ -225,7 +226,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
         const rtspPreviews = [
             `h264Preview_${channel}_main`,
             `h264Preview_${channel}_sub`,
-            `h265Preview_${channel}_main`,
         ];
         for (const preview of rtspPreviews) {
             ret.push({
@@ -248,18 +248,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
             width: 2560,
             height: 1920,
         }
+        const rtspSubIndex = 4;
         ret[4].container = 'rtsp';
         ret[4].video = {
             codec: 'h264',
-            width: 896,
-            height: 672,
-        }
-
-        ret[5].container = 'rtsp';
-        ret[5].video = {
-            codec: 'h265',
-            width: 896,
-            height: 672,
+            width: 640,
+            height: 480,
         }
 
         if (encoderConfig) {
@@ -272,10 +266,23 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
                 // 4k h265 rtmp is seemingly nonfunctional, but rtsp works. swap them so there is a functional stream.
                 if (mainStream.vType === 'h265' || mainStream.vType === 'hevc') {
                     this.console.warn('Detected h265. Change the camera configuration to use 2k mode to force h264. https://docs.scrypted.app/camera-preparation.html#h-264-video-codec')
-                    rtmpMain.video.codec = 'h265';
                     rtspMain.video.codec = 'h265';
-                    ret[rtmpMainIndex] = rtspMain;
-                    ret[rtspMainIndex] = rtmpMain;
+                    rtspMain.id = `h265Preview_${channel}_main`;
+                    rtspMain.name = `RTSP ${rtspMain.id}`;
+                    rtspMain.url = `rtsp://${this.getRtspAddress()}/${rtspMain.id}`;
+
+                    const rtmpSub = ret[rtmpSubIndex];
+                    const rtspSub = ret[rtspSubIndex];
+
+                    // Per Reolink:
+                    // https://support.reolink.com/hc/en-us/articles/360007010473-How-to-Live-View-Reolink-Cameras-via-VLC-Media-Player/
+                    // Note: the 4k cameras connected with the 4k NVR system will only show a fluent live stream instead of the clear live stream due to the H.264+(h.265) limit.
+
+                    ret.splice(0, ret.length);
+                    ret.push(rtspMain);
+                    // prefer rtmp for sub? not sure
+                    ret.push(rtmpSub);
+                    ret.push(rtspSub);
                 }
             }
         }
