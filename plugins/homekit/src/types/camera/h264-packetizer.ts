@@ -63,6 +63,16 @@ export function splitH264NaluStartCode(data: Buffer) {
 export interface H264CodecInfo {
     sps: Buffer;
     pps: Buffer;
+    // Per ChatGPT excerpt below, resending the SEI may not the correct behavior when resending codec info,
+    // as SEI payloads MAY only apply to a number or time range of frames.
+    // I suspect that any encoders that send SEI messages that apply to a time range will send them regularly with SPS/PPS anyways.
+    // The Supplemental Enhancement Information (SEI) payload in H.264 video compression typically applies to all following frames within a specific context. The SEI information is not frame-specific but rather context-specific. Here's how it works:
+    //     1. **Context-Specific Information**: The SEI payload data often provides information that is valid for a range of frames or a portion of the video stream. For example, SEI messages may contain information about display orientation, buffering instructions, timing cues, or other metadata that applies to the video content as a whole or a specific segment of it.
+    //     2. **Duration of Applicability**: SEI messages often include information about the "duration of applicability" or the time period for which the conveyed information is relevant. This duration information helps video decoders understand how long the SEI data should be applied to the frames.
+    //     3. **Multiple SEI Messages**: The video stream can include multiple SEI messages, each with its own payload data and duration of applicability. As SEI messages are parsed, the decoder processes and applies the information according to the specified time range.
+    //     4. **Continuous Application**: SEI information, once applied, typically remains in effect until a subsequent SEI message with different or canceling information is received. The decoder continues to use the information conveyed by the SEI message within its defined duration of applicability.
+    //     5. **Dynamic Changes**: SEI messages can convey information about dynamic changes in the video stream, such as a change in display orientation or closed caption content. The decoder adjusts the display or handling of frames accordingly based on the SEI information received.
+    //     In summary, SEI payload data is context-specific and often applies to multiple frames within a specified time range. It is not frame-specific but provides supplemental information that helps maintain synchronization, enhance accessibility, or optimize video playback over a period of time within the video stream. The specific behavior may vary depending on the type of SEI message and the video codec being used.
     sei?: Buffer;
 }
 
@@ -351,7 +361,8 @@ export class H264Repacketizer {
             this.console.error('expected only 1 packet for sps/pps stapa');
             return;
         }
-        this.createRtpPackets(packet, aggregates, ret);
+        // this stapa only contains sps and pps (and no frame data), thus the marker bit should not be set.
+        this.createRtpPackets(packet, aggregates, ret, false);
         this.extraPackets++;
     }
 
@@ -476,8 +487,8 @@ export class H264Repacketizer {
             let hasPps = false;
 
             // break the aggregated packet up to update codec information.
-            depacketizeStapA(packet.payload)
-                .forEach(payload => {
+            const depacketized = depacketizeStapA(packet.payload);
+            depacketized.forEach(payload => {
                     const nalType = payload[0] & 0x1F;
                     if (nalType === NAL_TYPE_SPS) {
                         hasSps = true;
@@ -510,7 +521,9 @@ export class H264Repacketizer {
             if (hasSps && hasPps)
                 this.stapa = packet;
 
-            const stapa = this.packetizeStapA(depacketizeStapA(packet.payload));
+            const stapa = this.packetizeStapA(depacketized);
+            if (stapa.length !== 1)
+                this.console.warn('Expepcted single stapa packet. Please report this to @koush on Discord.')
             this.createRtpPackets(packet, stapa, ret);
         }
         else if (nalType >= 1 && nalType < 24) {
