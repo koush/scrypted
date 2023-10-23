@@ -220,7 +220,7 @@ export async function createTrackForwarder(options: {
     const audioRtpTrack: RtpTrack = {
         codecCopy: audioCodecCopy,
         onRtp: buffer => {
-            if (false && audioTransceiver.sender.codec.mimeType === "audio/opus") {
+            if (false && audioTransceiver.sender.codec.mimeType?.toLowerCase() === "audio/opus") {
                 // this will use 3 20ms frames, 60ms. seems to work up to 6/120ms
                 if (!opusRepacketizer)
                     opusRepacketizer = new OpusRepacketizer(3);
@@ -229,6 +229,8 @@ export async function createTrackForwarder(options: {
                 }
             }
             else {
+                // pcm audio can be concatenated.
+                // hikvision seems to send 40ms duration packets, so 25 packets per second.
                 audioTransceiver.sender.sendRtp(buffer);
             }
         },
