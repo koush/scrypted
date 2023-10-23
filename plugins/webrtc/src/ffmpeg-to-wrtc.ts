@@ -10,6 +10,7 @@ import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients, legacyGetSignalingSessionOptions } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
+import { OpusRepacketizer } from "../../homekit/src/types/camera/opus-repacketizer";
 import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { RtpCodecCopy, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
@@ -215,9 +216,22 @@ export async function createTrackForwarder(options: {
         }
     }
 
+    let opusRepacketizer: OpusRepacketizer;
     const audioRtpTrack: RtpTrack = {
         codecCopy: audioCodecCopy,
-        onRtp: audioTransceiver.sender.sendRtp.bind(audioTransceiver.sender),
+        onRtp: buffer => {
+            if (false && audioTransceiver.sender.codec.mimeType === "audio/opus") {
+                // this will use 3 20ms frames, 60ms. seems to work up to 6/120ms
+                if (!opusRepacketizer)
+                    opusRepacketizer = new OpusRepacketizer(3);
+                for (const rtp of opusRepacketizer.repacketize(RtpPacket.deSerialize(buffer))) {
+                    audioTransceiver.sender.sendRtp(rtp);
+                }
+            }
+            else {
+                audioTransceiver.sender.sendRtp(buffer);
+            }
+        },
         encoderArguments: [
             ...audioTranscodeArguments,
         ],

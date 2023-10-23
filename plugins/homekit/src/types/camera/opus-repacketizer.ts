@@ -165,7 +165,7 @@ export class OpusRepacketizer {
         }
 
         if (this.depacketized.length < this.framesPerPacket)
-            return;
+            return [];
 
         const ret: RtpPacket[] = [];
         while (true) {

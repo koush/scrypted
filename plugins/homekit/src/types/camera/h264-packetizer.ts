@@ -523,7 +523,7 @@ export class H264Repacketizer {
 
             const stapa = this.packetizeStapA(depacketized);
             if (stapa.length !== 1)
-                this.console.warn('Expepcted single stapa packet. Please report this to @koush on Discord.')
+                this.console.warn('Expected single stapa packet. Please report this to @koush on Discord.')
             this.createRtpPackets(packet, stapa, ret);
         }
         else if (nalType >= 1 && nalType < 24) {
