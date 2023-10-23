@@ -21,8 +21,8 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
     # none of this stuff seems to work. might be libav being slow with rtsp.
     # container.no_buffer = True
     # container.gen_pts = False
-    # container.options['-analyzeduration'] = '0'
-    # container.options['-probesize'] = '500000'
+    container.options['analyzeduration'] = '0'
+    container.options['probesize'] = '500000'
     stream = container.streams.video[0]
     # stream.codec_context.thread_count = 1
     # stream.codec_context.low_delay = True
@@ -48,15 +48,22 @@ async def generateVideoFramesLibav(mediaObject: scrypted_sdk.MediaObject, option
     thread = threading.Thread(target=threadMain)
     thread.start()
 
+    print(time.time())
     try:
         vipsImage: vipsimage.VipsImage = None
         pilImage: pilimage.PILImage = None
         mo: scrypted_sdk.MediaObject = None
 
+        firstFrame = False
         while True:
             frame = await sampleQueue.get()
             if not frame:
                 break
+
+            if not firstFrame:
+                print('first frame')
+                print(time.time())
+                firstFrame = True
 
             if vipsimage.pyvips:
                 if gray and frame.format.name.startswith('yuv') and frame.planes and len(frame.planes):
