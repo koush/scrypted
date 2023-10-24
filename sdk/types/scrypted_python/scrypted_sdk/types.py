@@ -1428,6 +1428,7 @@ class VideoFrameGenerator:
 
 class VideoRecorder:
 
+    recordingActive: bool
     async def getRecordingStream(self, options: RequestRecordingStreamOptions, recordingStream: MediaObject = None) -> MediaObject:
         pass
 
@@ -1444,6 +1445,9 @@ class VideoRecorder:
 class VideoRecorderManagement:
 
     async def deleteRecordingStream(self, options: DeleteRecordingStreamOptions) -> None:
+        pass
+
+    async def setRecordingActive(self, recordingActive: bool) -> None:
         pass
 
 
@@ -1667,6 +1671,7 @@ class ScryptedInterfaceProperty(str, Enum):
     temperature = "temperature"
     temperatureUnit = "temperatureUnit"
     humidity = "humidity"
+    recordingActive = "recordingActive"
     ptzCapabilities = "ptzCapabilities"
     lockState = "lockState"
     entryOpen = "entryOpen"
@@ -1740,6 +1745,7 @@ class ScryptedInterfaceMethods(str, Enum):
     getRecordingStreamOptions = "getRecordingStreamOptions"
     getRecordingStreamThumbnail = "getRecordingStreamThumbnail"
     deleteRecordingStream = "deleteRecordingStream"
+    setRecordingActive = "setRecordingActive"
     ptzCommand = "ptzCommand"
     getRecordedEvents = "getRecordedEvents"
     getVideoClip = "getVideoClip"
@@ -2061,6 +2067,14 @@ class DeviceState:
     @humidity.setter
     def humidity(self, value: float):
         self.setScryptedProperty("humidity", value)
+
+    @property
+    def recordingActive(self) -> bool:
+        return self.getScryptedProperty("recordingActive")
+
+    @recordingActive.setter
+    def recordingActive(self, value: bool):
+        self.setScryptedProperty("recordingActive", value)
 
     @property
     def ptzCapabilities(self) -> PanTiltZoomCapabilities:
@@ -2512,12 +2526,15 @@ ScryptedInterfaceDescriptors = {
       "getRecordingStreamOptions",
       "getRecordingStreamThumbnail"
     ],
-    "properties": []
+    "properties": [
+      "recordingActive"
+    ]
   },
   "VideoRecorderManagement": {
     "name": "VideoRecorderManagement",
     "methods": [
-      "deleteRecordingStream"
+      "deleteRecordingStream",
+      "setRecordingActive"
     ],
     "properties": []
   },

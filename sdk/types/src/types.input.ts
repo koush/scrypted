@@ -689,6 +689,8 @@ export interface RecordingStreamThumbnailOptions {
 }
 
 export interface VideoRecorder {
+  recordingActive?: boolean;
+
   /**
    * Returns a MediaObject for a recording stream.
    * @param options Options that denote where to start the recording stream.
@@ -706,6 +708,7 @@ export interface VideoRecorder {
 
 export interface VideoRecorderManagement {
   deleteRecordingStream(options: DeleteRecordingStreamOptions): Promise<void>;
+  setRecordingActive(recordingActive: boolean): Promise<void>
 }
 
 export interface RecordedEvent {
