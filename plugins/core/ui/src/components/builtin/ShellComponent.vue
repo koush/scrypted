@@ -37,16 +37,22 @@ export default {
     const rootLocation = `${window.location.protocol}//${window.location.host}`;
     this.socket = eio(rootLocation, options);
 
+    this.socket.send(JSON.stringify({ dim: { cols: term.cols, rows: term.rows } }));
+
     this.socket.on("message", (data) => {
-      term.write(new Uint8Array(Buffer.from(data)));
+      term.write(new Uint8Array(Buffer.from(JSON.parse(data).data)));
     });
 
     term.onData((data) => {
-      this.socket.send(data);
+      this.socket.send(JSON.stringify({ data }));
+    });
+
+    term.on('resize', dim => {
+      this.socket.send(JSON.stringify({ dim }));
     });
 
     term.onBinary((data) => {
-      this.socket.send(data);
+      this.socket.send(JSON.stringify({ data }));
     });
   },
   destroyed() {
