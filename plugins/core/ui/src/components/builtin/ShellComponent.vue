@@ -44,7 +44,7 @@ export default {
     });
 
     term.onData((data) => {
-      this.socket.send(JSON.stringify({ d: data }));
+      this.socket.send(Buffer.from(data, 'utf8'));
     });
 
     term.onBinary((data) => {

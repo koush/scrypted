@@ -127,9 +127,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     }
 
                     const parsed = JSON.parse(message.toString());
-                    if (parsed.d) {
-                        cp.write(parsed.d);
-                    } else if (parsed.dim) {
+                    if (parsed.dim) {
                         cp.resize(parsed.dim.cols, parsed.dim.rows);
                     }
                 });
