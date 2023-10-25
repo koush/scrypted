@@ -119,11 +119,16 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
                 const cp = spawn(process.env.SHELL, [], {
                 });
-                cp.onData(data => connection.send(JSON.stringify({data})));
+                cp.onData(data => connection.send(data));
                 connection.on('message', message => {
+                    if (Buffer.isBuffer(message)) {
+                        cp.write(message.toString());
+                        return;
+                    }
+
                     const parsed = JSON.parse(message.toString());
-                    if (parsed.data) {
-                        cp.write(parsed.data);
+                    if (parsed.d) {
+                        cp.write(parsed.d);
                     } else if (parsed.dim) {
                         cp.resize(parsed.dim.cols, parsed.dim.rows);
                     }

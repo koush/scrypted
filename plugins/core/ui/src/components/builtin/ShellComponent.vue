@@ -40,19 +40,20 @@ export default {
     this.socket.send(JSON.stringify({ dim: { cols: term.cols, rows: term.rows } }));
 
     this.socket.on("message", (data) => {
-      term.write(new Uint8Array(Buffer.from(JSON.parse(data).data)));
+      term.write(new Uint8Array(Buffer.from(data)));
     });
 
     term.onData((data) => {
-      this.socket.send(JSON.stringify({ data }));
+      this.socket.send(JSON.stringify({ d: data }));
+    });
+
+    term.onBinary((data) => {
+      // https://github.com/xtermjs/xterm.js/blob/2e02c37e528c1abc200ce401f49d0d7eae330e63/typings/xterm.d.ts#L859-L868
+      this.socket.send(Buffer.from(data, 'binary'));
     });
 
     term.on('resize', dim => {
       this.socket.send(JSON.stringify({ dim }));
-    });
-
-    term.onBinary((data) => {
-      this.socket.send(JSON.stringify({ data }));
     });
   },
   destroyed() {
