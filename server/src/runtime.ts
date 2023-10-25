@@ -126,9 +126,15 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                         return;
                     }
 
-                    const parsed = JSON.parse(message.toString());
-                    if (parsed.dim) {
-                        cp.resize(parsed.dim.cols, parsed.dim.rows);
+                    try {
+                        const parsed = JSON.parse(message.toString());
+                        if (parsed.dim) {
+                            cp.resize(parsed.dim.cols, parsed.dim.rows);
+                        }
+                    } catch (e) {
+                        // we should only get here if an outdated core plugin
+                        // is sending us string data instead of buffer data
+                        console.log(e);
                     }
                 });
                 connection.on('close', () => cp.kill());
