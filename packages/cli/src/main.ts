@@ -221,8 +221,8 @@ async function main() {
         console.log('install successful. id:', response.data.id);
     }
     else if (process.argv[2] === 'shell') {
-        if (!process.stdout.isTTY) {
-            throw Error("must be a tty for interactive shell");
+        if (!process.stdout.isTTY || !process.stdin.isTTY) {
+            throw Error("shell can only be used in interactive mode");
         }
         const ip = process.argv[3] || '127.0.0.1';
         const login = await getOrDoLogin(ip);
