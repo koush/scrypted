@@ -49,6 +49,7 @@ export interface ScryptedClientStatic extends ScryptedStatic {
     connectionType: ScryptedClientConnectionType;
     rpcPeer: RpcPeer;
     loginResult: ScryptedClientLoginResult;
+    connectShell(): IOClientSocket;
 }
 
 export interface ScryptedConnectionOptions {
@@ -56,6 +57,7 @@ export interface ScryptedConnectionOptions {
     local?: boolean;
     webrtc?: boolean;
     baseUrl?: string;
+    logger?: Function;
     axiosConfig?: AxiosRequestConfig;
     previousLoginResult?: ScryptedClientLoginResult;
 }
@@ -206,9 +208,10 @@ export class ScryptedClientLoginError extends Error {
 }
 
 export function redirectScryptedLogin(options?: {
-    redirect?: string, baseUrl?: string
+    redirect?: string, baseUrl?: string, logger?: Function
 }) {
     let { baseUrl, redirect } = options || {};
+    let logger: Function = options?.logger ? options.logger : console.log;
     redirect = redirect || `/endpoint/@scrypted/core/public/`
     if (baseUrl) {
         const url = new URL(redirect, baseUrl);
@@ -219,7 +222,7 @@ export function redirectScryptedLogin(options?: {
         redirect = `${redirect}?redirect_uri=${encodeURIComponent(window.location.href)}`;
     }
     const redirect_uri = redirect;
-    console.log('redirect_uri', redirect_uri);
+    logger('redirect_uri', redirect_uri);
     globalThis.location.href = redirect_uri;
 }
 
@@ -243,8 +246,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let directAddress: string;
     let cloudAddress: string;
     let token: string;
+    let logger: Function = options?.logger ? options.logger : console.log;
 
-    console.log('@scrypted/client', packageJson.version);
+    logger('@scrypted/client', packageJson.version);
 
     const extraHeaders: { [header: string]: string } = {};
 
@@ -267,7 +271,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         authorization = loginResult.authorization;
         queryToken = loginResult.queryToken;
         token = loginResult.token;
-        console.log('login result', Date.now() - start, loginResult);
+        logger('login result', Date.now() - start, loginResult);
     }
     else {
         const urlsToCheck = new Set<string>();
@@ -321,7 +325,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         }
 
         if (tryAlternateAddresses)
-            console.log('Found direct login. Allowing alternate addresses.')
+            logger('Found direct login. Allowing alternate addresses.')
 
         if (loginCheck.error || loginCheck.redirect)
             throw new ScryptedClientLoginError(loginCheck);
@@ -334,7 +338,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         authorization = loginCheck.authorization;
         queryToken = loginCheck.queryToken;
         token = loginCheck.token;
-        console.log('login checked', Date.now() - start, loginCheck);
+        logger('login checked', Date.now() - start, loginCheck);
     }
 
     let socket: IOClientSocket;
@@ -398,7 +402,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         }
     }
 
-    console.log({
+    logger({
         tryLocalAddressess: tryAddresses,
         tryWebrtc,
     });
@@ -426,7 +430,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         // if it is reacahble.
 
         for (const address of new Set(addresses)) {
-            console.log('trying', address);
+            logger('trying', address);
             const check = new eio.Socket(address, localEioOptions);
             sockets.push(check);
             promises.push((async () => {
@@ -441,7 +445,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     }
 
     if (tryWebrtc) {
-        console.log('trying webrtc');
+        logger('trying webrtc');
         const webrtcEioOptions: Partial<SocketOptions> = {
             path: '/endpoint/@scrypted/webrtc/engine.io/',
             query: {
@@ -506,13 +510,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             upgradingPeer.params['session'] = session;
 
             const pc = await pcPromise;
-            console.log('peer connection received');
+            logger('peer connection received');
 
             await waitPeerConnectionIceConnected(pc);
-            console.log('waiting for data channel');
+            logger('waiting for data channel');
 
             const dc = await dcDeferred.promise;
-            console.log('datachannel received', Date.now() - start);
+            logger('datachannel received', Date.now() - start);
 
             const debouncer = new DataChannelDebouncer(dc, e => {
                 console.error('datachannel send error', e);
@@ -544,7 +548,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
             waitPeerIceConnectionClosed(pc).then(() => check.close());
             check.on('close', () => {
-                console.log('datachannel upgrade cancelled/closed');
+                logger('datachannel upgrade cancelled/closed');
                 pc.close()
             });
 
@@ -578,13 +582,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
     promises.push((async () => {
         const waitDuration = tryWebrtc ? 10000 : (tryAddresses ? 1000 : 0);
-        console.log('waiting', waitDuration);
+        logger('waiting', waitDuration);
         if (waitDuration) {
             // give the peer to peers a second, but then try connecting directly.
             try {
                 const any = Promise.any(p2pPromises);
                 await timeoutPromise(waitDuration, any);
-                console.log('found direct connection, aborting scrypted cloud connection')
+                logger('found direct connection, aborting scrypted cloud connection')
                 return;
             }
             catch (e) {
@@ -608,7 +612,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     if (tryWebrtc && connectionType !== 'webrtc')
         localStorage.setItem(webrtcLastFailedKey, Date.now().toString());
 
-    console.log('connected', connectionType, address)
+    logger('connected', connectionType, address)
 
     socket = ready;
     sockets = sockets.filter(s => s !== ready);
@@ -656,7 +660,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             endpointManager,
             mediaManager,
         } = scrypted;
-        console.log('api attached', Date.now() - start);
+        logger('api attached', Date.now() - start);
 
         mediaManager.createMediaObject = async<T extends MediaObjectOptions>(data: any, mimeType: string, options: T) => {
             return new MediaObject(mimeType, data, options) as any;
@@ -669,7 +673,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 if (!updateSession)
                     return;
                 await updateSession(browserSignalingSession);
-                console.log('signaling channel upgraded.');
+                logger('signaling channel upgraded.');
                 socket.removeAllListeners();
                 socket.close();
             });
@@ -700,8 +704,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             })(),
         ]);
 
-        console.log('api initialized', Date.now() - start);
-        console.log('api queried, version:', version);
+        logger('api initialized', Date.now() - start);
+        logger('api queried, version:', version);
 
         const userDevice = Object.keys(systemManager.getSystemState())
             .map(id => systemManager.getDeviceById(id))
@@ -736,6 +740,22 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 queryToken,
                 authorization,
                 cloudAddress,
+            },
+            connectShell() {
+                const eioPath = `engine.io/shell`;
+                const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
+                const shellOptions = {
+                    path: eioEndpoint,
+                    query: {
+                        cacehBust,
+                    },
+                    withCredentials: true,
+                    extraHeaders,
+                    rejectUnauthorized: false,
+                    transports: options?.transports,
+                };
+                const shellSocket = new eio.Socket(explicitBaseUrl, shellOptions);
+                return shellSocket;
             }
         }
 

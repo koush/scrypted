@@ -220,6 +220,46 @@ async function main() {
 
         console.log('install successful. id:', response.data.id);
     }
+    else if (process.argv[2] === 'shell') {
+        if (!process.stdout.isTTY) {
+            throw Error("must be a tty for interactive shell");
+        }
+        const ip = process.argv[3] || '127.0.0.1';
+        const login = await getOrDoLogin(ip);
+        const sdk = await connectScryptedClient({
+            baseUrl: `https://${ip}`,
+            pluginId: '@scrypted/core',
+            username: login.username,
+            password: login.token,
+            logger: () => {},
+            axiosConfig: {
+                httpsAgent,
+            }
+        });
+
+        const shellSocket = sdk.connectShell();
+        shellSocket.on('open', () => {
+            process.stdin.setRawMode(true);
+
+            const dim = { cols: process.stdout.columns, rows: process.stdout.rows };
+            shellSocket.send(JSON.stringify({ dim }));
+
+            shellSocket.on("message", (data) => {
+                process.stdout.write(new Uint8Array(Buffer.from(data)));
+            });
+
+            shellSocket.on("close", () => process.exit(0));
+
+            process.stdin.on("data", (data) => {
+                shellSocket.send(Buffer.from(data));
+            });
+
+            process.stdout.on('resize', () => {
+                const dim = { cols: process.stdout.columns, rows: process.stdout.rows };
+                shellSocket.send(JSON.stringify({ dim }));
+            });
+        });
+    }
     else {
         console.log('usage:');
         console.log('   npx scrypted install npm-package-name [127.0.0.1[:10443]]');
@@ -231,6 +271,7 @@ async function main() {
         console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted ffplay name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
+        console.log('   npx scrypted shell [127.0.0.1[:10443]]');
         console.log();
         console.log('examples:');
         console.log('   npx scrypted install @scrypted/rtsp');
