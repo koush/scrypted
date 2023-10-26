@@ -207,7 +207,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             let audioSection = audioSections.find(msection => msection.codec === audioCodec || audioCodec === 'copy');
             if (!audioSection) {
                 for (const check of audioSections) {
-                    if (await audio.negotiate?.(check) === true) {
+                    if (await audio?.negotiate?.(check) === true) {
                         audioSection = check;
                         break;
                     }
