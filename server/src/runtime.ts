@@ -138,6 +138,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     }
                 });
                 connection.on('close', () => cp.kill());
+                cp.onExit(() => connection.close());
             }
             catch (e) {
                 connection.close();
