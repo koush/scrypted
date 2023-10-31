@@ -23,6 +23,17 @@ export function createAsyncQueue<T>() {
         return deferred.promise;
     }
 
+    const take = () => {
+        if (queued.length) {
+            const { item, dequeued: enqueue } = queued.shift()!;
+            enqueue?.resolve();
+            return item;
+        }
+
+        if (ended)
+            throw ended;
+    }
+
     const submit = (item: T, dequeued?: Deferred<void>, signal?: AbortSignal) => {
         if (ended)
             return false;
@@ -82,6 +93,7 @@ export function createAsyncQueue<T>() {
     }
 
     return {
+        take,
         clear() {
             return clear();
         },
