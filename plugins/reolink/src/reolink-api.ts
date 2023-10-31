@@ -19,6 +19,27 @@ export interface Stream {
     width:     number;
 }
 
+export interface DevInfo {
+    B485:         number;
+    IOInputNum:   number;
+    IOOutputNum:  number;
+    audioNum:     number;
+    buildDay:     string;
+    cfgVer:       string;
+    channelNum:   number;
+    detail:       string;
+    diskNum:      number;
+    exactType:    string;
+    firmVer:      string;
+    frameworkVer: number;
+    hardVer:      string;
+    model:        string;
+    name:         string;
+    pakSuffix:    string;
+    serial:       string;
+    type:         string;
+    wifi:         number;
+}
 
 export class ReolinkCameraClient {
     digestAuth: AxiosDigestAuth;
@@ -109,5 +130,19 @@ export class ReolinkCameraClient {
         });
 
         return response.data?.[0]?.value?.Enc;
+    }
+
+    async getDeviceInfo(): Promise<DevInfo> {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'GetDevInfo');
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.digestAuth.request({
+            url: url.toString(),
+            httpsAgent: reolinkHttpsAgent,
+        });
+
+        return response.data?.[0]?.value?.DevInfo;
     }
 }
