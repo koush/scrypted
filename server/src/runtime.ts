@@ -134,7 +134,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     } catch (e) {
                         // we should only get here if an outdated core plugin
                         // is sending us string data instead of buffer data
-                        console.log(e);
+                        cp.write(message.toString());
                     }
                 });
                 connection.on('close', () => cp.kill());
