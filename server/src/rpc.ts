@@ -423,7 +423,7 @@ export class RpcPeer {
     }
 
     generateId() {
-        return Array(8).map(() => RpcPeer.RANDOM_DIGITS.charAt(Math.floor(Math.random() * RpcPeer.RANDOM_DIGITS.length))).join('');
+        return [...new Array(8)].map(() => RpcPeer.RANDOM_DIGITS.charAt(Math.floor(Math.random() * RpcPeer.RANDOM_DIGITS.length))).join('');
     }
 
     createPendingResult(method: string, cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
