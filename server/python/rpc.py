@@ -1,4 +1,6 @@
 import inspect
+import random
+import string
 import traceback
 from asyncio.futures import Future
 from typing import Any, Callable, Dict, List, Mapping
@@ -497,13 +499,15 @@ class RpcPeer:
             print("unhandled rpc error", self.peerName, e)
             pass
 
+    randomDigits = random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits)
+
     async def createPendingResult(self, cb: Callable[[str, Callable[[Exception], None]], None]):
         future = Future()
         if self.killed:
             future.set_exception(RPCResultError(None, 'RpcPeer has been killed (createPendingResult)'))
             return future
 
-        id = str(self.idCounter)
+        id = ''.join(random.choices(RpcPeer.randomDigits, k=8))
         self.idCounter = self.idCounter + 1
         self.pendingResults[id] = future
         await cb(id, lambda e: future.set_exception(RPCResultError(e, None)))

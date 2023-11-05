@@ -303,7 +303,6 @@ interface ErrorType {
 }
 
 export class RpcPeer {
-    idCounter = 1;
     params: { [name: string]: any } = {};
     pendingResults: { [id: string]: Deferred } = {};
     proxyCounter = 1;
@@ -390,6 +389,7 @@ export class RpcPeer {
         return props;
     }
 
+    static readonly RANDOM_DIGITS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     static readonly RPC_RESULT_ERROR_NAME = 'RPCResultError';
     static readonly PROPERTY_PROXY_ID = '__proxy_id';
     static readonly PROPERTY_PROXY_ONEWAY_METHODS = '__proxy_oneway_methods';
@@ -422,12 +422,16 @@ export class RpcPeer {
         return !value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.transportSafeArgumentTypes.has(value.constructor?.name));
     }
 
+    generateId() {
+        return Array(8).map(() => RpcPeer.RANDOM_DIGITS.charAt(Math.floor(Math.random() * RpcPeer.RANDOM_DIGITS.length))).join('');
+    }
+
     createPendingResult(method: string, cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
         if (Object.isFrozen(this.pendingResults))
             return Promise.reject(new RPCResultError(this, 'RpcPeer has been killed (createPendingResult)'));
 
         const promise = new Promise((resolve, reject) => {
-            const id = (this.idCounter++).toString();
+            const id = this.generateId();
             this.pendingResults[id] = { resolve, reject, method };
 
             cb(id, e => reject(new RPCResultError(this, e.message, e)));
