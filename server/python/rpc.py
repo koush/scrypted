@@ -499,7 +499,7 @@ class RpcPeer:
             print("unhandled rpc error", self.peerName, e)
             pass
 
-    randomDigits = random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits)
+    randomDigits = string.ascii_uppercase + string.ascii_lowercase + string.digits
 
     async def createPendingResult(self, cb: Callable[[str, Callable[[Exception], None]], None]):
         future = Future()
