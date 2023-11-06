@@ -12,13 +12,11 @@ export function setupConnectRPCObjectProxy(scrypted: ScryptedRuntime, port: numb
         throw new Error("invalid port");
     }
 
-    const socket = net.connect(port, '127.0.0.1');
-    socket.on('connect', () => {
-        connection.send(scrypted.clusterSecret);
+    connection.send(scrypted.clusterSecret);
 
-        socket.on('close', () => connection.close());
-        socket.on('data', data => connection.send(data.toString()));
-        connection.on('close', () => socket.destroy());
-        connection.on('message', message => socket.write(message.toString()));
-    });
+    const socket = net.connect(port, '127.0.0.1');
+    socket.on('close', () => connection.close());
+    socket.on('data', data => connection.send(data));
+    connection.on('close', () => socket.destroy());
+    connection.on('message', message => socket.write(message));
 };

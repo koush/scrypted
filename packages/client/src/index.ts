@@ -749,7 +749,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                         const serializer = createRpcDuplexSerializer({
                             write: data => clusterPeerSocket.send(data),
                         });
-                        clusterPeerSocket.on('message', data => serializer.onData(Buffer.from(data)));
+                        clusterPeerSocket.on('message', data => serializer.onData(data));
 
                         const clusterPeer = new RpcPeer(clientName || 'engine.io-client', "cluster-proxy", (message, reject, serializationContext) => {
                             try {
@@ -759,7 +759,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                                 reject?.(e);
                             }
                         });
-                        serializer.setupRpcPeer(rpcPeer);
+                        serializer.setupRpcPeer(clusterPeer);
                         clusterPeer.tags.localPort = 65535 + 1; // beyond max port number
                         peerReady = true;
                         return { clusterPeer, clusterSecret };
