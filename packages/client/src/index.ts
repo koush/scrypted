@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { MediaObjectOptions, RTCConnectionManagement, RTCSignalingSession, ScryptedStatic } from "@scrypted/types";
 import axios, { AxiosRequestConfig, AxiosRequestHeaders } from 'axios';
 import * as eio from 'engine.io-client';
@@ -9,6 +10,7 @@ import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-de
 import type { IOSocket } from '../../../server/src/io';
 import { MediaObject } from '../../../server/src/plugin/mediaobject';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
+import { ClusterObject, ConnectRPCObject } from '../../../server/src/plugin/plugin-remote-worker';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import packageJson from '../package.json';
@@ -707,6 +709,95 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             .map(id => systemManager.getDeviceById(id))
             .find(device => device.pluginId === '@scrypted/core' && device.nativeId === `user:${username}`);
 
+        const clusterPeers = new Map<number, Promise<{ clusterPeer: RpcPeer, clusterSecret: string }>>();
+        const ensureClusterPeer = (port: number) => {
+            let clusterPeerPromise = clusterPeers.get(port);
+            if (!clusterPeerPromise) {
+                clusterPeerPromise = (async () => {
+                    const eioPath = 'engine.io/connectRPCObject';
+                    const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
+                    const clusterPeerOptions = {
+                        path: eioEndpoint,
+                        query: {
+                            cacehBust,
+                        },
+                        withCredentials: true,
+                        extraHeaders,
+                        rejectUnauthorized: false,
+                        transports: options?.transports,
+                    };
+
+                    const clusterPeerSocket = new eio.Socket(explicitBaseUrl, clusterPeerOptions);
+                    clusterPeerSocket.on('close', () => clusterPeers.delete(port))
+
+                    try {
+                        await once(clusterPeerSocket, 'open');
+
+                        // @ts-expect-error
+                        const clusterPeerPort = await once(clusterPeerSocket, 'port');
+                        // @ts-expect-error
+                        const clusterSecret: string = await once(clusterPeerSocket, 'secret');
+
+                        const serializer = createRpcSerializer({
+                            sendMessageBuffer: buffer => clusterPeerSocket.send(buffer),
+                            sendMessageFinish: message => clusterPeerSocket.send(JSON.stringify(message)),
+                        });
+
+                        const clusterPeer = new RpcPeer(clientName || 'engine.io-client', "api", (message, reject, serializationContext) => {
+                            try {
+                                serializer.sendMessage(message, reject, serializationContext);
+                            }
+                            catch (e) {
+                                reject?.(e);
+                            }
+                        });
+                        clusterPeerSocket.on('message', data => {
+                            if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
+                                serializer.onMessageBuffer(Buffer.from(data));
+                            }
+                            else {
+                                serializer.onMessageFinish(JSON.parse(data as string));
+                            }
+                        });
+                        serializer.setupRpcPeer(rpcPeer);
+                        clusterPeer.tags.localPort = clusterPeerPort;
+                        return { clusterPeer, clusterSecret };
+                    }
+                    catch (e) {
+                        console.error('failure ipc connect', e);
+                        clusterPeerSocket.close();
+                        throw e;
+                    }
+                })();
+                clusterPeers.set(port, clusterPeerPromise);
+            }
+            return clusterPeerPromise;
+        };
+
+
+        const connectRPCObject = async (value: any) => {
+            const clusterObject: ClusterObject = value?.__cluster;
+            const { port, proxyId, source } = clusterObject;
+
+            try {
+                const clusterPeerPromise = ensureClusterPeer(port);
+                const { clusterPeer, clusterSecret } = await clusterPeerPromise;
+                // this object is already connected
+                if (clusterPeer.tags.localPort === source)
+                    return value;
+                const connectRPCObject: ConnectRPCObject = await clusterPeer.getParam('connectRPCObject');
+                const portSecret = crypto.createHash('sha256').update(`${port}${clusterSecret}`).digest().toString('hex');
+                const newValue = await connectRPCObject(proxyId, portSecret, source);
+                if (!newValue)
+                    throw new Error('ipc object not found?');
+                return newValue;
+            }
+            catch (e) {
+                console.error('failure ipc', e);
+                return value;
+            }
+        }
+
         const ret: ScryptedClientStatic = {
             userId: userDevice?.id,
             serverVersion,
@@ -736,7 +827,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 queryToken,
                 authorization,
                 cloudAddress,
-            }
+            },
+            connectRPCObject,
         }
 
         socket.on('close', () => {

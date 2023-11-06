@@ -26,14 +26,14 @@ export interface StartPluginRemoteOptions {
     onClusterPeer(peer: RpcPeer): void;
 }
 
-interface ClusterObject {
+export interface ClusterObject {
     id: string;
     port: number;
     proxyId: string;
     source: number;
 }
 
-type ConnectRPCObject = (id: string, secret: string, sourcePeerPort: number) => Promise<any>;
+export type ConnectRPCObject = (id: string, secret: string, sourcePeerPort: number) => Promise<any>;
 
 export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void, startPluginRemoteOptions?: StartPluginRemoteOptions) {
     const peer = new RpcPeer('unknown', 'host', peerSend);

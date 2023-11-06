@@ -34,6 +34,7 @@ import { getPluginVolume } from './plugin/plugin-volume';
 import { NodeForkWorker } from './plugin/runtime/node-fork-worker';
 import { PythonRuntimeWorker } from './plugin/runtime/python-worker';
 import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
+import { setupConnectRPCObjectProxy } from './plugin/connect-rpc-object';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
@@ -71,7 +72,18 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     devicesLogger = this.logger.getLogger('device', 'Devices');
     wss = new WebSocketServer({ noServer: true });
     wsAtomic = 0;
-    shellio: IOServer = new io.Server({
+    shellIO: IOServer = new io.Server({
+        pingTimeout: 120000,
+        perMessageDeflate: true,
+        cors: (req, callback) => {
+            const header = this.getAccessControlAllowOrigin(req.headers);
+            callback(undefined, {
+                origin: header,
+                credentials: true,
+            })
+        },
+    });
+    connectRPCObjectIO: IOServer = new io.Server({
         pingTimeout: 120000,
         perMessageDeflate: true,
         cors: (req, callback) => {
@@ -114,7 +126,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             this.shellHandler(req, res);
         });
 
-        this.shellio.on('connection', connection => {
+        this.shellIO.on('connection', connection => {
             try {
                 const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
                 const cp = spawn(process.env.SHELL, [], {
@@ -141,6 +153,24 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 cp.onExit(() => connection.close());
             }
             catch (e) {
+                connection.close();
+            }
+        });
+
+        app.all('/engine.io/connectRPCObject', (req, res) => {
+            if (res.locals.aclId) {
+                res.writeHead(401);
+                res.end();
+                return;
+            }
+            this.connectRPCObjectHandler(req, res);
+        });
+
+        this.connectRPCObjectIO.on('connection', connection => {
+            try {
+                const clusterObjectPortHeader = connection.request.headers["x-scrypted-clusterobject-port"] as string;
+                setupConnectRPCObjectProxy(this, parseInt(clusterObjectPortHeader), connection);
+            } catch {
                 connection.close();
             }
         });
@@ -274,9 +304,36 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
 
         if ((req as any).upgradeHead)
-            this.shellio.handleUpgrade(req, res.socket, (req as any).upgradeHead)
+            this.shellIO.handleUpgrade(req, res.socket, (req as any).upgradeHead)
         else
-            this.shellio.handleRequest(req, res);
+            this.shellIO.handleRequest(req, res);
+    }
+
+    async connectRPCObjectHandler(req: Request, res: Response) {
+        const isUpgrade = isConnectionUpgrade(req.headers);
+
+        const end = (code: number, message: string) => {
+            if (isUpgrade) {
+                const socket = res.socket;
+                socket.write(`HTTP/1.1 ${code} ${message}\r\n` +
+                    '\r\n');
+                socket.destroy();
+            }
+            else {
+                res.status(code);
+                res.send(message);
+            }
+        };
+
+        if (!res.locals.username) {
+            end(401, 'Not Authorized');
+            return;
+        }
+
+        if ((req as any).upgradeHead)
+            this.connectRPCObjectIO.handleUpgrade(req, res.socket, (req as any).upgradeHead)
+        else
+            this.connectRPCObjectIO.handleRequest(req, res);
     }
 
     async getEndpointPluginData(req: Request, endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<HttpPluginData> {
