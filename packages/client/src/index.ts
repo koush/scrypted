@@ -12,9 +12,11 @@ import { MediaObject } from '../../../server/src/plugin/mediaobject';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { ClusterObject, ConnectRPCObject } from '../../../server/src/plugin/plugin-remote-worker';
 import { RpcPeer } from '../../../server/src/rpc';
-import { createDuplexRpcPeer, createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
+import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import packageJson from '../package.json';
 import { isIPAddress } from "./ip";
+
+const connectRPCObjectPlaceholderPort = 65535 + 1; // beyond max port number
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -760,7 +762,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                             }
                         });
                         serializer.setupRpcPeer(clusterPeer);
-                        clusterPeer.tags.localPort = 65535 + 1; // beyond max port number
+                        clusterPeer.tags.localPort = connectRPCObjectPlaceholderPort;
                         peerReady = true;
                         return { clusterPeer, clusterSecret };
                     }
@@ -784,7 +786,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 const clusterPeerPromise = ensureClusterPeer(port);
                 const { clusterPeer, clusterSecret } = await clusterPeerPromise;
                 // this object is already connected
-                if (clusterPeer.tags.localPort === source)
+                if (clusterPeer.tags.localPort === connectRPCObjectPlaceholderPort)
                     return value;
                 const connectRPCObject: ConnectRPCObject = await clusterPeer.getParam('connectRPCObject');
                 const portSecret = crypto.createHash('sha256').update(`${port}${clusterSecret}`).digest().toString('hex');
