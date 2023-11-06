@@ -12,7 +12,7 @@ import { MediaObject } from '../../../server/src/plugin/mediaobject';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { ClusterObject, ConnectRPCObject } from '../../../server/src/plugin/plugin-remote-worker';
 import { RpcPeer } from '../../../server/src/rpc';
-import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
+import { createDuplexRpcPeer, createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import packageJson from '../package.json';
 import { isIPAddress } from "./ip";
 
@@ -722,28 +722,36 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                             cacehBust,
                         },
                         withCredentials: true,
-                        extraHeaders,
+                        extraHeaders: {
+                            ...extraHeaders,
+                            "x-scrypted-clusterobject-port": `${port}`,
+                        },
                         rejectUnauthorized: false,
                         transports: options?.transports,
                     };
 
                     const clusterPeerSocket = new eio.Socket(explicitBaseUrl, clusterPeerOptions);
-                    clusterPeerSocket.on('close', () => clusterPeers.delete(port))
+                    let peerReady = false;
+                    clusterPeerSocket.on('close', () => {
+                        clusterPeers.delete(port);
+                        if (!peerReady) {
+                            throw new Error("peer disconnected before setup completed");
+                        }
+                    });
 
                     try {
+                        const clusterSecretPromise = once(clusterPeerSocket, 'message');
+
                         await once(clusterPeerSocket, 'open');
 
-                        // @ts-expect-error
-                        const clusterPeerPort = await once(clusterPeerSocket, 'port');
-                        // @ts-expect-error
-                        const clusterSecret: string = await once(clusterPeerSocket, 'secret');
+                        const clusterSecret = await clusterSecretPromise as any as string;
 
-                        const serializer = createRpcSerializer({
-                            sendMessageBuffer: buffer => clusterPeerSocket.send(buffer),
-                            sendMessageFinish: message => clusterPeerSocket.send(JSON.stringify(message)),
+                        const serializer = createRpcDuplexSerializer({
+                            write: data => clusterPeerSocket.send(data),
                         });
+                        clusterPeerSocket.on('message', data => serializer.onData(Buffer.from(data)));
 
-                        const clusterPeer = new RpcPeer(clientName || 'engine.io-client', "api", (message, reject, serializationContext) => {
+                        const clusterPeer = new RpcPeer(clientName || 'engine.io-client', "cluster-proxy", (message, reject, serializationContext) => {
                             try {
                                 serializer.sendMessage(message, reject, serializationContext);
                             }
@@ -751,16 +759,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                                 reject?.(e);
                             }
                         });
-                        clusterPeerSocket.on('message', data => {
-                            if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
-                                serializer.onMessageBuffer(Buffer.from(data));
-                            }
-                            else {
-                                serializer.onMessageFinish(JSON.parse(data as string));
-                            }
-                        });
                         serializer.setupRpcPeer(rpcPeer);
-                        clusterPeer.tags.localPort = clusterPeerPort;
+                        clusterPeer.tags.localPort = 65535 + 1; // beyond max port number
+                        peerReady = true;
                         return { clusterPeer, clusterSecret };
                     }
                     catch (e) {

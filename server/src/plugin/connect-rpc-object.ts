@@ -13,11 +13,12 @@ export function setupConnectRPCObjectProxy(scrypted: ScryptedRuntime, port: numb
     }
 
     const socket = net.connect(port, '127.0.0.1');
-    connection.emit('port', (socket.address() as net.AddressInfo).port);
-    connection.emit('secret', scrypted.clusterSecret);
+    socket.on('connect', () => {
+        connection.send(scrypted.clusterSecret);
 
-    socket.on('close', () => connection.close());
-    socket.on('data', data => connection.send(data));
-    connection.on('close', () => socket.destroy());
-    connection.on('message', message => socket.write(message));
+        socket.on('close', () => connection.close());
+        socket.on('data', data => connection.send(data.toString()));
+        connection.on('close', () => socket.destroy());
+        connection.on('message', message => socket.write(message.toString()));
+    });
 };
