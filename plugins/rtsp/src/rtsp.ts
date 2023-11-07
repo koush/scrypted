@@ -9,7 +9,7 @@ export { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 const { mediaManager } = sdk;
 
 export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
-    takePictureThrottled(option?: PictureOptions): Promise<MediaObject> {
+    takePicture(option?: PictureOptions): Promise<MediaObject> {
         throw new Error("The RTSP Camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
     }
 
@@ -234,7 +234,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
         this.listener.then(l => l.emit('error', new Error("new settings")));
     }
 
-    async takePictureThrottled(option?: PictureOptions) {
+    async takePicture(option?: PictureOptions) {
         return this.takeSmartCameraPicture(option);;
     }
 
