@@ -305,7 +305,6 @@ interface ErrorType {
 export class RpcPeer {
     params: { [name: string]: any } = {};
     pendingResults: { [id: string]: Deferred } = {};
-    proxyCounter = 1;
     localProxied = new Map<any, LocalProxiedEntry>();
     localProxyMap = new Map<string, any>();
     // @ts-ignore
@@ -627,7 +626,7 @@ export class RpcPeer {
 
         let proxiedEntry = this.localProxied.get(value);
         if (proxiedEntry) {
-            const __remote_proxy_finalizer_id = (this.proxyCounter++).toString();
+            const __remote_proxy_finalizer_id = this.generateId();
             proxiedEntry.finalizerId = __remote_proxy_finalizer_id;
             const ret: RpcRemoteProxyValue = {
                 __remote_proxy_id: proxiedEntry.id,
@@ -649,7 +648,7 @@ export class RpcPeer {
 
         this.onProxyTypeSerialization.get(__remote_constructor_name)?.(value);
 
-        const __remote_proxy_id = (this.proxyCounter++).toString();
+        const __remote_proxy_id = this.generateId();
         proxiedEntry = {
             id: __remote_proxy_id,
             finalizerId: __remote_proxy_id,

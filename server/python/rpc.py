@@ -124,13 +124,11 @@ class RpcPeer:
 
     def __init__(self, send: Callable[[object, Callable[[Exception], None], Dict], None]) -> None:
         self.send = send
-        self.idCounter = 1
         self.peerName = 'Unnamed Peer'
         self.params: Mapping[str, any] = {}
         self.localProxied: Mapping[any, LocalProxiedEntry] = {}
         self.localProxyMap: Mapping[str, any] = {}
         self.constructorSerializerMap = {}
-        self.proxyCounter = 1
         self.pendingResults: Mapping[str, Future] = {}
         self.remoteWeakProxies: Mapping[str, any] = {}
         self.nameDeserializerMap: Mapping[str, RpcSerializer] = {}
@@ -282,8 +280,7 @@ class RpcPeer:
 
         proxiedEntry = self.localProxied.get(value, None)
         if proxiedEntry:
-            proxiedEntry['finalizerId'] = str(self.proxyCounter)
-            self.proxyCounter = self.proxyCounter + 1
+            proxiedEntry['finalizerId'] = self.generateId()
             ret = {
                 '__remote_proxy_id': proxiedEntry['id'],
                 '__remote_proxy_finalizer_id': proxiedEntry['finalizerId'],
@@ -301,8 +298,7 @@ class RpcPeer:
             }
             return ret
 
-        proxyId = str(self.proxyCounter)
-        self.proxyCounter = self.proxyCounter + 1
+        proxyId = self.generateId()
         proxiedEntry = {
             'id': proxyId,
             'finalizerId': proxyId,
@@ -501,14 +497,16 @@ class RpcPeer:
 
     randomDigits = string.ascii_uppercase + string.ascii_lowercase + string.digits
 
+    def generateId(self):
+        return ''.join(random.choices(RpcPeer.randomDigits, k=8))
+
     async def createPendingResult(self, cb: Callable[[str, Callable[[Exception], None]], None]):
         future = Future()
         if self.killed:
             future.set_exception(RPCResultError(None, 'RpcPeer has been killed (createPendingResult)'))
             return future
 
-        id = ''.join(random.choices(RpcPeer.randomDigits, k=8))
-        self.idCounter = self.idCounter + 1
+        id = self.generateId()
         self.pendingResults[id] = future
         await cb(id, lambda e: future.set_exception(RPCResultError(e, None)))
         return await future
