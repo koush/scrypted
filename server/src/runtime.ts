@@ -163,12 +163,17 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 res.end();
                 return;
             }
+            if (!req.query.port) {
+                res.writeHead(404);
+                res.end();
+                return;
+            }
             this.connectRPCObjectHandler(req, res);
         });
 
         this.connectRPCObjectIO.on('connection', connection => {
             try {
-                const clusterObjectPortHeader = connection.request.headers["x-scrypted-clusterobject-port"] as string;
+                const clusterObjectPortHeader = (connection.request as Request).query.port as string;
                 setupConnectRPCObjectProxy(this, parseInt(clusterObjectPortHeader), connection);
             } catch {
                 connection.close();

@@ -16,7 +16,7 @@ import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/
 import packageJson from '../package.json';
 import { isIPAddress } from "./ip";
 
-const connectRPCObjectPlaceholderPort = 65535 + 1; // beyond max port number
+const sourcePeerId = [...new Array(8)].map(() => RpcPeer.RANDOM_DIGITS.charAt(Math.floor(Math.random() * RpcPeer.RANDOM_DIGITS.length))).join('');
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -722,12 +722,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                         path: eioEndpoint,
                         query: {
                             cacehBust,
+                            port,
                         },
                         withCredentials: true,
-                        extraHeaders: {
-                            ...extraHeaders,
-                            "x-scrypted-clusterobject-port": `${port}`,
-                        },
+                        extraHeaders,
                         rejectUnauthorized: false,
                         transports: options?.transports,
                     };
@@ -762,7 +760,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                             }
                         });
                         serializer.setupRpcPeer(clusterPeer);
-                        clusterPeer.tags.localPort = connectRPCObjectPlaceholderPort;
+                        clusterPeer.tags.localPort = sourcePeerId;
                         peerReady = true;
                         return { clusterPeer, clusterSecret };
                     }
@@ -777,17 +775,33 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             return clusterPeerPromise;
         };
 
+        const resolveObject = async (proxyId: string, sourcePeerPort: number) => {
+            const sourcePeer = (await clusterPeers.get(sourcePeerPort))?.clusterPeer;
+            if (sourcePeer?.remoteWeakProxies) {
+                return Object.values(sourcePeer.remoteWeakProxies).find(
+                    v => v.deref()?.__cluster?.proxyId == proxyId
+                )?.deref();
+            }
+            return null;
+        }
 
         const connectRPCObject = async (value: any) => {
             const clusterObject: ClusterObject = value?.__cluster;
+            if (!clusterObject) {
+                return value;
+            }
+
             const { port, proxyId, source } = clusterObject;
+
+            // check if object is already connected
+            const resolved = await resolveObject(proxyId, port);
+            if (resolved) {
+                return resolved;
+            }
 
             try {
                 const clusterPeerPromise = ensureClusterPeer(port);
                 const { clusterPeer, clusterSecret } = await clusterPeerPromise;
-                // this object is already connected
-                if (clusterPeer.tags.localPort === connectRPCObjectPlaceholderPort)
-                    return value;
                 const connectRPCObject: ConnectRPCObject = await clusterPeer.getParam('connectRPCObject');
                 const portSecret = crypto.createHash('sha256').update(`${port}${clusterSecret}`).digest().toString('hex');
                 const newValue = await connectRPCObject(proxyId, portSecret, source);
