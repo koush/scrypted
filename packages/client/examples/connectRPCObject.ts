@@ -1,4 +1,4 @@
-import { Camera } from '@scrypted/types';
+import { Camera, VideoCamera, VideoFrameGenerator } from '@scrypted/types';
 import { connectScryptedClient } from '../dist/packages/client/src';
 
 import https from 'https';
@@ -19,13 +19,16 @@ async function example() {
     });
     console.log('server version', sdk.serverVersion);
 
-    const office = sdk.systemManager.getDeviceByName<Camera>("Office");
-    const mo = await office.takePicture();
+    const office = sdk.systemManager.getDeviceByName<VideoCamera & Camera>("Office");
+    const libav = sdk.systemManager.getDeviceByName<VideoFrameGenerator>("Libav");
+    const mo = await office.getVideoStream();
 
-    console.log("standard rpc object", mo);
+    const generator = await libav.generateVideoFrames(mo);
+    const remote = await sdk.connectRPCObject(generator);
 
-    const remote = await sdk.connectRPCObject(mo);
-    console.log("connectRPCObject object", remote);
+    for await (const frame of remote) {
+        console.log(frame);
+    }
 }
 
 example();
