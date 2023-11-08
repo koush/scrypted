@@ -177,6 +177,12 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
             await device.getSettings();
         }
         const mixin = this.createdMixins.get(id);
+        if (!mixin) {
+            response.send('Not Found', {
+                code: 404,
+            });
+            return;
+        }
         mixin.handle(request, response, device, pathSegments);
     }
 
