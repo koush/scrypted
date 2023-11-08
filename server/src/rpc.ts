@@ -421,7 +421,7 @@ export class RpcPeer {
         return !value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.transportSafeArgumentTypes.has(value.constructor?.name));
     }
 
-    generateId() {
+    static generateId() {
         return [...new Array(8)].map(() => RpcPeer.RANDOM_DIGITS.charAt(Math.floor(Math.random() * RpcPeer.RANDOM_DIGITS.length))).join('');
     }
 
@@ -430,7 +430,7 @@ export class RpcPeer {
             return Promise.reject(new RPCResultError(this, 'RpcPeer has been killed (createPendingResult)'));
 
         const promise = new Promise((resolve, reject) => {
-            const id = this.generateId();
+            const id = RpcPeer.generateId();
             this.pendingResults[id] = { resolve, reject, method };
 
             cb(id, e => reject(new RPCResultError(this, e.message, e)));
@@ -626,7 +626,7 @@ export class RpcPeer {
 
         let proxiedEntry = this.localProxied.get(value);
         if (proxiedEntry) {
-            const __remote_proxy_finalizer_id = this.generateId();
+            const __remote_proxy_finalizer_id = RpcPeer.generateId();
             proxiedEntry.finalizerId = __remote_proxy_finalizer_id;
             const ret: RpcRemoteProxyValue = {
                 __remote_proxy_id: proxiedEntry.id,
@@ -648,7 +648,7 @@ export class RpcPeer {
 
         this.onProxyTypeSerialization.get(__remote_constructor_name)?.(value);
 
-        const __remote_proxy_id = this.generateId();
+        const __remote_proxy_id = RpcPeer.generateId();
         proxiedEntry = {
             id: __remote_proxy_id,
             finalizerId: __remote_proxy_id,
@@ -839,7 +839,7 @@ export function getEvalSource() {
         ${RpcPeer}
 
         ${startPeriodicGarbageCollection}
-    
+
         return {
             startPeriodicGarbageCollection,
             RpcPeer,
