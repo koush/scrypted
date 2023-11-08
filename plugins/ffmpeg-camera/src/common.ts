@@ -15,7 +15,6 @@ export interface UrlMediaStreamOptions extends ResponseMediaStreamOptions {
 
 export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends ScryptedDeviceBase implements Camera, VideoCamera, Settings {
     snapshotAuth: AxiosDigestAuth;
-    pendingPicture: Promise<MediaObject>;
 
     constructor(nativeId: string, public provider: CameraProviderBase<T>) {
         super(nativeId);
@@ -38,16 +37,7 @@ export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends S
         return mediaManager.createMediaObject(Buffer.from(response.data), response.headers['Content-Type'] || 'image/jpeg');
     }
 
-    async takePicture(option?: PictureOptions): Promise<MediaObject> {
-        if (!this.pendingPicture) {
-            this.pendingPicture = this.takePictureThrottled(option);
-            this.pendingPicture.finally(() => this.pendingPicture = undefined);
-        }
-
-        return this.pendingPicture;
-    }
-
-    abstract takePictureThrottled(option?: PictureOptions): Promise<MediaObject>;
+    abstract takePicture(option?: PictureOptions): Promise<MediaObject>;
 
     async getPictureOptions(): Promise<PictureOptions[]> {
         return;
