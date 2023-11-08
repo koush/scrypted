@@ -72,7 +72,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     devicesLogger = this.logger.getLogger('device', 'Devices');
     wss = new WebSocketServer({ noServer: true });
     wsAtomic = 0;
-    shellIO: IOServer = new io.Server({
+    shellio: IOServer = new io.Server({
         pingTimeout: 120000,
         perMessageDeflate: true,
         cors: (req, callback) => {
@@ -126,7 +126,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             this.shellHandler(req, res);
         });
 
-        this.shellIO.on('connection', connection => {
+        this.shellio.on('connection', connection => {
             try {
                 const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
                 const cp = spawn(process.env.SHELL, [], {
@@ -174,7 +174,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         this.connectRPCObjectIO.on('connection', connection => {
             try {
                 const clusterObjectPortHeader = (connection.request as Request).query.port as string;
-                setupConnectRPCObjectProxy(this, parseInt(clusterObjectPortHeader), connection);
+                setupConnectRPCObjectProxy(this.clusterSecret, parseInt(clusterObjectPortHeader), connection);
             } catch {
                 connection.close();
             }
@@ -309,9 +309,9 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
 
         if ((req as any).upgradeHead)
-            this.shellIO.handleUpgrade(req, res.socket, (req as any).upgradeHead)
+            this.shellio.handleUpgrade(req, res.socket, (req as any).upgradeHead)
         else
-            this.shellIO.handleRequest(req, res);
+            this.shellio.handleRequest(req, res);
     }
 
     async connectRPCObjectHandler(req: Request, res: Response) {

@@ -10,13 +10,13 @@ import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-de
 import type { IOSocket } from '../../../server/src/io';
 import { MediaObject } from '../../../server/src/plugin/mediaobject';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
-import { ClusterObject, ConnectRPCObject } from '../../../server/src/plugin/plugin-remote-worker';
+import type { ClusterObject, ConnectRPCObject } from '../../../server/src/plugin/connect-rpc-object';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import packageJson from '../package.json';
 import { isIPAddress } from "./ip";
 
-const sourcePeerId = [...new Array(8)].map(() => RpcPeer.RANDOM_DIGITS.charAt(Math.floor(Math.random() * RpcPeer.RANDOM_DIGITS.length))).join('');
+const sourcePeerId = RpcPeer.generateId();
 
 type IOClientSocket = eio.Socket & IOSocket;
 

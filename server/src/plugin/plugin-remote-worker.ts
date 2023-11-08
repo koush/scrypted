@@ -17,6 +17,7 @@ import { attachPluginRemote, DeviceManagerImpl, PluginReader, setupPluginRemote 
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
+import { ClusterObject, ConnectRPCObject } from './connect-rpc-object';
 import crypto from 'crypto';
 const { link } = require('linkfs');
 
@@ -25,15 +26,6 @@ const serverVersion = require('../../package.json').version;
 export interface StartPluginRemoteOptions {
     onClusterPeer(peer: RpcPeer): void;
 }
-
-export interface ClusterObject {
-    id: string;
-    port: number;
-    proxyId: string;
-    source: number;
-}
-
-export type ConnectRPCObject = (id: string, secret: string, sourcePeerPort: number) => Promise<any>;
 
 export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void, startPluginRemoteOptions?: StartPluginRemoteOptions) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
