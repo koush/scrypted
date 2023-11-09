@@ -1,3 +1,4 @@
+import net from 'net';
 import { Device, DeviceInformation, DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceMethod, ScryptedInterfaceProperty, ScryptedNativeId, ScryptedUser as SU } from '@scrypted/types';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
@@ -34,7 +35,7 @@ import { getPluginVolume } from './plugin/plugin-volume';
 import { NodeForkWorker } from './plugin/runtime/node-fork-worker';
 import { PythonRuntimeWorker } from './plugin/runtime/python-worker';
 import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
-import { ClusterObject, computeClusterObjectHash, setupConnectRPCObjectProxy } from './plugin/connect-rpc-object';
+import { ClusterObject, computeClusterObjectHash } from './plugin/connect-rpc-object';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
@@ -157,35 +158,42 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             }
         });
 
-        app.all('/engine.io/connectRPCObject', (req, res) => {
-            if (res.locals.aclId) {
-                res.writeHead(401);
-                res.end();
-                return;
-            }
-            if (!req.query.clusterObject) {
-                res.writeHead(404);
-                res.end();
-                return;
-            }
-            try {
-                const clusterObject: ClusterObject = JSON.parse(req.query.clusterObject as string);
-                const sha256 = computeClusterObjectHash(clusterObject, this.clusterSecret);
-                if (sha256 != clusterObject.sha256) {
-                    throw Error("invalid signature");
-                }
-            } catch {
-                res.writeHead(404);
-                res.end();
-                return;
-            }
-            this.connectRPCObjectHandler(req, res);
-        });
+        app.all('/engine.io/connectRPCObject', (req, res) => this.connectRPCObjectHandler(req, res));
 
+        /*
+        * Handle incoming connections that will be
+        * proxied to a connectRPCObject socket.
+        *
+        * It is the responsibility of the caller of
+        * this function to verify the signature of
+        * clusterObject using the clusterSecret.
+        */
         this.connectRPCObjectIO.on('connection', connection => {
             try {
                 const clusterObject: ClusterObject = JSON.parse((connection.request as Request).query.clusterObject as string);
-                setupConnectRPCObjectProxy(clusterObject, connection);
+                const sha256 = computeClusterObjectHash(clusterObject, this.clusterSecret);
+                if (sha256 != clusterObject.sha256) {
+                    connection.send({
+                        error: 'invalid signature'
+                    });
+                    connection.close();
+                    return;
+                }
+
+                const socket = net.connect(clusterObject.port, '127.0.0.1');
+                socket.on('error', () => connection.close());
+                socket.on('close', () => connection.close());
+                socket.on('data', data => connection.send(data));
+                connection.on('close', () => socket.destroy());
+                connection.on('message', message => {
+                    if (typeof message !== 'string') {
+                        socket.write(message);
+                    }
+                    else {
+                        console.warn('unexpected string data on engine.io rpc connection. terminating.')
+                        connection.close();
+                    }
+                });
             } catch {
                 connection.close();
             }
