@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import gc
 import os
 import platform
@@ -38,6 +39,14 @@ import multiprocessing.connection
 
 import rpc
 import rpc_reader
+
+
+class ClusterObject(TypedDict):
+    id: str
+    port: int
+    proxyId: str
+    sourcePort: str
+    sha256: str
 
 
 class SystemDeviceState(TypedDict):
@@ -389,16 +398,22 @@ class PluginRemote:
         clusterId = options['clusterId']
         clusterSecret = options['clusterSecret']
 
+        def computeClusterObjectHash(o: ClusterObject) -> str:
+            m = hashlib.sha256()
+            m.update(bytes(f"{o['id']}{o['port']}{o.get('sourcePort', '')}{o['proxyId']}{clusterSecret}", 'utf8'))
+            return base64.b64encode(m.digest()).decode('utf-8')
+
         def onProxySerialization(value: Any, proxyId: str, source: int = None):
             properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
             clusterEntry = properties.get('__cluster', None)
             if not properties.get('__cluster', None):
-                clusterEntry = {
+                clusterEntry: ClusterObject = {
                     'id': clusterId,
                     'proxyId': proxyId,
                     'port': clusterPort,
                     'source': source,
                 }
+                clusterEntry['sha256'] = computeClusterObjectHash(clusterEntry)
                 properties['__cluster'] = clusterEntry
 
             # clusterEntry['proxyId'] = proxyId
@@ -426,13 +441,11 @@ class PluginRemote:
             future.set_result(peer)
             clusterPeers[clusterPeerPort] = future
 
-            async def connectRPCObject(id: str, secret: str, sourcePeerPort: int = None):
-                m = hashlib.sha256()
-                m.update(bytes('%s%s' % (clusterPort, clusterSecret), 'utf8'))
-                portSecret = m.hexdigest()
-                if secret != portSecret:
+            async def connectRPCObject(o: ClusterObject):
+                sha256 = computeClusterObjectHash(o)
+                if sha256 != o['sha256']:
                     raise Exception('secret incorrect')
-                return await resolveObject(id, sourcePeerPort)
+                return await resolveObject(o['proxyId'], o.get('sourcePort'))
 
             peer.params['connectRPCObject'] = connectRPCObject
             try:
@@ -496,10 +509,7 @@ class PluginRemote:
                 if clusterPeer.tags.get('localPort') == source:
                     return value
                 c = await clusterPeer.getParam('connectRPCObject')
-                m = hashlib.sha256()
-                m.update(bytes('%s%s' % (port, clusterSecret), 'utf8'))
-                portSecret = m.hexdigest()
-                newValue = await c(proxyId, portSecret, source)
+                newValue = await c(clusterObject)
                 if not newValue:
                     raise Exception('ipc object not found?')
                 return newValue

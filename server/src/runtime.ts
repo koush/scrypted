@@ -34,7 +34,7 @@ import { getPluginVolume } from './plugin/plugin-volume';
 import { NodeForkWorker } from './plugin/runtime/node-fork-worker';
 import { PythonRuntimeWorker } from './plugin/runtime/python-worker';
 import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
-import { setupConnectRPCObjectProxy } from './plugin/connect-rpc-object';
+import { ClusterObject, computeClusterObjectHash, setupConnectRPCObjectProxy } from './plugin/connect-rpc-object';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
@@ -163,7 +163,18 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 res.end();
                 return;
             }
-            if (!req.query.port) {
+            if (!req.query.clusterObject) {
+                res.writeHead(404);
+                res.end();
+                return;
+            }
+            try {
+                const clusterObject: ClusterObject = JSON.parse(req.query.clusterObject as string);
+                const sha256 = computeClusterObjectHash(clusterObject, this.clusterSecret);
+                if (sha256 != clusterObject.sha256) {
+                    throw Error("invalid signature");
+                }
+            } catch {
                 res.writeHead(404);
                 res.end();
                 return;
@@ -173,8 +184,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
         this.connectRPCObjectIO.on('connection', connection => {
             try {
-                const clusterObjectPortHeader = (connection.request as Request).query.port as string;
-                setupConnectRPCObjectProxy(this.clusterSecret, parseInt(clusterObjectPortHeader), connection);
+                const clusterObject: ClusterObject = JSON.parse((connection.request as Request).query.clusterObject as string);
+                setupConnectRPCObjectProxy(clusterObject, connection);
             } catch {
                 connection.close();
             }
