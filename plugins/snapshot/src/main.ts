@@ -223,6 +223,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     responseType: 'arraybuffer',
                     url: this.storageSettings.values.snapshotUrl,
                     timeout: 60000,
+                    headers: {
+                        'Accept': 'image/*',
+                    }
                 });
 
                 return response.data;
