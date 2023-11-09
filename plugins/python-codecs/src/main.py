@@ -33,6 +33,7 @@ class LibavGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGen
         self,
         mediaObject: scrypted_sdk.MediaObject,
         options: scrypted_sdk.VideoFrameGeneratorOptions = None,
+        # todo remove
         filter: Any = None,
     ) -> scrypted_sdk.VideoFrame:
         forked: CodecFork = await self.zygote().result
@@ -52,6 +53,7 @@ class GstreamerGenerator(
         self,
         mediaObject: scrypted_sdk.MediaObject,
         options: scrypted_sdk.VideoFrameGeneratorOptions = None,
+        # todo remove
         filter: Any = None,
     ) -> scrypted_sdk.VideoFrame:
         start = time.time()
