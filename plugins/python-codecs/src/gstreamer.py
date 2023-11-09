@@ -314,7 +314,6 @@ async def createGstMediaObject(image: GstImage):
 async def generateVideoFramesGstreamer(
     mediaObject: scrypted_sdk.MediaObject,
     options: scrypted_sdk.VideoFrameGeneratorOptions = None,
-    filter: Any = None,
     h264Decoder: str = None,
     h265Decoder: str = None,
     postProcessPipeline: str = None,

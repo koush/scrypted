@@ -36,7 +36,7 @@ class LibavGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGen
         filter: Any = None,
     ) -> scrypted_sdk.VideoFrame:
         forked: CodecFork = await self.zygote().result
-        return await forked.generateVideoFramesLibav(mediaObject, options, filter)
+        return await forked.generateVideoFramesLibav(mediaObject, options)
 
 
 class GstreamerGenerator(
@@ -60,7 +60,6 @@ class GstreamerGenerator(
         return await forked.generateVideoFramesGstreamer(
             mediaObject,
             options,
-            filter,
             self.storage.getItem("h264Decoder"),
             self.storage.getItem("h265Decoder"),
             self.storage.getItem("postProcessPipeline"),
@@ -242,14 +241,13 @@ class CodecFork:
         self,
         mediaObject: scrypted_sdk.MediaObject,
         options: scrypted_sdk.VideoFrameGeneratorOptions,
-        filter: Any,
         h264Decoder: str,
         h265Decoder: str,
         postProcessPipeline: str,
     ) -> scrypted_sdk.VideoFrame:
         async for data in self.generateVideoFrames(
             gstreamer.generateVideoFramesGstreamer(
-                mediaObject, options, filter, h264Decoder, h265Decoder, postProcessPipeline
+                mediaObject, options, h264Decoder, h265Decoder, postProcessPipeline
             ),
             "gstreamer",
             options and options.get("firstFrameOnly"),
@@ -260,10 +258,9 @@ class CodecFork:
         self,
         mediaObject: scrypted_sdk.MediaObject,
         options: scrypted_sdk.VideoFrameGeneratorOptions = None,
-        filter: Any = None,
     ) -> scrypted_sdk.VideoFrame:
         async for data in self.generateVideoFrames(
-            libav.generateVideoFramesLibav(mediaObject, options, filter),
+            libav.generateVideoFramesLibav(mediaObject, options),
             "libav",
             options and options.get("firstFrameOnly"),
         ):

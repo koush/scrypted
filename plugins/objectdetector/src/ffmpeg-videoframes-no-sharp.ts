@@ -50,7 +50,7 @@ class RawImage implements Image, RawFrame {
 }
 
 export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements VideoFrameGenerator {
-    async *generateVideoFramesInternal(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): AsyncGenerator<VideoFrame, any, unknown> {
+    async *generateVideoFramesInternal(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions): AsyncGenerator<VideoFrame, any, unknown> {
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
         const gray = options?.format === 'gray';
         const format = options?.format || 'rgb';
@@ -171,7 +171,7 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
     }
 
 
-    async generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame & MediaObject) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame, any, unknown>> {
-        return this.generateVideoFramesInternal(mediaObject, options, filter);
+    async generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions): Promise<AsyncGenerator<VideoFrame, any, unknown>> {
+        return this.generateVideoFramesInternal(mediaObject, options);
     }
 }

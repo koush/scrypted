@@ -20,7 +20,6 @@ except:
 async def generateVideoFramesLibav(
     mediaObject: scrypted_sdk.MediaObject,
     options: scrypted_sdk.VideoFrameGeneratorOptions = None,
-    filter: Any = None,
 ) -> scrypted_sdk.VideoFrame:
     ffmpegInput: scrypted_sdk.FFmpegInput = (
         await scrypted_sdk.mediaManager.convertMediaObjectToJSON(
