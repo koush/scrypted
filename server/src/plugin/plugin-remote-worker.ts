@@ -10,7 +10,7 @@ import { install as installSourceMapSupport } from 'source-map-support';
 import { listenZero } from '../listen-zero';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { createDuplexRpcPeer } from '../rpc-serializer';
-import { ClusterObject, ConnectRPCObject, computeClusterObjectHash } from './connect-rpc-object';
+import { ClusterObject, ConnectRPCObject } from '../cluster/connect-rpc-object';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { prepareConsoles } from './plugin-console';
@@ -19,6 +19,7 @@ import { DeviceManagerImpl, PluginReader, attachPluginRemote, setupPluginRemote 
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
+import { computeClusterObjectHash } from '../cluster/cluster-hash';
 const { link } = require('linkfs');
 
 const serverVersion = require('../../package.json').version;

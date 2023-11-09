@@ -35,7 +35,7 @@ import { getPluginVolume } from './plugin/plugin-volume';
 import { NodeForkWorker } from './plugin/runtime/node-fork-worker';
 import { PythonRuntimeWorker } from './plugin/runtime/python-worker';
 import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
-import { ClusterObject, computeClusterObjectHash } from './plugin/connect-rpc-object';
+import { ClusterObject } from './cluster/connect-rpc-object';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
@@ -45,6 +45,7 @@ import { PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
+import { computeClusterObjectHash } from './cluster/cluster-hash';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
