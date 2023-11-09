@@ -1,7 +1,4 @@
 import crypto from "crypto";
-import net from "net";
-import { Socket } from "engine.io";
-import { IOSocket } from "../io";
 
 export interface ClusterObject {
     id: string;
