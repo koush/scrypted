@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { MediaObjectOptions, RTCConnectionManagement, RTCSignalingSession, ScryptedStatic } from "@scrypted/types";
 import axios, { AxiosRequestConfig, AxiosRequestHeaders } from 'axios';
 import * as eio from 'engine.io-client';
@@ -711,9 +710,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             .map(id => systemManager.getDeviceById(id))
             .find(device => device.pluginId === '@scrypted/core' && device.nativeId === `user:${username}`);
 
-        const clusterPeers = new Map<number, Promise<{ clusterPeer: RpcPeer, clusterSecret: string }>>();
-        const ensureClusterPeer = (port: number) => {
-            let clusterPeerPromise = clusterPeers.get(port);
+        const clusterPeers = new Map<number, Promise<RpcPeer>>();
+        const ensureClusterPeer = (clusterObject: ClusterObject) => {
+            let clusterPeerPromise = clusterPeers.get(clusterObject.port);
             if (!clusterPeerPromise) {
                 clusterPeerPromise = (async () => {
                     const eioPath = 'engine.io/connectRPCObject';
@@ -722,7 +721,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                         path: eioEndpoint,
                         query: {
                             cacehBust,
-                            port,
+                            clusterObject: JSON.stringify(clusterObject),
                         },
                         withCredentials: true,
                         extraHeaders,
@@ -733,18 +732,14 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     const clusterPeerSocket = new eio.Socket(explicitBaseUrl, clusterPeerOptions);
                     let peerReady = false;
                     clusterPeerSocket.on('close', () => {
-                        clusterPeers.delete(port);
+                        clusterPeers.delete(clusterObject.port);
                         if (!peerReady) {
                             throw new Error("peer disconnected before setup completed");
                         }
                     });
 
                     try {
-                        const clusterSecretPromise = once(clusterPeerSocket, 'message');
-
                         await once(clusterPeerSocket, 'open');
-
-                        const clusterSecret = await clusterSecretPromise as any as string;
 
                         const serializer = createRpcDuplexSerializer({
                             write: data => clusterPeerSocket.send(data),
@@ -762,7 +757,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                         serializer.setupRpcPeer(clusterPeer);
                         clusterPeer.tags.localPort = sourcePeerId;
                         peerReady = true;
-                        return { clusterPeer, clusterSecret };
+                        return clusterPeer;
                     }
                     catch (e) {
                         console.error('failure ipc connect', e);
@@ -770,13 +765,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                         throw e;
                     }
                 })();
-                clusterPeers.set(port, clusterPeerPromise);
+                clusterPeers.set(clusterObject.port, clusterPeerPromise);
             }
             return clusterPeerPromise;
         };
 
         const resolveObject = async (proxyId: string, sourcePeerPort: number) => {
-            const sourcePeer = (await clusterPeers.get(sourcePeerPort))?.clusterPeer;
+            const sourcePeer = await clusterPeers.get(sourcePeerPort);
             if (sourcePeer?.remoteWeakProxies) {
                 return Object.values(sourcePeer.remoteWeakProxies).find(
                     v => v.deref()?.__cluster?.proxyId == proxyId
@@ -791,7 +786,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 return value;
             }
 
-            const { port, proxyId, source } = clusterObject;
+            const { port, proxyId  } = clusterObject;
 
             // check if object is already connected
             const resolved = await resolveObject(proxyId, port);
@@ -800,11 +795,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             }
 
             try {
-                const clusterPeerPromise = ensureClusterPeer(port);
-                const { clusterPeer, clusterSecret } = await clusterPeerPromise;
+                const clusterPeerPromise = ensureClusterPeer(clusterObject);
+                const clusterPeer = await clusterPeerPromise;
                 const connectRPCObject: ConnectRPCObject = await clusterPeer.getParam('connectRPCObject');
-                const portSecret = crypto.createHash('sha256').update(`${port}${clusterSecret}`).digest().toString('hex');
-                const newValue = await connectRPCObject(proxyId, portSecret, source);
+                const newValue = await connectRPCObject(clusterObject);
                 if (!newValue)
                     throw new Error('ipc object not found?');
                 return newValue;

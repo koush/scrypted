@@ -10,7 +10,7 @@ import { install as installSourceMapSupport } from 'source-map-support';
 import { listenZero } from '../listen-zero';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { createDuplexRpcPeer } from '../rpc-serializer';
-import { ClusterObject, ConnectRPCObject } from './connect-rpc-object';
+import { ClusterObject, ConnectRPCObject, computeClusterObjectHash } from './connect-rpc-object';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { prepareConsoles } from './plugin-console';
@@ -25,11 +25,6 @@ const serverVersion = require('../../package.json').version;
 
 export interface StartPluginRemoteOptions {
     onClusterPeer(peer: RpcPeer): void;
-}
-
-function computeClusterObjectHash(clusterId: string, clusterPort: number, sourcePeerPort: number, proxyId: string, clusterSecret: string) {
-    const sha256 = crypto.createHash('sha256').update(`${clusterId}${clusterPort}${sourcePeerPort}${proxyId}${clusterSecret}`).digest().toString('base64');
-    return sha256;
 }
 
 export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void, startPluginRemoteOptions?: StartPluginRemoteOptions) {
@@ -90,14 +85,14 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                 // set the cluster identity if it does not exist.
                 if (!clusterEntry) {
-                    const sha256 = computeClusterObjectHash(clusterId, clusterPort, sourcePeerPort, proxyId, clusterSecret);
                     clusterEntry = {
                         id: clusterId,
                         port: clusterPort,
                         proxyId,
                         sourcePort: sourcePeerPort,
-                        sha256,
+                        sha256: null,
                     };
+                    clusterEntry.sha256 = computeClusterObjectHash(clusterEntry, clusterSecret);
                     properties.__cluster = clusterEntry;
                 }
                 // always reassign the id and source.
@@ -126,7 +121,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 clusterPeers.set(clusterPeerPort, Promise.resolve(clusterPeer));
                 startPluginRemoteOptions?.onClusterPeer?.(clusterPeer);
                 const connectRPCObject: ConnectRPCObject = async (o) => {
-                    const sha256 = computeClusterObjectHash(o.id, o.port, o.sourcePort, o.proxyId, clusterSecret);
+                    const sha256 = computeClusterObjectHash(o, clusterSecret);
                     if (sha256 !== o.sha256)
                         throw new Error('secret incorrect');
                     return resolveObject(o.proxyId, o.sourcePort);
