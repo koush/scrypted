@@ -46,6 +46,7 @@ if (process.env.WEBPACK_ANALYZER) {
 
 const alias = {};
 const polyfills = [
+    'node-pty-prebuilt-multiarch',
     'node-forge',
     'source-map-support/register',
     'adm-zip',
