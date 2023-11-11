@@ -414,11 +414,19 @@ export class RpcPeer {
     }
 
     static isTransportSafe(value: any) {
-        return !value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.getDefaultTransportSafeArgumentTypes().has(value.constructor?.name));
+        if (!value)
+            return true;
+        return !value[Symbol.asyncIterator]
+            && !value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]
+            && this.getDefaultTransportSafeArgumentTypes().has(value.constructor?.name);
     }
 
     isTransportSafe(value: any) {
-        return !value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.transportSafeArgumentTypes.has(value.constructor?.name));
+        if (!value)
+            return true;
+        return !value[Symbol.asyncIterator]
+            && !value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]
+            && this.transportSafeArgumentTypes.has(value.constructor?.name);
     }
 
     static generateId() {
