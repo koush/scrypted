@@ -9,7 +9,7 @@ export class BufferedBuffer {
     }
 
     mayResolve() {
-        if (this._closed) {
+        if (this._closed && this._resolve) {
             this._resolve(null);
             this._resolve = null;
             return;
