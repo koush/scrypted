@@ -7,11 +7,9 @@
 <script>
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
-import eio from "engine.io-client";
-import { getCurrentBaseUrl } from "../../../../../../packages/client/src";
+import { BufferedBuffer } from "./buffered-buffer";
 
 export default {
-  socket: null,
   mounted() {
     const term = new Terminal({
       theme: this.$vuetify.theme.dark
@@ -28,36 +26,33 @@ export default {
     term.open(this.$refs.terminal);
     fitAddon.fit();
 
-    const baseUrl = getCurrentBaseUrl();
-    const eioPath = `engine.io/shell`;
-    const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
-    const options = {
-      path: eioEndpoint,
-    };
-    const rootLocation = `${window.location.protocol}//${window.location.host}`;
-    this.socket = eio(rootLocation, options);
-
-    this.socket.send(JSON.stringify({ dim: { cols: term.cols, rows: term.rows } }));
-
-    this.socket.on("message", (data) => {
-      term.write(new Uint8Array(Buffer.from(data)));
-    });
-
-    term.onData((data) => {
-      this.socket.send(Buffer.from(data, 'utf8'));
-    });
-
-    term.onBinary((data) => {
-      // https://github.com/xtermjs/xterm.js/blob/2e02c37e528c1abc200ce401f49d0d7eae330e63/typings/xterm.d.ts#L859-L868
-      this.socket.send(Buffer.from(data, 'binary'));
-    });
-
-    term.on('resize', dim => {
-      this.socket.send(JSON.stringify({ dim }));
-    });
+    this.setupShell(term);
   },
-  destroyed() {
-    this.socket?.close();
+  methods: {
+    async setupShell(term) {
+      const termSvc = await this.$scrypted.systemManager.getDeviceByName("@scrypted/core").getDevice("terminalservice");
+      const termSvcDirect = await this.$scrypted.connectRPCObject(termSvc);
+      const buffer = new BufferedBuffer();
+
+      buffer.append(JSON.stringify({ dim: { cols: term.cols, rows: term.rows } }));
+
+      term.onData(data => buffer.append(Buffer.from(data, 'utf8')));
+      term.onBinary(data => buffer.append(Buffer.from(data, 'binary')));
+      term.onResize(dim => buffer.append(JSON.stringify({ dim })));
+
+      const localGenerator = buffer.generator();
+      const remoteGenerator = await termSvcDirect.connectStream(localGenerator);
+
+      console.log(localGenerator);
+      console.log(remoteGenerator);
+
+      for await (const message of remoteGenerator) {
+        if (!message) {
+          break;
+        }
+        term.write(new Uint8Array(Buffer.from(message)));
+      }
+    }
   },
 };
 </script>

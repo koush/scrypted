@@ -165,9 +165,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         * Handle incoming connections that will be
         * proxied to a connectRPCObject socket.
         *
-        * It is the responsibility of the caller of
-        * this function to verify the signature of
-        * clusterObject using the clusterSecret.
+        * Note that the clusterObject hash must be
+        * verified before connecting to the target port.
         */
         this.connectRPCObjectIO.on('connection', connection => {
             try {

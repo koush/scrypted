@@ -9,7 +9,7 @@ import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-de
 import type { IOSocket } from '../../../server/src/io';
 import { MediaObject } from '../../../server/src/plugin/mediaobject';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
-import type { ClusterObject, ConnectRPCObject } from '../../../server/src/plugin/connect-rpc-object';
+import type { ClusterObject, ConnectRPCObject } from '../../../server/src/cluster/connect-rpc-object';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import packageJson from '../package.json';
@@ -744,7 +744,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                         const serializer = createRpcDuplexSerializer({
                             write: data => clusterPeerSocket.send(data),
                         });
-                        clusterPeerSocket.on('message', data => serializer.onData(data));
+                        clusterPeerSocket.on('message', data => serializer.onData(Buffer.from(data)));
 
                         const clusterPeer = new RpcPeer(clientName || 'engine.io-client', "cluster-proxy", (message, reject, serializationContext) => {
                             try {
