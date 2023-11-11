@@ -13,7 +13,7 @@ class BufferedBuffer {
     }
 
     mayResolve() {
-        if (this._closed) {
+        if (this._closed && this._resolve) {
             this._resolve(null);
             this._resolve = null;
             return;
@@ -60,24 +60,27 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
         cp.onData(data => buffer.append(Buffer.from(data)));
         cp.onExit(() => buffer.close());
         setTimeout(async () => {
-            this.console.log(input);
-            for await (const message of input) {
-                if (!message) {
-                    cp.kill();
-                    return;
-                }
-                if (Buffer.isBuffer(message)) {
-                    cp.write(message.toString());
-                    continue;
-                }
-                try {
-                    const parsed = JSON.parse(message.toString());
-                    if (parsed.dim) {
-                        cp.resize(parsed.dim.cols, parsed.dim.rows);
+            try {
+                for await (const message of input) {
+                    if (!message) {
+                        cp.kill();
+                        return;
                     }
-                } catch (e) {
-                    cp.write(message.toString());
+                    if (Buffer.isBuffer(message)) {
+                        cp.write(message.toString());
+                        continue;
+                    }
+                    try {
+                        const parsed = JSON.parse(message.toString());
+                        if (parsed.dim) {
+                            cp.resize(parsed.dim.cols, parsed.dim.rows);
+                        }
+                    } catch {
+                        cp.write(message.toString());
+                    }
                 }
+            } catch {
+                cp.kill();
             }
         }, 0);
 
