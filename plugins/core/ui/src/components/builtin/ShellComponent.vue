@@ -43,9 +43,6 @@ export default {
       const localGenerator = buffer.generator();
       const remoteGenerator = await termSvcDirect.connectStream(localGenerator);
 
-      console.log(localGenerator);
-      console.log(remoteGenerator);
-
       for await (const message of remoteGenerator) {
         if (!message) {
           break;
