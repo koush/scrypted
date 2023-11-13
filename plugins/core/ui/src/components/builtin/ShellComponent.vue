@@ -7,7 +7,7 @@
 <script>
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
-import { BufferedBuffer } from "./buffered-buffer";
+import { createAsyncQueue } from "@scrypted/common/src/async-queue";
 
 export default {
   mounted() {
@@ -32,15 +32,15 @@ export default {
     async setupShell(term) {
       const termSvc = await this.$scrypted.systemManager.getDeviceByName("@scrypted/core").getDevice("terminalservice");
       const termSvcDirect = await this.$scrypted.connectRPCObject(termSvc);
-      const buffer = new BufferedBuffer();
+      const queue = createAsyncQueue();
 
-      buffer.append(JSON.stringify({ dim: { cols: term.cols, rows: term.rows } }));
+      queue.enqueue(JSON.stringify({ dim: { cols: term.cols, rows: term.rows } }));
 
-      term.onData(data => buffer.append(Buffer.from(data, 'utf8')));
-      term.onBinary(data => buffer.append(Buffer.from(data, 'binary')));
-      term.onResize(dim => buffer.append(JSON.stringify({ dim })));
+      term.onData(data => queue.enqueue(Buffer.from(data, 'utf8')));
+      term.onBinary(data => queue.enqueue(Buffer.from(data, 'binary')));
+      term.onResize(dim => queue.enqueue(JSON.stringify({ dim })));
 
-      const localGenerator = buffer.generator();
+      const localGenerator = queue.queue;
       const remoteGenerator = await termSvcDirect.connectStream(localGenerator);
 
       for await (const message of remoteGenerator) {
