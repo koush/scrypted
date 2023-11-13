@@ -7,7 +7,7 @@ export const TerminalServiceNativeId = 'terminalservice';
 export class TerminalService extends ScryptedDeviceBase implements StreamService {
     async connectStream(input: AsyncGenerator<any, void>): Promise<AsyncGenerator<any, void>> {
         const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
-        const cp: IPty = spawn(process.env.SHELL, [], {});
+        const cp: IPty = spawn(process.env.SHELL as string, [], {});
         const queue = createAsyncQueue<Buffer>();
         cp.onExit(() => queue.end());
 
@@ -42,7 +42,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
             }
         }
 
-        setTimeout(async () => {
+        (async () => {
             try {
                 for await (const message of input) {
                     if (!message) {
@@ -63,10 +63,13 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                     }
                 }
             }
+            catch (e) {
+                this.console.log(e);
+            }
             finally {
                 cp.kill();
             }
-        }, 0);
+        })();
 
         return generator();
     }
