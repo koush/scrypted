@@ -263,7 +263,6 @@ async function main() {
                     process.stdin.resume();
             }
         });
-        process.stdin.end(() => queue.end());
 
         async function* generator() {
             try {
@@ -276,12 +275,19 @@ async function main() {
                         // groups of buffer data, but allow string control messages
                         // to be sent without any batching
                         for (let i = 0; i < buffers.length; ++i) {
-                            if (!Buffer.isBuffer(buffers[i]) && i != buffersStart) {
-                                yield Buffer.concat(buffers.slice(buffersStart, i) as Buffer[]);
+                            if (!Buffer.isBuffer(buffers[i])) {
+                                if (i != buffersStart) {
+                                    yield Buffer.concat(buffers.slice(buffersStart, i) as Buffer[]);
+                                }
+                                buffersStart = i + 1;
+                                yield buffers[i];
                             }
-                            buffersStart = i + 1;
-                            yield buffers[i];
                         }
+
+                        if (buffersStart != buffers.length) {
+                            yield Buffer.concat(buffers.slice(buffersStart, buffers.length) as Buffer[]);
+                        }
+
                         continue;
                     }
 
