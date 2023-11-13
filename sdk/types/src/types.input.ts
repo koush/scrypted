@@ -1434,6 +1434,12 @@ export interface VideoFrameGenerator {
   generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions): Promise<AsyncGenerator<VideoFrame, void>>;
 }
 /**
+ * Generic bidirectional stream connection.
+ */
+export interface StreamService {
+  connectStream(input: AsyncGenerator<any, void>): Promise<AsyncGenerator<any, void>>;
+}
+/**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
  */
 export interface Logger {
@@ -2022,6 +2028,7 @@ export enum ScryptedInterface {
   LauncherApplication = "LauncherApplication",
   ScryptedUser = "ScryptedUser",
   VideoFrameGenerator = 'VideoFrameGenerator',
+  StreamService = 'StreamService',
 }
 
 /**

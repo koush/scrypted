@@ -175,6 +175,7 @@ class ScryptedInterface(str, Enum):
     SecuritySystem = "SecuritySystem"
     Settings = "Settings"
     StartStop = "StartStop"
+    StreamService = "StreamService"
     TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
     Thermometer = "Thermometer"
@@ -1343,6 +1344,13 @@ class StartStop:
         pass
 
 
+class StreamService:
+    """Generic bidirectional stream connection."""
+
+    async def connectStream(self, input: Any) -> Any:
+        pass
+
+
 class TamperSensor:
 
     tampered: TamperState
@@ -1810,6 +1818,7 @@ class ScryptedInterfaceMethods(str, Enum):
     createRTCSignalingSession = "createRTCSignalingSession"
     getScryptedUserAccessControl = "getScryptedUserAccessControl"
     generateVideoFrames = "generateVideoFrames"
+    connectStream = "connectStream"
 
 class DeviceState:
 
@@ -3002,6 +3011,13 @@ ScryptedInterfaceDescriptors = {
     "name": "VideoFrameGenerator",
     "methods": [
       "generateVideoFrames"
+    ],
+    "properties": []
+  },
+  "StreamService": {
+    "name": "StreamService",
+    "methods": [
+      "connectStream"
     ],
     "properties": []
   }

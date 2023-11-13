@@ -11,6 +11,7 @@ import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
 import { ScriptCore, ScriptCoreNativeId } from './script-core';
 import { UsersCore, UsersNativeId } from './user';
+import { TerminalService, TerminalServiceNativeId } from './terminal-service';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
 
@@ -39,6 +40,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     aggregateCore: AggregateCore;
     automationCore: AutomationCore;
     users: UsersCore;
+    terminalService: TerminalService;
     localAddresses: string[];
     storageSettings = new StorageSettings(this, {
         localAddresses: {
@@ -79,6 +81,16 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     name: 'Scripts',
                     nativeId: ScriptCoreNativeId,
                     interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+        })();
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Terminal Service',
+                    nativeId: TerminalServiceNativeId,
+                    interfaces: [ScryptedInterface.StreamService],
                     type: ScryptedDeviceType.Builtin,
                 },
             );
@@ -157,6 +169,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.aggregateCore ||= new AggregateCore();
         if (nativeId === UsersNativeId)
             return this.users ||= new UsersCore();
+        if (nativeId === TerminalServiceNativeId)
+            return this.terminalService ||= new TerminalService();
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
