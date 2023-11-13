@@ -9,9 +9,13 @@ export const TerminalServiceNativeId = 'terminalservice';
 class InteractiveTerminal {
     cp: IPty
 
-    constructor() {
+    constructor(cmd: string[]) {
         const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
-        this.cp = spawn(process.env.SHELL as string, [], {});
+        if (cmd?.length) {
+            this.cp = spawn(cmd[0], cmd.slice(1), {});
+        } else {
+            this.cp = spawn(process.env.SHELL as string, [], {});
+        }
     }
 
     onExit(fn: (e: { exitCode: number; signal?: number; }) => any) {
@@ -50,8 +54,12 @@ class InteractiveTerminal {
 class NoninteractiveTerminal {
     cp: ChildProcess
 
-    constructor() {
-        this.cp = childSpawn(process.env.SHELL as string);
+    constructor(cmd: string[]) {
+        if (cmd?.length) {
+            this.cp = childSpawn(cmd[0], cmd.slice(1));
+        } else {
+            this.cp = childSpawn(process.env.SHELL as string);
+        }
     }
 
     onExit(fn: (code: number, signal: NodeJS.Signals) => void) {
@@ -92,7 +100,17 @@ class NoninteractiveTerminal {
 
 
 export class TerminalService extends ScryptedDeviceBase implements StreamService {
-    async connectStream(input: AsyncGenerator<any, void>): Promise<AsyncGenerator<any, void>> {
+    /*
+     * The input to this stream can send buffers for normal terminal data and strings
+     * for control messages. Control messages are JSON-formatted.
+     *
+     * The current implemented control messages:
+     *
+     *   Start: { "interactive": boolean, "cmd": string[] }
+     *   Resize: { "dim": { "cols": number, "rows": number } }
+     *   EOF: { "eof": true }
+     */
+    async connectStream(input: AsyncGenerator<Buffer | string, void>): Promise<AsyncGenerator<Buffer, void>> {
         let cp: InteractiveTerminal | NoninteractiveTerminal = null;
         const queue = createAsyncQueue<Buffer>();
 
@@ -154,9 +172,9 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                                 cp.sendEOF();
                         } else if ("interactive" in parsed && !cp) {
                             if (parsed.interactive) {
-                                cp = new InteractiveTerminal();
+                                cp = new InteractiveTerminal(parsed.cmd);
                             } else {
-                                cp = new NoninteractiveTerminal();
+                                cp = new NoninteractiveTerminal(parsed.cmd);
                             }
                             registerChildListeners();
                         }

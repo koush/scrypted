@@ -236,7 +236,9 @@ async function main() {
             }
         });
 
-        await connectShell(sdk);
+        const separator = process.argv.indexOf("--");
+        const cmd = separator != -1 ? process.argv.slice(separator + 1): [];
+        await connectShell(sdk, ...cmd);
     }
     else {
         console.log('usage:');
@@ -249,7 +251,7 @@ async function main() {
         console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted ffplay name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
-        console.log('   npx scrypted shell [127.0.0.1[:10443]]');
+        console.log('   npx scrypted shell [127.0.0.1[:10443]] [-- cmd [...cmd-args]]');
         console.log();
         console.log('examples:');
         console.log('   npx scrypted install @scrypted/rtsp');
