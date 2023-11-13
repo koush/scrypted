@@ -11,7 +11,7 @@ import { connectScryptedClient } from '@scrypted/client';
 import { ScryptedMimeTypes, FFmpegInput, DeviceProvider, StreamService } from '@scrypted/types';
 import semver from 'semver';
 import child_process from 'child_process';
-import { createAsyncQueue } from '../../../common/src/async-queue';
+import { connectShell } from './shell';
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -236,88 +236,7 @@ async function main() {
             }
         });
 
-        const termSvc = await sdk.systemManager.getDeviceByName<DeviceProvider>("@scrypted/core").getDevice("terminalservice");
-        if (!termSvc) {
-            throw Error("@scrypted/core does not provide a Terminal Service");
-        }
-
-        const termSvcDirect = await sdk.connectRPCObject<StreamService>(termSvc);
-        const queue = createAsyncQueue<Buffer | string>();
-
-        if (process.stdin.isTTY) {
-            process.stdin.setRawMode(true);
-        } else {
-            process.stdin.end(() => queue.end());
-        }
-
-        const dim = { cols: process.stdout.columns, rows: process.stdout.rows };
-        queue.enqueue(JSON.stringify({ dim }));
-
-        let bufferedLength = 0;
-        const MAX_BUFFERED_LENGTH = 64000;
-        process.stdin.on('data', async data => {
-            bufferedLength += data.length;
-            const promise = queue.enqueue(data).then(() => bufferedLength -= data.length);
-            if (bufferedLength >= MAX_BUFFERED_LENGTH) {
-                process.stdin.pause();
-                await promise;
-                if (bufferedLength < MAX_BUFFERED_LENGTH)
-                    process.stdin.resume();
-            }
-        });
-
-        async function* generator() {
-            try {
-                while (true) {
-                    const buffers = queue.clear();
-                    if (buffers.length) {
-                        let buffersStart = 0;
-
-                        // this wonky loop-concat-yield is to batch together
-                        // groups of buffer data, but allow string control messages
-                        // to be sent without any batching
-                        for (let i = 0; i < buffers.length; ++i) {
-                            if (!Buffer.isBuffer(buffers[i])) {
-                                if (i != buffersStart) {
-                                    yield Buffer.concat(buffers.slice(buffersStart, i) as Buffer[]);
-                                }
-                                buffersStart = i + 1;
-                                yield buffers[i];
-                            }
-                        }
-
-                        if (buffersStart != buffers.length) {
-                            yield Buffer.concat(buffers.slice(buffersStart, buffers.length) as Buffer[]);
-                        }
-
-                        continue;
-                    }
-
-                    yield await queue.dequeue();
-                }
-            }
-            finally {
-                process.exit();
-            }
-        }
-
-        process.stdout.on('resize', () => {
-            const dim = { cols: process.stdout.columns, rows: process.stdout.rows };
-            queue.enqueue(JSON.stringify({ dim }));
-        });
-
-        try {
-            for await (const message of await termSvcDirect.connectStream(generator())) {
-                if (!message) {
-                    process.exit();
-                }
-                process.stdout.write(new Uint8Array(Buffer.from(message)));
-            }
-        } catch {
-            // ignore
-        } finally {
-            process.exit();
-        }
+        await connectShell(sdk);
     }
     else {
         console.log('usage:');
