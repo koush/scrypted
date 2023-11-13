@@ -8,9 +8,10 @@ import https from 'https';
 import mkdirp from 'mkdirp';
 import { installServe, serveMain } from './service';
 import { connectScryptedClient } from '@scrypted/client';
-import { ScryptedMimeTypes, FFmpegInput } from '@scrypted/types';
+import { ScryptedMimeTypes, FFmpegInput, DeviceProvider, StreamService } from '@scrypted/types';
 import semver from 'semver';
 import child_process from 'child_process';
+import { connectShell } from './shell';
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -220,6 +221,23 @@ async function main() {
 
         console.log('install successful. id:', response.data.id);
     }
+    else if (process.argv[2] === 'shell') {
+        console.log = () => {};
+
+        const ip = process.argv[3] || '127.0.0.1';
+        const login = await getOrDoLogin(ip);
+        const sdk = await connectScryptedClient({
+            baseUrl: `https://${ip}`,
+            pluginId: '@scrypted/core',
+            username: login.username,
+            password: login.token,
+            axiosConfig: {
+                httpsAgent,
+            }
+        });
+
+        await connectShell(sdk);
+    }
     else {
         console.log('usage:');
         console.log('   npx scrypted install npm-package-name [127.0.0.1[:10443]]');
@@ -231,6 +249,7 @@ async function main() {
         console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted ffplay name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
+        console.log('   npx scrypted shell [127.0.0.1[:10443]]');
         console.log();
         console.log('examples:');
         console.log('   npx scrypted install @scrypted/rtsp');
