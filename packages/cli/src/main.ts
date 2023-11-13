@@ -244,7 +244,9 @@ async function main() {
         const termSvcDirect = await sdk.connectRPCObject<StreamService>(termSvc);
         const queue = createAsyncQueue<Buffer | string>();
 
-        process.stdin.setRawMode(true);
+        if (process.stdin.isTTY) {
+            process.stdin.setRawMode(true);
+        }
 
         const dim = { cols: process.stdout.columns, rows: process.stdout.rows };
         queue.enqueue(JSON.stringify({ dim }));
@@ -261,6 +263,7 @@ async function main() {
                     process.stdin.resume();
             }
         });
+        process.stdin.end(() => queue.end());
 
         async function* generator() {
             try {
