@@ -56,16 +56,16 @@ export async function connectShell(sdk: ScryptedStatic) {
             }
 
             const dataBuffers = dataQueue.clear();
-            const concat = Buffer.concat(dataBuffers);
-            if (concat.length) {
-                yield concat;
+            if (dataBuffers.length === 0) {
+                const buf = await dataQueue.dequeue();
+                if (buf.length)
+                    yield buf;
                 continue;
             }
 
-            const buf = await dataQueue.dequeue();
-            if (buf.length) {
-                yield buf;
-            }
+            const concat = Buffer.concat(dataBuffers);
+            if (concat.length)
+                yield concat;
         }
     }
 
