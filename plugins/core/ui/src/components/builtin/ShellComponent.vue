@@ -7,7 +7,7 @@
 <script>
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
-import { BufferedBuffer } from "@scrypted/common/src/buffered-buffer";
+import { BufferedBuffer } from "./buffered-buffer";
 
 export default {
   mounted() {
@@ -43,15 +43,11 @@ export default {
       const localGenerator = buffer.generator();
       const remoteGenerator = await termSvcDirect.connectStream(localGenerator);
 
-      try {
-        for await (const message of remoteGenerator) {
-          if (!message) {
-            break;
-          }
-          term.write(new Uint8Array(Buffer.from(message)));
+      for await (const message of remoteGenerator) {
+        if (!message) {
+          break;
         }
-      } catch (e) {
-        term.write(`connection closed: ${e}`);
+        term.write(new Uint8Array(Buffer.from(message)));
       }
     }
   },

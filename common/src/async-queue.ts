@@ -7,7 +7,6 @@ export function createAsyncQueue<T>() {
     let ended: Error | undefined;
     const waiting: Deferred<T>[] = [];
     const queued: { item: T, dequeued?: Deferred<void> }[] = [];
-    const onEnd: Function[] = [];
 
     const dequeue = async () => {
         if (queued.length) {
@@ -29,15 +28,6 @@ export function createAsyncQueue<T>() {
             const { item, dequeued: enqueue } = queued.shift()!;
             enqueue?.resolve();
             return item;
-        }
-
-        if (ended)
-            throw ended;
-    }
-
-    const peek = () => {
-        if (queued.length) {
-            return queued[0].item;
         }
 
         if (ended)
@@ -104,7 +94,6 @@ export function createAsyncQueue<T>() {
 
     return {
         take,
-        peek,
         clear() {
             return clear();
         },
@@ -123,17 +112,7 @@ export function createAsyncQueue<T>() {
             // catch to prevent unhandled rejection.
             ended = e || new EndError()
             clear(e);
-            onEnd.map(fn => fn(ended));
             return true;
-        },
-        get ended() {
-            return Boolean(ended);
-        },
-        onEnd(fn: Function) {
-            if (ended)
-                fn(ended);
-            else
-                onEnd.push(fn);
         },
         async enqueue(item: T, signal?: AbortSignal) {
             const dequeued = new Deferred<void>();
