@@ -246,6 +246,8 @@ async function main() {
 
         if (process.stdin.isTTY) {
             process.stdin.setRawMode(true);
+        } else {
+            process.stdin.end(() => queue.end());
         }
 
         const dim = { cols: process.stdout.columns, rows: process.stdout.rows };
