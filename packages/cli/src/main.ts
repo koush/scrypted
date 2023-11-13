@@ -8,9 +8,10 @@ import https from 'https';
 import mkdirp from 'mkdirp';
 import { installServe, serveMain } from './service';
 import { connectScryptedClient } from '@scrypted/client';
-import { ScryptedMimeTypes, FFmpegInput } from '@scrypted/types';
+import { ScryptedMimeTypes, FFmpegInput, DeviceProvider, StreamService } from '@scrypted/types';
 import semver from 'semver';
 import child_process from 'child_process';
+import { createAsyncQueue } from '../../../common/src/async-queue';
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -220,6 +221,93 @@ async function main() {
 
         console.log('install successful. id:', response.data.id);
     }
+    else if (process.argv[2] === 'shell') {
+        console.log = () => {};
+
+        const ip = process.argv[3] || '127.0.0.1';
+        const login = await getOrDoLogin(ip);
+        const sdk = await connectScryptedClient({
+            baseUrl: `https://${ip}`,
+            pluginId: '@scrypted/core',
+            username: login.username,
+            password: login.token,
+            axiosConfig: {
+                httpsAgent,
+            }
+        });
+
+        const termSvc = await sdk.systemManager.getDeviceByName<DeviceProvider>("@scrypted/core").getDevice("terminalservice");
+        if (!termSvc) {
+            throw Error("@scrypted/core does not provide a Terminal Service");
+        }
+
+        const termSvcDirect = await sdk.connectRPCObject<StreamService>(termSvc);
+        const queue = createAsyncQueue<Buffer | string>();
+
+        process.stdin.setRawMode(true);
+
+        const dim = { cols: process.stdout.columns, rows: process.stdout.rows };
+        queue.enqueue(JSON.stringify({ dim }));
+
+        let bufferedLength = 0;
+        const MAX_BUFFERED_LENGTH = 64000;
+        process.stdin.on('data', async data => {
+            bufferedLength += data.length;
+            const promise = queue.enqueue(data).then(() => bufferedLength -= data.length);
+            if (bufferedLength >= MAX_BUFFERED_LENGTH) {
+                process.stdin.pause();
+                await promise;
+                if (bufferedLength < MAX_BUFFERED_LENGTH)
+                    process.stdin.resume();
+            }
+        });
+
+        async function* generator() {
+            try {
+                while (true) {
+                    const buffers = queue.clear();
+                    if (buffers.length) {
+                        let buffersStart = 0;
+
+                        // this wonky loop-concat-yield is to batch together
+                        // groups of buffer data, but allow string control messages
+                        // to be sent without any batching
+                        for (let i = 0; i < buffers.length; ++i) {
+                            if (!Buffer.isBuffer(buffers[i]) && i != buffersStart) {
+                                yield Buffer.concat(buffers.slice(buffersStart, i) as Buffer[]);
+                            }
+                            buffersStart = i + 1;
+                            yield buffers[i];
+                        }
+                        continue;
+                    }
+
+                    yield await queue.dequeue();
+                }
+            }
+            finally {
+                process.exit();
+            }
+        }
+
+        process.stdout.on('resize', () => {
+            const dim = { cols: process.stdout.columns, rows: process.stdout.rows };
+            queue.enqueue(JSON.stringify({ dim }));
+        });
+
+        try {
+            for await (const message of await termSvcDirect.connectStream(generator())) {
+                if (!message) {
+                    process.exit();
+                }
+                process.stdout.write(new Uint8Array(Buffer.from(message)));
+            }
+        } catch {
+            // ignore
+        } finally {
+            process.exit();
+        }
+    }
     else {
         console.log('usage:');
         console.log('   npx scrypted install npm-package-name [127.0.0.1[:10443]]');
@@ -231,6 +319,7 @@ async function main() {
         console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted ffplay name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
+        console.log('   npx scrypted shell [127.0.0.1[:10443]]');
         console.log();
         console.log('examples:');
         console.log('   npx scrypted install @scrypted/rtsp');
