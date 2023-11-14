@@ -34,8 +34,8 @@ class InteractiveTerminal {
         this.cp.resume();
     }
 
-    write(data: string) {
-        this.cp.write(data);
+    write(data: Buffer) {
+        this.cp.write(data.toString());
     }
 
     sendEOF() {
@@ -82,7 +82,7 @@ class NoninteractiveTerminal {
         this.cp.stderr.resume();
     }
 
-    write(data: any) {
+    write(data: Buffer) {
         this.cp.stdin.write(data);
     }
 
@@ -159,7 +159,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
 
                     if (Buffer.isBuffer(message)) {
                         if (cp)
-                            cp.write(message.toString());
+                            cp.write(message);
                         continue;
                     }
 
@@ -181,7 +181,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                         }
                     } catch {
                         if (cp)
-                            cp.write(message.toString());
+                            cp.write(Buffer.from(message));
                     }
                 }
             }
