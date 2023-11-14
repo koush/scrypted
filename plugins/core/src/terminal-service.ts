@@ -47,7 +47,8 @@ class InteractiveTerminal {
     }
 
     resize(columns: number, rows: number) {
-        this.cp.resize(columns, rows);
+        if (columns > 0 && rows > 0)
+            this.cp.resize(columns, rows);
     }
 }
 
@@ -77,8 +78,8 @@ class NoninteractiveTerminal {
     }
 
     resume() {
-        this.cp.stdout.pause();
-        this.cp.stderr.pause();
+        this.cp.stdout.resume();
+        this.cp.stderr.resume();
     }
 
     write(data: any) {
