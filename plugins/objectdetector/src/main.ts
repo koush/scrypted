@@ -10,7 +10,7 @@ import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
 import { getMaxConcurrentObjectDetectionSessions } from './performance-profile';
 import { serverSupportsMixinEventMasking } from './server-version';
 import { getAllDevices, safeParseJson } from './util';
-import { objectDetector, SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor } from './smart-motionsensor';
+import { createObjectDetectorStorageSetting, SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor } from './smart-motionsensor';
 
 const polygonOverlap = require('polygon-overlap');
 const insidePolygon = require('point-inside-polygon');
@@ -1228,7 +1228,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
 
   async getCreateDeviceSettings(): Promise<Setting[]> {
     return [
-      objectDetector,
+      createObjectDetectorStorageSetting(),
     ];
   }
 

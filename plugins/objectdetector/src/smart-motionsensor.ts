@@ -1,19 +1,21 @@
 import sdk, { EventListenerRegister, MotionSensor, ObjectDetector, ObjectsDetected, Readme, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings } from "@scrypted/sdk";
-import { StorageSetting, StorageSettings, StorageSettingsDict } from "@scrypted/sdk/storage-settings";
+import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
 
 export const SMART_MOTIONSENSOR_PREFIX = 'smart-motionsensor-';
 
-export const objectDetector: StorageSetting = {
-    key: 'objectDetector',
-    title: 'Object Detector',
-    description: 'Select the camera or doorbell that provides smart detection event.',
-    type: 'device',
-    deviceFilter: `(type === '${ScryptedDeviceType.Doorbell}' || type === '${ScryptedDeviceType.Camera}') && interfaces.includes('${ScryptedInterface.ObjectDetector}')`,
+export function createObjectDetectorStorageSetting(): StorageSetting {
+    return {
+        key: 'objectDetector',
+        title: 'Object Detector',
+        description: 'Select the camera or doorbell that provides smart detection event.',
+        type: 'device',
+        deviceFilter: `(type === '${ScryptedDeviceType.Doorbell}' || type === '${ScryptedDeviceType.Camera}') && interfaces.includes('${ScryptedInterface.ObjectDetector}')`,
+    };
 }
 
 export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, Readme, MotionSensor {
     storageSettings = new StorageSettings(this, {
-        objectDetector,
+        objectDetector: createObjectDetectorStorageSetting(),
         detections: {
             title: 'Detections',
             description: 'The detections that will trigger this smart motion sensor.',
@@ -42,13 +44,9 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             };
         };
 
-        this.storageSettings.settings.detections.onPut = () =>  {
-            this.rebind();
-        };
+        this.storageSettings.settings.detections.onPut = () => this.rebind();
 
-        this.storageSettings.settings.objectDetector.onPut = () =>  {
-            this.rebind();
-        };
+        this.storageSettings.settings.objectDetector.onPut = () => this.rebind();
 
         this.rebind();
     }

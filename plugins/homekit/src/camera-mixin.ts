@@ -136,42 +136,6 @@ The latest troubleshooting guide for all known streaming or recording issues can
             });
         }
 
-        if (this.interfaces.includes(ScryptedInterface.ObjectDetector)) {
-            try {
-                const types = await realDevice.getObjectTypes();
-                const classes = types?.classes?.filter(c => c !== 'motion');
-                if (classes?.length) {
-                    const value: string[] = [];
-                    try {
-                        value.push(...JSON.parse(this.storage.getItem('objectDetectionContactSensors')));
-                    }
-                    catch (e) {
-                    }
-
-                    settings.push({
-                        title: 'Object Detection Sensors',
-                        type: 'string',
-                        choices: classes,
-                        multiple: true,
-                        key: 'objectDetectionContactSensors',
-                        description: 'Create HomeKit occupancy sensors that detect specific people or objects.',
-                        value,
-                    });
-
-                    settings.push({
-                        title: 'Object Detection Timeout',
-                        type: 'number',
-                        key: 'objectDetectionContactSensorTimeout',
-                        description: 'Duration in seconds the sensor will report as occupied, before resetting.',
-                        value: this.storage.getItem('objectDetectionContactSensorTimeout') || defaultObjectDetectionContactSensorTimeout,
-                    });
-                }
-
-            }
-            catch (e) {
-            }
-        }
-
         if (this.interfaces.includes(ScryptedInterface.OnOff)) {
             settings.push({
                 title: 'Camera Status Indicator',
@@ -190,14 +154,14 @@ The latest troubleshooting guide for all known streaming or recording issues can
             return super.putMixinSetting(key, value);
         }
 
-        if (key === 'objectDetectionContactSensors' || key === 'debugMode') {
+        if (key === 'debugMode') {
             this.storage.setItem(key, JSON.stringify(value));
         }
         else {
             this.storage.setItem(key, value?.toString() || '');
         }
 
-        if (key === 'detectAudio' || key === 'linkedMotionSensor' || key === 'objectDetectionContactSensors') {
+        if (key === 'detectAudio' || key === 'linkedMotionSensor') {
             super.alertReload();
         }
 
