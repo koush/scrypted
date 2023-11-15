@@ -42,8 +42,13 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             };
         };
 
-        this.storageSettings.settings.detections.onPut = () => this.rebind();
-        this.storageSettings.settings.objectDetector.onPut = () => this.rebind();
+        this.storageSettings.settings.detections.onPut = () =>  {
+            this.rebind();
+        };
+
+        this.storageSettings.settings.objectDetector.onPut = () =>  {
+            this.rebind();
+        };
 
         this.rebind();
     }
