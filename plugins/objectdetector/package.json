@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/objectdetector",
-   "version": "0.1.2",
+   "version": "0.1.3",
    "description": "Scrypted Video Analysis Plugin. Installed alongside a detection service like OpenCV or TensorFlow.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -35,6 +35,7 @@
       "name": "Video Analysis Plugin",
       "type": "API",
       "interfaces": [
+         "DeviceCreator",
          "DeviceProvider",
          "Settings",
          "MixinProvider"

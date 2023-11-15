@@ -1,15 +1,16 @@
 import { Deferred } from '@scrypted/common/src/deferred';
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceProvider, DeviceState, EventListenerRegister, Image, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetectionZone, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
+import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, DeviceState, EventListenerRegister, Image, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetectionZone, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import os from 'os';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes-no-sharp';
+import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
 import { getMaxConcurrentObjectDetectionSessions } from './performance-profile';
 import { serverSupportsMixinEventMasking } from './server-version';
 import { getAllDevices, safeParseJson } from './util';
+import { objectDetector, SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor } from './smart-motionsensor';
 
 const polygonOverlap = require('polygon-overlap');
 const insidePolygon = require('point-inside-polygon');
@@ -960,7 +961,7 @@ interface ObjectDetectionStatistics {
   sampleTime: number;
 }
 
-class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings, DeviceProvider {
+class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings, DeviceProvider, DeviceCreator {
   currentMixins = new Set<ObjectDetectorMixin>();
   objectDetectionStatistics = new Map<number, ObjectDetectionStatistics>();
   statsSnapshotTime: number;
@@ -1029,6 +1030,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
       type: 'boolean',
     }
   });
+  devices = new Map<string, any>();
 
   shouldUseSnapshotPipeline() {
     this.pruneOldStatistics();
@@ -1164,27 +1166,34 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     super(nativeId, 'v5');
 
     process.nextTick(() => {
-      sdk.deviceManager.onDevicesChanged({
-        devices: [
-          {
-            name: 'FFmpeg Frame Generator',
-            type: ScryptedDeviceType.Builtin,
-            interfaces: [
-              ScryptedInterface.VideoFrameGenerator,
-            ],
-            nativeId: 'ffmpeg',
-          }
-        ]
+      sdk.deviceManager.onDeviceDiscovered({
+        name: 'FFmpeg Frame Generator',
+        type: ScryptedDeviceType.Builtin,
+        interfaces: [
+          ScryptedInterface.VideoFrameGenerator,
+        ],
+        nativeId: 'ffmpeg',
       })
     })
   }
 
   async getDevice(nativeId: string): Promise<any> {
+    let ret: any;
     if (nativeId === 'ffmpeg')
-      return new FFmpegVideoFrameGenerator('ffmpeg');
+      ret = this.devices.get(nativeId) || new FFmpegVideoFrameGenerator('ffmpeg');
+    if (nativeId?.startsWith(SMART_MOTIONSENSOR_PREFIX))
+      ret = this.devices.get(nativeId) || new SmartMotionSensor(nativeId);
+
+    if (ret)
+      this.devices.set(nativeId, ret);
+    return ret;
   }
 
   async releaseDevice(id: string, nativeId: string): Promise<void> {
+    if (nativeId?.startsWith(SMART_MOTIONSENSOR_PREFIX)) {
+      const smart = this.devices.get(nativeId) as SmartMotionSensor;
+      smart?.listener?.removeListener();
+    }
   }
 
   getSettings(): Promise<Setting[]> {
@@ -1215,6 +1224,35 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     // just ignore it until reboot?
     this.currentMixins.delete(mixinDevice);
     return mixinDevice.release();
+  }
+
+  async getCreateDeviceSettings(): Promise<Setting[]> {
+    return [
+      objectDetector,
+    ];
+  }
+
+  async createDevice(settings: DeviceCreatorSettings): Promise<string> {
+    const nativeId = SMART_MOTIONSENSOR_PREFIX + crypto.randomBytes(8).toString('hex');
+    const objectDetector = sdk.systemManager.getDeviceById(settings.objectDetector as string);
+    let name = objectDetector.name || 'New';
+    name += ' Smart Motion Sensor'
+
+    const id = await sdk.deviceManager.onDeviceDiscovered({
+      nativeId,
+      name,
+      type: ScryptedDeviceType.Sensor,
+      interfaces: [
+        ScryptedInterface.MotionSensor,
+        ScryptedInterface.Settings,
+        ScryptedInterface.Readme,
+      ]
+    });
+
+    const sensor = new SmartMotionSensor(nativeId);
+    sensor.storageSettings.values.objectDetector = objectDetector?.id;
+
+    return id;
   }
 }
 
