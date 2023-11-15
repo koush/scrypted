@@ -34,6 +34,7 @@ export default {
       const termSvcDirect = await this.$scrypted.connectRPCObject(termSvc);
       const queue = createAsyncQueue();
 
+      queue.enqueue(JSON.stringify({ interactive: true }));
       queue.enqueue(JSON.stringify({ dim: { cols: term.cols, rows: term.rows } }));
 
       term.onData(data => queue.enqueue(Buffer.from(data, 'utf8')));
