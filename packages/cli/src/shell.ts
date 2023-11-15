@@ -1,7 +1,7 @@
 import { DeviceProvider, ScryptedStatic, StreamService } from "@scrypted/types";
 import { createAsyncQueue } from '../../../common/src/async-queue';
 
-export async function connectShell(sdk: ScryptedStatic) {
+export async function connectShell(sdk: ScryptedStatic, ...cmd: string[]) {
     const termSvc = await sdk.systemManager.getDeviceByName<DeviceProvider>("@scrypted/core").getDevice("terminalservice");
     if (!termSvc) {
         throw Error("@scrypted/core does not provide a Terminal Service");
@@ -19,7 +19,7 @@ export async function connectShell(sdk: ScryptedStatic) {
             dataQueue.enqueue(Buffer.alloc(0));
         });
     }
-    ctrlQueue.enqueue({ interactive: Boolean(process.stdin.isTTY) });
+    ctrlQueue.enqueue({ interactive: Boolean(process.stdin.isTTY), cmd: cmd });
 
     const dim = { cols: process.stdout.columns, rows: process.stdout.rows };
     ctrlQueue.enqueue({ dim });

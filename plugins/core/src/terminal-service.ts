@@ -9,9 +9,13 @@ export const TerminalServiceNativeId = 'terminalservice';
 class InteractiveTerminal {
     cp: IPty
 
-    constructor() {
+    constructor(cmd: string[]) {
         const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
-        this.cp = spawn(process.env.SHELL as string, [], {});
+        if (cmd?.length) {
+            this.cp = spawn(cmd[0], cmd.slice(1), {});
+        } else {
+            this.cp = spawn(process.env.SHELL as string, [], {});
+        }
     }
 
     onExit(fn: (e: { exitCode: number; signal?: number; }) => any) {
@@ -30,8 +34,8 @@ class InteractiveTerminal {
         this.cp.resume();
     }
 
-    write(data: string) {
-        this.cp.write(data);
+    write(data: Buffer) {
+        this.cp.write(data.toString());
     }
 
     sendEOF() {
@@ -43,15 +47,20 @@ class InteractiveTerminal {
     }
 
     resize(columns: number, rows: number) {
-        this.cp.resize(columns, rows);
+        if (columns > 0 && rows > 0)
+            this.cp.resize(columns, rows);
     }
 }
 
 class NoninteractiveTerminal {
     cp: ChildProcess
 
-    constructor() {
-        this.cp = childSpawn(process.env.SHELL as string);
+    constructor(cmd: string[]) {
+        if (cmd?.length) {
+            this.cp = childSpawn(cmd[0], cmd.slice(1));
+        } else {
+            this.cp = childSpawn(process.env.SHELL as string);
+        }
     }
 
     onExit(fn: (code: number, signal: NodeJS.Signals) => void) {
@@ -69,11 +78,11 @@ class NoninteractiveTerminal {
     }
 
     resume() {
-        this.cp.stdout.pause();
-        this.cp.stderr.pause();
+        this.cp.stdout.resume();
+        this.cp.stderr.resume();
     }
 
-    write(data: any) {
+    write(data: Buffer) {
         this.cp.stdin.write(data);
     }
 
@@ -92,7 +101,17 @@ class NoninteractiveTerminal {
 
 
 export class TerminalService extends ScryptedDeviceBase implements StreamService {
-    async connectStream(input: AsyncGenerator<any, void>): Promise<AsyncGenerator<any, void>> {
+    /*
+     * The input to this stream can send buffers for normal terminal data and strings
+     * for control messages. Control messages are JSON-formatted.
+     *
+     * The current implemented control messages:
+     *
+     *   Start: { "interactive": boolean, "cmd": string[] }
+     *   Resize: { "dim": { "cols": number, "rows": number } }
+     *   EOF: { "eof": true }
+     */
+    async connectStream(input: AsyncGenerator<Buffer | string, void>): Promise<AsyncGenerator<Buffer, void>> {
         let cp: InteractiveTerminal | NoninteractiveTerminal = null;
         const queue = createAsyncQueue<Buffer>();
 
@@ -140,7 +159,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
 
                     if (Buffer.isBuffer(message)) {
                         if (cp)
-                            cp.write(message.toString());
+                            cp.write(message);
                         continue;
                     }
 
@@ -154,15 +173,15 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                                 cp.sendEOF();
                         } else if ("interactive" in parsed && !cp) {
                             if (parsed.interactive) {
-                                cp = new InteractiveTerminal();
+                                cp = new InteractiveTerminal(parsed.cmd);
                             } else {
-                                cp = new NoninteractiveTerminal();
+                                cp = new NoninteractiveTerminal(parsed.cmd);
                             }
                             registerChildListeners();
                         }
                     } catch {
                         if (cp)
-                            cp.write(message.toString());
+                            cp.write(Buffer.from(message));
                     }
                 }
             }
