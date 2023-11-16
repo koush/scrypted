@@ -62,18 +62,35 @@ export function createAsyncQueue<T>() {
         return true;
     }
 
+    function end(e?: Error) {
+        if (ended)
+            return false;
+        // catch to prevent unhandled rejection.
+        ended = e || new EndError()
+        clear(e);
+        return true;
+    }
+
     function queue() {
         return (async function* () {
-            while (true) {
-                try {
-                    const item = await dequeue();
-                    yield item;
+            try {
+                while (true) {
+                    try {
+                        const item = await dequeue();
+                        yield item;
+                    }
+                    catch (e) {
+                        // the yield above may raise an error, and the queue should be ended.
+                        end(e);
+                        if (e instanceof EndError)
+                            return;
+                        throw e;
+                    }
                 }
-                catch (e) {
-                    if (e instanceof EndError)
-                        return;
-                    throw e;
-                }
+            }
+            finally {
+                // the yield above may cause an iterator return, and the queue should be ended.
+                end();
             }
         })();
     }
@@ -106,14 +123,7 @@ export function createAsyncQueue<T>() {
         submit(item: T, signal?: AbortSignal) {
             return submit(item, undefined, signal);
         },
-        end(e?: Error) {
-            if (ended)
-                return false;
-            // catch to prevent unhandled rejection.
-            ended = e || new EndError()
-            clear(e);
-            return true;
-        },
+        end,
         async enqueue(item: T, signal?: AbortSignal) {
             const dequeued = new Deferred<void>();
             if (!submit(item, dequeued, signal))
