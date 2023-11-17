@@ -282,10 +282,10 @@ export async function createRTCPeerConnectionSource(options: {
                         onRtp: (rtp) => {
                             const packet = RtpPacket.deSerialize(rtp);
                             const now = Date.now();
-                            packet.header.marker = now - lastPacketTs > 1000; // set the marker if it's been more than 1s since the last packet
-                            lastPacketTs = now;
                             packet.header.payloadType = audioCodec.payloadType;
+                            packet.header.marker = now - lastPacketTs > 1000; // set the marker if it's been more than 1s since the last packet
                             audioTransceiver.sender.sendRtp(packet.serialize());
+                            lastPacketTs = now;
                         },
                     },
                 });
