@@ -50,8 +50,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           'Default',
           ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
         ];
-        if (!this.hasMotionType)
-          choices.push('Snapshot');
         return {
           choices,
         }
@@ -244,9 +242,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (!this.hasMotionType)
       this.plugin.objectDetectionStarted(this.name, this.console);
 
-    const options = {
-      snapshotPipeline: this.plugin.shouldUseSnapshotPipeline(),
-    };
+    const options = {};
 
     const session = crypto.randomBytes(4).toString('hex');
     const typeName = this.hasMotionType ? 'motion' : 'object';
@@ -257,14 +253,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.console.error('Video Analysis ended with error', e);
       }).finally(() => {
         if (!this.hasMotionType)
-          this.plugin.objectDetectionEnded(this.console, options.snapshotPipeline);
+          this.plugin.objectDetectionEnded(this.console);
         this.console.log(`Video Analysis ${typeName} detection session ${session} ended.`);
         signal.resolve();
       });
   }
 
   async runPipelineAnalysisLoop(signal: Deferred<void>, options: {
-    snapshotPipeline: boolean,
     suppress?: boolean,
   }) {
     while (!signal.finished) {
@@ -283,106 +278,51 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
-  getCurrentFrameGenerator(snapshotPipeline: boolean) {
+  getCurrentFrameGenerator() {
     let frameGenerator: string = this.frameGenerator;
-    if (!this.hasMotionType && snapshotPipeline) {
-      frameGenerator = 'Snapshot';
-      this.console.warn(`Due to limited performance, Snapshot mode is being used with ${this.plugin.statsSnapshotConcurrent} actively detecting cameras.`);
-    }
     return frameGenerator;
   }
 
   async createFrameGenerator(signal: Deferred<void>,
     frameGenerator: string,
     options: {
-      snapshotPipeline: boolean,
       suppress?: boolean,
     }, updatePipelineStatus: (status: string) => void): Promise<AsyncGenerator<VideoFrame, any, unknown>> {
-    if (frameGenerator === 'Snapshot' && !this.hasMotionType) {
 
-      options.snapshotPipeline = true;
-      this.console.log('Snapshot', '+', this.objectDetection.name);
-      const self = this;
-      return (async function* gen() {
-        try {
-          const flush = async () => { };
-          while (!signal.finished) {
-            const now = Date.now();
-            const sleeper = async () => {
-              const diff = now + 1100 - Date.now();
-              if (diff > 0)
-                await sleep(diff);
-            };
-            let image: Image & MediaObject;
-            try {
-              updatePipelineStatus('takePicture');
-              const mo = await self.cameraDevice.takePicture({
-                reason: 'event',
-              });
-              updatePipelineStatus('converting image');
-              image = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.Image);
-            }
-            catch (e) {
-              self.console.error('Video analysis snapshot failed. Will retry in a moment.');
-              await sleeper();
-              continue;
-            }
+    const destination: MediaStreamDestination = this.hasMotionType ? 'low-resolution' : 'local-recorder';
+    const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(frameGenerator);
+    if (!videoFrameGenerator)
+      throw new Error('invalid VideoFrameGenerator');
+    if (!options?.suppress)
+      this.console.log(videoFrameGenerator.name, '+', this.objectDetection.name);
+    updatePipelineStatus('getVideoStream');
+    const stream = await this.cameraDevice.getVideoStream({
+      prebuffer: this.model.prebuffer,
+      destination,
+      // ask rebroadcast to mute audio, not needed.
+      audio: null,
+    });
+    updatePipelineStatus('generateVideoFrames');
 
-            // self.console.log('yield')
-            updatePipelineStatus('processing image');
-            yield {
-              __json_copy_serialize_children: true,
-              timestamp: now,
-              queued: 0,
-              flush,
-              image,
-            };
-            // self.console.log('done yield')
-            await sleeper();
-          }
-        }
-        finally {
-          self.console.log('Snapshot generation finished.');
-        }
-      })();
-    }
-    else {
-      const destination: MediaStreamDestination = this.hasMotionType ? 'low-resolution' : 'local-recorder';
-      const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(frameGenerator);
-      if (!videoFrameGenerator)
-        throw new Error('invalid VideoFrameGenerator');
-      if (!options?.suppress)
-        this.console.log(videoFrameGenerator.name, '+', this.objectDetection.name);
-      updatePipelineStatus('getVideoStream');
-      const stream = await this.cameraDevice.getVideoStream({
-        prebuffer: this.model.prebuffer,
-        destination,
-        // ask rebroadcast to mute audio, not needed.
-        audio: null,
+    try {
+      return await videoFrameGenerator.generateVideoFrames(stream, {
+        queue: 0,
+        fps: this.hasMotionType ? 4 : undefined,
+        // this seems to be unused now?
+        resize: this.model?.inputSize ? {
+          width: this.model.inputSize[0],
+          height: this.model.inputSize[1],
+        } : undefined,
+        // this seems to be unused now?
+        format: this.model?.inputFormat,
       });
-      updatePipelineStatus('generateVideoFrames');
-
-      try {
-        return await videoFrameGenerator.generateVideoFrames(stream, {
-          queue: 0,
-          fps: this.hasMotionType ? 4 : undefined,
-          // this seems to be unused now?
-          resize: this.model?.inputSize ? {
-            width: this.model.inputSize[0],
-            height: this.model.inputSize[1],
-          } : undefined,
-          // this seems to be unused now?
-          format: this.model?.inputFormat,
-        });
-      }
-      finally {
-        updatePipelineStatus('waiting first result');
-      }
+    }
+    finally {
+      updatePipelineStatus('waiting first result');
     }
   }
 
   async runPipelineAnalysis(signal: Deferred<void>, options: {
-    snapshotPipeline: boolean,
     suppress?: boolean,
   }) {
     const start = Date.now();
@@ -429,7 +369,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     let longObjectDetectionWarning = false;
 
-    const frameGenerator = this.getCurrentFrameGenerator(options.snapshotPipeline);
+    const frameGenerator = this.getCurrentFrameGenerator();
     for await (const detected of
       await sdk.connectRPCObject(
         await this.objectDetection.generateObjectDetections(
@@ -688,21 +628,17 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   get frameGenerator() {
-    const frameGenerator = this.storageSettings.values.newPipeline as string || 'Default';
-    if (frameGenerator === 'Snapshot')
-      return frameGenerator;
-
-    if (frameGenerator === 'Default' && !this.hasMotionType && os.cpus().length < 4) {
-      this.console.log('Less than 4 processors detected. Defaulting to snapshot mode.');
-      return 'Snapshot';
-    }
+    let frameGenerator = this.storageSettings.values.newPipeline as string;
+    if (frameGenerator === 'Default')
+      frameGenerator = this.plugin.storageSettings.values.defaultDecoder || 'Default';
 
     const pipelines = getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator));
-    const webcodec = process.env.SCRYPTED_INSTALL_ENVIRONMENT === 'electron' ? pipelines.find(p => p.nativeId === 'webcodec') : undefined;
-    const gstreamer = pipelines.find(p => p.nativeId === 'gstreamer');
-    const libav = pipelines.find(p => p.nativeId === 'libav');
-    const ffmpeg = pipelines.find(p => p.nativeId === 'ffmpeg');
-    const use = pipelines.find(p => p.name === frameGenerator) || webcodec || gstreamer || libav || ffmpeg;
+    const webcodec = process.env.SCRYPTED_INSTALL_ENVIRONMENT === 'electron' ? sdk.systemManager.getDeviceById('@scrypted/electron-core', 'webcodec') : undefined;
+    const webassembly = sdk.systemManager.getDeviceById('@scrypted/nvr', 'decoder') || undefined;
+    const gstreamer = sdk.systemManager.getDeviceById('@scrypted/python-codecs', 'gstreamer') || undefined;
+    const libav = sdk.systemManager.getDeviceById('@scrypted/python-codecs', 'libav') || undefined;
+    const ffmpeg = sdk.systemManager.getDeviceById('@scrypted/objectdetector', 'ffmpeg') || undefined;
+    const use = pipelines.find(p => p.name === frameGenerator) || webcodec || webassembly || gstreamer || libav || ffmpeg;
     return use.id;
   }
 
@@ -861,7 +797,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     if (key === 'analyzeButton') {
-      // await this.snapshotDetection();
       this.startPipelineAnalysis();
       this.analyzeStop = Date.now() + 60000;
     }
@@ -1023,39 +958,27 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
         return value;
       },
     },
+    defaultDecoder: {
+      group: 'Advanced',
+      onGet: async () => {
+        const choices = [
+          'Default',
+          ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
+        ];
+        return {
+          choices,
+        }
+      },
+      defaultValue: 'Default',
+    },
     developerMode: {
       group: 'Advanced',
       title: 'Developer Mode',
       description: 'Developer mode enables usage of the raw detector object detectors. Using raw object detectors (ie, outside of Scrypted NVR) can cause severe performance degradation.',
       type: 'boolean',
-    }
+    },
   });
   devices = new Map<string, any>();
-
-  shouldUseSnapshotPipeline() {
-    this.pruneOldStatistics();
-
-    // deprecated in favor of object detection session eviction.
-    return false;
-
-    // never use snapshot mode if its a single camera.
-    if (this.statsSnapshotConcurrent < 2)
-      return false;
-
-    // find any concurrent cameras with as many or more that had passable results
-    for (const [k, v] of this.objectDetectionStatistics.entries()) {
-      if (v.dps > 2 && k >= this.statsSnapshotConcurrent)
-        return false;
-    }
-
-    // find any concurrent camera with less or as many that had struggle bus
-    for (const [k, v] of this.objectDetectionStatistics.entries()) {
-      if (v.dps < 2 && k <= this.statsSnapshotConcurrent)
-        return true;
-    }
-
-    return false;
-  }
 
   pruneOldStatistics() {
     const now = Date.now();
@@ -1121,8 +1044,8 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     }
   }
 
-  objectDetectionEnded(console: Console, snapshotPipeline: boolean) {
-    this.resetStats(console, snapshotPipeline);
+  objectDetectionEnded(console: Console) {
+    this.resetStats(console);
 
     this.statsSnapshotConcurrent--;
 
@@ -1135,7 +1058,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     }
   }
 
-  resetStats(console: Console, snapshotPipeline?: boolean) {
+  resetStats(console: Console) {
     const now = Date.now();
     const concurrentSessions = this.statsSnapshotConcurrent;
     if (concurrentSessions) {
@@ -1146,9 +1069,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
       };
 
       // ignore short sessions and sessions with no detections (busted?).
-      // also ignore snapshot sessions because that will skew/throttle the stats used
-      // to determine system dps capabilities.
-      if (duration > 10000 && this.statsSnapshotDetections && !snapshotPipeline)
+      if (duration > 10000 && this.statsSnapshotDetections)
         this.objectDetectionStatistics.set(concurrentSessions, stats);
 
       this.pruneOldStatistics();
