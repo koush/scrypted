@@ -281,6 +281,7 @@ export async function createRTCPeerConnectionSource(options: {
                         onRtp: (rtp) => {
                             const packet = RtpPacket.deSerialize(rtp);
                             packet.header.payloadType = audioCodec.payloadType;
+                            packet.header.marker = false;
                             audioTransceiver.sender.sendRtp(packet.serialize());
                         },
                     },

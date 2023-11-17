@@ -229,9 +229,12 @@ export async function createTrackForwarder(options: {
                 }
             }
             else {
+                const rtp = RtpPacket.deSerialize(buffer);
+                rtp.header.marker = false;
+                rtp.header.payloadType = audioTransceiver.sender.codec.payloadType;
                 // pcm audio can be concatenated.
                 // hikvision seems to send 40ms duration packets, so 25 packets per second.
-                audioTransceiver.sender.sendRtp(buffer);
+                audioTransceiver.sender.sendRtp(rtp.serialize());
             }
         },
         encoderArguments: [
