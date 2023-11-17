@@ -261,14 +261,14 @@ export async function createRTCPeerConnectionSource(options: {
 
         let destroyProcess: () => void;
 
-        const track = audioTransceiver.sender.sendRtp;
+        const audioCodec = audioTransceiver?.sender?.codec;
 
         const ic: Intercom = {
             async startIntercom(media: MediaObject) {
                 if (!isPeerConnectionAlive(pc))
                     throw new Error('peer connection is closed');
 
-                if (!track)
+                if (!audioTransceiver?.sender?.sendRtp || !audioCodec)
                     throw new Error('peer connection does not support two way audio');
 
 
@@ -276,8 +276,13 @@ export async function createRTCPeerConnectionSource(options: {
 
                 const { kill: destroy } = await startRtpForwarderProcess(console, ffmpegInput, {
                     audio: {
+                        codecCopy: audioCodec.name,
                         encoderArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode),
-                        onRtp: (rtp) => audioTransceiver.sender.sendRtp(rtp),
+                        onRtp: (rtp) => {
+                            const packet = RtpPacket.deSerialize(rtp);
+                            packet.header.payloadType = audioCodec.payloadType;
+                            audioTransceiver.sender.sendRtp(packet.serialize());
+                        },
                     },
                 });
 
