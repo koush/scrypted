@@ -173,17 +173,6 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider)
             }
         )
 
-        manifest["devices"].append(
-            {
-                "name": "Image Writer",
-                "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
-                "nativeId": "writer",
-                "interfaces": [
-                    scrypted_sdk.ScryptedInterface.BufferConverter.value,
-                ],
-            }
-        )
-
         await scrypted_sdk.deviceManager.onDevicesChanged(manifest)
 
     def getDevice(self, nativeId: str) -> Any:
@@ -198,13 +187,9 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider)
         if vipsimage.pyvips:
             if nativeId == "reader":
                 return vipsimage.ImageReader("reader")
-            if nativeId == "writer":
-                return vipsimage.ImageWriter("writer")
         else:
             if nativeId == "reader":
                 return pilimage.ImageReader("reader")
-            if nativeId == "writer":
-                return pilimage.ImageWriter("writer")
 
 
 def create_scrypted_plugin():

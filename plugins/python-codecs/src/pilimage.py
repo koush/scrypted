@@ -114,18 +114,6 @@ class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
         pil.load()
         return await createImageMediaObject(PILImage(pil))
 
-class ImageWriter(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter):
-    def __init__(self, nativeId: str):
-        super().__init__(nativeId)
-
-        self.fromMimeType = scrypted_sdk.ScryptedMimeTypes.Image.value
-        self.toMimeType = 'image/*'
-
-    async def convert(self, data: scrypted_sdk.VideoFrame, fromMimeType: str, toMimeType: str, options: scrypted_sdk.MediaObjectOptions = None) -> Any:
-        return await data.toBuffer({
-            format: 'jpg',
-        })
-
 def new_from_memory(data, width: int, height: int, bands: int):
     data = bytes(data)
     if bands == 4:
