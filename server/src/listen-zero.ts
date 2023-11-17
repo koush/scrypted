@@ -13,8 +13,8 @@ export async function listenZero(server: net.Server, hostname?: string) {
     return (server.address() as net.AddressInfo).port;
 }
 
-export async function listenZeroSingleClient(hostname?: string) {
-    const server = new net.Server();
+export async function listenZeroSingleClient(hostname?: string, options?: net.ServerOpts) {
+    const server = new net.Server(options);
     const port = await listenZero(server, hostname);
 
     let cancel: () => void;
