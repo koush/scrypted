@@ -285,6 +285,7 @@ export async function createRTCPeerConnectionSource(options: {
                             packet.header.marker = now - lastPacketTs > 1000; // set the marker if it's been more than 1s since the last packet
                             lastPacketTs = now;
                             packet.header.payloadType = audioCodec.payloadType;
+                            packet.header.marker = false;
                             audioTransceiver.sender.sendRtp(packet.serialize());
                         },
                     },
