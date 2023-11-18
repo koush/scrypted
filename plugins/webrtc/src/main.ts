@@ -18,7 +18,7 @@ import { WebRTCCamera } from "./webrtc-camera";
 import { InterfaceAddresses, MediaStreamTrack, PeerConfig, RTCPeerConnection, defaultPeerConfig } from './werift';
 import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
-import { createZygote } from './zygote';
+import { createZygote } from '@scrypted/common/src/zygote';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
