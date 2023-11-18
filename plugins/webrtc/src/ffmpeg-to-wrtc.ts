@@ -217,6 +217,7 @@ export async function createTrackForwarder(options: {
     }
 
     let opusRepacketizer: OpusRepacketizer;
+    let lastPacketTs: number = 0;
     const audioRtpTrack: RtpTrack = {
         codecCopy: audioCodecCopy,
         onRtp: buffer => {
@@ -230,11 +231,13 @@ export async function createTrackForwarder(options: {
             }
             else {
                 const rtp = RtpPacket.deSerialize(buffer);
-                rtp.header.marker = false;
+                const now = Date.now();
+                rtp.header.marker = now - lastPacketTs > 1000; // set the marker if it's been more than 1s since the last packet
                 rtp.header.payloadType = audioTransceiver.sender.codec.payloadType;
                 // pcm audio can be concatenated.
                 // hikvision seems to send 40ms duration packets, so 25 packets per second.
                 audioTransceiver.sender.sendRtp(rtp.serialize());
+                lastPacketTs = now;
             }
         },
         encoderArguments: [
@@ -257,7 +260,7 @@ export async function createTrackForwarder(options: {
     // 1/9/2023:
     // 1378 is what homekit requests, regardless of local or remote network.
     // so setting 1378 as the fixed value seems wise, given apple probably has
-    // better knowledge of network capabilities, and also mirrors 
+    // better knowledge of network capabilities, and also mirrors
     // from my cursory research into ipv6, the MTU is no lesser than ipv4, in fact
     // the min mtu is larger.
     const videoPacketSize = 1378;
