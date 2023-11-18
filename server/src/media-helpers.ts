@@ -12,6 +12,7 @@ export function safeKillFFmpeg(cp: ChildProcess) {
         return;
     // this will allow ffmpeg to send rtsp TEARDOWN etc
     try {
+        cp.stdin.on('error', () => {});
         cp.stdin.write('q\n');
     }
     catch (e) {
