@@ -274,15 +274,18 @@ export async function createRTCPeerConnectionSource(options: {
 
                 const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
+                let lastPacketTs: number = 0;
                 const { kill: destroy } = await startRtpForwarderProcess(console, ffmpegInput, {
                     audio: {
                         codecCopy: audioCodec.name,
                         encoderArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode),
                         onRtp: (rtp) => {
                             const packet = RtpPacket.deSerialize(rtp);
+                            const now = Date.now();
                             packet.header.payloadType = audioCodec.payloadType;
-                            packet.header.marker = false;
+                            packet.header.marker = now - lastPacketTs > 1000; // set the marker if it's been more than 1s since the last packet
                             audioTransceiver.sender.sendRtp(packet.serialize());
+                            lastPacketTs = now;
                         },
                     },
                 });
