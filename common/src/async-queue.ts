@@ -67,7 +67,6 @@ export function createAsyncQueue<T>() {
             return false;
         // catch to prevent unhandled rejection.
         ended = e || new EndError()
-        clear(ended);
         while (waiting.length) {
             waiting.shift().reject(ended);
         }
