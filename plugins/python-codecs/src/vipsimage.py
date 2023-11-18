@@ -110,3 +110,9 @@ class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
     async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: scrypted_sdk.MediaObjectOptions = None) -> Any:
         vips = Image.new_from_buffer(data, '')
         return await createImageMediaObject(VipsImage(vips))
+
+def new_from_memory(data, width: int, height: int, bands: int):
+    return Image.new_from_memory(data, width, height, bands, pyvips.BandFormat.UCHAR)
+
+def new_from_buffer(data, width: int, height: int, bands: int):
+    return Image.new_from_buffer(data, width, height, bands, pyvips.BandFormat.UCHAR)
