@@ -45,19 +45,28 @@ export function createAsyncQueue<T>() {
             return true;
         }
 
+        if (signal)
+            dequeued ||= new Deferred();
+
         const qi = {
             item,
             dequeued,
         };
         queued!.push(qi);
 
-        signal?.addEventListener('abort', () => {
+        if (!signal)
+            return true;
+
+        const h = () => {
             const index = queued.indexOf(qi);
             if (index === -1)
                 return;
             queued.splice(index, 1);
             dequeued?.reject(new Error('abort'));
-        });
+        };
+
+        dequeued.promise.catch(() => {}).finally(() => signal.removeEventListener('abort', h));
+        signal.addEventListener('abort', h);
 
         return true;
     }
@@ -112,6 +121,9 @@ export function createAsyncQueue<T>() {
     }
 
     return {
+        get ended() {
+            return ended;
+        },
         take,
         clear() {
             return clear();
