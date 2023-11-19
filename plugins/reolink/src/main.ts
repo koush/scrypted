@@ -334,7 +334,7 @@ class ReolinkProider extends RtspProvider {
         const username = settings.username?.toString();
         const password = settings.password?.toString();
         const doorbell = settings.doorbell?.toString();
-        const skipValidate = settings.skipValidate === 'true';
+        const skipValidate = settings.skipValidate?.toString() === 'true';
         const rtspChannel = parseInt(settings.rtspChannel?.toString()) || 0;
         if (!skipValidate) {
             try {
