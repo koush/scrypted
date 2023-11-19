@@ -303,7 +303,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     this.debugConsole?.log("Resizing picture from camera", options?.picture);
 
                     try {
-                        const mo = await mediaManager.createMediaObject(picture, 'image/jpeg');
+                        const mo = await mediaManager.createMediaObject(picture, 'image/jpeg', {
+                            sourceId: this.id,
+                        });
                         const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
                         let { width, height } = options.picture;
                         if (!width)
