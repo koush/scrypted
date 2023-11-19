@@ -151,6 +151,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                     'GPU',
                 ],
                 'value': mode,
+                'combobox': True,
             },
             {
                 'key': 'precision',
