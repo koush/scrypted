@@ -113,10 +113,11 @@ export function createRpcDuplexSerializer(writable: {
     let header: Buffer;
     let pending: Buffer;
     let offset: number;
+    let type: number;
 
     const onData = (data: Buffer) => {
         while (data.length) {
-            if (!header || header.length < 5) {
+            if (!pending) {
                 if (!header)
                     header = data;
                 else
@@ -130,6 +131,8 @@ export function createRpcDuplexSerializer(writable: {
                 pending = Buffer.alloc(length - 1);
                 data = extra;
                 offset = 0;
+                type = header.readUInt8(4);
+                header = undefined;
             }
 
             const need = pending.length - offset;
@@ -141,10 +144,7 @@ export function createRpcDuplexSerializer(writable: {
             if (offset !== pending.length)
                 return;
 
-            const type = header.readUInt8(4);
             const payload = pending;
-
-            header = undefined;
             pending = undefined;
 
             if (type === 0) {
