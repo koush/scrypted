@@ -112,38 +112,40 @@ export function createRpcDuplexSerializer(writable: {
 
     let header: Buffer;
     let pending: Buffer;
-
-    const readPending = (length: number) => {
-        if (!pending || pending.length < length)
-            return;
-
-        const ret = pending.slice(0, length);
-        pending = pending.slice(length);
-        if (!pending.length)
-            pending = undefined;
-        return ret;
-    }
+    let offset: number;
 
     const onData = (data: Buffer) => {
-        if (!pending)
-            pending = data;
-        else
-            pending = Buffer.concat([pending, data]);
-
-        while (true) {
-            if (!header) {
-                header = readPending(5);
+        while (data.length) {
+            if (!header || header.length < 5) {
                 if (!header)
+                    header = data;
+                else
+                    header = Buffer.concat([header, data]);
+                if (header.length < 5)
                     return;
+                const extra = header.subarray(5);
+                header = header.subarray(0, 5);
+                const length = header.readUInt32BE(0);
+                // length includes type field.
+                pending = Buffer.alloc(length - 1);
+                data = extra;
+                offset = 0;
             }
 
-            const length = header.readUInt32BE(0);
-            const type = header.readUInt8(4);
-            const payload: Buffer = readPending(length - 1);
-            if (!payload)
+            const need = pending.length - offset;
+            const sub = data.subarray(0, need);
+            data = data.subarray(need);
+            pending.set(sub, offset);
+            offset += sub.length;
+
+            if (offset !== pending.length)
                 return;
 
+            const type = header.readUInt8(4);
+            const payload = pending;
+
             header = undefined;
+            pending = undefined;
 
             if (type === 0) {
                 try {
