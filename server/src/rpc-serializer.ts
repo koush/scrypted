@@ -123,9 +123,14 @@ export function createRpcDuplexSerializer(writable: {
                     header = Buffer.concat([header, data]);
                 if (header.length < 5)
                     return;
-                const extra = header.subarray(5);
-                header = header.subarray(0, 5);
+                const extra = header.slice(5);
+                header = header.slice(0, 5);
                 const length = header.readUInt32BE(0);
+                if (length > 20000000) {
+                    console.warn('wtf big payload');
+                    serializer.kill('wtf big payload');
+                    return;
+                }
                 // length includes type field.
                 pending = Buffer.alloc(length - 1);
                 data = extra;
@@ -133,8 +138,8 @@ export function createRpcDuplexSerializer(writable: {
             }
 
             const need = pending.length - offset;
-            const sub = data.subarray(0, need);
-            data = data.subarray(need);
+            const sub = data.slice(0, need);
+            data = data.slice(need);
             pending.set(sub, offset);
             offset += sub.length;
 
