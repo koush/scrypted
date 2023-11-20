@@ -23,12 +23,11 @@ export class ServiceControl {
         const webhookUpdate = process.env.SCRYPTED_WEBHOOK_UPDATE;
         if (webhookUpdate) {
             const webhookUpdateAuthorization = process.env.SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION;
-            const json = await fetchJSON(webhookUpdate, {
+            await fetchJSON(webhookUpdate, {
                 headers: {
                     Authorization: webhookUpdateAuthorization,
                 }
             });
-            return json;
         }
         else {
             fs.writeFileSync('.update', '');
