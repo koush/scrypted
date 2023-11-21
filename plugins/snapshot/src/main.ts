@@ -10,7 +10,6 @@ import path from 'path';
 import MimeType from 'whatwg-mimetype';
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
-import { loadVipsImage, VipsImage } from './image-reader';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -303,47 +302,35 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 }, async () => {
                     this.debugConsole?.log("Resizing picture from camera", options?.picture);
 
-                    // try {
-                    //     const mo = await mediaManager.createMediaObject(picture, 'image/jpeg', {
-                    //         sourceId: this.id,
-                    //     });
-                    //     const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
-                    //     let { width, height } = options.picture;
-                    //     if (!width)
-                    //         width = height / image.height * image.width;
-                    //     if (!height)
-                    //         height = width / image.width * image.height;
-                    //     return await image.toBuffer({
-                    //         resize: {
-                    //             width,
-                    //             height,
-                    //         },
-                    //         format: 'jpg',
-                    //     });
-                    // }
-                    // catch (e) {
-                    //     if (!e.message?.includes('no converter found'))
-                    //         throw e;
-                    // }
-
-                    // return ffmpegFilterImageBuffer(picture, {
-                    //     console: this.debugConsole,
-                    //     ffmpegPath: await mediaManager.getFFmpegPath(),
-                    //     resize: options?.picture,
-                    //     timeout: 10000,
-                    // });
-
-                    const vips = await loadVipsImage(picture, this.id);
                     try {
-                        const ret = await vips.toBuffer({
-                            resize: options?.picture,
+                        const mo = await mediaManager.createMediaObject(picture, 'image/jpeg', {
+                            sourceId: this.id,
+                        });
+                        const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
+                        let { width, height } = options.picture;
+                        if (!width)
+                            width = height / image.height * image.width;
+                        if (!height)
+                            height = width / image.width * image.height;
+                        return await image.toBuffer({
+                            resize: {
+                                width,
+                                height,
+                            },
                             format: 'jpg',
                         });
-                        return ret;
                     }
-                    finally {
-                        vips.close();
+                    catch (e) {
+                        if (!e.message?.includes('no converter found'))
+                            throw e;
                     }
+
+                    return ffmpegFilterImageBuffer(picture, {
+                        console: this.debugConsole,
+                        ffmpegPath: await mediaManager.getFFmpegPath(),
+                        resize: options?.picture,
+                        timeout: 10000,
+                    });
                 });
             }
             catch (e) {
@@ -364,58 +351,41 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const xmax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
-        // try {
-        //     const mo = await mediaManager.createMediaObject(picture, 'image/jpeg');
-        //     const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
-        //     const left = image.width * xmin;
-        //     const width = image.width * (xmax - xmin);
-        //     const top = image.height * ymin;
-        //     const height = image.height * (ymax - ymin);
-
-        //     return await image.toBuffer({
-        //         crop: {
-        //             left,
-        //             width,
-        //             top,
-        //             height,
-        //         },
-        //         format: 'jpg',
-        //     });
-        // }
-        // catch (e) {
-        //     if (!e.message?.includes('no converter found'))
-        //         throw e;
-        // }
-
-        // return ffmpegFilterImageBuffer(picture, {
-        //     console: this.debugConsole,
-        //     ffmpegPath: await mediaManager.getFFmpegPath(),
-        //     crop: {
-        //         fractional: true,
-        //         left: xmin,
-        //         top: ymin,
-        //         width: xmax - xmin,
-        //         height: ymax - ymin,
-        //     },
-        //     timeout: 10000,
-        // });
-
-        const vips = await loadVipsImage(picture, this.id);
         try {
-            const ret = await vips.toBuffer({
+            const mo = await mediaManager.createMediaObject(picture, 'image/jpeg');
+            const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
+            const left = image.width * xmin;
+            const width = image.width * (xmax - xmin);
+            const top = image.height * ymin;
+            const height = image.height * (ymax - ymin);
+
+            return await image.toBuffer({
                 crop: {
-                    left: xmin * vips.width,
-                    top: ymin * vips.height,
-                    width: (xmax - xmin) * vips.width,
-                    height: (ymax - ymin) * vips.height,
+                    left,
+                    width,
+                    top,
+                    height,
                 },
                 format: 'jpg',
             });
-            return ret;
         }
-        finally {
-            vips.close();
+        catch (e) {
+            if (!e.message?.includes('no converter found'))
+                throw e;
         }
+
+        return ffmpegFilterImageBuffer(picture, {
+            console: this.debugConsole,
+            ffmpegPath: await mediaManager.getFFmpegPath(),
+            crop: {
+                fractional: true,
+                left: xmin,
+                top: ymin,
+                width: xmax - xmin,
+                height: ymax - ymin,
+            },
+            timeout: 10000,
+        });
     }
 
     clearErrorImages() {
