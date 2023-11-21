@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/snapshot",
-   "version": "0.1.2",
+   "version": "0.0.69",
    "description": "Snapshot Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -31,6 +31,9 @@
          "BufferConverter",
          "DeviceProvider"
       ]
+   },
+   "optionalDependencies": {
+      "sharp": "^0.32.6"
    },
    "dependencies": {
       "@koush/axios-digest-auth": "^0.8.5",

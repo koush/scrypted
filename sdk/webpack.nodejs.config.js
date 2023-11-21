@@ -96,7 +96,7 @@ module.exports = {
                 {
                     test: /\.([cm]?ts|tsx)$/,
                     loader: "ts-loader",
-                }
+                },
         ],
     },
 
@@ -124,6 +124,13 @@ module.exports = {
         minimize: isProduction,
         minimizer: [
             new TerserPlugin(
+                {
+                    terserOptions: {
+                        compress: {
+                            typeofs: false,
+                        }
+                    }
+                }
                 // {
                 //     terserOptions: {
                 //         mangle: {
