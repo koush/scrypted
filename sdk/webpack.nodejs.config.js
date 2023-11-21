@@ -130,16 +130,7 @@ module.exports = {
                             typeofs: false,
                         }
                     }
-                }
-                // {
-                //     terserOptions: {
-                //         mangle: {
-                //             properties: {
-                //                 regex: /^[\$_]/
-                //             }
-                //         },
-                //     },
-                // }
+                },
             ),
         ],
     },
