@@ -124,22 +124,34 @@ export function createRpcDuplexSerializer(writable: {
                     header = Buffer.concat([header, data]);
                 if (header.length < 5)
                     return;
-                const extra = header.slice(5);
-                header = header.slice(0, 5);
-                const length = header.readUInt32BE(0);
+
+                // slice is used below because in web environment,
+                // babel seems to return a Uint8Arrray when subarray is called.
+                data = header.slice(5);
                 // length includes type field.
-                pending = Buffer.alloc(length - 1);
-                data = extra;
-                offset = 0;
+                const length = header.readUInt32BE(0) - 1;
                 type = header.readUInt8(4);
+                if (data.length >= length && type === 0) {
+                    // no need to alloc a buffer for this, since it can be immediately parsed
+                    // as json.
+                    pending = data.length === length ? data : data.slice(0, length);
+                    offset = length;
+                    data = data.slice(length);
+                }
+                else {
+                    pending = Buffer.alloc(length);
+                    offset = 0;
+                }
                 header = undefined;
             }
 
             const need = pending.length - offset;
-            const sub = data.slice(0, need);
-            data = data.slice(need);
-            pending.set(sub, offset);
-            offset += sub.length;
+            if (need) {
+                const sub = data.slice(0, need);
+                data = data.slice(need);
+                pending.set(sub, offset);
+                offset += sub.length;
+            }
 
             if (offset !== pending.length)
                 return;
