@@ -1,5 +1,5 @@
 import sdk, { BufferConverter, Image, ImageOptions, MediaObject, MediaObjectOptions, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
-import sharp from 'sharp';
+import sharp from '@koush/sharp';
 
 async function createVipsMediaObject(image: VipsImage): Promise<Image & MediaObject> {
     const ret: Image & MediaObject = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
