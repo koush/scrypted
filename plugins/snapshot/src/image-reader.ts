@@ -2,21 +2,24 @@ import sdk, { BufferConverter, Image, ImageOptions, MediaObject, MediaObjectOpti
 import sharp from 'sharp';
 
 async function createVipsMediaObject(image: VipsImage): Promise<Image & MediaObject> {
-    const ret = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
+    const ret: Image & MediaObject = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
+        sourceId: image.sourceId,
         width: image.width,
         height: image.height,
+        format: null,
         toBuffer: (options: ImageOptions) => image.toBuffer(options),
         toImage: async (options: ImageOptions) => {
             const newImage = await image.toVipsImage(options);
             return createVipsMediaObject(newImage);
-        }
+        },
+        close: () => image.close(),
     });
 
     return ret;
 }
 
-class VipsImage implements Image {
-    constructor(public image: sharp.Sharp, public metadata: sharp.Metadata) {
+export class VipsImage implements Image {
+    constructor(public image: sharp.Sharp, public metadata: sharp.Metadata, public sourceId: string) {
     }
 
     get width() {
@@ -38,7 +41,7 @@ class VipsImage implements Image {
         }
         if (options?.resize) {
             transformed.resize(typeof options.resize.width === 'number' ? Math.floor(options.resize.width) : undefined, typeof options.resize.height === 'number' ? Math.floor(options.resize.height) : undefined, {
-                fit: "fill",
+                fit: "cover",
             });
         }
 
@@ -67,7 +70,7 @@ class VipsImage implements Image {
         });
 
         const newMetadata = await newImage.metadata();
-        const newVipsImage = new VipsImage(newImage, newMetadata);
+        const newVipsImage = new VipsImage(newImage, newMetadata, this.sourceId);
         return newVipsImage;
     }
 
@@ -77,21 +80,20 @@ class VipsImage implements Image {
         const newVipsImage = await this.toVipsImage(options);
         return createVipsMediaObject(newVipsImage);
     }
+
+    async close() {
+        this.image?.destroy();
+        this.image = undefined;
+    }
 }
 
-export class ImageWriter extends ScryptedDeviceBase implements BufferConverter {
-    constructor(nativeId: string) {
-        super(nativeId);
-
-        this.fromMimeType = ScryptedMimeTypes.Image;
-        this.toMimeType = 'image/*';
-    }
-
-    async convert(data: Image, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<Buffer> {
-        return data.toBuffer({
-            format: 'jpg',
-        });
-    }
+export async function loadVipsImage(data: Buffer, sourceId: string) {
+    const image = sharp(data, {
+        failOnError: false,
+    });
+    const metadata = await image.metadata();
+    const vipsImage = new VipsImage(image, metadata, sourceId);
+    return vipsImage;
 }
 
 export class ImageReader extends ScryptedDeviceBase implements BufferConverter {
@@ -103,11 +105,7 @@ export class ImageReader extends ScryptedDeviceBase implements BufferConverter {
     }
 
     async convert(data: Buffer, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<Image> {
-        const image = sharp(data, {
-            failOnError: false,
-        });
-        const metadata = await image.metadata();
-        const vipsImage = new VipsImage(image, metadata);
+        const vipsImage = await loadVipsImage(data, options?.sourceId);
         return createVipsMediaObject(vipsImage);
     }
 }
