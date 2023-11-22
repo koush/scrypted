@@ -120,14 +120,14 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
                     });
                 }
                 else {
-                    this.maybeSendMediaObject(response, result, methodOrProperty);
+                    await this.maybeSendMediaObject(response, result, methodOrProperty);
                 }
             }
             catch (e) {
                 this.console.error('webhook action error', e);
                 response.send('Internal Error', {
                     code: 500,
-                })
+                });
             }
         }
         else if (allInterfaceProperties.includes(methodOrProperty)) {
@@ -147,7 +147,7 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
             this.console.error('Unknown method or property', methodOrProperty);
             response.send('Not Found', {
                 code: 404,
-            })
+            });
         }
     }
 }
@@ -183,7 +183,7 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
             });
             return;
         }
-        mixin.handle(request, response, device, pathSegments);
+        await mixin.handle(request, response, device, pathSegments);
     }
 
     onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
