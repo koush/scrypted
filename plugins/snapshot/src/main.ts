@@ -2,15 +2,15 @@ import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
 import { createMapPromiseDebouncer, RefreshPromise, singletonPromise, TimeoutError } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, DeviceProvider, FFmpegInput, Image, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios, { AxiosInstance } from "axios";
 import https from 'https';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
+import { ImageReader, ImageReaderNativeId, loadVipsImage, sharpInstance } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
-import { loadVipsImage, sharpInstance, VipsImage } from './image-reader';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -572,25 +572,42 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
         this.fromMimeType = ScryptedMimeTypes.FFmpegInput;
         this.toMimeType = 'image/jpeg';
 
+        const manifest: DeviceManifest = {
+            devices: [
+                {
+                    name: 'Image Writer',
+                    interfaces: [
+                        ScryptedInterface.BufferConverter,
+                    ],
+                    type: ScryptedDeviceType.Builtin,
+                    nativeId: ImageWriterNativeId,
+                }
+            ]
+        };
+
+        if (sharpInstance) {
+            manifest.devices.push(
+                {
+                    name: 'Image Reader',
+                    interfaces: [
+                        ScryptedInterface.BufferConverter,
+                    ],
+                    type: ScryptedDeviceType.Builtin,
+                    nativeId: ImageReaderNativeId,
+                }
+            );
+        }
+
         process.nextTick(() => {
-            sdk.deviceManager.onDevicesChanged({
-                devices: [
-                    {
-                        name: 'Image Writer',
-                        interfaces: [
-                            ScryptedInterface.BufferConverter,
-                        ],
-                        type: ScryptedDeviceType.Builtin,
-                        nativeId: ImageWriterNativeId,
-                    }
-                ]
-            })
-        })
+            sdk.deviceManager.onDevicesChanged(manifest)
+        });
     }
 
     async getDevice(nativeId: string): Promise<any> {
         if (nativeId === ImageWriterNativeId)
             return new ImageWriter(ImageWriterNativeId);
+        if (nativeId === ImageReaderNativeId)
+            return new ImageReader(ImageReaderNativeId);
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {

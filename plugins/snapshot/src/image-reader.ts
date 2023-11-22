@@ -7,8 +7,10 @@ try {
     console.log('sharp loaded');
 }
 catch (e) {
-    console.warn('sharp failed to load', e);
+    console.warn('sharp failed to load, scrypted server may be out of date', e);
 }
+
+export const ImageReaderNativeId = 'imagereader';
 
 async function createVipsMediaObject(image: VipsImage): Promise<Image & MediaObject> {
     const ret: Image & MediaObject = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
