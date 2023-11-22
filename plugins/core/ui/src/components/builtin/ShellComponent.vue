@@ -30,7 +30,8 @@ export default {
   },
   methods: {
     async setupShell(term) {
-      const termSvc = await this.$scrypted.systemManager.getDeviceByName("@scrypted/core").getDevice("terminalservice");
+      const termSvcRaw = this.$scrypted.systemManager.getDeviceByName("@scrypted/core");
+      const termSvc = await termSvcRaw.getDevice("terminalservice");
       const termSvcDirect = await this.$scrypted.connectRPCObject(termSvc);
       const queue = createAsyncQueue();
 

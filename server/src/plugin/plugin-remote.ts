@@ -475,7 +475,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
     const ioSockets: { [id: string]: WebSocketConnectCallbacks } = {};
     const websocketSerializer = new WebSocketSerializer();
-    peer.addSerializer(WebSocketConnection, WebSocketConnection.name, websocketSerializer);
+    peer.addSerializer(WebSocketConnection, 'WebSocketConnection', websocketSerializer);
 
     let done: (scrypted: ScryptedStatic) => void;
     const retPromise = new Promise<ScryptedStatic>(resolve => done = resolve);
