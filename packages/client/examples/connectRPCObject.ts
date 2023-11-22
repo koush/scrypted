@@ -24,7 +24,7 @@ async function example() {
     const mo = await office.getVideoStream();
 
     const generator = await libav.generateVideoFrames(mo);
-    const remote = await sdk.connectRPCObject(generator);
+    const remote = await sdk.connectRPCObject!(generator);
 
     for await (const frame of remote) {
         console.log(frame);

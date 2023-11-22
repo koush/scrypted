@@ -2,10 +2,8 @@
 import child_process from 'child_process';
 import { once } from 'events';
 import fs from 'fs';
-import rimraf from 'rimraf';
 import path from 'path';
 import os from 'os';
-import mkdirp from 'mkdirp';
 import semver from 'semver';
 
 async function sleep(ms: number) {
@@ -57,9 +55,18 @@ export function getInstallDir() {
 export function cwdInstallDir(): { volume: string, installDir: string } {
     const installDir = getInstallDir();
     const volume = path.join(installDir, 'volume');
-    mkdirp.sync(volume);
+    fs.mkdirSync(volume, {
+        recursive: true,
+    });
     process.chdir(installDir);
     return { volume, installDir };
+}
+
+function rimrafSync(p: string) {
+    fs.rmSync(p, {
+        recursive: true,
+        force: true,
+    });
 }
 
 export async function installServe(installVersion: string, ignoreError?: boolean) {
@@ -67,7 +74,7 @@ export async function installServe(installVersion: string, ignoreError?: boolean
     const packageLockJson = path.join(installDir, 'package-lock.json');
     // apparently corrupted or old version of package-lock.json prevents upgrades, so
     // nuke it before installing.
-    rimraf.sync(packageLockJson);
+    rimrafSync(packageLockJson);
 
     const installJson = path.join(installDir, 'install.json');
     try {
@@ -78,7 +85,7 @@ export async function installServe(installVersion: string, ignoreError?: boolean
     catch (e) {
         const nodeModules = path.join(installDir, 'node_modules');
         console.log('Node version mismatch, missing, or corrupt. Clearing node_modules.');
-        rimraf.sync(nodeModules);
+        rimrafSync(nodeModules);
     }
     fs.writeFileSync(installJson, JSON.stringify({
         version: process.version,
@@ -112,8 +119,8 @@ export async function serveMain(installVersion?: string) {
     console.log('cwd', process.cwd());
 
     while (true) {
-        rimraf.sync(EXIT_FILE);
-        rimraf.sync(UPDATE_FILE);
+        rimrafSync(EXIT_FILE);
+        rimrafSync(UPDATE_FILE);
 
         await startServer(installDir);
 
