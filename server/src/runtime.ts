@@ -519,8 +519,19 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             });
         }
 
-        const filesPath = path.join(getPluginVolume(pluginHost.pluginId), 'files');
-        handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.unzippedPath, filesPath));
+        const { pluginId } = pluginHost;
+        const filesPath = path.join(getPluginVolume(pluginId), 'files');
+        const ri = createResponseInterface(res, pluginHost.unzippedPath, filesPath);
+        handler.onRequest(endpointRequest, ri)
+            .catch(() => { })
+            .finally(() => {
+                if (!ri.sent) {
+                    console.warn(pluginId, 'did not send a response before onRequest returned.');
+                    ri.send(`Internal Plugin Error: ${pluginId}` , {
+                        code: 500,
+                    })
+                }
+            });
     }
 
     killPlugin(pluginId: string) {
