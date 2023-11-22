@@ -10,7 +10,7 @@ import path from 'path';
 import MimeType from 'whatwg-mimetype';
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
-import { loadVipsImage, VipsImage } from './image-reader';
+import { loadVipsImage, sharpInstance, VipsImage } from './image-reader';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -303,6 +303,20 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 }, async () => {
                     this.debugConsole?.log("Resizing picture from camera", options?.picture);
 
+                    if (sharpInstance) {
+                        const vips = await loadVipsImage(picture, this.id);
+                        try {
+                            const ret = await vips.toBuffer({
+                                resize: options?.picture,
+                                format: 'jpg',
+                            });
+                            return ret;
+                        }
+                        finally {
+                            vips.close();
+                        }
+                    }
+
                     // try {
                     //     const mo = await mediaManager.createMediaObject(picture, 'image/jpeg', {
                     //         sourceId: this.id,
@@ -326,24 +340,13 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     //         throw e;
                     // }
 
-                    // return ffmpegFilterImageBuffer(picture, {
-                    //     console: this.debugConsole,
-                    //     ffmpegPath: await mediaManager.getFFmpegPath(),
-                    //     resize: options?.picture,
-                    //     timeout: 10000,
-                    // });
+                    return ffmpegFilterImageBuffer(picture, {
+                        console: this.debugConsole,
+                        ffmpegPath: await mediaManager.getFFmpegPath(),
+                        resize: options?.picture,
+                        timeout: 10000,
+                    });
 
-                    const vips = await loadVipsImage(picture, this.id);
-                    try {
-                        const ret = await vips.toBuffer({
-                            resize: options?.picture,
-                            format: 'jpg',
-                        });
-                        return ret;
-                    }
-                    finally {
-                        vips.close();
-                    }
                 });
             }
             catch (e) {
@@ -363,6 +366,25 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const ymin = Math.min(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
         const xmax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
+
+        if (sharpInstance) {
+            const vips = await loadVipsImage(picture, this.id);
+            try {
+                const ret = await vips.toBuffer({
+                    crop: {
+                        left: xmin * vips.width,
+                        top: ymin * vips.height,
+                        width: (xmax - xmin) * vips.width,
+                        height: (ymax - ymin) * vips.height,
+                    },
+                    format: 'jpg',
+                });
+                return ret;
+            }
+            finally {
+                vips.close();
+            }
+        }
 
         // try {
         //     const mo = await mediaManager.createMediaObject(picture, 'image/jpeg');
@@ -387,35 +409,18 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         //         throw e;
         // }
 
-        // return ffmpegFilterImageBuffer(picture, {
-        //     console: this.debugConsole,
-        //     ffmpegPath: await mediaManager.getFFmpegPath(),
-        //     crop: {
-        //         fractional: true,
-        //         left: xmin,
-        //         top: ymin,
-        //         width: xmax - xmin,
-        //         height: ymax - ymin,
-        //     },
-        //     timeout: 10000,
-        // });
-
-        const vips = await loadVipsImage(picture, this.id);
-        try {
-            const ret = await vips.toBuffer({
-                crop: {
-                    left: xmin * vips.width,
-                    top: ymin * vips.height,
-                    width: (xmax - xmin) * vips.width,
-                    height: (ymax - ymin) * vips.height,
-                },
-                format: 'jpg',
-            });
-            return ret;
-        }
-        finally {
-            vips.close();
-        }
+        return ffmpegFilterImageBuffer(picture, {
+            console: this.debugConsole,
+            ffmpegPath: await mediaManager.getFFmpegPath(),
+            crop: {
+                fractional: true,
+                left: xmin,
+                top: ymin,
+                width: xmax - xmin,
+                height: ymax - ymin,
+            },
+            timeout: 10000,
+        });
     }
 
     clearErrorImages() {
@@ -546,7 +551,7 @@ export function parseDims<T extends string>(dict: DimDict<T>) {
             ret[t] = parseFloat(val?.substring(0, val?.length - 1)) / 100;
         }
         else {
-            ret[t] = parseFloat(val);
+            ret[t] = val ? parseFloat(val) : undefined;
         }
     }
     return ret;
@@ -609,11 +614,6 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
 
         const ffmpegInput = JSON.parse(data.toString()) as FFmpegInput;
 
-        const args = [
-            ...ffmpegInput.inputArguments,
-            ...(ffmpegInput.h264EncoderArguments || []),
-        ];
-
         const {
             width,
             height,
@@ -636,17 +636,65 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
             bottom: mime.parameters.get('bottom'),
         });
 
+        const filename = ffmpegInput.url?.startsWith('file:') && new URL(ffmpegInput.url).pathname;
+        if (filename && sharpInstance) {
+            const vips = await loadVipsImage(filename, options?.sourceId);
+
+            const resize = width && {
+                width,
+                height,
+            };
+
+            if (fractional) {
+                if (resize.width)
+                    resize.width *= vips.width;
+                if (resize.height)
+                    resize.height *= vips.height;
+            }
+
+            const crop = left && {
+                left,
+                top,
+                width: right - left,
+                height: bottom - top,
+            };
+
+            if (cropFractional) {
+                crop.left *= vips.width;
+                crop.top *= vips.height;
+                crop.width *= vips.width;
+                crop.height *= vips.height;
+            }
+
+            try {
+                const ret = await vips.toBuffer({
+                    resize,
+                    crop,
+                    format: 'jpg',
+                });
+                return ret;
+            }
+            finally {
+                vips.close();
+            }
+        }
+
+        const args = [
+            ...ffmpegInput.inputArguments,
+            ...(ffmpegInput.h264EncoderArguments || []),
+        ];
+
         return ffmpegFilterImage(args, {
             console: this.debugConsole,
             ffmpegPath: await mediaManager.getFFmpegPath(),
-            resize: (isNaN(width) && isNaN(height))
+            resize: width === undefined && height === undefined
                 ? undefined
                 : {
                     width,
                     height,
                     fractional,
                 },
-            crop: (isNaN(left) && isNaN(top) && isNaN(right) && isNaN(bottom))
+            crop: left === undefined || right === undefined || top === undefined || bottom === undefined
                 ? undefined
                 : {
                     left,

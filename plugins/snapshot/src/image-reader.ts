@@ -1,5 +1,14 @@
 import sdk, { BufferConverter, Image, ImageOptions, MediaObject, MediaObjectOptions, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
-import sharp from '@koush/sharp';
+import type sharp from 'sharp';
+
+export let sharpInstance: typeof sharp;
+try {
+    sharpInstance = require('sharp');
+    console.log('sharp loaded');
+}
+catch (e) {
+    console.warn('sharp failed to load', e);
+}
 
 async function createVipsMediaObject(image: VipsImage): Promise<Image & MediaObject> {
     const ret: Image & MediaObject = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
@@ -65,7 +74,7 @@ export class VipsImage implements Image {
             resolveWithObject: true,
         });
 
-        const newImage = sharp(data, {
+        const newImage = sharpInstance(data, {
             raw: info,
         });
 
@@ -87,8 +96,8 @@ export class VipsImage implements Image {
     }
 }
 
-export async function loadVipsImage(data: Buffer, sourceId: string) {
-    const image = sharp(data, {
+export async function loadVipsImage(data: Buffer|string, sourceId: string) {
+    const image = sharpInstance(data, {
         failOnError: false,
     });
     const metadata = await image.metadata();
