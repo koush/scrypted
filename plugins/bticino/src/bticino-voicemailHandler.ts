@@ -3,6 +3,7 @@ import { BticinoSipCamera } from "./bticino-camera"
 
 export class VoicemailHandler extends SipRequestHandler {
     private timeout : NodeJS.Timeout
+    private aswmIsEnabled: boolean
     
     constructor( private sipCamera : BticinoSipCamera ) {
         super()
@@ -15,14 +16,12 @@ export class VoicemailHandler extends SipRequestHandler {
     checkVoicemail() {
         if( !this.sipCamera )
             return
-        if( this.isEnabled() ) {
-            this.sipCamera.console.debug("Checking answering machine, cameraId: " + this.sipCamera.id )
-            this.sipCamera.getAswmStatus().catch( e => this.sipCamera.console.error(e) )
-        } else {
-            this.sipCamera.console.debug("Answering machine check not enabled, cameraId: " + this.sipCamera.id )
-        }
-        //TODO: make interval customizable, now every 5 minutes
-        this.timeout = setTimeout( () => this.checkVoicemail() , 5 * 60 * 1000 )
+
+        this.sipCamera.console.debug("Checking answering machine, cameraId: " + this.sipCamera.id )
+        this.sipCamera.getAswmStatus().catch( e => this.sipCamera.console.error(e) )
+
+        //TODO: make interval customizable, now every minute
+        this.timeout = setTimeout( () => this.checkVoicemail() , 1 * 60 * 1000 )
     }
 
     cancelTimer() {
@@ -32,10 +31,11 @@ export class VoicemailHandler extends SipRequestHandler {
     }
 
     handle(request: SipRequest) {
-        if( this.isEnabled() ) {
-            const lastVoicemailMessageTimestamp : number = Number.parseInt( this.sipCamera.storage.getItem('lastVoicemailMessageTimestamp') ) || -1
-            const message : string = request.content.toString()
-            if( message.startsWith('*#8**40*0*0*1176*0*2##') ) {
+        const lastVoicemailMessageTimestamp : number = Number.parseInt( this.sipCamera.storage.getItem('lastVoicemailMessageTimestamp') ) || -1
+        const message : string = request.content.toString()
+        if( message.startsWith('*#8**40*0*0*') || message.startsWith('*#8**40*1*0*') ) {
+            this.aswmIsEnabled = message.startsWith('*#8**40*1*0*');
+            if( this.isEnabled() ) {
                 this.sipCamera.console.debug("Handling incoming answering machine reply")
                 const messages : string[] = message.split(';')
                 let lastMessageTimestamp : number = 0
@@ -53,17 +53,21 @@ export class VoicemailHandler extends SipRequestHandler {
                     }
                 } )
                 if( (lastVoicemailMessageTimestamp == null && lastMessageTimestamp > 0) ||
-                 ( lastVoicemailMessageTimestamp != null && lastMessageTimestamp > lastVoicemailMessageTimestamp ) ) {
+                    ( lastVoicemailMessageTimestamp != null && lastMessageTimestamp > lastVoicemailMessageTimestamp ) ) {
                     this.sipCamera.log.a(`You have ${countNewMessages} new voicemail messages.`)
                     this.sipCamera.storage.setItem('lastVoicemailMessageTimestamp', lastMessageTimestamp.toString())
-                 } else {
+                    } else {
                     this.sipCamera.console.debug("No new messages since: " + lastVoicemailMessageTimestamp + " lastMessage: " + lastMessageTimestamp)
-                 }
+                }
             }
         }
     }
 
     isEnabled() : boolean {
         return this.sipCamera?.storage?.getItem('notifyVoicemail')?.toLocaleLowerCase() === 'true' || false
+    }
+
+    isAswmEnabled() : boolean {
+        return this.aswmIsEnabled
     }
 }  
