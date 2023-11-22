@@ -45,7 +45,7 @@ class ClusterObject(TypedDict):
     id: str
     port: int
     proxyId: str
-    sourcePort: str
+    sourcePort: int
     sha256: str
 
 
@@ -403,7 +403,7 @@ class PluginRemote:
             m.update(bytes(f"{o['id']}{o['port']}{o.get('sourcePort', '')}{o['proxyId']}{clusterSecret}", 'utf8'))
             return base64.b64encode(m.digest()).decode('utf-8')
 
-        def onProxySerialization(value: Any, proxyId: str, source: int = None):
+        def onProxySerialization(value: Any, proxyId: str, sourcePeerPort: int = None):
             properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
             clusterEntry = properties.get('__cluster', None)
             if not properties.get('__cluster', None):
@@ -411,13 +411,11 @@ class PluginRemote:
                     'id': clusterId,
                     'proxyId': proxyId,
                     'port': clusterPort,
-                    'source': source,
+                    'sourcePort': sourcePeerPort,
                 }
                 clusterEntry['sha256'] = computeClusterObjectHash(clusterEntry)
                 properties['__cluster'] = clusterEntry
 
-            # clusterEntry['proxyId'] = proxyId
-            # clusterEntry['source'] = source
             return properties
 
         self.peer.onProxySerialization = onProxySerialization
@@ -498,18 +496,21 @@ class PluginRemote:
 
             port = clusterObject['port']
             proxyId = clusterObject['proxyId']
-            source = clusterObject.get('source', None)
+            sourcePort = clusterObject.get('sourcePort', None)
             if port == clusterPort:
-                return await resolveObject(proxyId, source)
+                return await resolveObject(proxyId, sourcePort)
 
             clusterPeerPromise = ensureClusterPeer(port)
 
             try:
                 clusterPeer = await clusterPeerPromise
-                if clusterPeer.tags.get('localPort') == source:
+                if clusterPeer.tags.get('localPort') == sourcePort:
                     return value
-                c = await clusterPeer.getParam('connectRPCObject')
-                newValue = await c(clusterObject)
+                peerConnectRPCObject = clusterPeer.tags.get('connectRPCObject')
+                if not peerConnectRPCObject:
+                    peerConnectRPCObject = await clusterPeer.getParam('connectRPCObject')
+                    clusterPeer.tags['connectRPCObject'] = peerConnectRPCObject
+                newValue = await peerConnectRPCObject(clusterObject)
                 if not newValue:
                     raise Exception('ipc object not found?')
                 return newValue

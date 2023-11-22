@@ -181,8 +181,12 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     // so return the existing proxy.
                     if (clusterPeer.tags.localPort === sourcePort)
                         return value;
-                    const connectRPCObject: ConnectRPCObject = await clusterPeer.getParam('connectRPCObject');
-                    const newValue = await connectRPCObject(clusterObject);
+                    let peerConnectRPCObject: ConnectRPCObject = clusterPeer.tags['connectRPCObject'];
+                    if (!peerConnectRPCObject) {
+                        peerConnectRPCObject = await clusterPeer.getParam('connectRPCObject');
+                        clusterPeer.tags['connectRPCObject'] = peerConnectRPCObject;
+                    }
+                    const newValue = await peerConnectRPCObject(clusterObject);
                     if (!newValue)
                         throw new Error('rpc object not found?');
                     return newValue;
