@@ -20,6 +20,8 @@ import { SipRequest } from '../../sip/src/sip-manager';
 
 import { get } from 'http'
 import { ControllerApi } from './c300x-controller-api';
+import { BticinoAswmSwitch } from './bticino-aswm-switch';
+import { BticinoMuteSwitch } from './bticino-mute-switch';
 
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
@@ -63,9 +65,49 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
             get(`http://${c300x}:8080/reboot?now`, (res) => {
                 console.log("Reboot API result: " + res.statusCode)
-            });               
+            }).on('error', (error) => {
+                this.console.error(error)
+                reject(error)
+            } ).end();               
         })
     }
+
+    muteRinger(mute : boolean): Promise<void> {
+        return new Promise<void>( (resolve,reject ) => {
+            let c300x = SipHelper.getIntercomIp(this)
+
+            get(`http://${c300x}:8080/mute?raw=true&enable=` + mute, (res) => {
+                console.log("Mute API result: " + res.statusCode)
+            }).on('error', (error) => {
+                this.console.error(error)
+                reject(error)
+            } ).end();               
+        })
+    }    
+
+    muteStatus(): Promise<boolean> {
+        return new Promise<boolean>( (resolve,reject ) => {
+            let c300x = SipHelper.getIntercomIp(this)
+
+            get(`http://${c300x}:8080/mute?status=true&raw=true`, (res) => {
+                let rawData = '';
+                res.on('data', (chunk) => { rawData += chunk; })
+                res.on('error', (error) =>  this.console.log(error))
+                res.on('end', () => {
+                try {
+                    return  resolve(JSON.parse(rawData))
+                } catch (e) {
+                    console.error(e.message);
+                    reject(e.message)
+                    
+                }
+                })
+            }).on('error', (error) => {
+                this.console.error(error)
+                reject(error)
+            } ).end();               
+        })
+    }      
 
     getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
        return new Promise<VideoClip[]>(  (resolve,reject ) => {
@@ -95,7 +137,10 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                     console.error(e.message);
                 }
                 })
-            });                    
+            }).on('error', (error) => {
+                this.console.error(error)
+                reject(error)
+            } ).end(); ;                    
         });
     }
 
@@ -131,6 +176,18 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             sipCall.message( "GetAswmStatus!" )
         } )        
     }
+
+    turnOnAswm() : Promise<void> {
+        return this.persistentSipManager.enable().then( (sipCall) => {
+            sipCall.message( "*8*91##" )
+        } )        
+    }
+
+    turnOffAswm() : Promise<void> {
+        return this.persistentSipManager.enable().then( (sipCall) => {
+            sipCall.message( "*8*92##" )
+        } )        
+    }    
 
     async takePicture(option?: PictureOptions): Promise<MediaObject> {
         throw new Error("The SIP doorbell camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
@@ -378,11 +435,17 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
         ]
     }
 
-    async getDevice(nativeId: string) : Promise<BticinoSipLock> {
+    async getDevice(nativeId: string) : Promise<any> {
+        if( nativeId && nativeId.endsWith('-aswm-switch')) {
+            return new BticinoAswmSwitch(this, this.voicemailHandler)
+        } else if( nativeId && nativeId.endsWith('-mute-switch') ) {
+            return new BticinoMuteSwitch(this)
+        }
         return new BticinoSipLock(this)
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
+        this.stopIntercom()
         this.voicemailHandler.cancelTimer()
         this.persistentSipManager.cancelTimer()        
         this.controllerApi.cancelTimer()
