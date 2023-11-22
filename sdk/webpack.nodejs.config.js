@@ -48,6 +48,7 @@ const alias = {};
 const polyfills = [
     'node-pty-prebuilt-multiarch',
     'node-forge',
+    'sharp',
     'source-map-support/register',
     'adm-zip',
     "memfs",
