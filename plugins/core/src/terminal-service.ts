@@ -1,4 +1,4 @@
-import { ScryptedDeviceBase, StreamService } from "@scrypted/sdk";
+import { ScryptedDeviceBase, ScryptedNativeId, StreamService } from "@scrypted/sdk";
 import { IPty, spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
 import { createAsyncQueue } from '@scrypted/common/src/async-queue'
 import { ChildProcess, spawn as childSpawn } from "child_process";
@@ -101,6 +101,10 @@ class NoninteractiveTerminal {
 
 
 export class TerminalService extends ScryptedDeviceBase implements StreamService {
+    constructor(nativeId?: ScryptedNativeId) {
+        super(TerminalServiceNativeId);
+    }
+
     /*
      * The input to this stream can send buffers for normal terminal data and strings
      * for control messages. Control messages are JSON-formatted.

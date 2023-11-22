@@ -22,7 +22,7 @@
     "apexcharts": "^3.28.3",
     "axios": "^0.19.2",
     "bn.js": "^5.2.1",
-    "core-js": "^2.6.12",
+    "core-js": "^3.33.3",
     "draggabilly": "^2.3.0",
     "engine.io-client": "^5.2.0",
     "feather-icons": "^4.28.0",
