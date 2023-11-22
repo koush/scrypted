@@ -9,7 +9,7 @@ import https from 'https';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
-import { ImageReader, ImageReaderNativeId, loadVipsImage, sharpInstance } from './image-reader';
+import { ImageReader, ImageReaderNativeId, loadVipsImage, loadSharp } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
 
 const { mediaManager, systemManager } = sdk;
@@ -303,7 +303,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 }, async () => {
                     this.debugConsole?.log("Resizing picture from camera", options?.picture);
 
-                    if (sharpInstance) {
+                    if (loadSharp()) {
                         const vips = await loadVipsImage(picture, this.id);
                         try {
                             const ret = await vips.toBuffer({
@@ -367,7 +367,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const xmax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
-        if (sharpInstance) {
+        if (loadSharp()) {
             const vips = await loadVipsImage(picture, this.id);
             try {
                 const ret = await vips.toBuffer({
@@ -585,7 +585,7 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
             ]
         };
 
-        if (sharpInstance) {
+        if (loadSharp()) {
             manifest.devices.push(
                 {
                     name: 'Image Reader',
@@ -654,7 +654,7 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
         });
 
         const filename = ffmpegInput.url?.startsWith('file:') && new URL(ffmpegInput.url).pathname;
-        if (filename && sharpInstance) {
+        if (filename && loadSharp()) {
             const vips = await loadVipsImage(filename, options?.sourceId);
 
             const resize = width && {

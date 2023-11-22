@@ -1,13 +1,20 @@
 import sdk, { BufferConverter, Image, ImageOptions, MediaObject, MediaObjectOptions, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import type sharp from 'sharp';
 
-export let sharpInstance: typeof sharp;
-try {
-    sharpInstance = require('sharp');
-    console.log('sharp loaded');
-}
-catch (e) {
-    console.warn('sharp failed to load, scrypted server may be out of date', e);
+let hasLoadedSharp = false;
+let sharpInstance: typeof sharp;
+export function loadSharp() {
+    if (!hasLoadedSharp) {
+        hasLoadedSharp = true;
+        try {
+            sharpInstance = require('sharp');
+            console.log('sharp loaded');
+        }
+        catch (e) {
+            console.warn('sharp failed to load, scrypted server may be out of date', e);
+        }
+    }
+    return !!sharpInstance;
 }
 
 export const ImageReaderNativeId = 'imagereader';
@@ -98,7 +105,7 @@ export class VipsImage implements Image {
     }
 }
 
-export async function loadVipsImage(data: Buffer|string, sourceId: string) {
+export async function loadVipsImage(data: Buffer | string, sourceId: string) {
     const image = sharpInstance(data, {
         failOnError: false,
     });
