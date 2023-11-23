@@ -18,7 +18,11 @@ async function runCommand(command: string, ...args: string[]) {
         command += '.cmd';
     console.log('running', command, ...args);
     const cp = child_process.spawn(command, args, {
-        stdio: 'inherit'
+        stdio: 'inherit',
+        env: {
+            // https://github.com/lovell/sharp/blob/eefaa998725cf345227d94b40615e090495c6d09/lib/libvips.js#L115C19-L115C46
+            SHARP_IGNORE_GLOBAL_LIBVIPS: 'true',
+        },
     });
     await once(cp, 'exit');
     if (cp.exitCode)
