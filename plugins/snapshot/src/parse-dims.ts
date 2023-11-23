@@ -1,7 +1,7 @@
 import sdk, { FFmpegInput } from '@scrypted/sdk';
 import type { MIMETypeParameters } from 'whatwg-mimetype';
 import { loadSharp, loadVipsImage } from './image-reader';
-import { ffmpegFilterImage } from './ffmpeg-image-filter';
+import { FFmpegImageFilterOptions, ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 
 export type DimDict<T extends string> = {
     [key in T]: string;
@@ -48,15 +48,15 @@ export function parseImageOp(parameters: MIMETypeParameters | URLSearchParams): 
     };
 }
 
-export async function processImageOp(input: string | FFmpegInput, op: ImageOp, time: number, sourceId: string, debugConsole: Console): Promise<Buffer> {
+export async function processImageOp(input: string | FFmpegInput | Buffer, op: ImageOp, time: number, sourceId: string, debugConsole: Console): Promise<Buffer> {
     const { crop, resize } = op;
     const { width, height, fractional } = resize;
     const { left, top, right, bottom, fractional: cropFractional } = crop;
 
-    const filename = typeof input === 'string' ? input : input.url?.startsWith('file:') && new URL(input.url).pathname;
+    const filenameOrBuffer = typeof input === 'string' || Buffer.isBuffer(input) ? input : input.url?.startsWith('file:') && new URL(input.url).pathname;
 
-    if (filename && loadSharp()) {
-        const vips = await loadVipsImage(filename, sourceId);
+    if (filenameOrBuffer && loadSharp()) {
+        const vips = await loadVipsImage(filenameOrBuffer, sourceId);
 
         const resize = width && {
             width,
@@ -97,20 +97,7 @@ export async function processImageOp(input: string | FFmpegInput, op: ImageOp, t
         }
     }
 
-    const ffmpegInput: FFmpegInput = typeof input !== 'string'
-        ? input
-        : {
-            inputArguments: [
-                '-i', input,
-            ]
-        };
-
-    const args = [
-        ...ffmpegInput.inputArguments,
-        ...(ffmpegInput.h264EncoderArguments || []),
-    ];
-
-    return ffmpegFilterImage(args, {
+    const ffmpegOpts: FFmpegImageFilterOptions = {
         console: debugConsole,
         ffmpegPath: await sdk.mediaManager.getFFmpegPath(),
         resize: width === undefined && height === undefined
@@ -131,5 +118,24 @@ export async function processImageOp(input: string | FFmpegInput, op: ImageOp, t
             },
         timeout: 10000,
         time,
-    });
+    };
+
+    if (Buffer.isBuffer(input)) {
+        return ffmpegFilterImageBuffer(input, ffmpegOpts);
+    }
+
+    const ffmpegInput: FFmpegInput = typeof input !== 'string'
+        ? input
+        : {
+            inputArguments: [
+                '-i', input,
+            ]
+        };
+
+    const args = [
+        ...ffmpegInput.inputArguments,
+        ...(ffmpegInput.h264EncoderArguments || []),
+    ];
+
+    return ffmpegFilterImage(args, ffmpegOpts);
 }
