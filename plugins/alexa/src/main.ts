@@ -632,8 +632,10 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         debug("received directive from alexa", mapName, body);
 
         const handler = alexaHandlers.get(mapName);
-        if (handler)
-            return handler.apply(this, [request, response, directive]);
+        if (handler) {
+            await handler.apply(this, [request, response, directive]);
+            return;
+        }
 
         const deviceHandler = alexaDeviceHandlers.get(mapName);
 
@@ -644,7 +646,8 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
                 return;
             }
 
-            return deviceHandler.apply(this, [request, response, directive, device]);
+            await deviceHandler.apply(this, [request, response, directive, device]);
+            return;
         } else {
             this.console.error(`no handler for: ${mapName}`);
         }
