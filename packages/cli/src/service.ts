@@ -20,6 +20,7 @@ async function runCommand(command: string, ...args: string[]) {
     const cp = child_process.spawn(command, args, {
         stdio: 'inherit',
         env: {
+            ...process.env,
             // https://github.com/lovell/sharp/blob/eefaa998725cf345227d94b40615e090495c6d09/lib/libvips.js#L115C19-L115C46
             SHARP_IGNORE_GLOBAL_LIBVIPS: 'true',
         },
