@@ -260,8 +260,20 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
         });
         client.setMaxListeners(Infinity);
 
+        const allProperties: string[] = [];
+        const allMethods: string[] = [];
+        for (const iface of this.device.interfaces) {
+            const methods = ScryptedInterfaceDescriptors[iface]?.methods || [];
+            allMethods.push(...methods);
+            const properties = ScryptedInterfaceDescriptors[iface]?.properties || [];
+            allProperties.push(...properties);
+        }
+
         client.on('connect', packet => {
             this.console.log('MQTT client connected, publishing current state.');
+            for (const method of allMethods) {
+                client.subscribe(this.pathname + '/' + method);
+            }
 
             for (const iface of this.device.interfaces) {
                 for (const prop of ScryptedInterfaceDescriptors[iface]?.properties || []) {
@@ -276,6 +288,22 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
         client.on('disconnect', () => this.console.log('mqtt client disconnected'));
         client.on('error', e => {
             this.console.log('mqtt client error', e);
+        });
+
+        client.on('message', async (messageTopic, message) => {
+            const method = messageTopic.substring(this.pathname.length + 1);
+            if (!allMethods.includes(method)) {
+                if (!allProperties.includes(method))
+                    this.console.warn('unknown topic', method);
+                return;
+            }
+            try {
+                const args = JSON.parse(message.toString());
+                await this.device[method](...args);
+            }
+            catch (e) {
+                this.console.warn('error invoking method', e);
+            }
         });
 
         return this.client;
@@ -482,7 +510,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-        
+
     }
 
     createMqttDevice(nativeId: string): MqttDevice {
