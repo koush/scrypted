@@ -2,6 +2,7 @@ import sdk, { FFmpegInput } from '@scrypted/sdk';
 import type { MIMETypeParameters } from 'whatwg-mimetype';
 import { loadSharp, loadVipsImage } from './image-reader';
 import { FFmpegImageFilterOptions, ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
+import url from 'url';
 
 export type DimDict<T extends string> = {
     [key in T]: string;
@@ -53,7 +54,7 @@ export async function processImageOp(input: string | FFmpegInput | Buffer, op: I
     const { width, height, fractional } = resize;
     const { left, top, right, bottom, fractional: cropFractional } = crop;
 
-    const filenameOrBuffer = typeof input === 'string' || Buffer.isBuffer(input) ? input : input.url?.startsWith('file:') && new URL(input.url).pathname;
+    const filenameOrBuffer = typeof input === 'string' || Buffer.isBuffer(input) ? input : input.url?.startsWith('file:') && url.fileURLToPath(input.url);
 
     if (filenameOrBuffer && loadSharp()) {
         const vips = await loadVipsImage(filenameOrBuffer, sourceId);
