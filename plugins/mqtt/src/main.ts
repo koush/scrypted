@@ -298,7 +298,7 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
                 return;
             }
             try {
-                const args = JSON.parse(message.toString());
+                const args = JSON.parse(message.toString() || '[]');
                 await this.device[method](...args);
             }
             catch (e) {
