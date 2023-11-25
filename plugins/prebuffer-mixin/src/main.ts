@@ -531,9 +531,12 @@ class PrebufferSession {
         else if (parser === FFMPEG_PARSER_TCP)
           ffmpegInput.inputArguments = ['-rtsp_transport', 'tcp', '-i', ffmpegInput.url];
         // create missing pts from dts so mpegts and mp4 muxing does not fail
-        const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
+        const userInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey);
+        const extraInputArguments = userInputArguments || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
         const extraOutputArguments = this.storage.getItem(this.ffmpegOutputArgumentsKey) || '';
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
+        if (!userInputArguments && (ffmpegInput.container === 'rtmp' || ffmpegInput.url?.startsWith('rtmp:')))
+          ffmpegInput.inputArguments.unshift('-use_wallclock_as_timestamps', '1');
 
         // extraOutputArguments must contain full codec information
         if (extraOutputArguments) {

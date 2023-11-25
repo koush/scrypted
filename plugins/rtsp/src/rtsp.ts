@@ -74,6 +74,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
 
     createMediaStreamUrl(stringUrl: string, vso: ResponseMediaStreamOptions) {
         const ret: MediaStreamUrl = {
+            container: vso.container,
             url: stringUrl,
             mediaStreamOptions: vso,
         };
