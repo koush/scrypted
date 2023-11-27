@@ -1,8 +1,8 @@
-import sdk, { FFmpegInput } from '@scrypted/sdk';
-import type { MIMETypeParameters } from 'whatwg-mimetype';
-import { loadSharp, loadVipsImage } from './image-reader';
-import { FFmpegImageFilterOptions, ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
+import sdk, { FFmpegInput, RecordingStreamThumbnailOptions } from '@scrypted/sdk';
 import url from 'url';
+import type { MIMETypeParameters } from 'whatwg-mimetype';
+import { FFmpegImageFilterOptions, ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
+import { loadSharp, loadVipsImage } from './image-reader';
 
 export type DimDict<T extends string> = {
     [key in T]: string;
@@ -49,10 +49,32 @@ export function parseImageOp(parameters: MIMETypeParameters | URLSearchParams): 
     };
 }
 
+export function toImageOp(options: RecordingStreamThumbnailOptions) {
+    const ret: ImageOp = {};
+    const { resize, crop } = options || {};
+    if (resize) {
+        ret.resize = {
+            width: resize.width,
+            height: resize.height,
+            fractional: resize.percent,
+        };
+    }
+    if (crop) {
+        ret.crop = {
+            left: crop.left,
+            top: crop.top,
+            right: crop.left + crop.width,
+            bottom: crop.top + crop.height,
+            fractional: crop.percent,
+        }
+    }
+    return ret;
+}
+
 export async function processImageOp(input: string | FFmpegInput | Buffer, op: ImageOp, time: number, sourceId: string, debugConsole: Console): Promise<Buffer> {
     const { crop, resize } = op;
-    const { width, height, fractional } = resize;
-    const { left, top, right, bottom, fractional: cropFractional } = crop;
+    const { width, height, fractional } = resize || {};
+    const { left, top, right, bottom, fractional: cropFractional } = crop || {};
 
     const filenameOrBuffer = typeof input === 'string' || Buffer.isBuffer(input) ? input : input.url?.startsWith('file:') && url.fileURLToPath(input.url);
 
