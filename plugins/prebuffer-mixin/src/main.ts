@@ -535,8 +535,9 @@ class PrebufferSession {
         const extraInputArguments = userInputArguments || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
         const extraOutputArguments = this.storage.getItem(this.ffmpegOutputArgumentsKey) || '';
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
-        if (!userInputArguments && (ffmpegInput.container === 'rtmp' || ffmpegInput.url?.startsWith('rtmp:')))
-          ffmpegInput.inputArguments.unshift('-use_wallclock_as_timestamps', '1');
+        // ehh this seems to cause issues with frames being updated in the webassembly decoder..?
+        // if (!userInputArguments && (ffmpegInput.container === 'rtmp' || ffmpegInput.url?.startsWith('rtmp:')))
+        //   ffmpegInput.inputArguments.unshift('-use_wallclock_as_timestamps', '1');
 
         // extraOutputArguments must contain full codec information
         if (extraOutputArguments) {
