@@ -7,6 +7,17 @@ assignees: ''
 
 ---
 
+# Github Issues is not a Support Forum
+
+**This issue tracker is not for general support**. If you are troubleshooting adding a device for the first time, use Discord, Reddit, or Github Discussions. However, if something **was working**, and is now **no longer working**, you may create a Github issue.
+Created issues that do not meet these requirements or are improperly filled out will be immediately closed.
+
+
+# New Issue Instructions
+
+1. Delete this section and everything above it.
+2. Fill out the sections below.
+
 **Describe the bug**
 A clear and concise description of what the bug is. The issue tracker is only for reporting bugs in Scrypted, for general support check Discord. Hardrware support requests or assistance requests will be immediately closed.
 
