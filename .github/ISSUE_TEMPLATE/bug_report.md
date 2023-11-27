@@ -7,9 +7,9 @@ assignees: ''
 
 ---
 
-# Github Issues is not a Support Forum
+# Github Issues is not a Forum
 
-**This issue tracker is not for general support**. If you are troubleshooting adding a device for the first time, use Discord, Reddit, or Github Discussions. However, if something **was working**, and is now **no longer working**, you may create a Github issue.
+**This issue tracker is not for hardware support or feature requests**. If you are troubleshooting adding a device for the first time, use Discord, Reddit, or Github Discussions. However, if something **was working**, and is now **no longer working**, you may create a Github issue.
 Created issues that do not meet these requirements or are improperly filled out will be immediately closed.
 
 
