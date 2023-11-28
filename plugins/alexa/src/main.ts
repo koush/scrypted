@@ -79,7 +79,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             if (status === DeviceMixinStatus.Setup)
                 await this.syncEndpoints();
 
-            if (status === DeviceMixinStatus.Setup || status === DeviceMixinStatus.AlreadySetup) {  
+            if (status === DeviceMixinStatus.Setup || status === DeviceMixinStatus.AlreadySetup) {
 
                 if (!this.devices.has(eventSource.id)) {
                     this.devices.set(eventSource.id, eventSource);
@@ -142,7 +142,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         await this.syncEndpoints();
     }
 
-    async deviceListen(eventSource: ScryptedDevice | undefined, eventDetails: EventDetails, eventData: any) : Promise<void> {
+    async deviceListen(eventSource: ScryptedDevice | undefined, eventDetails: EventDetails, eventData: any): Promise<void> {
         if (!eventSource)
             return;
 
@@ -194,14 +194,14 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
 
         // nothing to report
         if (data.context === undefined && data.event.payload === undefined)
-           return;
-       
+            return;
+
         data = await this.addAccessToken(data);
 
         await this.postEvent(data);
     }
 
-    private async addAccessToken(data: any) : Promise<any> {
+    private async addAccessToken(data: any): Promise<any> {
         const accessToken = await this.getAccessToken();
 
         if (data.event === undefined)
@@ -232,7 +232,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         'api.fe.amazonalexa.com'
     ];
 
-    async getAlexaEndpoint() : Promise<string> {
+    async getAlexaEndpoint(): Promise<string> {
         if (this.storageSettings.values.apiEndpoint)
             return this.storageSettings.values.apiEndpoint;
 
@@ -276,7 +276,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         });
     }
 
-    async getEndpoints() : Promise<DiscoveryEndpoint[]> {
+    async getEndpoints(): Promise<DiscoveryEndpoint[]> {
         const endpoints: DiscoveryEndpoint[] = [];
 
         for (const id of Object.keys(systemManager.getSystemState())) {
@@ -284,7 +284,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
 
             if (!device.mixins?.includes(this.id))
                 continue;
-                
+
             const endpoint = await this.getEndpointForDevice(device);
             if (endpoint)
                 endpoints.push(endpoint);
@@ -319,7 +319,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         const endpoints = await this.getEndpoints();
 
         if (!endpoints.length)
-        return [];
+            return [];
 
         const accessToken = await this.getAccessToken();
         const data = {
@@ -448,7 +448,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
                         self.console.warn(error?.response?.data);
                         self.log.a(error?.response?.data?.error_description);
                         break;
-                    
+
                     case 'expired_token':
                         self.console.warn(error?.response?.data);
                         self.log.a(error?.response?.data?.error_description);
@@ -480,9 +480,14 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         this.storageSettings.values.tokenInfo = grant;
         this.storageSettings.values.apiEndpoint = undefined;
         this.accessToken = undefined;
-        
+
         const self = this;
-        let accessToken = await this.getAccessToken().catch(reason => {
+        let accessToken: any;
+
+        try {
+            accessToken = await this.getAccessToken();
+        }
+        catch (reason) {
             self.console.error(`Failed to handle the AcceptGrant directive because ${reason}`);
 
             this.storageSettings.values.tokenInfo = undefined;
@@ -491,36 +496,23 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
 
             response.send(authErrorResponse("ACCEPT_GRANT_FAILED", `Failed to handle the AcceptGrant directive because ${reason}`, directive));
 
-            return undefined;
-        });
-
-        if (accessToken !== undefined) {
-            this.log.clearAlerts();
-            
-            try {
-                response.send({
-                    "event": {
-                        "header": {
-                            "namespace": "Alexa.Authorization",
-                            "name": "AcceptGrant.Response",
-                            "messageId": createMessageId(),
-                            "payloadVersion": "3"
-                        },
-                        "payload": {}
-                    }
-                });
-            } catch (error) {
-                this.console.error(`AcceptGrant.Response failed because ${error}`);
-
-                this.storageSettings.values.tokenInfo = undefined;
-                this.storageSettings.values.apiEndpoint = undefined;
-                this.accessToken = undefined;
-                throw error;
+            return;
+        };
+        this.log.clearAlerts();
+        response.send({
+            "event": {
+                "header": {
+                    "namespace": "Alexa.Authorization",
+                    "name": "AcceptGrant.Response",
+                    "messageId": createMessageId(),
+                    "payloadVersion": "3"
+                },
+                "payload": {}
             }
-        }
+        });
     }
 
-    async getEndpointForDevice(device: ScryptedDevice) : Promise<DiscoveryEndpoint> {
+    async getEndpointForDevice(device: ScryptedDevice): Promise<DiscoveryEndpoint> {
         if (!device)
             return;
 
@@ -545,7 +537,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         };
 
         let supportedEndpointHealths: any[] = [];
-        
+
         if (device.interfaces.includes(ScryptedInterface.Online)) {
             supportedEndpointHealths.push({
                 "name": "connectivity"
