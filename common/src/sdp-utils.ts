@@ -207,6 +207,10 @@ export function parseRtpMap(mlineType: string, rtpmap: string) {
         codec = 'pcm_s16be';
         ffmpegEncoder = 'pcm_s16be';
     }
+    else if (rtpmap?.includes('speex')) {
+        codec = 'speex';
+        ffmpegEncoder = 'libspeex';
+    }
     else if (rtpmap?.includes('h264')) {
         codec = 'h264';
     }
