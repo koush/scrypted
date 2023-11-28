@@ -5,6 +5,7 @@ class EndError extends Error {
 
 export function createAsyncQueue<T>() {
     let ended: Error | undefined;
+    const endDeferred = new Deferred<void>();
     const waiting: Deferred<T>[] = [];
     const queued: { item: T, dequeued?: Deferred<void> }[] = [];
 
@@ -75,7 +76,8 @@ export function createAsyncQueue<T>() {
         if (ended)
             return false;
         // catch to prevent unhandled rejection.
-        ended = e || new EndError()
+        ended = e || new EndError();
+        endDeferred.resolve();
         while (waiting.length) {
             waiting.shift().reject(ended);
         }
@@ -124,6 +126,7 @@ export function createAsyncQueue<T>() {
         get ended() {
             return ended;
         },
+        endPromise: endDeferred.promise,
         take,
         clear() {
             return clear();

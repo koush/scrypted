@@ -1,5 +1,6 @@
 import { ChildProcess } from "child_process";
 import process from 'process';
+import { sleep } from "./sleep";
 
 const filtered = [
     'decode_slice_header error',
@@ -7,17 +8,22 @@ const filtered = [
     'non-existing PPS',
 ];
 
-export function safeKillFFmpeg(cp: ChildProcess) {
+export async function safeKillFFmpeg(cp: ChildProcess) {
     if (!cp)
         return;
-    // this will allow ffmpeg to send rtsp TEARDOWN etc
-    try {
-        cp.stdin.on('error', () => {});
-        cp.stdin.write('q\n');
-    }
-    catch (e) {
-    }
-    setTimeout(() => {
+    if (cp.exitCode != null)
+        return;
+    await new Promise(async resolve => {
+        cp.on('exit', resolve);
+        // this will allow ffmpeg to send rtsp TEARDOWN etc
+        try {
+            cp.stdin.on('error', () => { });
+            cp.stdin.write('q\n');
+        }
+        catch (e) {
+        }
+
+        await sleep(2000);
         for (const f of cp.stdio) {
             try {
                 f?.destroy();
@@ -25,11 +31,9 @@ export function safeKillFFmpeg(cp: ChildProcess) {
             catch (e) {
             }
         }
-        cp.kill();
-        setTimeout(() => {
-            cp.kill('SIGKILL');
-        }, 2000);
-    }, 2000);
+        await sleep(2000);
+        cp.kill('SIGKILL');
+    });
 }
 
 export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forever?: boolean, storage?: Storage) {
