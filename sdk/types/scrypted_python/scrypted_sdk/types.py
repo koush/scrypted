@@ -291,10 +291,11 @@ class ObjectDetectionResult(TypedDict):
     cost: float  # The certainty that this is correct tracked object.
     history: ObjectDetectionHistory
     id: str  # The id of the tracked object.
+    label: str  # The label of the object, if it was recognized as a familiar object (person, pet, etc).
     movement: Union[ObjectDetectionHistory, Any]  # Movement history will track the first/last time this object was moving.
-    name: str  # The name of the object, if it was recognized as a familiar object (person, pet, etc).
     resources: VideoResource
     score: float
+    vector: str  # A base64 encoded Float32Array that represents the vector of the detection. Can be used to compute euclidian distance to determine similarity.
     zoneHistory: Any
     zones: list[str]
 

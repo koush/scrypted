@@ -1306,9 +1306,14 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
    */
   className: ObjectDetectionClass;
   /**
-   * The name of the object, if it was recognized as a familiar object (person, pet, etc).
+   * The label of the object, if it was recognized as a familiar object (person, pet, etc).
    */
-  name?: string;
+  label?: string;
+  /**
+   * A base64 encoded Float32Array that represents the vector of the detection.
+   * Can be used to compute euclidian distance to determine similarity. 
+   */
+  vector?: string,
   score: number;
   resources?: VideoResource;
   /**
