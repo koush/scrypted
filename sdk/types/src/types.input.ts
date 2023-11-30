@@ -1288,7 +1288,6 @@ export interface BoundingBoxResult {
    * x, y, width, height
    */
   boundingBox?: [number, number, number, number];
-  zoneHistory?: { [zone: string]: ObjectDetectionHistory };
   zones?: string[];
   history?: ObjectDetectionHistory;
 }
@@ -1310,10 +1309,18 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
    */
   label?: string;
   /**
-   * A base64 encoded Float32Array that represents the vector of the detection.
+   * A base64 encoded Float32Array that represents the vector descriptor of the detection.
    * Can be used to compute euclidian distance to determine similarity. 
    */
-  vector?: string,
+  descriptor?: string;
+  /**
+   * The detection landmarks, like key points in a face landmarks.
+   */
+  landmarks?: Point[];
+  /**
+   * The detection clip paths that outlines various features or segments, like traced facial features.
+   */
+  clipPaths?: ClipPath[];
   score: number;
   resources?: VideoResource;
   /**
