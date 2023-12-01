@@ -317,6 +317,13 @@ class PictureDimensions(TypedDict):
     height: float
     width: float
 
+class RequestMediaStreamAdaptiveOptions(TypedDict):
+
+    keyframe: bool
+    packetLoss: bool
+    pictureLoss: bool
+    reconfigure: bool
+
 class ScryptedDeviceAccessControl(TypedDict):
     """ScryptedDeviceAccessControl describes the methods and properties on a device that will be visible to the user. If methods is nullish, the user will be granted full access to all methods. If properties is nullish, the user will be granted full access to all properties. If events is nullish, the user will be granted full access to all events."""
 
@@ -651,7 +658,7 @@ class RecordingStreamThumbnailOptions(TypedDict):
 class RequestMediaStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""
 
-    adaptive: bool  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
+    adaptive: bool | RequestMediaStreamAdaptiveOptions  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
     audio: AudioStreamOptions
     container: str  # The container type of this stream, ie: mp4, mpegts, rtsp.
     destination: MediaStreamDestination  # The intended destination for this media stream. May be used as a hint to determine which main/substream to send if no id is explicitly provided.
@@ -677,7 +684,7 @@ class RequestPictureOptions(TypedDict):
 class RequestRecordingStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""
 
-    adaptive: bool  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
+    adaptive: bool | RequestMediaStreamAdaptiveOptions  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
     audio: AudioStreamOptions
     container: str  # The container type of this stream, ie: mp4, mpegts, rtsp.
     destination: MediaStreamDestination  # The intended destination for this media stream. May be used as a hint to determine which main/substream to send if no id is explicitly provided.

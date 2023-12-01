@@ -569,6 +569,13 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
 
 export type MediaStreamDestination = "local" | "remote" | "medium-resolution" | "low-resolution" | "local-recorder" | "remote-recorder";
 
+export interface RequestMediaStreamAdaptiveOptions {
+  packetLoss?: boolean;
+  pictureLoss?: boolean;
+  keyframe?: boolean;
+  reconfigure?: boolean;
+}
+
 export interface RequestMediaStreamOptions extends MediaStreamOptions {
   /**
    * When retrieving media, setting route directs how the media should be
@@ -605,7 +612,7 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
    * Request an adaptive bitrate stream, if available. The destination
    * will need to report packet loss indication.
    */
-  adaptive?: boolean;
+  adaptive?: boolean | RequestMediaStreamAdaptiveOptions;
 }
 
 export interface MediaStreamPacketLoss {
