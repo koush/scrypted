@@ -574,6 +574,7 @@ export interface RequestMediaStreamAdaptiveOptions {
   pictureLoss?: boolean;
   keyframe?: boolean;
   reconfigure?: boolean;
+  resize?: boolean;
 }
 
 export interface RequestMediaStreamOptions extends MediaStreamOptions {
@@ -634,6 +635,10 @@ export interface MediaStreamFeedback {
   reportPacketLoss(report: MediaStreamPacketLoss): Promise<void>;
   reportPictureLoss(): Promise<void>;
   reportEstimatedMaxBitrate(bitrate: number): Promise<void>;
+  resizeStream(options: {
+    width: number;
+    height: number;
+  }): Promise<void>;
 }
 
 /**
