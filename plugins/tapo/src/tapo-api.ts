@@ -39,7 +39,7 @@ export class TapoAPI {
         });
 
         const wwwAuthenticate = response.headers['www-authenticate'];
-        const useSHA256 = wwwAuthenticate.indexOf('encrypt_type="3"') > 0;
+        const useSHA256 = wwwAuthenticate.includes('encrypt_type="3"');
 
         const password = getTapoAdminPassword(options.cloudPassword, useSHA256);
 
