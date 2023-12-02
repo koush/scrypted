@@ -325,6 +325,23 @@ class RequestMediaStreamAdaptiveOptions(TypedDict):
     reconfigure: bool
     resize: bool
 
+class RequestVideoStreamOptions(TypedDict):
+
+    bitrate: float
+    bitrateControl: Any | Any
+    clientHeight: float
+    clientWidth: float
+    codec: str
+    fps: float
+    h264Info: H264Info
+    height: float
+    idrIntervalMillis: float  # Key Frame interval in milliseconds.
+    keyframeInterval: float  # Key Frame interval in frames.
+    maxBitrate: float
+    minBitrate: float
+    profile: str
+    width: float
+
 class ScryptedDeviceAccessControl(TypedDict):
     """ScryptedDeviceAccessControl describes the methods and properties on a device that will be visible to the user. If methods is nullish, the user will be granted full access to all methods. If properties is nullish, the user will be granted full access to all properties. If events is nullish, the user will be granted full access to all events."""
 
@@ -672,7 +689,7 @@ class RequestMediaStreamOptions(TypedDict):
     refresh: bool  # Specify the stream refresh behavior when this stream is requested. Use case is primarily for perioidic snapshot of streams while they are active.
     route: Any | Any | Any  # When retrieving media, setting route directs how the media should be retrieved and exposed. A direct route will get the stream as is from the source. This will bypass any intermediaries if possible, such as an NVR or restreamers. An external route will request that that provided route is exposed to the local network.
     tool: MediaStreamTool  # The tool was used to write the container or will be used to read teh container. Ie, scrypted, the ffmpeg tools, gstreamer.
-    video: VideoStreamOptions
+    video: RequestVideoStreamOptions
 
 class RequestPictureOptions(TypedDict):
 
@@ -702,7 +719,7 @@ class RequestRecordingStreamOptions(TypedDict):
     route: Any | Any | Any  # When retrieving media, setting route directs how the media should be retrieved and exposed. A direct route will get the stream as is from the source. This will bypass any intermediaries if possible, such as an NVR or restreamers. An external route will request that that provided route is exposed to the local network.
     startTime: float
     tool: MediaStreamTool  # The tool was used to write the container or will be used to read teh container. Ie, scrypted, the ffmpeg tools, gstreamer.
-    video: VideoStreamOptions
+    video: RequestVideoStreamOptions
 
 class ResponseMediaStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""

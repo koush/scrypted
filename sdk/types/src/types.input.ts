@@ -490,6 +490,11 @@ export interface VideoStreamOptions {
   h264Info?: H264Info;
 }
 
+export interface RequestVideoStreamOptions extends VideoStreamOptions {
+  clientWidth?: number;
+  clientHeight?: number;
+}
+
 export interface AudioStreamOptions {
   codec?: string;
   encoder?: string;
@@ -614,6 +619,8 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
    * will need to report packet loss indication.
    */
   adaptive?: boolean | RequestMediaStreamAdaptiveOptions;
+
+  video?: RequestVideoStreamOptions;
 }
 
 export interface MediaStreamPacketLoss {
