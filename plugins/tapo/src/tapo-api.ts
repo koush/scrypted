@@ -6,7 +6,10 @@ import crypto from 'crypto';
 import { Duplex, PassThrough, Writable } from 'stream';
 import { digestAuthHeader } from './digest-auth';
 
-export function getTapoAdminPassword(cloudPassword: string) {
+export function getTapoAdminPassword(cloudPassword: string, useSHA256: boolean) {
+    if (useSHA256) {
+        return crypto.createHash('sha256').update(Buffer.from(cloudPassword)).digest('hex').toUpperCase();
+    }
     return crypto.createHash('md5').update(Buffer.from(cloudPassword)).digest('hex').toUpperCase();
 }
 
@@ -36,8 +39,9 @@ export class TapoAPI {
         });
 
         const wwwAuthenticate = response.headers['www-authenticate'];
+        const useSHA256 = wwwAuthenticate.indexOf('encrypt_type="3"') > 0;
 
-        const password = getTapoAdminPassword(options.cloudPassword);
+        const password = getTapoAdminPassword(options.cloudPassword, useSHA256);
 
         const auth = digestAuthHeader('POST', '/stream', wwwAuthenticate, 'admin', password, 0) + ', algorithm=MD5';
 
