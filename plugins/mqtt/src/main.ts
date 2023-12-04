@@ -1,5 +1,7 @@
+import crypto from 'crypto';
 import { createScriptDevice, ScriptDeviceImpl, tsCompile } from '@scrypted/common/src/eval/scrypted-eval';
 import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, EventListenerRegister, MixinProvider, Scriptable, ScriptSource, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, Setting, Settings } from '@scrypted/sdk';
+import { StorageSettings } from "@scrypted/sdk/storage-settings"
 import aedes, { AedesOptions } from 'aedes';
 import fs from 'fs';
 import http from 'http';
@@ -10,7 +12,7 @@ import ws from 'websocket-stream';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
 import { MqttClient, MqttClientPublishOptions, MqttSubscriptions } from './api/mqtt-client';
 import { MqttDeviceBase } from './api/mqtt-device-base';
-import { MqttAutoDiscoveryProvider } from './autodiscovery/autodiscovery';
+import { MqttAutoDiscoveryProvider, publishAutoDiscovery } from './autodiscovery';
 import { monacoEvalDefaults } from './monaco';
 import { isPublishable } from './publishable-types';
 import { scryptedEval } from './scrypted-eval';
@@ -229,6 +231,18 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
         this.connectClient();
     }
 
+    publishState(client: Client) {
+        for (const iface of this.device.interfaces) {
+            for (const prop of ScryptedInterfaceDescriptors[iface]?.properties || []) {
+                let str = this[prop];
+                if (typeof str === 'object')
+                    str = JSON.stringify(str);
+
+                client.publish(`${this.pathname}/${prop}`, str?.toString() || '');
+            }
+        }
+    }
+
     connectClient() {
         this.client?.end();
         this.client = undefined;
@@ -275,22 +289,21 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
                 client.subscribe(this.pathname + '/' + method);
             }
 
-            for (const iface of this.device.interfaces) {
-                for (const prop of ScryptedInterfaceDescriptors[iface]?.properties || []) {
-                    let str = this[prop];
-                    if (typeof str === 'object')
-                        str = JSON.stringify(str);
-
-                    client.publish(`${this.pathname}/${prop}`, str?.toString() || '');
-                }
-            }
-        })
+            publishAutoDiscovery(this.provider.storageSettings.values.mqttId, client, this, this.pathname, 'homeassistant');
+            client.subscribe('homeassistant/status');
+            this.publishState(client);
+        });
         client.on('disconnect', () => this.console.log('mqtt client disconnected'));
         client.on('error', e => {
             this.console.log('mqtt client error', e);
         });
 
         client.on('message', async (messageTopic, message) => {
+            if (messageTopic === 'homeassistant/status') {
+                publishAutoDiscovery(this.provider.storageSettings.values.mqttId, client, this, this.pathname, 'homeassistant');
+                this.publishState(client);
+                return;
+            }
             const method = messageTopic.substring(this.pathname.length + 1);
             if (!allMethods.includes(method)) {
                 if (!allProperties.includes(method))
@@ -321,6 +334,14 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
     devices = new Map<string, any>();
     netServer: net.Server;
     httpServer: http.Server;
+    storageSettings = new StorageSettings(this, {
+        mqttId: {
+            group: 'Advanced',
+            title: 'Autodiscovery ID',
+            // hide: true,
+            persistedDefaultValue: crypto.randomBytes(4).toString('hex'),
+        }
+    })
 
     constructor(nativeId?: string) {
         super(nativeId);
@@ -417,6 +438,8 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
                 value: this.storage.getItem('httpPort'),
             },
         );
+
+        ret.push(...await this.storageSettings.getSettings());
         return ret;
     }
 
@@ -497,6 +520,9 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
     }
 
     async putSetting(key: string, value: string | number) {
+        if (this.storageSettings.keys[key]) {
+            return this.storageSettings.putSetting(key, value);
+        }
         this.storage.setItem(key, value.toString());
 
         if (brokerProperties.includes(key)) {
