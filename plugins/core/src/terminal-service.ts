@@ -1,5 +1,5 @@
 import { ScryptedDeviceBase, ScryptedNativeId, StreamService } from "@scrypted/sdk";
-import { IPty, spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
+import type { IPty, spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
 import { createAsyncQueue } from '@scrypted/common/src/async-queue'
 import { ChildProcess, spawn as childSpawn } from "child_process";
 
@@ -9,8 +9,7 @@ export const TerminalServiceNativeId = 'terminalservice';
 class InteractiveTerminal {
     cp: IPty
 
-    constructor(cmd: string[]) {
-        const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
+    constructor(cmd: string[], spawn: typeof ptySpawn) {
         if (cmd?.length) {
             this.cp = spawn(cmd[0], cmd.slice(1), {});
         } else {
@@ -150,8 +149,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                 }
             }
             finally {
-                if (cp)
-                    cp.kill();
+                cp?.kill();
             }
         }
 
@@ -162,37 +160,40 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                         continue;
 
                     if (Buffer.isBuffer(message)) {
-                        if (cp)
-                            cp.write(message);
+                        cp?.write(message);
                         continue;
                     }
 
                     try {
                         const parsed = JSON.parse(message.toString());
                         if (parsed.dim) {
-                            if (cp)
-                                cp.resize(parsed.dim.cols, parsed.dim.rows);
+                            cp?.resize(parsed.dim.cols, parsed.dim.rows);
                         } else if (parsed.eof) {
-                            if (cp)
-                                cp.sendEOF();
+                            cp?.sendEOF();
                         } else if ("interactive" in parsed && !cp) {
                             if (parsed.interactive) {
-                                cp = new InteractiveTerminal(parsed.cmd);
+                                try {
+                                    const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
+                                    cp = new InteractiveTerminal(parsed.cmd, spawn);
+                                }
+                                catch (e) {
+                                    this.console.error('Error starting pty', e);
+                                    queue.end(e);
+                                    return;
+                                }
                             } else {
                                 cp = new NoninteractiveTerminal(parsed.cmd);
                             }
                             registerChildListeners();
                         }
                     } catch {
-                        if (cp)
-                            cp.write(Buffer.from(message));
+                        cp?.write(Buffer.from(message));
                     }
                 }
             }
             catch (e) {
                 this.console.log(e);
-                if (cp)
-                    cp.kill();
+                cp?.kill();
             }
         })();
 
