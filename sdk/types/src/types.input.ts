@@ -615,6 +615,13 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
   destinationId?: string;
 
   /**
+   * The destination type of the target of this media stream. This
+   * should be the calling application package name. Used for logging
+   * or adaptive bitrate fingerprinting.
+   */
+  destinationType?: string;
+
+  /**
    * Request an adaptive bitrate stream, if available. The destination
    * will need to report packet loss indication.
    */

@@ -681,6 +681,7 @@ class RequestMediaStreamOptions(TypedDict):
     container: str  # The container type of this stream, ie: mp4, mpegts, rtsp.
     destination: MediaStreamDestination  # The intended destination for this media stream. May be used as a hint to determine which main/substream to send if no id is explicitly provided.
     destinationId: str  # The destination id for this media stream. This should generally be the IP address of the destination, if known. May be used by to determine stream selection and track dynamic bitrate history.
+    destinationType: str  # The destination type of the target of this media stream. This should be the calling application package name. Used for logging or adaptive bitrate fingerprinting.
     id: str
     metadata: Any  # Stream specific metadata.
     name: str
@@ -707,6 +708,7 @@ class RequestRecordingStreamOptions(TypedDict):
     container: str  # The container type of this stream, ie: mp4, mpegts, rtsp.
     destination: MediaStreamDestination  # The intended destination for this media stream. May be used as a hint to determine which main/substream to send if no id is explicitly provided.
     destinationId: str  # The destination id for this media stream. This should generally be the IP address of the destination, if known. May be used by to determine stream selection and track dynamic bitrate history.
+    destinationType: str  # The destination type of the target of this media stream. This should be the calling application package name. Used for logging or adaptive bitrate fingerprinting.
     duration: float
     id: str
     loop: bool
