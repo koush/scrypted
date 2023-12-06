@@ -304,6 +304,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             const mediaOptions: RequestMediaStreamOptions = {
                 destination,
                 destinationId: session.prepareRequest.targetAddress,
+                destinationType: '@scrypted/homekit',
                 adaptive: true,
                 video: {
                     codec: 'h264',
