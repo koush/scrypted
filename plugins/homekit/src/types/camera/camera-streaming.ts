@@ -309,6 +309,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 video: {
                     codec: 'h264',
                     bitrate: request.video.max_bit_rate * 1000,
+                    // if these are sent as width/height rather than clientWidth/clientHeight,
+                    // rebroadcast will always choose substream to treat it as a hard constraint.
+                    // send as hint for adaptive bitrate.
+                    clientWidth: request.video.width,
+                    clientHeight: request.video.height,
                 },
                 audio: {
                     // opus is the preferred/default codec, and can be repacketized to fit any request if in use.

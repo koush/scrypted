@@ -69,10 +69,16 @@ addSupportedType({
                 resolutions: [
                     // 3840x2160@30 (4k).
                     [3840, 2160, 30],
+                    // 3K
+                    [2880, 1620, 30],
+                    // 2MP
+                    [2560, 1440, 30],
                     // 1920x1080@30 (1080p).
                     [1920, 1080, 30],
                     // 1280x720@30 (720p).
                     [1280, 720, 30],
+                    [960, 540, 30],
+                    [640, 360, 30],
                     // 320x240@15 (Apple Watch).
                     [320, 240, 15],
                 ]
@@ -103,7 +109,7 @@ addSupportedType({
         const openRecordingStreams = new Map<number, Deferred<any>>();
         if (isRecordingEnabled) {
             recordingDelegate = {
-                updateRecordingConfiguration(newConfiguration: CameraRecordingConfiguration ) {
+                updateRecordingConfiguration(newConfiguration: CameraRecordingConfiguration) {
                     configuration = newConfiguration;
                 },
                 handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
