@@ -349,11 +349,8 @@ interface AutoDiscoveryConfig {
 
 const autoDiscoveryMap = new Map<string, AutoDiscoveryConfig>();
 
-function createBinarySensorConfig(mqttId: string, device: MixinDeviceBase<any>, prop: ScryptedInterfaceProperty, topic: string) {
+function getAutoDiscoveryDevice(device: MixinDeviceBase<any>, mqttId: string) {
     return {
-        state_topic: `${topic}/${prop}`,
-        payload_on: 'true',
-        payload_off: 'false',
         dev: {
             name: device.name,
             // what the hell is this
@@ -362,6 +359,15 @@ function createBinarySensorConfig(mqttId: string, device: MixinDeviceBase<any>, 
             "mdl": device.info?.model,
             "mf": device.info?.manufacturer,
         },
+    }
+}
+
+function createBinarySensorConfig(mqttId: string, device: MixinDeviceBase<any>, prop: ScryptedInterfaceProperty, topic: string) {
+    return {
+        state_topic: `${topic}/${prop}`,
+        payload_on: 'true',
+        payload_off: 'false',
+        ...getAutoDiscoveryDevice(device, mqttId),
     }
 }
 
@@ -377,7 +383,32 @@ function addBinarySensor(iface: ScryptedInterface, prop: ScryptedInterfaceProper
 addBinarySensor(ScryptedInterface.MotionSensor, ScryptedInterfaceProperty.motionDetected);
 addBinarySensor(ScryptedInterface.BinarySensor, ScryptedInterfaceProperty.binaryState);
 addBinarySensor(ScryptedInterface.OccupancySensor, ScryptedInterfaceProperty.occupied);
+addBinarySensor(ScryptedInterface.FloodSensor, ScryptedInterfaceProperty.flooded);
 addBinarySensor(ScryptedInterface.AudioSensor, ScryptedInterfaceProperty.audioDetected);
+
+autoDiscoveryMap.set(ScryptedInterface.Thermometer, {
+    component: 'sensor',
+    create(mqttId, device, topic) {
+        return {
+            state_topic: `${topic}/${ScryptedInterfaceProperty.temperature}`,
+            value_template: '{{ value_json }}',
+            unit_of_measurement: 'C',
+            ...getAutoDiscoveryDevice(device, mqttId),
+        }
+    }
+});
+
+autoDiscoveryMap.set(ScryptedInterface.HumiditySensor, {
+    component: 'sensor',
+    create(mqttId, device, topic) {
+        return {
+            state_topic: `${topic}/${ScryptedInterfaceProperty.humidity}`,
+            value_template: '{{ value_json }}',
+            unit_of_measurement: '%',
+            ...getAutoDiscoveryDevice(device, mqttId),
+        }
+    }
+});
 
 export function publishAutoDiscovery(mqttId: string, client: Client, device: MixinDeviceBase<any>, topic: string, autoDiscoveryPrefix = 'homeassistant') {
     for (const iface of device.interfaces) {
