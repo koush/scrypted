@@ -310,7 +310,7 @@ class ObjectDetectionZone(TypedDict):
     classes: list[str]
     exclusion: bool
     path: ClipPath
-    type: Any | Any
+    type: Any | Any | Any
 
 class PictureDimensions(TypedDict):
 

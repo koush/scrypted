@@ -1411,7 +1411,7 @@ export interface ObjectDetectionGeneratorResult {
 }
 export interface ObjectDetectionZone {
   exclusion?: boolean;
-  type?: 'Intersect' | 'Contain';
+  type?: 'Intersect' | 'Contain' | 'Observe';
   classes?: string[];
   path?: ClipPath;
 }
