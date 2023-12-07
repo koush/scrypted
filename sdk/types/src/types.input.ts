@@ -1411,13 +1411,6 @@ export interface ObjectDetectionGeneratorResult {
 }
 export interface ObjectDetectionZone {
   exclusion?: boolean;
-  /**
-   * The filter mode used by this zone.
-   * include - Only detections in this zone and other include zones will be reported.
-   * exclude - Detections in this zone will be filtered, even when inside an include zone.
-   * observe - Detections in this zone will be tagged with the zone, but will not otherwise affect filtering.
-   */
-  filterMode?: 'include' | 'exclude' | 'observe';
   type?: 'Intersect' | 'Contain';
   classes?: string[];
   path?: ClipPath;

@@ -354,12 +354,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           continue;
         for (const [key, zone] of Object.entries(mixin.zones)) {
           const zi = mixin.zoneInfos[key];
-          if (!zone?.length || zone?.length < 3)
+          if (!zone?.length || zone?.length < 3 || zi?.filterMode === 'observe')
             continue;
           const odz: ObjectDetectionZone = {
             classes: mixin.hasMotionType ? ['motion'] : zi?.classes,
             exclusion: zi?.filterMode ? zi?.filterMode === 'exclude' : zi?.exclusion,
-            filterMode: zi?.filterMode || (zi?.exclusion ? 'exclude' : undefined),
             path: zone,
             type: zi?.type,
           }
