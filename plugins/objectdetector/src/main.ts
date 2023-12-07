@@ -1,18 +1,17 @@
 import { Deferred } from '@scrypted/common/src/deferred';
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, DeviceState, EventListenerRegister, Image, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetectionZone, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
+import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetectionZone, ObjectDetector, ObjectsDetected, Point, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
 import { getMaxConcurrentObjectDetectionSessions } from './performance-profile';
+import { insidePolygon, polygonOverlap } from './polygon';
 import { serverSupportsMixinEventMasking } from './server-version';
+import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor, createObjectDetectorStorageSetting } from './smart-motionsensor';
 import { getAllDevices, safeParseJson } from './util';
-import { createObjectDetectorStorageSetting, SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor } from './smart-motionsensor';
 
-const polygonOverlap = require('polygon-overlap');
-const insidePolygon = require('point-inside-polygon');
 
 const { systemManager } = sdk;
 
@@ -24,7 +23,7 @@ const BUILTIN_MOTION_SENSOR_REPLACE = 'Replace';
 
 const objectDetectionPrefix = `${ScryptedInterface.ObjectDetection}:`;
 
-type ClipPath = [number, number][];
+type ClipPath = Point[];
 type Zones = { [zone: string]: ClipPath };
 interface ZoneInfo {
   exclusion?: boolean;
@@ -342,7 +341,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }, 30000);
     signal.promise.finally(() => clearInterval(interval));
 
-    const currentDetections = new Set<string>();
+    const currentDetections = new Map<string, number>();
     let lastReport = 0;
 
     updatePipelineStatus('waiting result');
@@ -417,12 +416,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         //   this.console.log('Zone filtered detections:', numZonedDetections - numOriginalDetections);
 
         for (const d of detected.detected.detections) {
-          currentDetections.add(d.className);
+          currentDetections.set(d.className, Math.max(currentDetections.get(d.className) || 0, d.score));
         }
 
         const now = Date.now();
         if (now > lastReport + 10000) {
-          const found = [...currentDetections.values()];
+          const found = [...currentDetections.entries()].map(([className, score]) => `${className} (${score})`);
           if (!found.length)
             found.push('[no detections]');
           this.console.log(`[${Math.round((now - start) / 100) / 10}s] Detected:`, ...found);
@@ -462,7 +461,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
-  normalizeBox(boundingBox: [number, number, number, number], inputDimensions: [number, number]) {
+  normalizeBox(boundingBox: [number, number, number, number], inputDimensions: [number, number]): [Point, Point, Point, Point] {
     let [x, y, width, height] = boundingBox;
     let x2 = x + width;
     let y2 = y + height;
@@ -471,8 +470,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     y = y * 100 / inputDimensions[1];
     x2 = x2 * 100 / inputDimensions[0];
     y2 = y2 * 100 / inputDimensions[1];
-    const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
-    return box;
+    return [[x, y], [x2, y], [x2, y2], [x, y2]];
   }
 
   applyZones(detection: ObjectsDetected) {
@@ -497,12 +495,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         const zoneInfo = this.zoneInfos[zone];
         const exclusion = zoneInfo?.filterMode ? zoneInfo.filterMode === 'exclude' : zoneInfo?.exclusion;
         // track if there are any inclusion zones
-        if (!exclusion && !included && zoneInfo.filterMode !== 'observe')
+        if (!exclusion && !included && zoneInfo?.filterMode !== 'observe')
           included = false;
 
         let match = false;
         if (zoneInfo?.type === 'Contain') {
-          match = insidePolygon(box[0], zoneValue) &&
+          match = insidePolygon(box[0] as Point, zoneValue) &&
             insidePolygon(box[1], zoneValue) &&
             insidePolygon(box[2], zoneValue) &&
             insidePolygon(box[3], zoneValue);
@@ -517,7 +515,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         if (match) {
           o.zones.push(zone);
 
-          if (zoneInfo.filterMode !== 'observe') {
+          if (zoneInfo?.filterMode !== 'observe') {
             if (exclusion && match) {
               copy = copy.filter(c => c !== o);
               break;
@@ -532,7 +530,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       // use a default inclusion zone that crops the top and bottom to
       // prevents errant motion from the on screen time changing every second.
       if (this.hasMotionType && included === undefined) {
-        const defaultInclusionZone = [[0, 10], [100, 10], [100, 90], [0, 90]];
+        const defaultInclusionZone: ClipPath = [[0, 10], [100, 10], [100, 90], [0, 90]];
         included = polygonOverlap(box, defaultInclusionZone);
       }
 
