@@ -3,7 +3,6 @@ import { sleep } from '@scrypted/common/src/sleep';
 import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, DeviceState, EventListenerRegister, Image, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetectionZone, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
-import os from 'os';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
@@ -29,6 +28,7 @@ type ClipPath = [number, number][];
 type Zones = { [zone: string]: ClipPath };
 interface ZoneInfo {
   exclusion?: boolean;
+  filterMode?: 'include' | 'exclude' | 'observe';
   type?: 'Intersect' | 'Contain';
   classes?: string[];
   scoreThreshold?: number;
@@ -358,7 +358,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
             continue;
           const odz: ObjectDetectionZone = {
             classes: mixin.hasMotionType ? ['motion'] : zi?.classes,
-            exclusion: zi?.exclusion,
+            exclusion: zi?.filterMode ? zi?.filterMode === 'exclude' : zi?.exclusion,
+            filterMode: zi?.filterMode || (zi?.exclusion ? 'exclude' : undefined),
             path: zone,
             type: zi?.type,
           }
@@ -495,8 +496,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         }
 
         const zoneInfo = this.zoneInfos[zone];
+        const exclusion = zoneInfo?.filterMode ? zoneInfo.filterMode === 'exclude' : zoneInfo?.exclusion;
         // track if there are any inclusion zones
-        if (!zoneInfo?.exclusion && !included)
+        if (!exclusion && !included && zoneInfo.filterMode !== 'observe')
           included = false;
 
         let match = false;
@@ -516,12 +518,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         if (match) {
           o.zones.push(zone);
 
-          if (zoneInfo?.exclusion && match) {
-            copy = copy.filter(c => c !== o);
-            break;
-          }
+          if (zoneInfo.filterMode !== 'observe') {
+            if (exclusion && match) {
+              copy = copy.filter(c => c !== o);
+              break;
+            }
 
-          included = true;
+            included = true;
+          }
         }
       }
 
@@ -690,13 +694,26 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         value: JSON.stringify(value),
       });
 
+      // settings.push({
+      //   subgroup,
+      //   key: `zoneinfo-exclusion-${name}`,
+      //   title: `Exclusion Zone`,
+      //   description: 'Detections in this zone will be excluded.',
+      //   type: 'boolean',
+      //   value: zi?.exclusion,
+      // });
       settings.push({
         subgroup,
-        key: `zoneinfo-exclusion-${name}`,
-        title: `Exclusion Zone`,
-        description: 'Detections in this zone will be excluded.',
-        type: 'boolean',
-        value: zi?.exclusion,
+        key: `zoneinfo-filterMode-${name}`,
+        title: `Filter Mode`,
+        description: 'The filter mode used by this zone. The Default is include. Zones set to observe will not affect filtering and can be used for automations.',
+        choices: [
+          'Default',
+          'include',
+          'exclude',
+          'observe',
+        ],
+        value: zi?.filterMode || (zi?.exclusion ? 'exclude' : undefined) || 'Default',
       });
 
       settings.push({

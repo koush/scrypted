@@ -28,6 +28,14 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             type: 'number',
             defaultValue: 60,
         },
+        zones: {
+            title: 'Zones',
+            description: 'Optional: The sensor will only be triggered when an object is in any of the following zones.',
+            multiple: true,
+            combobox: true,
+            choices: [
+            ],
+        }
     });
     listener: EventListenerRegister;
     timeout: NodeJS.Timeout;
@@ -47,6 +55,14 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
         this.storageSettings.settings.detections.onPut = () => this.rebind();
 
         this.storageSettings.settings.objectDetector.onPut = () => this.rebind();
+
+        this.storageSettings.settings.zones.onPut = () => this.rebind();
+
+        this.storageSettings.settings.zones.onGet = async () => {
+            return {
+                choices: this.storageSettings.values.zones || [],
+            };
+        };
 
         this.rebind();
     }
@@ -80,7 +96,6 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
         if (!detections?.length)
             return;
 
-
         const console = sdk.deviceManager.getMixinConsole(objectDetector.id, this.nativeId);
 
         this.listener = objectDetector.listen(ScryptedInterface.ObjectDetector, (source, details, data) => {
@@ -88,6 +103,23 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             const match = detected.detections?.find(d => {
                 if (!detections.includes(d.className))
                     return false;
+                const zones: string[] = this.storageSettings.values.zones;
+                if (zones?.length) {
+                    if (d.zones) {
+                        let found = false;
+                        for (const z of d.zones) {
+                            if (zones.includes(z)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found)
+                            return false;
+                    }
+                    else {
+                        this.console.warn('Camera does not provide Zones in detection event. Zone filter will not be applied.');
+                    }
+                }
                 if (!d.movement)
                     return true;
                 return d.movement.moving;
