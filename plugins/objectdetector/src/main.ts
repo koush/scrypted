@@ -7,7 +7,7 @@ import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-pr
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
 import { getMaxConcurrentObjectDetectionSessions } from './performance-profile';
-import { insidePolygon, polygonOverlap } from './polygon';
+import { insidePolygon, normalizeBox, polygonOverlap } from './polygon';
 import { serverSupportsMixinEventMasking } from './server-version';
 import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor, createObjectDetectorStorageSetting } from './smart-motionsensor';
 import { getAllDevices, safeParseJson } from './util';
@@ -461,18 +461,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
-  normalizeBox(boundingBox: [number, number, number, number], inputDimensions: [number, number]): [Point, Point, Point, Point] {
-    let [x, y, width, height] = boundingBox;
-    let x2 = x + width;
-    let y2 = y + height;
-    // the zones are point paths in percentage format
-    x = x * 100 / inputDimensions[0];
-    y = y * 100 / inputDimensions[1];
-    x2 = x2 * 100 / inputDimensions[0];
-    y2 = y2 * 100 / inputDimensions[1];
-    return [[x, y], [x2, y], [x2, y2], [x, y2]];
-  }
-
   applyZones(detection: ObjectsDetected) {
     // determine zones of the objects, if configured.
     if (!detection.detections)
@@ -483,7 +471,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         continue;
 
       o.zones = []
-      const box = this.normalizeBox(o.boundingBox, detection.inputDimensions);
+      const box = normalizeBox(o.boundingBox, detection.inputDimensions);
 
       let included: boolean;
       for (const [zone, zoneValue] of Object.entries(this.zones)) {
