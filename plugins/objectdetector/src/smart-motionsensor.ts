@@ -1,5 +1,6 @@
 import sdk, { EventListenerRegister, MotionSensor, ObjectDetector, ObjectsDetected, Readme, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings } from "@scrypted/sdk";
 import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
+import type { ObjectDetectionPlugin } from "./main";
 
 export const SMART_MOTIONSENSOR_PREFIX = 'smart-motionsensor-';
 
@@ -40,7 +41,7 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
     listener: EventListenerRegister;
     timeout: NodeJS.Timeout;
 
-    constructor(nativeId?: ScryptedNativeId) {
+    constructor(public plugin: ObjectDetectionPlugin, nativeId?: ScryptedNativeId) {
         super(nativeId);
 
         this.storageSettings.settings.detections.onGet = async () => {
@@ -59,8 +60,18 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
         this.storageSettings.settings.zones.onPut = () => this.rebind();
 
         this.storageSettings.settings.zones.onGet = async () => {
+            const objectDetector: ObjectDetector & ScryptedDevice = this.storageSettings.values.objectDetector;
+            const objectDetections = [...this.plugin.currentMixins.values()]
+                .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat();
+
+            const mixin = objectDetections.find(m => m.id === objectDetector?.id);
+            const zones = new Set(Object.keys(mixin?.getZones() || {}));
+            for (const z of this.storageSettings.values.zones || []) {
+                zones.add(z);
+            }
+
             return {
-                choices: this.storageSettings.values.zones || [],
+                choices: [...zones],
             };
         };
 

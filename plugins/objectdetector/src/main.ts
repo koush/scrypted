@@ -898,7 +898,7 @@ interface ObjectDetectionStatistics {
   sampleTime: number;
 }
 
-class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings, DeviceProvider, DeviceCreator {
+export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings, DeviceProvider, DeviceCreator {
   currentMixins = new Set<ObjectDetectorMixin>();
   objectDetectionStatistics = new Map<number, ObjectDetectionStatistics>();
   statsSnapshotTime: number;
@@ -1105,7 +1105,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
     if (nativeId === 'ffmpeg')
       ret = this.devices.get(nativeId) || new FFmpegVideoFrameGenerator('ffmpeg');
     if (nativeId?.startsWith(SMART_MOTIONSENSOR_PREFIX))
-      ret = this.devices.get(nativeId) || new SmartMotionSensor(nativeId);
+      ret = this.devices.get(nativeId) || new SmartMotionSensor(this, nativeId);
 
     if (ret)
       this.devices.set(nativeId, ret);
@@ -1172,7 +1172,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider implements Settings,
       ]
     });
 
-    const sensor = new SmartMotionSensor(nativeId);
+    const sensor = new SmartMotionSensor(this, nativeId);
     sensor.storageSettings.values.objectDetector = objectDetector?.id;
 
     return id;
