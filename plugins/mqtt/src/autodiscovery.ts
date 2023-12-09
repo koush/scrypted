@@ -385,6 +385,7 @@ addBinarySensor(ScryptedInterface.BinarySensor, ScryptedInterfaceProperty.binary
 addBinarySensor(ScryptedInterface.OccupancySensor, ScryptedInterfaceProperty.occupied);
 addBinarySensor(ScryptedInterface.FloodSensor, ScryptedInterfaceProperty.flooded);
 addBinarySensor(ScryptedInterface.AudioSensor, ScryptedInterfaceProperty.audioDetected);
+addBinarySensor(ScryptedInterface.Online, ScryptedInterfaceProperty.online);
 
 autoDiscoveryMap.set(ScryptedInterface.Thermometer, {
     component: 'sensor',
