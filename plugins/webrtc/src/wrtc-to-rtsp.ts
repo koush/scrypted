@@ -261,23 +261,32 @@ export async function createRTCPeerConnectionSource(options: {
 
         let destroyProcess: () => void;
 
-        const track = audioTransceiver.sender.sendRtp;
+        const audioCodec = audioTransceiver?.sender?.codec;
 
         const ic: Intercom = {
             async startIntercom(media: MediaObject) {
                 if (!isPeerConnectionAlive(pc))
                     throw new Error('peer connection is closed');
 
-                if (!track)
+                if (!audioTransceiver?.sender?.sendRtp || !audioCodec)
                     throw new Error('peer connection does not support two way audio');
 
 
                 const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
+                let lastPacketTs: number = 0;
                 const { kill: destroy } = await startRtpForwarderProcess(console, ffmpegInput, {
                     audio: {
+                        codecCopy: audioCodec.name,
                         encoderArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode),
-                        onRtp: (rtp) => audioTransceiver.sender.sendRtp(rtp),
+                        onRtp: (rtp) => {
+                            const packet = RtpPacket.deSerialize(rtp);
+                            const now = Date.now();
+                            packet.header.payloadType = audioCodec.payloadType;
+                            packet.header.marker = now - lastPacketTs > 1000; // set the marker if it's been more than 1s since the last packet
+                            audioTransceiver.sender.sendRtp(packet.serialize());
+                            lastPacketTs = now;
+                        },
                     },
                 });
 

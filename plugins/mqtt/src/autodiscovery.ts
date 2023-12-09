@@ -1,6 +1,7 @@
-import { Brightness, DeviceProvider, Lock, LockState, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings } from "@scrypted/sdk";
-import { MqttClient, connect } from "mqtt";
-import { MqttDeviceBase } from "../api/mqtt-device-base";
+import crypto from 'crypto';
+import { Brightness, DeviceProvider, Lock, LockState, MixinDeviceBase, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from "@scrypted/sdk";
+import { Client, MqttClient, connect } from "mqtt";
+import { MqttDeviceBase } from "./api/mqtt-device-base";
 import nunjucks from 'nunjucks';
 import sdk from "@scrypted/sdk";
 
@@ -180,7 +181,7 @@ export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceP
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-        
+
     }
 
     async putSetting(key: string, value: string) {
@@ -338,5 +339,92 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff
         const config = this.loadComponentConfig(ScryptedInterface.Lock);
         return this.publishValue(config.command_topic,
             config.value_template, config.payload_unlock, 'UNLOCK');
+    }
+}
+
+interface AutoDiscoveryConfig {
+    component: string;
+    create: (mqttId: string, device: MixinDeviceBase<any>, topic: string) => any;
+}
+
+const autoDiscoveryMap = new Map<string, AutoDiscoveryConfig>();
+
+function getAutoDiscoveryDevice(device: MixinDeviceBase<any>, mqttId: string) {
+    return {
+        dev: {
+            name: device.name,
+            // what the hell is this
+            "ids": crypto.createHash('sha256').update(`scrypted-${mqttId}-${device.id}`).digest().toString('hex').substring(0, 8),
+            "sw": device.info?.version,
+            "mdl": device.info?.model,
+            "mf": device.info?.manufacturer,
+        },
+    }
+}
+
+function createBinarySensorConfig(mqttId: string, device: MixinDeviceBase<any>, prop: ScryptedInterfaceProperty, topic: string) {
+    return {
+        state_topic: `${topic}/${prop}`,
+        payload_on: 'true',
+        payload_off: 'false',
+        ...getAutoDiscoveryDevice(device, mqttId),
+    }
+}
+
+function addBinarySensor(iface: ScryptedInterface, prop: ScryptedInterfaceProperty) {
+    autoDiscoveryMap.set(iface, {
+        component: 'binary_sensor',
+        create(mqttId, device, topic) {
+            return createBinarySensorConfig(mqttId, device, prop, topic);
+        }
+    });
+}
+
+addBinarySensor(ScryptedInterface.MotionSensor, ScryptedInterfaceProperty.motionDetected);
+addBinarySensor(ScryptedInterface.BinarySensor, ScryptedInterfaceProperty.binaryState);
+addBinarySensor(ScryptedInterface.OccupancySensor, ScryptedInterfaceProperty.occupied);
+addBinarySensor(ScryptedInterface.FloodSensor, ScryptedInterfaceProperty.flooded);
+addBinarySensor(ScryptedInterface.AudioSensor, ScryptedInterfaceProperty.audioDetected);
+addBinarySensor(ScryptedInterface.Online, ScryptedInterfaceProperty.online);
+
+autoDiscoveryMap.set(ScryptedInterface.Thermometer, {
+    component: 'sensor',
+    create(mqttId, device, topic) {
+        return {
+            state_topic: `${topic}/${ScryptedInterfaceProperty.temperature}`,
+            value_template: '{{ value_json }}',
+            unit_of_measurement: 'C',
+            ...getAutoDiscoveryDevice(device, mqttId),
+        }
+    }
+});
+
+autoDiscoveryMap.set(ScryptedInterface.HumiditySensor, {
+    component: 'sensor',
+    create(mqttId, device, topic) {
+        return {
+            state_topic: `${topic}/${ScryptedInterfaceProperty.humidity}`,
+            value_template: '{{ value_json }}',
+            unit_of_measurement: '%',
+            ...getAutoDiscoveryDevice(device, mqttId),
+        }
+    }
+});
+
+export function publishAutoDiscovery(mqttId: string, client: Client, device: MixinDeviceBase<any>, topic: string, autoDiscoveryPrefix = 'homeassistant') {
+    for (const iface of device.interfaces) {
+        const found = autoDiscoveryMap.get(iface);
+        if (!found)
+            continue;
+
+        const config = found.create(mqttId, device, topic);
+        const nodeId = `scrypted-${mqttId}-${device.id}`;
+        config.unique_id = `scrypted-${mqttId}-${device.id}-${iface}`;
+        config.name = iface;
+
+        const configTopic = `${autoDiscoveryPrefix}/${found.component}/${nodeId}/${iface}/config`;
+        client.publish(configTopic, JSON.stringify(config), {
+            retain: true,
+        });
     }
 }

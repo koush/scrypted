@@ -5,6 +5,7 @@ import path from 'path';
 import { Duplex } from "stream";
 
 const highWaterMark = 1024 * 1024;
+const bufferOverflow = 100 * 1024 * 1024;
 
 // non standard extension that dumps the rtp payload to a file.
 export class FileRtspServer extends RtspServer {
@@ -99,6 +100,12 @@ export class FileRtspServer extends RtspServer {
             return super.writeRtpPayload(header, rtp);
 
         this.segmentBytesWritten += header.length + rtp.length;
+        if (this.writeStream.writableLength > bufferOverflow) {
+            this.writeConsole?.error('RTSP WRITE overflowed.');
+            this.cleanup();
+            this.client?.destroy();
+            return;
+        }
         this.writeStream.write(header);
         return this.writeStream.write(rtp);
     }

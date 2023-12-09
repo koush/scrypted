@@ -1,3 +1,4 @@
+import net from 'net';
 import { Device, DeviceInformation, DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceMethod, ScryptedInterfaceProperty, ScryptedNativeId, ScryptedUser as SU } from '@scrypted/types';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
@@ -34,6 +35,7 @@ import { getPluginVolume } from './plugin/plugin-volume';
 import { NodeForkWorker } from './plugin/runtime/node-fork-worker';
 import { PythonRuntimeWorker } from './plugin/runtime/python-worker';
 import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
+import { ClusterObject } from './cluster/connect-rpc-object';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
@@ -43,13 +45,14 @@ import { PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
+import { computeClusterObjectHash } from './cluster/cluster-hash';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
     proxy: ScryptedDevice;
 }
 
-const MIN_SCRYPTED_CORE_VERSION = 'v0.1.16';
+const MIN_SCRYPTED_CORE_VERSION = 'v0.1.147';
 const PLUGIN_DEVICE_STATE_VERSION = 2;
 
 interface HttpPluginData {
@@ -72,6 +75,17 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     wss = new WebSocketServer({ noServer: true });
     wsAtomic = 0;
     shellio: IOServer = new io.Server({
+        pingTimeout: 120000,
+        perMessageDeflate: true,
+        cors: (req, callback) => {
+            const header = this.getAccessControlAllowOrigin(req.headers);
+            callback(undefined, {
+                origin: header,
+                credentials: true,
+            })
+        },
+    });
+    connectRPCObjectIO: IOServer = new io.Server({
         pingTimeout: 120000,
         perMessageDeflate: true,
         cors: (req, callback) => {
@@ -120,10 +134,67 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 const cp = spawn(process.env.SHELL, [], {
                 });
                 cp.onData(data => connection.send(data));
-                connection.on('message', message => cp.write(message.toString()));
+                connection.on('message', message => {
+                    if (Buffer.isBuffer(message)) {
+                        cp.write(message.toString());
+                        return;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(message.toString());
+                        if (parsed.dim) {
+                            cp.resize(parsed.dim.cols, parsed.dim.rows);
+                        }
+                    } catch (e) {
+                        // we should only get here if an outdated core plugin
+                        // is sending us string data instead of buffer data
+                        cp.write(message.toString());
+                    }
+                });
                 connection.on('close', () => cp.kill());
+                cp.onExit(() => connection.close());
             }
             catch (e) {
+                connection.close();
+            }
+        });
+
+        app.all('/engine.io/connectRPCObject', (req, res) => this.connectRPCObjectHandler(req, res));
+
+        /*
+        * Handle incoming connections that will be
+        * proxied to a connectRPCObject socket.
+        *
+        * Note that the clusterObject hash must be
+        * verified before connecting to the target port.
+        */
+        this.connectRPCObjectIO.on('connection', connection => {
+            try {
+                const clusterObject: ClusterObject = JSON.parse((connection.request as Request).query.clusterObject as string);
+                const sha256 = computeClusterObjectHash(clusterObject, this.clusterSecret);
+                if (sha256 != clusterObject.sha256) {
+                    connection.send({
+                        error: 'invalid signature'
+                    });
+                    connection.close();
+                    return;
+                }
+
+                const socket = net.connect(clusterObject.port, '127.0.0.1');
+                socket.on('error', () => connection.close());
+                socket.on('close', () => connection.close());
+                socket.on('data', data => connection.send(data));
+                connection.on('close', () => socket.destroy());
+                connection.on('message', message => {
+                    if (typeof message !== 'string') {
+                        socket.write(message);
+                    }
+                    else {
+                        console.warn('unexpected string data on engine.io rpc connection. terminating.')
+                        connection.close();
+                    }
+                });
+            } catch {
                 connection.close();
             }
         });
@@ -260,6 +331,33 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             this.shellio.handleUpgrade(req, res.socket, (req as any).upgradeHead)
         else
             this.shellio.handleRequest(req, res);
+    }
+
+    async connectRPCObjectHandler(req: Request, res: Response) {
+        const isUpgrade = isConnectionUpgrade(req.headers);
+
+        const end = (code: number, message: string) => {
+            if (isUpgrade) {
+                const socket = res.socket;
+                socket.write(`HTTP/1.1 ${code} ${message}\r\n` +
+                    '\r\n');
+                socket.destroy();
+            }
+            else {
+                res.status(code);
+                res.send(message);
+            }
+        };
+
+        if (!res.locals.username) {
+            end(401, 'Not Authorized');
+            return;
+        }
+
+        if ((req as any).upgradeHead)
+            this.connectRPCObjectIO.handleUpgrade(req, res.socket, (req as any).upgradeHead)
+        else
+            this.connectRPCObjectIO.handleRequest(req, res);
     }
 
     async getEndpointPluginData(req: Request, endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<HttpPluginData> {
@@ -421,8 +519,19 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             });
         }
 
-        const filesPath = path.join(getPluginVolume(pluginHost.pluginId), 'files');
-        handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.unzippedPath, filesPath));
+        const { pluginId } = pluginHost;
+        const filesPath = path.join(getPluginVolume(pluginId), 'files');
+        const ri = createResponseInterface(res, pluginHost.unzippedPath, filesPath);
+        handler.onRequest(endpointRequest, ri)
+            .catch(() => { })
+            .finally(() => {
+                if (!ri.sent) {
+                    console.warn(pluginId, 'did not send a response before onRequest returned.');
+                    ri.send(`Internal Plugin Error: ${pluginId}` , {
+                        code: 500,
+                    })
+                }
+            });
     }
 
     killPlugin(pluginId: string) {

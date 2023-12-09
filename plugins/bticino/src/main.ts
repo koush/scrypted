@@ -36,7 +36,7 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
             const name = settings.newCamera?.toString() === undefined ? "Doorbell" : settings.newCamera?.toString()
             await this.updateDevice(nativeId, name)
     
-            const device: Device = {
+            const lockDevice: Device = {
                 providerNativeId: nativeId,
                 info: {
                     //model: `${camera.model} (${camera.data.kind})`,
@@ -49,10 +49,38 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
                 type: ScryptedDeviceType.Lock,
                 interfaces: [ScryptedInterface.Lock, ScryptedInterface.HttpRequestHandler],
             }
+
+            const aswmSwitchDevice: Device = {
+                providerNativeId: nativeId,
+                info: {
+                    //model: `${camera.model} (${camera.data.kind})`,
+                    manufacturer: 'BticinoPlugin',
+                    //firmware: camera.data.firmware_version,
+                    //serialNumber: camera.data.device_id
+                },
+                nativeId: nativeId + '-aswm-switch',
+                name: name + ' Voicemail',
+                type: ScryptedDeviceType.Switch,
+                interfaces: [ScryptedInterface.OnOff, ScryptedInterface.HttpRequestHandler],
+            }           
+            
+            const muteSwitchDevice: Device = {
+                providerNativeId: nativeId,
+                info: {
+                    //model: `${camera.model} (${camera.data.kind})`,
+                    manufacturer: 'BticinoPlugin',
+                    //firmware: camera.data.firmware_version,
+                    //serialNumber: camera.data.device_id
+                },
+                nativeId: nativeId + '-mute-switch',
+                name: name + ' Muted',
+                type: ScryptedDeviceType.Switch,
+                interfaces: [ScryptedInterface.OnOff, ScryptedInterface.HttpRequestHandler],
+            }                
     
             await deviceManager.onDevicesChanged({
                 providerNativeId: nativeId,
-                devices: [device],
+                devices: [lockDevice, aswmSwitchDevice, muteSwitchDevice],
             })
     
             let sipCamera : BticinoSipCamera = await this.getDevice(nativeId)

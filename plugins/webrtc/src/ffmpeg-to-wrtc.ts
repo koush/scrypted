@@ -1,15 +1,16 @@
 import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "./werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCInputMediaObjectTrack, RTCMediaObjectTrack, RTCOutputMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { isLocalIceTransport, logIsLocalIceTransport } from "./werift-util";
+import { logIsLocalIceTransport } from "./werift-util";
 
 import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients, legacyGetSignalingSessionOptions } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
+import { OpusRepacketizer } from "../../homekit/src/types/camera/opus-repacketizer";
 import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { RtpCodecCopy, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
@@ -129,7 +130,7 @@ export async function createTrackForwarder(options: {
 
     if (!maximumCompatibilityMode) {
         let found: RTCRtpCodecParameters;
-        if (mediaStreamOptions?.audio?.codec === 'pcm_ulaw') {
+        if (mediaStreamOptions?.audio?.codec === 'pcm_mulaw') {
             found = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU')
         }
         else if (mediaStreamOptions?.audio?.codec === 'pcm_alaw') {
@@ -215,9 +216,30 @@ export async function createTrackForwarder(options: {
         }
     }
 
+    let opusRepacketizer: OpusRepacketizer;
+    let lastPacketTs: number = 0;
     const audioRtpTrack: RtpTrack = {
         codecCopy: audioCodecCopy,
-        onRtp: audioTransceiver.sender.sendRtp.bind(audioTransceiver.sender),
+        onRtp: buffer => {
+            if (false && audioTransceiver.sender.codec.mimeType?.toLowerCase() === "audio/opus") {
+                // this will use 3 20ms frames, 60ms. seems to work up to 6/120ms
+                if (!opusRepacketizer)
+                    opusRepacketizer = new OpusRepacketizer(3);
+                for (const rtp of opusRepacketizer.repacketize(RtpPacket.deSerialize(buffer))) {
+                    audioTransceiver.sender.sendRtp(rtp);
+                }
+            }
+            else {
+                const rtp = RtpPacket.deSerialize(buffer);
+                const now = Date.now();
+                rtp.header.marker = now - lastPacketTs > 1000; // set the marker if it's been more than 1s since the last packet
+                rtp.header.payloadType = audioTransceiver.sender.codec.payloadType;
+                // pcm audio can be concatenated.
+                // hikvision seems to send 40ms duration packets, so 25 packets per second.
+                audioTransceiver.sender.sendRtp(rtp.serialize());
+                lastPacketTs = now;
+            }
+        },
         encoderArguments: [
             ...audioTranscodeArguments,
         ],
@@ -238,7 +260,7 @@ export async function createTrackForwarder(options: {
     // 1/9/2023:
     // 1378 is what homekit requests, regardless of local or remote network.
     // so setting 1378 as the fixed value seems wise, given apple probably has
-    // better knowledge of network capabilities, and also mirrors 
+    // better knowledge of network capabilities, and also mirrors
     // from my cursory research into ipv6, the MTU is no lesser than ipv4, in fact
     // the min mtu is larger.
     const videoPacketSize = 1378;
@@ -362,7 +384,7 @@ export function parseOptions(options: RTCSignalingOptions) {
     };
 }
 
-class WebRTCTrack implements RTCMediaObjectTrack {
+class WebRTCTrack implements RTCOutputMediaObjectTrack, RTCInputMediaObjectTrack {
     control: ScryptedSessionControl;
     removed = new Deferred<void>();
 
@@ -397,7 +419,7 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         if (this.removed.finished)
             return;
         this.removed.resolve(undefined);
-        this.control.killed.resolve(undefined);
+        this.control.endSession();
         this.video.sender.onRtcp.allUnsubscribe();
 
         if (cleanupTrackOnly)
@@ -414,8 +436,8 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         return this.cleanup(false);
     }
 
-    setPlayback(options: { audio: boolean; video: boolean; }): Promise<void> {
-        return this.control.setPlayback(options);
+    setPlayback(options: { audio: boolean; video: boolean; }): Promise<MediaObject> {
+        return this.control.setPlaybackInternal(options);
     }
 }
 
@@ -486,7 +508,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             createTrackForwarder: async (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) => {
                 const ret = await createTrackForwarder({
                     timeStart,
-                    ...isLocalIceTransport(this.pc),
+                    ...logIsLocalIceTransport(console, this.pc),
                     requestMediaStream,
                     videoTransceiver,
                     audioTransceiver,
@@ -532,9 +554,16 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         }
     }
 
+    addInputTrack(options: { videoMid?: string; audioMid?: string; }): Promise<RTCInputMediaObjectTrack> {
+        throw new Error('not implemented');
+    }
+
     async addTrack(mediaObject: MediaObject, options?: {
         videoMid?: string,
         audioMid?: string,
+        /**
+         * @deprecated
+         */
         intercomId?: string,
     }) {
         const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject, options?.intercomId);

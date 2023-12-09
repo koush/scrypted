@@ -1,8 +1,7 @@
 import { Deferred } from '@scrypted/common/src/deferred';
-import sdk, { AudioSensor, Camera, Intercom, MotionSensor, ObjectsDetected, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, DeviceProvider, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
-import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
-import { addSupportedType, bindCharacteristic, DummyDevice } from '../common';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, H264Level, H264Profile, MediaContainerType, OccupancySensor, RecordingPacket, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
+import sdk, { AudioSensor, Camera, DeviceProvider, Intercom, MotionSensor, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import { DummyDevice, addSupportedType, bindCharacteristic } from '../common';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, H264Level, H264Profile, MediaContainerType, RecordingPacket, SRTPCryptoSuites, Service, VideoCodecType, WithUUID } from '../hap';
 import type { HomeKitPlugin } from '../main';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
@@ -70,10 +69,16 @@ addSupportedType({
                 resolutions: [
                     // 3840x2160@30 (4k).
                     [3840, 2160, 30],
+                    // 3K
+                    [2880, 1620, 30],
+                    // 2MP
+                    [2560, 1440, 30],
                     // 1920x1080@30 (1080p).
                     [1920, 1080, 30],
                     // 1280x720@30 (720p).
                     [1280, 720, 30],
+                    [960, 540, 30],
+                    [640, 360, 30],
                     // 320x240@15 (Apple Watch).
                     [320, 240, 15],
                 ]
@@ -104,7 +109,7 @@ addSupportedType({
         const openRecordingStreams = new Map<number, Deferred<any>>();
         if (isRecordingEnabled) {
             recordingDelegate = {
-                updateRecordingConfiguration(newConfiguration: CameraRecordingConfiguration ) {
+                updateRecordingConfiguration(newConfiguration: CameraRecordingConfiguration) {
                     configuration = newConfiguration;
                 },
                 handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
@@ -256,50 +261,6 @@ addSupportedType({
                     else
                         device.turnOff();
                 });
-            }
-        }
-
-
-        if (device.interfaces.includes(ScryptedInterface.ObjectDetector)) {
-            const objectDetectionContactSensorsValue = storage.getItem('objectDetectionContactSensors');
-            const objectDetectionContactSensors: string[] = [];
-            try {
-                objectDetectionContactSensors.push(...JSON.parse(objectDetectionContactSensorsValue));
-            }
-            catch (e) {
-            }
-
-            for (const ojs of new Set(objectDetectionContactSensors)) {
-                const sensor = new OccupancySensor(`${device.name}: ` + ojs, ojs);
-                accessory.addService(sensor);
-
-                let contactState = Characteristic.OccupancyDetected.OCCUPANCY_NOT_DETECTED;
-                let timeout: NodeJS.Timeout;
-
-                const resetSensorTimeout = () => {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => {
-                        contactState = Characteristic.OccupancyDetected.OCCUPANCY_NOT_DETECTED;
-                        sensor.updateCharacteristic(Characteristic.OccupancyDetected, contactState);
-                    }, (parseInt(storage.getItem('objectDetectionContactSensorTimeout')) || defaultObjectDetectionContactSensorTimeout) * 1000)
-                }
-
-                bindCharacteristic(device, ScryptedInterface.ObjectDetector, sensor, Characteristic.OccupancyDetected, (source, details, data) => {
-                    if (!source)
-                        return contactState;
-
-                    const ed: ObjectsDetected = data;
-                    if (!ed.detections)
-                        return contactState;
-
-                    const objects = ed.detections.map(d => d.className);
-                    if (objects.includes(ojs)) {
-                        contactState = Characteristic.OccupancyDetected.OCCUPANCY_DETECTED;
-                        resetSensorTimeout();
-                    }
-
-                    return contactState;
-                }, true);
             }
         }
 

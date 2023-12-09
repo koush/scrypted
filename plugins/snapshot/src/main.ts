@@ -2,13 +2,16 @@ import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
 import { createMapPromiseDebouncer, RefreshPromise, singletonPromise, TimeoutError } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, FFmpegInput, Image, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios, { AxiosInstance } from "axios";
 import https from 'https';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
+import { ImageReader, ImageReaderNativeId, loadVipsImage, loadSharp } from './image-reader';
+import { ImageWriter, ImageWriterNativeId } from './image-writer';
+import { parseDims, parseImageOp, processImageOp } from './parse-dims';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -223,6 +226,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     responseType: 'arraybuffer',
                     url: this.storageSettings.values.snapshotUrl,
                     timeout: 60000,
+                    headers: {
+                        'Accept': 'image/*',
+                    }
                 });
 
                 return response.data;
@@ -298,26 +304,42 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 }, async () => {
                     this.debugConsole?.log("Resizing picture from camera", options?.picture);
 
-                    try {
-                        const mo = await mediaManager.createMediaObject(picture, 'image/jpeg');
-                        const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
-                        let { width, height } = options.picture;
-                        if (!width)
-                            width = height / image.height * image.width;
-                        if (!height)
-                            height = width / image.width * image.height;
-                        return await image.toBuffer({
-                            resize: {
-                                width,
-                                height,
-                            },
-                            format: 'jpg',
-                        });
+                    if (loadSharp()) {
+                        const vips = await loadVipsImage(picture, this.id);
+                        try {
+                            const ret = await vips.toBuffer({
+                                resize: options?.picture,
+                                format: 'jpg',
+                            });
+                            return ret;
+                        }
+                        finally {
+                            vips.close();
+                        }
                     }
-                    catch (e) {
-                        if (!e.message?.includes('no converter found'))
-                            throw e;
-                    }
+
+                    // try {
+                    //     const mo = await mediaManager.createMediaObject(picture, 'image/jpeg', {
+                    //         sourceId: this.id,
+                    //     });
+                    //     const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
+                    //     let { width, height } = options.picture;
+                    //     if (!width)
+                    //         width = height / image.height * image.width;
+                    //     if (!height)
+                    //         height = width / image.width * image.height;
+                    //     return await image.toBuffer({
+                    //         resize: {
+                    //             width,
+                    //             height,
+                    //         },
+                    //         format: 'jpg',
+                    //     });
+                    // }
+                    // catch (e) {
+                    //     if (!e.message?.includes('no converter found'))
+                    //         throw e;
+                    // }
 
                     return ffmpegFilterImageBuffer(picture, {
                         console: this.debugConsole,
@@ -325,6 +347,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                         resize: options?.picture,
                         timeout: 10000,
                     });
+
                 });
             }
             catch (e) {
@@ -336,16 +359,58 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         return this.createMediaObject(picture, 'image/jpeg');
     }
 
-    async cropAndScale(buffer: Buffer) {
+    async cropAndScale(picture: Buffer) {
         if (!this.storageSettings.values.snapshotCropScale?.length)
-            return buffer;
+            return picture;
 
         const xmin = Math.min(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
         const ymin = Math.min(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
         const xmax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
-        return ffmpegFilterImageBuffer(buffer, {
+        if (loadSharp()) {
+            const vips = await loadVipsImage(picture, this.id);
+            try {
+                const ret = await vips.toBuffer({
+                    crop: {
+                        left: xmin * vips.width,
+                        top: ymin * vips.height,
+                        width: (xmax - xmin) * vips.width,
+                        height: (ymax - ymin) * vips.height,
+                    },
+                    format: 'jpg',
+                });
+                return ret;
+            }
+            finally {
+                vips.close();
+            }
+        }
+
+        // try {
+        //     const mo = await mediaManager.createMediaObject(picture, 'image/jpeg');
+        //     const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
+        //     const left = image.width * xmin;
+        //     const width = image.width * (xmax - xmin);
+        //     const top = image.height * ymin;
+        //     const height = image.height * (ymax - ymin);
+
+        //     return await image.toBuffer({
+        //         crop: {
+        //             left,
+        //             width,
+        //             top,
+        //             height,
+        //         },
+        //         format: 'jpg',
+        //     });
+        // }
+        // catch (e) {
+        //     if (!e.message?.includes('no converter found'))
+        //         throw e;
+        // }
+
+        return ffmpegFilterImageBuffer(picture, {
             console: this.debugConsole,
             ffmpegPath: await mediaManager.getFFmpegPath(),
             crop: {
@@ -468,32 +533,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 }
 
-type DimDict<T extends string> = {
-    [key in T]: string;
-};
-
-export function parseDims<T extends string>(dict: DimDict<T>) {
-    const ret: {
-        [key in T]?: number;
-    } & {
-        fractional?: boolean;
-    } = {
-    };
-
-    for (const t of Object.keys(dict)) {
-        const val = dict[t as T];
-        if (val?.endsWith('%')) {
-            ret.fractional = true;
-            ret[t] = parseFloat(val?.substring(0, val?.length - 1)) / 100;
-        }
-        else {
-            ret[t] = parseFloat(val);
-        }
-    }
-    return ret;
-}
-
-class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings {
+class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider {
     storageSettings = new StorageSettings(this, {
         debugLogging: {
             title: 'Debug Logging',
@@ -508,12 +548,45 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
         this.fromMimeType = ScryptedMimeTypes.FFmpegInput;
         this.toMimeType = 'image/jpeg';
 
+        const manifest: DeviceManifest = {
+            devices: [
+                {
+                    name: 'Image Writer',
+                    interfaces: [
+                        ScryptedInterface.BufferConverter,
+                    ],
+                    type: ScryptedDeviceType.Builtin,
+                    nativeId: ImageWriterNativeId,
+                }
+            ]
+        };
+
+        if (loadSharp()) {
+            manifest.devices.push(
+                {
+                    name: 'Image Reader',
+                    interfaces: [
+                        ScryptedInterface.BufferConverter,
+                    ],
+                    type: ScryptedDeviceType.Builtin,
+                    nativeId: ImageReaderNativeId,
+                }
+            );
+        }
+
         process.nextTick(() => {
-            sdk.deviceManager.onDevicesChanged({
-                devices: [
-                ]
-            })
-        })
+            sdk.deviceManager.onDevicesChanged(manifest)
+        });
+    }
+
+    async getDevice(nativeId: string): Promise<any> {
+        if (nativeId === ImageWriterNativeId)
+            return new ImageWriter(ImageWriterNativeId);
+        if (nativeId === ImageReaderNativeId)
+            return new ImageReader(ImageReaderNativeId);
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
     getSettings(): Promise<Setting[]> {
@@ -532,57 +605,10 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
     async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
         const mime = new MimeType(toMimeType);
 
+        const op = parseImageOp(mime.parameters);
         const ffmpegInput = JSON.parse(data.toString()) as FFmpegInput;
 
-        const args = [
-            ...ffmpegInput.inputArguments,
-            ...(ffmpegInput.h264EncoderArguments || []),
-        ];
-
-        const {
-            width,
-            height,
-            fractional
-        } = parseDims({
-            width: mime.parameters.get('width'),
-            height: mime.parameters.get('height'),
-        });
-
-        const {
-            left,
-            top,
-            right,
-            bottom,
-            fractional: cropFractional,
-        } = parseDims({
-            left: mime.parameters.get('left'),
-            top: mime.parameters.get('top'),
-            right: mime.parameters.get('right'),
-            bottom: mime.parameters.get('bottom'),
-        });
-
-        return ffmpegFilterImage(args, {
-            console: this.debugConsole,
-            ffmpegPath: await mediaManager.getFFmpegPath(),
-            resize: (isNaN(width) && isNaN(height))
-                ? undefined
-                : {
-                    width,
-                    height,
-                    fractional,
-                },
-            crop: (isNaN(left) && isNaN(top) && isNaN(right) && isNaN(bottom))
-                ? undefined
-                : {
-                    left,
-                    top,
-                    width: right - left,
-                    height: bottom - top,
-                    fractional: cropFractional,
-                },
-            timeout: 10000,
-            time: parseFloat(mime.parameters.get('time')),
-        });
+        return processImageOp(ffmpegInput, op, parseFloat(mime.parameters.get('time')), options?.sourceId, this.debugConsole);
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {

@@ -99,7 +99,7 @@ export class ControllerApi {
                 })      
             }
             console.log("Endpoint registration status: " + res.statusCode)
-        });   
+        }).on('error', (e) => this.sipCamera.console.error(e) );   
 
         // The default evict time on the c300x-controller is 5 minutes, so this will certainly be within bounds
         this.timeout = setTimeout( () => this.registerEndpoints( false ) , 2 * 60 * 1000 )
@@ -114,7 +114,7 @@ export class ControllerApi {
         return new Promise( (resolve, reject) => get(`http://${ipAddress}:8080/register-endpoint?raw=true&updateStreamEndpoint=${sipFrom}`, (res) => {
             if( res.statusCode != 200 ) reject( "ERROR: Could not update streaming endpoint, call returned: " + res.statusCode )
             else resolve()
-        } ) );
+        } ).on('error', (error) => this.sipCamera.console.error(error) ).end() );
     }
 
     public cancelTimer() {

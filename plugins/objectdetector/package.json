@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/objectdetector",
-   "version": "0.1.1",
+   "version": "0.1.14",
    "description": "Scrypted Video Analysis Plugin. Installed alongside a detection service like OpenCV or TensorFlow.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -35,19 +35,18 @@
       "name": "Video Analysis Plugin",
       "type": "API",
       "interfaces": [
+         "DeviceCreator",
          "DeviceProvider",
          "Settings",
          "MixinProvider"
       ],
       "realfs": true
    },
-   "optionalDependencies": {},
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "lodash": "^4.17.21",
-      "point-inside-polygon": "^1.0.3",
-      "polygon-overlap": "^1.0.5",
+      "polygon-clipping": "^0.15.3",
       "semver": "^7.3.8"
    },
    "devDependencies": {

@@ -84,6 +84,12 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             ],
             defaultValue: 'Disabled',
         },
+        legacyRtspStream: {
+            title: 'Legacy RTSP Streaming',
+            description: 'Enable legacy RTSP Stream support. No longer supported and is being phased out by Ring.',
+            type: 'boolean',
+            persistedDefaultValue: true,
+        },
     });
 
     constructor() {

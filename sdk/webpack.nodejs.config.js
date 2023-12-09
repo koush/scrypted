@@ -46,7 +46,9 @@ if (process.env.WEBPACK_ANALYZER) {
 
 const alias = {};
 const polyfills = [
+    'node-pty-prebuilt-multiarch',
     'node-forge',
+    'sharp',
     'source-map-support/register',
     'adm-zip',
     "memfs",
@@ -95,7 +97,7 @@ module.exports = {
                 {
                     test: /\.([cm]?ts|tsx)$/,
                     loader: "ts-loader",
-                }
+                },
         ],
     },
 
@@ -123,15 +125,13 @@ module.exports = {
         minimize: isProduction,
         minimizer: [
             new TerserPlugin(
-                // {
-                //     terserOptions: {
-                //         mangle: {
-                //             properties: {
-                //                 regex: /^[\$_]/
-                //             }
-                //         },
-                //     },
-                // }
+                {
+                    terserOptions: {
+                        compress: {
+                            typeofs: false,
+                        }
+                    }
+                },
             ),
         ],
     },

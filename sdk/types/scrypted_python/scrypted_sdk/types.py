@@ -175,6 +175,7 @@ class ScryptedInterface(str, Enum):
     SecuritySystem = "SecuritySystem"
     Settings = "Settings"
     StartStop = "StartStop"
+    StreamService = "StreamService"
     TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
     Thermometer = "Thermometer"
@@ -271,6 +272,11 @@ class ClipPath(TypedDict):
     pass
 
 
+class Point(TypedDict):
+
+    pass
+
+
 class AudioStreamOptions(TypedDict):
 
     bitrate: float
@@ -287,14 +293,16 @@ class ObjectDetectionResult(TypedDict):
 
     boundingBox: tuple[float, float, float, float]  # x, y, width, height
     className: str  # The detection class of the object.
+    clipPaths: list[ClipPath]  # The detection clip paths that outlines various features or segments, like traced facial features.
     cost: float  # The certainty that this is correct tracked object.
+    descriptor: str  # A base64 encoded Float32Array that represents the vector descriptor of the detection. Can be used to compute euclidian distance to determine similarity.
     history: ObjectDetectionHistory
     id: str  # The id of the tracked object.
+    label: str  # The label of the object, if it was recognized as a familiar object (person, pet, etc).
+    landmarks: list[Point]  # The detection landmarks, like key points in a face landmarks.
     movement: Union[ObjectDetectionHistory, Any]  # Movement history will track the first/last time this object was moving.
-    name: str  # The name of the object, if it was recognized as a familiar object (person, pet, etc).
     resources: VideoResource
     score: float
-    zoneHistory: Any
     zones: list[str]
 
 class ObjectDetectionZone(TypedDict):
@@ -307,6 +315,31 @@ class ObjectDetectionZone(TypedDict):
 class PictureDimensions(TypedDict):
 
     height: float
+    width: float
+
+class RequestMediaStreamAdaptiveOptions(TypedDict):
+
+    keyframe: bool
+    packetLoss: bool
+    pictureLoss: bool
+    reconfigure: bool
+    resize: bool
+
+class RequestVideoStreamOptions(TypedDict):
+
+    bitrate: float
+    bitrateControl: Any | Any
+    clientHeight: float
+    clientWidth: float
+    codec: str
+    fps: float
+    h264Info: H264Info
+    height: float
+    idrIntervalMillis: float  # Key Frame interval in milliseconds.
+    keyframeInterval: float  # Key Frame interval in frames.
+    maxBitrate: float
+    minBitrate: float
+    profile: str
     width: float
 
 class ScryptedDeviceAccessControl(TypedDict):
@@ -643,11 +676,12 @@ class RecordingStreamThumbnailOptions(TypedDict):
 class RequestMediaStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""
 
-    adaptive: bool  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
+    adaptive: bool | RequestMediaStreamAdaptiveOptions  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
     audio: AudioStreamOptions
     container: str  # The container type of this stream, ie: mp4, mpegts, rtsp.
     destination: MediaStreamDestination  # The intended destination for this media stream. May be used as a hint to determine which main/substream to send if no id is explicitly provided.
     destinationId: str  # The destination id for this media stream. This should generally be the IP address of the destination, if known. May be used by to determine stream selection and track dynamic bitrate history.
+    destinationType: str  # The destination type of the target of this media stream. This should be the calling application package name. Used for logging or adaptive bitrate fingerprinting.
     id: str
     metadata: Any  # Stream specific metadata.
     name: str
@@ -656,7 +690,7 @@ class RequestMediaStreamOptions(TypedDict):
     refresh: bool  # Specify the stream refresh behavior when this stream is requested. Use case is primarily for perioidic snapshot of streams while they are active.
     route: Any | Any | Any  # When retrieving media, setting route directs how the media should be retrieved and exposed. A direct route will get the stream as is from the source. This will bypass any intermediaries if possible, such as an NVR or restreamers. An external route will request that that provided route is exposed to the local network.
     tool: MediaStreamTool  # The tool was used to write the container or will be used to read teh container. Ie, scrypted, the ffmpeg tools, gstreamer.
-    video: VideoStreamOptions
+    video: RequestVideoStreamOptions
 
 class RequestPictureOptions(TypedDict):
 
@@ -669,11 +703,12 @@ class RequestPictureOptions(TypedDict):
 class RequestRecordingStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""
 
-    adaptive: bool  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
+    adaptive: bool | RequestMediaStreamAdaptiveOptions  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
     audio: AudioStreamOptions
     container: str  # The container type of this stream, ie: mp4, mpegts, rtsp.
     destination: MediaStreamDestination  # The intended destination for this media stream. May be used as a hint to determine which main/substream to send if no id is explicitly provided.
     destinationId: str  # The destination id for this media stream. This should generally be the IP address of the destination, if known. May be used by to determine stream selection and track dynamic bitrate history.
+    destinationType: str  # The destination type of the target of this media stream. This should be the calling application package name. Used for logging or adaptive bitrate fingerprinting.
     duration: float
     id: str
     loop: bool
@@ -686,7 +721,7 @@ class RequestRecordingStreamOptions(TypedDict):
     route: Any | Any | Any  # When retrieving media, setting route directs how the media should be retrieved and exposed. A direct route will get the stream as is from the source. This will bypass any intermediaries if possible, such as an NVR or restreamers. An external route will request that that provided route is exposed to the local network.
     startTime: float
     tool: MediaStreamTool  # The tool was used to write the container or will be used to read teh container. Ie, scrypted, the ffmpeg tools, gstreamer.
-    video: VideoStreamOptions
+    video: RequestVideoStreamOptions
 
 class ResponseMediaStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""
@@ -1343,6 +1378,13 @@ class StartStop:
         pass
 
 
+class StreamService:
+    """Generic bidirectional stream connection."""
+
+    async def connectStream(self, input: Any) -> Any:
+        pass
+
+
 class TamperSensor:
 
     tampered: TamperState
@@ -1422,12 +1464,13 @@ class VideoClips:
 
 class VideoFrameGenerator:
 
-    async def generateVideoFrames(self, mediaObject: MediaObject, options: VideoFrameGeneratorOptions = None, filter: Any = None) -> VideoFrame:
+    async def generateVideoFrames(self, mediaObject: MediaObject, options: VideoFrameGeneratorOptions = None) -> VideoFrame:
         pass
 
 
 class VideoRecorder:
 
+    recordingActive: bool
     async def getRecordingStream(self, options: RequestRecordingStreamOptions, recordingStream: MediaObject = None) -> MediaObject:
         pass
 
@@ -1444,6 +1487,9 @@ class VideoRecorder:
 class VideoRecorderManagement:
 
     async def deleteRecordingStream(self, options: DeleteRecordingStreamOptions) -> None:
+        pass
+
+    async def setRecordingActive(self, recordingActive: bool) -> None:
         pass
 
 
@@ -1667,6 +1713,7 @@ class ScryptedInterfaceProperty(str, Enum):
     temperature = "temperature"
     temperatureUnit = "temperatureUnit"
     humidity = "humidity"
+    recordingActive = "recordingActive"
     ptzCapabilities = "ptzCapabilities"
     lockState = "lockState"
     entryOpen = "entryOpen"
@@ -1740,6 +1787,7 @@ class ScryptedInterfaceMethods(str, Enum):
     getRecordingStreamOptions = "getRecordingStreamOptions"
     getRecordingStreamThumbnail = "getRecordingStreamThumbnail"
     deleteRecordingStream = "deleteRecordingStream"
+    setRecordingActive = "setRecordingActive"
     ptzCommand = "ptzCommand"
     getRecordedEvents = "getRecordedEvents"
     getVideoClip = "getVideoClip"
@@ -1804,6 +1852,7 @@ class ScryptedInterfaceMethods(str, Enum):
     createRTCSignalingSession = "createRTCSignalingSession"
     getScryptedUserAccessControl = "getScryptedUserAccessControl"
     generateVideoFrames = "generateVideoFrames"
+    connectStream = "connectStream"
 
 class DeviceState:
 
@@ -2061,6 +2110,14 @@ class DeviceState:
     @humidity.setter
     def humidity(self, value: float):
         self.setScryptedProperty("humidity", value)
+
+    @property
+    def recordingActive(self) -> bool:
+        return self.getScryptedProperty("recordingActive")
+
+    @recordingActive.setter
+    def recordingActive(self, value: bool):
+        self.setScryptedProperty("recordingActive", value)
 
     @property
     def ptzCapabilities(self) -> PanTiltZoomCapabilities:
@@ -2512,12 +2569,15 @@ ScryptedInterfaceDescriptors = {
       "getRecordingStreamOptions",
       "getRecordingStreamThumbnail"
     ],
-    "properties": []
+    "properties": [
+      "recordingActive"
+    ]
   },
   "VideoRecorderManagement": {
     "name": "VideoRecorderManagement",
     "methods": [
-      "deleteRecordingStream"
+      "deleteRecordingStream",
+      "setRecordingActive"
     ],
     "properties": []
   },
@@ -2985,6 +3045,13 @@ ScryptedInterfaceDescriptors = {
     "name": "VideoFrameGenerator",
     "methods": [
       "generateVideoFrames"
+    ],
+    "properties": []
+  },
+  "StreamService": {
+    "name": "StreamService",
+    "methods": [
+      "connectStream"
     ],
     "properties": []
   }

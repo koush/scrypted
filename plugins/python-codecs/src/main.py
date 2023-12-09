@@ -33,10 +33,11 @@ class LibavGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGen
         self,
         mediaObject: scrypted_sdk.MediaObject,
         options: scrypted_sdk.VideoFrameGeneratorOptions = None,
+        # todo remove
         filter: Any = None,
     ) -> scrypted_sdk.VideoFrame:
         forked: CodecFork = await self.zygote().result
-        return await forked.generateVideoFramesLibav(mediaObject, options, filter)
+        return await forked.generateVideoFramesLibav(mediaObject, options)
 
 
 class GstreamerGenerator(
@@ -52,6 +53,7 @@ class GstreamerGenerator(
         self,
         mediaObject: scrypted_sdk.MediaObject,
         options: scrypted_sdk.VideoFrameGeneratorOptions = None,
+        # todo remove
         filter: Any = None,
     ) -> scrypted_sdk.VideoFrame:
         start = time.time()
@@ -60,8 +62,8 @@ class GstreamerGenerator(
         return await forked.generateVideoFramesGstreamer(
             mediaObject,
             options,
-            filter,
             self.storage.getItem("h264Decoder"),
+            self.storage.getItem("h265Decoder"),
             self.storage.getItem("postProcessPipeline"),
         )
 
@@ -78,6 +80,20 @@ class GstreamerGenerator(
                     "vtdec_hw",
                     "nvh264dec",
                     "vaapih264dec",
+                ],
+                "combobox": True,
+            },
+            {
+                "key": "h265Decoder",
+                "title": "H25 Decoder",
+                "description": "The Gstreamer pipeline to use to decode H265 video.",
+                "value": self.storage.getItem("h265Decoder") or "Default",
+                "choices": [
+                    "Default",
+                    "decodebin",
+                    "vtdec_hw",
+                    "nvh265dec",
+                    "vaapih265dec",
                 ],
                 "combobox": True,
             },
@@ -157,17 +173,6 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider)
             }
         )
 
-        manifest["devices"].append(
-            {
-                "name": "Image Writer",
-                "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
-                "nativeId": "writer",
-                "interfaces": [
-                    scrypted_sdk.ScryptedInterface.BufferConverter.value,
-                ],
-            }
-        )
-
         await scrypted_sdk.deviceManager.onDevicesChanged(manifest)
 
     def getDevice(self, nativeId: str) -> Any:
@@ -182,13 +187,9 @@ class PythonCodecs(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.DeviceProvider)
         if vipsimage.pyvips:
             if nativeId == "reader":
                 return vipsimage.ImageReader("reader")
-            if nativeId == "writer":
-                return vipsimage.ImageWriter("writer")
         else:
             if nativeId == "reader":
                 return pilimage.ImageReader("reader")
-            if nativeId == "writer":
-                return pilimage.ImageWriter("writer")
 
 
 def create_scrypted_plugin():
@@ -227,13 +228,13 @@ class CodecFork:
         self,
         mediaObject: scrypted_sdk.MediaObject,
         options: scrypted_sdk.VideoFrameGeneratorOptions,
-        filter: Any,
         h264Decoder: str,
+        h265Decoder: str,
         postProcessPipeline: str,
     ) -> scrypted_sdk.VideoFrame:
         async for data in self.generateVideoFrames(
             gstreamer.generateVideoFramesGstreamer(
-                mediaObject, options, filter, h264Decoder, postProcessPipeline
+                mediaObject, options, h264Decoder, h265Decoder, postProcessPipeline
             ),
             "gstreamer",
             options and options.get("firstFrameOnly"),
@@ -244,10 +245,9 @@ class CodecFork:
         self,
         mediaObject: scrypted_sdk.MediaObject,
         options: scrypted_sdk.VideoFrameGeneratorOptions = None,
-        filter: Any = None,
     ) -> scrypted_sdk.VideoFrame:
         async for data in self.generateVideoFrames(
-            libav.generateVideoFramesLibav(mediaObject, options, filter),
+            libav.generateVideoFramesLibav(mediaObject, options),
             "libav",
             options and options.get("firstFrameOnly"),
         ):

@@ -5,6 +5,7 @@ class EndError extends Error {
 
 export function createAsyncQueue<T>() {
     let ended: Error | undefined;
+    const endDeferred = new Deferred<void>();
     const waiting: Deferred<T>[] = [];
     const queued: { item: T, dequeued?: Deferred<void> }[] = [];
 
@@ -23,6 +24,17 @@ export function createAsyncQueue<T>() {
         return deferred.promise;
     }
 
+    const take = () => {
+        if (queued.length) {
+            const { item, dequeued: enqueue } = queued.shift()!;
+            enqueue?.resolve();
+            return item;
+        }
+
+        if (ended)
+            throw ended;
+    }
+
     const submit = (item: T, dequeued?: Deferred<void>, signal?: AbortSignal) => {
         if (ended)
             return false;
@@ -34,35 +46,64 @@ export function createAsyncQueue<T>() {
             return true;
         }
 
+        if (signal)
+            dequeued ||= new Deferred();
+
         const qi = {
             item,
             dequeued,
         };
         queued!.push(qi);
 
-        signal?.addEventListener('abort', () => {
+        if (!signal)
+            return true;
+
+        const h = () => {
             const index = queued.indexOf(qi);
             if (index === -1)
                 return;
             queued.splice(index, 1);
             dequeued?.reject(new Error('abort'));
-        });
+        };
 
+        dequeued.promise.catch(() => {}).finally(() => signal.removeEventListener('abort', h));
+        signal.addEventListener('abort', h);
+
+        return true;
+    }
+
+    function end(e?: Error) {
+        if (ended)
+            return false;
+        // catch to prevent unhandled rejection.
+        ended = e || new EndError();
+        endDeferred.resolve();
+        while (waiting.length) {
+            waiting.shift().reject(ended);
+        }
         return true;
     }
 
     function queue() {
         return (async function* () {
-            while (true) {
-                try {
-                    const item = await dequeue();
-                    yield item;
+            try {
+                while (true) {
+                    try {
+                        const item = await dequeue();
+                        yield item;
+                    }
+                    catch (e) {
+                        // the yield above may raise an error, and the queue should be ended.
+                        end(e);
+                        if (e instanceof EndError)
+                            return;
+                        throw e;
+                    }
                 }
-                catch (e) {
-                    if (e instanceof EndError)
-                        return;
-                    throw e;
-                }
+            }
+            finally {
+                // the yield above may cause an iterator return, and the queue should be ended.
+                end();
             }
         })();
     }
@@ -82,6 +123,11 @@ export function createAsyncQueue<T>() {
     }
 
     return {
+        get ended() {
+            return ended;
+        },
+        endPromise: endDeferred.promise,
+        take,
         clear() {
             return clear();
         },
@@ -94,14 +140,7 @@ export function createAsyncQueue<T>() {
         submit(item: T, signal?: AbortSignal) {
             return submit(item, undefined, signal);
         },
-        end(e?: Error) {
-            if (ended)
-                return false;
-            // catch to prevent unhandled rejection.
-            ended = e || new EndError()
-            clear(e);
-            return true;
-        },
+        end,
         async enqueue(item: T, signal?: AbortSignal) {
             const dequeued = new Deferred<void>();
             if (!submit(item, dequeued, signal))

@@ -150,10 +150,10 @@ export class StorageSettings<T extends string> implements Settings {
             if (setting?.mapPut)
                 value = setting.mapPut(oldValue, value);
             // nullish values should be removed, since Storage can't persist them correctly.
-            if (typeof value === 'object')
-                this.device.storage.setItem(key, JSON.stringify(value));
-            else if (value == null)
+            if (value == null)
                 this.device.storage.removeItem(key);
+            else if (typeof value === 'object')
+                this.device.storage.setItem(key, JSON.stringify(value));
             else
                 this.device.storage.setItem(key, value?.toString());
         }

@@ -314,8 +314,8 @@ async def createGstMediaObject(image: GstImage):
 async def generateVideoFramesGstreamer(
     mediaObject: scrypted_sdk.MediaObject,
     options: scrypted_sdk.VideoFrameGeneratorOptions = None,
-    filter: Any = None,
     h264Decoder: str = None,
+    h265Decoder: str = None,
     postProcessPipeline: str = None,
 ) -> scrypted_sdk.VideoFrame:
     ffmpegInput: scrypted_sdk.FFmpegInput = (
@@ -345,6 +345,8 @@ async def generateVideoFramesGstreamer(
         )
         if videoCodec == "h264":
             pipeline += " ! rtph264depay ! h264parse"
+        elif videoCodec == "h265":
+            pipeline += " ! rtph265depay ! h265parse"
 
     decoder = None
 
@@ -367,6 +369,11 @@ async def generateVideoFramesGstreamer(
                 decoder = "vtdec_hw"
             else:
                 decoder = "avdec_h264 output-corrupt=false"
+    elif videoCodec == "h265":
+        setDecoderClearDefault(h265Decoder)
+
+        if not decoder:
+            decoder = "avdec_h265 output-corrupt=false"
     else:
         # decodebin may pick a hardware accelerated decoder, which isn't ideal
         # so use a known software decoder for h264 and decodebin for anything else.

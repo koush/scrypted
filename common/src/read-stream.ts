@@ -19,7 +19,7 @@ export async function read16BELengthLoop(readable: Readable, options: {
   let length: number;
   let skipCount = 0;
   let readCount = 0;
-  
+
   const resumeRead = () => {
     readCount++;
     read();
@@ -109,17 +109,26 @@ export async function readLength(readable: Readable, length: number): Promise<Bu
 const CHARCODE_NEWLINE = '\n'.charCodeAt(0);
 
 export async function readUntil(readable: Readable, charCode: number) {
-  const data = [];
-  let count = 0;
+  const queued: Buffer[] = [];
   while (true) {
-    const buffer = await readLength(readable, 1);
-    if (!buffer)
-      throw new Error("end of stream");
-    if (buffer[0] === charCode)
-      break;
-    data[count++] = buffer[0];
+    const available: Buffer = readable.read();
+    if (!available) {
+      await once(readable, 'readable');
+      continue;
+    }
+    const index = available.findIndex(b => b === charCode);
+    if (index === -1) {
+      queued.push(available);
+      continue;
+    }
+
+    const before = available.subarray(0, index);
+    queued.push(before);
+
+    const after = available.subarray(index + 1);
+    readable.unshift(after);
+    return Buffer.concat(queued).toString();
   }
-  return Buffer.from(data).toString();
 }
 
 export async function readLine(readable: Readable) {

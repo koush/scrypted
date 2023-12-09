@@ -379,7 +379,7 @@ async function start(mainFilename: string, options?: {
 
         if (!plugin) {
             res.status(500);
-            res.send(`npm package ${npmPackage} not found`);
+            res.send(`npm package not found`);
             return;
         }
 
@@ -399,7 +399,7 @@ async function start(mainFilename: string, options?: {
 
         if (!plugin) {
             res.status(500);
-            res.send(`npm package ${npmPackage} not found`);
+            res.send(`npm package not found`);
             return;
         }
 
@@ -416,9 +416,10 @@ async function start(mainFilename: string, options?: {
             });
         }
         catch (e) {
+            res.header('Content-Type', 'text/plain');
             res.status(500);
             res.send(e.toString());
-            return
+            return;
         }
 
         res.send({

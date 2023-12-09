@@ -21,9 +21,7 @@
             ],
             "preLaunchTask": "npm: build",
             "args": [
-                "ffplay",
-                "Baby Camera@192.168.2.109",
-                "getVideoStream",
+                "shell",
             ],
             "sourceMaps": true,
             "resolveSourceMapLocations": [

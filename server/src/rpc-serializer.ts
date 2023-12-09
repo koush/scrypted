@@ -112,38 +112,52 @@ export function createRpcDuplexSerializer(writable: {
 
     let header: Buffer;
     let pending: Buffer;
-
-    const readPending = (length: number) => {
-        if (!pending || pending.length < length)
-            return;
-
-        const ret = pending.slice(0, length);
-        pending = pending.slice(length);
-        if (!pending.length)
-            pending = undefined;
-        return ret;
-    }
+    let offset: number;
+    let type: number;
 
     const onData = (data: Buffer) => {
-        if (!pending)
-            pending = data;
-        else
-            pending = Buffer.concat([pending, data]);
-
-        while (true) {
-            if (!header) {
-                header = readPending(5);
+        while (data.length) {
+            if (!pending) {
                 if (!header)
+                    header = data;
+                else
+                    header = Buffer.concat([header, data]);
+                if (header.length < 5)
                     return;
+
+                // slice is used below because in web environment,
+                // babel seems to return a Uint8Arrray when subarray is called.
+                data = header.slice(5);
+                // length includes type field.
+                const length = header.readUInt32BE(0) - 1;
+                type = header.readUInt8(4);
+                if (data.length >= length && type === 0) {
+                    // no need to alloc a buffer for this, since it can be immediately parsed
+                    // as json.
+                    pending = data.length === length ? data : data.slice(0, length);
+                    offset = length;
+                    data = data.slice(length);
+                }
+                else {
+                    pending = Buffer.alloc(length);
+                    offset = 0;
+                }
+                header = undefined;
             }
 
-            const length = header.readUInt32BE(0);
-            const type = header.readUInt8(4);
-            const payload: Buffer = readPending(length - 1);
-            if (!payload)
+            const need = pending.length - offset;
+            if (need) {
+                const sub = data.slice(0, need);
+                data = data.slice(need);
+                pending.set(sub, offset);
+                offset += sub.length;
+            }
+
+            if (offset !== pending.length)
                 return;
 
-            header = undefined;
+            const payload = pending;
+            pending = undefined;
 
             if (type === 0) {
                 try {

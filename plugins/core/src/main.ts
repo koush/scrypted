@@ -11,6 +11,7 @@ import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
 import { ScriptCore, ScriptCoreNativeId } from './script-core';
 import { UsersCore, UsersNativeId } from './user';
+import { TerminalService, TerminalServiceNativeId } from './terminal-service';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
 
@@ -39,6 +40,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     aggregateCore: AggregateCore;
     automationCore: AutomationCore;
     users: UsersCore;
+    terminalService: TerminalService;
     localAddresses: string[];
     storageSettings = new StorageSettings(this, {
         localAddresses: {
@@ -79,6 +81,16 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     name: 'Scripts',
                     nativeId: ScriptCoreNativeId,
                     interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+        })();
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Terminal Service',
+                    nativeId: TerminalServiceNativeId,
+                    interfaces: [ScryptedInterface.StreamService],
                     type: ScryptedDeviceType.Builtin,
                 },
             );
@@ -157,6 +169,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.aggregateCore ||= new AggregateCore();
         if (nativeId === UsersNativeId)
             return this.users ||= new UsersCore();
+        if (nativeId === TerminalServiceNativeId)
+            return this.terminalService ||= new TerminalService();
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
@@ -198,7 +212,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         ws.close();
     }
 
-    handlePublicFinal(request: HttpRequest, response: HttpResponse) {
+    async handlePublicFinal(request: HttpRequest, response: HttpResponse) {
         // need to strip off the query.
         const incomingPathname = request.url.split('?')[0];
         if (request.url !== '/index.html') {
@@ -208,24 +222,24 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
 
         // the rel hrefs (manifest, icons) are pulled in a web worker which does not
         // have cookies. need to attach auth info to them.
-        endpointManager.getPublicCloudEndpoint()
-            .then(endpoint => {
-                const u = new URL(endpoint);
+        try {
+            const endpoint = await endpointManager.getPublicCloudEndpoint();
+            const u = new URL(endpoint);
 
-                const rewritten = indexHtml
-                    .replace('href="manifest.json"', `href="manifest.json${u.search}"`)
-                    .replace('href="img/icons/apple-touch-icon-152x152.png"', `href="img/icons/apple-touch-icon-152x152.png${u.search}"`)
-                    .replace('href="img/icons/safari-pinned-tab.svg"', `href="img/icons/safari-pinned-tab.svg${u.search}"`)
-                    ;
-                response.send(rewritten, {
-                    headers: {
-                        'Content-Type': 'text/html',
-                    }
-                });
-            })
-            .catch(() => {
-                response.sendFile("dist" + incomingPathname);
+            const rewritten = indexHtml
+                .replace('href="manifest.json"', `href="manifest.json${u.search}"`)
+                .replace('href="img/icons/apple-touch-icon-152x152.png"', `href="img/icons/apple-touch-icon-152x152.png${u.search}"`)
+                .replace('href="img/icons/safari-pinned-tab.svg"', `href="img/icons/safari-pinned-tab.svg${u.search}"`)
+                ;
+            response.send(rewritten, {
+                headers: {
+                    'Content-Type': 'text/html',
+                }
             });
+        }
+        catch (e) {
+            response.sendFile("dist" + incomingPathname);
+        }
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse) {
@@ -238,13 +252,13 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         }
 
         if (request.isPublicEndpoint) {
-            this.publicRouter(normalizedRequest, response, () => this.handlePublicFinal(normalizedRequest, response));
+            await new Promise(resolve => this.publicRouter(normalizedRequest, response, resolve));
+            await this.handlePublicFinal(normalizedRequest, response);
         }
         else {
-            this.router(normalizedRequest, response, () => {
-                response.send('Not Found', {
-                    code: 404,
-                });
+            await new Promise(resolve => this.router(normalizedRequest, response, resolve));
+            response.send('Not Found', {
+                code: 404,
             });
         }
     }

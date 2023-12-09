@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import gc
 import aiofiles
 from aiofiles import os as aios
@@ -39,6 +40,14 @@ import multiprocessing.connection
 
 import rpc
 import rpc_reader
+
+
+class ClusterObject(TypedDict):
+    id: str
+    port: int
+    proxyId: str
+    sourcePort: int
+    sha256: str
 
 
 class SystemDeviceState(TypedDict):
@@ -388,20 +397,24 @@ class PluginRemote:
         clusterId = options['clusterId']
         clusterSecret = options['clusterSecret']
 
-        def onProxySerialization(value: Any, proxyId: str, source: int = None):
+        def computeClusterObjectHash(o: ClusterObject) -> str:
+            m = hashlib.sha256()
+            m.update(bytes(f"{o['id']}{o['port']}{o.get('sourcePort', '')}{o['proxyId']}{clusterSecret}", 'utf8'))
+            return base64.b64encode(m.digest()).decode('utf-8')
+
+        def onProxySerialization(value: Any, proxyId: str, sourcePeerPort: int = None):
             properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
             clusterEntry = properties.get('__cluster', None)
             if not properties.get('__cluster', None):
-                clusterEntry = {
+                clusterEntry: ClusterObject = {
                     'id': clusterId,
                     'proxyId': proxyId,
                     'port': clusterPort,
-                    'source': source,
+                    'sourcePort': sourcePeerPort,
                 }
+                clusterEntry['sha256'] = computeClusterObjectHash(clusterEntry)
                 properties['__cluster'] = clusterEntry
 
-            # clusterEntry['proxyId'] = proxyId
-            # clusterEntry['source'] = source
             return properties
 
         self.peer.onProxySerialization = onProxySerialization
@@ -423,13 +436,11 @@ class PluginRemote:
                 value, proxyId, clusterPeerPort)
             clusterPeers[clusterPeerPort] = peer
 
-            async def connectRPCObject(id: str, secret: str, sourcePeerPort: int = None):
-                m = hashlib.sha256()
-                m.update(bytes('%s%s' % (clusterPort, clusterSecret), 'utf8'))
-                portSecret = m.hexdigest()
-                if secret != portSecret:
+            async def connectRPCObject(o: ClusterObject):
+                sha256 = computeClusterObjectHash(o)
+                if sha256 != o['sha256']:
                     raise Exception('secret incorrect')
-                return await resolveObject(id, sourcePeerPort)
+                return await resolveObject(o['proxyId'], o.get('sourcePort'))
 
             peer.params['connectRPCObject'] = connectRPCObject
             try:
@@ -481,19 +492,19 @@ class PluginRemote:
 
             port = clusterObject['port']
             proxyId = clusterObject['proxyId']
-            source = clusterObject.get('source', None)
+            sourcePort = clusterObject.get('sourcePort', None)
             if port == clusterPort:
-                return await resolveObject(proxyId, source)
+                return await resolveObject(proxyId, sourcePort)
 
             try:
-                clusterPeer = await ensureClusterPeer(port)
-                if clusterPeer.tags.get('localPort') == source:
+                clusterPeer = await clusterPeerPromise
+                if clusterPeer.tags.get('localPort') == sourcePort:
                     return value
-                c = await clusterPeer.getParam('connectRPCObject')
-                m = hashlib.sha256()
-                m.update(bytes('%s%s' % (port, clusterSecret), 'utf8'))
-                portSecret = m.hexdigest()
-                newValue = await c(proxyId, portSecret, source)
+                peerConnectRPCObject = clusterPeer.tags.get('connectRPCObject')
+                if not peerConnectRPCObject:
+                    peerConnectRPCObject = await clusterPeer.getParam('connectRPCObject')
+                    clusterPeer.tags['connectRPCObject'] = peerConnectRPCObject
+                newValue = await peerConnectRPCObject(clusterObject)
                 if not newValue:
                     raise Exception('ipc object not found?')
                 return newValue

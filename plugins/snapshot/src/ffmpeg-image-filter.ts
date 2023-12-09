@@ -133,13 +133,11 @@ export function ffmpegFilterImage(inputArguments: string[], options: FFmpegImage
         ];
     }
     else {
-
         outputArguments = [
             '-frames:v', '1',
             '-f', 'image2',
             'pipe:3',
         ];
-
     }
 
     const args: string[] = [

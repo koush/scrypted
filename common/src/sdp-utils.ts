@@ -149,7 +149,7 @@ export function parseFmtp(msection: string[]) {
             const paramLine = fmtpLine.substring(firstSpace + 1);
             const payloadType = parseInt(fmtp.split(':')[1]);
 
-            if (!fmtp || !paramLine || Number.isNaN( payloadType )) {
+            if (!fmtp || !paramLine || Number.isNaN(payloadType)) {
                 return;
             }
 
@@ -170,27 +170,46 @@ export function parseFmtp(msection: string[]) {
 }
 
 export type MSection = ReturnType<typeof parseMSection>;
+export type RTPMap = ReturnType<typeof parseRtpMap>;
 
 export function parseRtpMap(mlineType: string, rtpmap: string) {
-    const match = rtpmap?.match(/a=rtpmap:([\d]+) (.*?)\/([\d]+)/);
+    const match = rtpmap?.match(/a=rtpmap:([\d]+) (.*?)\/([\d]+)(\/([\d]+))?/);
 
     rtpmap = rtpmap?.toLowerCase();
 
     let codec: string;
+    let ffmpegEncoder: string;
     if (rtpmap?.includes('mpeg4')) {
         codec = 'aac';
+        ffmpegEncoder = 'aac';
     }
     else if (rtpmap?.includes('opus')) {
         codec = 'opus';
+        ffmpegEncoder = 'libopus';
     }
     else if (rtpmap?.includes('pcma')) {
         codec = 'pcm_alaw';
+        ffmpegEncoder = 'pcm_alaw';
     }
     else if (rtpmap?.includes('pcmu')) {
-        codec = 'pcm_ulaw';
+        codec = 'pcm_mulaw';
+        ffmpegEncoder = 'pcm_mulaw';
+    }
+    else if (rtpmap?.includes('g726')) {
+        codec = 'g726';
+        // disabled since it 48000 is non compliant in ffmpeg and fails.
+        // ffmpegEncoder = 'g726';
     }
     else if (rtpmap?.includes('pcm')) {
         codec = 'pcm';
+    }
+    else if (rtpmap?.includes('l16')) {
+        codec = 'pcm_s16be';
+        ffmpegEncoder = 'pcm_s16be';
+    }
+    else if (rtpmap?.includes('speex')) {
+        codec = 'speex';
+        ffmpegEncoder = 'libspeex';
     }
     else if (rtpmap?.includes('h264')) {
         codec = 'h264';
@@ -207,8 +226,10 @@ export function parseRtpMap(mlineType: string, rtpmap: string) {
     return {
         line: rtpmap,
         codec,
+        ffmpegEncoder,
         rawCodec: match?.[2],
         clock: parseInt(match?.[3]),
+        channels: parseInt(match?.[5]) || undefined,
         payloadType: parseInt(match?.[1]),
     }
 }
@@ -220,9 +241,11 @@ export function parseMSection(msection: string[]) {
     const mline = parseMLine(msection[0]);
     const rawRtpmaps = msection.filter(line => line.startsWith(artpmap));
     const rtpmaps = rawRtpmaps.map(line => parseRtpMap(mline.type, line));
-    const codec = parseRtpMap(mline.type, rawRtpmaps[0]).codec;
+    // if no rtp map is specified, pcm_alaw is used. parsing a null rtpmap is valid.
+    const rtpmap = parseRtpMap(mline.type, rawRtpmaps[0]);
+    const { codec } = rtpmap;
     let direction: string;
-    
+
     for (const checkDirection of ['sendonly', 'sendrecv', 'recvonly', 'inactive']) {
         const found = msection.find(line => line === 'a=' + checkDirection);
         if (found) {
@@ -239,6 +262,7 @@ export function parseMSection(msection: string[]) {
         contents: msection.join('\r\n'),
         control,
         codec,
+        rtpmap,
         direction,
         toSdp: () => {
             return ret.lines.join('\r\n');

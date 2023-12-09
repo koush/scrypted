@@ -67,17 +67,21 @@ export class WeriftSignalingSession implements RTCSignalingSession {
     async addIceCandidate(candidate: RTCIceCandidateInit) {
         this.remoteHasV6 ||= isV6Only(candidate.candidate?.split(' ')?.[4]);
 
-        // todo: fix this in werift or verify it still occurs at later point
-        // werift seems to choose whatever candidate pair results in the fastest connection.
-        // this makes it sometimes choose the STUN or TURN candidate even when
-        // on the local network.
         if (candidate.candidate?.includes('relay')) {
-            if (this.remoteHasV6 && !this.localHasV6) {
-                this.console.log('Possible mobile network IPv6to4 translation detected.');
-            }
-            else {
-                await sleep(500);
-            }
+            // note: this code is done, werift was modified to ban bad ips like 6to4 relays from tmobile.
+
+            // todo: fix this in werift or verify it still occurs at later point
+            // werift seems to choose whatever candidate pair results in the fastest connection.
+            // this makes it sometimes choose the STUN or TURN candidate even when
+            // on the local network.
+            // if (this.remoteHasV6 && !this.localHasV6) {
+            //     this.console.log('Possible mobile network IPv6to4 translation detected.');
+            // }
+            // else {
+            //     await sleep(500);
+            // }
+
+            await sleep(500);
         }
         else if (candidate.candidate?.includes('srflx')) {
             await sleep(250);

@@ -303,10 +303,8 @@ interface ErrorType {
 }
 
 export class RpcPeer {
-    idCounter = 1;
     params: { [name: string]: any } = {};
     pendingResults: { [id: string]: Deferred } = {};
-    proxyCounter = 1;
     localProxied = new Map<any, LocalProxiedEntry>();
     localProxyMap = new Map<string, any>();
     // @ts-ignore
@@ -390,6 +388,7 @@ export class RpcPeer {
         return props;
     }
 
+    static readonly RANDOM_DIGITS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     static readonly RPC_RESULT_ERROR_NAME = 'RPCResultError';
     static readonly PROPERTY_PROXY_ID = '__proxy_id';
     static readonly PROPERTY_PROXY_ONEWAY_METHODS = '__proxy_oneway_methods';
@@ -415,11 +414,23 @@ export class RpcPeer {
     }
 
     static isTransportSafe(value: any) {
-        return !value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.getDefaultTransportSafeArgumentTypes().has(value.constructor?.name));
+        if (!value)
+            return true;
+        return !value[Symbol.asyncIterator]
+            && !value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]
+            && this.getDefaultTransportSafeArgumentTypes().has(value.constructor?.name);
     }
 
     isTransportSafe(value: any) {
-        return !value || (!value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] && this.transportSafeArgumentTypes.has(value.constructor?.name));
+        if (!value)
+            return true;
+        return !value[Symbol.asyncIterator]
+            && !value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]
+            && this.transportSafeArgumentTypes.has(value.constructor?.name);
+    }
+
+    static generateId() {
+        return [...new Array(8)].map(() => RpcPeer.RANDOM_DIGITS.charAt(Math.floor(Math.random() * RpcPeer.RANDOM_DIGITS.length))).join('');
     }
 
     createPendingResult(method: string, cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
@@ -427,7 +438,7 @@ export class RpcPeer {
             return Promise.reject(new RPCResultError(this, 'RpcPeer has been killed (createPendingResult)'));
 
         const promise = new Promise((resolve, reject) => {
-            const id = (this.idCounter++).toString();
+            const id = RpcPeer.generateId();
             this.pendingResults[id] = { resolve, reject, method };
 
             cb(id, e => reject(new RPCResultError(this, e.message, e)));
@@ -623,7 +634,7 @@ export class RpcPeer {
 
         let proxiedEntry = this.localProxied.get(value);
         if (proxiedEntry) {
-            const __remote_proxy_finalizer_id = (this.proxyCounter++).toString();
+            const __remote_proxy_finalizer_id = RpcPeer.generateId();
             proxiedEntry.finalizerId = __remote_proxy_finalizer_id;
             const ret: RpcRemoteProxyValue = {
                 __remote_proxy_id: proxiedEntry.id,
@@ -645,7 +656,7 @@ export class RpcPeer {
 
         this.onProxyTypeSerialization.get(__remote_constructor_name)?.(value);
 
-        const __remote_proxy_id = (this.proxyCounter++).toString();
+        const __remote_proxy_id = RpcPeer.generateId();
         proxiedEntry = {
             id: __remote_proxy_id,
             finalizerId: __remote_proxy_id,
@@ -836,7 +847,7 @@ export function getEvalSource() {
         ${RpcPeer}
 
         ${startPeriodicGarbageCollection}
-    
+
         return {
             startPeriodicGarbageCollection,
             RpcPeer,

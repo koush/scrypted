@@ -363,7 +363,7 @@ export abstract class MediaManagerBase implements MediaManager {
                         node[candidateId] = inputWeight + outputWeight;
                     }
                     catch (e) {
-                        console.warn(candidate.name, 'skipping converter due to error', e)
+                        // console.warn(candidate.name, 'skipping converter due to error', e)
                     }
                 }
 
@@ -378,7 +378,7 @@ export abstract class MediaManagerBase implements MediaManager {
                 }
             }
             catch (e) {
-                console.warn('skipping converter due to error', e)
+                // console.warn('skipping converter due to error', e)
             }
         }
 

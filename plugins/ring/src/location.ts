@@ -61,7 +61,7 @@ class RingLight extends ScryptedDeviceBase implements Battery, TamperSensor, Mot
     }
 
     private isBeamDevice() {
-        return [RingDeviceType.BeamsMultiLevelSwitch,  RingDeviceType.BeamsSwitch, RingDeviceType.BeamsTransformerSwitch].includes(this.device.deviceType);
+        return [RingDeviceType.BeamsMultiLevelSwitch, RingDeviceType.BeamsSwitch, RingDeviceType.BeamsTransformerSwitch].includes(this.device.deviceType);
     }
 
     updateState(data: RingDeviceData) {
@@ -80,7 +80,7 @@ class RingLight extends ScryptedDeviceBase implements Battery, TamperSensor, Mot
             return this.device.setInfo({ device: { v1: { on: false } } });
         }
     }
-    
+
     turnOn(): Promise<void> {
         if (this.isBeamDevice()) {
             this.device.sendCommand('light-mode.set', { lightMode: 'on' });
@@ -118,7 +118,7 @@ class RingSwitch extends ScryptedDeviceBase implements OnOff {
     turnOff(): Promise<void> {
         return this.device.setInfo({ device: { v1: { on: false } } });
     }
-    
+
     turnOn(): Promise<void> {
         return this.device.setInfo({ device: { v1: { on: true } } });
     }
@@ -162,7 +162,7 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
         this.location = location;
 
         this.location.onLocationMode.subscribe(mode => this.updateLocationMode(mode));
-        
+
         // if the location has a base station, updates when arming/disarming are not sent to the `onLocationMode` subscription
         // instead we subscribe to the security panel, which is updated during arming actions
         this.location.getSecurityPanel().then(panel => {
@@ -193,8 +193,9 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
                 ScryptedInterface.RTCSignalingChannel,
             ];
             if (!camera.isRingEdgeEnabled) {
+                if (this.plugin.settingsStorage.values.legacyRtspStream)
+                    interfaces.push(ScryptedInterface.VideoCamera);
                 interfaces.push(
-                    ScryptedInterface.VideoCamera,
                     ScryptedInterface.Intercom,
                     ScryptedInterface.VideoClips,
                 );
@@ -237,7 +238,7 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
 
             switch (data.deviceType) {
                 case RingDeviceType.ContactSensor:
-                case RingDeviceType.RetrofitZone: 
+                case RingDeviceType.RetrofitZone:
                 case RingDeviceType.TiltSensor:
                 case RingDeviceType.GlassbreakSensor:
                     nativeId = locationDevice.id.toString() + '-sensor';
@@ -346,7 +347,7 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
         return this.devices.get(nativeId);
     }
 
-    async releaseDevice(id: string, nativeId: string): Promise<void> {}
+    async releaseDevice(id: string, nativeId: string): Promise<void> { }
 
     updateLocationMode(locationMode: LocationMode) {
         let mode: SecuritySystemMode;

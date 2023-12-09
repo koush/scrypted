@@ -151,6 +151,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             hide: true,
             json: true,
         },
+        cloudflareEnabled: {
+            group: 'Advanced',
+            title: 'Cloudflare',
+            type: 'boolean',
+            description: 'Optional: Create a Cloudflare Tunnel to this server at a random domain name. Providing a Cloudflare token will allow usage of a custom domain name.',
+            defaultValue: true,
+            onPut: () => deviceManager.requestRestart(),
+        },
         cloudflaredTunnelToken: {
             group: 'Advanced',
             title: 'Cloudflare Tunnel Token',
@@ -164,7 +172,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             title: 'Cloudflare Tunnel URL',
             description: 'Cloudflare Tunnel URL is a randomized cloud connection, unless a Cloudflare Tunnel Token is provided.',
             readonly: true,
-            mapGet: () =>  this.cloudflareTunnel || 'Unavailable',
+            mapGet: () => this.cloudflareTunnel || 'Unavailable',
         },
         register: {
             group: 'Advanced',
@@ -197,6 +205,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     securePort: number;
     randomBytes = crypto.randomBytes(16).toString('base64');
     reverseConnections = new Set<Duplex>();
+
+    get cloudflareTunnelHost() {
+        if (!this.cloudflareTunnel)
+            return;
+        return new URL(this.cloudflareTunnel).host;
+    }
 
     constructor() {
         super();
@@ -253,6 +267,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         //             || this.storageSettings.values.forwardingMode === 'Disabled',
         //     }
         // };
+
+        this.storageSettings.settings.cloudflaredTunnelToken.onGet =
+            this.storageSettings.settings.cloudflaredTunnelUrl.onGet = async () => {
+                return {
+                    hide: !this.storageSettings.values.cloudflareEnabled,
+                }
+            };
 
         this.log.clearAlerts();
 
@@ -340,11 +361,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
             ip = this.storageSettings.values.duckDnsHostname;
         }
+        else if (this.cloudflareTunnelHost) {
+            ip = this.cloudflareTunnelHost;
+        }
         else {
             ip = (await axios(`https://${SCRYPTED_SERVER}/_punch/ip`)).data.ip;
         }
 
-        if (this.storageSettings.values.forwardingMode === 'Custom Domain')
+        if (this.storageSettings.values.forwardingMode === 'Custom Domain' || this.cloudflareTunnelHost)
             upnpPort = 443;
 
         this.console.log(`Scrypted Cloud mapped https://${ip}:${upnpPort} to https://127.0.0.1:${this.securePort}`);
@@ -355,7 +379,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
             const registrationId = await this.manager.registrationId;
             const data = await this.sendRegistrationId(registrationId);
-            if (ip !== 'localhost' && ip !== data.ip_address) {
+            if (ip !== 'localhost' && ip !== data.ip_address && ip !== this.cloudflareTunnelHost) {
                 this.log.a(`Scrypted Cloud could not verify the IP Address of your custom domain ${this.storageSettings.values.hostname}.`);
             }
             this.storageSettings.values.lastPersistedIp = ip;
@@ -391,14 +415,15 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async refreshPortForward() {
-        if (this.storageSettings.values.forwardingMode === 'Disabled') {
-            this.updatePortForward(0);
-            return;
-        }
-
         let { upnpPort } = this.storageSettings.values;
+
         if (!upnpPort)
             upnpPort = Math.round(Math.random() * 30000 + 20000);
+
+        if (this.storageSettings.values.forwardingMode === 'Disabled') {
+            this.updatePortForward(upnpPort);
+            return;
+        }
 
         if (upnpPort === 443) {
             this.upnpStatus = 'Error: Port 443 Not Allowed';
@@ -413,7 +438,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             return this.updatePortForward(upnpPort);
 
         if (this.storageSettings.values.forwardingMode === 'Custom Domain')
-            return this.updatePortForward(upnpPort);
+            return this.updatePortForward(this.storageSettings.values.upnpPort);
 
         const [localAddress] = await endpointManager.getLocalAddresses() || [];
         if (!localAddress) {
@@ -501,6 +526,19 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         catch (e) {
             this.console.error('error updating cors, is your scrypted server up to date?', e);
         }
+    }
+
+    async updateExternalAddresses() {
+        const addresses = await systemManager.getComponent('addresses');
+        const cloudAddresses: string[] = [];
+        if (this.storageSettings.values.hostname)
+            cloudAddresses.push(`https://${this.storageSettings.values.hostname}`);
+        if (this.cloudflareTunnel)
+            cloudAddresses.push(this.cloudflareTunnel);
+
+        await addresses.setExternalAddresses('@scrypted/cloud', cloudAddresses);
+
+        await this.updatePortForward(this.storageSettings.values.upnpPort);
     }
 
     getAuthority() {
@@ -595,6 +633,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     getSSLHostname() {
         const validDomain = (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
+            || (this.storageSettings.values.cloudflaredTunnelToken && this.cloudflareTunnelHost)
             || (this.storageSettings.values.duckDnsCertValid && this.storageSettings.values.duckDnsHostname && this.storageSettings.values.upnpPort && `${this.storageSettings.values.duckDnsHostname}:${this.storageSettings.values.upnpPort}`);
         return validDomain;
     }
@@ -815,6 +854,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async startCloudflared() {
+        if (!this.storageSettings.values.cloudflareEnabled) {
+            this.console.log('cloudflared is disabled.');
+            return;
+        }
+
         while (true) {
             try {
                 this.console.log('starting cloudflared');
@@ -898,6 +942,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     cloudflareTunnel.child.on('exit', () => deferred.resolve(undefined));
                     try {
                         this.cloudflareTunnel = await Promise.any([deferred.promise, cloudflareTunnel.url]);
+                        this.updateExternalAddresses();
                         if (!this.cloudflareTunnel)
                             throw new Error('cloudflared exited, the provided cloudflare tunnel token may be invalid.')
                     }
@@ -924,6 +969,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             finally {
                 this.cloudflared = undefined;
                 this.cloudflareTunnel = undefined;
+                this.updateExternalAddresses();
             }
         }
     }

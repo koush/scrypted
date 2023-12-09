@@ -50,7 +50,7 @@ export function getAudioCodec(outputCodecParameters: RTCRtpCodecParameters) {
     }
     if (outputCodecParameters.name === 'PCMU') {
         return {
-            name: 'pcm_ulaw',
+            name: 'pcm_mulaw',
             encoder: 'pcm_mulaw',
         };
     }
@@ -72,7 +72,7 @@ export function getFFmpegRtpAudioOutputArguments(inputCodec: string, outputCodec
         ret.push(
             '-acodec', encoder,
             '-flags', '+global_header',
-            '-ar', '48k',
+            '-ar', `${outputCodecParameters.clockRate}`,
             // choose a better birate? this is on the high end recommendation for voice.
             '-b:a', '40k',
             '-bufsize', '96k',

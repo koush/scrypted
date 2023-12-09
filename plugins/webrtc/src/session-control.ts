@@ -3,7 +3,7 @@ import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
-import sdk, { FFmpegInput, Intercom, RTCSessionControl } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Intercom, MediaObject, RTCSessionControl } from "@scrypted/sdk";
 
 const { mediaManager } = sdk;
 
@@ -12,9 +12,24 @@ export class ScryptedSessionControl implements RTCSessionControl {
     killed = new Deferred<void>();
 
     constructor(public intercom: Intercom, public audioTransceiver: RTCRtpTransceiver) {
+        this.killed.promise.finally(async () => {
+            this.rtspServer?.client.destroy();
+            try {
+                await this.intercom?.stopIntercom();
+            }
+            catch (e) {
+            }
+        });
     }
 
-    async setPlayback(options: { audio: boolean; video: boolean; }) {
+    async setPlayback(options: { audio: boolean; video: boolean; }): Promise<void> {
+        await this.setPlaybackInternal(options);
+    }
+
+    async setPlaybackInternal(options: { audio: boolean; video: boolean; }): Promise<MediaObject> {
+        if (this.killed.finished)
+            return;
+
         if (!this.intercom)
             return;
 
@@ -35,50 +50,62 @@ export class ScryptedSessionControl implements RTCSessionControl {
 
         const url = rtspTcpServer.url.replace('tcp:', 'rtsp:');
         const ffmpegInput: FFmpegInput = {
+            container: 'rtsp',
             url,
             mediaStreamOptions: {
                 id: undefined,
                 video: null,
             },
             inputArguments: [
-                '-rtsp_transport', 'udp',
+                '-analyzeduration', '0',
+                '-probesize', '512',
+                '-rtsp_transport', 'tcp',
                 '-i', url,
             ],
         };
 
 
         const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput);
-        await this.intercom.startIntercom(mo);
+        rtspTcpServer.clientPromise.then(async client => {
+            const sdpReturnAudio = [
+                "v=0",
+                "o=- 0 0 IN IP4 127.0.0.1",
+                "s=" + "WebRTC Audio Talkback",
+                "c=IN IP4 127.0.0.1",
+                "t=0 0",
+                "b=AS:24",
 
-        const client = await rtspTcpServer.clientPromise;
+                // HACK, this may not be opus
+                "m=audio 0 RTP/AVP 110",
+                "a=rtpmap:110 opus/48000/2",
+                "a=fmtp:101 minptime=10;useinbandfec=1",
 
-        const sdpReturnAudio = [
-            "v=0",
-            "o=- 0 0 IN IP4 127.0.0.1",
-            "s=" + "WebRTC Audio Talkback",
-            "c=IN IP4 127.0.0.1",
-            "t=0 0",
-            "m=audio 0 RTP/AVP 110",
-            "b=AS:24",
-            // HACK, this may not be opus
-            "a=rtpmap:110 opus/48000/2",
-            "a=fmtp:101 minptime=10;useinbandfec=1",
-        ];
-        let sdp = sdpReturnAudio.join('\r\n');
-        sdp = createSdpInput(0, 0, sdp);
+                // "m=audio 0 RTP/AVP 0",
+                // "a=rtpmap:0 PCMU/8000",
+
+                // "m=audio 0 RTP/AVP 8",
+                // "a=rtpmap:8 PCMA/8000",
+            ];
+            let sdp = sdpReturnAudio.join('\r\n');
+            sdp = createSdpInput(0, 0, sdp);
 
 
-        const rtspServer = new RtspServer(client, sdp, true);
-        this.rtspServer = rtspServer;
-        // rtspServer.console = console;
-        await rtspServer.handlePlayback();
-        const parsedSdp = parseSdp(rtspServer.sdp);
-        const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
+            const rtspServer = new RtspServer(client, sdp);
+            this.rtspServer = rtspServer;
+            rtspServer.console = console;
+            await rtspServer.handlePlayback();
+            const parsedSdp = parseSdp(rtspServer.sdp);
+            const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
 
-        track.onReceiveRtp.subscribe(rtpPacket => {
-            rtpPacket.header.payloadType = 110;
-            rtspServer.sendTrack(audioTrack, rtpPacket.serialize(), false);
+            track.onReceiveRtp.subscribe(rtpPacket => {
+                rtpPacket.header.payloadType = 110;
+                rtspServer.sendTrack(audioTrack, rtpPacket.serialize(), false);
+            });
         });
+
+        await this.intercom.startIntercom(mo);
+        await rtspTcpServer.clientPromise;
+        return mo;
     }
 
     async getRefreshAt() {
@@ -87,7 +114,6 @@ export class ScryptedSessionControl implements RTCSessionControl {
     }
 
     async endSession() {
-        this.rtspServer?.client.destroy();
         this.killed.resolve(undefined);
     }
 }

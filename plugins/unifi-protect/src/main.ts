@@ -562,6 +562,13 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 placeholder: '192.168.1.100',
                 value: this.getSetting('ip') || '',
             },
+            {
+                key: 'useConnectionHost',
+                title: 'Use Connection Host',
+                description: 'Uses the connection host to connect to the RTSP Stream. This is required in stacked UNVR configurations. Disabling this setting will always use the configured Unifi Protect IP as the RTSP stream IP.',
+                type: 'boolean',
+                value: this.getSetting('useConnectionHost') !== 'false',
+            }
         ];
 
         if (!isInstanceableProviderModeEnabled()) {

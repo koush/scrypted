@@ -1,5 +1,5 @@
-import type { Worker as NodeWorker } from 'worker_threads';
 import type { Socket as NodeNetSocket } from 'net';
+import type { Worker as NodeWorker } from 'worker_threads';
 
 export type ScryptedNativeId = string | undefined;
 
@@ -490,6 +490,11 @@ export interface VideoStreamOptions {
   h264Info?: H264Info;
 }
 
+export interface RequestVideoStreamOptions extends VideoStreamOptions {
+  clientWidth?: number;
+  clientHeight?: number;
+}
+
 export interface AudioStreamOptions {
   codec?: string;
   encoder?: string;
@@ -569,6 +574,14 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
 
 export type MediaStreamDestination = "local" | "remote" | "medium-resolution" | "low-resolution" | "local-recorder" | "remote-recorder";
 
+export interface RequestMediaStreamAdaptiveOptions {
+  packetLoss?: boolean;
+  pictureLoss?: boolean;
+  keyframe?: boolean;
+  reconfigure?: boolean;
+  resize?: boolean;
+}
+
 export interface RequestMediaStreamOptions extends MediaStreamOptions {
   /**
    * When retrieving media, setting route directs how the media should be
@@ -602,10 +615,19 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
   destinationId?: string;
 
   /**
+   * The destination type of the target of this media stream. This
+   * should be the calling application package name. Used for logging
+   * or adaptive bitrate fingerprinting.
+   */
+  destinationType?: string;
+
+  /**
    * Request an adaptive bitrate stream, if available. The destination
    * will need to report packet loss indication.
    */
-  adaptive?: boolean;
+  adaptive?: boolean | RequestMediaStreamAdaptiveOptions;
+
+  video?: RequestVideoStreamOptions;
 }
 
 export interface MediaStreamPacketLoss {
@@ -627,6 +649,10 @@ export interface MediaStreamFeedback {
   reportPacketLoss(report: MediaStreamPacketLoss): Promise<void>;
   reportPictureLoss(): Promise<void>;
   reportEstimatedMaxBitrate(bitrate: number): Promise<void>;
+  resizeStream(options: {
+    width: number;
+    height: number;
+  }): Promise<void>;
 }
 
 /**
@@ -689,6 +715,8 @@ export interface RecordingStreamThumbnailOptions {
 }
 
 export interface VideoRecorder {
+  recordingActive?: boolean;
+
   /**
    * Returns a MediaObject for a recording stream.
    * @param options Options that denote where to start the recording stream.
@@ -706,6 +734,7 @@ export interface VideoRecorder {
 
 export interface VideoRecorderManagement {
   deleteRecordingStream(options: DeleteRecordingStreamOptions): Promise<void>;
+  setRecordingActive(recordingActive: boolean): Promise<void>
 }
 
 export interface RecordedEvent {
@@ -1285,7 +1314,6 @@ export interface BoundingBoxResult {
    * x, y, width, height
    */
   boundingBox?: [number, number, number, number];
-  zoneHistory?: { [zone: string]: ObjectDetectionHistory };
   zones?: string[];
   history?: ObjectDetectionHistory;
 }
@@ -1303,9 +1331,22 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
    */
   className: ObjectDetectionClass;
   /**
-   * The name of the object, if it was recognized as a familiar object (person, pet, etc).
+   * The label of the object, if it was recognized as a familiar object (person, pet, etc).
    */
-  name?: string;
+  label?: string;
+  /**
+   * A base64 encoded Float32Array that represents the vector descriptor of the detection.
+   * Can be used to compute euclidian distance to determine similarity. 
+   */
+  descriptor?: string;
+  /**
+   * The detection landmarks, like key points in a face landmarks.
+   */
+  landmarks?: Point[];
+  /**
+   * The detection clip paths that outlines various features or segments, like traced facial features.
+   */
+  clipPaths?: ClipPath[];
   score: number;
   resources?: VideoResource;
   /**
@@ -1428,7 +1469,13 @@ export interface VideoFrameGeneratorOptions extends ImageOptions {
   firstFrameOnly?: boolean;
 }
 export interface VideoFrameGenerator {
-  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions, filter?: (videoFrame: VideoFrame) => Promise<boolean>): Promise<AsyncGenerator<VideoFrame, void>>;
+  generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions): Promise<AsyncGenerator<VideoFrame, void>>;
+}
+/**
+ * Generic bidirectional stream connection.
+ */
+export interface StreamService {
+  connectStream(input: AsyncGenerator<any, void>): Promise<AsyncGenerator<any, void>>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -2019,6 +2066,7 @@ export enum ScryptedInterface {
   LauncherApplication = "LauncherApplication",
   ScryptedUser = "ScryptedUser",
   VideoFrameGenerator = 'VideoFrameGenerator',
+  StreamService = 'StreamService',
 }
 
 /**
@@ -2105,12 +2153,24 @@ export interface RTCSessionControl {
  */
 export interface RTCMediaObjectTrack {
   onStop(): Promise<void>;
-  replace(mediaObject: MediaObject): Promise<void>;
   stop(): Promise<void>;
+}
+
+/**
+ * @category WebRTC Reference
+ */
+export interface RTCOutputMediaObjectTrack extends RTCMediaObjectTrack{
+  replace(mediaObject: MediaObject): Promise<void>;
+}
+
+/**
+ * @category WebRTC Reference
+ */
+export interface RTCInputMediaObjectTrack extends RTCMediaObjectTrack{
   setPlayback(options: {
     audio: boolean,
     video: boolean,
-  }): Promise<void>;
+  }): Promise<MediaObject>;
 }
 
 /**
@@ -2121,8 +2181,15 @@ export interface RTCConnectionManagement {
   addTrack(mediaObject: MediaObject, options?: {
     videoMid?: string,
     audioMid?: string,
+    /**
+     * @deprecated
+     */
     intercomId?: string,
-  }): Promise<RTCMediaObjectTrack>;
+  }): Promise<RTCOutputMediaObjectTrack>;
+  addInputTrack(options: {
+    videoMid?: string,
+    audioMid?: string,
+  }): Promise<RTCInputMediaObjectTrack>;
   close(): Promise<void>;
   probe(): Promise<void>;
 }

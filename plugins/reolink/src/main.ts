@@ -6,12 +6,13 @@ import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } fro
 import { OnvifCameraAPI, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
-import { ReolinkCameraClient } from './reolink-api';
+import { DevInfo, Enc, ReolinkCameraClient } from './reolink-api';
 
 class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom {
     client: ReolinkCameraClient;
     onvifClient: OnvifCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
+    videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
 
     storageSettings = new StorageSettings(this, {
         doorbell: {
@@ -33,7 +34,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
         this.updateDeviceInfo();
         this.updateDevice();
     }
-    
+
     async startIntercom(media: MediaObject): Promise<void> {
         if (!this.onvifIntercom.url) {
             const client = await this.getOnvifClient();
@@ -162,85 +163,127 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
     }
 
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
-        const ret: UrlMediaStreamOptions[] = [];
+        this.videoStreamOptions ||= this.getConstructedVideoStreamOptionsInternal().catch(e => {
+            this.constructedVideoStreamOptions = undefined;
+            throw e;
+        });
 
-        const rtmpPreviews = [
-            `main.bcs`,
-            `ext.bcs`,
-            `sub.bcs`,
-        ];
-        for (const preview of rtmpPreviews) {
-            const url = new URL(`rtmp://${this.getRtmpAddress()}/bcs/channel${this.getRtspChannel()}_${preview}`);
-            const params = url.searchParams;
-            params.set('channel', this.getRtspChannel().toString());
-            params.set('stream', '0');
-            params.set('user', this.getUsername());
-            params.set('password', this.getPassword());
-            ret.push({
-                name: `RTMP ${preview}`,
-                id: preview,
-                url: url.toString(),
-            });
+        return this.videoStreamOptions;
+    }
+
+    async getConstructedVideoStreamOptionsInternal(): Promise<UrlMediaStreamOptions[]> {
+        let deviceInfo: DevInfo;
+        try {
+            const client = this.getClient();
+            deviceInfo = await client.getDeviceInfo();
+        } catch (e) {
+            this.console.error("Unable to gather device information.", e);
         }
 
-        // rough guesses for rebroadcast stream selection.
-        ret[0].container = 'rtmp';
-        ret[0].video = {
-            width: 2560,
-            height: 1920,
-        }
-        ret[1].container = 'rtmp';
-        ret[1].video = {
-            width: 896,
-            height: 672,
-        }
-        ret[2].container = 'rtmp';
-        ret[2].video = {
-            width: 640,
-            height: 480,
+        let encoderConfig: Enc;
+        try {
+            const client = this.getClient();
+            encoderConfig = await client.getEncoderConfiguration();
+        } catch (e) {
+            this.console.error("Codec query failed. Falling back to known defaults.", e);
         }
 
         const channel = (this.getRtspChannel() + 1).toString().padStart(2, '0');
-        const rtspPreviews = [
-            `h264Preview_${channel}_main`,
-            `h264Preview_${channel}_sub`,
-            `h265Preview_${channel}_main`,
-        ];
-        for (const preview of rtspPreviews) {
-            ret.push({
-                name: `RTSP ${preview}`,
-                id: preview,
-                url: `rtsp://${this.getRtspAddress()}/${preview}`,
+
+        const streams: UrlMediaStreamOptions[] = [
+            {
+                name: '',
+                id: 'main.bcs',
+                container: 'rtmp',
+                video: { width: 2560, height: 1920 },
+                url: ''
+            },
+            {
+                name: '',
+                id: 'ext.bcs',
+                container: 'rtmp',
+                video: { width: 896, height: 672 },
+                url: ''
+            },
+            {
+                name: '',
+                id: 'sub.bcs',
+                container: 'rtmp',
+                video: { width: 640, height: 480 },
+                url: ''
+            },
+            {
+                name: '',
+                id: `h264Preview_${channel}_main`,
                 container: 'rtsp',
-                video: {
-                    codec: preview.substring(0, 4),
-                },
-            });
+                video: { codec: 'h264', width: 2560, height: 1920 },
+                url: ''
+            },
+            {
+                name: '',
+                id: `h264Preview_${channel}_sub`,
+                container: 'rtsp',
+                video: { codec: 'h264', width: 640, height: 480 },
+                url: ''
+            }
+        ];
+
+        if (deviceInfo?.model == "Reolink TrackMix PoE"){
+            streams.push({
+                name: '',
+                id: 'autotrack.bcs',
+                container: 'rtmp',
+                video: { width: 896, height: 512 },
+                url: ''
+
+            })
         }
 
-        // rough guesses for h264
-        ret[3].container = 'rtsp';
-        ret[3].video = {
-            codec: 'h264',
-            width: 2560,
-            height: 1920,
-        }
-        ret[4].container = 'rtsp';
-        ret[4].video = {
-            codec: 'h264',
-            width: 896,
-            height: 672,
-        }
-
-        ret[5].container = 'rtsp';
-        ret[5].video = {
-            codec: 'h265',
-            width: 896,
-            height: 672,
+        for (const stream of streams) {
+            var streamUrl;
+            if (stream.container === 'rtmp') {
+                streamUrl = new URL(`rtmp://${this.getRtmpAddress()}/bcs/channel${this.getRtspChannel()}_${stream.id}`)
+                const params = streamUrl.searchParams;
+                params.set("channel", this.getRtspChannel().toString())
+                params.set("stream", '0')
+                params.set("user", this.getUsername())
+                params.set("password", this.getPassword())
+                stream.url = streamUrl.toString();
+                stream.name = `RTMP ${stream.id}`;
+            } else if (stream.container === 'rtsp') {
+                streamUrl = new URL(`rtsp://${this.getRtspAddress()}/${stream.id}`)
+                stream.url = streamUrl.toString();
+                stream.name = `RTSP ${stream.id}`;
+            }
         }
 
+        if (encoderConfig) {
+            const { mainStream } = encoderConfig;
+            if (mainStream?.width && mainStream?.height) {
+                for (const stream of streams) {
+                    if (stream.id === 'main.bcs' || stream.id === `h264Preview_${channel}_main`) {
+                        stream.video.width = mainStream.width;
+                        stream.video.height = mainStream.height;
+                    }
+                    // 4k h265 rtmp is seemingly nonfunctional, but rtsp works. swap them so there is a functional stream.
+                    if (mainStream.vType === 'h265' || mainStream.vType === 'hevc') {
+                        if (stream.id === `h264Preview_${channel}_main`) {
+                            this.console.warn('Detected h265. Change the camera configuration to use 2k mode to force h264. https://docs.scrypted.app/camera-preparation.html#h-264-video-codec');
+                            stream.video.codec = 'h265';
+                            stream.id = `h265Preview_${channel}_main`;
+                            stream.name = `RTSP ${stream.id}`;
+                            stream.url = `rtsp://${this.getRtspAddress()}/${stream.id}`;
+                            // Per Reolink:
+                            // https://support.reolink.com/hc/en-us/articles/360007010473-How-to-Live-View-Reolink-Cameras-via-VLC-Media-Player/
+                            // Note: the 4k cameras connected with the 4k NVR system will only show a fluent live stream instead of the clear live stream due to the H.264+(h.265) limit.
+                        }
+                    }
+                }
+            }
+        }
 
-        return ret;
+        return streams;
+    
     }
 
     async putSetting(key: string, value: string) {
@@ -291,7 +334,7 @@ class ReolinkProider extends RtspProvider {
         const username = settings.username?.toString();
         const password = settings.password?.toString();
         const doorbell = settings.doorbell?.toString();
-        const skipValidate = settings.skipValidate === 'true';
+        const skipValidate = settings.skipValidate?.toString() === 'true';
         const rtspChannel = parseInt(settings.rtspChannel?.toString()) || 0;
         if (!skipValidate) {
             try {

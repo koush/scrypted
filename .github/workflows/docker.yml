@@ -19,7 +19,14 @@ jobs:
 #     runs-on: ubuntu-latest
     strategy:
       matrix:
-        BASE: ["18-jammy-full", "18-jammy-lite", "18-jammy-thin", "20-jammy-full", "20-jammy-lite", "20-jammy-thin"]
+        BASE: [
+          "18-jammy-full",
+          "18-jammy-lite",
+          # "18-jammy-thin",
+          # "20-jammy-full",
+          # "20-jammy-lite",
+          # "20-jammy-thin",
+        ]
         SUPERVISOR: ["", ".s6"]
     steps:
       - name: Check out the repo

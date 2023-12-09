@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 
-import fs from 'fs';
-import path from 'path';
-import axios, { AxiosRequestConfig } from 'axios';
-import readline from 'readline-sync';
-import https from 'https';
-import mkdirp from 'mkdirp';
-import { installServe, serveMain } from './service';
 import { connectScryptedClient } from '@scrypted/client';
-import { ScryptedMimeTypes, FFmpegInput } from '@scrypted/types';
-import semver from 'semver';
+import { FFmpegInput, ScryptedMimeTypes } from '@scrypted/types';
+import axios, { AxiosRequestConfig } from 'axios';
 import child_process from 'child_process';
+import fs from 'fs';
+import https from 'https';
+import path from 'path';
+import readline from 'readline-sync';
+import semver from 'semver';
+import { installServe, serveMain } from './service';
+import { connectShell } from './shell';
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -64,7 +64,9 @@ async function doLogin(host: string) {
         httpsAgent,
     }, axiosConfig));
 
-    mkdirp.sync(scryptedHome);
+    fs.mkdirSync(scryptedHome, {
+        recursive: true,
+    });
     let login: LoginFile;
     try {
         login = JSON.parse(fs.readFileSync(loginPath).toString());
@@ -220,6 +222,25 @@ async function main() {
 
         console.log('install successful. id:', response.data.id);
     }
+    else if (process.argv[2] === 'shell') {
+        console.log = () => { };
+
+        const host = toIpAndPort(process.argv[3] || '127.0.0.1');
+        const login = await getOrDoLogin(host);
+        const sdk = await connectScryptedClient({
+            baseUrl: `https://${host}`,
+            pluginId: '@scrypted/core',
+            username: login.username,
+            password: login.token,
+            axiosConfig: {
+                httpsAgent,
+            }
+        });
+
+        const separator = process.argv.indexOf("--");
+        const cmd = separator != -1 ? process.argv.slice(separator + 1) : [];
+        await connectShell(sdk, ...cmd);
+    }
     else {
         console.log('usage:');
         console.log('   npx scrypted install npm-package-name [127.0.0.1[:10443]]');
@@ -231,6 +252,7 @@ async function main() {
         console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted ffplay name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
+        console.log('   npx scrypted shell [127.0.0.1[:10443]] [-- cmd [...cmd-args]]');
         console.log();
         console.log('examples:');
         console.log('   npx scrypted install @scrypted/rtsp');

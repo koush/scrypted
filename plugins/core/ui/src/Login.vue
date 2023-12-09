@@ -112,6 +112,16 @@ export default {
         try {
           const redirect_uri = new URL(window.location).searchParams.get('redirect_uri');
           if (redirect_uri) {
+            try {
+              const parsed = new URL(redirect_uri);
+              // allow everything but javascript evaluation within this browser (ie, custom uri handlers, https, etc are all valid)
+              if (parsed.protocol === 'javascript:') {
+                window.location = '/';
+                return;
+              }
+            }
+            catch (e) {
+            }
             window.location = redirect_uri;
             return;
           }

@@ -1,7 +1,45 @@
-import axios from 'axios';
 import AxiosDigestAuth from "@koush/axios-digest-auth";
-import https from 'https';
 import { getMotionState, reolinkHttpsAgent } from './probe';
+
+export interface Enc {
+    audio:      number;
+    channel:    number;
+    mainStream: Stream;
+    subStream:  Stream;
+}
+
+export interface Stream {
+    bitRate:   number;
+    frameRate: number;
+    gop:       number;
+    height:    number;
+    profile:   string;
+    size:      string;
+    vType:     string;
+    width:     number;
+}
+
+export interface DevInfo {
+    B485:         number;
+    IOInputNum:   number;
+    IOOutputNum:  number;
+    audioNum:     number;
+    buildDay:     string;
+    cfgVer:       string;
+    channelNum:   number;
+    detail:       string;
+    diskNum:      number;
+    exactType:    string;
+    firmVer:      string;
+    frameworkVer: number;
+    hardVer:      string;
+    model:        string;
+    name:         string;
+    pakSuffix:    string;
+    serial:       string;
+    type:         string;
+    wifi:         number;
+}
 
 export class ReolinkCameraClient {
     digestAuth: AxiosDigestAuth;
@@ -76,5 +114,35 @@ export class ReolinkCameraClient {
         });
 
         return Buffer.from(response.data);
+    }
+
+    async getEncoderConfiguration(): Promise<Enc> {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'GetEnc');
+        // is channel used on this call?
+        params.set('channel', this.channelId.toString());
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.digestAuth.request({
+            url: url.toString(),
+            httpsAgent: reolinkHttpsAgent,
+        });
+
+        return response.data?.[0]?.value?.Enc;
+    }
+
+    async getDeviceInfo(): Promise<DevInfo> {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'GetDevInfo');
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.digestAuth.request({
+            url: url.toString(),
+            httpsAgent: reolinkHttpsAgent,
+        });
+
+        return response.data?.[0]?.value?.DevInfo;
     }
 }

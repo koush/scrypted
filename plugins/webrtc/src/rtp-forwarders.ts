@@ -2,7 +2,7 @@ import { Deferred } from "@scrypted/common/src/deferred";
 import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import { RtspClient, RtspServer, RtspServerResponse, RtspStatusError } from "@scrypted/common/src/rtsp-server";
-import { MSection, addTrackControls, parseSdp, replaceSectionPort } from "@scrypted/common/src/sdp-utils";
+import { MSection, RTPMap, addTrackControls, parseSdp, replaceSectionPort } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
@@ -16,6 +16,7 @@ type StringWithAutocomplete<T> = T | (string & Record<never, never>);
 export type RtpCodecCopy = StringWithAutocomplete<"copy">;
 
 export interface RtpTrack {
+    negotiate?: (msection: MSection) => Promise<boolean>;
     codecCopy?: RtpCodecCopy;
     ffmpegDestination?: string;
     packetSize?: number;
@@ -164,7 +165,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
     if (ffmpegInput.url
         && isRtsp
-        && isCodecCopy(videoCodec, ffmpegInput.mediaStreamOptions?.video?.codec)) {
+        && (!video || isCodecCopy(videoCodec, ffmpegInput.mediaStreamOptions?.video?.codec))) {
 
         // console.log('video codec matched:', rtpTracks.video.codecCopy);
 
@@ -178,30 +179,45 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             const describe = await rtspClient.describe();
             rtspSdp = describe.body.toString();
             const parsedSdp = parseSdp(rtspSdp);
-
-            const videoSection = parsedSdp.msections.find(msection => msection.type === 'video' && (msection.codec === videoCodec || videoCodec === 'copy'));
-            // maybe fallback to udp forwarding/transcoding?
-            if (!videoSection)
-                throw new Error(`advertised video codec ${videoCodec} not found in sdp.`);
-
-            if (!videoSection.codec) {
-                console.warn('Unable to determine sdpvideo codec? Please report this to @koush on Discord.');
-                console.warn(rtspSdp);
-            }
-
-            videoSectionDeferred.resolve(videoSection);
+            let videoSection: MSection;
 
             let channel = 0;
-            await setupRtspClient(console, rtspClient, channel, videoSection, rtspClientForceTcp, createPacketDelivery(video));
-            channel += 2;
 
-            const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio' && (msection.codec === audioCodec || audioCodec === 'copy'));
+            if (video) {
+                videoSection = parsedSdp.msections.find(msection => msection.type === 'video' && (msection.codec === videoCodec || videoCodec === 'copy'));
+                // maybe fallback to udp forwarding/transcoding?
+                if (!videoSection)
+                    throw new Error(`advertised video codec ${videoCodec} not found in sdp.`);
 
-            console.log('a/v', videoCodec, audioCodec, 'found', videoSection.codec, audioSection?.codec);
+                if (!videoSection.codec) {
+                    console.warn('Unable to determine sdpvideo codec? Please report this to @koush on Discord.');
+                    console.warn(rtspSdp);
+                }
+
+                videoSectionDeferred.resolve(videoSection);
+
+                await setupRtspClient(console, rtspClient, channel, videoSection, rtspClientForceTcp, createPacketDelivery(video));
+                channel += 2;
+            }
+            else {
+                videoSectionDeferred.resolve(undefined);
+            }
+
+            const audioSections = parsedSdp.msections.filter(msection => msection.type === 'audio');
+            let audioSection = audioSections.find(msection => msection.codec === audioCodec || audioCodec === 'copy');
+            if (!audioSection) {
+                for (const check of audioSections) {
+                    if (await audio?.negotiate?.(check) === true) {
+                        audioSection = check;
+                        break;
+                    }
+                }
+            }
+
+            console.log('a/v', videoCodec, audioCodec, 'found', videoSection?.codec, audioSection?.codec);
 
             if (audio) {
-                if (audioSection
-                    && isCodecCopy(audioCodec, audioSection?.codec)) {
+                if (audioSection) {
 
                     // console.log('audio codec matched:', audio.codecCopy);
 
@@ -216,9 +232,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                     // console.log('audio codec transcoding:', audio.codecCopy);
 
                     const newSdp = parseSdp(rtspSdp);
-                    let audioSection = newSdp.msections.find(msection => msection.type === 'audio' && msection.codec === audioCodec)
-                    if (!audioSection)
-                        audioSection = newSdp.msections.find(msection => msection.type === 'audio');
+                    const audioSection = newSdp.msections.find(msection => msection.type === 'audio');
 
                     if (!audioSection) {
                         delete rtpTracks.audio;

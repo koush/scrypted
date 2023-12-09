@@ -9,10 +9,13 @@ import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-de
 import type { IOSocket } from '../../../server/src/io';
 import { MediaObject } from '../../../server/src/plugin/mediaobject';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
+import type { ClusterObject, ConnectRPCObject } from '../../../server/src/cluster/connect-rpc-object';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import packageJson from '../package.json';
 import { isIPAddress } from "./ip";
+
+const sourcePeerId = RpcPeer.generateId();
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -132,22 +135,18 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
     if (response.status !== 200)
         throw new Error('status ' + response.status);
 
-    const addresses = response.data.addresses as string[] || [];
-    // the cloud plugin will include this header.
-    // should maybe move this into the cloud server itself.
-    const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
-    const directAddress = response.headers['x-scrypted-direct-address'];
-    const cloudAddress = response.headers['x-scrypted-cloud-address'];
-
     return {
         error: response.data.error as string,
         authorization: response.data.authorization as string,
         queryToken: response.data.queryToken as any,
         token: response.data.token as string,
-        addresses,
-        scryptedCloud,
-        directAddress,
-        cloudAddress,
+        addresses: response.data.addresses as string[],
+        externalAddresses: response.data.externalAddresses as string[],
+        // the cloud plugin will include this header.
+        // should maybe move this into the cloud server itself.
+        scryptedCloud: response.headers['x-scrypted-cloud'] === 'true',
+        directAddress: response.headers['x-scrypted-direct-address'],
+        cloudAddress: response.headers['x-scrypted-cloud-address'],
     };
 }
 
@@ -169,9 +168,6 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         headers,
         ...options?.axiosConfig,
     });
-    const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
-    const directAddress = response.headers['x-scrypted-direct-address'];
-    const cloudAddress = response.headers['x-scrypted-cloud-address'];
 
     return {
         baseUrl,
@@ -185,9 +181,12 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         queryToken: response.data.queryToken as any,
         token: response.data.token as string,
         addresses: response.data.addresses as string[],
-        scryptedCloud,
-        directAddress,
-        cloudAddress,
+        externalAddresses: response.data.externalAddresses as string[],
+        // the cloud plugin will include this header.
+        // should maybe move this into the cloud server itself.
+        scryptedCloud: response.headers['x-scrypted-cloud'] === 'true',
+        directAddress: response.headers['x-scrypted-direct-address'],
+        cloudAddress: response.headers['x-scrypted-cloud-address'],
     };
 }
 
@@ -197,6 +196,7 @@ export interface ScryptedClientLoginResult {
     authorization: string;
     queryToken: { [parameter: string]: string };
     localAddresses: string[];
+    externalAddresses: string[];
     scryptedCloud: boolean;
     directAddress: string;
     cloudAddress: string;
@@ -241,6 +241,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let authorization: string;
     let queryToken: any;
     let localAddresses: string[];
+    let externalAddresses: string[];
     let scryptedCloud: boolean;
     let directAddress: string;
     let cloudAddress: string;
@@ -262,6 +263,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         if (loginResult.authorization)
             extraHeaders['Authorization'] = loginResult.authorization;
         localAddresses = loginResult.addresses;
+        externalAddresses = loginResult.externalAddresses;
         scryptedCloud = loginResult.scryptedCloud;
         directAddress = loginResult.directAddress;
         cloudAddress = loginResult.cloudAddress;
@@ -272,13 +274,21 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     }
     else {
         const urlsToCheck = new Set<string>();
-        for (const u of [
-            ...options?.previousLoginResult?.localAddresses || [],
-            options?.previousLoginResult?.directAddress,
-            options?.previousLoginResult?.cloudAddress,
-        ]) {
-            if (u && options?.previousLoginResult?.token && (isNotChromeOrIsInstalledApp || options.direct))
-                urlsToCheck.add(u);
+        if (options?.previousLoginResult?.token) {
+            for (const u of [
+                ...options?.previousLoginResult?.localAddresses || [],
+                options?.previousLoginResult?.directAddress,
+            ]) {
+                if (u && (isNotChromeOrIsInstalledApp || options.direct))
+                    urlsToCheck.add(u);
+            }
+            for (const u of [
+                ...options?.previousLoginResult?.externalAddresses || [],
+                options?.previousLoginResult?.cloudAddress,
+            ]) {
+                if (u)
+                    urlsToCheck.add(u);
+            }
         }
 
         // the alternate urls must have a valid response.
@@ -319,6 +329,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         if (loginCheck.error || loginCheck.redirect)
             throw new ScryptedClientLoginError(loginCheck);
         localAddresses = loginCheck.addresses;
+        externalAddresses = loginCheck.externalAddresses;
         scryptedCloud = loginCheck.scryptedCloud;
         directAddress = loginCheck.directAddress;
         cloudAddress = loginCheck.cloudAddress;
@@ -332,8 +343,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let socket: IOClientSocket;
     const eioPath = `endpoint/${pluginId}/engine.io/api`;
     const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
+    // https://github.com/socketio/engine.io/issues/690
+    const cacehBust = Math.random().toString(36).substring(3, 10);
     const eioOptions: Partial<SocketOptions> = {
         path: eioEndpoint,
+        query: {
+            cacehBust,
+        },
         withCredentials: true,
         extraHeaders,
         rejectUnauthorized: false,
@@ -360,8 +376,12 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         addresses.push(directAddress);
     }
 
-    if (((tryAlternateAddresses && options.direct === undefined) || options.direct) && cloudAddress) {
-        addresses.push(cloudAddress);
+    if ((tryAlternateAddresses && options.direct === undefined) || options.direct) {
+        if (cloudAddress)
+            addresses.push(cloudAddress);
+        for (const externalAddress of externalAddresses || []) {
+            addresses.push(externalAddress);
+        }
     }
 
     const tryAddresses = !!addresses.length;
@@ -408,7 +428,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         // It is probably better to simply prompt and redirect to the LAN address
         // if it is reacahble.
 
-        for (const address of addresses) {
+        for (const address of new Set(addresses)) {
             console.log('trying', address);
             const check = new eio.Socket(address, localEioOptions);
             sockets.push(check);
@@ -427,6 +447,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         console.log('trying webrtc');
         const webrtcEioOptions: Partial<SocketOptions> = {
             path: '/endpoint/@scrypted/webrtc/engine.io/',
+            query: {
+                cacehBust,
+            },
             withCredentials: true,
             extraHeaders,
             rejectUnauthorized: false,
@@ -687,6 +710,105 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             .map(id => systemManager.getDeviceById(id))
             .find(device => device.pluginId === '@scrypted/core' && device.nativeId === `user:${username}`);
 
+        const clusterPeers = new Map<number, Promise<RpcPeer>>();
+        const ensureClusterPeer = (clusterObject: ClusterObject) => {
+            let clusterPeerPromise = clusterPeers.get(clusterObject.port);
+            if (!clusterPeerPromise) {
+                clusterPeerPromise = (async () => {
+                    const eioPath = 'engine.io/connectRPCObject';
+                    const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
+                    const clusterPeerOptions = {
+                        path: eioEndpoint,
+                        query: {
+                            cacehBust,
+                            clusterObject: JSON.stringify(clusterObject),
+                        },
+                        withCredentials: true,
+                        extraHeaders,
+                        rejectUnauthorized: false,
+                        transports: options?.transports,
+                    };
+
+                    const clusterPeerSocket = new eio.Socket(explicitBaseUrl, clusterPeerOptions);
+                    let peerReady = false;
+                    clusterPeerSocket.on('close', () => {
+                        clusterPeers.delete(clusterObject.port);
+                        if (!peerReady) {
+                            throw new Error("peer disconnected before setup completed");
+                        }
+                    });
+
+                    try {
+                        await once(clusterPeerSocket, 'open');
+
+                        const serializer = createRpcDuplexSerializer({
+                            write: data => clusterPeerSocket.send(data),
+                        });
+                        clusterPeerSocket.on('message', data => serializer.onData(Buffer.from(data)));
+
+                        const clusterPeer = new RpcPeer(clientName || 'engine.io-client', "cluster-proxy", (message, reject, serializationContext) => {
+                            try {
+                                serializer.sendMessage(message, reject, serializationContext);
+                            }
+                            catch (e) {
+                                reject?.(e);
+                            }
+                        });
+                        serializer.setupRpcPeer(clusterPeer);
+                        clusterPeer.tags.localPort = sourcePeerId;
+                        peerReady = true;
+                        return clusterPeer;
+                    }
+                    catch (e) {
+                        console.error('failure ipc connect', e);
+                        clusterPeerSocket.close();
+                        throw e;
+                    }
+                })();
+                clusterPeers.set(clusterObject.port, clusterPeerPromise);
+            }
+            return clusterPeerPromise;
+        };
+
+        const resolveObject = async (proxyId: string, sourcePeerPort: number) => {
+            const sourcePeer = await clusterPeers.get(sourcePeerPort);
+            if (sourcePeer?.remoteWeakProxies) {
+                return Object.values(sourcePeer.remoteWeakProxies).find(
+                    v => v.deref()?.__cluster?.proxyId == proxyId
+                )?.deref();
+            }
+            return null;
+        }
+
+        const connectRPCObject = async (value: any) => {
+            const clusterObject: ClusterObject = value?.__cluster;
+            if (!clusterObject) {
+                return value;
+            }
+
+            const { port, proxyId  } = clusterObject;
+
+            // check if object is already connected
+            const resolved = await resolveObject(proxyId, port);
+            if (resolved) {
+                return resolved;
+            }
+
+            try {
+                const clusterPeerPromise = ensureClusterPeer(clusterObject);
+                const clusterPeer = await clusterPeerPromise;
+                const connectRPCObject: ConnectRPCObject = await clusterPeer.getParam('connectRPCObject');
+                const newValue = await connectRPCObject(clusterObject);
+                if (!newValue)
+                    throw new Error('ipc object not found?');
+                return newValue;
+            }
+            catch (e) {
+                console.error('failure ipc', e);
+                return value;
+            }
+        }
+
         const ret: ScryptedClientStatic = {
             userId: userDevice?.id,
             serverVersion,
@@ -711,11 +833,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 token,
                 directAddress,
                 localAddresses,
+                externalAddresses,
                 scryptedCloud,
                 queryToken,
                 authorization,
                 cloudAddress,
-            }
+            },
+            connectRPCObject,
         }
 
         socket.on('close', () => {
