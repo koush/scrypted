@@ -574,6 +574,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
 
         const { token_info } = this.storageSettings.values;
+        if (!token_info)
+            throw new Error('Scrypted Cloud is not logged in. Skipping home.scrypted.app registration.');
         const response = await axios(`https://${SCRYPTED_SERVER}/_punch/register?${q}`, {
             headers: {
                 Authorization: `Bearer ${token_info}`
