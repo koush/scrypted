@@ -124,14 +124,18 @@ async function start(mainFilename: string, options?: {
     await db.open();
 
     let certSetting = await db.tryGet(Settings, 'certificate') as Settings;
+    let keyPair: ReturnType<typeof createSelfSignedCertificate> = certSetting?.value;
 
     if (certSetting?.value?.version !== CURRENT_SELF_SIGNED_CERTIFICATE_VERSION) {
-        const cert = createSelfSignedCertificate();
+        keyPair = createSelfSignedCertificate();
 
         certSetting = new Settings();
         certSetting._id = 'certificate';
-        certSetting.value = cert;
+        certSetting.value = keyPair;
         certSetting = await db.upsert(certSetting);
+    }
+    else {
+        keyPair = createSelfSignedCertificate(keyPair.serviceKey);
     }
 
     const basicAuth = httpAuth.basic({
@@ -147,15 +151,13 @@ async function start(mainFilename: string, options?: {
         callback(sha === user.passwordHash || password === user.token);
     });
 
-    const keys = certSetting.value;
-
     const httpsServerOptions = process.env.SCRYPTED_HTTPS_OPTIONS_FILE
         ? JSON.parse(fs.readFileSync(process.env.SCRYPTED_HTTPS_OPTIONS_FILE).toString())
         : {};
 
     const mergedHttpsServerOptions = Object.assign({
-        key: keys.serviceKey,
-        cert: keys.certificate
+        key: keyPair.serviceKey,
+        cert: keyPair.certificate
     }, httpsServerOptions);
     const secure = https.createServer(mergedHttpsServerOptions, app);
     const insecure = http.createServer(app);

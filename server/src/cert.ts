@@ -7,12 +7,20 @@ const { pki } = forge;
 
 export const CURRENT_SELF_SIGNED_CERTIFICATE_VERSION = 'v2';
 
-export function createSelfSignedCertificate() {
-
-    // generate a keypair and create an X.509v3 certificate
-    const keys = pki.rsa.generateKeyPair(2048);
+export function createSelfSignedCertificate(serviceKey?: string) {
+    let privateKey: ReturnType<typeof pki.privateKeyFromPem>;
     const cert = pki.createCertificate();
-    cert.publicKey = keys.publicKey;
+
+    if (serviceKey) {
+        privateKey = pki.privateKeyFromPem(serviceKey);
+        cert.publicKey = pki.rsa.setPublicKey(privateKey.n, privateKey.e);
+    }
+    else {
+        // generate a keypair and create an X.509v3 certificate
+        const keys = pki.rsa.generateKeyPair(2048);
+        privateKey = keys.privateKey;
+        cert.publicKey = keys.publicKey;
+    }
 
     // NOTE: serialNumber is the hex encoded value of an ASN.1 INTEGER.
     // Conforming CAs should ensure serialNumber is:
@@ -65,9 +73,9 @@ export function createSelfSignedCertificate() {
     }]);
 
     // self-sign certificate
-    cert.sign(keys.privateKey);
+    cert.sign(privateKey);
     return {
-        serviceKey: pki.privateKeyToPem(keys.privateKey),
+        serviceKey: pki.privateKeyToPem(privateKey),
         certificate: pki.certificateToPem(cert),
         version: CURRENT_SELF_SIGNED_CERTIFICATE_VERSION,
     };
