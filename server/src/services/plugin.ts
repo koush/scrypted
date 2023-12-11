@@ -91,9 +91,15 @@ export class PluginComponent {
         const host = this.scrypted.plugins[pluginId];
         let rpcObjects = 0;
         let pendingResults = 0;
+        const pendingResultMethods: {
+            [method: string]: number,
+        } = {};
         if (host.peer) {
             rpcObjects = host.peer.localProxied.size + Object.keys(host.peer.remoteWeakProxies).length;
             pendingResults = Object.keys(host.peer.pendingResults).length;
+            for (const deferred of Object.values(host.peer.pendingResults)) {
+                pendingResultMethods[deferred.method] = (pendingResultMethods[deferred.method] || 0) + 1;
+            }
         }
         return {
             pid: host?.worker?.pid,
@@ -101,6 +107,7 @@ export class PluginComponent {
             rpcObjects,
             packageJson,
             pendingResults,
+            pendingResultCounts: pendingResultMethods,
             id: this.scrypted.findPluginDevice(pluginId)._id,
         }
     }
