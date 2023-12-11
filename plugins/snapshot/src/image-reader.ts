@@ -71,6 +71,12 @@ export class VipsImage implements Image {
         if (options?.format === 'rgb') {
             transformed.removeAlpha().toFormat('raw');
         }
+        else if (options?.format === 'rgba') {
+            transformed.ensureAlpha().toFormat('raw');
+        }
+        else if (options?.format === 'gray') {
+            transformed.toFormat('raw').grayscale();
+        }
         else if (options?.format === 'jpg') {
             transformed.toFormat('jpg');
         }
@@ -106,6 +112,8 @@ export class VipsImage implements Image {
 }
 
 export async function loadVipsImage(data: Buffer | string, sourceId: string) {
+    loadSharp();
+
     const image = sharpInstance(data, {
         failOnError: false,
     });
