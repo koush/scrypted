@@ -410,8 +410,6 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
 
                 await rtsp.handlePlayback();
 
-                this.videoStreamStartedAt = new Date().getTime()
-
                 this.session = sip
 
                 videoSplitter.server.on('message', (message, rinfo) => {
