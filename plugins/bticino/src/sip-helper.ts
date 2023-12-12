@@ -61,7 +61,7 @@ export class SipHelper {
         if( !md5 ) {
             md5 = crypto.createHash('md5').update( camera.nativeId ).digest("hex")
             md5 = md5.substring(0, 8) + '-' + md5.substring(8, 12) + '-' + md5.substring(12,16) + '-' + md5.substring(16, 32)
-            camera.storage.setItem('md5has', md5)
+            camera.storage.setItem('md5hash', md5)
         }
         return md5
     }    

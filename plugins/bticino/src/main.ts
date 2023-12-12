@@ -115,6 +115,7 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
                 ScryptedInterface.Settings,
                 ScryptedInterface.Intercom,
                 ScryptedInterface.BinarySensor,
+                ScryptedInterface.MotionSensor,
                 ScryptedDeviceType.DeviceProvider,
                 ScryptedInterface.HttpRequestHandler,
                 ScryptedInterface.VideoClips,
