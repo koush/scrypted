@@ -59,13 +59,13 @@ export async function read16BELengthLoop(readable: Readable, options: {
 
 export class StreamEndError extends Error {
   constructor() {
-    super()
+    super('stream ended');
   }
 }
 
 export async function readLength(readable: Readable, length: number): Promise<Buffer> {
   if (readable.readableEnded || readable.destroyed)
-    throw new Error("stream ended");
+    throw new StreamEndError();
 
   if (!length) {
     return Buffer.alloc(0);

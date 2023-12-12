@@ -203,14 +203,14 @@ class PrebufferSession {
       return;
     this.console.log(this.streamName, 'prebuffer session started');
     this.parserSessionPromise = this.startPrebufferSession();
-    this.parserSessionPromise.catch(e => {
-      this.console.error(this.streamName, 'prebuffer session ended with error', e);
-      this.parserSessionPromise = undefined;
-    });
     this.parserSessionPromise.then(pso => pso.killed.finally(() => {
       this.console.error(this.streamName, 'prebuffer session ended');
       this.parserSessionPromise = undefined;
-    }));
+    }))
+      .catch(e => {
+        this.console.error(this.streamName, 'prebuffer session ended with error', e);
+        this.parserSessionPromise = undefined;
+      });
   }
 
   canUseRtspParser(mediaStreamOptions: MediaStreamOptions) {
