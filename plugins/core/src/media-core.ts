@@ -16,7 +16,7 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
     constructor() {
         super(MediaCoreNativeId);
 
-        this.fromMimeType = ScryptedMimeTypes.SchemePrefix + 'scrypted-media';
+        this.fromMimeType = ScryptedMimeTypes.SchemePrefix + 'scrypted-media' + ';converter-weight=2';
         this.toMimeType = ScryptedMimeTypes.MediaObject;
 
         (async () => {
