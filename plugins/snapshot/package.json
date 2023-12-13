@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/snapshot",
-   "version": "0.2.15",
+   "version": "0.2.16",
    "description": "Snapshot Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -29,7 +29,8 @@
          "Settings",
          "MixinProvider",
          "BufferConverter",
-         "DeviceProvider"
+         "DeviceProvider",
+         "HttpRequestHandler"
       ]
    },
    "dependencies": {

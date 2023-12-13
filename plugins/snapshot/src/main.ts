@@ -2,16 +2,16 @@ import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
 import { createMapPromiseDebouncer, RefreshPromise, singletonPromise, TimeoutError } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios, { AxiosInstance } from "axios";
 import https from 'https';
 import path from 'path';
-import MimeType from 'whatwg-mimetype';
+import url from 'url';
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
-import { ImageReader, ImageReaderNativeId, loadVipsImage, loadSharp } from './image-reader';
+import { ImageConverter, ImageConverterNativeId } from './image-converter';
+import { ImageReader, ImageReaderNativeId, loadSharp, loadVipsImage } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
-import { parseDims, parseImageOp, processImageOp } from './parse-dims';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -538,20 +538,21 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 }
 
-class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider {
+export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider, HttpRequestHandler {
     storageSettings = new StorageSettings(this, {
         debugLogging: {
             title: 'Debug Logging',
             description: 'Debug logging for all cameras will be shown in the Snapshot Plugin Console.',
             type: 'boolean',
-        }
+        },
     });
+    mixinDevices = new Map<string, SnapshotMixin>();
 
     constructor(nativeId?: string) {
         super(nativeId);
 
-        this.fromMimeType = ScryptedMimeTypes.FFmpegInput;
-        this.toMimeType = 'image/jpeg';
+        this.fromMimeType = ScryptedMimeTypes.SchemePrefix + 'scrypted-media' + ';converter-weight=0';
+        this.toMimeType = ScryptedMimeTypes.LocalUrl;
 
         const manifest: DeviceManifest = {
             devices: [
@@ -562,8 +563,16 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
                     ],
                     type: ScryptedDeviceType.Builtin,
                     nativeId: ImageWriterNativeId,
+                },
+                {
+                    name: 'Image Converter',
+                    interfaces: [
+                        ScryptedInterface.BufferConverter,
+                    ],
+                    type: ScryptedDeviceType.Builtin,
+                    nativeId: ImageConverterNativeId,
                 }
-            ]
+            ],
         };
 
         if (loadSharp()) {
@@ -585,6 +594,8 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
     }
 
     async getDevice(nativeId: string): Promise<any> {
+        if (nativeId === ImageConverterNativeId)
+            return new ImageConverter(this, ImageConverterNativeId);
         if (nativeId === ImageWriterNativeId)
             return new ImageWriter(ImageWriterNativeId);
         if (nativeId === ImageReaderNativeId)
@@ -607,13 +618,74 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
             return this.console;
     }
 
+
+    async getLocalSnapshot(id: string, iface: string, search: string) {
+        const endpoint = await sdk.endpointManager.getAuthenticatedPath(this.nativeId);
+        const ret = url.resolve(path.join(endpoint, id, iface, `${Date.now()}.jpg`) + `${search}`, '');
+        return Buffer.from(ret);
+    }
+
     async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
-        const mime = new MimeType(toMimeType);
+        const url = new URL(data.toString());
+        const id = url.hostname;
+        const path = url.pathname.split('/')[1];
 
-        const op = parseImageOp(mime.parameters);
-        const ffmpegInput = JSON.parse(data.toString()) as FFmpegInput;
+        if (path === ScryptedInterface.Camera) {
+            return this.getLocalSnapshot(id, path, url.search);
+        }
+        if (path === ScryptedInterface.VideoCamera) {
+            return this.getLocalSnapshot(id, path, url.search);
+        }
+        else {
+            throw new Error('Unrecognized Scrypted Media interface.')
+        }
+    }
 
-        return processImageOp(ffmpegInput, op, parseFloat(mime.parameters.get('time')), options?.sourceId, this.debugConsole);
+    async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        if (request.isPublicEndpoint) {
+            response.send('', {
+                code: 404,
+            });
+            return;
+        }
+
+        const pathname = request.url.substring(request.rootPath.length);
+        const [_, id, iface] = pathname.split('/');
+        try {
+            if (iface !== ScryptedInterface.Camera && iface !== ScryptedInterface.VideoCamera)
+                throw new Error();
+
+            const search = new URLSearchParams(pathname.split('?')[1]);
+            const mixin = this.mixinDevices.get(id);
+            let buffer: Buffer;
+            const rpo: RequestPictureOptions = {
+                picture: {
+                    width: parseInt(search.get('width')) || undefined,
+                    height: parseInt(search.get('height')) || undefined,
+                }
+            };
+
+            if (mixin && iface === ScryptedInterface.Camera) {
+                buffer = await mixin.takePictureInternal(rpo)
+            }
+            else {
+                const device = systemManager.getDeviceById<Camera & VideoCamera>(id);
+                const picture = iface === ScryptedInterface.Camera ? await device.takePicture(rpo) : await device.getVideoStream();
+                buffer = await mediaManager.convertMediaObjectToBuffer(picture, 'image/jpeg');
+            }
+
+            response.send(buffer, {
+                headers: {
+                    'Content-Type': 'image/jpeg',
+                    'Cache-Control': 'max-age=10',
+                }
+            });
+        }
+        catch (e) {
+            response.send('', {
+                code: 500,
+            });
+        }
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
@@ -621,8 +693,9 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
             return [ScryptedInterface.Camera, ScryptedInterface.Settings];
         return undefined;
     }
+
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-        return new SnapshotMixin(this, {
+        const ret = new SnapshotMixin(this, {
             mixinDevice,
             mixinDeviceInterfaces,
             mixinDeviceState,
@@ -630,6 +703,8 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
             group: 'Snapshot',
             groupKey: 'snapshot',
         });
+        this.mixinDevices.set(ret.id, ret);
+        return ret;
     }
 
     async shouldEnableMixin(device: ScryptedDevice) {
@@ -642,6 +717,8 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
     }
 
     async releaseMixin(id: string, mixinDevice: any): Promise<void> {
+        if (this.mixinDevices.get(id) === mixinDevice)
+            this.mixinDevices.delete(id);
         await mixinDevice.release()
     }
 }
