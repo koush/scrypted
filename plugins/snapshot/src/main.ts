@@ -176,7 +176,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     request.refresh = false;
                 takePrebufferPicture = async () => {
                     // this.console.log('snapshotting active prebuffer');
-                    return mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(request), 'image/jpeg');
+                    const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await realDevice.getVideoStream(request), ScryptedMimeTypes.FFmpegInput);
+                    return ffmpegFilterImage(ffmpegInput.inputArguments, {
+                        console: this.debugConsole,
+                        ffmpegPath: await mediaManager.getFFmpegPath(),
+                        timeout: 10000,
+                    });
                 };
                 return takePrebufferPicture;
             }

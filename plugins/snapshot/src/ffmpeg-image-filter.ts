@@ -1,12 +1,11 @@
-import fs from 'fs';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
+import { timeoutFunction } from '@scrypted/common/src/promise-utils';
 import { sleep } from '@scrypted/common/src/sleep';
 import child_process, { ChildProcess } from 'child_process';
 import { once } from 'events';
 import { Writable } from 'stream';
 import { Pipe2Jpeg } from './pipe2jpeg';
-import { timeoutFunction } from '@scrypted/common/src/promise-utils';
 
 export interface FFmpegImageFilterOptions {
     console?: Console,
