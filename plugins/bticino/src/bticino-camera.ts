@@ -1,10 +1,10 @@
-import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, createBindUdp, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { sleep } from '@scrypted/common/src/sleep';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
-import { addTrackControls } from '@scrypted/common/src/sdp-utils';
-import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, PictureOptions, Reboot, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
+import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
+import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, MotionSensor, PictureOptions, Reboot, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
 import { SipCallSession } from '../../sip/src/sip-call-session';
-import { RtpDescription } from '../../sip/src/rtp-utils';
+import { RtpDescription, getPayloadType, getSequenceNumber, isRtpMessagePayloadType, isStunMessage } from '../../sip/src/rtp-utils';
 import { VoicemailHandler } from './bticino-voicemailHandler';
 import { CompositeSipMessageHandler } from '../../sip/src/compositeSipMessageHandler';
 import { SipHelper } from './sip-helper';
@@ -16,7 +16,7 @@ import { BticinoSipLock } from './bticino-lock';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { PersistentSipManager } from './persistent-sip-manager';
 import { InviteHandler } from './bticino-inviteHandler';
-import { SipRequest } from '../../sip/src/sip-manager';
+import { SipOptions, SipRequest } from '../../sip/src/sip-manager';
 
 import { get } from 'http'
 import { ControllerApi } from './c300x-controller-api';
@@ -26,14 +26,12 @@ import { BticinoMuteSwitch } from './bticino-mute-switch';
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
 
-export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler, VideoClips, Reboot {
+export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor, DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler, VideoClips, Reboot {
 
     private session: SipCallSession
     private remoteRtpDescription: Promise<RtpDescription>
     private audioOutForwarder: dgram.Socket
     private audioOutProcess: ChildProcess
-    private currentMedia: FFmpegInput | MediaStreamUrl
-    private currentMediaMimeType: string
     private refreshTimeout: NodeJS.Timeout
     public requestHandlers: CompositeSipMessageHandler = new CompositeSipMessageHandler()
     public incomingCallRequest : SipRequest
@@ -41,16 +39,21 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     private voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
     private inviteHandler : InviteHandler = new InviteHandler(this)
     private controllerApi : ControllerApi = new ControllerApi(this)
+    private muteSwitch : BticinoMuteSwitch
+    private aswmSwitch : BticinoAswmSwitch
+    private deferredCleanup
+    private currentMediaObject : Promise<MediaObject>
+    private lastImageRefresh : number
     //TODO: randomize this
     private keyAndSalt : string = "/qE7OPGKp9hVGALG2KcvKWyFEZfSSvm7bYVDjT8X"
     //private decodedSrtpOptions : SrtpOptions = decodeSrtpOptions( this.keyAndSalt )
     private persistentSipManager : PersistentSipManager
     public doorbellWebhookUrl : string
     public doorbellLockWebhookUrl : string
+    private cachedImage : Buffer
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
-        
         this.requestHandlers.add( this.voicemailHandler ).add( this.inviteHandler )
         this.persistentSipManager = new PersistentSipManager( this );
         (async() => {
@@ -190,7 +193,21 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }    
 
     async takePicture(option?: PictureOptions): Promise<MediaObject> {
-        throw new Error("The SIP doorbell camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
+        const thumbnailCacheTime : number = parseInt( this.storage?.getItem('thumbnailCacheTime') ) * 1000 || 300000 
+        const now = new Date().getTime()
+        if( !this.lastImageRefresh || this.lastImageRefresh + thumbnailCacheTime < now ) {
+            // get a proxy object to make sure we pass prebuffer when already watching a stream
+            let cam : VideoCamera = sdk.systemManager.getDeviceById<VideoCamera>(this.id)
+            let vs : MediaObject = await cam.getVideoStream()
+            let buf : Buffer = await mediaManager.convertMediaObjectToBuffer(vs, 'image/jpeg');
+            this.cachedImage = buf
+            this.lastImageRefresh = new Date().getTime()
+            this.console.log(`Camera picture updated and cached: ${this.lastImageRefresh} + cache time: ${thumbnailCacheTime} < ${now}`)
+
+        } else {
+            this.console.log(`Not refreshing camera picture: ${this.lastImageRefresh} + cache time: ${thumbnailCacheTime} < ${now}`)
+        }
+        return mediaManager.createMediaObject(this.cachedImage, 'image/jpeg')
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
@@ -206,8 +223,17 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
     }    
 
     async startIntercom(media: MediaObject): Promise<void> {
-        if (!this.session)
-            throw new Error("not in call");
+        if (!this.session) {
+            const cleanup = () => {
+                this.console.log("STARTINTERCOM CLEANUP CALLED: " + this.session )
+                this.session?.stop()
+                this.session = undefined
+                this.deferredCleanup()
+                this.console.log("STARTINTERCOM CLEANUP ENDED")
+            }
+            this.session = await this.callIntercom( cleanup )
+        }
+            
 
         this.stopIntercom();
 
@@ -280,27 +306,24 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             throw new Error('Please configure from/to/domain settings')
         }
 
-        if (options?.metadata?.refreshAt) {
-            if (!this.currentMedia?.mediaStreamOptions)
-                throw new Error("no stream to refresh");
-
-            const currentMedia = this.currentMedia
-            currentMedia.mediaStreamOptions.refreshAt = Date.now() + STREAM_TIMEOUT;
-            currentMedia.mediaStreamOptions.metadata = {
-                refreshAt: currentMedia.mediaStreamOptions.refreshAt
-            };
-            this.resetStreamTimeout()
-            return mediaManager.createMediaObject(currentMedia, this.currentMediaMimeType)
-        }
-
+        this.console.log("Before stopping session")
         this.stopSession();
-        const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient()
+        this.console.log("After stopping session")
 
-        const playbackUrl = clientUrl
+        let rebroadcastEnabled = this.interfaces?.includes( "mixin:@scrypted/prebuffer-mixin")
+
+        const { clientPromise: playbackPromise, port: playbackPort } = await listenZeroSingleClient()
+
+        const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`
+
+        this.console.log("PLAYBACKURL: " +playbackUrl)
 
         playbackPromise.then(async (client) => {
             client.setKeepAlive(true, 10000)
+
             let sip: SipCallSession
+            let audioSplitter
+            let videoSplitter
             try {
                 if( !this.incomingCallRequest ) {
                     // If this is a "view" call, update the stream endpoint to send it only to "us"
@@ -309,61 +332,37 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 }
 
                 let rtsp: RtspServer;
+
                 const cleanup = () => {
+                    this.console.log("CLEANUP CALLED")
                     client.destroy();
                     if (this.session === sip)
                         this.session = undefined
                     try {
                         this.log.d('cleanup(): stopping sip session.')
-                        sip.stop()
+                        sip?.stop()
+                        this.currentMediaObject = undefined
                     }
                     catch (e) {
                     }
+                    audioSplitter?.server?.close()
+                    videoSplitter?.server?.close()
                     rtsp?.destroy()
+                    this.console.log("CLEANUP ENDED")
+                    this.deferredCleanup = undefined
+                    this.remoteRtpDescription = undefined
                 }
+                this.deferredCleanup = cleanup
 
                 client.on('close', cleanup)
                 client.on('error', cleanup)
 
-                let sipOptions = SipHelper.sipOptions( this )
-
-                sip = await this.persistentSipManager.session( sipOptions );
-                // Validate this sooner
-                if( !sip ) return Promise.reject("Cannot create session")
-                
-                sip.onCallEnded.subscribe(cleanup)
-
-                // Call the C300X
-                this.remoteRtpDescription = sip.callOrAcceptInvite(
-                    ( audio ) => {
-                    return [
-                        //TODO: Payload types are hardcoded
-                        `m=audio 65000 RTP/SAVP 110`,
-                        `a=rtpmap:110 speex/8000`,
-                        `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
-                    ]
-                }, ( video ) => {
-                    if( false ) {
-                        //TODO: implement later
-                        return [
-                            `m=video 0 RTP/SAVP 0`
-                        ]
-                    } else {
-                        return [
-                            //TODO: Payload types are hardcoded
-                            `m=video 65002 RTP/SAVP 96`,
-                            `a=rtpmap:96 H264/90000`,
-                            `a=fmtp:96 profile-level-id=42801F`,
-                            `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
-                            'a=recvonly'                        
-                        ]
-                    }
-                }, this.incomingCallRequest );
-
-                this.incomingCallRequest = undefined
+                if( !rebroadcastEnabled || (rebroadcastEnabled && !this.incomingCallRequest ) ) {
+                    sip = await this.callIntercom( cleanup )
+                }
 
                 //let sdp: string = replacePorts(this.remoteRtpDescription.sdp, 0, 0 )
-                let sdp : string = [ 
+                let sdp : string = [
                     "v=0",
                     "m=audio 5000 RTP/AVP 110",
                     "c=IN IP4 127.0.0.1",
@@ -375,42 +374,141 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
                 //sdp = sdp.replaceAll(/a=crypto\:1.*/g, '')
                 //sdp = sdp.replaceAll(/RTP\/SAVP/g, 'RTP\/AVP')
                 //sdp = sdp.replaceAll('\r\n\r\n', '\r\n')
-                sdp = addTrackControls(sdp)
-                sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n')
-                if( sipOptions.debugSip )
-                    this.log.d('SIP: Updated SDP:\n' + sdp);
 
-                client.write(sdp)
-                client.end()
+                let vseq = 0;
+                let vseen = 0;
+                let vlost = 0;
+                let aseq = 0;
+                let aseen = 0;
+                let alost = 0;
+
+                sdp = addTrackControls(sdp);
+                sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n');
+                this.console.log('proposed sdp', sdp);
+
+                this.console.log("=================  AUDIOSPLITTER CREATING.... ============" )
+                audioSplitter = await createBindUdp(5000)
+                this.console.log("=================  AUDIOSPLITTER CREATED ============" )
+                audioSplitter.server.on('close', () => {
+                    this.console.log("================= CLOSED AUDIOSPLITTER ================")
+                    audioSplitter = undefined
+                })
+                this.console.log("=================  VIDEOSPLITTER CREATING.... ============" )
+                videoSplitter = await createBindUdp(5002)
+                this.console.log("=================  VIDEOSPLITTER CREATED.... ============" )
+                videoSplitter.server.on('close', () => {
+                    this.console.log("================= CLOSED VIDEOSPLITTER ================")
+                    videoSplitter = undefined
+                })
+
+                rtsp = new RtspServer(client, sdp, false);
+
+                const parsedSdp = parseSdp(rtsp.sdp);
+                const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control;
+                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
+                rtsp.console = this.console;
+
+                await rtsp.handlePlayback();
 
                 this.session = sip
+
+                videoSplitter.server.on('message', (message, rinfo) => {
+                     if ( !isStunMessage(message)) {
+                            const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                            if (!isRtpMessage)
+                                return;
+                            vseen++;
+                            try {
+                                rtsp.sendTrack(videoTrack, message, !isRtpMessage);
+                            } catch(e ) {
+                                this.console.log(e)
+                            }
+
+                            const seq = getSequenceNumber(message);
+                            if (seq !== (vseq + 1) % 0x0FFFF)
+                                vlost++;
+                            vseq = seq;
+                        }
+                });
+
+                audioSplitter.server.on('message', (message, rinfo ) => {
+                        if ( !isStunMessage(message)) {
+                            const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                            if (!isRtpMessage)
+                                return;
+                            aseen++;
+                            try {
+                                rtsp.sendTrack(audioTrack, message, !isRtpMessage);
+                            } catch(e) {
+                                this.console.log(e)
+                            }
+                            const seq = getSequenceNumber(message);
+                            if (seq !== (aseq + 1) % 0x0FFFF)
+                                alost++;
+                            aseq = seq;
+                        }
+                });
+
+                try {
+                    await rtsp.handleTeardown();
+                    this.console.log('rtsp client ended');
+                } catch (e) {
+                    this.console.log('rtsp client ended ungracefully', e);
+                } finally {
+                    cleanup();
+                }
             }
             catch (e) {
                 this.console.error(e)
-                sip?.stop()
                 throw e;
             }
         });
 
-        this.resetStreamTimeout();
-
-        const mediaStreamOptions = Object.assign(this.getSipMediaStreamOptions(), {
-            refreshAt: Date.now() + STREAM_TIMEOUT,
-        });
-
-        const ffmpegInput: FFmpegInput = {
-            url: undefined,
-            container: 'sdp',
-            mediaStreamOptions,
-            inputArguments: [
-                '-f', 'sdp',
-                '-i', playbackUrl,
-            ],
+        const mediaStreamUrl: MediaStreamUrl = {
+            url: playbackUrl,
+            mediaStreamOptions: this.getSipMediaStreamOptions(),
         };
-        this.currentMedia = ffmpegInput;
-        this.currentMediaMimeType = ScryptedMimeTypes.FFmpegInput;
 
-        return mediaManager.createFFmpegMediaObject(ffmpegInput);
+        sleep(2500).then( () => this.takePicture() )
+
+        this.currentMediaObject = mediaManager.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
+        // Invalidate any cached image and take a picture after some seconds to take into account the opening of the lens
+        this.lastImageRefresh = undefined
+        return this.currentMediaObject
+    }
+
+    async callIntercom( cleanup ) : Promise<SipCallSession> {
+        let sipOptions : SipOptions = SipHelper.sipOptions( this )
+
+        let sip : SipCallSession = await this.persistentSipManager.session( sipOptions );
+        // Validate this sooner
+        if( !sip ) return Promise.reject("Cannot create session")
+
+        sip.onCallEnded.subscribe(cleanup)
+
+        // Call the C300X
+        this.remoteRtpDescription = sip.callOrAcceptInvite(
+            ( audio ) => {
+            return [
+                // this SDP is used by the intercom and will send the encrypted packets which we don't care about to the loopback on port 65000 of the intercom
+                `m=audio 65000 RTP/SAVP 110`,
+                `a=rtpmap:110 speex/8000`,
+                `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
+            ]
+        }, ( video ) => {
+                return [
+                // this SDP is used by the intercom and will send the encrypted packets which we don't care about to the loopback on port 65000 of the intercom
+                `m=video 65002 RTP/SAVP 96`,
+                `a=rtpmap:96 H264/90000`,
+                `a=fmtp:96 profile-level-id=42801F`,
+                `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
+                'a=recvonly'
+                ]
+        }, this.incomingCallRequest );
+
+        this.incomingCallRequest = undefined
+
+        return sip
     }
 
     getSipMediaStreamOptions(): ResponseMediaStreamOptions {
@@ -419,13 +517,16 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
             name: 'SIP',
             // this stream is NOT scrypted blessed due to wackiness in the h264 stream.
             // tool: "scrypted",
-            container: 'sdp',
+            container: 'rtsp',
+            video: {
+                codec: 'h264'
+            },
             audio: {
                 // this is a hint to let homekit, et al, know that it's speex audio and needs transcoding.
                 codec: 'speex',
             },
             source: 'cloud', // to disable prebuffering
-            userConfigurable: false,
+            userConfigurable: true,
         };
     }
 
@@ -437,18 +538,26 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements DeviceProvid
 
     async getDevice(nativeId: string) : Promise<any> {
         if( nativeId && nativeId.endsWith('-aswm-switch')) {
-            return new BticinoAswmSwitch(this, this.voicemailHandler)
+            this.aswmSwitch = new BticinoAswmSwitch(this, this.voicemailHandler)
+            return this.aswmSwitch
         } else if( nativeId && nativeId.endsWith('-mute-switch') ) {
-            return new BticinoMuteSwitch(this)
+            this.muteSwitch = new BticinoMuteSwitch(this)
+            return this.muteSwitch
         }
         return new BticinoSipLock(this)
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-        this.stopIntercom()
-        this.voicemailHandler.cancelTimer()
-        this.persistentSipManager.cancelTimer()        
-        this.controllerApi.cancelTimer()
+        if( nativeId?.endsWith('-aswm-switch') ) {
+            this.aswmSwitch.cancelTimer()
+        } else if( nativeId?.endsWith('mute-switch') ) {
+            this.muteSwitch.cancelTimer()
+        } else {
+            this.stopIntercom()
+            this.voicemailHandler.cancelTimer()
+            this.persistentSipManager.cancelTimer()        
+            this.controllerApi.cancelTimer()
+        }
     }    
 
     reset() {

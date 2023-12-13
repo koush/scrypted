@@ -35,6 +35,14 @@ export class BticinoStorageSettings {
                 defaultValue: 600,
                 placeholder: '600',
             },
+            thumbnailCacheTime: {
+                title: 'Thumbnail cache time',
+                type: 'number',
+                range: [60, 86400],
+                description: 'How long the snapshot is cached before taking a new one. (in seconds)',
+                defaultValue: 300,
+                placeholder: '300',
+            },            
             sipdebug: {
                 title: 'SIP debug logging',
                 type: 'boolean',
