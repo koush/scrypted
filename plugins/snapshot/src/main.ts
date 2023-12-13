@@ -267,7 +267,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         throw new Error('Snapshot Unavailable (Snapshot URL empty)');
     }
 
-    async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
+    async takePictureRaw(options?: RequestPictureOptions): Promise<Buffer> {
         let picture: Buffer;
         const eventSnapshot = options?.reason === 'event';
 
@@ -294,7 +294,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 throw e;
 
             if (!this.currentPicture)
-                return this.createMediaObject(await this.createErrorImage(e), 'image/jpeg');
+                return this.createErrorImage(e);
 
             this.console.warn('Snapshot failed, but recovered from cache', e);
             picture = this.currentPicture;
@@ -358,10 +358,14 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             catch (e) {
                 if (eventSnapshot)
                     throw e;
-                return this.createMediaObject(await this.createErrorImage(e), 'image/jpeg');
+                return this.createErrorImage(e);
             }
         }
-        return this.createMediaObject(picture, 'image/jpeg');
+        return picture;
+    }
+
+    async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
+        return this.createMediaObject(await this.takePictureRaw(options), 'image/jpeg');
     }
 
     async cropAndScale(picture: Buffer) {
@@ -666,7 +670,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             };
 
             if (mixin && iface === ScryptedInterface.Camera) {
-                buffer = await mixin.takePictureInternal(rpo)
+                buffer = await mixin.takePictureRaw(rpo)
             }
             else {
                 const device = systemManager.getDeviceById<Camera & VideoCamera>(id);
