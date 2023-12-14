@@ -31,8 +31,8 @@ const loopbackLight = filterExample('loopback-light.ts');
 const { log, deviceManager, systemManager } = sdk;
 
 class MqttDevice extends MqttDeviceBase implements Scriptable {
-    constructor(nativeId: string) {
-        super(nativeId);
+    constructor(provider: MqttProvider, nativeId: string) {
+        super(provider, nativeId);
     }
 
     async saveScript(source: ScriptSource): Promise<void> {
@@ -154,7 +154,7 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
     }
 }
 
-const brokerProperties = ['httpPort', 'tcpPort', 'enableBroker', 'username', 'password'];
+const brokerProperties = ['httpPort', 'tcpPort', 'enableBroker', 'username', 'password', 'externalBroker'];
 
 
 class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
@@ -250,17 +250,28 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
         let url: URL;
         let username: string;
         let password: string;
+
+        const externalBroker = this.provider.storage.getItem('externalBroker');
         if (urlString) {
+            this.console.log('Using device specific broker.', urlString);
             url = new URL(urlString);
             username = this.storage.getItem('username') || undefined;
             password = this.storage.getItem('password') || undefined;
             this.pathname = url.pathname.substring(1);
         }
-        else {
-            const tcpPort = this.provider.storage.getItem('tcpPort') || '';
+        else if (externalBroker && !this.provider.isBrokerEnabled) {
+            this.console.log('Using external broker.', externalBroker);
+            url = new URL(externalBroker);
             username = this.provider.storage.getItem('username') || undefined;
             password = this.provider.storage.getItem('password') || undefined;
+            this.pathname = `${url.pathname.substring(1)}/${this.id}`;
+        }
+        else {
+            this.console.log('Using built in broker.');
+            const tcpPort = this.provider.storage.getItem('tcpPort') || '';
             url = new URL(`mqtt://localhost:${tcpPort}/scrypted`);
+            username = this.provider.storage.getItem('username') || undefined;
+            password = this.provider.storage.getItem('password') || undefined;
             this.pathname = `${url.pathname.substring(1)}/${this.id}`;
         }
 
@@ -330,7 +341,7 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
     }
 }
 
-class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Settings, MixinProvider, DeviceCreator {
+export class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Settings, MixinProvider, DeviceCreator {
     devices = new Map<string, any>();
     netServer: net.Server;
     httpServer: http.Server;
@@ -393,15 +404,25 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
             {
                 title: 'Enable MQTT Broker',
                 key: 'enableBroker',
-                description: 'Enable the Aedes MQTT Broker.',
+                description: 'Enable the built in Aedes MQTT Broker.',
                 // group: 'MQTT Broker',
                 type: 'boolean',
                 value: (this.storage.getItem('enableBroker') === 'true').toString(),
             },
         ];
 
-        if (!this.isBrokerEnabled)
-            return ret;
+        if (!this.isBrokerEnabled) {
+            ret.push(
+                {
+                    title: 'External Broker',
+                    group: 'MQTT Broker',
+                    key: 'externalBroker',
+                    description: 'Specify the mqtt address of an external MQTT broker.',
+                    placeholder: 'mqtt://192.168.1.100',
+                    value: this.storage.getItem('externalBroker'),
+                }
+            )
+        }
 
         ret.push(
             {
@@ -418,26 +439,31 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
                 key: 'password',
                 type: 'password',
                 description: 'Optional: Password used to authenticate with the MQTT broker.',
-            },
-            {
-                title: 'TCP Port',
-                key: 'tcpPort',
-                description: 'The port to use for TCP connections',
-                placeholder: '1883',
-                type: 'number',
-                group: 'MQTT Broker',
-                value: this.storage.getItem('tcpPort'),
-            },
-            {
-                title: 'HTTP Port',
-                key: 'httpPort',
-                description: 'The port to use for HTTP connections',
-                placeholder: '8888',
-                type: 'number',
-                group: 'MQTT Broker',
-                value: this.storage.getItem('httpPort'),
-            },
+            }
         );
+
+        if (this.isBrokerEnabled) {
+            ret.push(
+                {
+                    title: 'TCP Port',
+                    key: 'tcpPort',
+                    description: 'The port to use for TCP connections',
+                    placeholder: '1883',
+                    type: 'number',
+                    group: 'MQTT Broker',
+                    value: this.storage.getItem('tcpPort'),
+                },
+                {
+                    title: 'HTTP Port',
+                    key: 'httpPort',
+                    description: 'The port to use for HTTP connections',
+                    placeholder: '8888',
+                    type: 'number',
+                    group: 'MQTT Broker',
+                    value: this.storage.getItem('httpPort'),
+                },
+            );
+        }
 
         ret.push(...await this.storageSettings.getSettings());
         return ret;
@@ -547,10 +573,10 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
         let ret = this.devices.get(nativeId);
         if (!ret) {
             if (nativeId.startsWith('autodiscovery:')) {
-                ret = new MqttAutoDiscoveryProvider(nativeId);
+                ret = new MqttAutoDiscoveryProvider(this, nativeId);
             }
             else if (nativeId.startsWith('0.')) {
-                ret = new MqttDevice(nativeId);
+                ret = new MqttDevice(this, nativeId);
                 await ret.bind();
             }
             if (ret)

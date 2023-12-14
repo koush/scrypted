@@ -4,6 +4,7 @@ import { Client, MqttClient, connect } from "mqtt";
 import { MqttDeviceBase } from "./api/mqtt-device-base";
 import nunjucks from 'nunjucks';
 import sdk from "@scrypted/sdk";
+import type { MqttProvider } from './main';
 
 const { deviceManager } = sdk;
 
@@ -60,8 +61,8 @@ typeMap.set('binary_sensor', {
 export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceProvider {
     devices = new Map<string, MqttAutoDiscoveryDevice>();
 
-    constructor(nativeId: string) {
-        super(nativeId);
+    constructor(provider: MqttProvider, nativeId: string) {
+        super(provider, nativeId);
 
         this.bind();
     }

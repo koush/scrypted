@@ -1,13 +1,14 @@
 import { Settings, Setting, ScryptedDeviceBase, ScryptedInterface } from '@scrypted/sdk';
 import { connect, Client } from 'mqtt';
 import { ScriptableDeviceBase } from '../scrypted-eval';
+import type {MqttProvider} from '../main';
 
 export class MqttDeviceBase extends ScriptableDeviceBase implements Settings {
     client: Client;
     handler: any;
     pathname: string;
 
-    constructor(nativeId: string) {
+    constructor(public provider: MqttProvider, nativeId: string) {
         super(nativeId, undefined);
     }
 
@@ -53,9 +54,36 @@ export class MqttDeviceBase extends ScriptableDeviceBase implements Settings {
         this.client?.removeAllListeners();
         this.client?.end();
         this.client = undefined;
-        const url = new URL(this.storage.getItem('url'));
-        this.pathname = url.pathname.substring(1);
-        const urlWithoutPath = new URL(this.storage.getItem('url'));
+        const urlString = this.storage.getItem('url');
+        let url: URL;
+        let username: string;
+        let password: string;
+
+        const externalBroker = this.provider.storage.getItem('externalBroker');
+        if (urlString) {
+            this.console.log('Using device specific broker.', urlString);
+            url = new URL(urlString);
+            username = this.storage.getItem('username') || undefined;
+            password = this.storage.getItem('password') || undefined;
+            this.pathname = url.pathname.substring(1);
+        }
+        else if (externalBroker && !this.provider.isBrokerEnabled) {
+            this.console.log('Using external broker.', externalBroker);
+            url = new URL(externalBroker);
+            username = this.provider.storage.getItem('username') || undefined;
+            password = this.provider.storage.getItem('password') || undefined;
+            this.pathname = `${url.pathname.substring(1)}/${this.id}`;
+        }
+        else {
+            this.console.log('Using built in broker.');
+            const tcpPort = this.provider.storage.getItem('tcpPort') || '';
+            url = new URL(`mqtt://localhost:${tcpPort}/scrypted`);
+            username = this.provider.storage.getItem('username') || undefined;
+            password = this.provider.storage.getItem('password') || undefined;
+            this.pathname = `${url.pathname.substring(1)}/${this.id}`;
+        }
+
+        const urlWithoutPath = new URL(url);
         urlWithoutPath.pathname = '';
 
         const client = this.client = connect(urlWithoutPath.toString(), {
