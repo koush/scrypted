@@ -15,7 +15,7 @@ import { getAllDevices, safeParseJson } from './util';
 
 const { systemManager } = sdk;
 
-const defaultMinimumDetectionDuration = 30;
+const defaultPostMotionAnalysisDuration = 20;
 const defaultMotionDuration = 30;
 
 const BUILTIN_MOTION_SENSOR_ASSIST = 'Assist';
@@ -63,12 +63,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.maybeStartDetection();
       }
     },
-    minimumDetectionDuration: {
-      title: 'Minimum Detection Duration',
+    postMotionAnalysisDuration: {
+      title: 'Post Motion Analysis Duration',
       subgroup: 'Advanced',
-      description: 'The minimum duration in seconds to analyze video when motion occurs.',
+      description: 'The duration in seconds to analyze video after motion ends.',
       type: 'number',
-      defaultValue: defaultMinimumDetectionDuration,
+      defaultValue: defaultPostMotionAnalysisDuration,
     },
     motionDuration: {
       title: 'Motion Duration',
@@ -204,8 +204,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (!this.hasMotionType) {
       this.motionListener = this.cameraDevice.listen(ScryptedInterface.MotionSensor, async () => {
         if (!this.cameraDevice.motionDetected) {
-          const minimumEndTme = this.detectionStartTime + this.storageSettings.values.minimumDetectionDuration * 1000;
-          const sleepTime = minimumEndTme - Date.now();
+          // const minimumEndTme = this.detectionStartTime + this.storageSettings.values.minimumDetectionDuration * 1000;
+          // const sleepTime = minimumEndTme - Date.now();
+          const sleepTime = this.storageSettings.values.postMotionAnalysisDuration * 1000;
 
           if (sleepTime > 0) {
             this.console.log('Motion stopped. Waiting additional time for minimum detection duration:', sleepTime);
@@ -665,7 +666,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     this.storageSettings.settings.motionSensorSupplementation.hide = !this.hasMotionType || !this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor);
-    this.storageSettings.settings.minimumDetectionDuration.hide = this.hasMotionType;
+    this.storageSettings.settings.postMotionAnalysisDuration.hide = this.hasMotionType;
     this.storageSettings.settings.motionDuration.hide = !this.hasMotionType;
 
     settings.push(...await this.storageSettings.getSettings());
@@ -807,7 +808,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
     else {
       const settings = this.getCurrentSettings();
-      if (settings && settings[key]) {
+      if (settings && key in settings) {
         this.storage.setItem(key, vs);
         settings[key] = value;
       }
