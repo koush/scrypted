@@ -1673,8 +1673,10 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
+    if (type !== ScryptedDeviceType.Doorbell && type !== ScryptedDeviceType.Camera)
+      return;
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
-      return null;
+      return;
     const ret = [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, ScryptedInterface.Online, REBROADCAST_MIXIN_INTERFACE_TOKEN];
     return ret;
   }
