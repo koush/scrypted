@@ -747,7 +747,6 @@ export interface RecordedEventOptions {
   endTime?: number;
   startId?: string;
   count?: number;
-  reverseOrder?: boolean;
 }
 
 export interface EventRecorder {
@@ -781,7 +780,6 @@ export interface VideoClipOptions extends VideoClipThumbnailOptions {
   endTime?: number;
   startId?: string;
   count?: number;
-  reverseOrder?: boolean;
 }
 
 export interface VideoClipThumbnailOptions {

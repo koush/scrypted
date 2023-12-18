@@ -663,7 +663,6 @@ class RecordedEventOptions(TypedDict):
 
     count: float
     endTime: float
-    reverseOrder: bool
     startId: str
     startTime: float
 
@@ -816,7 +815,6 @@ class VideoClipOptions(TypedDict):
     aspectRatio: float
     count: float
     endTime: float
-    reverseOrder: bool
     startId: str
     startTime: float
 
