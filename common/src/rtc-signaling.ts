@@ -73,6 +73,14 @@ function createOptions() {
     return options;
 }
 
+// can be called on anything with getStats, ie for receiver specific reports or connection reports.
+export async function getPacketsLost(t: { getStats(): Promise<RTCStatsReport> }) {
+    const stats = await t.getStats();
+    const packetsLost = ([...stats.values()] as { packetsLost: number }[]).filter(stat => 'packetsLost' in stat).map(stat => stat.packetsLost);
+    const total = packetsLost.reduce((p, c) => p + c, 0);
+    return total;
+}
+
 export class BrowserSignalingSession implements RTCSignalingSession {
     private pc: RTCPeerConnection;
     pcDeferred = new Deferred<RTCPeerConnection>();
@@ -91,10 +99,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
     }
 
     async getPacketsLost() {
-        const stats = await this.pc.getStats();
-        const packetsLost = ([...stats.values()] as { packetsLost: number }[]).filter(stat => 'packetsLost' in stat).map(stat => stat.packetsLost);
-        const total = packetsLost.reduce((p, c) => p + c, 0);
-        return total;
+        return getPacketsLost(this.pc);
     }
 
     async setMicrophone(enabled: boolean) {
