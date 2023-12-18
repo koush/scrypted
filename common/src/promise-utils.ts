@@ -78,11 +78,17 @@ export function createPromiseDebouncer<T>() {
 export function createMapPromiseDebouncer<T>() {
     const map = new Map<string, Promise<T>>();
 
-    return (key: any, func: () => Promise<T>): Promise<T> => {
+    return (key: any, debounce: number, func: () => Promise<T>): Promise<T> => {
         const keyStr = JSON.stringify(key);
         let value = map.get(keyStr);
         if (!value) {
-            value = func().finally(() => map.delete(keyStr));
+            value = func().finally(() => {
+                if (!debounce) {
+                    map.delete(keyStr);
+                    return;
+                }
+                setTimeout(() => map.delete(keyStr), debounce);
+            });
             map.set(keyStr, value);
         }
         return value;

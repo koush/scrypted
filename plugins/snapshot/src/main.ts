@@ -275,7 +275,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             picture = await this.snapshotDebouncer({
                 id: options?.id,
                 reason: options?.reason,
-            }, async () => {
+            }, eventSnapshot ? 0 : 2000, async () => {
                 let picture = await this.takePictureInternal();
                 picture = await this.cropAndScale(picture);
                 this.clearCachedPictures();
@@ -306,7 +306,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 picture = await this.snapshotDebouncer({
                     needSoftwareResize: true,
                     picture: options.picture,
-                }, async () => {
+                }, eventSnapshot ? 0 : 2000, async () => {
                     this.debugConsole?.log("Resizing picture from camera", options?.picture);
 
                     if (loadSharp()) {
