@@ -745,7 +745,6 @@ export interface RecordedEvent {
 export interface RecordedEventOptions {
   startTime?: number;
   endTime?: number;
-  startId?: string;
   count?: number;
 }
 
@@ -778,7 +777,6 @@ export interface VideoClip {
 export interface VideoClipOptions extends VideoClipThumbnailOptions {
   startTime?: number;
   endTime?: number;
-  startId?: string;
   count?: number;
 }
 

@@ -663,7 +663,6 @@ class RecordedEventOptions(TypedDict):
 
     count: float
     endTime: float
-    startId: str
     startTime: float
 
 class RecordingStreamThumbnailOptions(TypedDict):
@@ -815,7 +814,6 @@ class VideoClipOptions(TypedDict):
     aspectRatio: float
     count: float
     endTime: float
-    startId: str
     startTime: float
 
 class VideoClipThumbnailOptions(TypedDict):
