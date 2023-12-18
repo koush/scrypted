@@ -90,6 +90,13 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         return this.options;
     }
 
+    async getPacketsLost() {
+        const stats = await this.pc.getStats();
+        const packetsLost = ([...stats.values()] as { packetsLost: number }[]).filter(stat => 'packetsLost' in stat).map(stat => stat.packetsLost);
+        const total = packetsLost.reduce((p, c) => p + c, 0);
+        return total;
+    }
+
     async setMicrophone(enabled: boolean) {
         if (this.microphone && enabled && !this.micEnabled) {
             this.micEnabled = true;
