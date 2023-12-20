@@ -162,8 +162,18 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     const ret: { [key: string]: any } = {};
     for (const setting of this.settings) {
-      ret[setting.key] = (setting.multiple ? safeParseJson(this.storage.getItem(setting.key)) : this.storage.getItem(setting.key))
-        || setting.value;
+      let value: any;
+      if (setting.multiple) {
+        value = safeParseJson(this.storage.getItem(setting.key));
+        if (!value?.length)
+          value = undefined;
+      }
+      else {
+        value = this.storage.getItem(setting.key);
+      }
+      value ||= setting.value;
+
+      ret[setting.key] = value;
     }
 
     if (this.hasMotionType)
@@ -656,13 +666,22 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     if (this.settings) {
-      settings.push(...this.settings.map(setting =>
-        Object.assign({}, setting, {
+      settings.push(...this.settings.map(setting => {
+        let value: any;
+        if (setting.multiple) {
+          value = safeParseJson(this.storage.getItem(setting.key));
+          if (!value?.length)
+            value = undefined;
+        }
+        else {
+          value = this.storage.getItem(setting.key);
+        }
+        value ||= setting.value;
+        return Object.assign({}, setting, {
           placeholder: setting.placeholder?.toString(),
-          value: (setting.multiple ? safeParseJson(this.storage.getItem(setting.key)) : this.storage.getItem(setting.key))
-            || setting.value,
-        } as Setting))
-      );
+          value,
+        } as Setting);
+      }));
     }
 
     this.storageSettings.settings.motionSensorSupplementation.hide = !this.hasMotionType || !this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor);
@@ -1170,6 +1189,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
       name,
       type: ScryptedDeviceType.Sensor,
       interfaces: [
+        ScryptedInterface.Camera,
         ScryptedInterface.MotionSensor,
         ScryptedInterface.Settings,
         ScryptedInterface.Readme,

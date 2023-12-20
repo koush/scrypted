@@ -1,4 +1,4 @@
-import sdk, { EventListenerRegister, MotionSensor, ObjectDetector, ObjectsDetected, Readme, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings } from "@scrypted/sdk";
+import sdk, { Camera, EventListenerRegister, MediaObject, MotionSensor, ObjectDetector, ObjectsDetected, Readme, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings } from "@scrypted/sdk";
 import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
 import type { ObjectDetectionPlugin } from "./main";
 
@@ -14,7 +14,7 @@ export function createObjectDetectorStorageSetting(): StorageSetting {
     };
 }
 
-export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, Readme, MotionSensor {
+export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, Readme, MotionSensor, Camera {
     storageSettings = new StorageSettings(this, {
         objectDetector: createObjectDetectorStorageSetting(),
         detections: {
@@ -36,10 +36,11 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             combobox: true,
             choices: [
             ],
-        }
+        },
     });
     listener: EventListenerRegister;
     timeout: NodeJS.Timeout;
+    lastPicture: Promise<MediaObject>;
 
     constructor(public plugin: ObjectDetectionPlugin, nativeId?: ScryptedNativeId) {
         super(nativeId);
@@ -76,6 +77,28 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
         };
 
         this.rebind();
+
+        if (!this.providedInterfaces.includes(ScryptedInterface.Camera)) {
+            sdk.deviceManager.onDeviceDiscovered({
+                name: this.providedName,
+                nativeId: this.nativeId,
+                type: this.providedType,
+                interfaces: [
+                    ScryptedInterface.Camera,
+                    ScryptedInterface.MotionSensor,
+                    ScryptedInterface.Settings,
+                    ScryptedInterface.Readme,
+                ]
+            })
+        }
+    }
+
+    async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
+        return this.lastPicture;
+    }
+
+    async getPictureOptions(): Promise<ResponsePictureOptions[]> {
+        return;
     }
 
     resetTrigger() {
@@ -138,6 +161,8 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             if (match) {
                 if (!this.motionDetected)
                     console.log('Smart Motion Sensor triggered on', match);
+                if (detected.detectionId)
+                    this.lastPicture = objectDetector.getDetectionInput(detected.detectionId, details.eventId);
                 this.trigger();
             }
         });
