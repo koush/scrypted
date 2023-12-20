@@ -35,3 +35,6 @@
 [submodule "plugins/cloud/node-nat-upnp"]
 	path = plugins/cloud/external/node-nat-upnp
 	url = ../../koush/node-nat-upnp.git
+[submodule "plugins/wyze/docker-wyze-bridge"]
+	path = plugins/wyze/docker-wyze-bridge
+	url = ../../koush/docker-wyze-bridge.git
