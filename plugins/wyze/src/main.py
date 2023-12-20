@@ -113,16 +113,16 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
         # not all wyze can substream, need to create an exhaustive list?
         # wyze pan v2 does not, for example. others seem to set can_substream to False,
         # but DO actually support it
-        ret.append(
-            {
-                'id': 'main',
-                'name': 'Substream',
-                'video': {
-                    'width': 640,
-                    'height': 360,
-                }
-            }
-        )
+        # ret.append(
+        #     {
+        #         'id': 'main',
+        #         'name': 'Substream',
+        #         'video': {
+        #             'width': 640,
+        #             'height': 360,
+        #         }
+        #     }
+        # )
         return ret
 
 
