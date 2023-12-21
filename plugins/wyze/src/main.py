@@ -9,6 +9,7 @@ import sys
 import platform
 from scrypted_sdk.other import MediaObject
 import wyzecam
+import wyzecam.api_models
 import json
 import threading
 import queue
@@ -20,10 +21,9 @@ import base64
 import struct
 
 from wyzecam.tutk.tutk import (
+    FRAME_SIZE_2K,
     FRAME_SIZE_1080P,
     FRAME_SIZE_360P,
-    BITRATE_360P,
-    BITRATE_HD,
 )
 
 from scrypted_sdk.types import (
@@ -79,7 +79,7 @@ class CodecInfo:
         self.audioSampleRate = audioSampleRate
 
 
-class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
+class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings):
     camera: wyzecam.WyzeCamera
     plugin: WyzePlugin
     streams: MutableSet[wyzecam.WyzeIOTCSession]
@@ -100,6 +100,8 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
         self.audioQueues = set()
         self.main = None
         self.sub = None
+        self.mainFrameSize = FRAME_SIZE_2K if camera.is_2k else FRAME_SIZE_1080P
+        self.subByterate = 30
 
         self.mainServer = asyncio.ensure_future(self.ensureServer(self.handleClientHD))
         self.subServer = asyncio.ensure_future(self.ensureServer(self.handleClientSD))
@@ -113,13 +115,66 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
             self.ensureServer(self.handleSubRfcClient)
         )
 
+    def safeParseJsonStorage(self, key: str):
+        try:
+            return json.loads(self.storage.getItem(key))
+        except:
+            return None
+        
+    def getMainByteRate(self, default=False):
+        try:
+            bit = int(self.safeParseJsonStorage("bitrate"))
+            bit = round(bit / 8)
+            bit = bit if 1 <= bit <= 255 else 0
+            if not bit:
+                raise
+            if default:
+                return bit * 8
+            return bit
+        except:
+            if default:
+                return "Default"
+            return 120 if self.camera.is_2k else 60
+
+    async def getSettings(self):
+        ret: List[Setting] = []
+        ret.append(
+            {
+                "key": "bitrate",
+                "title": "Main Stream Bitrate",
+                "description": "The bitrate used by the main stream.",
+                "value": self.safeParseJsonStorage("bitrate"),
+                "combobox": True,
+                "value": str(self.getMainByteRate(True)),
+                "choices": [
+                    "Default",
+                    "480",
+                    "960",
+                    "1440",
+                    "1920",
+                ],
+            }
+        )
+        return ret
+
+    async def putSetting(self, key, value):
+        self.storage.setItem(key, json.dumps(value))
+
+        await scrypted_sdk.deviceManager.onDeviceEvent(
+            self.nativeId, ScryptedInterface.Settings.value, None
+        )
+
+        await scrypted_sdk.deviceManager.onDeviceEvent(
+            self.nativeId, ScryptedInterface.VideoCamera.value, None
+        )
+
     async def handleClientHD(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
         return await self.handleClient(
             self.plugin.account.model_copy(),
-            FRAME_SIZE_1080P,
-            BITRATE_HD,
+            self.mainFrameSize,
+            self.getMainByteRate(),
             reader,
             writer,
         )
@@ -134,7 +189,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
         return await self.handleClient(
             account,
             FRAME_SIZE_360P,
-            BITRATE_360P,
+            self.subByterate,
             reader,
             writer,
         )
@@ -423,8 +478,8 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
     def probeMainCodec(self):
         return self.probeCodec(
             self.plugin.account.model_copy(),
-            FRAME_SIZE_1080P,
-            BITRATE_HD,
+            self.mainFrameSize,
+            self.getMainByteRate(),
         )
 
     def probeSubCodec(self):
@@ -433,7 +488,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
         return self.probeCodec(
             account,
             FRAME_SIZE_360P,
-            BITRATE_360P,
+            self.subByterate,
         )
 
     async def getVideoStream(
@@ -531,8 +586,8 @@ a=rtpmap:97 {audioCodecName}/{info.audioSampleRate}/1
                 "name": "Main Stream",
                 "video": {
                     "codec": "h264",
-                    "width": 1920,
-                    "height": 1080,
+                    "width": 2560 if self.camera.is_2k else 1920,
+                    "height": 1440 if self.camera.is_2k else 1080,
                 },
                 "audio": {},
             }
@@ -639,14 +694,25 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
             self.cameras[camera.p2p_id] = camera
 
             interfaces: List[ScryptedInterface] = [
+                ScryptedInterface.Settings.value,
                 ScryptedInterface.VideoCamera.value,
             ]
-            if "pan" in camera.model_name.lower():
+
+            if camera.is_pan_cam:
                 interfaces.append(ScryptedInterface.PanTiltZoom.value)
+
+            if camera.is_battery:
+                interfaces.append(ScryptedInterface.Battery.value)
+
+            if camera.is_vertical:
+                deviceType = ScryptedDeviceType.Doorbell.value
+                interfaces.append(ScryptedInterface.BinarySensor.value)
+            else:
+                deviceType = ScryptedDeviceType.Camera.value
 
             device: scrypted_sdk.Device = {
                 "nativeId": camera.p2p_id,
-                "type": ScryptedDeviceType.Camera.value,
+                "type": deviceType,
                 "name": camera.nickname,
                 "interfaces": interfaces,
                 "info": {
