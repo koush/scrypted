@@ -195,7 +195,7 @@ export async function createTrackForwarder(options: {
         videoTranscodeArguments.push('-vcodec', 'copy')
     }
 
-    const audioTranscodeArguments = getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode);
+    const audioTranscodeArguments = getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio, audioTransceiver.sender.codec, maximumCompatibilityMode);
 
     let needPacketization = !!videoCodecCopy;
     if (transcode) {
@@ -219,7 +219,18 @@ export async function createTrackForwarder(options: {
     let opusRepacketizer: OpusRepacketizer;
     let lastPacketTs: number = 0;
     const audioRtpTrack: RtpTrack = {
-        codecCopy: audioCodecCopy,
+        negotiate: async msection => {
+            if (!audioCodecCopy)
+                return false;
+            if (audioCodecCopy === 'copy')
+                return true;
+            if (msection.codec === 'opus')
+                return msection.rtpmap.clock === 48000;
+            if (msection.codec !== 'pcm_mulaw' && msection.codec !== 'pcm_alaw')
+                return false;
+            return msection.rtpmap.clock === 8000;
+        },
+        // codecCopy: audioCodecCopy,
         onRtp: buffer => {
             if (false && audioTransceiver.sender.codec.mimeType?.toLowerCase() === "audio/opus") {
                 // this will use 3 20ms frames, 60ms. seems to work up to 6/120ms

@@ -309,6 +309,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         audio.srtp = undefined;
 
                         inputArguments = [
+                            '-analyzeduration', '0',
+                            '-probesize', '512',
                             '-i', `rtsp://${audioClient.host}:${audioClient.port}`,
                         ];
                     }

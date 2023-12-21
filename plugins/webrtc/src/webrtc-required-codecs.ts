@@ -1,3 +1,4 @@
+import { AudioStreamOptions } from "@scrypted/sdk";
 import { RTCRtpCodecParameters } from "./werift";
 
 export const requiredVideoCodec = new RTCRtpCodecParameters({
@@ -46,26 +47,29 @@ export function getAudioCodec(outputCodecParameters: RTCRtpCodecParameters) {
         return {
             name: 'pcm_alaw',
             encoder: 'pcm_alaw',
+            sampleRate: 8000,
         };
     }
     if (outputCodecParameters.name === 'PCMU') {
         return {
             name: 'pcm_mulaw',
             encoder: 'pcm_mulaw',
+            sampleRate: 8000,
         };
     }
     return {
         name: 'opus',
         encoder: 'libopus',
+        sampleRate: 16000,
     };
 }
 
-export function getFFmpegRtpAudioOutputArguments(inputCodec: string, outputCodecParameters: RTCRtpCodecParameters, maximumCompatibilityMode: boolean) {
+export function getFFmpegRtpAudioOutputArguments(audio: AudioStreamOptions, outputCodecParameters: RTCRtpCodecParameters, maximumCompatibilityMode: boolean) {
     const ret: string[] = [];
 
-    const { encoder, name } = getAudioCodec(outputCodecParameters);
+    const { encoder, name, sampleRate } = getAudioCodec(outputCodecParameters);
 
-    if (inputCodec === name && !maximumCompatibilityMode) {
+    if (audio?.codec === name && (!audio?.sampleRate || audio?.sampleRate === sampleRate) && !maximumCompatibilityMode) {
         ret.push('-acodec', 'copy');
     }
     else {

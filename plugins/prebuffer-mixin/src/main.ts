@@ -1027,6 +1027,11 @@ class PrebufferSession {
     if (this.audioDisabled) {
       mediaStreamOptions.audio = null;
     }
+    else if (audioSection) {
+      mediaStreamOptions.audio ||= {};
+      mediaStreamOptions.audio.codec ||= audioSection.rtpmap.codec;
+      mediaStreamOptions.audio.sampleRate ||= audioSection.rtpmap.clock;
+    }
 
     if (session.inputVideoResolution?.width && session.inputVideoResolution?.height) {
       // this may be an audio only request.
