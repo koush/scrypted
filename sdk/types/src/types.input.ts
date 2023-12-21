@@ -500,6 +500,7 @@ export interface AudioStreamOptions {
   encoder?: string;
   profile?: string;
   bitrate?: number;
+  sampleRate?: number;
 }
 
 export type MediaStreamSource = "local" | "cloud";

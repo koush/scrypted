@@ -283,6 +283,7 @@ class AudioStreamOptions(TypedDict):
     codec: str
     encoder: str
     profile: str
+    sampleRate: float
 
 class HttpResponseOptions(TypedDict):
 
