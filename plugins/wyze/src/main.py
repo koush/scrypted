@@ -378,7 +378,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
         thread.start()
 
         try:
-            while True:
+            while not closed:
                 buffer = await reader.read()
                 if not len(buffer):
                     return
@@ -394,6 +394,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
                     break
             self.print("reader closed")
             closed = True
+            writer.close()
 
     async def ensureServer(self, cb) -> int:
         server = await asyncio.start_server(cb, "127.0.0.1", 0)
