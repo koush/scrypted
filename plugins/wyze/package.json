@@ -28,5 +28,5 @@
    "devDependencies": {
       "@scrypted/sdk": "^0.2.101"
    },
-   "version": "0.0.3"
+   "version": "0.0.4"
 }
