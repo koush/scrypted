@@ -82,7 +82,7 @@ export interface EventDetails {
  * @category Core Reference
 */
 export interface EventListenerRegister {
-  removeListener(): void;
+  removeListener(): Promise<void>;
 
 }
 

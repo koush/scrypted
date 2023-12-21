@@ -7,7 +7,7 @@ class Bar:
     pass
 
 async def main():
-    peer, peerReadLoop = await prepare_peer_readloop(loop, RpcFileTransport(4, 3))
+    peer, peerReadLoop = await prepare_peer_readloop(RpcFileTransport(4, 3))
     peer.params['foo'] = 3
     jsoncopy = {}
     jsoncopy[rpc.RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN] = True

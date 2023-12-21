@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import base64
 import gc
+import aiofiles
+from aiofiles import os as aios
 import os
 import platform
 import shutil
-import subprocess
 import sys
 import threading
 import time
@@ -23,7 +24,7 @@ from typing import Any, Optional, Set, Tuple
 import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
-                                                EventDetails,
+                                                EventDetails, PluginAPI,
                                                 ScryptedInterfaceMethods,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
@@ -97,7 +98,7 @@ class DeviceProxy(object):
 class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
     deviceProxies: Mapping[str, DeviceProxy]
 
-    def __init__(self, api: Any, systemState: Mapping[str, Mapping[str, SystemDeviceState]]) -> None:
+    def __init__(self, api: scrypted_python.scrypted_sdk.PluginAPI, systemState: Mapping[str, Mapping[str, SystemDeviceState]]) -> None:
         super().__init__()
         self.api = api
         self.systemState = systemState
@@ -152,13 +153,11 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
             if checkName.get('value', None) == name:
                 return self.getDeviceById(check)
 
-    # TODO
     async def listen(self, callback: scrypted_python.scrypted_sdk.EventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
-        return super().listen(callback)
+        return await self.api.listen(callback)
 
-    # TODO
-    async def listenDevice(self, id: str, event: str | scrypted_python.scrypted_sdk.EventListenerOptions, callback: scrypted_python.scrypted_sdk.EventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
-        return super().listenDevice(id, event, callback)
+    async def listenDevice(self, id: str, event: str | scrypted_python.scrypted_sdk.EventListenerOptions, callback: scrypted_python.scrypted_sdk.DeviceEventListener) -> scrypted_python.scrypted_sdk.EventListenerRegister:
+        return await self.api.listenDevice(id, event, callback)
 
     async def removeDevice(self, id: str) -> None:
         return await self.api.removeDevice(id)
@@ -426,18 +425,16 @@ class PluginRemote:
                 return
             return sourcePeer.localProxyMap.get(id, None)
 
-        clusterPeers: Mapping[int, asyncio.Future[rpc.RpcPeer]] = {}
+        clusterPeers: Mapping[int, rpc.RpcPeer] = {}
 
         async def handleClusterClient(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
             _, clusterPeerPort = writer.get_extra_info('peername')
             rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
             peer: rpc.RpcPeer
-            peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
+            peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(rpcTransport)
             peer.onProxySerialization = lambda value, proxyId: onProxySerialization(
                 value, proxyId, clusterPeerPort)
-            future: asyncio.Future[rpc.RpcPeer] = asyncio.Future()
-            future.set_result(peer)
-            clusterPeers[clusterPeerPort] = future
+            clusterPeers[clusterPeerPort] = peer
 
             async def connectRPCObject(o: ClusterObject):
                 sha256 = computeClusterObjectHash(o)
@@ -458,16 +455,16 @@ class PluginRemote:
         clusterRpcServer = await asyncio.start_server(handleClusterClient, '127.0.0.1', 0)
         clusterPort = clusterRpcServer.sockets[0].getsockname()[1]
 
-        def ensureClusterPeer(port: int):
-            clusterPeerPromise = clusterPeers.get(port)
-            if not clusterPeerPromise:
+        async def ensureClusterPeer(port: int):
+            clusterPeer = clusterPeers.get(port)
+            if not clusterPeer:
                 async def connectClusterPeer():
                     reader, writer = await asyncio.open_connection(
                         '127.0.0.1', port)
                     _, clusterPeerPort = writer.get_extra_info('sockname')
                     rpcTransport = rpc_reader.RpcStreamTransport(
                         reader, writer)
-                    clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
+                    clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(rpcTransport)
                     clusterPeer.tags['localPort'] = clusterPeerPort
                     clusterPeer.onProxySerialization = lambda value, proxyId: onProxySerialization(
                         value, proxyId, clusterPeerPort)
@@ -479,12 +476,11 @@ class PluginRemote:
                             pass
                         finally:
                             clusterPeers.pop(port)
-                    asyncio.run_coroutine_threadsafe(run_loop(), self.loop)
+                    asyncio.create_task(run_loop())
                     return clusterPeer
-                clusterPeerPromise = self.loop.create_task(
-                    connectClusterPeer())
-                clusterPeers[port] = clusterPeerPromise
-            return clusterPeerPromise
+                clusterPeer = await connectClusterPeer()
+                clusterPeers[port] = clusterPeer
+            return clusterPeer
 
         async def connectRPCObject(value):
             clusterObject = getattr(value, '__cluster')
@@ -499,8 +495,6 @@ class PluginRemote:
             sourcePort = clusterObject.get('sourcePort', None)
             if port == clusterPort:
                 return await resolveObject(proxyId, sourcePort)
-
-            clusterPeerPromise = ensureClusterPeer(port)
 
             try:
                 clusterPeer = await clusterPeerPromise
@@ -533,9 +527,8 @@ class PluginRemote:
                     shutil.copyfile(zipData, zipPath)
             else:
                 zipPath = options['filename']
-                f = open(zipPath, 'wb')
-                f.write(zipData)
-                f.close()
+                async with aiofiles.open(zipPath, 'wb') as f:
+                    await f.write(zipData)
 
             zipData = None
 
@@ -572,8 +565,7 @@ class PluginRemote:
 
             print('python prefix: %s' % python_prefix)
 
-            if not os.path.exists(python_prefix):
-                os.makedirs(python_prefix)
+            await aios.makedirs(python_prefix, exist_ok=True)
 
             if 'requirements.txt' in zip.namelist():
                 requirements = zip.open('requirements.txt').read()
@@ -593,7 +585,7 @@ class PluginRemote:
 
                 if need_pip:
                     try:
-                        for de in os.listdir(plugin_volume):
+                        for de in await aios.listdir(plugin_volume):
                             if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
                                 filePath = os.path.join(plugin_volume, de)
                                 print('Removing old dependencies: %s' %
@@ -605,7 +597,7 @@ class PluginRemote:
                     except:
                         pass
 
-                    os.makedirs(python_prefix)
+                    await aios.makedirs(python_prefix)
 
                     print('requirements.txt (outdated)')
                     print(str_requirements)
@@ -631,22 +623,23 @@ class PluginRemote:
                         # force reinstall even if it exists in system packages.
                         pipArgs.append('--force-reinstall')
 
-                    p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    p = await asyncio.create_subprocess_exec(sys.executable, pipArgs, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+
+                    # p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
                     while True:
-                        line = p.stdout.readline()
+                        line = await p.stdout.readline()
                         if not line:
                             break
                         line = line.decode('utf8').rstrip('\r\n')
                         print(line)
-                    result = p.wait()
+                    result = await p.wait()
                     print('pip install result %s' % result)
                     if result:
                         raise Exception('non-zero result from pip %s' % result)
 
-                    f = open(installed_requirementstxt, 'wb')
-                    f.write(requirements)
-                    f.close()
+                    async with aiofiles.open(installed_requirementstxt, 'wb') as f:
+                        await f.write(requirements)
                 else:
                     print('requirements.txt (up to date)')
                     print(str_requirements)
@@ -657,7 +650,7 @@ class PluginRemote:
                 # TODO: find a way to programatically get this value, or switch to venv.
                 dist_packages = os.path.join(
                     python_prefix, 'local', 'lib', python_version, 'dist-packages')
-                if os.path.exists(dist_packages):
+                if await aios.path.exists(dist_packages):
                     site_packages = dist_packages
                 else:
                     site_packages = os.path.join(
@@ -707,7 +700,7 @@ class PluginRemote:
                 async def getFork():
                     rpcTransport = rpc_reader.RpcConnectionTransport(
                         parent_conn)
-                    forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
+                    forkPeer, readLoop = await rpc_reader.prepare_peer_readloop(rpcTransport)
                     forkPeer.peerName = 'thread'
 
                     async def updateStats(stats):
@@ -726,8 +719,7 @@ class PluginRemote:
                             parent_conn.close()
                             rpcTransport.executor.shutdown()
                             pluginFork.worker.kill()
-                    asyncio.run_coroutine_threadsafe(
-                        forkReadLoop(), loop=self.loop)
+                    await forkReadLoop()
                     getRemote = await forkPeer.getParam('getRemote')
                     remote: PluginRemote = await getRemote(self.api, self.pluginId, self.hostInfo)
                     await remote.setSystemState(self.systemManager.getSystemState())
@@ -811,7 +803,7 @@ class PluginRemote:
             print('host did not provide update_stats')
             return
 
-        def stats_runner():
+        async def stats_runner():
             ptime = round(time.process_time() * 1000000) + self.ptimeSum
             try:
                 import psutil
@@ -837,14 +829,14 @@ class PluginRemote:
                     'heapTotal': heapTotal,
                 },
             }
-            asyncio.run_coroutine_threadsafe(update_stats(stats), self.loop)
+            await update_stats(stats)
             self.loop.call_later(10, stats_runner)
 
-        stats_runner()
+        await stats_runner()
 
 
 async def plugin_async_main(loop: AbstractEventLoop, rpcTransport: rpc_reader.RpcTransport):
-    peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, rpcTransport)
+    peer, readLoop = await rpc_reader.prepare_peer_readloop(rpcTransport)
     peer.params['print'] = print
     peer.params['getRemote'] = lambda api, pluginId, hostInfo: PluginRemote(
         peer, api, pluginId, hostInfo, loop)

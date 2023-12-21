@@ -3057,7 +3057,7 @@ ScryptedInterfaceDescriptors = {
 class EventListenerRegister:
     """Returned when an event listener is attached to an EventEmitter. Call removeListener to unregister from events."""
 
-    def removeListener(self) -> None:
+    async def removeListener(self) -> None:
         pass
 
 

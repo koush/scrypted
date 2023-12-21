@@ -6,8 +6,7 @@ import json
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from asyncio.events import AbstractEventLoop
-from typing import List, Any
+from typing import List
 import multiprocessing.connection
 import rpc
 import concurrent.futures
@@ -159,7 +158,7 @@ class RpcConnectionTransport(RpcTransport):
         return self.writeMessage(bytes(buffer), reject)
 
 
-async def readLoop(loop, peer: rpc.RpcPeer, rpcTransport: RpcTransport):
+async def readLoop(peer: rpc.RpcPeer, rpcTransport: RpcTransport):
     deserializationContext = {
         'buffers': []
     }
@@ -171,26 +170,23 @@ async def readLoop(loop, peer: rpc.RpcPeer, rpcTransport: RpcTransport):
             deserializationContext['buffers'].append(message)
             continue
 
-        asyncio.run_coroutine_threadsafe(
-            peer.handleMessage(message, deserializationContext), loop)
+        await peer.handleMessage(message, deserializationContext)
 
         deserializationContext = {
             'buffers': []
         }
 
 
-async def prepare_peer_readloop(loop: AbstractEventLoop, rpcTransport: RpcTransport):
+async def prepare_peer_readloop(rpcTransport: RpcTransport):
     await rpcTransport.prepare()
 
     mutex = threading.Lock()
 
     def send(message, reject=None, serializationContext=None):
         with mutex:
-            if serializationContext:
-                buffers = serializationContext.get('buffers', None)
-                if buffers:
-                    for buffer in buffers:
-                        rpcTransport.writeBuffer(buffer, reject)
+            if serializationContext and (buffers := serializationContext.get('buffers')):
+                for buffer in buffers:
+                    rpcTransport.writeBuffer(buffer, reject)
 
             rpcTransport.writeJSON(message, reject)
 
@@ -202,7 +198,7 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, rpcTransport: RpcTransp
 
     async def peerReadLoop():
         try:
-            await readLoop(loop, peer, rpcTransport)
+            await readLoop(peer, rpcTransport)
         except:
             peer.kill()
             raise
