@@ -1082,6 +1082,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   streamSettings = createStreamSettings(this);
   rtspServer: net.Server;
   settingsListener: EventListenerRegister;
+  videoCameraListener: EventListenerRegister;
 
   constructor(public getTranscodeStorageSettings: () => Promise<any>, options: SettingsMixinDeviceOptions<VideoCamera & VideoCameraConfiguration>) {
     super(options);
@@ -1104,6 +1105,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     })();
 
     this.settingsListener = systemManager.listenDevice(this.id, ScryptedInterface.Settings, () => this.ensurePrebufferSessions());
+    this.videoCameraListener = systemManager.listenDevice(this.id, ScryptedInterface.VideoCamera, () => this.reinitiatePrebufferSessions());
   }
 
   async startRtspServer() {
@@ -1455,6 +1457,16 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     return settings;
   }
 
+  async reinitiatePrebufferSessions() {
+    const sessions = this.sessions;
+    this.sessions = new Map();
+    // kill and reinitiate the prebuffers.
+    for (const session of sessions.values()) {
+      session?.parserSessionPromise?.then(session => session.kill(new Error('rebroadcast settings changed')));
+    }
+    this.ensurePrebufferSessions();
+  }
+
   async putMixinSetting(key: string, value: SettingValue): Promise<void> {
     if (this.streamSettings.storageSettings.settings[key])
       await this.streamSettings.storageSettings.putSetting(key, value);
@@ -1465,14 +1477,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     if (this.streamSettings.storageSettings.settings[key]?.group === 'Transcoding')
       return;
 
-    const sessions = this.sessions;
-    this.sessions = new Map();
-
-    // kill and reinitiate the prebuffers.
-    for (const session of sessions.values()) {
-      session?.parserSessionPromise?.then(session => session.kill(new Error('rebroadcast settings changed')));
-    }
-    this.ensurePrebufferSessions();
+    this.reinitiatePrebufferSessions();
   }
 
   getPrebufferedStreams(msos?: ResponseMediaStreamOptions[]) {
@@ -1514,6 +1519,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   async release() {
     closeQuiet(this.rtspServer);
     this.settingsListener.removeListener();
+    this.videoCameraListener.removeListener();
     this.online = true;
     super.release();
     this.console.log('prebuffer sessions releasing if started');
