@@ -9,3 +9,4 @@ dist/*.js
 __pycache__
 docker-wyze-bridge
 .devcontainer
+.venv

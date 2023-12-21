@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Coroutine, List, Dict
+from typing import Any, Coroutine, List, Dict, Callable, Iterator
 import scrypted_sdk
 import asyncio
 import urllib.request
@@ -66,6 +66,8 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
         account = self.plugin.account.model_copy()
+        # wyze cams will disconnect first stream if the phone id requests a second stream.
+        # use a different substream phone id, similar to how docker wyze bridge does it.
         account.phone_id = account.phone_id[2:]
         return await self.handleClient(
             account,
@@ -75,6 +77,16 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
             writer,
         )
 
+    async def handleAudioClient(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        return await self.handleClient(
+            self.plugin.account.model_copy(),
+            FRAME_SIZE_1080P,
+            BITRATE_HD,
+            reader,
+            writer,
+            session_reader=lambda sess: sess.recv_audio_frames()
+        )
+
     async def handleClient(
         self,
         account: wyzecam.WyzeAccount,
@@ -82,6 +94,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
         bitrate,
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
+        session_reader: Callable[[wyzecam.WyzeIOTCSession], Iterator[tuple[bytes | None, Any]]] = None,
     ):
         loop = asyncio.get_event_loop()
         closed = False
@@ -107,8 +120,8 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera):
                     frame_size=frameSize,
                     bitrate=bitrate,
                 ) as sess:
-                    sess.session_id
-                    for frame, frame_info in sess.recv_video_data():
+                    reader = (session_reader and session_reader(sess)) or sess.recv_video_data()
+                    for frame, frame_info in reader:
                         if closed:
                             return
                         q.put(frame)

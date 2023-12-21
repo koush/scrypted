@@ -13,6 +13,11 @@
       "scrypted-readme": "scrypted-readme",
       "scrypted-package-json": "scrypted-package-json"
    },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "wyze"
+   ],
    "scrypted": {
       "name": "Wyze Plugin",
       "runtime": "python",
@@ -28,5 +33,5 @@
    "devDependencies": {
       "@scrypted/sdk": "^0.2.101"
    },
-   "version": "0.0.4"
+   "version": "0.0.6"
 }
