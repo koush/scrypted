@@ -470,6 +470,10 @@ class PrebufferSession {
       this.console.log('bypassing ffmpeg: using scrypted rfc4571 parser')
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       const { url, sdp, mediaStreamOptions } = json;
+      sessionMso = mediaStreamOptions;
+
+      const rtspParser = createRtspParser();
+      rbo.parsers.rtsp = rtspParser;
 
       session = startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, rbo);
       this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
@@ -558,7 +562,7 @@ class PrebufferSession {
       }
     }
 
-    if (this.usingScryptedParser) {
+    if (this.usingScryptedParser && !isRfc4571) {
       // watch the stream for 10 seconds to see if an weird nalu is encountered.
       // if one is found and using scrypted parser as default, will need to restart rebroadcast to prevent
       // downstream issues.
