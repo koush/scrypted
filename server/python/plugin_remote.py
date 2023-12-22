@@ -56,12 +56,10 @@ class SystemDeviceState(TypedDict):
 
 
 class DeviceProxy(object):
-    device: asyncio.Future[rpc.RpcPeer]
-
     def __init__(self, systemManager: SystemManager, id: str):
         self.systemManager = systemManager
         self.id = id
-        self.device = None
+        self.device: asyncio.Future[rpc.RpcPeer] = None
 
     def __getattr__(self, name):
         if name == 'id':
@@ -95,13 +93,11 @@ class DeviceProxy(object):
 
 
 class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
-    deviceProxies: Mapping[str, DeviceProxy]
-
     def __init__(self, api: Any, systemState: Mapping[str, Mapping[str, SystemDeviceState]]) -> None:
         super().__init__()
         self.api = api
         self.systemState = systemState
-        self.deviceProxies = {}
+        self.deviceProxies: Mapping[str, DeviceProxy] = {}
 
     async def getComponent(self, id: str) -> Any:
         return await self.api.getComponent(id)
@@ -329,16 +325,12 @@ class DeviceManager(scrypted_python.scrypted_sdk.types.DeviceManager):
 
 
 class PluginRemote:
-    systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}
-    nativeIds: Mapping[str, DeviceStorage] = {}
-    pluginId: str
-    hostInfo: Any
-    mediaManager: MediaManager
-    loop: AbstractEventLoop
-    consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
-    ptimeSum = 0
-
-    def __init__(self, peer: rpc.RpcPeer, api, pluginId, hostInfo, loop: AbstractEventLoop):
+    def __init__(self, peer: rpc.RpcPeer, api, pluginId: str, hostInfo, loop: AbstractEventLoop):
+        self.systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}
+        self.nativeIds: Mapping[str, DeviceStorage] = {}
+        self.mediaManager: MediaManager
+        self.consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
+        self.ptimeSum = 0
         self.allMemoryStats = {}
         self.peer = peer
         self.api = api

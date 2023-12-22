@@ -52,8 +52,6 @@ class RpcTransport:
 
 
 class RpcFileTransport(RpcTransport):
-    executor: ThreadPoolExecutor
-
     def __init__(self, readFd: int, writeFd: int) -> None:
         super().__init__()
         self.readFd = readFd
