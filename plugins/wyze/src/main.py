@@ -6,16 +6,14 @@ import concurrent.futures
 import json
 import os
 import platform
-import queue
 import struct
-import subprocess
 import sys
 import threading
 import traceback
 import urllib
 import urllib.request
 from ctypes import c_int
-from typing import Any, Callable, Coroutine, Dict, Iterator, List, MutableSet
+from typing import Any, Coroutine, Dict, List
 
 import scrypted_sdk
 from scrypted_sdk.other import MediaObject
@@ -188,10 +186,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         writer: asyncio.StreamWriter,
     ):
         info = self.sub if substream else self.main
-        try:
-            ffmpeg = await scrypted_sdk.mediaManager.getFFmpegPath()
-        except Exception as e:
-            raise e
+        ffmpeg = await scrypted_sdk.mediaManager.getFFmpegPath()
         loop = asyncio.get_event_loop()
 
         class Protocol:
@@ -232,6 +227,10 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             f"rtp://127.0.0.1:{vport}?pkt_size=1300",
             stdin=asyncio.subprocess.PIPE,
         )
+        vprocess.stdin.write(b"\x00\x00\x00\x01")
+        vprocess.stdin.write(info.videoCodecInfo[0])
+        vprocess.stdin.write(b"\x00\x00\x00\x01")
+        vprocess.stdin.write(info.videoCodecInfo[1])
 
         aprocess: asyncio.subprocess.Process = None
         if not self.getMuted():
@@ -265,7 +264,6 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             )
 
         try:
-            print("stuffing")
             async for audio, data, codec, sampleRate in self.forkAndStream(substream):
                 if writer.is_closing():
                     return
