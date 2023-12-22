@@ -14,14 +14,21 @@ import urllib
 import urllib.request
 from ctypes import c_int
 from typing import Any, Coroutine, Dict, List
+from wyzecam import tutk_protocol
 
 import scrypted_sdk
 from scrypted_sdk.other import MediaObject
-from scrypted_sdk.types import (DeviceProvider, PanTiltZoom,
-                                RequestMediaStreamOptions,
-                                ResponseMediaStreamOptions, ScryptedDeviceType,
-                                ScryptedInterface, Setting, Settings,
-                                VideoCamera)
+from scrypted_sdk.types import (
+    DeviceProvider,
+    PanTiltZoom,
+    RequestMediaStreamOptions,
+    ResponseMediaStreamOptions,
+    ScryptedDeviceType,
+    ScryptedInterface,
+    Setting,
+    Settings,
+    VideoCamera,
+)
 
 import wyzecam
 import wyzecam.api_models
@@ -77,12 +84,6 @@ class CodecInfo:
 
 
 class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTiltZoom):
-    camera: wyzecam.WyzeCamera
-    plugin: WyzePlugin
-
-    main: CodecInfo
-    sub: CodecInfo
-
     def __init__(
         self, nativeId: str | None, plugin: WyzePlugin, camera: wyzecam.WyzeCamera
     ):
@@ -92,10 +93,11 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         self.streams = set()
         self.activeStream = None
         self.audioQueues = set()
-        self.main = None
-        self.sub = None
+        self.main: CodecInfo = None
+        self.sub: CodecInfo = None
         self.mainFrameSize = FRAME_SIZE_2K if camera.is_2k else FRAME_SIZE_1080P
         self.subByteRate = 30
+        self.ptzQueue = asyncio.Queue[scrypted_sdk.PanTiltZoomCommand]()
 
         self.rfcServer = asyncio.ensure_future(
             self.ensureServer(self.handleMainRfcClient)
@@ -111,7 +113,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             }
 
     async def ptzCommand(self, command: scrypted_sdk.PanTiltZoomCommand) -> None:
-        pass
+        await self.ptzQueue.put(command)
 
     def safeParseJsonStorage(self, key: str):
         try:
@@ -326,6 +328,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 frameSize,
                 bitrate,
                 self.getMuted(),
+                self.ptzQueue,
             ):
                 audio: bool = payload["audio"]
                 data: bytes = payload["data"]
@@ -612,6 +615,7 @@ class WyzeFork:
         frameSize: int,
         bitrate: int,
         muted: bool,
+        ptzQueue: asyncio.Queue[scrypted_sdk.PanTiltZoomCommand],
     ):
         account = wyzecam.WyzeAccount(**account_json)
         camera = wyzecam.WyzeCamera(**camera_json)
@@ -641,8 +645,39 @@ class WyzeFork:
             ) as sess:
                 nonlocal closed
 
-                if not muted:
+                async def ptzRunner():
+                    while not closed:
+                        command = await ptzQueue.get()
+                        try:
+                            movement = command.get("movement", scrypted_sdk.PanTiltZoomMovement.Relative.value)
+                            pan = command.get("pan", 0)
+                            tilt = command.get("tilt", 0)
+                            speed = command.get("speed", 1)
+                            if  movement == scrypted_sdk.PanTiltZoomMovement.Absolute.value:
+                                pan = round(max(0, min(350, pan * 350)))
+                                tilt = round(max(0, min(40, tilt * 40)))
+                                message = tutk_protocol.K11018SetPTZPosition(tilt, pan)
+                                with sess.iotctrl_mux() as mux:
+                                    mux.send_ioctl(message)
+                            elif movement == scrypted_sdk.PanTiltZoomMovement.Relative.value:
+                                # this is range which turns in a full rotation.
+                                scalar = 3072
+                                # speed is 1-9 inclusive
+                                speed = round(max(0, min(8, speed * 8)))
+                                speed += 1
+                                pan = round(max(-scalar, min(scalar, pan * scalar)))
+                                tilt = round(max(-scalar, min(scalar, tilt * scalar)))
+                                message = tutk_protocol.K11000SetRotaryByDegree(pan, tilt, speed)
+                                with sess.iotctrl_mux() as mux:
+                                    mux.send_ioctl(message)
+                            else:
+                                raise Exception("Unknown PTZ cmmand: " + command["movement"])                   
+                        except Exception as e:
+                            print_exception(print, e)
 
+                asyncio.ensure_future(ptzRunner(), loop=loop)
+
+                if not muted:
                     def runAudio():
                         nonlocal closed
                         try:
