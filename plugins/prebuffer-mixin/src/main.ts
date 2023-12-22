@@ -469,7 +469,8 @@ class PrebufferSession {
       this.usingScryptedParser = true;
       this.console.log('bypassing ffmpeg: using scrypted rfc4571 parser')
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
-      const { url, sdp, mediaStreamOptions } = json;
+      let { url, sdp, mediaStreamOptions } = json;
+      sdp = addTrackControls(sdp);
       sessionMso = mediaStreamOptions;
 
       const rtspParser = createRtspParser();
