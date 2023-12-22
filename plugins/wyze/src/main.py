@@ -146,15 +146,16 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 "key": "bitrate",
                 "title": "Main Stream Bitrate",
                 "description": "The bitrate used by the main stream.",
-                "value": self.safeParseJsonStorage("byterate"),
+                "value": self.safeParseJsonStorage("bitrate"),
                 "combobox": True,
                 "value": str(self.getMainByteRate(True)),
                 "choices": [
                     "Default",
-                    "480",
-                    "960",
-                    "1440",
-                    "1920",
+                    "500",
+                    "750",
+                    "1000",
+                    "1200",
+                    "1400",
                 ],
             }
         )
@@ -649,17 +650,26 @@ class WyzeFork:
                     while not closed:
                         command = await ptzQueue.get()
                         try:
-                            movement = command.get("movement", scrypted_sdk.PanTiltZoomMovement.Relative.value)
+                            movement = command.get(
+                                "movement",
+                                scrypted_sdk.PanTiltZoomMovement.Relative.value,
+                            )
                             pan = command.get("pan", 0)
                             tilt = command.get("tilt", 0)
                             speed = command.get("speed", 1)
-                            if  movement == scrypted_sdk.PanTiltZoomMovement.Absolute.value:
+                            if (
+                                movement
+                                == scrypted_sdk.PanTiltZoomMovement.Absolute.value
+                            ):
                                 pan = round(max(0, min(350, pan * 350)))
                                 tilt = round(max(0, min(40, tilt * 40)))
                                 message = tutk_protocol.K11018SetPTZPosition(tilt, pan)
                                 with sess.iotctrl_mux() as mux:
                                     mux.send_ioctl(message)
-                            elif movement == scrypted_sdk.PanTiltZoomMovement.Relative.value:
+                            elif (
+                                movement
+                                == scrypted_sdk.PanTiltZoomMovement.Relative.value
+                            ):
                                 # this is range which turns in a full rotation.
                                 scalar = 3072
                                 # speed is 1-9 inclusive
@@ -667,17 +677,22 @@ class WyzeFork:
                                 speed += 1
                                 pan = round(max(-scalar, min(scalar, pan * scalar)))
                                 tilt = round(max(-scalar, min(scalar, tilt * scalar)))
-                                message = tutk_protocol.K11000SetRotaryByDegree(pan, tilt, speed)
+                                message = tutk_protocol.K11000SetRotaryByDegree(
+                                    pan, tilt, speed
+                                )
                                 with sess.iotctrl_mux() as mux:
                                     mux.send_ioctl(message)
                             else:
-                                raise Exception("Unknown PTZ cmmand: " + command["movement"])                   
+                                raise Exception(
+                                    "Unknown PTZ cmmand: " + command["movement"]
+                                )
                         except Exception as e:
                             print_exception(print, e)
 
                 asyncio.ensure_future(ptzRunner(), loop=loop)
 
                 if not muted:
+
                     def runAudio():
                         nonlocal closed
                         try:
@@ -713,7 +728,10 @@ class WyzeFork:
                     athread = None
 
                 try:
-                    for frame in sess.recv_bridge_frame():
+                    videoParm = sess.camera.camera_info.get("videoParm")
+                    fps = int((videoParm and videoParm.get('fps', 20)) or 20)
+
+                    for frame in sess.recv_bridge_frame(fps=fps):
                         if closed:
                             return
                         asyncio.run_coroutine_threadsafe(
