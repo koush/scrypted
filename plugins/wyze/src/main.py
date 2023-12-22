@@ -126,7 +126,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
 
     def getMainByteRate(self, default=False):
         try:
-            bit = int(self.safeParseJsonStorage("byterate"))
+            bit = int(self.safeParseJsonStorage("bitrate"))
             bit = round(bit / 8)
             bit = bit if 1 <= bit <= 255 else 0
             if not bit:
