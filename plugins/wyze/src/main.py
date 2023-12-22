@@ -189,12 +189,9 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         ffmpeg = await scrypted_sdk.mediaManager.getFFmpegPath()
         loop = asyncio.get_event_loop()
 
-        class Protocol:
-            def __init__(self, pt: int) -> None:
-                self.pt = pt
-
+        class RFC4571Writer:
             def connection_made(self, transport):
-                self.transport = transport
+                pass
 
             def datagram_received(self, data, addr):
                 l = len(data)
@@ -203,7 +200,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 writer.write(data)
 
         vt, vp = await loop.create_datagram_endpoint(
-            lambda: Protocol(96), local_addr=("127.0.0.1", 0)
+            lambda: RFC4571Writer(), local_addr=("127.0.0.1", 0)
         )
         vhost, vport = vt._sock.getsockname()
 
@@ -226,6 +223,8 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             "96",
             f"rtp://127.0.0.1:{vport}?pkt_size=1300",
             stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
         )
         vprocess.stdin.write(b"\x00\x00\x00\x01")
         vprocess.stdin.write(info.videoCodecInfo[0])
@@ -235,7 +234,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         aprocess: asyncio.subprocess.Process = None
         if not self.getMuted():
             at, ap = await loop.create_datagram_endpoint(
-                lambda: Protocol(97), local_addr=("127.0.0.1", 0)
+                lambda: RFC4571Writer(), local_addr=("127.0.0.1", 0)
             )
 
             ahost, aport = at._sock.getsockname()
@@ -261,6 +260,8 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 "97",
                 f"rtp://127.0.0.1:{aport}?pkt_size=1300",
                 stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
             )
 
         try:
