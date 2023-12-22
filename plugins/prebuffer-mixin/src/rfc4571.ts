@@ -64,7 +64,9 @@ export function connectRFC4571Parser(url: string) {
     return socket;
 }
 
-export function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">): ParserSession<"rtsp"> {
+export function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: {
+    timeout?: number,
+}): ParserSession<"rtsp"> {
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup

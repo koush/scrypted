@@ -475,7 +475,9 @@ class PrebufferSession {
       const rtspParser = createRtspParser();
       rbo.parsers.rtsp = rtspParser;
 
-      session = startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, rbo);
+      session = startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, {
+        timeout: 10000,
+      });
       this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
     }
     else {
