@@ -374,7 +374,7 @@ class RpcPeer:
             return RpcPeer.deserializeError(__serialized_value)
 
         if __remote_proxy_id:
-            weakref = self.remoteWeakProxies.get('__remote_proxy_id', None)
+            weakref = self.remoteWeakProxies.get(__remote_proxy_id, None)
             proxy = weakref() if weakref else None
             if not proxy:
                 proxy = self.newProxy(__remote_proxy_id, __remote_constructor_name,
