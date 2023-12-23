@@ -6,19 +6,6 @@ then
     exit 0
 fi
 
-if [ "$SERVICE_USER" == "root" ]
-then
-    echo "Scrypted SERVICE_USER root is not allowed."
-    exit 1
-fi
-
-USER_HOME=$(eval echo ~$SERVICE_USER)
-SCRYPTED_HOME=$USER_HOME/.scrypted
-mkdir -p $SCRYPTED_HOME
-
-set -e
-cd $SCRYPTED_HOME
-
 function readyn() {
     while true; do
         read -p "$1 (y/n) " yn
@@ -29,6 +16,22 @@ function readyn() {
         esac
     done
 }
+
+if [ "$SERVICE_USER" == "root" ]
+then
+    readyn "Scrypted will store its files in the root user home directory. Running as a non-root user is recommended. Are you sure?"
+    if [ "$yn" == "n" ]
+    then
+        exit 1
+    fi
+fi
+
+USER_HOME=$(eval echo ~$SERVICE_USER)
+SCRYPTED_HOME=$USER_HOME/.scrypted
+mkdir -p $SCRYPTED_HOME
+
+set -e
+cd $SCRYPTED_HOME
 
 readyn "Install Docker?"
 
