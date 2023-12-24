@@ -268,7 +268,8 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             )
 
         try:
-            async for audio, data, codec, sampleRate in self.forkAndStream(substream):
+            forked, gen = self.forkAndStream(substream)
+            async for audio, data, codec, sampleRate in gen:
                 if writer.is_closing():
                     return
 
@@ -279,6 +280,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         except Exception as e:
             print_exception(self.print, e)
         finally:
+            forked.worker.terminate()
             writer.close()
             self.print("rfc reader closed")
             vprocess.stdin.write("q\n".encode())
@@ -299,20 +301,24 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         pps: bytes = None
         audioCodec: str = None
         audioSampleRate: int = None
-        async for audio, data, codec, sampleRate in self.forkAndStream(substream):
-            if not audio and not sps and len(data):
-                nals = data.split(b"\x00\x00\x00\x01")
-                sps = nals[1]
-                pps = nals[2]
+        forked, gen = self.forkAndStream(substream)
+        try:
+            async for audio, data, codec, sampleRate in gen:
+                if not audio and not sps and len(data):
+                    nals = data.split(b"\x00\x00\x00\x01")
+                    sps = nals[1]
+                    pps = nals[2]
 
-            if audio and not self.getMuted():
-                audioCodec = codec
-                audioSampleRate = sampleRate
+                if audio and not self.getMuted():
+                    audioCodec = codec
+                    audioSampleRate = sampleRate
 
-            if sps and (audioCodec or self.getMuted()):
-                return (audioCodec, audioSampleRate, sps, pps)
+                if sps and (audioCodec or self.getMuted()):
+                    return (audioCodec, audioSampleRate, sps, pps)
+        finally:
+            forked.worker.terminate()
 
-    async def forkAndStream(self, substream: bool):
+    def forkAndStream(self, substream: bool):
         frameSize = FRAME_SIZE_360P if substream else self.mainFrameSize
         bitrate = self.subByteRate if substream else self.getMainByteRate()
         account = self.plugin.account.model_copy()
@@ -320,24 +326,26 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             account.phone_id = account.phone_id[2:]
 
         forked = scrypted_sdk.fork()
-        try:
-            wyzeFork: WyzeFork = await forked.result
-            async for payload in await wyzeFork.open_stream(
-                self.plugin.tutk_platform_lib,
-                account.model_dump(),
-                self.camera.model_dump(),
-                frameSize,
-                bitrate,
-                self.getMuted(),
-                self.ptzQueue,
-            ):
-                audio: bool = payload["audio"]
-                data: bytes = payload["data"]
-                codec: bytes = payload["codec"]
-                sampleRate: bytes = payload["sampleRate"]
-                yield audio, data, codec, sampleRate
-        finally:
-            forked.worker.terminate()
+        async def gen():
+            try:
+                wyzeFork: WyzeFork = await forked.result
+                async for payload in await wyzeFork.open_stream(
+                    self.plugin.tutk_platform_lib,
+                    account.model_dump(),
+                    self.camera.model_dump(),
+                    frameSize,
+                    bitrate,
+                    self.getMuted(),
+                    self.ptzQueue,
+                ):
+                    audio: bool = payload["audio"]
+                    data: bytes = payload["data"]
+                    codec: bytes = payload["codec"]
+                    sampleRate: bytes = payload["sampleRate"]
+                    yield audio, data, codec, sampleRate
+            finally:
+                forked.worker.terminate()
+        return forked, gen()
 
     async def getVideoStream(
         self, options: RequestMediaStreamOptions = None

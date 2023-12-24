@@ -176,7 +176,8 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
                 }
 
                 events.emit('rtsp', chunk);
-                resetActivityTimer();
+                if (chunk.type === inputVideoCodec)
+                    resetActivityTimer();
             }
         })
             .catch(e => {
