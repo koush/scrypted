@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import asyncio
 import base64
 import concurrent.futures
@@ -326,7 +327,23 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             account.phone_id = account.phone_id[2:]
 
         forked = scrypted_sdk.fork()
+
+        activity = time.time()
+        done = False
+        loop = asyncio.get_event_loop()
+        def reset_timer():
+            if done:
+                return
+            nonlocal activity
+            if time.time() - activity > 5:
+                forked.worker.terminate()
+            else:
+                loop.call_later(1, reset_timer)
+
+        loop.call_later(1, reset_timer)
+
         async def gen():
+            nonlocal activity
             try:
                 wyzeFork: WyzeFork = await forked.result
                 async for payload in await wyzeFork.open_stream(
@@ -342,8 +359,12 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                     data: bytes = payload["data"]
                     codec: bytes = payload["codec"]
                     sampleRate: bytes = payload["sampleRate"]
+                    if not audio and len(data):
+                        activity = time.time()
                     yield audio, data, codec, sampleRate
             finally:
+                nonlocal done
+                done = True
                 forked.worker.terminate()
         return forked, gen()
 
