@@ -128,15 +128,14 @@ async function start(mainFilename: string, options?: {
 
     if (certSetting?.value?.version !== CURRENT_SELF_SIGNED_CERTIFICATE_VERSION) {
         keyPair = createSelfSignedCertificate();
-
-        certSetting = new Settings();
-        certSetting._id = 'certificate';
-        certSetting.value = keyPair;
-        certSetting = await db.upsert(certSetting);
     }
     else {
-        keyPair = createSelfSignedCertificate(keyPair.serviceKey);
+        keyPair = createSelfSignedCertificate(keyPair);
     }
+    certSetting = new Settings();
+    certSetting._id = 'certificate';
+    certSetting.value = keyPair;
+    certSetting = await db.upsert(certSetting);
 
     const basicAuth = httpAuth.basic({
         realm: 'Scrypted',

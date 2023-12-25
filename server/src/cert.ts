@@ -6,37 +6,56 @@ const { pki } = forge;
 
 
 export const CURRENT_SELF_SIGNED_CERTIFICATE_VERSION = 'v2';
+const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
 
-export function createSelfSignedCertificate(serviceKey?: string) {
-    let privateKey: ReturnType<typeof pki.privateKeyFromPem>;
-    const cert = pki.createCertificate();
+export interface SelfSignedCertificate {
+    serviceKey: string;
+    certificate: string;
+    version: string,
+};
 
-    if (serviceKey) {
-        privateKey = pki.privateKeyFromPem(serviceKey);
-        cert.publicKey = pki.rsa.setPublicKey(privateKey.n, privateKey.e);
+export function createSelfSignedCertificate(existing?: SelfSignedCertificate): SelfSignedCertificate {
+    let serviceKey: ReturnType<typeof pki.privateKeyFromPem>;
+    // check if existing key is usable
+    if (existing?.certificate && existing?.serviceKey && existing?.version === CURRENT_SELF_SIGNED_CERTIFICATE_VERSION) {
+        try {
+            const certificate = pki.certificateFromPem(existing.certificate);
+            if (certificate.validity.notAfter.getTime() > Date.now() + SIXTY_DAYS_MS)
+                return existing;
+            serviceKey = pki.privateKeyFromPem(existing.serviceKey);
+        }
+        catch (e) {
+        }
+    }
+
+    const certificate = pki.createCertificate();
+
+    if (existing?.serviceKey) {
+        certificate.publicKey = pki.rsa.setPublicKey(serviceKey.n, serviceKey.e);
     }
     else {
         // generate a keypair and create an X.509v3 certificate
         const keys = pki.rsa.generateKeyPair(2048);
-        privateKey = keys.privateKey;
-        cert.publicKey = keys.publicKey;
+        serviceKey = keys.privateKey;
+        certificate.publicKey = keys.publicKey;
     }
+
 
     // NOTE: serialNumber is the hex encoded value of an ASN.1 INTEGER.
     // Conforming CAs should ensure serialNumber is:
     // - no more than 20 octets
     // - non-negative (prefix a '00' if your value starts with a '1' bit)
-    cert.serialNumber = '01' + crypto.randomBytes(19).toString("hex"); // 1 octet = 8 bits = 1 byte = 2 hex chars
-    cert.validity.notBefore = new Date();
-    cert.validity.notAfter = new Date();
-    cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1); // adding 1 year of validity from now
+    certificate.serialNumber = '01' + crypto.randomBytes(19).toString("hex"); // 1 octet = 8 bits = 1 byte = 2 hex chars
+    certificate.validity.notBefore = new Date();
+    certificate.validity.notAfter = new Date();
+    certificate.validity.notAfter.setFullYear(certificate.validity.notBefore.getFullYear() + 5); // adding 5 years of validity from now
     const attrs = [{
         name: 'commonName',
         value: 'localhost'
     }];
-    cert.setSubject(attrs);
-    cert.setIssuer(attrs);
-    cert.setExtensions([{
+    certificate.setSubject(attrs);
+    certificate.setIssuer(attrs);
+    certificate.setExtensions([{
         name: 'basicConstraints',
         cA: true
     }, {
@@ -73,10 +92,10 @@ export function createSelfSignedCertificate(serviceKey?: string) {
     }]);
 
     // self-sign certificate
-    cert.sign(privateKey);
+    certificate.sign(serviceKey);
     return {
-        serviceKey: pki.privateKeyToPem(privateKey),
-        certificate: pki.certificateToPem(cert),
+        serviceKey: pki.privateKeyToPem(serviceKey),
+        certificate: pki.certificateToPem(certificate),
         version: CURRENT_SELF_SIGNED_CERTIFICATE_VERSION,
     };
 }
