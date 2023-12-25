@@ -41,6 +41,17 @@ export interface DevInfo {
     wifi:         number;
 }
 
+export interface AIDetectionState {
+    alarm_state: number;
+    support: number;
+}
+
+export type AIState = {
+    [key: string]: AIDetectionState;
+} & {
+    channel: number;
+};
+
 export class ReolinkCameraClient {
     digestAuth: AxiosDigestAuth;
 
@@ -92,7 +103,7 @@ export class ReolinkCameraClient {
             httpsAgent: reolinkHttpsAgent,
         });
         return {
-            value: !!response.data?.[0]?.value?.state,
+            value: response.data?.[0]?.value as AIState,
             data: response.data,
         };
     }

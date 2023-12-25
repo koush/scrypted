@@ -1,18 +1,19 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import { Camera, DeviceCreatorSettings, DeviceInformation, Intercom, MediaObject, PictureOptions, Reboot, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, Reboot, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { OnvifCameraAPI, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
-import { DevInfo, Enc, ReolinkCameraClient } from './reolink-api';
+import { AIState, DevInfo, Enc, ReolinkCameraClient } from './reolink-api';
 
-class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom {
+class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom, ObjectDetector {
     client: ReolinkCameraClient;
     onvifClient: OnvifCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
+    motionTimeout: NodeJS.Timeout;
 
     storageSettings = new StorageSettings(this, {
         doorbell: {
@@ -25,6 +26,16 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
             title: 'RTMP Port Override',
             placeholder: '1935',
             type: 'number',
+        },
+        motionTimeout: {
+            group: 'Advanced',
+            title: 'Motion Timeout',
+            defaultValue: 10,
+            type: 'number',
+        },
+        hasObjectDetector: {
+            json: true,
+            hide: true,
         }
     });
 
@@ -33,6 +44,33 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
 
         this.updateDeviceInfo();
         this.updateDevice();
+    }
+
+    async getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject> {
+        return;
+    }
+
+    async getObjectTypes(): Promise<ObjectDetectionTypes> {
+        try {
+            const ai: AIState = this.storageSettings.values.hasObjectDetector[0]?.value;
+            const classes: string[] = [];
+
+            for (const key of Object.keys(ai)) {
+                if (key === 'channel')
+                    continue;
+                const { alarm_state, support } = ai[key];
+                if (support)
+                    classes.push(key);
+            }
+            return {
+                classes,
+            };
+        }
+        catch (e) {
+            return {
+                classes: [],
+            };
+        }
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
@@ -59,6 +97,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
             );
             type = ScryptedDeviceType.Doorbell;
             name = 'Reolink Doorbell';
+        }
+        if (this.storageSettings.values.hasObjectDetector) {
+            interfaces.push(ScryptedInterface.ObjectDetector);
         }
         this.provider.updateDevice(this.nativeId, name, interfaces, type);
     }
@@ -97,11 +138,70 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
     }
 
     async listenEvents() {
-        if (this.storageSettings.values.doorbell)
-            return listenEvents(this, await this.createOnvifClient());
-
-        const client = this.getClient();
         let killed = false;
+        const client = this.getClient();
+
+        // reolink ai might not trigger motion if objects are detected, weird.
+        const startAI = async (ret: Destroyable, triggerMotion: () => void) => {
+            let hasSucceeded = false;
+            while (!killed) {
+                try {
+                    const ai = await client.getAiState();
+                    ret.emit('data', JSON.stringify(ai.data));
+
+                    const classes: string[] = [];
+
+                    for (const key of Object.keys(ai.value)) {
+                        if (key === 'channel')
+                            continue;
+                        const { alarm_state, support } = ai.value[key];
+                        if (support)
+                            classes.push(key);
+                    }
+
+                    if (!classes.length)
+                        return;
+
+                    hasSucceeded = true;
+                    if (!this.storageSettings.values.hasObjectDetector) {
+                        this.storageSettings.values.hasObjectDetector = ai.data;
+                        this.updateDevice();
+                    }
+                    const od: ObjectsDetected = {
+                        timestamp: Date.now(),
+                        detections: [],
+                    };
+                    for (const c of classes) {
+                        const { alarm_state } = ai.value[c];
+                        if (alarm_state) {
+                            od.detections.push({
+                                className: c,
+                                score: 1,
+                            });
+                        }
+                    }
+                    if (od.detections.length) {
+                        triggerMotion();
+                        sdk.deviceManager.onDeviceEvent(this.nativeId, ScryptedInterface.ObjectDetector, od);
+                    }
+                }
+                catch (e) {
+                    if (!hasSucceeded)
+                        return;
+                    ret.emit('error', e);
+                }
+                await sleep(1000);
+            }
+        }
+
+        if (this.storageSettings.values.doorbell) {
+            const ret = await listenEvents(this, await this.createOnvifClient(), this.storageSettings.values.motionTimeout * 1000);
+            ret.on('close', () => killed = true);
+            ret.on('error', () => killed = true);
+            startAI(ret, ret.triggerMotion);
+            return ret;
+        }
+
         const events = new EventEmitter();
         const ret: Destroyable = {
             on: function (eventName: string | symbol, listener: (...args: any[]) => void): void {
@@ -115,13 +215,17 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
             }
         };
 
+        const triggerMotion = () => {
+            this.motionDetected = true;
+            clearTimeout(this.motionTimeout);
+            this.motionTimeout = setTimeout(() => this.motionDetected = false, this.storageSettings.values.motionTimeout * 1000);
+        };
         (async () => {
             while (!killed) {
                 try {
-                    // const ai = await client.getAiState();
-                    // ret.emit('data', JSON.stringify(ai));
                     const { value, data } = await client.getMotionState();
-                    this.motionDetected = value;
+                    if (value)
+                        triggerMotion();
                     ret.emit('data', JSON.stringify(data));
                 }
                 catch (e) {
@@ -130,6 +234,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
                 await sleep(1000);
             }
         })();
+        startAI(ret, triggerMotion);
         return ret;
     }
 
@@ -228,7 +333,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
             }
         ];
 
-        if (deviceInfo?.model == "Reolink TrackMix PoE"){
+        if (deviceInfo?.model == "Reolink TrackMix PoE") {
             streams.push({
                 name: '',
                 id: 'autotrack.bcs',
@@ -283,7 +388,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom 
         }
 
         return streams;
-    
+
     }
 
     async putSetting(key: string, value: string) {
