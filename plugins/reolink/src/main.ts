@@ -30,7 +30,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
         motionTimeout: {
             group: 'Advanced',
             title: 'Motion Timeout',
-            defaultValue: 10,
+            defaultValue: 20,
             type: 'number',
         },
         hasObjectDetector: {
