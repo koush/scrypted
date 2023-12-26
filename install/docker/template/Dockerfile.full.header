@@ -43,11 +43,6 @@ RUN echo "Installing pillow-simd dependencies."
 RUN apt-get -y install \
     libjpeg-dev zlib1g-dev
 
-# plugins support fallback to pillow, but vips is faster.
-RUN echo "Installing libvips42."
-RUN apt-get -y install \
-    libvips42
-
 # gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
 RUN echo "Installing gstreamer."
 RUN apt-get -y install \
