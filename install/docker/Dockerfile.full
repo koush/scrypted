@@ -27,7 +27,7 @@ RUN apt-get update && apt-get -y install \
 ARG NODE_VERSION=18
 RUN apt-get install -y ca-certificates curl gnupg
 RUN mkdir -p /etc/apt/keyrings
-RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg
 RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_"$NODE_VERSION".x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
 RUN apt-get update && apt-get install -y nodejs
 
@@ -94,7 +94,7 @@ RUN bash -c "if [ \"$(uname -m)\" == \"x86_64\" ]; \
     then \
         apt-get update && apt-get install -y gpg-agent && \
         rm -f /usr/share/keyrings/intel-graphics.gpg && \
-        curl -L https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg && \
+        curl -L https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --yes --output /usr/share/keyrings/intel-graphics.gpg && \
         echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy arc' | tee  /etc/apt/sources.list.d/intel.gpu.jammy.list && \
         apt-get -y update && \
         apt-get -y install intel-opencl-icd intel-media-va-driver-non-free && \
