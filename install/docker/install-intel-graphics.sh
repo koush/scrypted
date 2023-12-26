@@ -1,5 +1,6 @@
 if [ "$(uname -m)" = "x86_64" ]
 then
+    echo "Installing Intel graphics packages."
     apt-get update && apt-get install -y gpg-agent &&
     rm -f /usr/share/keyrings/intel-graphics.gpg &&
     curl -L https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --yes --output /usr/share/keyrings/intel-graphics.gpg &&
