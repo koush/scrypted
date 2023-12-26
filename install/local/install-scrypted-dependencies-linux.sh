@@ -12,6 +12,26 @@ then
     exit 1
 fi
 
+function readyn() {
+    while true; do
+        read -p "$1 (y/n) " yn
+        case $yn in
+            [Yy]* ) break;;
+            [Nn]* ) break;;
+            * ) echo "Please answer yes or no. (y/n)";;
+        esac
+    done
+}
+
+if [ "$SERVICE_USER" == "root" ]
+then
+    readyn "Scrypted will store its files in the root user home directory. Running as a non-root user is recommended. Are you sure?"
+    if [ "$yn" == "n" ]
+    then
+        exit 1
+    fi
+fi
+
 echo "Stopping existing service if it is running..."
 systemctl stop scrypted.service
 
@@ -54,12 +74,6 @@ if [ -z "$SERVICE_USER" ]
 then
     echo "Scrypted SERVICE_USER environment variable was not specified. Service will not be installed."
     exit 0
-fi
-
-if [ "$SERVICE_USER" == "root" ]
-then
-    echo "Scrypted SERVICE_USER root is not allowed."
-    exit 1
 fi
 
 # this is not RUN as we do not care about the result
