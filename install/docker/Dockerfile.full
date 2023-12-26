@@ -90,7 +90,7 @@ RUN python3 -m pip install debugpy typing_extensions psutil
 FROM header as base
 
 # intel opencl gpu for openvino
-RUN bash -c "if [ \"$(uname -m)\" == \"x86_64\" ]; \
+RUN if [ "$(uname -m)" == "x86_64" ]; \
     then \
         apt-get update && apt-get install -y gpg-agent && \
         rm -f /usr/share/keyrings/intel-graphics.gpg && \
