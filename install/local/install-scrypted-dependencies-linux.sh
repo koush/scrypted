@@ -23,7 +23,7 @@ function readyn() {
     done
 }
 
-if [ "$SERVICE_USER" == "root" ] && [ -z "$SERVICE_USER_ROOT"]
+if [ "$SERVICE_USER" = "root" ] && [ -z "$SERVICE_USER_ROOT"]
 then
     readyn "Scrypted will store its files in the root user home directory. Running as a non-root user is recommended. Are you sure?"
     if [ "$yn" == "n" ]

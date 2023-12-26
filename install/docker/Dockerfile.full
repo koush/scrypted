@@ -94,7 +94,7 @@ RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/in
 
 # python 3.9 from ppa.
 # 3.9 is the version with prebuilt support for tensorflow lite
-RUN add-apt-repository ppa:deadsnakes/ppa && \
+RUN add-apt-repository -y ppa:deadsnakes/ppa && \
     apt-get -y install \
     python3.9 \
     python3.9-dev \
