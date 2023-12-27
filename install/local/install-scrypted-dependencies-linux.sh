@@ -69,7 +69,7 @@ ENV() {
 }
 
 source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/template/Dockerfile.full.header)
-if [ ! -z "SCRYPTED_CONTAINER" ]
+if [ ! -z "SERVICE_CONTAINER" ]
 then
     source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/template/Dockerfile.full.footer)
 fi
