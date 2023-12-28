@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 import asyncio
 import base64
 import concurrent.futures
@@ -10,29 +9,26 @@ import platform
 import struct
 import sys
 import threading
+import time
 import traceback
 import urllib
 import urllib.request
 from ctypes import c_int
 from typing import Any, Coroutine, Dict, List
-from wyzecam import tutk_protocol
 
 import scrypted_sdk
+from requests import HTTPError, RequestException
 from scrypted_sdk.other import MediaObject
-from scrypted_sdk.types import (
-    DeviceProvider,
-    PanTiltZoom,
-    RequestMediaStreamOptions,
-    ResponseMediaStreamOptions,
-    ScryptedDeviceType,
-    ScryptedInterface,
-    Setting,
-    Settings,
-    VideoCamera,
-)
+from scrypted_sdk.types import (DeviceProvider, PanTiltZoom,
+                                RequestMediaStreamOptions,
+                                ResponseMediaStreamOptions, ScryptedDeviceType,
+                                ScryptedInterface, Setting, Settings,
+                                VideoCamera)
 
 import wyzecam
 import wyzecam.api_models
+from wyzecam import tutk_protocol
+from wyzecam.api import RateLimitError, post_v2_device
 from wyzecam.tutk.tutk import FRAME_SIZE_2K, FRAME_SIZE_360P, FRAME_SIZE_1080P
 
 os.environ["TUTK_PROJECT_ROOT"] = os.path.join(
@@ -331,16 +327,17 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         activity = time.time()
         done = False
         loop = asyncio.get_event_loop()
+
         def reset_timer():
             if done:
                 return
             nonlocal activity
-            if time.time() - activity > 5:
+            if time.time() - activity > 15:
                 forked.worker.terminate()
             else:
                 loop.call_later(1, reset_timer)
 
-        loop.call_later(1, reset_timer)
+        loop.call_later(30, reset_timer)
 
         async def gen():
             nonlocal activity
@@ -366,6 +363,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 nonlocal done
                 done = True
                 forked.worker.terminate()
+
         return forked, gen()
 
     async def getVideoStream(
@@ -471,15 +469,14 @@ a=rtpmap:97 {audioCodecName}/{info.audioSampleRate}/1
 
 
 class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
-    cameras: Dict[str, wyzecam.WyzeCamera]
-    account: wyzecam.WyzeAccount
-    tutk_platform_lib: str
-    wyze_iotc: wyzecam.WyzeIOTC
-
     def __init__(self):
         super().__init__()
-        self.cameras = {}
-        self.account = None
+        self.authInfo: wyzecam.WyzeCredential = None
+        self.cameras: Dict[str, wyzecam.WyzeCamera] = {}
+        self.account: wyzecam.WyzeAccount = None
+        self.tutk_platform_lib: str = None
+        self.wyze_iotc: wyzecam.WyzeIOTC = None
+        self.last_ts = 0
 
         if sys.platform != "linux":
             self.print("Wyze plugin must be installed under Scrypted for Linux.")
@@ -532,6 +529,26 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
         except:
             return None
 
+    async def pollEvents(self):
+        current_ms = int(time.time() + 60) * 1000
+        params = {
+            "count": 20,
+            "order_by": 1,
+            "begin_time": max((self.last_ts + 1) * 1_000, (current_ms - 1_000_000)),
+            "end_time": current_ms,
+            "device_mac_list": [],
+        }
+
+        try:
+            resp = post_v2_device(self.authInfo, "get_event_list", params)
+            return time.time(), resp["event_list"]
+        except RateLimitError as ex:
+            self.print(f"[EVENTS] RateLimitError: {ex}, cooling down.")
+            return ex.reset_by, []
+        except (HTTPError, RequestException) as ex:
+            self.print(f"[EVENTS] HTTPError: {ex}, cooling down.")
+            return time.time() + 60, []
+
     async def refreshDevices(self):
         print("refreshing")
 
@@ -545,8 +562,10 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
             return
 
         auth_info = wyzecam.login(email, password, api_key=apiKey, key_id=keyId)
+        self.authInfo = auth_info
         self.account = wyzecam.get_user_info(auth_info)
         cameras = wyzecam.get_camera_list(auth_info)
+        # await self.pollEvents()
         manifest: scrypted_sdk.DeviceManifest = {"devices": []}
         for camera in cameras:
             self.cameras[camera.p2p_id] = camera
@@ -758,7 +777,7 @@ class WyzeFork:
 
                 try:
                     videoParm = sess.camera.camera_info.get("videoParm")
-                    fps = int((videoParm and videoParm.get('fps', 20)) or 20)
+                    fps = int((videoParm and videoParm.get("fps", 20)) or 20)
 
                     for frame in sess.recv_bridge_frame(fps=fps):
                         if closed:
