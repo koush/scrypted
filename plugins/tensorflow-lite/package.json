@@ -31,8 +31,7 @@
    "scrypted": {
       "name": "Tensorflow Lite Object Detection",
       "pluginDependencies": [
-         "@scrypted/objectdetector",
-         "@scrypted/python-codecs"
+         "@scrypted/objectdetector"
       ],
       "runtime": "python",
       "pythonVersion": {
@@ -54,5 +53,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.44"
+   "version": "0.1.45"
 }
