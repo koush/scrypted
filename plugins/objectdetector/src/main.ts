@@ -539,7 +539,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
         const classes = zoneInfo?.classes?.length ? zoneInfo?.classes : this.model?.classes || [];
         if (match && classes.length) {
-          match = zoneInfo.classes.includes(o.className);
+          match = classes.includes(o.className);
         }
         if (match) {
           o.zones.push(zone);
