@@ -8,6 +8,8 @@ export function loadSharp() {
         hasLoadedSharp = true;
         try {
             sharpInstance = require('sharp');
+            // not exposed by sharp but it exists.
+            (sharpInstance.kernel as any).linear = 'linear';
             console.log('sharp loaded');
         }
         catch (e) {
@@ -58,8 +60,27 @@ export class VipsImage implements Image {
             });
         }
         if (options?.resize) {
+            let kernel: string;
+            switch (options?.resize.filter) {
+                case 'bilinear':
+                    kernel = 'linear';
+                    break;
+                case 'lanczos':
+                    kernel = 'lanczos2';
+                    break;
+                case 'mitchell':
+                    kernel = 'mitchell';
+                    break;
+                case 'nearest':
+                    kernel = 'nearest';
+                    break;
+                default:
+                    kernel = 'linear';
+                    break
+            }
             transformed.resize(typeof options.resize.width === 'number' ? Math.floor(options.resize.width) : undefined, typeof options.resize.height === 'number' ? Math.floor(options.resize.height) : undefined, {
                 fit: "cover",
+                kernel: kernel as any,
             });
         }
 

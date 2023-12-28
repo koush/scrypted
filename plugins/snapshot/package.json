@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/snapshot",
-   "version": "0.2.22",
+   "version": "0.2.23",
    "description": "Snapshot Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -35,14 +35,14 @@
    },
    "dependencies": {
       "@koush/axios-digest-auth": "^0.8.5",
-      "@types/node": "^18.16.18",
+      "@types/node": "^20.10.5",
       "axios": "^1.4.0",
-      "sharp": "^0.32.6",
-      "whatwg-mimetype": "^3.0.0"
+      "sharp": "^0.33.1",
+      "whatwg-mimetype": "^4.0.0"
    },
    "devDependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "@types/whatwg-mimetype": "^3.0.0"
+      "@types/whatwg-mimetype": "^3.0.2"
    }
 }
