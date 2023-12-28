@@ -188,7 +188,7 @@ async function start(mainFilename: string, options?: {
     }
 
     app.use(async (req, res, next) => {
-        const defaultAuthentication = process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
+        const defaultAuthentication = !req.query.disableDefaultAuthentication && process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
         if (defaultAuthentication) {
             const user = scrypted.usersService.users.get(defaultAuthentication);
             if (user) {
@@ -609,7 +609,7 @@ async function start(mainFilename: string, options?: {
         }
 
         // env based anon user login
-        const defaultAuthentication = process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
+        const defaultAuthentication = !req.query.disableDefaultAuthentication && process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
         if (defaultAuthentication) {
             const user = scrypted.usersService.users.get(defaultAuthentication);
             if (user) {
