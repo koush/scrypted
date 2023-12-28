@@ -1,12 +1,13 @@
-import ip, { isV4Format } from 'ip';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
+import { once } from 'events';
 import express, { Request } from 'express';
 import fs from 'fs';
 import http from 'http';
 import httpAuth from 'http-auth';
 import https from 'https';
+import ip, { isV4Format } from 'ip';
 import net from 'net';
 import os from 'os';
 import path from 'path';
@@ -15,19 +16,16 @@ import semver from 'semver';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { Plugin, ScryptedUser, Settings } from './db-types';
+import { getNpmPackageInfo } from './http-fetch-helpers';
 import Level from './level';
 import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { RPCResultError } from './rpc';
 import { ScryptedRuntime } from './runtime';
 import { getHostAddresses, SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
-import { Info } from './services/info';
 import { setScryptedUserPassword } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
-import { once } from 'events';
-import util from 'util';
-import { getNpmPackageInfo } from './http-fetch-helpers';
 
 export type Runtime = ScryptedRuntime;
 
@@ -190,10 +188,14 @@ async function start(mainFilename: string, options?: {
     }
 
     app.use(async (req, res, next) => {
-        if (process.env.SCRYPTED_DISABLE_AUTHENTICATION === 'true') {
-            res.locals.username = 'anonymous';
-            next();
-            return;
+        const defaultAuthentication = process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
+        if (defaultAuthentication) {
+            const user = scrypted.usersService.users.get(defaultAuthentication);
+            if (user) {
+                res.locals.username = defaultAuthentication;
+                next();
+                return;
+            }
         }
 
         // the remote address may be ipv6 prefixed so use a fuzzy match.
@@ -606,14 +608,23 @@ async function start(mainFilename: string, options?: {
             return;
         }
 
-        // env based anon admin login
-        if (process.env.SCRYPTED_DISABLE_AUTHENTICATION === 'true') {
-            res.send({
-                expiration: ONE_DAY_MILLISECONDS,
-                username: 'anonymous',
-                ...alternateAddresses,
-                hostname,
-            })
+        // env based anon user login
+        const defaultAuthentication = process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
+        if (defaultAuthentication) {
+            const user = scrypted.usersService.users.get(defaultAuthentication);
+            if (user) {
+                const userToken = new UserToken(defaultAuthentication, user.aclId, Date.now());
+                res.send({
+                    ...createTokens(userToken),
+                    expiration: ONE_DAY_MILLISECONDS,
+                    username: defaultAuthentication,
+                    // TODO: do not return the token from a short term auth mechanism?
+                    token: user?.token,
+                    ...alternateAddresses,
+                    hostname,
+                });
+                return;
+            }
             return;
         }
 
