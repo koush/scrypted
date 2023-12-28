@@ -28,8 +28,7 @@
    "scrypted": {
       "name": "OpenVINO Object Detection",
       "pluginDependencies": [
-         "@scrypted/objectdetector",
-         "@scrypted/python-codecs"
+         "@scrypted/objectdetector"
       ],
       "runtime": "python",
       "type": "API",
@@ -42,5 +41,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.45"
+   "version": "0.1.46"
 }
