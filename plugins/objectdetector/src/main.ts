@@ -104,12 +104,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   analyzeStop: number;
   detectorSignal = new Deferred<void>().resolve();
   released = false;
+  // settings: Setting[];
 
   get detectorRunning() {
     return !this.detectorSignal.finished;
   }
 
-  constructor(public plugin: ObjectDetectionPlugin, mixinDevice: VideoCamera & Camera & MotionSensor & ObjectDetector & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, public model: ObjectDetectionModel, group: string, public hasMotionType: boolean, public settings: Setting[]) {
+  constructor(public plugin: ObjectDetectionPlugin, mixinDevice: VideoCamera & Camera & MotionSensor & ObjectDetector & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, public model: ObjectDetectionModel, group: string, public hasMotionType: boolean) {
     super({
       mixinDevice, mixinDeviceState,
       mixinProviderNativeId: providerNativeId,
@@ -157,11 +158,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   getCurrentSettings() {
-    if (!this.settings)
+    const settings = this.model.settings;
+    if (!settings)
       return;
 
     const ret: { [key: string]: any } = {};
-    for (const setting of this.settings) {
+    for (const setting of settings) {
       let value: any;
       if (setting.multiple) {
         value = safeParseJson(this.storage.getItem(setting.key));
@@ -209,8 +211,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   async register() {
-    const model = await this.objectDetection.getDetectionModel();
-
     if (!this.hasMotionType) {
       this.motionListener = this.cameraDevice.listen(ScryptedInterface.MotionSensor, async () => {
         if (!this.cameraDevice.motionDetected) {
@@ -300,6 +300,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   async runPipelineAnalysisLoop(signal: Deferred<void>, options: {
     suppress?: boolean,
   }) {
+    await this.updateModel();
     while (!signal.finished) {
       if (options.suppress) {
         this.console.log('Resuming motion processing after active motion timeout.');
@@ -536,7 +537,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           match = polygonOverlap(box, zoneValue);
         }
 
-        if (match && zoneInfo?.classes?.length) {
+        const classes = zoneInfo?.classes?.length ? zoneInfo?.classes : this.model?.classes || [];
+        if (match && classes.length) {
           match = zoneInfo.classes.includes(o.className);
         }
         if (match) {
@@ -611,7 +613,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     const ret = await this.getNativeObjectTypes();
     if (!ret.classes)
       ret.classes = [];
-    ret.classes.push(...(await this.objectDetection.getDetectionModel()).classes);
+    ret.classes.push(...(await this.objectDetection.getDetectionModel(this.getCurrentSettings())).classes);
     return ret;
   }
 
@@ -656,17 +658,22 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return use.id;
   }
 
-  async getMixinSettings(): Promise<Setting[]> {
-    const settings: Setting[] = [];
-
+  async updateModel() {
     try {
-      this.settings = (await this.objectDetection.getDetectionModel(this.getCurrentSettings())).settings;
+      this.model = await this.objectDetection.getDetectionModel(this.getCurrentSettings());
     }
     catch (e) {
     }
+  }
 
-    if (this.settings) {
-      settings.push(...this.settings.map(setting => {
+  async getMixinSettings(): Promise<Setting[]> {
+    const settings: Setting[] = [];
+
+    await this.updateModel();
+    const modelSettings = this.model.settings;
+
+    if (modelSettings) {
+      settings.push(...modelSettings.map(setting => {
         let value: any;
         if (setting.multiple) {
           value = safeParseJson(this.storage.getItem(setting.key));
@@ -737,14 +744,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
 
       if (!this.hasMotionType) {
+        const classes = this.model.classes;
         settings.push(
           {
             subgroup,
             key: `zoneinfo-classes-${name}`,
             title: `Detection Classes`,
-            description: 'The detection classes to match inside this zone. An empty list will match all classes.',
-            choices: (await this.getObjectTypes())?.classes || [],
-            value: zi?.classes || [],
+            description: 'The detection classes to match inside this zone.',
+            choices: classes || [],
+            value: zi?.classes?.length ? zi?.classes : classes || [],
             multiple: true,
           },
         );
@@ -817,7 +825,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       return this.storageSettings.putSetting(key, value);
     }
 
-    if (value && this.settings?.find(s => s.key === key)?.multiple) {
+    if (value && this.model.settings?.find(s => s.key === key)?.multiple) {
       vs = JSON.stringify(value);
     }
 
@@ -895,9 +903,7 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
     const group = hasMotionType ? 'Motion Detection' : 'Object Detection';
     // const group = objectDetection.name.replace('Plugin', '').trim();
 
-    const settings = this.model.settings;
-
-    const ret = new ObjectDetectionMixin(this.plugin, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.model, group, hasMotionType, settings);
+    const ret = new ObjectDetectionMixin(this.plugin, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.model, group, hasMotionType);
     this.currentMixins.add(ret);
     return ret;
   }
