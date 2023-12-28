@@ -2,9 +2,15 @@ import { ObjectsDetected, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface 
 import { OnvifCameraAPI, OnvifEvent } from "./onvif-api";
 import { Destroyable } from "../../rtsp/src/rtsp";
 
-export async function listenEvents(thisDevice: ScryptedDeviceBase, client: OnvifCameraAPI) {
+export async function listenEvents(thisDevice: ScryptedDeviceBase, client: OnvifCameraAPI, motionTimeoutMs = 30000) {
     let motionTimeout: NodeJS.Timeout;
     let binaryTimeout: NodeJS.Timeout;
+
+    const triggerMotion = () => {
+        thisDevice.motionDetected = true;
+        clearTimeout(motionTimeout);
+        motionTimeout = setTimeout(() => thisDevice.motionDetected = false, motionTimeoutMs);
+    };
 
     try {
         await client.supportsEvents();
@@ -17,22 +23,28 @@ export async function listenEvents(thisDevice: ScryptedDeviceBase, client: Onvif
     const events = client.listenEvents();
     events.on('event', (event, className) => {
         if (event === OnvifEvent.MotionBuggy) {
-            thisDevice.motionDetected = true;
-            clearTimeout(motionTimeout);
-            motionTimeout = setTimeout(() => thisDevice.motionDetected = false, 30000);
+            // some onvif cameras have motion with no associated motion end event.
+            triggerMotion();
             return;
         }
         if (event === OnvifEvent.BinaryRingEvent) {
             thisDevice.binaryState = true;
             clearTimeout(binaryTimeout);
-            binaryTimeout = setTimeout(() => thisDevice.binaryState = false, 30000);
+            binaryTimeout = setTimeout(() => thisDevice.binaryState = false, motionTimeoutMs);
             return;
         }
 
-        if (event === OnvifEvent.MotionStart)
-            thisDevice.motionDetected = true;
-        else if (event === OnvifEvent.MotionStop)
-            thisDevice.motionDetected = false;
+        if (event === OnvifEvent.MotionStart) {
+            // some onvif cameras (like the reolink doorbell) have very short duration motion
+            // events.
+            // furthermore, cameras are not guaranteed to send motion stop events, which makes.
+            // for the sake of providing normalized motion durations through scrypted, debounce the motion.
+            triggerMotion();
+            // thisDevice.motionDetected = true;
+        }
+        else if (event === OnvifEvent.MotionStop) {
+            // thisDevice.motionDetected = false;
+        }
         else if (event === OnvifEvent.AudioStart)
             thisDevice.audioDetected = true;
         else if (event === OnvifEvent.AudioStop)
@@ -55,8 +67,9 @@ export async function listenEvents(thisDevice: ScryptedDeviceBase, client: Onvif
         }
     });
 
-    const ret: Destroyable = {
+    const ret = {
         destroy() {
+            clearTimeout(motionTimeout);
             try {
                 client.unsubscribe();
             }
@@ -70,6 +83,7 @@ export async function listenEvents(thisDevice: ScryptedDeviceBase, client: Onvif
         emit(eventName: string | symbol, ...args: any[]) {
             return events.emit(eventName, ...args);
         },
+        triggerMotion,
     };
 
     return ret;
