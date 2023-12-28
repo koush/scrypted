@@ -188,14 +188,12 @@ async function start(mainFilename: string, options?: {
     }
 
     app.use(async (req, res, next) => {
-        const defaultAuthentication = !req.query.disableDefaultAuthentication && process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
+        const defaultAuthentication = getDefaultAuthentication(req);
         if (defaultAuthentication) {
-            const user = scrypted.usersService.users.get(defaultAuthentication);
-            if (user) {
-                res.locals.username = defaultAuthentication;
-                next();
-                return;
-            }
+            res.locals.username = defaultAuthentication._id;
+            res.locals.aclId = defaultAuthentication.aclId;
+            next();
+            return;
         }
 
         // the remote address may be ipv6 prefixed so use a fuzzy match.
@@ -585,6 +583,24 @@ async function start(mainFilename: string, options?: {
         }
     }
 
+    const getDefaultAuthentication = (req: Request) => {
+        const defaultAuthentication = !req.query.disableDefaultAuthentication && process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
+        if (defaultAuthentication) {
+            const referer = req.headers.referer;
+            if (referer) {
+                try {
+                    const u = new URL(referer);
+                    if (u.searchParams.has('disableDefaultAuthentication'))
+                        return;
+                }
+                catch (e) {
+                    // no/invalid referer, allow the default auth
+                }
+            }
+            return scrypted.usersService.users.get(defaultAuthentication);
+        }
+    }
+
     app.get('/login', async (req, res) => {
         await checkResetLogin();
 
@@ -609,22 +625,18 @@ async function start(mainFilename: string, options?: {
         }
 
         // env based anon user login
-        const defaultAuthentication = !req.query.disableDefaultAuthentication && process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
+        const defaultAuthentication = getDefaultAuthentication(req);
         if (defaultAuthentication) {
-            const user = scrypted.usersService.users.get(defaultAuthentication);
-            if (user) {
-                const userToken = new UserToken(defaultAuthentication, user.aclId, Date.now());
-                res.send({
-                    ...createTokens(userToken),
-                    expiration: ONE_DAY_MILLISECONDS,
-                    username: defaultAuthentication,
-                    // TODO: do not return the token from a short term auth mechanism?
-                    token: user?.token,
-                    ...alternateAddresses,
-                    hostname,
-                });
-                return;
-            }
+            const userToken = new UserToken(defaultAuthentication._id, defaultAuthentication.aclId, Date.now());
+            res.send({
+                ...createTokens(userToken),
+                expiration: ONE_DAY_MILLISECONDS,
+                username: defaultAuthentication,
+                // TODO: do not return the token from a short term auth mechanism?
+                token: defaultAuthentication?.token,
+                ...alternateAddresses,
+                hostname,
+            });
             return;
         }
 
