@@ -265,7 +265,10 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             )
 
         def pkill(p: asyncio.subprocess.Process):
-            p.stdin.write_eof()
+            try:
+                p.stdin.write_eof()
+            except:
+                pass
             loop.call_later(5, lambda: p.terminate())
             loop.call_later(10, lambda: p.kill())
 
