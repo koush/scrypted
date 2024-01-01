@@ -23,18 +23,4 @@ then
     udevadm control --reload-rules && udevadm trigger
 fi
 
-echo "Building: gasket-dkms driver"
-readyn "Build gasket-dkms driver? This step is only necessary if the server has a Coral EdgeTPU."
-if [ "$yn" == "y" ]
-then
-    apt remove -y gasket-dkms
-    apt install -y git devscripts dh-dkms dkms pve-headers-$(uname -r)
-    cd /tmp
-    git clone https://github.com/google/gasket-driver.git
-    rm -rf gasket-driver
-    cd gasket-driver/
-    debuild -us -uc -tc -b
-    dpkg -i ../gasket-dkms_1.0-18_all.deb
-fi
-
 echo "Scrypted setup is complete and the container can be started."
