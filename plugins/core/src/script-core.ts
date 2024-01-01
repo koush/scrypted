@@ -78,13 +78,15 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
         const e = this.scripts.get(nativeId);
         if (e)
             return e;
+
         let script = new Script(nativeId);
         let worker: Worker;
+
         if (script.providedInterfaces.length > 2) {
             const fork = sdk.fork<{
                 newScript: typeof newScript,
             }>();
-            worker = fork.worker
+            worker = fork.worker;
             try {
                 script = await (await fork.result).newScript(nativeId);
                 await script.run();
@@ -94,6 +96,12 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
                 throw e;
             }
         }
+
+        worker?.on('exit', () => {
+            if (this.scripts.get(nativeId)?.worker === worker)
+                this.scripts.delete(nativeId);
+        });
+
         this.scripts.set(nativeId, {
             script,
             worker,
