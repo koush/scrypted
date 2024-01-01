@@ -69,7 +69,11 @@ ENV() {
 }
 
 source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/template/Dockerfile.full.header)
-if [ ! -z "SERVICE_CONTAINER" ]
+if [ -z "$SCRYPTED_INSTALL_ENVIRONMENT" ]
+then
+    SCRYPTED_INSTALL_ENVIRONMENT=local
+fi
+if [ "$SCRYPTED_INSTALL_ENVIRONMENT" = "lxc" ]
 then
     source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/template/Dockerfile.full.footer)
 fi
@@ -102,6 +106,7 @@ ExecStart=/usr/bin/npx -y scrypted serve
 Restart=on-failure
 RestartSec=3
 Environment="NODE_OPTIONS=$NODE_OPTIONS"
+Environment="SCRYPTED_INSTALL_ENVIRONMENT=$SCRYPTED_INSTALL_ENVIRONMENT"
 
 [Install]
 WantedBy=multi-user.target
