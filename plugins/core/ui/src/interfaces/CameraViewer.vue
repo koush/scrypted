@@ -169,7 +169,7 @@ export default {
 
         const fs = 20;
 
-        const box = `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="2" fill="none" />
+        const box = `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="1px" fill="none" />
         <text x="${x}" y="${y}" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
         <text x="${x}" y="${y}" font-size="${fs}" fill="white">${t}</text>
       `;

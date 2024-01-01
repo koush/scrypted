@@ -45,7 +45,7 @@ export default {
             for (const detection of this.lastDetection.detections || []) {
                 if (!detection.boundingBox) continue;
                 const svgScale = this.svgWidth / 1080;
-                const sw = 6 * svgScale;
+                const sw = 1;
                 const s = "red";
                 const x = detection.boundingBox[0];
                 const y = detection.boundingBox[1];

@@ -1,33 +1,24 @@
-import { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting } from "@scrypted/sdk";
 import { Script } from "./script";
 import sdk from '@scrypted/sdk';
 import { randomBytes } from "crypto";
 import fs from 'fs';
 import path from "path/posix";
+import { Worker } from "worker_threads";
 
 const { deviceManager } = sdk;
 export const ScriptCoreNativeId = 'scriptcore';
 
+interface ScriptWorker {
+    script: Script;
+    worker: Worker;
+}
+
 export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator, Readme {
-    scripts = new Map<string, Promise<Script>>();
+    scripts = new Map<string, ScriptWorker>();
 
     constructor() {
         super(ScriptCoreNativeId);
-
-        for (const nativeId of deviceManager.getNativeIds()) {
-            if (nativeId?.startsWith('script:')) {
-                const script = new Script(nativeId);
-                this.scripts.set(nativeId, (async () => {
-                    if (script.providedInterfaces.length > 2) {
-                        await script.run();
-                    }
-                    else {
-                        this.reportScript(nativeId);
-                    }
-                    return script;
-                })());
-            }
-        }
     }
 
     async getCreateDeviceSettings(): Promise<Setting[]> {
@@ -65,7 +56,6 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
             catch (e) {
             }
         }
-        this.scripts.set(nativeId, Promise.resolve(script));
         return nativeId;
     }
 
@@ -84,10 +74,38 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
         return await deviceManager.onDeviceDiscovered(device);
     }
 
-    getDevice(nativeId: string) {
-        return this.scripts.get(nativeId);
+    async getDevice(nativeId: string) {
+        const e = this.scripts.get(nativeId);
+        if (e)
+            return e;
+        let script = new Script(nativeId);
+        let worker: Worker;
+        if (script.providedInterfaces.length > 2) {
+            const fork = sdk.fork<{
+                newScript: typeof newScript,
+            }>();
+            worker = fork.worker
+            try {
+                script = await (await fork.result).newScript(nativeId);
+                await script.run();
+            }
+            catch (e) {
+                worker.terminate();
+                throw e;
+            }
+        }
+        this.scripts.set(nativeId, {
+            script,
+            worker,
+        });
+        return script;
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
+        this.scripts.get(nativeId)?.worker?.terminate();
     }
+}
+
+export async function newScript(nativeId: ScryptedNativeId) {
+    return new Script(nativeId);
 }

@@ -5,7 +5,7 @@ import { createScriptDevice, ScriptDeviceImpl } from "@scrypted/common/src/eval/
 import { ScriptCoreNativeId } from "./script-core";
 import { PluginAPIProxy } from "../../../server/src/plugin/plugin-api";
 
-const { log, deviceManager, systemManager } = sdk;
+const { deviceManager } = sdk;
 
 export class Script extends ScryptedDeviceBase implements Scriptable, Program, ScriptDeviceImpl {
     apiProxy: PluginAPIProxy;

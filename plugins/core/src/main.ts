@@ -9,13 +9,11 @@ import { AggregateCore, AggregateCoreNativeId } from './aggregate-core';
 import { AutomationCore, AutomationCoreNativeId } from './automations-core';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
-import { ScriptCore, ScriptCoreNativeId } from './script-core';
-import { UsersCore, UsersNativeId } from './user';
+import { newScript, ScriptCore, ScriptCoreNativeId } from './script-core';
 import { TerminalService, TerminalServiceNativeId } from './terminal-service';
+import { UsersCore, UsersNativeId } from './user';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
-
-const indexHtml = fs.readFileSync('dist/index.html').toString();
 
 export function getAddresses() {
     const addresses: string[] = [];
@@ -61,9 +59,13 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             },
         }
     });
+    indexHtml: string;
 
     constructor() {
         super();
+
+
+        this.indexHtml = fs.readFileSync('dist/index.html').toString();
 
         (async () => {
             await deviceManager.onDeviceDiscovered(
@@ -226,7 +228,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             const endpoint = await endpointManager.getPublicCloudEndpoint();
             const u = new URL(endpoint);
 
-            const rewritten = indexHtml
+            const rewritten = this.indexHtml
                 .replace('href="manifest.json"', `href="manifest.json${u.search}"`)
                 .replace('href="img/icons/apple-touch-icon-152x152.png"', `href="img/icons/apple-touch-icon-152x152.png${u.search}"`)
                 .replace('href="img/icons/safari-pinned-tab.svg"', `href="img/icons/safari-pinned-tab.svg${u.search}"`)
@@ -269,5 +271,6 @@ export default ScryptedCore;
 export async function fork() {
     return {
         tsCompile,
+        newScript,
     }
 }
