@@ -93,7 +93,7 @@ export class PluginHost {
         // do this on next tick, after this call has returned an id, so the plugin can handle
         // any subsequent requests.
         process.nextTick(async () => {
-            let needInvalidate = interfacesChanged;
+            let needInvalidate = interfacesChanged || upsert.refresh;
             if (!needInvalidate) {
                 // may also need to invalidate if the the plugin did not previously return a device
                 // because it had not yet completed the discovery process.
