@@ -37,4 +37,4 @@ then
     dpkg -i ../gasket-dkms_1.0-18_all.deb
 fi
 
-echo "Scrypted setup is  complete and the container can be started."
+echo "Scrypted setup is complete and the container can be started."
