@@ -264,6 +264,14 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 stderr=asyncio.subprocess.DEVNULL,
             )
 
+        def pkill(p: asyncio.subprocess.Process):
+            try:
+                p.stdin.write_eof()
+            except:
+                pass
+            loop.call_later(5, lambda: p.terminate())
+            loop.call_later(10, lambda: p.kill())
+
         try:
             forked, gen = self.forkAndStream(substream)
             async for audio, data, codec, sampleRate in gen:
@@ -280,11 +288,9 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             forked.worker.terminate()
             writer.close()
             self.print("rfc reader closed")
-            vprocess.stdin.write("q\n".encode())
-            vprocess.terminate()
+            pkill(vprocess)
             if aprocess:
-                aprocess.stdin.write("q\n".encode())
-                aprocess.terminate()
+                pkill(aprocess)
 
     async def ensureServer(self, cb) -> int:
         server = await asyncio.start_server(cb, "127.0.0.1", 0)
