@@ -1672,6 +1672,11 @@ export interface Device {
    */
   providerNativeId?: ScryptedNativeId;
   room?: string;
+
+  /**
+   * Directs Scrypted to purge any previously returned instances of the device and call getDevice on the DeviceProvider.
+   */
+  refresh?: boolean;
 }
 
 export interface EndpointAccessControlAllowOrigin {

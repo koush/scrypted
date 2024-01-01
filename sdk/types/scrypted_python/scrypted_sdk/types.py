@@ -431,6 +431,7 @@ class Device(TypedDict):
     name: str
     nativeId: str  # The native id that is used by the DeviceProvider used to internally identify provided devices.
     providerNativeId: str  # The native id of the hub or discovery DeviceProvider that manages this device.
+    refresh: bool  # Directs Scrypted to purge any previously returned instances of the device and call getDevice on the DeviceProvider.
     room: str
     type: ScryptedDeviceType
 
