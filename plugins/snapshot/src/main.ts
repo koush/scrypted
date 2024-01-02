@@ -12,8 +12,12 @@ import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filte
 import { ImageConverter, ImageConverterNativeId } from './image-converter';
 import { ImageReader, ImageReaderNativeId, loadSharp, loadVipsImage } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
+import os from 'os';
 
 const { mediaManager, systemManager } = sdk;
+if (os.cpus().find(cpu => cpu.model?.toLowerCase().includes('qemu'))) {
+    sdk.log.a('QEMU CPU detected. Set your CPU model to host.');
+}
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false
@@ -300,7 +304,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             picture = this.currentPicture;
         }
 
-        const needSoftwareResize = !!(options?.picture?.width || options?.picture?.height);
+        const needSoftwareResize = !!(options?.picture?.width || options?.picture?.height) && this.storageSettings.values.snapshotResolution !== 'Full Resolution';
         if (needSoftwareResize) {
             try {
                 picture = await this.snapshotDebouncer({
@@ -668,6 +672,9 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
                     height: parseInt(search.get('height')) || undefined,
                 }
             };
+
+            if (mixin.storageSettings.values.snapshotResolution === 'Full Resolution')
+                delete rpo.picture;
 
             if (mixin && iface === ScryptedInterface.Camera) {
                 buffer = await mixin.takePictureRaw(rpo)
