@@ -58,18 +58,13 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         worker.worker.terminate();
     }
 
-    const smProxy = new SystemManagerImpl();
-    smProxy.state = systemManager.getSystemState();
-    const apiProxy = new PluginAPIProxy(sdk.pluginHostAPI);
-    smProxy.api = apiProxy;
-
     const allParams = Object.assign({}, params, {
         sdk,
         fs: require('realfs'),
         fetch,
         ScryptedDeviceBase,
         MixinDeviceBase,
-        systemManager: smProxy,
+        systemManager,
         deviceManager,
         endpointManager,
         mediaManager,
@@ -104,7 +99,6 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         return {
             value,
             defaultExport,
-            apiProxy,
         };
     }
     catch (e) {
