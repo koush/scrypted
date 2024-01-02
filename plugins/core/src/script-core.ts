@@ -1,10 +1,9 @@
-import { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting } from "@scrypted/sdk";
-import { Script } from "./script";
-import sdk from '@scrypted/sdk';
+import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting } from '@scrypted/sdk';
 import { randomBytes } from "crypto";
 import fs from 'fs';
 import path from "path/posix";
 import { Worker } from "worker_threads";
+import { Script } from "./script";
 
 const { deviceManager } = sdk;
 export const ScriptCoreNativeId = 'scriptcore';
@@ -42,6 +41,10 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
         const nativeId = 'script:' + randomBytes(8).toString('hex');
         await this.reportScript(nativeId, name?.toString());
         const script = new Script(nativeId);
+        this.scripts.set(nativeId, {
+            script,
+            worker: undefined,
+        });
         if (template) {
             try {
                 await script.saveScript({
@@ -76,11 +79,31 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
 
     async getDevice(nativeId: string) {
         const e = this.scripts.get(nativeId);
-        if (e)
-            return e;
+        if (e) {
+            if (e.script)
+                return e.script;
+            e.worker?.terminate();
+            this.scripts.delete(nativeId);
+        }
 
         let script = new Script(nativeId);
         let worker: Worker;
+
+        const triggerDeviceDiscover = async (name: string, type: ScryptedDeviceType, interfaces: string[]) => {
+            const e = this.scripts.get(nativeId);
+            if (e?.script == script)
+                e.script = undefined;
+
+            const device: Device = {
+                providerNativeId: this.nativeId,
+                name,
+                nativeId,
+                type,
+                interfaces,
+                refresh: true,
+            };
+            return await deviceManager.onDeviceDiscovered(device);
+        };
 
         if (script.providedInterfaces.length > 2) {
             const fork = sdk.fork<{
@@ -88,8 +111,7 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
             }>();
             worker = fork.worker;
             try {
-                script = await (await fork.result).newScript(nativeId);
-                await script.run();
+                script = await (await fork.result).newScript(nativeId, triggerDeviceDiscover);
             }
             catch (e) {
                 worker.terminate();
@@ -98,8 +120,14 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
         }
 
         worker?.on('exit', () => {
-            if (this.scripts.get(nativeId)?.worker === worker)
+            if (this.scripts.get(nativeId)?.worker === worker) {
                 this.scripts.delete(nativeId);
+                // notify the system that the device needs to be refreshed.
+                if (deviceManager.getNativeIds().includes(nativeId)) {
+                    const script = new Script(nativeId);
+                    triggerDeviceDiscover(script.providedName, script.providedType, script.providedInterfaces);
+                }
+            }
         });
 
         this.scripts.set(nativeId, {
@@ -110,10 +138,14 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-        this.scripts.get(nativeId)?.worker?.terminate();
+        const worker = this.scripts.get(nativeId)?.worker;
+        this.scripts.delete(nativeId);
+        worker?.terminate();
     }
 }
 
-export async function newScript(nativeId: ScryptedNativeId) {
-    return new Script(nativeId);
+export async function newScript(nativeId: ScryptedNativeId, triggerDeviceDiscover: (name: string, type: ScryptedDeviceType, interfaces: string[]) => Promise<string>) {
+    const script = new Script(nativeId, triggerDeviceDiscover);
+    await script.run();
+    return script;
 }

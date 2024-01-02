@@ -8,9 +8,7 @@ import { PluginAPIProxy } from "../../../server/src/plugin/plugin-api";
 const { deviceManager } = sdk;
 
 export class Script extends ScryptedDeviceBase implements Scriptable, Program, ScriptDeviceImpl {
-    apiProxy: PluginAPIProxy;
-
-    constructor(nativeId: string) {
+    constructor(nativeId: string, public triggerDeviceDiscover?: (name: string, type: ScryptedDeviceType, interfaces: string[]) => Promise<string>) {
         super(nativeId);
     }
 
@@ -18,6 +16,8 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         this.storage.setItem('data', JSON.stringify({
             'script.ts': source.script,
         }));
+
+        this.triggerDeviceDiscover?.(this.providedName, this.providedType, this.providedInterfaces);
     }
 
     async loadScripts(): Promise<{ [filename: string]: ScriptSource; }> {
@@ -70,46 +70,38 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
     }
 
     prepareScript() {
-        this.apiProxy?.removeListeners();
-
         Object.assign(this, createScriptDevice([
             ScryptedInterface.Scriptable,
             ScryptedInterface.Program,
         ]));
     }
 
-    async run(variables?: { [name: string]: any; }): Promise<any> {
+    async runInternal(script: string, variables?: { [name: string]: any; }): Promise<any> {
         this.prepareScript();
 
         try {
             const data = JSON.parse(this.storage.getItem('data'));
 
-            const { value, defaultExport, apiProxy } = await scryptedEval(this, data['script.ts'], Object.assign({
+            const { value, defaultExport } = await scryptedEval(this, script, Object.assign({
                 device: this,
             }, variables));
-
-            this.apiProxy = apiProxy;
 
             await this.postRunScript(defaultExport);
             return value;
         }
         catch (e) {
-            this.console.error('error loading script', e);
+            this.console.error('error evaluating script', e);
             throw e;
         }
     }
 
+    async run(variables?: { [name: string]: any; }): Promise<any> {
+        const data = JSON.parse(this.storage.getItem('data'));
+        return this.runInternal(data['script.ts'], variables)
+    }
+
     async eval(source: ScriptSource, variables?: { [name: string]: any }) {
-        this.prepareScript();
-
-        const { value, defaultExport, apiProxy } = await scryptedEval(this, source.script, Object.assign({
-            device: this,
-        }, variables));
-
-        this.apiProxy = apiProxy;
-
-        await this.postRunScript(defaultExport);
-        return value;
+        return this.runInternal(source.script, variables);
     }
 
     // will be done at runtime
