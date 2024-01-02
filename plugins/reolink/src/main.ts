@@ -1,5 +1,5 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, Reboot, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PanTiltZoom, PanTiltZoomCommand, PictureOptions, Reboot, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -8,7 +8,7 @@ import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
 import { AIState, DevInfo, Enc, ReolinkCameraClient } from './reolink-api';
 
-class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom, ObjectDetector {
+class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom, ObjectDetector, PanTiltZoom {
     client: ReolinkCameraClient;
     onvifClient: OnvifCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
@@ -36,6 +36,19 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
         hasObjectDetector: {
             json: true,
             hide: true,
+        },
+        ptz: {
+            title: 'PTZ Capabilities',
+            choices: [
+                'Pan',
+                'Tilt',
+                'Zoom',
+            ],
+            multiple: true,
+            onPut: async () => {
+                await this.updateDevice();
+                this.updatePtzCaps();
+            },
         }
     });
 
@@ -44,10 +57,26 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
 
         this.updateDeviceInfo();
         this.updateDevice();
+
+        this.updatePtzCaps();
+    }
+
+    updatePtzCaps() {
+        const { ptz } = this.storageSettings.values;
+        this.ptzCapabilities = {
+            pan: ptz?.includes('Pan'),
+            tilt: ptz?.includes('Tilt'),
+            zoom: ptz?.includes('Zoom'),
+        }
     }
 
     async getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject> {
         return;
+    }
+
+    async ptzCommand(command: PanTiltZoomCommand): Promise<void> {
+        const client = this.getClient();
+        client.ptz(command);
     }
 
     async getObjectTypes(): Promise<ObjectDetectionTypes> {
@@ -86,7 +115,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
         return this.onvifIntercom.stopIntercom();
     }
 
-    updateDevice() {
+    async updateDevice() {
         const interfaces = this.provider.getInterfaces();
         let type = ScryptedDeviceType.Camera;
         let name = 'Reolink Camera';
@@ -98,10 +127,13 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
             type = ScryptedDeviceType.Doorbell;
             name = 'Reolink Doorbell';
         }
+        if (this.storageSettings.values.ptz?.length) {
+            interfaces.push(ScryptedInterface.PanTiltZoom);
+        }
         if (this.storageSettings.values.hasObjectDetector) {
             interfaces.push(ScryptedInterface.ObjectDetector);
         }
-        this.provider.updateDevice(this.nativeId, name, interfaces, type);
+        await this.provider.updateDevice(this.nativeId, name, interfaces, type);
     }
 
     async reboot() {
@@ -393,7 +425,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
 
     async putSetting(key: string, value: string) {
         this.client = undefined;
-        super.putSetting(key, value);
+        if (this.storageSettings.keys[key]) {
+            await this.storageSettings.putSetting(key, value);
+        }
+        else {
+            await super.putSetting(key, value);
+        }
         this.updateDevice();
         this.updateDeviceInfo();
     }

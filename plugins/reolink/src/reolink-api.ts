@@ -1,44 +1,46 @@
 import AxiosDigestAuth from "@koush/axios-digest-auth";
 import { getMotionState, reolinkHttpsAgent } from './probe';
+import { PanTiltZoomCommand } from "@scrypted/sdk";
+import { sleep } from "@scrypted/common/src/sleep";
 
 export interface Enc {
-    audio:      number;
-    channel:    number;
+    audio: number;
+    channel: number;
     mainStream: Stream;
-    subStream:  Stream;
+    subStream: Stream;
 }
 
 export interface Stream {
-    bitRate:   number;
+    bitRate: number;
     frameRate: number;
-    gop:       number;
-    height:    number;
-    profile:   string;
-    size:      string;
-    vType:     string;
-    width:     number;
+    gop: number;
+    height: number;
+    profile: string;
+    size: string;
+    vType: string;
+    width: number;
 }
 
 export interface DevInfo {
-    B485:         number;
-    IOInputNum:   number;
-    IOOutputNum:  number;
-    audioNum:     number;
-    buildDay:     string;
-    cfgVer:       string;
-    channelNum:   number;
-    detail:       string;
-    diskNum:      number;
-    exactType:    string;
-    firmVer:      string;
+    B485: number;
+    IOInputNum: number;
+    IOOutputNum: number;
+    audioNum: number;
+    buildDay: string;
+    cfgVer: string;
+    channelNum: number;
+    detail: string;
+    diskNum: number;
+    exactType: string;
+    firmVer: string;
     frameworkVer: number;
-    hardVer:      string;
-    model:        string;
-    name:         string;
-    pakSuffix:    string;
-    serial:       string;
-    type:         string;
-    wifi:         number;
+    hardVer: string;
+    model: string;
+    name: string;
+    pakSuffix: string;
+    serial: string;
+    type: string;
+    wifi: number;
 }
 
 export interface AIDetectionState {
@@ -155,5 +157,63 @@ export class ReolinkCameraClient {
         });
 
         return response.data?.[0]?.value?.DevInfo;
+    }
+
+    async ptz(command: PanTiltZoomCommand) {
+        let op = '';
+        if (command.pan < 0)
+            op += 'Left';
+        else if (command.pan > 0)
+            op += 'Right'
+        if (command.tilt < 0)
+            op += 'Down';
+        else if (command.tilt > 0)
+            op += 'Up';
+
+        if (!op)
+            return;
+
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'PtzCtrl');
+        params.set('user', this.username);
+        params.set('password', this.password);
+
+        const c1 = this.digestAuth.request({
+            method: 'POST',
+            url: url.toString(),
+            httpsAgent: reolinkHttpsAgent,
+            data: [
+                {
+                    cmd: "PtzCtrl",
+                    param: {
+                        channel: this.channelId,
+                        op,
+                        speed: 10,
+                        timeout: 1,
+                    }
+                },
+            ]
+        });
+
+        await sleep(500);
+
+        const c2 = this.digestAuth.request({
+            method: 'POST',
+            url: url.toString(),
+            httpsAgent: reolinkHttpsAgent,
+            data: [
+                {
+                    cmd: "PtzCtrl",
+                    param: {
+                        channel: this.channelId,
+                        op: "Stop"
+                    }
+                },
+            ]
+        });
+
+        this.console.log(await c1);
+        this.console.log(await c2);
     }
 }
