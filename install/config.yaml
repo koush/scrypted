@@ -29,9 +29,9 @@ environment:
   SCRYPTED_ADMIN_USERNAME: "homeassistant"
   SCRYPTED_INSTALL_ENVIRONMENT: "ha"
 backup_exclude:
-  - '/server/**'
-  - '/data/scrypted_nvr/**'
-  - '/data/scrypted_data/plugins/**'
+  - '*/server/**'
+  - '*/scrypted_nvr/**'
+  - '*/scrypted_data/plugins/**'
 map:
   - config:rw
   - media:rw
