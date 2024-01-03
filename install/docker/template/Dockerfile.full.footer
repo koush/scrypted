@@ -37,7 +37,7 @@ ENV SCRYPTED_FFMPEG_PATH="/usr/bin/ffmpeg"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION="20230727"
+ENV SCRYPTED_BASE_VERSION="20240103"
 ENV SCRYPTED_DOCKER_FLAVOR="full"
 
 ################################################################
