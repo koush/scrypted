@@ -20,7 +20,7 @@ export interface StdPassThroughs {
 }
 
 export function getConsole(hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>,
-    also?: Console, alsoPrefix?: string)  {
+    also?: Console, alsoPrefix?: string) {
 
     const stdout = new PassThrough();
     const stderr = new PassThrough();
@@ -63,7 +63,7 @@ export function getConsole(hook: (stdout: PassThrough, stderr: PassThrough) => P
 
 export function prepareConsoles(getConsoleName: () => string, systemManager: () => SystemManager, deviceManager: () => DeviceManager, getPlugins: () => Promise<any>) {
     const deviceConsoles = new Map<string, Console>();
-    function getDeviceConsole (nativeId?: ScryptedNativeId) {
+    function getDeviceConsole(nativeId?: ScryptedNativeId) {
         // the the plugin console is simply the default console
         // and gets read from stderr/stdout.
         if (!nativeId)
@@ -126,13 +126,16 @@ export function prepareConsoles(getConsoleName: () => string, systemManager: () 
 
             const connect = async () => {
                 const ds = deviceManager().getDeviceState(nativeId);
-                if (!ds) {
-                    // deleted?
+                // device deleted
+                if (!ds)
                     return;
-                }
 
                 const plugins = await getPlugins();
-                const { pluginId, nativeId: mixinNativeId } = await plugins.getDeviceInfo(mixinId);
+                const mixin = systemManager().getDeviceById(mixinId);
+                // mixin deleted
+                if (!mixin)
+                    return;
+                const { pluginId, nativeId: mixinNativeId } = mixin;
                 const port = await plugins.getRemoteServicePort(pluginId, 'console-writer');
                 const socket = net.connect(port);
                 socket.write(mixinNativeId + '\n');
@@ -161,7 +164,7 @@ export function prepareConsoles(getConsoleName: () => string, systemManager: () 
         nativeIdConsoles.set(mixinId, ret);
         return ret;
     }
-    
+
     return {
         getDeviceConsole,
         getMixinConsole,
