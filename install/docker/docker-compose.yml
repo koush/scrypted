@@ -90,7 +90,7 @@ services:
         container_name: scrypted
         restart: unless-stopped
         network_mode: host
-        image: koush/scrypted
+        image: ghcr.io/koush/scrypted
 
         # logging is noisy and will unnecessarily wear on flash storage.
         # scrypted has per device in memory logging that is preferred.

@@ -11,8 +11,8 @@ echo $BASE
 SUPERVISOR=.s6
 SUPERVISOR_BASE=$BASE$SUPERVISOR
 
-docker build -t koush/scrypted-common:$BASE -f Dockerfile.$FLAVOR \
+docker build -t ghcr.io/koush/scrypted-common:$BASE -f Dockerfile.$FLAVOR \
     --build-arg NODE_VERSION=$NODE_VERSION --build-arg BASE=$IMAGE_BASE . && \
 \
-docker build -t koush/scrypted:$SUPERVISOR_BASE -f Dockerfile$SUPERVISOR \
+docker build -t ghcr.io/koush/scrypted:$SUPERVISOR_BASE -f Dockerfile$SUPERVISOR \
     --build-arg BASE=$BASE --build-arg SCRYPTED_INSTALL_VERSION=$SCRYPTED_INSTALL_VERSION .

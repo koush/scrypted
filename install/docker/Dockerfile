@@ -1,5 +1,5 @@
 ARG BASE="18-jammy-full"
-FROM koush/scrypted-common:${BASE}
+FROM ghcr.io/koush/scrypted-common:${BASE}
 
 WORKDIR /
 # cache bust

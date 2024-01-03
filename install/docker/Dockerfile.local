@@ -1,4 +1,4 @@
-FROM koush/scrypted-common
+FROM ghcr.io/koush/scrypted-common
 
 WORKDIR /
 COPY . .
