@@ -230,7 +230,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
             const ret = await listenEvents(this, await this.createOnvifClient(), this.storageSettings.values.motionTimeout * 1000);
             ret.on('close', () => killed = true);
             ret.on('error', () => killed = true);
-            startAI(ret, ret.triggerMotion);
+            // Use Onvif event instead for doorbell
+            //startAI(ret, ret.triggerMotion);
             return ret;
         }
 
