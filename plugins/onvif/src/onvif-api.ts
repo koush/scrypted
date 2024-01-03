@@ -99,6 +99,13 @@ export class OnvifCameraAPI {
                     else
                         ret.emit('event', OnvifEvent.MotionStop)
                 }
+                //Reolink Doorbell Cam Person detect
+                else if (eventTopic.includes('PeopleDetect')) {
+                    if (dataValue)
+                        ret.emit('event', OnvifEvent.MotionStart)
+                    else
+                        ret.emit('event', OnvifEvent.MotionStop)
+                }
                 else if (eventTopic.includes('DetectedSound')) {
                     if (dataValue)
                         ret.emit('event', OnvifEvent.AudioStart)
