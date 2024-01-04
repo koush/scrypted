@@ -31,6 +31,7 @@ export async function safeKillFFmpeg(cp: ChildProcess) {
             catch (e) {
             }
         }
+        cp.kill();
         await sleep(2000);
         cp.kill('SIGKILL');
     });
