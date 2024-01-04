@@ -23,7 +23,7 @@ import { getScryptedVolume } from './plugin/plugin-volume';
 import { RPCResultError } from './rpc';
 import { ScryptedRuntime } from './runtime';
 import { getHostAddresses, SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
-import { setScryptedUserPassword } from './services/users';
+import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 
@@ -135,6 +135,15 @@ async function start(mainFilename: string, options?: {
     certSetting.value = keyPair;
     certSetting = await db.upsert(certSetting);
 
+    let hasLogin = await db.getCount(ScryptedUser) > 0;
+    if (process.env.SCRYPTED_ADMIN_USERNAME) {
+        let user = await db.tryGet(ScryptedUser, process.env.SCRYPTED_ADMIN_USERNAME);
+        if (!user) {
+            user = await UsersService.addUserToDatabase(db, process.env.SCRYPTED_ADMIN_USERNAME, crypto.randomBytes(8).toString('hex'), undefined);
+            hasLogin = true;
+        }
+    }
+
     const basicAuth = httpAuth.basic({
         realm: 'Scrypted',
     }, async (username, password, callback) => {
@@ -185,6 +194,24 @@ async function start(mainFilename: string, options?: {
                 scryptedToken: queryToken,
             },
         };
+    }
+
+    const getDefaultAuthentication = (req: Request) => {
+        const defaultAuthentication = !req.query.disableDefaultAuthentication && process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
+        if (defaultAuthentication) {
+            const referer = req.headers.referer;
+            if (referer) {
+                try {
+                    const u = new URL(referer);
+                    if (u.searchParams.has('disableDefaultAuthentication'))
+                        return;
+                }
+                catch (e) {
+                    // no/invalid referer, allow the default auth
+                }
+            }
+            return scrypted.usersService.users.get(defaultAuthentication);
+        }
     }
 
     app.use(async (req, res, next) => {
@@ -307,27 +334,6 @@ async function start(mainFilename: string, options?: {
     const scrypted = new ScryptedRuntime(mainFilename, db, insecure, secure, app);
     await options?.onRuntimeCreated?.(scrypted);
     await scrypted.start();
-
-    await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
-    await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
-
-    console.log('#######################################################');
-    console.log(`Scrypted Volume           : ${volumeDir}`);
-    console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
-    for (const address of getHostAddresses(true, true)) {
-        console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
-    }
-    console.log(`Version:       : ${await scrypted.info.getVersion()}`);
-    console.log('#######################################################');
-    console.log('Scrypted insecure http service port:', SCRYPTED_INSECURE_PORT);
-    console.log('Ports can be changed with environment variables.')
-    console.log('https: $SCRYPTED_SECURE_PORT')
-    console.log('http : $SCRYPTED_INSECURE_PORT')
-    console.log('Certificate can be modified via tls.createSecureContext options in')
-    console.log('JSON file located at SCRYPTED_HTTPS_OPTIONS_FILE environment variable:');
-    console.log('export SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/options.json');
-    console.log('https://nodejs.org/api/tls.html#tlscreatesecurecontextoptions')
-    console.log('#######################################################');
 
     app.get(['/web/component/script/npm/:pkg', '/web/component/script/npm/@:owner/:pkg'], async (req, res) => {
         const { owner, pkg } = req.params;
@@ -460,16 +466,6 @@ async function start(mainFilename: string, options?: {
         }
     });
 
-    let hasLogin = await db.getCount(ScryptedUser) > 0;
-
-    if (process.env.SCRYPTED_ADMIN_USERNAME) {
-        let user = await db.tryGet(ScryptedUser, process.env.SCRYPTED_ADMIN_USERNAME);
-        if (!user) {
-            user = await scrypted.usersService.addUserInternal(process.env.SCRYPTED_ADMIN_USERNAME, crypto.randomBytes(8).toString('hex'), undefined);
-            hasLogin = true;
-        }
-    }
-
     app.options('/login', (req, res) => {
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
@@ -583,24 +579,6 @@ async function start(mainFilename: string, options?: {
         }
     }
 
-    const getDefaultAuthentication = (req: Request) => {
-        const defaultAuthentication = !req.query.disableDefaultAuthentication && process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
-        if (defaultAuthentication) {
-            const referer = req.headers.referer;
-            if (referer) {
-                try {
-                    const u = new URL(referer);
-                    if (u.searchParams.has('disableDefaultAuthentication'))
-                        return;
-                }
-                catch (e) {
-                    // no/invalid referer, allow the default auth
-                }
-            }
-            return scrypted.usersService.users.get(defaultAuthentication);
-        }
-    }
-
     app.get('/login', async (req, res) => {
         await checkResetLogin();
 
@@ -694,6 +672,27 @@ async function start(mainFilename: string, options?: {
     });
 
     app.get('/', (_req, res) => res.redirect('./endpoint/@scrypted/core/public/'));
+
+    await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
+    await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
+
+    console.log('#######################################################');
+    console.log(`Scrypted Volume           : ${volumeDir}`);
+    console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
+    for (const address of getHostAddresses(true, true)) {
+        console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
+    }
+    console.log(`Version:       : ${await scrypted.info.getVersion()}`);
+    console.log('#######################################################');
+    console.log('Scrypted insecure http service port:', SCRYPTED_INSECURE_PORT);
+    console.log('Ports can be changed with environment variables.')
+    console.log('https: $SCRYPTED_SECURE_PORT')
+    console.log('http : $SCRYPTED_INSECURE_PORT')
+    console.log('Certificate can be modified via tls.createSecureContext options in')
+    console.log('JSON file located at SCRYPTED_HTTPS_OPTIONS_FILE environment variable:');
+    console.log('export SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/options.json');
+    console.log('https://nodejs.org/api/tls.html#tlscreatesecurecontextoptions')
+    console.log('#######################################################');
 
     return scrypted;
 }
