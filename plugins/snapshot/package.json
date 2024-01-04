@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/snapshot",
-   "version": "0.2.30",
+   "version": "0.2.31",
    "description": "Snapshot Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -34,10 +34,10 @@
       ]
    },
    "dependencies": {
-      "@koush/axios-digest-auth": "^0.8.5",
+      "@koush/axios-digest-auth": "^0.8.7",
       "@types/node": "^20.10.6",
       "axios": "^0.21.4",
-      "sharp": "^0.32.6",
+      "sharp": "^0.33.1",
       "whatwg-mimetype": "^4.0.0"
    },
    "devDependencies": {
