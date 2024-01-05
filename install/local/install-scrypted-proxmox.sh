@@ -38,6 +38,14 @@ fi
 
 pct restore $VMID $SCRYPTED_TAR_ZST $@
 
+CONF=/etc/pve/lxc/$VMID.conf
+if [ -f "$CONF" ]
+then
+    echo "onboot: 1" >> $CONF
+else
+    echo "$CONF not found? Start on boot must be enabled manually."    
+fi
+
 if [ "$?" != "0" ]
 then
     echo ""
@@ -63,4 +71,3 @@ fi
 
 echo "Scrypted setup is complete and the container resources can be started."
 echo "Scrypted NVR users should provide at least 4 cores and 16GB RAM prior to starting."
-
