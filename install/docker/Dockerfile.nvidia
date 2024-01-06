@@ -1,4 +1,4 @@
-FROM ghcr.io/koush/18-jammy-full.s6
+FROM ghcr.io/koush/scrypted-common/18-jammy-full.s6
 
 WORKDIR /
 
