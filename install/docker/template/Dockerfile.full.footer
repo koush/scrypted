@@ -18,7 +18,6 @@ RUN add-apt-repository -y ppa:deadsnakes/ppa && \
 RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
 
 RUN python3.9 -m pip install --upgrade pip
-RUN python3.9 -m pip install --force-reinstall --no-binary :all: cffi
 RUN python3.9 -m pip install debugpy typing_extensions psutil
 
 # Coral Edge TPU
