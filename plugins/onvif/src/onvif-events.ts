@@ -44,7 +44,8 @@ export async function listenEvents(thisDevice: ScryptedDeviceBase, client: Onvif
         }
         else if (event === OnvifEvent.MotionStop) {
             // reset the trigger to debounce per above.
-            triggerMotion();
+            if (thisDevice.motionDetected)
+                triggerMotion();
 
             // thisDevice.motionDetected = false;
         }
