@@ -173,7 +173,7 @@ export default {
         const version = await info.getVersion();
         const scryptedEnv = await info.getScryptedEnv();
         this.currentVersion = version;
-        const { updateAvailable } = await checkServerUpdate(version, scryptedEnv.SCRYPTED_INSTALL_ENVIRONMENT);
+        const { updateAvailable } = await checkServerUpdate(this.$scrypted.mediaManager, version, scryptedEnv.SCRYPTED_INSTALL_ENVIRONMENT);
         this.updateAvailable = updateAvailable;
       }
 

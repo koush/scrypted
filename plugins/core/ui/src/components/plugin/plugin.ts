@@ -1,4 +1,4 @@
-import { DeviceCreator, Scriptable, ScryptedInterface, ScryptedStatic, SystemManager } from '@scrypted/types';
+import { DeviceCreator, MediaObject, Scriptable, ScryptedInterface, ScryptedStatic, SystemManager, MediaManager } from '@scrypted/types';
 import axios, { AxiosResponse } from 'axios';
 import semver from 'semver';
 import { getAllDevices } from '../../common/mixin';
@@ -66,7 +66,7 @@ export async function checkUpdate(npmPackage: string, npmPackageVersion: string)
     };
 }
 
-export async function checkServerUpdate(version: string, installEnvironment: string): Promise<PluginUpdateCheck> {
+export async function checkServerUpdate(mediaManager: MediaManager, version: string, installEnvironment: string): Promise<PluginUpdateCheck> {
     const { updateAvailable, updatePublished, versions } = await checkUpdate(
         "@scrypted/server",
         version
@@ -78,8 +78,9 @@ export async function checkServerUpdate(version: string, installEnvironment: str
         // check if there is a new docker image available, using 'latest' tag
         // this is done so newer server versions in npm are not immediately
         // displayed until a docker image has been published
-        let response: AxiosResponse<any> = await axios.get("https://corsproxy.io?https://hub.docker.com/v2/namespaces/koush/repositories/scrypted/tags/latest");
-        const { data } = response;
+        // due to CORS restrictions, we query this through scrypted server
+        const mo: MediaObject = await mediaManager.createMediaObjectFromUrl('https://hub.docker.com/v2/namespaces/koush/repositories/scrypted/tags/latest');
+        const data: any = await mediaManager.convertMediaObjectToJSON(mo, 'application/json');
         const imagePublished = new Date(data.last_updated);
         console.log(`Latest docker image published ${imagePublished}`);
 

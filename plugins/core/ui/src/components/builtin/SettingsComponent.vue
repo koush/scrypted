@@ -141,7 +141,7 @@ export default {
         // old scrypted servers dont support this call, or it may be unimplemented
         // in which case fall back and determine what the install type is.
         const scryptedEnv = await info.getScryptedEnv();
-        const { updateAvailable } = await checkServerUpdate(version, scryptedEnv.SCRYPTED_INSTALL_ENVIRONMENT);
+        const { updateAvailable } = await checkServerUpdate(this.$scrypted.mediaManager, version, scryptedEnv.SCRYPTED_INSTALL_ENVIRONMENT);
         this.updateAvailable = updateAvailable;
       }
     },
