@@ -6,3 +6,4 @@ fs
 src
 .vscode
 dist/*.js
+onvif

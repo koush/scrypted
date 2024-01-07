@@ -38,3 +38,6 @@
 [submodule "plugins/wyze/docker-wyze-bridge"]
 	path = plugins/wyze/docker-wyze-bridge
 	url = ../../koush/docker-wyze-bridge.git
+[submodule "plugins/onvif/onvif"]
+	path = plugins/onvif/onvif
+	url = git@github.com:koush/onvif
