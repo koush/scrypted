@@ -1,0 +1,1 @@
+declare module '@bjia56/portable-python-3.9';

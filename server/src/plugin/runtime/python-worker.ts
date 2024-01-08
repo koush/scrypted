@@ -7,6 +7,7 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { createRpcDuplexSerializer } from '../../rpc-serializer';
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
+import * as portablePython from "@bjia56/portable-python-3.9";
 
 export class PythonRuntimeWorker extends ChildProcessWorker {
     serializer: ReturnType<typeof createRpcDuplexSerializer>;
@@ -49,7 +50,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             }
         }
 
-        let pythonPath = process.env.SCRYPTED_PYTHON_PATH;
+        let pythonPath = process.env.SCRYPTED_PYTHON_PATH || portablePython.default;
         const pluginPythonVersion = options.packageJson.scrypted.pythonVersion?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonVersion?.default;
 
         if (os.platform() === 'win32') {
