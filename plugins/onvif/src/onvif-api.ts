@@ -88,68 +88,68 @@ export class OnvifCameraAPI {
         this.cam.on('event', (event: any, xml: string) => {
             ret.emit('data', xml);
 
+            if (!event.message.message.data?.simpleItem?.$)
+                return;
+
+            const dataValue = event.message.message.data.simpleItem.$.Value;
             const eventTopic = stripNamespaces(event.topic._);
 
-            if (event.message.message.data && event.message.message.data.simpleItem && event.message.message.data.simpleItem.$) {
-                const dataValue = event.message.message.data.simpleItem.$.Value;
-
-                if (eventTopic.includes('MotionAlarm')) {
-                    // ret.emit('event', OnvifEvent.MotionBuggy);
-                    if (dataValue)
-                        ret.emit('event', OnvifEvent.MotionStart)
-                    else
-                        ret.emit('event', OnvifEvent.MotionStop)
+            if (eventTopic.includes('MotionAlarm')) {
+                // ret.emit('event', OnvifEvent.MotionBuggy);
+                if (dataValue)
+                    ret.emit('event', OnvifEvent.MotionStart)
+                else
+                    ret.emit('event', OnvifEvent.MotionStop)
+            }
+            else if (eventTopic.includes('DetectedSound')) {
+                if (dataValue)
+                    ret.emit('event', OnvifEvent.AudioStart)
+                else
+                    ret.emit('event', OnvifEvent.AudioStop)
+            }
+            // Reolink
+            else if (eventTopic.includes('Visitor') && (dataValue === true || dataValue === false)) {
+                if (dataValue) {
+                    ret.emit('event', OnvifEvent.BinaryStart)
                 }
-                else if (eventTopic.includes('DetectedSound')) {
-                    if (dataValue)
-                        ret.emit('event', OnvifEvent.AudioStart)
-                    else
-                        ret.emit('event', OnvifEvent.AudioStop)
+                else {
+                    ret.emit('event', OnvifEvent.BinaryStop)
                 }
-                // Reolink
-                else if (eventTopic.includes('Visitor') && (dataValue === true || dataValue === false)) {
-                    if (dataValue) {
-                        ret.emit('event', OnvifEvent.BinaryStart)
+            }
+            // Mobotix T26
+            else if (eventTopic.includes('VideoSource/Alarm')) {
+                if (dataValue === "Ring" || dataValue === "CameraBellButton") {
+                    ret.emit('event', OnvifEvent.BinaryRingEvent);
+                }
+            }
+            // else if (eventTopic.includes('DigitalInput')) {
+            //     if (dataValue)
+            //         ret.emit('event', OnvifEvent.BinaryStart)
+            //     else
+            //         ret.emit('event', OnvifEvent.BinaryStop)
+            // }
+            else if (this.binaryStateEvent && eventTopic.includes(this.binaryStateEvent)) {
+                if (dataValue)
+                    ret.emit('event', OnvifEvent.BinaryStart)
+                else
+                    ret.emit('event', OnvifEvent.BinaryStop)
+            }
+            else if (eventTopic.includes('RuleEngine/CellMotionDetector/Motion')) {
+                // unclear if the IsMotion false is indicative of motion stop?
+                if (event.message.message.data.simpleItem.$.Name === 'IsMotion' && dataValue) {
+                    ret.emit('event', OnvifEvent.MotionBuggy);
+                }
+            }
+            else if (eventTopic.includes('RuleEngine/ObjectDetector')) {
+                if (dataValue) {
+                    try {
+                        const eventName = event.message.message.data.simpleItem.$.Name;
+                        const className = this.detections.get(eventName);
+                        this.console.log('object detected:', className);
+                        ret.emit('event', OnvifEvent.Detection, className);
                     }
-                    else {
-                        ret.emit('event', OnvifEvent.BinaryStop)
-                    }
-                }
-                // Mobotix T26
-                else if (eventTopic.includes('VideoSource/Alarm')) {
-                    if (dataValue === "Ring" || dataValue === "CameraBellButton") {
-                        ret.emit('event', OnvifEvent.BinaryRingEvent);
-                    }
-                }
-                // else if (eventTopic.includes('DigitalInput')) {
-                //     if (dataValue)
-                //         ret.emit('event', OnvifEvent.BinaryStart)
-                //     else
-                //         ret.emit('event', OnvifEvent.BinaryStop)
-                // }
-                else if (this.binaryStateEvent && eventTopic.includes(this.binaryStateEvent)) {
-                    if (dataValue)
-                        ret.emit('event', OnvifEvent.BinaryStart)
-                    else
-                        ret.emit('event', OnvifEvent.BinaryStop)
-                }
-                else if (eventTopic.includes('RuleEngine/CellMotionDetector/Motion')) {
-                    // unclear if the IsMotion false is indicative of motion stop?
-                    if (event.message.message.data.simpleItem.$.Name === 'IsMotion' && dataValue) {
-                        ret.emit('event', OnvifEvent.MotionBuggy);
-                    }
-                }
-                else if (eventTopic.includes('RuleEngine/ObjectDetector')) {
-                    if (dataValue) {
-                        try {
-                            const eventName = event.message.message.data.simpleItem.$.Name;
-                            const className = this.detections.get(eventName);
-                            this.console.log('object detected:', className);
-                            ret.emit('event', OnvifEvent.Detection, className);
-                        }
-                        catch (e) {
-                            this.console.warn('error parsing detection', e);
-                        }
+                    catch (e) {
+                        this.console.warn('error parsing detection', e);
                     }
                 }
             }
