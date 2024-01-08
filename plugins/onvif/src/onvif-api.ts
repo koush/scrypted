@@ -90,8 +90,9 @@ export class OnvifCameraAPI {
 
             const eventTopic = stripNamespaces(event.topic._);
 
-            if (event.message.message.data && event.message.message.data.simpleItem) {
+            if (event.message.message.data && event.message.message.data.simpleItem && event.message.message.data.simpleItem.$) {
                 const dataValue = event.message.message.data.simpleItem.$.Value;
+
                 if (eventTopic.includes('MotionAlarm')) {
                     // ret.emit('event', OnvifEvent.MotionBuggy);
                     if (dataValue)
