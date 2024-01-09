@@ -219,7 +219,7 @@ export interface NotifierOptions {
   requireInteraction?: boolean;
   silent?: boolean;
   tag?: string;
-  timestamp?: EpochTimeStamp;
+  timestamp?: number;
   vibrate?: VibratePattern;
 }
 
