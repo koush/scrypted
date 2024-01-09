@@ -38,14 +38,6 @@ fi
 
 pct restore $VMID $SCRYPTED_TAR_ZST $@
 
-CONF=/etc/pve/lxc/$VMID.conf
-if [ -f "$CONF" ]
-then
-    echo "onboot: 1" >> $CONF
-else
-    echo "$CONF not found? Start on boot must be enabled manually."    
-fi
-
 if [ "$?" != "0" ]
 then
     echo ""
@@ -57,6 +49,14 @@ then
     echo "bash $0 --storage local-lvm"
     echo ""
     exit 1
+fi
+
+CONF=/etc/pve/lxc/$VMID.conf
+if [ -f "$CONF" ]
+then
+    echo "onboot: 1" >> $CONF
+else
+    echo "$CONF not found? Start on boot must be enabled manually."    
 fi
 
 echo "Adding udev rule: /etc/udev/rules.d/65-scrypted.rules"
