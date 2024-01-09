@@ -38,14 +38,6 @@ fi
 
 pct restore $VMID $SCRYPTED_TAR_ZST $@
 
-CONF=/etc/pve/lxc/$VMID.conf
-if [ -f "$CONF" ]
-then
-    echo "onboot: 1" >> $CONF
-else
-    echo "$CONF not found? Start on boot must be enabled manually."    
-fi
-
 if [ "$?" != "0" ]
 then
     echo ""
@@ -59,6 +51,14 @@ then
     exit 1
 fi
 
+CONF=/etc/pve/lxc/$VMID.conf
+if [ -f "$CONF" ]
+then
+    echo "onboot: 1" >> $CONF
+else
+    echo "$CONF not found? Start on boot must be enabled manually."    
+fi
+
 echo "Adding udev rule: /etc/udev/rules.d/65-scrypted.rules"
 readyn "Add udev rule for hardware acceleration? This may conflict with existing rules."
 if [ "$yn" == "y" ]
@@ -66,6 +66,8 @@ then
     sh -c "echo 'SUBSYSTEM==\"apex\", MODE=\"0666\"' > /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'KERNEL==\"renderD128\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'KERNEL==\"card0\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
+    sh -c "echo 'SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1a6e\", ATTRS{idProduct}==\"089a\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
+    sh -c "echo 'SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"18d1\", ATTRS{idProduct}==\"9302\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     udevadm control --reload-rules && udevadm trigger
 fi
 
