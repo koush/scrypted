@@ -1,8 +1,7 @@
-import sdk, { Setting, MediaObject, ScryptedInterface, FFmpegInput, PictureOptions, SettingValue, MediaStreamOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, MediaStreamUrl } from "@scrypted/sdk";
-import { EventEmitter } from "stream";
-import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
+import { timeoutPromise } from '@scrypted/common/src/promise-utils';
+import sdk, { MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue } from "@scrypted/sdk";
 import url from 'url';
-import { timeoutFunction, timeoutPromise } from '@scrypted/common/src/promise-utils';
+import { CameraBase, CameraProviderBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 
 export { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 

@@ -1,9 +1,10 @@
 import { Deferred } from '@scrypted/common/src/deferred';
+import { authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { readLine } from '@scrypted/common/src/read-stream';
 import { parseHeaders, readBody, readMessage, writeMessage } from '@scrypted/common/src/rtsp-server';
-import axios from 'axios';
 import crypto from 'crypto';
 import { Duplex, PassThrough, Writable } from 'stream';
+import { BufferParser, StreamParser } from '../../../server/src/http-fetch-helpers';
 import { digestAuthHeader } from './digest-auth';
 
 export function getTapoAdminPassword(cloudPassword: string, useSHA256: boolean) {
@@ -27,16 +28,19 @@ export class TapoAPI {
         const url = `http://${options.address}/stream`;
 
         // will fail with auth required.
-        const response = await axios({
+        const response = await authHttpFetch({
+            credential: undefined,
             url: url,
+            ignoreStatusCode: true,
+        }, {
             method: 'POST',
             headers: {
                 'Content-Type': 'multipart/mixed; boundary=--client-stream-boundary--',
             },
-            validateStatus(status) {
-                return status === 401;
-            },
-        });
+        }, BufferParser);
+
+        if (response.statusCode !== 401)
+            throw new Error('Expected 401 status code for two way audio init')
 
         const wwwAuthenticate = response.headers['www-authenticate'];
         const useSHA256 = wwwAuthenticate.includes('encrypt_type="3"');
@@ -45,20 +49,21 @@ export class TapoAPI {
 
         const auth = digestAuthHeader('POST', '/stream', wwwAuthenticate, 'admin', password, 0) + ', algorithm=MD5';
 
-        const response2 = await axios({
+        const response2 = await authHttpFetch({
+            credential: undefined,
             url: url,
+        }, {
             method: 'POST',
             headers: {
                 'Authorization': auth,
                 'Content-Type': 'multipart/mixed; boundary=--client-stream-boundary--',
             },
-            responseType: "stream",
-        })
+        }, StreamParser)
 
         const tapo = new TapoAPI();
-        tapo.keyExchange = response2.headers['key-exchange'];
-        tapo.stream = response2.data.socket;
-        tapo.stream.on('close', () => console.error('strema closed'));
+        tapo.keyExchange = response2.headers['key-exchange'] as string;
+        tapo.stream = response2.body.socket;
+        tapo.stream.on('close', () => console.error('stream closed'));
         // this.stream.on('data', data => console.log('data', data));
         // this.stream.resume();
         return tapo;

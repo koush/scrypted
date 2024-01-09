@@ -1,4 +1,4 @@
-import sdk, { FFmpegInput, MediaObject, PictureOptions, Setting, SettingValue } from "@scrypted/sdk";
+import sdk, { FFmpegInput, MediaObject, Setting, SettingValue } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { CameraBase, CameraProviderBase, UrlMediaStreamOptions } from "./common";
 
@@ -15,10 +15,6 @@ function parseDoubleQuotedArguments(input: string) {
 }
 
 class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> {
-    takePictureThrottled(option?: PictureOptions): Promise<MediaObject> {
-        throw new Error("The RTSP Camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
-    }
-
     storageSettings = new StorageSettings(this, {
         ffmpegInputs: {
             title: 'FFmpeg Input Stream Arguments',

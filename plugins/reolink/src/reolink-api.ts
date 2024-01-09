@@ -1,4 +1,9 @@
-import AxiosDigestAuth from "@koush/axios-digest-auth";
+import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { EventEmitter } from 'events';
+import https, { RequestOptions } from 'https';
+import { PassThrough, Readable } from 'stream';
+import { BufferParser, FetchParser, JSONParser, TextParser } from '../../../server/src/http-fetch-helpers';
+
 import { getMotionState, reolinkHttpsAgent } from './probe';
 import { PanTiltZoomCommand } from "@scrypted/sdk";
 import { sleep } from "@scrypted/common/src/sleep";
@@ -55,13 +60,23 @@ export type AIState = {
 };
 
 export class ReolinkCameraClient {
-    digestAuth: AxiosDigestAuth;
+    credential: AuthFetchCredentialState;
 
     constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console) {
-        this.digestAuth = new AxiosDigestAuth({
-            password,
+        this.credential = {
             username,
-        });
+            password,
+        };
+    }
+
+    async request<T>(url: string, parser: FetchParser<T>, init?: RequestOptions, body?: Readable) {
+        const response = await authHttpFetch({
+            url,
+            httpsAgent: reolinkHttpsAgent,
+            credential: this.credential,
+            body,
+        }, init, parser);
+        return response;
     }
 
     async reboot() {
@@ -70,13 +85,10 @@ export class ReolinkCameraClient {
         params.set('cmd', 'Reboot');
         params.set('user', this.username);
         params.set('password', this.password);
-        const response = await this.digestAuth.request({
-            url: url.toString(),
-            httpsAgent: reolinkHttpsAgent,
-        });
+        const response = await this.request(url.toString(), JSONParser);
         return {
-            value: response.data?.[0]?.value?.rspCode,
-            data: response.data,
+            value: response.body?.[0]?.value?.rspCode,
+            data: response.body,
         };
     }
 
@@ -90,7 +102,7 @@ export class ReolinkCameraClient {
     //     }
     //  ]
     async getMotionState() {
-        return getMotionState(this.digestAuth, this.username, this.password, this.host, this.channelId);
+        return getMotionState(this.credential, this.username, this.password, this.host, this.channelId);
     }
 
     async getAiState() {
@@ -100,13 +112,10 @@ export class ReolinkCameraClient {
         params.set('channel', this.channelId.toString());
         params.set('user', this.username);
         params.set('password', this.password);
-        const response = await this.digestAuth.request({
-            url: url.toString(),
-            httpsAgent: reolinkHttpsAgent,
-        });
+        const response = await this.request(url.toString(), JSONParser);
         return {
-            value: response.data?.[0]?.value as AIState,
-            data: response.data,
+            value: response.body?.[0]?.value as AIState,
+            data: response.body,
         };
     }
 
@@ -119,14 +128,11 @@ export class ReolinkCameraClient {
         params.set('user', this.username);
         params.set('password', this.password);
 
-        const response = await this.digestAuth.request({
-            url: url.toString(),
-            responseType: 'arraybuffer',
-            httpsAgent: reolinkHttpsAgent,
+        const response = await this.request(url.toString(), BufferParser, {
             timeout: 60000,
         });
 
-        return Buffer.from(response.data);
+        return response.body;
     }
 
     async getEncoderConfiguration(): Promise<Enc> {
@@ -137,12 +143,9 @@ export class ReolinkCameraClient {
         params.set('channel', this.channelId.toString());
         params.set('user', this.username);
         params.set('password', this.password);
-        const response = await this.digestAuth.request({
-            url: url.toString(),
-            httpsAgent: reolinkHttpsAgent,
-        });
+        const response = await this.request(url.toString(), JSONParser);
 
-        return response.data?.[0]?.value?.Enc;
+        return response.body?.[0]?.value?.Enc;
     }
 
     async getDeviceInfo(): Promise<DevInfo> {
@@ -151,12 +154,9 @@ export class ReolinkCameraClient {
         params.set('cmd', 'GetDevInfo');
         params.set('user', this.username);
         params.set('password', this.password);
-        const response = await this.digestAuth.request({
-            url: url.toString(),
-            httpsAgent: reolinkHttpsAgent,
-        });
+        const response = await this.request(url.toString(), JSONParser);
 
-        return response.data?.[0]?.value?.DevInfo;
+        return response.body?.[0]?.value?.DevInfo;
     }
 
     async ptz(command: PanTiltZoomCommand) {
@@ -179,39 +179,40 @@ export class ReolinkCameraClient {
         params.set('user', this.username);
         params.set('password', this.password);
 
-        const c1 = this.digestAuth.request({
+        const createReadable = (data: any) => {
+            const pt = new PassThrough();
+            pt.write(Buffer.from(JSON.stringify(data)));
+            pt.end();
+            return pt;
+        }
+
+        const c1 = this.request(url.toString(), TextParser, {
             method: 'POST',
-            url: url.toString(),
-            httpsAgent: reolinkHttpsAgent,
-            data: [
-                {
-                    cmd: "PtzCtrl",
-                    param: {
-                        channel: this.channelId,
-                        op,
-                        speed: 10,
-                        timeout: 1,
-                    }
-                },
-            ]
-        });
+        }, createReadable([
+            {
+                cmd: "PtzCtrl",
+                param: {
+                    channel: this.channelId,
+                    op,
+                    speed: 10,
+                    timeout: 1,
+                }
+            },
+        ]));
 
         await sleep(500);
 
-        const c2 = this.digestAuth.request({
+        const c2 = this.request(url.toString(), TextParser, {
             method: 'POST',
-            url: url.toString(),
-            httpsAgent: reolinkHttpsAgent,
-            data: [
-                {
-                    cmd: "PtzCtrl",
-                    param: {
-                        channel: this.channelId,
-                        op: "Stop"
-                    }
-                },
-            ]
-        });
+        }, createReadable([
+            {
+                cmd: "PtzCtrl",
+                param: {
+                    channel: this.channelId,
+                    op: "Stop"
+                }
+            },
+        ]));
 
         this.console.log(await c1);
         this.console.log(await c2);

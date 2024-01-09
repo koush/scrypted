@@ -36,7 +36,6 @@
       ]
    },
    "dependencies": {
-      "@koush/axios-digest-auth": "^0.8.7",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "base-64": "^1.0.0",

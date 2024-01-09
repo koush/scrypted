@@ -7,6 +7,7 @@ import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 import { hikvisionHttpsAgent } from './probe';
+import { StreamParser, TextParser } from "../../../server/src/http-fetch-helpers";
 
 const { mediaManager } = sdk;
 
@@ -207,12 +208,8 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                     try {
                         let xml: string;
                         try {
-                            const response = await client.digestAuth.request({
-                                httpsAgent: hikvisionHttpsAgent,
-                                url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
-                                responseType: 'text',
-                            });
-                            xml = response.data;
+                            const response = await client.request(`http://${this.getHttpAddress()}/ISAPI/Streaming/channels`, TextParser);
+                            xml = response.body;
                             this.storage.setItem('channels', xml);
                         }
                         catch (e) {
@@ -382,12 +379,9 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         try {
             const parameters = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels`;
-            const { data: parametersData } = await this.getClient().digestAuth.request({
-                httpsAgent: hikvisionHttpsAgent,
-                url: parameters,
-            });
+            const { body } = await this.getClient().request(parameters, TextParser);
 
-            const parsedXml = await xml2js.parseStringPromise(parametersData);
+            const parsedXml = await xml2js.parseStringPromise(body);
             for (const twoWayChannel of parsedXml.TwoWayAudioChannelList.TwoWayAudioChannel) {
                 const [id] = twoWayChannel.id;
                 if (id !== channel)
@@ -423,27 +417,21 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         const passthrough = new PassThrough();
         const open = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/open`;
-        const { data } = await this.getClient().digestAuth.request({
-            httpsAgent: hikvisionHttpsAgent,
-            method: 'PUT',
-            url: open,
+        const { body } = await this.getClient().request(open, TextParser, {
+            method: 'PUT'
         });
-        this.console.log('two way audio opened', data);
+        this.console.log('two way audio opened', body);
 
         const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/audioData`;
         this.console.log('posting audio data to', url);
 
-        const put = this.getClient().digestAuth.request({
-            httpsAgent: hikvisionHttpsAgent,
-            method: 'PUT',
-            url,
+        const put = this.getClient().request(url, StreamParser, {
             headers: {
                 'Content-Type': 'application/octet-stream',
                 // 'Connection': 'close',
                 'Content-Length': '0'
             },
-            data: passthrough,
-        });
+        }, passthrough);
 
         let available = Buffer.alloc(0);
         this.activeIntercom?.kill();
@@ -484,11 +472,9 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         }
 
         const client = this.getClient();
-        await client.digestAuth.request({
-            httpsAgent: hikvisionHttpsAgent,
+        await client.request(`http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/close`, TextParser, {
             method: 'PUT',
-            url: `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/close`,
-        })
+        });
     }
 }
 

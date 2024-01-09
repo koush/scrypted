@@ -35,13 +35,10 @@
       ]
    },
    "dependencies": {
-      "@koush/axios-digest-auth": "^0.8.7",
       "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk",
-      "@types/multiparty": "^0.0.33",
-      "multiparty": "^4.2.3"
+      "@scrypted/sdk": "file:../../sdk"
    },
    "devDependencies": {
-      "@types/node": "^18.16.18"
+      "@types/node": "^20.10.8"
    }
 }

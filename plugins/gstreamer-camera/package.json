@@ -32,12 +32,10 @@
       ]
    },
    "devDependencies": {
-      "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk",
-      "@types/node": "^16.9.6"
+      "@types/node": "^20.10.8"
    },
    "dependencies": {
-      "@koush/axios-digest-auth": "^0.8.5",
-      "url-parse": "^1.4.7"
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk"
    }
 }

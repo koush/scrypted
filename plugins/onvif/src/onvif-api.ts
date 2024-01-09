@@ -1,6 +1,8 @@
+import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { EventEmitter } from 'events';
-import AxiosDigestAuth from '@koush/axios-digest-auth';
-import https from 'https';
+import https, { RequestOptions } from 'https';
+import { Readable } from 'stream';
+import { BufferParser, FetchParser } from '../../../server/src/http-fetch-helpers';
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -58,15 +60,25 @@ export class OnvifCameraAPI {
     rtspUrls = new Map<string, string>();
     profiles: Promise<any>;
     binaryStateEvent: string;
-    digestAuth: AxiosDigestAuth;
+    credential: AuthFetchCredentialState;
     detections: Map<string, string>;
 
     constructor(public cam: any, username: string, password: string, public console: Console, binaryStateEvent: string) {
         this.binaryStateEvent = binaryStateEvent
-        this.digestAuth = new AxiosDigestAuth({
+        this.credential = {
             username,
             password,
-        });
+        };
+    }
+
+    async request<T>(url: string, parser: FetchParser<T>, init?: RequestOptions, body?: Readable) {
+        const response = await authHttpFetch({
+            url,
+            httpsAgent,
+            credential: this.credential,
+            body,
+        }, init, parser);
+        return response;
     }
 
     async reboot() {
@@ -229,13 +241,14 @@ export class OnvifCameraAPI {
                 this.console.log(xml);
                 this.detections = new Map();
                 try {
-
-                    for (const [className, entry] of Object.entries(data.topicSet.ruleEngine.objectDetector) as any) {
-                        try {
-                            const eventName = entry.messageDescription.data.simpleItemDescription.$.Name;
-                            this.detections.set(eventName, className);
-                        }
-                        catch (e) {
+                    if (data.topicSet.ruleEngine.objectDetector) {
+                        for (const [className, entry] of Object.entries(data.topicSet.ruleEngine.objectDetector) as any) {
+                            try {
+                                const eventName = entry.messageDescription.data.simpleItemDescription.$.Name;
+                                this.detections.set(eventName, className);
+                            }
+                            catch (e) {
+                            }
                         }
                     }
                 }
@@ -280,15 +293,11 @@ export class OnvifCameraAPI {
         if (!snapshotUri)
             return;
 
-        const response = await this.digestAuth.request({
-            method: 'GET',
-            url: snapshotUri,
-            responseType: 'arraybuffer',
-            httpsAgent,
+        const response = await this.request(snapshotUri, BufferParser, {
             timeout: 60000,
         });
 
-        return Buffer.from(response.data);
+        return response.body;
     }
 
     getDeviceInformation(): Promise<any> {

@@ -35,14 +35,11 @@
          "@scrypted/snapshot"
       ]
    },
-   "devDependencies": {
-      "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk",
-      "@types/node": "^16.9.6"
-   },
    "dependencies": {
-      "@koush/axios-digest-auth": "^0.8.5",
-      "axios": "^0.23.0",
-      "url-parse": "^1.4.7"
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "devDependencies": {
+      "@types/node": "^20.10.8"
    }
 }

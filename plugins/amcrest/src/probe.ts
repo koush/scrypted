@@ -1,4 +1,6 @@
+import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import https from 'https';
+import { TextParser } from '../../../server/src/http-fetch-helpers';
 
 export const amcrestHttpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -11,17 +13,15 @@ export const amcrestHttpsAgent = new https.Agent({
 // serialNumber=12345
 // updateSerial=IPC-AW46WN-S2
 
-import AxiosDigestAuth from "@koush/axios-digest-auth";
 
 // updateSerialCloudUpgrade=IPC-AW46WN-.....
-export async function getDeviceInfo(digestAuth: AxiosDigestAuth, address: string) {
-    const response = await digestAuth.request({
+export async function getDeviceInfo(credential: AuthFetchCredentialState, address: string) {
+    const response = await authHttpFetch({
+        credential,
         httpsAgent: amcrestHttpsAgent,
-        method: "GET",
-        responseType: 'text',
         url: `http://${address}/cgi-bin/magicBox.cgi?action=getSystemInfo`,
-    });
-    const lines = (response.data as string).split('\n');
+    }, undefined, TextParser);
+    const lines = response.body.split('\n');
     const vals: {
         [key: string]: string,
     } = {};

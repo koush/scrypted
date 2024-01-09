@@ -1,7 +1,7 @@
-import AxiosDigestAuth from '@koush/axios-digest-auth';
+import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { RequestOptions } from 'http';
 import { Readable } from 'stream';
-import https from 'https';
-import { IncomingMessage } from 'http';
+import { BufferParser, FetchParser, StreamParser, TextParser } from '../../../server/src/http-fetch-helpers';
 import { amcrestHttpsAgent, getDeviceInfo } from './probe';
 
 export enum AmcrestEvent {
@@ -22,35 +22,34 @@ export enum AmcrestEvent {
     DahuaTalkPulse = "Code=_CallNoAnswer_;action=Pulse",
 }
 
-
 export class AmcrestCameraClient {
-    digestAuth: AxiosDigestAuth;
+    credential: AuthFetchCredentialState;
 
     constructor(public ip: string, username: string, password: string, public console?: Console) {
-        this.digestAuth = new AxiosDigestAuth({
+        this.credential = {
             username,
             password,
-        });
+        };
+    }
+
+    async request<T>(url: string, parser: FetchParser<T>, init?: RequestOptions, body?: Readable) {
+        const response = await authHttpFetch({
+            url,
+            httpsAgent: amcrestHttpsAgent,
+            credential: this.credential,
+            body,
+        }, init, parser);
+        return response;
     }
 
     async reboot() {
-        const response = await this.digestAuth.request({
-            httpsAgent: amcrestHttpsAgent,
-            method: "GET",
-            responseType: 'text',
-            url: `http://${this.ip}/cgi-bin/magicBox.cgi?action=reboot`,
-        });
-        return response.data as string;
+        const response = await this.request(`http://${this.ip}/cgi-bin/magicBox.cgi?action=reboot`, TextParser);
+        return response.body;
     }
 
     async checkTwoWayAudio() {
-        const response = await this.digestAuth.request({
-            httpsAgent: amcrestHttpsAgent,
-            method: "GET",
-            responseType: 'text',
-            url: `http://${this.ip}/cgi-bin/devAudioOutput.cgi?action=getCollect`,
-        });
-        return (response.data as string).includes('result=1');
+        const response = await this.request(`http://${this.ip}/cgi-bin/devAudioOutput.cgi?action=getCollect`, TextParser);
+        return response.body.includes('result=1');
     }
 
     // appAutoStart=true
@@ -61,33 +60,27 @@ export class AmcrestCameraClient {
     // updateSerial=IPC-AW46WN-S2
     // updateSerialCloudUpgrade=IPC-AW46WN-.....
     async getDeviceInfo() {
-        return getDeviceInfo(this.digestAuth, this.ip);
+        return getDeviceInfo(this.credential, this.ip);
     }
 
     async jpegSnapshot(): Promise<Buffer> {
-
-        const response = await this.digestAuth.request({
-            httpsAgent: amcrestHttpsAgent,
-            method: "GET",
-            responseType: 'arraybuffer',
-            url: `http://${this.ip}/cgi-bin/snapshot.cgi`,
+        const response = await this.request(`http://${this.ip}/cgi-bin/snapshot.cgi`, BufferParser, {
             timeout: 60000,
         });
 
-        return Buffer.from(response.data);
+        return response.body;
     }
 
     async listenEvents() {
         const url = `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[All]`;
         console.log('preparing event listener', url);
 
-        const response = await this.digestAuth.request({
+        const response = await authHttpFetch({
+            credential: this.credential,
             httpsAgent: amcrestHttpsAgent,
-            method: "GET",
-            responseType: 'stream',
             url,
-        });
-        const stream = response.data as IncomingMessage;
+        }, undefined, StreamParser);
+        const stream = response.body;
         stream.socket.setKeepAlive(true);
 
         stream.on('data', (buffer: Buffer) => {
@@ -118,12 +111,10 @@ export class AmcrestCameraClient {
     async enableContinousRecording(channel: number) {
         for (let i = 0; i < 7; i++) {
             const url = `http://${this.ip}/cgi-bin/configManager.cgi?action=setConfig&Record[${channel - 1}].TimeSection[${i}][0]=1 00:00:00-23:59:59`;
-            const response = await this.digestAuth.request({
-                httpsAgent: amcrestHttpsAgent,
-                method: "POST",
-                url,
+            const response = await this.request(url, TextParser, {
+                method: 'POST',
             });
-            this.console.log(response.data);
+            this.console.log(response.body);
         }
     }
 }

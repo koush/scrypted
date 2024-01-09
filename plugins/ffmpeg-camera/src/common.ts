@@ -1,43 +1,20 @@
-import AxiosDigestAuth from '@koush/axios-digest-auth';
 import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, MediaObject, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { randomBytes } from "crypto";
-import https from 'https';
 
-const { deviceManager, mediaManager } = sdk;
-
-const httpsAgent = new https.Agent({
-    rejectUnauthorized: false
-});
+const { deviceManager } = sdk;
 
 export interface UrlMediaStreamOptions extends ResponseMediaStreamOptions {
     url: string;
 }
 
 export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends ScryptedDeviceBase implements Camera, VideoCamera, Settings {
-    snapshotAuth: AxiosDigestAuth;
-
     constructor(nativeId: string, public provider: CameraProviderBase<T>) {
         super(nativeId);
     }
 
-    protected async takePictureUrl(snapshotUrl: string) {
-        if (!this.snapshotAuth) {
-            this.snapshotAuth = new AxiosDigestAuth({
-                username: this.getUsername(),
-                password: this.getPassword(),
-            });
-        }
-        const response = await this.snapshotAuth.request({
-            httpsAgent,
-            method: "GET",
-            responseType: 'arraybuffer',
-            url: snapshotUrl,
-        });
-
-        return mediaManager.createMediaObject(Buffer.from(response.data), response.headers['Content-Type'] || 'image/jpeg');
+    takePicture(option?: PictureOptions): Promise<MediaObject> {
+        throw new Error("The RTSP Camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
     }
-
-    abstract takePicture(option?: PictureOptions): Promise<MediaObject>;
 
     async getPictureOptions(): Promise<PictureOptions[]> {
         return;
@@ -139,8 +116,6 @@ export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends S
         else {
             this.storage.setItem(key, value.toString());
         }
-
-        this.snapshotAuth = undefined;
 
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }

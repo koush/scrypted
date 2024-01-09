@@ -1,6 +1,9 @@
-import AxiosDigestAuth from '@koush/axios-digest-auth';
+import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { IncomingMessage } from 'http';
 import { getDeviceInfo, hikvisionHttpsAgent } from './probe';
+import { BufferParser, FetchParser, StreamParser, TextParser } from '../../../server/src/http-fetch-helpers';
+import { RequestOptions } from 'http';
+import { Readable } from 'stream';
 
 export function getChannel(channel: string) {
     return channel || '101';
@@ -28,47 +31,53 @@ export interface HikvisionCameraStreamSetup {
 }
 
 export class HikvisionCameraAPI {
-    digestAuth: AxiosDigestAuth;
+    credential: AuthFetchCredentialState;
     deviceModel: Promise<string>;
     listenerPromise: Promise<IncomingMessage>;
 
     constructor(public ip: string, username: string, password: string, public console: Console) {
-        this.digestAuth = new AxiosDigestAuth({
+        this.credential = {
             username,
             password,
-        });
+        };
+    }
+
+    async request<T>(url: string, parser: FetchParser<T>, init?: RequestOptions, body?: Readable) {
+        const response = await authHttpFetch({
+            url,
+            httpsAgent: hikvisionHttpsAgent,
+            credential: this.credential,
+            body,
+        }, init, parser);
+        return response;
     }
 
     async reboot() {
-        const response = await this.digestAuth.request({
-            httpsAgent: hikvisionHttpsAgent,
-            method: "PUT",
-            responseType: 'text',
+        const response = await authHttpFetch({
             url: `http://${this.ip}/ISAPI/System/reboot`,
-        });
+            credential: this.credential,
+        }, {
+            method: "PUT",
+        }, TextParser);
 
-        return response.data;
+        return response.body;
     }
 
     async getDeviceInfo() {
-        return getDeviceInfo(this.digestAuth, this.ip);
+        return getDeviceInfo(this.credential, this.ip);
     }
 
     async checkTwoWayAudio() {
-        const response = await this.digestAuth.request({
-            httpsAgent: hikvisionHttpsAgent,
-            method: "GET",
-            responseType: 'text',
-            url: `http://${this.ip}/ISAPI/System/TwoWayAudio/channels`,
-        });
+        const response = await this.request(`http://${this.ip}/ISAPI/System/TwoWayAudio/channels`, TextParser);
 
-        return (response.data as string).includes('Speaker');
+        return response.body.includes('Speaker');
     }
 
     async checkDeviceModel(): Promise<string> {
         if (!this.deviceModel) {
             this.deviceModel = this.getDeviceInfo().then(d => d.deviceModel).catch(e => {
                 this.console.error('error checking NVR model', e);
+                return undefined;
             });
         }
         return await this.deviceModel;
@@ -91,17 +100,12 @@ export class HikvisionCameraAPI {
             }
         }
 
-        const response = await this.digestAuth.request({
-            httpsAgent: hikvisionHttpsAgent,
-            method: "GET",
-            responseType: 'text',
-            url: `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/capabilities`,
-        });
+        const response = await this.request(`http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/capabilities`, TextParser);
 
         // this is bad:
         // <videoCodecType opt="H.264,H.265">H.265</videoCodecType>
-        const vcodec = response.data.match(/>(.*?)<\/videoCodecType>/);
-        const acodec = response.data.match(/>(.*?)<\/audioCompressionType>/);
+        const vcodec = response.body.match(/>(.*?)<\/videoCodecType>/);
+        const acodec = response.body.match(/>(.*?)<\/audioCompressionType>/);
 
         return {
             videoCodecType: vcodec?.[1],
@@ -112,15 +116,15 @@ export class HikvisionCameraAPI {
     async jpegSnapshot(channel: string): Promise<Buffer> {
         const url = `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/picture?snapShotImageType=JPEG`
 
-        const response = await this.digestAuth.request({
+        const response = await authHttpFetch({
+            credential: this.credential,
             httpsAgent: hikvisionHttpsAgent,
-            method: "GET",
-            responseType: 'arraybuffer',
             url: url,
+        }, {
             timeout: 60000,
-        });
+        }, BufferParser);
 
-        return Buffer.from(response.data);
+        return Buffer.from(response.body);
     }
 
     async listenEvents() {
@@ -128,13 +132,12 @@ export class HikvisionCameraAPI {
         if (!this.listenerPromise) {
             const url = `http://${this.ip}/ISAPI/Event/notification/alertStream`;
 
-            this.listenerPromise = this.digestAuth.request({
+            this.listenerPromise = authHttpFetch({
+                credential: this.credential,
                 httpsAgent: hikvisionHttpsAgent,
-                method: "GET",
                 url,
-                responseType: 'stream',
-            }).then(response => {
-                const stream = response.data as IncomingMessage;
+            }, undefined, StreamParser).then(response => {
+                const stream = response.body;
                 stream.socket.setKeepAlive(true);
 
                 stream.on('data', (buffer: Buffer) => {
