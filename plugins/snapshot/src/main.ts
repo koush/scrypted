@@ -1,18 +1,18 @@
-import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
-import { createMapPromiseDebouncer, RefreshPromise, singletonPromise, TimeoutError } from "@scrypted/common/src/promise-utils";
+import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
-import axios, { AxiosInstance } from "axios";
 import https from 'https';
+import os from 'os';
 import path from 'path';
 import url from 'url';
+import { BufferParser } from "../../../server/src/http-fetch-helpers";
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 import { ImageConverter, ImageConverterNativeId } from './image-converter';
 import { ImageReader, ImageReaderNativeId, loadSharp, loadVipsImage } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
-import os from 'os';
 
 const { mediaManager, systemManager } = sdk;
 if (os.cpus().find(cpu => cpu.model?.toLowerCase().includes('qemu'))) {
@@ -217,30 +217,27 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 password = settings?.find(setting => setting.key === 'password')?.value?.toString();
             }
 
-            let axiosClient: AxiosDigestAuth | AxiosInstance;
+            let credential: AuthFetchCredentialState;
             if (username && password) {
-                axiosClient = new AxiosDigestAuth({
-                    username,
+                credential = {
+                    username, 
                     password,
-                });
-            }
-            else {
-                axiosClient = axios;
+                };
             }
 
             try {
-                const response = await axiosClient.request({
+                const response = await authHttpFetch({
                     httpsAgent,
-                    method: "GET",
-                    responseType: 'arraybuffer',
                     url: this.storageSettings.values.snapshotUrl,
+                    credential,
+                }, {
                     timeout: 60000,
                     headers: {
                         'Accept': 'image/*',
                     }
-                });
+                }, BufferParser);
 
-                return response.data;
+                return response.body;
             }
             catch (e) {
                 return retryWithPrebuffer(e);

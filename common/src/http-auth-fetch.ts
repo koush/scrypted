@@ -17,6 +17,8 @@ export interface AuthFetchOptions extends HttpFetchOptions {
 }
 
 function getAuth(options: AuthFetchOptions, method: string) {
+    if (!options.credential)
+        return;
     const { digest, basic } = options.credential;
     if (digest) {
         options.credential.count ||= 0;
@@ -75,7 +77,7 @@ export async function authHttpFetch<T = any>(options: AuthFetchOptions, init?: R
         ignoreStatusCode: true,
     }, init, StreamParser);
 
-    if (initialResponse.statusCode !== 401) {
+    if (initialResponse.statusCode !== 401 || !options.credential) {
         if (!options?.ignoreStatusCode)
             checkStatus(initialResponse.statusCode);
         return {

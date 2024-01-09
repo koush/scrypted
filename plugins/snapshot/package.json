@@ -34,9 +34,7 @@
       ]
    },
    "dependencies": {
-      "@koush/axios-digest-auth": "^0.8.7",
       "@types/node": "^20.10.6",
-      "axios": "^0.21.4",
       "sharp": "^0.33.1",
       "whatwg-mimetype": "^4.0.0"
    },
