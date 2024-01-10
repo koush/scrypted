@@ -198,7 +198,7 @@ export interface MixinDeviceOptions<T> {
 })();
 
 
-let sdk: ScryptedStatic = {} as any;
+export const sdk: ScryptedStatic = {} as any;
 declare const deviceManager: DeviceManager;
 declare const endpointManager: EndpointManager;
 declare const mediaManager: MediaManager;
@@ -214,7 +214,7 @@ try {
   catch (e) {
   }
 
-  sdk = Object.assign(sdk, {
+  Object.assign(sdk, {
     log: deviceManager.getDeviceLogger(undefined),
     deviceManager,
     endpointManager,

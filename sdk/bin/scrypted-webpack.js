@@ -223,11 +223,16 @@ else {
                     // create a zip that has a main.js in the root, and an fs folder containing a read only virtual file system.
                     // todo: read write file system? seems like a potential sandbox and backup nightmare to do a real fs. scripts should
                     // use localStorage, etc?
-                    zip.addLocalFile(path.join(out, runtime.output));
-                    const sourcemap = path.join(out, runtime.output + '.map');
-                    if (fs.existsSync(sourcemap))
-                        zip.addLocalFile(sourcemap);
-                    console.log(runtime.output);
+                    const jsFiles = fs.readdirSync(out, {
+                        withFileTypes: true
+                    }).filter(ft => ft.isFile() && ft.name.endsWith('.js')).map(ft => ft.name);
+                    for (const js of jsFiles) {
+                        zip.addLocalFile(path.join(out, js));
+                        const sourcemap = path.join(out, js + '.map');
+                        if (fs.existsSync(sourcemap))
+                            zip.addLocalFile(sourcemap);
+                        console.log(js);
+                    }
                     resolve();
                 })
             });

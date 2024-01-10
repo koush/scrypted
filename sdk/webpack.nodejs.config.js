@@ -34,6 +34,9 @@ const plugins = [
     new webpack.DefinePlugin({
         'process.env.SSDP_COV': false,
     }),
+    new webpack.optimize.LimitChunkCountPlugin({
+        maxChunks: 1,
+    }),
 ];
 
 if (process.env.WEBPACK_ANALYZER) {
