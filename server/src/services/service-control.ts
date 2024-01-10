@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { fetchJSON } from "../http-fetch-helpers";
+import { httpFetch } from "../http-fetch-helpers";
 import { ScryptedRuntime } from "../runtime";
 
 export class ServiceControl {
@@ -23,7 +23,8 @@ export class ServiceControl {
         const webhookUpdate = process.env.SCRYPTED_WEBHOOK_UPDATE;
         if (webhookUpdate) {
             const webhookUpdateAuthorization = process.env.SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION;
-            await fetchJSON(webhookUpdate, {
+            await httpFetch({
+                url: webhookUpdate,
                 headers: {
                     Authorization: webhookUpdateAuthorization,
                 }

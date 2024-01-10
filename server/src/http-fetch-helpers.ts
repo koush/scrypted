@@ -1,11 +1,11 @@
 import { once } from 'events';
 import { http, https } from 'follow-redirects';
-import { IncomingHttpHeaders, IncomingMessage } from 'http';
-import { Readable } from 'stream';
+import { IncomingMessage } from 'http';
+import type { Readable } from 'stream';
 
 export type HttpFetchResponseType = 'json' | 'text' | 'buffer' | 'readable';
 export interface HttpFetchOptions<T extends HttpFetchResponseType> {
-    url: string|URL;
+    url: string | URL;
     family?: 4 | 6;
     method?: string;
     headers?: HeadersInit;
@@ -71,12 +71,22 @@ export async function getNpmPackageInfo(pkg: string) {
         url: `https://registry.npmjs.org/${pkg}`,
         // force ipv4 in case of busted ipv6.
         family: 4,
+        responseType: 'json',
     });
     return body;
 }
 
-export function setFetchAcceptOptions(accept: string, headers: Headers) {
-    headers.set('Accept', accept);
+export function getHttpFetchAccept(responseType: HttpFetchResponseType) {
+    const { accept } = getHttpFetchParser(responseType);
+    return accept;
+}
+
+export function setDefaultHttpFetchAccept(headers: Headers, responseType: HttpFetchResponseType) {
+    if (headers.has('Accept'))
+        return;
+    const { accept } = getHttpFetchParser(responseType);
+    if (accept)
+        headers.set('Accept', accept);
 }
 
 export function fetchStatusCodeOk(statusCode: number) {
@@ -90,7 +100,7 @@ export function checkStatus(statusCode: number) {
 
 export interface HttpFetchResponse<T> {
     statusCode: number;
-    headers: IncomingHttpHeaders;
+    headers: Headers;
     body: T;
 }
 
@@ -106,6 +116,10 @@ export function getHttpFetchParser(responseType: HttpFetchResponseType) {
     return BufferParser;
 }
 
+export function parseResponseType(readable: IncomingMessage, responseType: HttpFetchResponseType) {
+    return getHttpFetchParser(responseType).parse(readable);
+}
+
 export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType>>(options: T): Promise<HttpFetchResponse<
     // first one serves as default.
     T extends HttpFetchBufferOptions ? Buffer
@@ -114,10 +128,9 @@ export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType
     : T extends HttpFetchJsonOptions ? any : Buffer
 >> {
     const headers = new Headers(options.headers);
-    const parser = getHttpFetchParser(options.responseType);
+    setDefaultHttpFetchAccept(headers, options.responseType);
 
-    if (parser.accept)
-        setFetchAcceptOptions(parser.accept, headers);
+    const parser = getHttpFetchParser(options.responseType);
 
     const { url } = options;
     const isSecure = url.toString().startsWith('https:');
@@ -144,7 +157,7 @@ export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType
         options.body.pipe(request);
     else
         request.end();
-    const [response] = await once(request, 'response') as IncomingMessage[];
+    const [response] = await once(request, 'response') as [IncomingMessage];
 
     if (!options?.ignoreStatusCode) {
         try {
@@ -156,9 +169,16 @@ export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType
         }
     }
 
+    const incomingHeaders = new Headers();
+    for (const [k, v] of Object.entries(response.headers)) {
+        for (const vv of (typeof v === 'string' ? [v] : v)) {
+            incomingHeaders.append(k, vv)
+        }
+    }
+
     return {
         statusCode: response.statusCode,
-        headers: response.headers,
+        headers: incomingHeaders,
         body: await parser.parse(response),
     };
 }

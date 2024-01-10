@@ -1,4 +1,3 @@
-import net from 'net';
 import { Device, DeviceInformation, DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceMethod, ScryptedInterfaceProperty, ScryptedNativeId, ScryptedUser as SU } from '@scrypted/types';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
@@ -9,6 +8,7 @@ import { ParamsDictionary } from 'express-serve-static-core';
 import fs from 'fs';
 import http, { ServerResponse } from 'http';
 import https from 'https';
+import net from 'net';
 import type { spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
 import path from 'path';
 import { ParsedQs } from 'qs';
@@ -17,8 +17,10 @@ import { PassThrough } from 'stream';
 import tar from 'tar';
 import { URL } from "url";
 import WebSocket, { Server as WebSocketServer } from "ws";
+import { computeClusterObjectHash } from './cluster/cluster-hash';
+import { ClusterObject } from './cluster/connect-rpc-object';
 import { Plugin, PluginDevice, ScryptedAlert, ScryptedUser } from './db-types';
-import { fetchBuffer, getNpmPackageInfo } from './http-fetch-helpers';
+import { getNpmPackageInfo, httpFetch } from './http-fetch-helpers';
 import { createResponseInterface } from './http-interfaces';
 import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefault, getProvidedRoomOrDefault, getProvidedTypeOrDefault } from './infer-defaults';
 import { IOServer } from './io';
@@ -35,7 +37,6 @@ import { getPluginVolume } from './plugin/plugin-volume';
 import { NodeForkWorker } from './plugin/runtime/node-fork-worker';
 import { PythonRuntimeWorker } from './plugin/runtime/python-worker';
 import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
-import { ClusterObject } from './cluster/connect-rpc-object';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
@@ -45,7 +46,6 @@ import { PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
-import { computeClusterObjectHash } from './cluster/cluster-hash';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -619,7 +619,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
         console.log('installing package', pkg, version);
 
-        const { body: tarball } = await fetchBuffer(`${registry.versions[version].dist.tarball}`, {
+        const { body: tarball } = await httpFetch( {
+            url: `${registry.versions[version].dist.tarball}`,
             // force ipv4 in case of busted ipv6.
             family: 4,
         });
