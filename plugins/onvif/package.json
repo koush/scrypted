@@ -39,7 +39,6 @@
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "base-64": "^1.0.0",
-      "http-auth-utils": "^4.0.0",
       "md5": "^2.3.0",
       "onvif": "file:./onvif",
       "xml2js": "^0.6.0"

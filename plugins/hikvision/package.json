@@ -38,7 +38,6 @@
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "@types/xml2js": "^0.4.11",
-      "http-auth-utils": "^3.0.2",
       "lodash": "^4.17.21",
       "xml2js": "^0.6.0"
    },

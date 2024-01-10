@@ -1,8 +1,6 @@
 import crypto, { randomBytes } from 'crypto';
 import dgram from 'dgram';
 import { once } from 'events';
-import { BASIC } from 'http-auth-utils/dist/index';
-import { parseHTTPHeadersQuotedKeyValueSet } from 'http-auth-utils/dist/utils';
 import net from 'net';
 import { Duplex, Readable, Writable } from 'stream';
 import tls from 'tls';
@@ -363,7 +361,7 @@ export class RtspClient extends RtspBase {
         }
     }
 
-    writeRequest(method: string, headers?: Headers, path?: string, body?: Buffer) {
+    async writeRequest(method: string, headers?: Headers, path?: string, body?: Buffer) {
         headers = headers || {};
 
         let fullUrl = this.url;
@@ -390,7 +388,7 @@ export class RtspClient extends RtspBase {
         headers['User-Agent'] = 'Scrypted';
 
         if (this.wwwAuthenticate)
-            headers['Authorization'] = this.createAuthorizationHeader(method, new URL(fullUrl));
+            headers['Authorization'] = await this.createAuthorizationHeader(method, new URL(fullUrl));
 
         if (this.session)
             headers['Session'] = this.session;
@@ -531,9 +529,12 @@ export class RtspClient extends RtspBase {
         }
     }
 
-    createAuthorizationHeader(method: string, url: URL) {
+    async createAuthorizationHeader(method: string, url: URL) {
         if (!this.wwwAuthenticate)
             throw new Error('no WWW-Authenticate found');
+
+        const { BASIC } = await import('http-auth-utils');
+        const { parseHTTPHeadersQuotedKeyValueSet } = await import('http-auth-utils/dist/utils');
 
         if (this.wwwAuthenticate.includes('Basic')) {
             const hash = BASIC.computeHash(url);
@@ -586,7 +587,7 @@ export class RtspClient extends RtspBase {
     }
 
     async request(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean): Promise<RtspServerResponse> {
-        this.writeRequest(method, headers, path, body);
+        await this.writeRequest(method, headers, path, body);
 
         const message = this.requestTimeout ? await timeoutPromise(this.requestTimeout, this.readMessage()) : await this.readMessage();
         const statusLine = message[0];

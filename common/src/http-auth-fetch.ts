@@ -1,30 +1,35 @@
-import { HttpFetchOptions, HttpFetchResponseType, checkStatus, getHttpFetchParser, httpFetch } from '@scrypted/server/src/http-fetch-helpers';
-import crypto from 'crypto';
-import { IncomingMessage } from 'http';
-import { BASIC, DIGEST, buildAuthorizationHeader, parseWWWAuthenticateHeader } from 'http-auth-utils/src/index';
-
+import { HttpFetchOptions, HttpFetchResponseType, checkStatus, getHttpFetchParser, httpFetch, setDefaultHttpFetchAccept } from '@scrypted/server/src/http-fetch-helpers';
+import type { IncomingMessage } from 'http';
 export interface AuthFetchCredentialState {
     username: string;
     password: string;
-    count?: number;
-    digest?: ReturnType<typeof parseWWWAuthenticateHeader<typeof DIGEST>>;
-    basic?: ReturnType<typeof parseWWWAuthenticateHeader<typeof BASIC>>;
+    [key: string]: any;
 }
 
 export interface AuthFetchOptions<T extends HttpFetchResponseType> extends HttpFetchOptions<T> {
     credential: AuthFetchCredentialState;
 }
 
-function getAuth(options: AuthFetchOptions<any>, method: string) {
+async function getAuth(options: AuthFetchOptions<any>, method: string) {
     if (!options.credential)
         return;
-    const { digest, basic } = options.credential;
+
+    const { BASIC, DIGEST, parseWWWAuthenticateHeader } = await import('http-auth-utils');
+
+    const { digest, basic } = options.credential as AuthFetchCredentialState & {
+        count?: number;
+        digest?: ReturnType<typeof parseWWWAuthenticateHeader<typeof DIGEST>>;
+        basic?: ReturnType<typeof parseWWWAuthenticateHeader<typeof BASIC>>;
+    };
+
     if (digest) {
         options.credential.count ||= 0;
         ++options.credential.count;
         const nc = ('00000000' + options.credential.count).slice(-8);
-        const cnonce = crypto.randomBytes(24).toString('hex');
+        const cnonce = [...Array(24)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
         const uri = new URL(options.url).pathname;
+
+        const { DIGEST, buildAuthorizationHeader } = await import('http-auth-utils');
 
         const response = DIGEST.computeHash({
             username: options.credential.username,
@@ -52,6 +57,8 @@ function getAuth(options: AuthFetchOptions<any>, method: string) {
         return header;
     }
     else if (basic) {
+        const { BASIC, buildAuthorizationHeader } = await import('http-auth-utils');
+
         const header = buildAuthorizationHeader(BASIC, {
             username: options.credential.username,
             password: options.credential.password,
@@ -65,9 +72,12 @@ export async function authHttpFetch<T extends HttpFetchResponseType>(options: Au
     const method = options.method || 'GET';
     const headers = new Headers(options.headers);
     options.headers = headers;
+    setDefaultHttpFetchAccept(headers, options.responseType);
 
-    const initialHeader = getAuth(options, method);
-    if (initialHeader)
+    const initialHeader = await getAuth(options, method);
+    // try to provide an authorization if a session exists, but don't override Authorization if provided already.
+    // 401 will trigger a proper auth.
+    if (initialHeader && !headers.has('Authorization'))
         headers.set('Authorization', initialHeader);
 
     const initialResponse = await httpFetch({
@@ -76,18 +86,16 @@ export async function authHttpFetch<T extends HttpFetchResponseType>(options: Au
         responseType: 'readable',
     });
 
-    const parser = getHttpFetchParser(options.responseType);
-
     if (initialResponse.statusCode !== 401 || !options.credential) {
         if (!options?.ignoreStatusCode)
             checkStatus(initialResponse.statusCode);
         return {
             ...initialResponse,
-            body: await parser.parse(initialResponse.body),
+            body: await getHttpFetchParser(options.responseType).parse(initialResponse.body),
         };
     }
 
-    let authenticateHeaders: string | string[] = initialResponse.headers['www-authenticate'];
+    let authenticateHeaders: string | string[] = initialResponse.headers.get('www-authenticate');
     if (!authenticateHeaders)
         throw new Error('Did not find WWW-Authenticate header.');
 
@@ -95,6 +103,7 @@ export async function authHttpFetch<T extends HttpFetchResponseType>(options: Au
     if (typeof authenticateHeaders === 'string')
         authenticateHeaders = [authenticateHeaders];
 
+    const { BASIC, DIGEST, parseWWWAuthenticateHeader } = await import('http-auth-utils');
     const parsedHeaders = authenticateHeaders.map(h => parseWWWAuthenticateHeader(h));
 
     const digest = parsedHeaders.find(p => p.type === 'Digest') as ReturnType<typeof parseWWWAuthenticateHeader<typeof DIGEST>>;
@@ -106,7 +115,7 @@ export async function authHttpFetch<T extends HttpFetchResponseType>(options: Au
     if (!digest && !basic)
         throw new Error(`Unknown WWW-Authenticate type: ${parsedHeaders[0]?.type}`);
 
-    const header = getAuth(options, method);
+    const header = await getAuth(options, method);
     if (header)
         headers.set('Authorization', header);
 

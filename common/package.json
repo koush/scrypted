@@ -13,7 +13,7 @@
   "dependencies": {
     "@scrypted/sdk": "file:../sdk",
     "@scrypted/server": "file:../server",
-    "http-auth-utils": "^3.0.2",
+    "http-auth-utils": "^5.0.1",
     "node-fetch-commonjs": "^3.1.1",
     "typescript": "^5.3.3"
   },
