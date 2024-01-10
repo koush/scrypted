@@ -1,6 +1,6 @@
-import { FetchParser, HttpFetchOptions, HttpFetchResponse, JSONParser, StreamParser, checkStatus, httpFetch } from '@scrypted/server/src/http-fetch-helpers';
+import { HttpFetchOptions, HttpFetchResponseType, checkStatus, getHttpFetchParser, httpFetch } from '@scrypted/server/src/http-fetch-helpers';
 import crypto from 'crypto';
-import { RequestOptions } from 'http';
+import { IncomingMessage } from 'http';
 import { BASIC, DIGEST, buildAuthorizationHeader, parseWWWAuthenticateHeader } from 'http-auth-utils/src/index';
 
 export interface AuthFetchCredentialState {
@@ -11,12 +11,11 @@ export interface AuthFetchCredentialState {
     basic?: ReturnType<typeof parseWWWAuthenticateHeader<typeof BASIC>>;
 }
 
-export interface AuthFetchOptions extends HttpFetchOptions {
-    url: string;
+export interface AuthFetchOptions<T extends HttpFetchResponseType> extends HttpFetchOptions<T> {
     credential: AuthFetchCredentialState;
 }
 
-function getAuth(options: AuthFetchOptions, method: string) {
+function getAuth(options: AuthFetchOptions<any>, method: string) {
     if (!options.credential)
         return;
     const { digest, basic } = options.credential;
@@ -60,22 +59,24 @@ function getAuth(options: AuthFetchOptions, method: string) {
 
         return header;
     }
-
 }
 
-export async function authHttpFetch<T = any>(options: AuthFetchOptions, init?: RequestOptions, parser: FetchParser<T> = JSONParser): Promise<HttpFetchResponse<T>> {
-    const method = init?.method || 'GET';
-    init ||= {};
-    init.headers ||= {};
+export async function authHttpFetch<T extends HttpFetchResponseType>(options: AuthFetchOptions<T>): ReturnType<typeof httpFetch<AuthFetchOptions<T>>> {
+    const method = options.method || 'GET';
+    const headers = new Headers(options.headers);
+    options.headers = headers;
 
     const initialHeader = getAuth(options, method);
     if (initialHeader)
-        init.headers['Authorization'] = initialHeader;
+        headers.set('Authorization', initialHeader);
 
     const initialResponse = await httpFetch({
         ...options,
         ignoreStatusCode: true,
-    }, init, StreamParser);
+        responseType: 'readable',
+    });
+
+    const parser = getHttpFetchParser(options.responseType);
 
     if (initialResponse.statusCode !== 401 || !options.credential) {
         if (!options?.ignoreStatusCode)
@@ -107,7 +108,41 @@ export async function authHttpFetch<T = any>(options: AuthFetchOptions, init?: R
 
     const header = getAuth(options, method);
     if (header)
-        init.headers['Authorization'] = header;
+        headers.set('Authorization', header);
 
-    return httpFetch(options, init, parser);
+    return httpFetch(options);
 }
+
+function ensureType<T>(v: T) {
+}
+
+async function test() {
+    const a = await authHttpFetch({
+        credential: undefined,
+        url: 'http://example.com',
+    });
+
+    ensureType<Buffer>(a.body);
+
+    const b = await authHttpFetch({
+        credential: undefined,
+        url: 'http://example.com',
+        responseType: 'json',
+    });
+    ensureType<any>(b.body);
+
+    const c = await authHttpFetch({
+        credential: undefined,
+        url: 'http://example.com',
+        responseType: 'readable',
+    });
+    ensureType<IncomingMessage>(c.body);
+
+    const d = await authHttpFetch({
+        credential: undefined,
+        url: 'http://example.com',
+        responseType: 'buffer',
+    });
+    ensureType<Buffer>(d.body);
+}
+
