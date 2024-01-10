@@ -5,20 +5,21 @@ import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
+import { createZygote } from '@scrypted/common/src/zygote';
 import sdk, { BufferConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import ip from 'ip';
 import net from 'net';
+import os from 'os';
 import { DataChannelDebouncer } from './datachannel-debouncer';
 import { RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement, createRTCPeerConnectionSink, createTrackForwarder } from "./ffmpeg-to-wrtc";
 import { stunServer, turnServer, weriftStunServer, weriftTurnServer } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
-import { InterfaceAddresses, MediaStreamTrack, PeerConfig, RTCPeerConnection, defaultPeerConfig } from './werift';
+import { MediaStreamTrack, PeerConfig, RTCPeerConnection, defaultPeerConfig } from './werift';
 import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
-import { createZygote } from '@scrypted/common/src/zygote';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -439,27 +440,46 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             ? [weriftStunServer, weriftTurnServer]
             : [weriftStunServer];
 
-        let iceInterfaceAddresses: InterfaceAddresses;
+        let iceAdditionalHostAddresses: string[];
+        let iceUseIpv4: boolean;
+        let iceUseIpv6: boolean;
         if (this.storageSettings.values.iceInterfaceAddresses !== 'All Addresses') {
             try {
-                for (const address of await sdk.endpointManager.getLocalAddresses()) {
-                    if (ip.isV4Format(address)) {
-                        iceInterfaceAddresses ||= {};
-                        iceInterfaceAddresses.udp4 = address;
-                    }
-                    else if (ip.isV6Format(address)) {
-                        iceInterfaceAddresses ||= {};
-                        iceInterfaceAddresses.udp6 = address;
-                    }
-                }
+                // if local addresses are set in scrypted, use those.
+                iceAdditionalHostAddresses = await sdk.endpointManager.getLocalAddresses();
             }
             catch (e) {
             }
         }
 
+        iceAdditionalHostAddresses ||= [];
+
+        if (iceAdditionalHostAddresses.length) {
+            // sanity check that atleast one of these addresses is valid... ip may change on server.
+            const ni = Object.values(os.networkInterfaces()).flat();
+            iceAdditionalHostAddresses = iceAdditionalHostAddresses.filter(la => ni.find(check => check.address === la));
+            if (iceAdditionalHostAddresses.length) {
+                // disable the default address collection mechanism and use the explicitly provided list.
+                iceUseIpv4 = false;
+                iceUseIpv6 = false;
+            }
+        }
+
+        // the additional addresses don't need to be validated? maybe?
+        if (ret?.iceAdditionalHostAddresses)
+            iceAdditionalHostAddresses.push(...ret.iceAdditionalHostAddresses);
+
+        // deduplicate
+        iceAdditionalHostAddresses = [...new Set(iceAdditionalHostAddresses)];
+
+        if (!iceAdditionalHostAddresses.length)
+            iceAdditionalHostAddresses = undefined;
+
         return {
             iceServers,
-            iceInterfaceAddresses,
+            iceUseIpv4,
+            iceUseIpv6,
+            iceAdditionalHostAddresses,
             ...ret,
         };
     }
