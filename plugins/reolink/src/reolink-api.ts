@@ -1,8 +1,8 @@
-import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { AuthFetchCredentialState, AuthFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { EventEmitter } from 'events';
 import https, { RequestOptions } from 'https';
 import { PassThrough, Readable } from 'stream';
-import { BufferParser, FetchParser, JSONParser, TextParser } from '../../../server/src/http-fetch-helpers';
+import {  HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/http-fetch-helpers';
 
 import { getMotionState, reolinkHttpsAgent } from './probe';
 import { PanTiltZoomCommand } from "@scrypted/sdk";
@@ -69,13 +69,17 @@ export class ReolinkCameraClient {
         };
     }
 
-    async request<T>(url: string, parser: FetchParser<T>, init?: RequestOptions, body?: Readable) {
-        const response = await authHttpFetch({
-            url,
-            httpsAgent: reolinkHttpsAgent,
+    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T>, body?: Readable) {
+        const options: AuthFetchOptions<T> = {
+            ...typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions : {
+                url: urlOrOptions,
+            },
+            rejectUnauthorized: false,
             credential: this.credential,
             body,
-        }, init, parser);
+        };
+
+        const response = await authHttpFetch(options);
         return response;
     }
 
@@ -85,7 +89,10 @@ export class ReolinkCameraClient {
         params.set('cmd', 'Reboot');
         params.set('user', this.username);
         params.set('password', this.password);
-        const response = await this.request(url.toString(), JSONParser);
+        const response = await this.request({
+            url: url.toString(),
+            responseType: 'json',
+        });
         return {
             value: response.body?.[0]?.value?.rspCode,
             data: response.body,
@@ -112,7 +119,10 @@ export class ReolinkCameraClient {
         params.set('channel', this.channelId.toString());
         params.set('user', this.username);
         params.set('password', this.password);
-        const response = await this.request(url.toString(), JSONParser);
+        const response = await this.request({
+            url,
+            responseType: 'json',
+        });
         return {
             value: response.body?.[0]?.value as AIState,
             data: response.body,
@@ -128,7 +138,8 @@ export class ReolinkCameraClient {
         params.set('user', this.username);
         params.set('password', this.password);
 
-        const response = await this.request(url.toString(), BufferParser, {
+        const response = await this.request({
+            url,
             timeout: 60000,
         });
 
@@ -143,7 +154,10 @@ export class ReolinkCameraClient {
         params.set('channel', this.channelId.toString());
         params.set('user', this.username);
         params.set('password', this.password);
-        const response = await this.request(url.toString(), JSONParser);
+        const response = await this.request({
+            url,
+            responseType: 'json',
+        });
 
         return response.body?.[0]?.value?.Enc;
     }
@@ -154,7 +168,10 @@ export class ReolinkCameraClient {
         params.set('cmd', 'GetDevInfo');
         params.set('user', this.username);
         params.set('password', this.password);
-        const response = await this.request(url.toString(), JSONParser);
+        const response = await this.request({
+            url,
+            responseType: 'json',
+        });
 
         return response.body?.[0]?.value?.DevInfo;
     }
@@ -186,8 +203,10 @@ export class ReolinkCameraClient {
             return pt;
         }
 
-        const c1 = this.request(url.toString(), TextParser, {
+        const c1 = this.request({
+            url,
             method: 'POST',
+            responseType: 'text',
         }, createReadable([
             {
                 cmd: "PtzCtrl",
@@ -202,7 +221,8 @@ export class ReolinkCameraClient {
 
         await sleep(500);
 
-        const c2 = this.request(url.toString(), TextParser, {
+        const c2 = this.request({
+            url,
             method: 'POST',
         }, createReadable([
             {

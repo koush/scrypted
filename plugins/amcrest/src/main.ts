@@ -3,7 +3,6 @@ import { readLength } from "@scrypted/common/src/read-stream";
 import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, PictureOptions, Reboot, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
-import { StreamParser, TextParser } from '../../../server/src/http-fetch-helpers';
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
@@ -94,7 +93,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         for (const element of deviceParameters) {
             try {
-                const response = await this.getClient().request(`http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=${element.action}`, TextParser);
+                const response = await this.getClient().request({
+                    url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=${element.action}`,
+                    responseType: 'text',
+                });
                 const result = String(response.body).replace(element.replace, "").trim();
                 deviceInfo[element.parameter] = result;
             }
@@ -143,7 +145,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         if (![...params.keys()].length)
             return;
 
-        const response = await this.getClient().request(`http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&${params}`, TextParser);
+        const response = await this.getClient().request({
+            url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&${params}`,
+            responseType: 'text',
+        });
         this.console.log('reconfigure result', response.body);
     }
 
@@ -337,7 +342,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             this.videoStreamOptions = (async () => {
                 let mas: string;
                 try {
-                    const response = await client.request(`http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getProductDefinition&name=MaxExtraStream`, TextParser)
+                    const response = await client.request({
+                        url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getProductDefinition&name=MaxExtraStream`,
+                        responseType: 'text',
+                    })
                     mas = response.body.split('=')[1].trim();
                     this.storage.setItem('maxExtraStreams', mas.toString());
                 }
@@ -351,9 +359,15 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 const vsos = [...Array(maxExtraStreams + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${channel}&subtype=${subtype}`, subtype));
 
                 try {
-                    const capResponse = await client.request(`http://${this.getHttpAddress()}/cgi-bin/encode.cgi?action=getConfigCaps&channel=0`, TextParser);
+                    const capResponse = await client.request({
+                        url: `http://${this.getHttpAddress()}/cgi-bin/encode.cgi?action=getConfigCaps&channel=0`,
+                        responseType: 'text',
+                    });
                     this.console.log(capResponse.body);
-                    const encodeResponse = await client.request(`http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=getConfig&name=Encode`, TextParser);
+                    const encodeResponse = await client.request({
+                        url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=getConfig&name=Encode`,
+                        responseType: 'text',
+                    });
                     this.console.log(encodeResponse.body);
 
                     for (let i = 0; i < vsos.length; i++) {
@@ -515,12 +529,14 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             // seems the dahua doorbells preferred 1024 chunks. should investigate adts
             // parsing and sending multipart chunks instead.
             const passthrough = new PassThrough();
-            this.getClient().request(url, StreamParser, {
+            this.getClient().request({
+                url,
                 method: 'POST',
                 headers: {
                     'Content-Type': 'Audio/AAC',
                     'Content-Length': '9999999'
                 },
+                responseType: 'readable',
             }, passthrough);
 
             try {

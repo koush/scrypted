@@ -1,6 +1,5 @@
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import https from 'https';
-import { JSONParser } from '../../../server/src/http-fetch-helpers';
 
 export const reolinkHttpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -16,8 +15,9 @@ export async function getMotionState(credential: AuthFetchCredentialState, usern
     const response = await authHttpFetch({
         credential,
         url: url.toString(),
-        httpsAgent: reolinkHttpsAgent,
-    }, undefined, JSONParser);
+        rejectUnauthorized: false,
+        responseType: 'json',
+    });
     return {
         value: !!response.body?.[0]?.value?.state,
         data: response.body,

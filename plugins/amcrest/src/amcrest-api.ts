@@ -1,8 +1,7 @@
-import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
-import { RequestOptions } from 'http';
+import { AuthFetchCredentialState, AuthFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { Readable } from 'stream';
-import { BufferParser, FetchParser, StreamParser, TextParser } from '../../../server/src/http-fetch-helpers';
-import { amcrestHttpsAgent, getDeviceInfo } from './probe';
+import { HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/http-fetch-helpers';
+import { getDeviceInfo } from './probe';
 
 export enum AmcrestEvent {
     MotionStart = "Code=VideoMotion;action=Start",
@@ -32,23 +31,33 @@ export class AmcrestCameraClient {
         };
     }
 
-    async request<T>(url: string, parser: FetchParser<T>, init?: RequestOptions, body?: Readable) {
-        const response = await authHttpFetch({
-            url,
-            httpsAgent: amcrestHttpsAgent,
+    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T>, body?: Readable) {
+        const options: AuthFetchOptions<T> = {
+            ...typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions : {
+                url: urlOrOptions,
+            },
+            rejectUnauthorized: false,
             credential: this.credential,
             body,
-        }, init, parser);
+        };
+
+        const response = await authHttpFetch(options);
         return response;
     }
 
     async reboot() {
-        const response = await this.request(`http://${this.ip}/cgi-bin/magicBox.cgi?action=reboot`, TextParser);
+        const response = await this.request({
+            url: `http://${this.ip}/cgi-bin/magicBox.cgi?action=reboot`,
+            responseType: 'text',
+        });
         return response.body;
     }
 
     async checkTwoWayAudio() {
-        const response = await this.request(`http://${this.ip}/cgi-bin/devAudioOutput.cgi?action=getCollect`, TextParser);
+        const response = await this.request({
+            url: `http://${this.ip}/cgi-bin/devAudioOutput.cgi?action=getCollect`,
+            responseType: 'text',
+        });
         return response.body.includes('result=1');
     }
 
@@ -64,7 +73,8 @@ export class AmcrestCameraClient {
     }
 
     async jpegSnapshot(): Promise<Buffer> {
-        const response = await this.request(`http://${this.ip}/cgi-bin/snapshot.cgi`, BufferParser, {
+        const response = await this.request({
+            url: `http://${this.ip}/cgi-bin/snapshot.cgi`,
             timeout: 60000,
         });
 
@@ -75,11 +85,10 @@ export class AmcrestCameraClient {
         const url = `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[All]`;
         console.log('preparing event listener', url);
 
-        const response = await authHttpFetch({
-            credential: this.credential,
-            httpsAgent: amcrestHttpsAgent,
+        const response = await this.request({
             url,
-        }, undefined, StreamParser);
+            responseType: 'readable',
+        });
         const stream = response.body;
         stream.socket.setKeepAlive(true);
 
@@ -111,9 +120,11 @@ export class AmcrestCameraClient {
     async enableContinousRecording(channel: number) {
         for (let i = 0; i < 7; i++) {
             const url = `http://${this.ip}/cgi-bin/configManager.cgi?action=setConfig&Record[${channel - 1}].TimeSection[${i}][0]=1 00:00:00-23:59:59`;
-            const response = await this.request(url, TextParser, {
+            const response = await this.request({
+                url,
                 method: 'POST',
-            });
+                responseType: 'text',
+            },);
             this.console.log(response.body);
         }
     }

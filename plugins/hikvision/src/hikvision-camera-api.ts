@@ -1,9 +1,8 @@
-import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
-import { IncomingMessage } from 'http';
-import { getDeviceInfo, hikvisionHttpsAgent } from './probe';
-import { BufferParser, FetchParser, StreamParser, TextParser } from '../../../server/src/http-fetch-helpers';
-import { RequestOptions } from 'http';
+import { AuthFetchCredentialState, AuthFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { IncomingMessage, RequestOptions } from 'http';
 import { Readable } from 'stream';
+import { HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/http-fetch-helpers';
+import { getDeviceInfo } from './probe';
 
 export function getChannel(channel: string) {
     return channel || '101';
@@ -42,23 +41,26 @@ export class HikvisionCameraAPI {
         };
     }
 
-    async request<T>(url: string, parser: FetchParser<T>, init?: RequestOptions, body?: Readable) {
-        const response = await authHttpFetch({
-            url,
-            httpsAgent: hikvisionHttpsAgent,
+    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T>, body?: Readable) {
+        const options: AuthFetchOptions<T> = {
+            ...typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions : {
+                url: urlOrOptions,
+            },
+            rejectUnauthorized: false,
             credential: this.credential,
             body,
-        }, init, parser);
+        };
+
+        const response = await authHttpFetch(options);
         return response;
     }
 
     async reboot() {
-        const response = await authHttpFetch({
+        const response = await this.request({
             url: `http://${this.ip}/ISAPI/System/reboot`,
-            credential: this.credential,
-        }, {
             method: "PUT",
-        }, TextParser);
+            responseType: 'text',
+        });
 
         return response.body;
     }
@@ -68,7 +70,10 @@ export class HikvisionCameraAPI {
     }
 
     async checkTwoWayAudio() {
-        const response = await this.request(`http://${this.ip}/ISAPI/System/TwoWayAudio/channels`, TextParser);
+        const response = await this.request({
+            url: `http://${this.ip}/ISAPI/System/TwoWayAudio/channels`,
+            responseType: 'text',
+        });
 
         return response.body.includes('Speaker');
     }
@@ -100,7 +105,10 @@ export class HikvisionCameraAPI {
             }
         }
 
-        const response = await this.request(`http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/capabilities`, TextParser);
+        const response = await this.request({
+            url: `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/capabilities`,
+            responseType: 'text',
+        });
 
         // this is bad:
         // <videoCodecType opt="H.264,H.265">H.265</videoCodecType>
@@ -116,15 +124,12 @@ export class HikvisionCameraAPI {
     async jpegSnapshot(channel: string): Promise<Buffer> {
         const url = `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/picture?snapShotImageType=JPEG`
 
-        const response = await authHttpFetch({
-            credential: this.credential,
-            httpsAgent: hikvisionHttpsAgent,
+        const response = await this.request({
             url: url,
-        }, {
             timeout: 60000,
-        }, BufferParser);
+        });
 
-        return Buffer.from(response.body);
+        return response.body;
     }
 
     async listenEvents() {
@@ -132,11 +137,10 @@ export class HikvisionCameraAPI {
         if (!this.listenerPromise) {
             const url = `http://${this.ip}/ISAPI/Event/notification/alertStream`;
 
-            this.listenerPromise = authHttpFetch({
-                credential: this.credential,
-                httpsAgent: hikvisionHttpsAgent,
+            this.listenerPromise = this.request({
                 url,
-            }, undefined, StreamParser).then(response => {
+                responseType: 'readable',
+            }).then(response => {
                 const stream = response.body;
                 stream.socket.setKeepAlive(true);
 

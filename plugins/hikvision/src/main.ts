@@ -6,8 +6,6 @@ import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
-import { hikvisionHttpsAgent } from './probe';
-import { StreamParser, TextParser } from "../../../server/src/http-fetch-helpers";
 
 const { mediaManager } = sdk;
 
@@ -208,7 +206,10 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                     try {
                         let xml: string;
                         try {
-                            const response = await client.request(`http://${this.getHttpAddress()}/ISAPI/Streaming/channels`, TextParser);
+                            const response = await client.request({
+                                url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
+                                responseType: 'text',
+                            });
                             xml = response.body;
                             this.storage.setItem('channels', xml);
                         }
@@ -379,7 +380,10 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         try {
             const parameters = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels`;
-            const { body } = await this.getClient().request(parameters, TextParser);
+            const { body } = await this.getClient().request({
+                url: parameters,
+                responseType: 'text',
+            });
 
             const parsedXml = await xml2js.parseStringPromise(body);
             for (const twoWayChannel of parsedXml.TwoWayAudioChannelList.TwoWayAudioChannel) {
@@ -417,15 +421,19 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         const passthrough = new PassThrough();
         const open = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/open`;
-        const { body } = await this.getClient().request(open, TextParser, {
-            method: 'PUT'
+        const { body } = await this.getClient().request({
+            url: open,
+            responseType: 'text',
+            method: 'PUT',
         });
         this.console.log('two way audio opened', body);
 
         const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/audioData`;
         this.console.log('posting audio data to', url);
 
-        const put = this.getClient().request(url, StreamParser, {
+        const put = this.getClient().request({
+            url,
+            responseType: 'readable',
             headers: {
                 'Content-Type': 'application/octet-stream',
                 // 'Connection': 'close',
@@ -472,7 +480,8 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         }
 
         const client = this.getClient();
-        await client.request(`http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/close`, TextParser, {
+        await client.request({
+            url: `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/close`,
             method: 'PUT',
         });
     }

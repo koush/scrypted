@@ -1,18 +1,15 @@
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
-import https from 'https';
-import { TextParser, checkStatus, fetchStatusCodeOk } from '../../../server/src/http-fetch-helpers';
+import { checkStatus } from '../../../server/src/http-fetch-helpers';
 
-export const hikvisionHttpsAgent = new https.Agent({
-    rejectUnauthorized: false,
-});
 
 export async function getDeviceInfo(credential: AuthFetchCredentialState, address: string) {
     const response = await authHttpFetch({
         credential,
-        httpsAgent: hikvisionHttpsAgent,
         url: `http://${address}/ISAPI/System/deviceInfo`,
         ignoreStatusCode: true,
-    }, undefined, TextParser);
+        responseType: 'text',
+        rejectUnauthorized: false,
+    });
 
     if (response.body.includes('notActivated'))
         throw new Error(`Camera must be first be activated at http://${address}.`);

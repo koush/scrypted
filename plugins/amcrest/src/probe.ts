@@ -1,10 +1,4 @@
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
-import https from 'https';
-import { TextParser } from '../../../server/src/http-fetch-helpers';
-
-export const amcrestHttpsAgent = new https.Agent({
-    rejectUnauthorized: false,
-});
 
 // appAutoStart=true
 // deviceType=IP4M-1041B
@@ -18,9 +12,10 @@ export const amcrestHttpsAgent = new https.Agent({
 export async function getDeviceInfo(credential: AuthFetchCredentialState, address: string) {
     const response = await authHttpFetch({
         credential,
-        httpsAgent: amcrestHttpsAgent,
         url: `http://${address}/cgi-bin/magicBox.cgi?action=getSystemInfo`,
-    }, undefined, TextParser);
+        rejectUnauthorized: false,
+        responseType: 'text',
+    });
     const lines = response.body.split('\n');
     const vals: {
         [key: string]: string,

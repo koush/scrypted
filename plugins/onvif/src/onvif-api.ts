@@ -1,8 +1,8 @@
-import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { AuthFetchCredentialState, AuthFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { EventEmitter } from 'events';
 import https, { RequestOptions } from 'https';
 import { Readable } from 'stream';
-import { BufferParser, FetchParser } from '../../../server/src/http-fetch-helpers';
+import { FetchParser, HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/http-fetch-helpers';
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -71,13 +71,17 @@ export class OnvifCameraAPI {
         };
     }
 
-    async request<T>(url: string, parser: FetchParser<T>, init?: RequestOptions, body?: Readable) {
-        const response = await authHttpFetch({
-            url,
-            httpsAgent,
+    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T>, body?: Readable) {
+        const options: AuthFetchOptions<T> = {
+            ...typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions : {
+                url: urlOrOptions,
+            },
+            rejectUnauthorized: false,
             credential: this.credential,
             body,
-        }, init, parser);
+        };
+
+        const response = await authHttpFetch(options);
         return response;
     }
 
@@ -293,7 +297,8 @@ export class OnvifCameraAPI {
         if (!snapshotUri)
             return;
 
-        const response = await this.request(snapshotUri, BufferParser, {
+        const response = await this.request({
+            url: snapshotUri,
             timeout: 60000,
         });
 
