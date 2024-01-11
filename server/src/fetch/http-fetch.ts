@@ -1,107 +1,44 @@
-import { once } from 'events';
-import { http, https } from 'follow-redirects';
-import { IncomingMessage } from 'http';
-import type { Readable } from 'stream';
-
-export type HttpFetchResponseType = 'json' | 'text' | 'buffer' | 'readable';
-export interface HttpFetchOptions<T extends HttpFetchResponseType> {
-    url: string | URL;
-    family?: 4 | 6;
-    method?: string;
-    headers?: HeadersInit;
-    timeout?: number;
-    rejectUnauthorized?: boolean;
-    ignoreStatusCode?: boolean;
-    body?: Readable;
-    responseType?: T;
-}
-
-export interface HttpFetchJsonOptions extends HttpFetchOptions<'json'> {
-}
-
-export interface HttpFetchBufferOptions extends HttpFetchOptions<'buffer'> {
-}
-
-export interface HttpFetchTextOptions extends HttpFetchOptions<'text'> {
-}
-export interface HttpFetchReadableOptions extends HttpFetchOptions<'readable'> {
-}
+import type events from 'events';
+import type stream from 'stream';
+import type followRedirects from 'follow-redirects';
+import type { IncomingMessage } from 'http';
+import { Readable } from 'stream';
+import { HttpFetchBufferOptions, HttpFetchJsonOptions, HttpFetchOptions, HttpFetchReadableOptions, HttpFetchResponse, HttpFetchResponseType, HttpFetchTextOptions, checkStatus, createStringOrBufferBody, getFetchMethod, setDefaultHttpFetchAccept } from '.';
+export type { HttpFetchBufferOptions, HttpFetchJsonOptions, HttpFetchOptions, HttpFetchReadableOptions, HttpFetchResponse, HttpFetchResponseType, HttpFetchTextOptions, checkStatus, setDefaultHttpFetchAccept } from '.';
 
 async function readMessageBuffer(response: IncomingMessage) {
     const buffers: Buffer[] = [];
     response.on('data', buffer => buffers.push(buffer));
+    const { once } = require('events') as typeof events;
     await once(response, 'end');
     return Buffer.concat(buffers);
 }
 
 export interface FetchParser<T> {
-    accept: string;
     parse(message: IncomingMessage): Promise<T>;
 }
 
 const TextParser: FetchParser<string> = {
-    accept: 'text/plain',
     async parse(message: IncomingMessage) {
         return (await readMessageBuffer(message)).toString();
     }
 }
 const JSONParser: FetchParser<any> = {
-    accept: 'application/json',
     async parse(message: IncomingMessage) {
         return JSON.parse((await readMessageBuffer(message)).toString());
     }
 }
 
 const BufferParser: FetchParser<Buffer> = {
-    accept: undefined as string,
     async parse(message: IncomingMessage) {
         return readMessageBuffer(message);
     }
 }
 
 const StreamParser: FetchParser<IncomingMessage> = {
-    accept: undefined as string,
     async parse(message: IncomingMessage) {
         return message;
     }
-}
-
-export async function getNpmPackageInfo(pkg: string) {
-    const { body } = await httpFetch({
-        url: `https://registry.npmjs.org/${pkg}`,
-        // force ipv4 in case of busted ipv6.
-        family: 4,
-        responseType: 'json',
-    });
-    return body;
-}
-
-export function getHttpFetchAccept(responseType: HttpFetchResponseType) {
-    const { accept } = getHttpFetchParser(responseType);
-    return accept;
-}
-
-export function setDefaultHttpFetchAccept(headers: Headers, responseType: HttpFetchResponseType) {
-    if (headers.has('Accept'))
-        return;
-    const { accept } = getHttpFetchParser(responseType);
-    if (accept)
-        headers.set('Accept', accept);
-}
-
-export function fetchStatusCodeOk(statusCode: number) {
-    return statusCode >= 200 && statusCode <= 299;
-}
-
-export function checkStatus(statusCode: number) {
-    if (!fetchStatusCodeOk(statusCode))
-        throw new Error(`http response statusCode ${statusCode}`);
-}
-
-export interface HttpFetchResponse<T> {
-    statusCode: number;
-    headers: Headers;
-    body: T;
 }
 
 export function getHttpFetchParser(responseType: HttpFetchResponseType) {
@@ -116,21 +53,23 @@ export function getHttpFetchParser(responseType: HttpFetchResponseType) {
     return BufferParser;
 }
 
-export function parseResponseType(readable: IncomingMessage, responseType: HttpFetchResponseType) {
+export function httpFetchParseIncomingMessage(readable: IncomingMessage, responseType: HttpFetchResponseType) {
     return getHttpFetchParser(responseType).parse(readable);
 }
 
-export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType>>(options: T): Promise<HttpFetchResponse<
+export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType, Readable>>(options: T): Promise<HttpFetchResponse<
     // first one serves as default.
-    T extends HttpFetchBufferOptions ? Buffer
-    : T extends HttpFetchTextOptions ? string
-    : T extends HttpFetchReadableOptions ? IncomingMessage
-    : T extends HttpFetchJsonOptions ? any : Buffer
+    T extends HttpFetchBufferOptions<Readable> ? Buffer
+    : T extends HttpFetchTextOptions<Readable> ? string
+    : T extends HttpFetchReadableOptions<Readable> ? IncomingMessage
+    : T extends HttpFetchJsonOptions<Readable> ? any : Buffer
 >> {
     const headers = new Headers(options.headers);
     setDefaultHttpFetchAccept(headers, options.responseType);
 
-    const parser = getHttpFetchParser(options.responseType);
+    const { once } = require('events') as typeof events;
+    const { PassThrough } = require('stream') as typeof stream;
+    const { http, https } = require('follow-redirects') as typeof followRedirects;
 
     const { url } = options;
     const isSecure = url.toString().startsWith('https:');
@@ -147,12 +86,19 @@ export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType
     }
 
     const request = proto.request(url, {
-        method: options.method,
+        method: getFetchMethod(options),
         rejectUnauthorized: options.rejectUnauthorized,
         family: options.family,
         headers: nodeHeaders,
         timeout: options.timeout,
     });
+
+    let { body } = options;
+    if (body && !(body instanceof Readable)) {
+        body = new PassThrough();
+        body = body.write(Buffer.from(createStringOrBufferBody(headers, body)));
+    }
+
     if (options.body)
         options.body.pipe(request);
     else
@@ -179,7 +125,7 @@ export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType
     return {
         statusCode: response.statusCode,
         headers: incomingHeaders,
-        body: await parser.parse(response),
+        body: await httpFetchParseIncomingMessage(response, options.responseType),
     };
 }
 

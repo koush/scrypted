@@ -1,5 +1,4 @@
 import { MediaObjectOptions, RTCConnectionManagement, RTCSignalingSession, ScryptedStatic } from "@scrypted/types";
-import axios, { AxiosRequestConfig, AxiosRequestHeaders } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
 import { Deferred } from "../../../common/src/deferred";
@@ -14,6 +13,7 @@ import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import packageJson from '../package.json';
 import { isIPAddress } from "./ip";
+import { authFetch } from '../../auth-fetch/src/index'
 
 const sourcePeerId = RpcPeer.generateId();
 
@@ -59,7 +59,6 @@ export interface ScryptedConnectionOptions {
     local?: boolean;
     webrtc?: boolean;
     baseUrl?: string;
-    axiosConfig?: AxiosRequestConfig;
     previousLoginResult?: ScryptedClientLoginResult;
 }
 
@@ -90,10 +89,13 @@ function isRunningStandalone() {
 
 export async function logoutScryptedClient(baseUrl?: string) {
     const url = combineBaseUrl(baseUrl, 'logout');
-    const response = await axios(url, {
+    const response = await authFetch({
+        url,
         withCredentials: true,
+        responseType: 'json',
+        rejectUnauthorized: false,
     });
-    return response.data;
+    return response.body;
 }
 
 export function getCurrentBaseUrl() {
@@ -122,38 +124,43 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
         maxAge = 365 * 24 * 60 * 60 * 1000;
 
     const url = combineBaseUrl(baseUrl, 'login');
-    const response = await axios.post(url, {
-        username,
-        password,
-        change_password,
-        maxAge,
-    }, {
+    const response = await authFetch({
+        url,
+        body: {
+            username,
+            password,
+            change_password,
+            maxAge,
+        },
+        rejectUnauthorized: false,
         withCredentials: true,
-        ...options.axiosConfig,
+        responseType: 'json',
     });
 
-    if (response.status !== 200)
-        throw new Error('status ' + response.status);
+    if (response.statusCode !== 200)
+        throw new Error('status ' + response.statusCode);
+
+    const { body } = response;
 
     return {
-        error: response.data.error as string,
-        authorization: response.data.authorization as string,
-        queryToken: response.data.queryToken as any,
-        token: response.data.token as string,
-        addresses: response.data.addresses as string[],
-        externalAddresses: response.data.externalAddresses as string[],
+        error: body.error as string,
+        authorization: body.authorization as string,
+        queryToken: body.queryToken as any,
+        token: body.token as string,
+        addresses: body.addresses as string[],
+        externalAddresses: body.externalAddresses as string[],
         // the cloud plugin will include this header.
         // should maybe move this into the cloud server itself.
-        scryptedCloud: response.headers['x-scrypted-cloud'] === 'true',
-        directAddress: response.headers['x-scrypted-direct-address'],
-        cloudAddress: response.headers['x-scrypted-cloud-address'],
+        scryptedCloud: response.headers.get('x-scrypted-cloud') === 'true',
+        directAddress: response.headers.get('x-scrypted-direct-address'),
+        cloudAddress: response.headers.get('x-scrypted-cloud-address'),
     };
 }
 
 export async function checkScryptedClientLogin(options?: ScryptedConnectionOptions) {
     let { baseUrl } = options || {};
     let url = combineBaseUrl(baseUrl, 'login');
-    const headers: AxiosRequestHeaders = {};
+    const headers = new Headers();
     if (options?.previousLoginResult?.queryToken) {
         // headers.Authorization = options?.previousLoginResult?.authorization;
         // const search = new URLSearchParams(options.previousLoginResult.queryToken);
@@ -161,32 +168,36 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         const token = options?.previousLoginResult.username + ":" + options.previousLoginResult.token;
         const hash = Buffer.from(token).toString('base64');
 
-        headers.Authorization = `Basic ${hash}`;
+        headers.set('Authorization', `Basic ${hash}`);
     }
-    const response = await axios.get(url, {
+    const response = await authFetch({
+        url,
         withCredentials: true,
         headers,
-        ...options?.axiosConfig,
+        rejectUnauthorized: false,
+        responseType: 'json',
     });
+
+    const { body } = response;
 
     return {
         baseUrl,
-        hostname: response.data.hostname as string,
-        redirect: response.data.redirect as string,
-        username: response.data.username as string,
-        expiration: response.data.expiration as number,
-        hasLogin: !!response.data.hasLogin,
-        error: response.data.error as string,
-        authorization: response.data.authorization as string,
-        queryToken: response.data.queryToken as any,
-        token: response.data.token as string,
-        addresses: response.data.addresses as string[],
-        externalAddresses: response.data.externalAddresses as string[],
+        hostname: body.hostname as string,
+        redirect: body.redirect as string,
+        username: body.username as string,
+        expiration: body.expiration as number,
+        hasLogin: !!body.hasLogin,
+        error: body.error as string,
+        authorization: body.authorization as string,
+        queryToken: body.queryToken as any,
+        token: body.token as string,
+        addresses: body.addresses as string[],
+        externalAddresses: body.externalAddresses as string[],
         // the cloud plugin will include this header.
         // should maybe move this into the cloud server itself.
-        scryptedCloud: response.headers['x-scrypted-cloud'] === 'true',
-        directAddress: response.headers['x-scrypted-direct-address'],
-        cloudAddress: response.headers['x-scrypted-cloud-address'],
+        scryptedCloud: response.headers.get('x-scrypted-cloud') === 'true',
+        directAddress: response.headers.get('x-scrypted-direct-address'),
+        cloudAddress: response.headers.get('x-scrypted-cloud-address'),
     };
 }
 
@@ -786,7 +797,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 return value;
             }
 
-            const { port, proxyId  } = clusterObject;
+            const { port, proxyId } = clusterObject;
 
             // check if object is already connected
             const resolved = await resolveObject(proxyId, port);

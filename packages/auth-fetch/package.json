@@ -1,0 +1,23 @@
+{
+  "name": "@scrypted/auth-fetch",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "tsc --outDir dist",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.9.4",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.3.2"
+  },
+  "dependencies": {
+    "follow-redirects": "^1.15.4",
+    "http-auth-utils": "^5.0.1"
+  },
+  "author": "",
+  "license": "ISC"
+}

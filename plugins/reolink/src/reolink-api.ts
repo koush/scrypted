@@ -2,7 +2,7 @@ import { AuthFetchCredentialState, AuthFetchOptions, authHttpFetch } from '@scry
 import { EventEmitter } from 'events';
 import https, { RequestOptions } from 'https';
 import { PassThrough, Readable } from 'stream';
-import {  HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/http-fetch-helpers';
+import { HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/fetch/http-fetch';
 
 import { getMotionState, reolinkHttpsAgent } from './probe';
 import { PanTiltZoomCommand } from "@scrypted/sdk";
@@ -69,17 +69,15 @@ export class ReolinkCameraClient {
         };
     }
 
-    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T>, body?: Readable) {
-        const options: AuthFetchOptions<T> = {
+    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T, Readable>, body?: Readable) {
+        const response = await authHttpFetch({
             ...typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions : {
                 url: urlOrOptions,
             },
             rejectUnauthorized: false,
             credential: this.credential,
             body,
-        };
-
-        const response = await authHttpFetch(options);
+        });
         return response;
     }
 

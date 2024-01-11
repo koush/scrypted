@@ -1,11 +1,22 @@
 import { ScryptedInterfaceProperty, ScryptedNativeId } from "@scrypted/types";
 import semver from 'semver';
 import { Plugin } from '../db-types';
-import { getNpmPackageInfo } from "../http-fetch-helpers";
 import { hasMixinCycle } from "../mixin/mixin-cycle";
 import { ScryptedRuntime } from "../runtime";
 import { sleep } from "../sleep";
 import { getState } from "../state";
+import { httpFetch } from "../fetch/http-fetch";
+
+
+export async function getNpmPackageInfo(pkg: string) {
+    const { body } = await httpFetch({
+        url: `https://registry.npmjs.org/${pkg}`,
+        // force ipv4 in case of busted ipv6.
+        family: 4,
+        responseType: 'json',
+    });
+    return body;
+}
 
 export class PluginComponent {
     scrypted: ScryptedRuntime;

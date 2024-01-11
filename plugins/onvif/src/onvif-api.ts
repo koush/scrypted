@@ -1,12 +1,7 @@
-import { AuthFetchCredentialState, AuthFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { HttpFetchOptions, HttpFetchResponseType, AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { EventEmitter } from 'events';
-import https, { RequestOptions } from 'https';
+import https from 'https';
 import { Readable } from 'stream';
-import { FetchParser, HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/http-fetch-helpers';
-
-const httpsAgent = new https.Agent({
-    rejectUnauthorized: false,
-})
 
 const onvif = require('onvif');
 const { Cam } = onvif;
@@ -71,17 +66,15 @@ export class OnvifCameraAPI {
         };
     }
 
-    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T>, body?: Readable) {
-        const options: AuthFetchOptions<T> = {
+    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T, Readable>, body?: Readable) {
+        const response = await authHttpFetch({
             ...typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions : {
                 url: urlOrOptions,
             },
             rejectUnauthorized: false,
             credential: this.credential,
             body,
-        };
-
-        const response = await authHttpFetch(options);
+        });
         return response;
     }
 

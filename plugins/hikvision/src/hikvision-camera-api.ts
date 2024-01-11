@@ -1,7 +1,6 @@
-import { AuthFetchCredentialState, AuthFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
-import { IncomingMessage, RequestOptions } from 'http';
+import { AuthFetchCredentialState, HttpFetchOptions, HttpFetchResponseType, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { IncomingMessage } from 'http';
 import { Readable } from 'stream';
-import { HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/http-fetch-helpers';
 import { getDeviceInfo } from './probe';
 
 export function getChannel(channel: string) {
@@ -41,17 +40,15 @@ export class HikvisionCameraAPI {
         };
     }
 
-    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T>, body?: Readable) {
-        const options: AuthFetchOptions<T> = {
+    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T, Readable>, body?: Readable) {
+        const response = await authHttpFetch({
             ...typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions : {
                 url: urlOrOptions,
             },
             rejectUnauthorized: false,
             credential: this.credential,
             body,
-        };
-
-        const response = await authHttpFetch(options);
+        });
         return response;
     }
 

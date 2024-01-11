@@ -1,6 +1,5 @@
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
-import { checkStatus } from '../../../server/src/http-fetch-helpers';
-
+import { checkStatus } from '../../../server/src/fetch';
 
 export async function getDeviceInfo(credential: AuthFetchCredentialState, address: string) {
     const response = await authHttpFetch({
