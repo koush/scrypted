@@ -57,7 +57,7 @@ export function httpFetchParseIncomingMessage(readable: IncomingMessage, respons
     return getHttpFetchParser(responseType).parse(readable);
 }
 
-export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType, Readable>>(options: T): Promise<HttpFetchResponse<
+export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T): Promise<HttpFetchResponse<
     // first one serves as default.
     T extends HttpFetchBufferOptions<Readable> ? Buffer
     : T extends HttpFetchTextOptions<Readable> ? string

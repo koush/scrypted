@@ -3,7 +3,6 @@ import { HttpFetchOptions, HttpFetchResponseType, checkStatus, fetcher, getFetch
 export interface AuthFetchCredentialState {
     username: string;
     password: string;
-    [key: string]: any;
 }
 
 export interface AuthFetchOptions {
@@ -16,16 +15,17 @@ async function getAuth(options: AuthFetchOptions, url: string | URL, method: str
 
     const { BASIC, DIGEST, parseWWWAuthenticateHeader } = await import('http-auth-utils');
 
-    const { digest, basic } = options.credential as AuthFetchCredentialState & {
+    const credential = options.credential as AuthFetchCredentialState & {
         count?: number;
         digest?: ReturnType<typeof parseWWWAuthenticateHeader<typeof DIGEST>>;
         basic?: ReturnType<typeof parseWWWAuthenticateHeader<typeof BASIC>>;
     };
+    const { digest, basic } = credential;
 
     if (digest) {
-        options.credential.count ||= 0;
-        ++options.credential.count;
-        const nc = ('00000000' + options.credential.count).slice(-8);
+        credential.count ||= 0;
+        ++credential.count;
+        const nc = ('00000000' + credential.count).slice(-8);
         const cnonce = [...Array(24)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
         const uri = new URL(url).pathname;
 
@@ -72,7 +72,7 @@ export function createAuthFetch<B, M>(
     h: fetcher<B, M>,
     parser: (body: M, responseType: HttpFetchResponseType) => Promise<any>
 ) {
-    const authHttpFetch = async <T extends HttpFetchOptions<HttpFetchResponseType, B>>(options: T & AuthFetchOptions): ReturnType<typeof h<T>> => {
+    const authHttpFetch = async <T extends HttpFetchOptions<B>>(options: T & AuthFetchOptions): ReturnType<typeof h<T>> => {
         const method = getFetchMethod(options);
         const headers = new Headers(options.headers);
         options.headers = headers;
@@ -112,9 +112,14 @@ export function createAuthFetch<B, M>(
 
         const digest = parsedHeaders.find(p => p.type === 'Digest') as ReturnType<typeof parseWWWAuthenticateHeader<typeof DIGEST>>;
         const basic = parsedHeaders.find(p => p.type === 'Basic') as ReturnType<typeof parseWWWAuthenticateHeader<typeof BASIC>>;
+        const credential = options.credential as AuthFetchCredentialState & {
+            count?: number;
+            digest?: ReturnType<typeof parseWWWAuthenticateHeader<typeof DIGEST>>;
+            basic?: ReturnType<typeof parseWWWAuthenticateHeader<typeof BASIC>>;
+        };
 
-        options.credential.digest = digest;
-        options.credential.basic = basic;
+        credential.digest = digest;
+        credential.basic = basic;
 
         if (!digest && !basic)
             throw new Error(`Unknown WWW-Authenticate type: ${parsedHeaders[0]?.type}`);

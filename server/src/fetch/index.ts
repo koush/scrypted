@@ -1,6 +1,6 @@
 
 export type HttpFetchResponseType = 'json' | 'text' | 'buffer' | 'readable';
-export interface HttpFetchOptions<T extends HttpFetchResponseType, B> {
+export interface HttpFetchOptionsBase<B> {
     url: string | URL;
     family?: 4 | 6;
     method?: string;
@@ -9,20 +9,29 @@ export interface HttpFetchOptions<T extends HttpFetchResponseType, B> {
     rejectUnauthorized?: boolean;
     ignoreStatusCode?: boolean;
     body?: B | string | ArrayBufferView | any;
-    responseType?: T;
     withCredentials?: boolean;
 }
 
-export interface HttpFetchJsonOptions<B> extends HttpFetchOptions<'json', B> {
+export interface HttpFetchJsonOptions<B> extends HttpFetchOptionsBase< B> {
+    responseType: 'json';
 }
 
-export interface HttpFetchBufferOptions<B> extends HttpFetchOptions<'buffer', B> {
+export interface HttpFetchBufferOptions<B> extends HttpFetchOptionsBase< B> {
+    responseType: 'buffer';
 }
 
-export interface HttpFetchTextOptions<B> extends HttpFetchOptions<'text', B> {
+export interface HttpFetchDefaultOptions<B> extends HttpFetchOptionsBase<B> {
+    responseType?: undefined;
 }
-export interface HttpFetchReadableOptions<B> extends HttpFetchOptions<'readable', B> {
+
+export interface HttpFetchTextOptions<B> extends HttpFetchOptionsBase<B> {
+    responseType: 'text';
 }
+export interface HttpFetchReadableOptions<B> extends HttpFetchOptionsBase<B> {
+    responseType: 'readable';
+}
+
+export type HttpFetchOptions<B> = HttpFetchJsonOptions<B> | HttpFetchBufferOptions<B> | HttpFetchDefaultOptions<B> | HttpFetchTextOptions<B> | HttpFetchReadableOptions<B>;
 
 export function fetchStatusCodeOk(statusCode: number) {
     return statusCode >= 200 && statusCode <= 299;
@@ -33,7 +42,7 @@ export function checkStatus(statusCode: number) {
         throw new Error(`http response statusCode ${statusCode}`);
 }
 
-export function getFetchMethod(options: HttpFetchOptions<any, any>) {
+export function getFetchMethod(options: HttpFetchOptions<any>) {
     const method = options.method || (options.body ? 'POST' : 'GET');
     return method;
 }
@@ -44,7 +53,7 @@ export interface HttpFetchResponse<T> {
     body: T;
 }
 
-export type fetcher<B, M> = <T extends HttpFetchOptions<HttpFetchResponseType, B>>(options: T) => Promise<HttpFetchResponse<
+export type fetcher<B, M> = <T extends HttpFetchOptions<B>>(options: T) => Promise<HttpFetchResponse<
     // first one serves as default.
     T extends HttpFetchBufferOptions<B> ? Buffer
     : T extends HttpFetchTextOptions<B> ? string
@@ -99,7 +108,7 @@ export async function domFetchParseIncomingMessage(response: Response, responseT
     return new Uint8Array(await response.arrayBuffer());
 }
 
-export async function domFetch<T extends HttpFetchOptions<HttpFetchResponseType, BodyInit>>(options: T): Promise<HttpFetchResponse<
+export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T): Promise<HttpFetchResponse<
     // first one serves as default.
     T extends HttpFetchBufferOptions<BodyInit> ? Buffer
     : T extends HttpFetchTextOptions<BodyInit> ? string
@@ -137,4 +146,33 @@ export async function domFetch<T extends HttpFetchOptions<HttpFetchResponseType,
         headers: response.headers,
         body: await domFetchParseIncomingMessage(response, options.responseType),
     };
+}
+
+function ensureType<T>(v: T) {
+}
+
+async function test() {
+    const a = await domFetch({
+        url: 'http://example.com',
+    });
+
+    ensureType<Buffer>(a.body);
+
+    const b = await domFetch({
+        url: 'http://example.com',
+        responseType: 'json',
+    });
+    ensureType<any>(b.body);
+
+    const c = await domFetch({
+        url: 'http://example.com',
+        responseType: 'readable',
+    });
+    ensureType<Response>(c.body);
+
+    const d = await domFetch({
+        url: 'http://example.com',
+        responseType: 'buffer',
+    });
+    ensureType<Buffer>(d.body);
 }
