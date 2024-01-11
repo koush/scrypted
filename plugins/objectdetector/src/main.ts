@@ -5,10 +5,9 @@ import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
+import { CpuTimer } from './cpu-timer';
 import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
-import { getMaxConcurrentObjectDetectionSessions } from './performance-profile';
 import { insidePolygon, normalizeBox, polygonOverlap } from './polygon';
-import { serverSupportsMixinEventMasking } from './server-version';
 import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor, createObjectDetectorStorageSetting } from './smart-motionsensor';
 import { getAllDevices, safeParseJson } from './util';
 
@@ -125,11 +124,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.bindObjectDetection();
     this.register();
 
-    this.detectionIntervalTimeout = setInterval(async () => {
-      if (this.released)
-        return;
-      this.maybeStartDetection();
-    }, 60000);
+    // ensure motion sensors stay alive. plugin will manage object detection throttling.
+    if (this.hasMotionType) {
+      this.detectionIntervalTimeout = setInterval(async () => {
+        if (this.released)
+          return;
+        this.maybeStartDetection();
+      }, 60000);
+    }
 
     this.storageSettings.settings.zones.mapGet = () => Object.keys(this.zones);
     this.storageSettings.settings.zones.onGet = async () => {
@@ -187,8 +189,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   maybeStartDetection() {
     if (!this.hasMotionType) {
       // object detection may be restarted if there are slots available.
-      if (this.cameraDevice.motionDetected && this.plugin.canStartObjectDetection(this))
+      if (this.cameraDevice.motionDetected && this.plugin.canStartObjectDetection(this)) {
         this.startPipelineAnalysis();
+        return true;
+      }
       return;
     }
 
@@ -238,7 +242,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           return;
         }
 
-        this.startPipelineAnalysis();
+        this.maybeStartDetection();
       });
 
       return;
@@ -627,7 +631,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   get motionSensorSupplementation() {
-    if (!serverSupportsMixinEventMasking() || !this.interfaces.includes(ScryptedInterface.MotionSensor))
+    if (!this.interfaces.includes(ScryptedInterface.MotionSensor))
       return BUILTIN_MOTION_SENSOR_REPLACE;
 
     const supp = this.storage.getItem('motionSensorSupplementation');
@@ -934,19 +938,6 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
   statsSnapshotDetections: number;
   statsSnapshotConcurrent = 0;
   storageSettings = new StorageSettings(this, {
-    maxConcurrentDetections: {
-      title: 'Max Concurrent Detections',
-      description: `The max number concurrent cameras that will perform object detection while their motion sensor is triggered. Older sessions will be terminated when the limit is reached. The default value is ${getMaxConcurrentObjectDetectionSessions()}.`,
-      defaultValue: 'Default',
-      combobox: true,
-      choices: [
-        'Default',
-        ...[2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => i.toString()),
-      ],
-      mapPut: (o, v) => {
-        return parseInt(v) || 'Default';
-      }
-    },
     activeMotionDetections: {
       title: 'Active Motion Detection Sessions',
       multiple: true,
@@ -1010,6 +1001,8 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     },
   });
   devices = new Map<string, any>();
+  cpuTimer = new CpuTimer();
+  cpuUsage = 0;
 
   pruneOldStatistics() {
     const now = Date.now();
@@ -1024,69 +1017,52 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     this.statsSnapshotDetections++;
   }
 
-  get maxConcurrent() {
-    let maxConcurrent = this.storageSettings.values.maxConcurrentDetections || 'Default';
-    maxConcurrent = Math.max(parseInt(maxConcurrent)) || getMaxConcurrentObjectDetectionSessions();
-    return maxConcurrent;
-  }
-
   canStartObjectDetection(mixin: ObjectDetectionMixin) {
-    const maxConcurrent = this.maxConcurrent;
-
-    const runningDetections = [...this.currentMixins.values()]
-      .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
-      .filter(c => c.detectorRunning)
-      .sort((a, b) => a.detectionStartTime - b.detectionStartTime);
+    const runningDetections = this.runningObjectDetections;
 
     // already running
     if (runningDetections.find(o => o.id === mixin.id))
       return false;
 
-    if (runningDetections.length < maxConcurrent)
+    if (!runningDetections.length)
       return true;
 
-    const [first] = runningDetections;
-    if (Date.now() - first.detectionStartTime > 30000)
-      return true;
+    const cpuPerDetector = this.cpuUsage / runningDetections.length;
+    if (cpuPerDetector * (runningDetections.length + 1) > .9) {
+      const [first] = runningDetections;
+      if (Date.now() - first.detectionStartTime > 30000) {
+        first.console.log(`Ending object detection to process activity on ${mixin.name}.`);
+        first.endObjectDetection();
+        mixin.console.log(`Ending object detection on ${first.name} to process activity.`);
+        return true;
+      }
 
-    mixin.console.log(`Not starting object detection to continue processing recent activity on ${first.name}.`);
-    return false;
+      mixin.console.log(`CPU is at capacity: ${this.cpuUsage}. Not starting object detection to continue processing recent activity on ${first.name}.`);
+      return false;
+    }
+
+    // CPU capacity is fine
+    return true;
+  }
+
+  get runningObjectDetections() {
+    const runningDetections = [...this.currentMixins.values()]
+      .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
+      .filter(c => c.detectorRunning)
+      .sort((a, b) => a.detectionStartTime - b.detectionStartTime);
+    return runningDetections;
   }
 
   objectDetectionStarted(name: string, console: Console) {
     this.resetStats(console);
 
     this.statsSnapshotConcurrent++;
-
-    const maxConcurrent = this.maxConcurrent;
-
-    const objectDetections = [...this.currentMixins.values()]
-      .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
-      .filter(c => c.detectorRunning)
-      .sort((a, b) => a.detectionStartTime - b.detectionStartTime);
-
-    while (objectDetections.length > maxConcurrent) {
-      const old = objectDetections.shift();
-      // allow exceeding the concurrency limit if user interaction triggered analyze.
-      if (old.analyzeStop)
-        continue;
-      old.console.log(`Ending object detection to process activity on ${name}.`);
-      old.endObjectDetection();
-    }
   }
 
   objectDetectionEnded(console: Console) {
     this.resetStats(console);
 
     this.statsSnapshotConcurrent--;
-
-    const objectDetections = [...this.currentMixins.values()]
-      .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
-      .filter(c => !c.detectorRunning);
-
-    for (const notRunning of objectDetections) {
-      notRunning.maybeStartDetection();
-    }
   }
 
   resetStats(console: Console) {
@@ -1126,7 +1102,34 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
         ],
         nativeId: 'ffmpeg',
       })
-    })
+    });
+
+    setInterval(() => {
+      this.cpuUsage = this.cpuTimer.sample();
+      // this.console.log('cpu usage', Math.round(this.cpuUsage * 100));
+
+      const runningDetections = this.runningObjectDetections;
+
+      let allowStart = 1;
+      if (runningDetections.length) {
+        const cpuPerDetector = this.cpuUsage / runningDetections.length;
+        allowStart = Math.ceil(1 / cpuPerDetector) - runningDetections.length;
+        if (allowStart <= 0)
+          return;
+      }
+
+      const idleDetectors = [...this.currentMixins.values()]
+        .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
+        .filter(c => !c.detectorRunning);
+
+      for (const notRunning of idleDetectors) {
+        if (notRunning.maybeStartDetection()) {
+          allowStart--;
+          if (allowStart <= 0)
+            return;
+        }
+      }
+    }, 10000)
   }
 
   async getDevice(nativeId: string): Promise<any> {
