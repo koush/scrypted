@@ -8,7 +8,6 @@ import https from 'https';
 import os from 'os';
 import path from 'path';
 import url from 'url';
-import { BufferParser } from "../../../server/src/http-fetch-helpers";
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 import { ImageConverter, ImageConverterNativeId } from './image-converter';
 import { ImageReader, ImageReaderNativeId, loadSharp, loadVipsImage } from './image-reader';
@@ -220,22 +219,21 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             let credential: AuthFetchCredentialState;
             if (username && password) {
                 credential = {
-                    username, 
+                    username,
                     password,
                 };
             }
 
             try {
                 const response = await authHttpFetch({
-                    httpsAgent,
+                    rejectUnauthorized: false,
                     url: this.storageSettings.values.snapshotUrl,
                     credential,
-                }, {
                     timeout: 60000,
                     headers: {
                         'Accept': 'image/*',
-                    }
-                }, BufferParser);
+                    },
+                });
 
                 return response.body;
             }
