@@ -2,7 +2,7 @@ import type events from 'events';
 import type stream from 'stream';
 import type followRedirects from 'follow-redirects';
 import type { IncomingMessage } from 'http';
-import { Readable } from 'stream';
+import type { Readable } from 'stream';
 import { HttpFetchBufferOptions, HttpFetchJsonOptions, HttpFetchOptions, HttpFetchReadableOptions, HttpFetchResponse, HttpFetchResponseType, HttpFetchTextOptions, checkStatus, createStringOrBufferBody, getFetchMethod, setDefaultHttpFetchAccept } from '.';
 export type { HttpFetchBufferOptions, HttpFetchJsonOptions, HttpFetchOptions, HttpFetchReadableOptions, HttpFetchResponse, HttpFetchResponseType, HttpFetchTextOptions, checkStatus, setDefaultHttpFetchAccept } from '.';
 
@@ -68,7 +68,7 @@ export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType
     setDefaultHttpFetchAccept(headers, options.responseType);
 
     const { once } = require('events') as typeof events;
-    const { PassThrough } = require('stream') as typeof stream;
+    const { PassThrough, Readable } = require('stream') as typeof stream;
     const { http, https } = require('follow-redirects') as typeof followRedirects;
 
     const { url } = options;
