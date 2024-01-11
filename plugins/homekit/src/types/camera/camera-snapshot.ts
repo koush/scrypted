@@ -1,7 +1,7 @@
 import { sleep } from "@scrypted/common/src/sleep";
 import sdk, { AudioSensor, Camera, Intercom, Logger, MotionSensor, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import throttle from "lodash/throttle";
-import { SnapshotRequest, SnapshotRequestCallback } from "../../hap";
+import { ResourceRequestReason, SnapshotRequest, SnapshotRequestCallback } from "../../hap";
 import type { HomeKitPlugin } from "../../main";
 
 const { systemManager, mediaManager } = sdk;
@@ -14,41 +14,18 @@ function recommendSnapshotPlugin(console: Console, log: Logger, message: string)
 }
 
 export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, storage: Storage, homekitPlugin: HomeKitPlugin, console: Console) {
-    let pendingPicture: Promise<Buffer>;
+    const takePicture = async (request: SnapshotRequest) => {
+        if (!device.interfaces.includes(ScryptedInterface.Camera))
+            throw new Error('Camera does not provide native snapshots. Please install the Snapshot Plugin.');
 
-    const takePicture = (request: SnapshotRequest) => {
-        if (pendingPicture)
-            return pendingPicture;
-
-        if (device.interfaces.includes(ScryptedInterface.Camera)) {
-            pendingPicture = device.takePicture({
-                picture: {
-                    width: request.width,
-                    height: request.height,
-                }
-            })
-                .then(media => mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg'));
-        }
-        else {
-            pendingPicture = Promise.reject(new Error('Camera does not provide native snapshots. Please install the Snapshot Plugin.'));
-        }
-
-        pendingPicture
-            .finally(() => {
-                pendingPicture = undefined;
-            })
-
-        return pendingPicture;
-    }
-
-    const throttledTakePicture = throttle(takePicture, 9000, {
-        leading: true,
-        trailing: true,
-    });
-    function snapshotAll(request: SnapshotRequest) {
-        for (const snapshotThrottle of homekitPlugin.snapshotThrottles.values()) {
-            snapshotThrottle(request);
-        }
+        const media = await device.takePicture({
+            reason: request.reason === ResourceRequestReason.EVENT ? 'event' : 'periodic',
+            picture: {
+                width: request.width,
+                height: request.height,
+            }
+        })
+        return await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
     }
 
     homekitPlugin.snapshotThrottles.set(device.id, takePicture);
@@ -72,11 +49,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             // this call is not a bug, to force lodash to take a picture on the trailing edge,
             // throttle must be called twice.
 
-            // no longer necessary in accessory mode?
-            snapshotAll(request);
-            snapshotAll(request);
-
-            callback(null, await throttledTakePicture(request));
+            callback(null, await takePicture(request));
         }
         catch (e) {
             console.error('snapshot error', e);

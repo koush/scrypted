@@ -440,7 +440,11 @@ export interface ResponsePictureOptions extends PictureOptions {
   staleDuration?: number;
 }
 export interface RequestPictureOptions extends PictureOptions {
-  reason?: 'user' | 'event';
+  /**
+   * periodic: The requestor will request the snapshot periodically so a recent cached image may be returned.
+   * event: The requestor needs an image for event processing or thumbnail. Cached or error images will not be returned.
+   */
+  reason?: 'periodic' | 'event';
   /**
    * Flag that hints whether this user request is happening due to a periodic refresh.
    */

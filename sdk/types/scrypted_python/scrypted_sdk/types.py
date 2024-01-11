@@ -698,7 +698,7 @@ class RequestPictureOptions(TypedDict):
     id: str
     periodicRequest: bool  # Flag that hints whether this user request is happening due to a periodic refresh.
     picture: PictureDimensions  # The native dimensions of the camera.
-    reason: Any | Any
+    reason: Any | Any  # periodic: The requestor will request the snapshot periodically so a recent cached image may be returned. event: The requestor needs an image for event processing or thumbnail. Cached or error images will not be returned.
 
 class RequestRecordingStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""

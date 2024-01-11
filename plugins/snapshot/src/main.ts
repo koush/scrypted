@@ -269,9 +269,10 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     async takePictureRaw(options?: RequestPictureOptions): Promise<Buffer> {
         let picture: Buffer;
         const eventSnapshot = options?.reason === 'event';
+        const periodicSnapshot = options?.reason === 'periodic';
 
         try {
-            picture = await this.snapshotDebouncer({
+            const debounced = this.snapshotDebouncer({
                 id: options?.id,
                 reason: options?.reason,
             }, eventSnapshot ? 0 : 2000, async () => {
@@ -283,6 +284,16 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 this.lastAvailablePicture = picture;
                 return picture;
             });
+
+            // periodic snapshot should get the immediately available picture.
+            // the debounce has already triggered a refresh for the next go around.
+            if (periodicSnapshot && this.currentPicture) {
+                debounced.catch(() => {});
+                picture = this.currentPicture;
+            }
+            else {
+                picture = await debounced;
+            }
         }
         catch (e) {
             // use the fallback cached picture if it is somewhat recent.
