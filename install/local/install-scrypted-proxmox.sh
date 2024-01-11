@@ -51,6 +51,15 @@ then
     exit 1
 fi
 
+pct set $VMID -net0 name=eth0,bridge=vmbr0,ip=dhcp,ip6=auto
+if [ "$?" != "0" ]
+then
+    echo ""
+    echo "pct set network failed"
+    echo ""
+    echo "Ignoring... Please verify your container's network settings."
+fi
+
 CONF=/etc/pve/lxc/$VMID.conf
 if [ -f "$CONF" ]
 then
