@@ -1,9 +1,9 @@
-import { httpFetch, httpFetchParseIncomingMessage } from '@scrypted/server/src/fetch/http-fetch';
+import { httpFetch, httpFetchParseIncomingMessage } from '../../server/src/fetch/http-fetch';
 import type { IncomingMessage } from 'http';
 import type { Readable } from 'stream';
 import { createAuthFetch } from '../../packages/auth-fetch/src/auth-fetch';
 
-export type { HttpFetchOptions, HttpFetchResponseType } from '@scrypted/server/src/fetch/http-fetch';
+export type { HttpFetchOptions, HttpFetchResponseType } from '../../server/src/fetch/http-fetch';
 export type { AuthFetchCredentialState, AuthFetchOptions } from '../../packages/auth-fetch/src/auth-fetch';
 
 export const authHttpFetch = createAuthFetch<Readable, IncomingMessage>(httpFetch, httpFetchParseIncomingMessage);

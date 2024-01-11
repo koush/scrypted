@@ -69,7 +69,7 @@ export class ReolinkCameraClient {
         };
     }
 
-    async request<T extends HttpFetchResponseType>(urlOrOptions: string | URL | HttpFetchOptions<T, Readable>, body?: Readable) {
+    async request(urlOrOptions: string | URL | HttpFetchOptions<Readable>, body?: Readable) {
         const response = await authHttpFetch({
             ...typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions : {
                 url: urlOrOptions,
