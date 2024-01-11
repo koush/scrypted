@@ -75,6 +75,14 @@ export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType
     const isSecure = url.toString().startsWith('https:');
     const proto = isSecure ? https : http;
 
+    let { body } = options;
+    if (body && !(body instanceof Readable)) {
+        const newBody = new PassThrough();
+        newBody.write(Buffer.from(createStringOrBufferBody(headers, body)));
+        newBody.end();
+        body = newBody;
+    }
+
     const nodeHeaders: Record<string, string[]> = {};
     for (const [k, v] of headers) {
         if (nodeHeaders[k]) {
@@ -93,14 +101,8 @@ export async function httpFetch<T extends HttpFetchOptions<HttpFetchResponseType
         timeout: options.timeout,
     });
 
-    let { body } = options;
-    if (body && !(body instanceof Readable)) {
-        body = new PassThrough();
-        body = body.write(Buffer.from(createStringOrBufferBody(headers, body)));
-    }
-
-    if (options.body)
-        options.body.pipe(request);
+    if (body)
+        body.pipe(request);
     else
         request.end();
     const [response] = await once(request, 'response') as [IncomingMessage];
