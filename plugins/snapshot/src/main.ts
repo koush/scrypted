@@ -673,6 +673,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             const mixin = this.mixinDevices.get(id);
             let buffer: Buffer;
             const rpo: RequestPictureOptions = {
+                reason: search.get('reason') as 'event' | 'periodic',
                 picture: {
                     width: parseInt(search.get('width')) || undefined,
                     height: parseInt(search.get('height')) || undefined,
