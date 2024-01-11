@@ -2,13 +2,13 @@
 
 import { connectScryptedClient } from '@scrypted/client';
 import { FFmpegInput, ScryptedMimeTypes } from '@scrypted/types';
-import axios, { AxiosRequestConfig } from 'axios';
 import child_process from 'child_process';
 import fs from 'fs';
 import https from 'https';
 import path from 'path';
 import readline from 'readline-sync';
 import semver from 'semver';
+import { authHttpFetch } from '../../../common/src/http-auth-fetch';
 import { installServe, serveMain } from './service';
 import { connectShell } from './shell';
 
@@ -54,15 +54,16 @@ async function doLogin(host: string) {
     });
 
     const url = `https://${host}/login`;
-    const response = await axios(Object.assign({
+    const response = await authHttpFetch({
         method: 'GET',
-        auth: {
+        credential: {
             username,
             password,
         },
         url,
-        httpsAgent,
-    }, axiosConfig));
+        rejectUnauthorized: false,
+        responseType: 'json',
+    });
 
     fs.mkdirSync(scryptedHome, {
         recursive: true,
@@ -78,7 +79,7 @@ async function doLogin(host: string) {
         login = {};
     login = login || {};
 
-    login[host] = response.data;
+    login[host] = response.body;
     fs.writeFileSync(loginPath, JSON.stringify(login));
     return login;
 }
@@ -102,12 +103,6 @@ async function getOrDoLogin(host: string): Promise<{
     return login[host];
 }
 
-const axiosConfig: AxiosRequestConfig = {
-    httpsAgent: new https.Agent({
-        rejectUnauthorized: false
-    })
-}
-
 async function runCommand() {
     const [idOrName, optionalHost] = process.argv[3].split('@');
     const host = toIpAndPort(optionalHost || '127.0.0.1');
@@ -119,9 +114,6 @@ async function runCommand() {
         pluginId: '@scrypted/core',
         username: login.username,
         password: login.token,
-        axiosConfig: {
-            httpsAgent,
-        }
     });
 
     const device: any = sdk.systemManager.getDeviceById(idOrName) || sdk.systemManager.getDeviceByName(idOrName);
@@ -211,16 +203,18 @@ async function main() {
 
         const login = await getOrDoLogin(ip);
         const url = `https://${ip}/web/component/script/install/${pkg}`;
-        const response = await axios(Object.assign({
+        const response = await authHttpFetch({
             method: 'POST',
-            auth: {
+            credential: {
                 username: login.username,
                 password: login.token,
             },
             url,
-        }, axiosConfig));
+            rejectUnauthorized: false,
+            responseType: 'json',
+        });
 
-        console.log('install successful. id:', response.data.id);
+        console.log('install successful. id:', response.body.id);
     }
     else if (process.argv[2] === 'shell') {
         console.log = () => { };
@@ -232,9 +226,6 @@ async function main() {
             pluginId: '@scrypted/core',
             username: login.username,
             password: login.token,
-            axiosConfig: {
-                httpsAgent,
-            }
         });
 
         const separator = process.argv.indexOf("--");
