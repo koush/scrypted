@@ -106,8 +106,8 @@ export async function createRTCPeerConnectionSource(options: {
             };
 
             const setupVideoTransceiver = (transceiver: RTCRtpTransceiver) => {
-                const videoPacketSize = 1378;
-                let h264Repacketizer: H264Repacketizer = null;
+                const videoPacketSize = 65535;
+                let h264Repacketizer = new H264Repacketizer(console, videoPacketSize - 12)
                 const videoTransceiver = transceiver;
                 videoTransceiver.mid = '1';
                 videoTransceiver.onTrack.subscribe((track) => {
@@ -118,18 +118,10 @@ export async function createRTCPeerConnectionSource(options: {
                             console.log('first video packet', Date.now() - timeStart);
                             const naluTypes = getNaluTypesInNalu(rtp.payload);
                             console.log('video packet types', ...[...naluTypes]);
-                            if (!h264Repacketizer && naluTypes.has(7)) {
-                                console.log('video requires repacketization');
-                                h264Repacketizer = new H264Repacketizer(console, videoPacketSize - 12)
-                            }
                         }
-                        if (h264Repacketizer) {
-                            const repacketized = h264Repacketizer.repacketize(rtp);
-                            for (const packet of repacketized) {
-                                rtspServer.sendTrack(videoTrack, packet.serialize(), false);
-                            }
-                        } else {
-                            rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
+                        const repacketized = h264Repacketizer.repacketize(rtp);
+                        for (const packet of repacketized) {
+                            rtspServer.sendTrack(videoTrack, packet.serialize(), false);
                         }
                     });
                     track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
