@@ -1,12 +1,8 @@
-import type { TranspileOptions } from "typescript";
-import sdk, { ScryptedDeviceBase, MixinDeviceBase, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
-import vm from "vm";
+import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors } from "@scrypted/sdk";
 import fs from 'fs';
+import type { TranspileOptions } from "typescript";
+import vm from "vm";
 import { ScriptDevice } from "./monaco/script-device";
-import { ScryptedInterfaceDescriptors } from "@scrypted/sdk";
-import fetch from 'node-fetch-commonjs';
-import { PluginAPIProxy } from '../../../server/src/plugin/plugin-api';
-import { SystemManagerImpl } from '../../../server/src/plugin/system';
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -61,7 +57,6 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
     const allParams = Object.assign({}, params, {
         sdk,
         fs: require('realfs'),
-        fetch,
         ScryptedDeviceBase,
         MixinDeviceBase,
         systemManager,

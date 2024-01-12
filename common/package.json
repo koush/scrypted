@@ -14,11 +14,10 @@
     "@scrypted/sdk": "file:../sdk",
     "@scrypted/server": "file:../server",
     "http-auth-utils": "^5.0.1",
-    "node-fetch-commonjs": "^3.1.1",
     "typescript": "^5.3.3"
   },
   "devDependencies": {
-    "@types/node": "^20.10.8",
+    "@types/node": "^20.11.0",
     "ts-node": "^10.9.2"
   }
 }
