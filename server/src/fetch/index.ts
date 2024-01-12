@@ -12,11 +12,11 @@ export interface HttpFetchOptionsBase<B> {
     withCredentials?: boolean;
 }
 
-export interface HttpFetchJsonOptions<B> extends HttpFetchOptionsBase< B> {
+export interface HttpFetchJsonOptions<B> extends HttpFetchOptionsBase<B> {
     responseType: 'json';
 }
 
-export interface HttpFetchBufferOptions<B> extends HttpFetchOptionsBase< B> {
+export interface HttpFetchBufferOptions<B> extends HttpFetchOptionsBase<B> {
     responseType: 'buffer';
 }
 
@@ -126,6 +126,7 @@ export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T)
     const { url } = options;
     const response = await fetch(url, {
         method: getFetchMethod(options),
+        credentials: options.withCredentials ? 'include' : undefined,
         headers,
         signal: options.timeout ? AbortSignal.timeout(options.timeout) : undefined,
         body,
