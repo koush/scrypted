@@ -116,6 +116,8 @@ export async function createRTCPeerConnectionSource(options: {
                         if (!gotVideo) {
                             gotVideo = true;
                             console.log('first video packet', Date.now() - timeStart);
+                            const naluTypes = getNaluTypesInNalu(rtp.payload);
+                            console.log('video packet types', ...[...naluTypes]);
                         }
                         const repacketized = h264Repacketizer.repacketize(rtp);
                         for (const packet of repacketized) {
