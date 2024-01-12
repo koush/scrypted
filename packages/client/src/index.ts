@@ -5,15 +5,27 @@ import { Deferred } from "../../../common/src/deferred";
 import { timeoutPromise } from "../../../common/src/promise-utils";
 import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
 import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-debouncer";
+import type { ClusterObject, ConnectRPCObject } from '../../../server/src/cluster/connect-rpc-object';
 import type { IOSocket } from '../../../server/src/io';
 import { MediaObject } from '../../../server/src/plugin/mediaobject';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
-import type { ClusterObject, ConnectRPCObject } from '../../../server/src/cluster/connect-rpc-object';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import packageJson from '../package.json';
 import { isIPAddress } from "./ip";
-import { authFetch } from '../../auth-fetch/src/index'
+
+import { domFetch } from "../../../server/src/fetch";
+import { httpFetch } from '../../../server/src/fetch/http-fetch';
+
+let fetcher: typeof httpFetch | typeof domFetch;
+try {
+    require('net');
+    require('events');
+    fetcher = httpFetch;
+}
+catch (e) {
+    fetcher = domFetch;
+}
 
 const sourcePeerId = RpcPeer.generateId();
 
@@ -89,7 +101,7 @@ function isRunningStandalone() {
 
 export async function logoutScryptedClient(baseUrl?: string) {
     const url = combineBaseUrl(baseUrl, 'logout');
-    const response = await authFetch({
+    const response = await fetcher({
         url,
         withCredentials: true,
         responseType: 'json',
@@ -124,7 +136,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
         maxAge = 365 * 24 * 60 * 60 * 1000;
 
     const url = combineBaseUrl(baseUrl, 'login');
-    const response = await authFetch({
+    const response = await fetcher({
         url,
         body: {
             username,
@@ -170,7 +182,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
 
         headers.set('Authorization', `Basic ${hash}`);
     }
-    const response = await authFetch({
+    const response = await fetcher({
         url,
         withCredentials: true,
         headers,
