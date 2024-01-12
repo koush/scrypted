@@ -33,7 +33,6 @@
       ]
    },
    "dependencies": {
-      "@koush/axios-digest-auth": "^0.8.5",
       "doorbird": "^2.1.2"
    },
    "devDependencies": {

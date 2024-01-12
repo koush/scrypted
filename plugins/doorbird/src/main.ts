@@ -5,8 +5,8 @@ import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/comm
 import net from 'net';
 import { randomBytes } from 'crypto';
 import { PassThrough, Readable } from "stream";
-import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { readLength } from "@scrypted/common/src/read-stream";
+import { authHttpFetch } from "@scrypted/common/src/http-auth-fetch";
 import { ApiRingEvent, ApiMotionEvent, DoorbirdAPI } from "./doorbird-api";
 
 const { deviceManager, mediaManager } = sdk;
@@ -27,7 +27,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         this.binaryState = false;
         this.doorbellAudioActive = false;
 
-        this.updateDeviceInfo();        
+        this.updateDeviceInfo();
     }
 
     getDoorbirdApi() {
@@ -49,8 +49,8 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                 this.console?.log("Time:", event.timestamp);
                 this.triggerMotionSensor();
             });
-            this.getDoorbirdApi()?.startEventSocket();        
-        }    
+            this.getDoorbirdApi()?.startEventSocket();
+        }
         return this.doorbirdApi;
     }
 
@@ -157,7 +157,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         this.stopAudioTransmitter();
         this.stopAudioReceiver();
     }
-    
+
     async startAudioTransmitter(media: MediaObject): Promise<void> {
         const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
 
@@ -194,13 +194,13 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
             this.console.log('Doorbird: audio transmitter started.');
 
             const passthrough = new PassThrough();
-            const digestAuth = new AxiosDigestAuth({
-                username,
-                password
-            });
-            digestAuth.request({
+            authHttpFetch({
                 method: 'POST',
                 url: audioTxUrl,
+                credential: {
+                    username,
+                    password,
+                },
                 headers: {
                     'Content-Type': 'audio/basic',
                     'Content-Length': '9999999'
@@ -293,7 +293,8 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                 // this is a hint to let homekit, et al, know that it's OPUS audio and does not need transcoding.
                 codec: 'pcm_mulaw',
             }
-        }];    }
+        }];
+    }
 
     async getVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
 
@@ -327,7 +328,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         if (this.audioSilenceProcess)
             return;
 
-        this.console.log('Doorbird: starting audio silence generator...')            
+        this.console.log('Doorbird: starting audio silence generator...')
 
         const ffmpegPath = await mediaManager.getFFmpegPath();
         const ffmpegArgs = [
@@ -552,10 +553,10 @@ export class DoorbirdCamProvider extends ScryptedDeviceBase implements DevicePro
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-        if( this.devices.delete( nativeId ) ) {
-            this.console.log("Doorbird: Removed device from list: " + id + " / " + nativeId )   
+        if (this.devices.delete(nativeId)) {
+            this.console.log("Doorbird: Removed device from list: " + id + " / " + nativeId)
         }
-    }    
+    }
 
     createCamera(nativeId: string): DoorbirdCamera {
         return new DoorbirdCamera(nativeId, this);
