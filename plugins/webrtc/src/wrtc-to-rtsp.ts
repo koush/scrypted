@@ -106,7 +106,7 @@ export async function createRTCPeerConnectionSource(options: {
             };
 
             const setupVideoTransceiver = (transceiver: RTCRtpTransceiver) => {
-                const videoPacketSize = 65535;
+                const videoPacketSize = 64000;
                 let h264Repacketizer = new H264Repacketizer(console, videoPacketSize - 12)
                 const videoTransceiver = transceiver;
                 videoTransceiver.mid = '1';
