@@ -47,37 +47,45 @@ export class Scheduler {
                         const day = future.getDay();
                         if (!days[day])
                             continue;
-        
+
                         source.log.i(`event will fire at ${future.toLocaleString()}`);
                         return future;
                     }
                     source.log.w('event will never fire');
                 }
 
-                const when = reschedule();
-                if (!when) {
-                    return {
-                        removeListener() {
-                        }
-                    }
-                }
+                let timeout: NodeJS.Timeout = null;
+                let when: Date = null;
 
-                const delay = when.getTime() - Date.now();
-                source.log.i(`event will fire in ${Math.round(delay / 60 / 1000)} minutes.`);
-
-                let timeout = setTimeout(() => {
-                    reschedule();
-
+                function timerCb() {
+                    timeout = null;
+                    const prevWhen = when;
+                    setupTimer();
                     callback(ret, {
                         eventId: undefined,
                         eventInterface: 'Scheduler',
                         eventTime: Date.now(),
-                    }, when)
-                }, delay);
+                    }, prevWhen)
+                }
+
+                function setupTimer() {
+                    when = reschedule();
+                    if (when) {
+                        const delay = when.getTime() - Date.now();
+                        source.log.i(`event will fire in ${Math.round(delay / 60 / 1000)} minutes.`);
+                        timeout = setTimeout(timerCb, delay);
+                    }
+                }
+
+                setupTimer();
 
                 return {
                     removeListener() {
-                        clearTimeout(timeout);
+                        if (timeout) {
+                            clearTimeout(timeout);
+                        }
+                        timeout = null;
+                        when = null;
                     }
                 }
             }
