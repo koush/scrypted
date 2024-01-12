@@ -1028,16 +1028,17 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
       return true;
 
     const cpuPerDetector = this.cpuUsage / runningDetections.length;
+    const cpuPercent = Math.round(this.cpuUsage * 100);
     if (cpuPerDetector * (runningDetections.length + 1) > .9) {
       const [first] = runningDetections;
       if (Date.now() - first.detectionStartTime > 30000) {
-        first.console.log(`Ending object detection to process activity on ${mixin.name}.`);
+        first.console.warn(`CPU is at capacity: ${cpuPercent} with ${runningDetections.length} cameras. Ending object detection to process activity on ${mixin.name}.`);
         first.endObjectDetection();
-        mixin.console.log(`Ending object detection on ${first.name} to process activity.`);
+        mixin.console.warn(`CPU is at capacity: ${cpuPercent} with ${runningDetections.length} cameras. Ending object detection on ${first.name} to process activity.`);
         return true;
       }
 
-      mixin.console.log(`CPU is at capacity: ${this.cpuUsage}. Not starting object detection to continue processing recent activity on ${first.name}.`);
+      mixin.console.warn(`CPU is at capacity: ${cpuPercent} with ${runningDetections.length} cameras. Not starting object detection to continue processing recent activity on ${first.name}.`);
       return false;
     }
 
