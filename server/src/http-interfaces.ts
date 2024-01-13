@@ -5,7 +5,6 @@ import net from 'net';
 import { join as pathJoin } from 'path';
 import { RpcPeer } from "./rpc";
 
-const mime = require('mime/lite');
 export class HttpResponseImpl implements HttpResponse {
     constructor(public res: Response, public unzippedDir: string, public filesPath: string) {
     }
@@ -48,13 +47,6 @@ export class HttpResponseImpl implements HttpResponse {
         if (options?.code)
             this.res.status(options.code);
         this.#setHeaders(options);
-
-        if (!this.res.getHeader('Content-Type')) {
-            const type = mime.getType(path);
-            if (type) {
-                this.res.contentType(mime.getExtension(type));
-            }
-        }
 
         let filePath = pathJoin(this.unzippedDir, 'fs', path);
         if (!fs.existsSync(filePath)) {
