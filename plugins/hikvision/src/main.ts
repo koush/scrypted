@@ -525,7 +525,7 @@ class HikvisionProvider extends RtspProvider {
 
         const username = settings.username?.toString();
         const password = settings.password?.toString();
-        const skipValidate = settings.skipValidate === 'true';
+        const skipValidate = settings.skipValidate?.toString() === 'true';
         let twoWayAudio: string;
         if (!skipValidate) {
             const api = new HikvisionCameraAPI(httpAddress, username, password, this.console);

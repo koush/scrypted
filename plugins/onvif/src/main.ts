@@ -492,7 +492,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
         const username = settings.username?.toString();
         const password = settings.password?.toString();
-        const skipValidate = settings.skipValidate === 'true';
+        const skipValidate = settings.skipValidate?.toString() === 'true';
         let ptzCapabilities: string[];
         if (!skipValidate) {
             try {
