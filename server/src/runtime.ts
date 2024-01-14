@@ -65,7 +65,6 @@ export type RuntimeHost = (mainFilename: string, pluginId: string, options: Runt
 export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     clusterId = crypto.randomBytes(3).toString('hex');
     clusterSecret = crypto.randomBytes(16).toString('hex');
-    datastore: Level;
     plugins: { [id: string]: PluginHost } = {};
     pluginDevices: { [id: string]: PluginDevice } = {};
     devices: { [id: string]: DeviceProxyPair } = {};
@@ -105,10 +104,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     info = new Info();
     pluginHosts = new Map<string, RuntimeHost>();
 
-    constructor(public mainFilename: string, datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
+    constructor(public mainFilename: string, public datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
         super(app);
-        this.datastore = datastore;
-        this.app = app;
         // ensure that all the users are loaded from the db.
         this.usersService.getAllUsers();
 
