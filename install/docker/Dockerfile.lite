@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # base tools and development stuff
 RUN apt-get update && apt-get -y install \
     curl software-properties-common apt-utils \
-    ffmpeg \
+    ffmpeg && \
     apt-get -y update && \
     apt-get -y upgrade
 
