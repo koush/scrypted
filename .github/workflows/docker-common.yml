@@ -15,7 +15,7 @@ jobs:
           # "20"
         ]
         BASE: ["jammy"]
-        FLAVOR: ["full", "lite", "thin"]
+        FLAVOR: ["full", "lite"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
