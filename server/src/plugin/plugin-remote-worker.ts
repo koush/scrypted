@@ -2,7 +2,6 @@ import { ScryptedStatic, SystemManager } from '@scrypted/types';
 import AdmZip from 'adm-zip';
 import { once } from 'events';
 import fs from 'fs';
-import { Volume } from 'memfs';
 import net from 'net';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
@@ -19,7 +18,7 @@ import { DeviceManagerImpl, PluginReader, attachPluginRemote, setupPluginRemote 
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
-const { link } = require('linkfs');
+import worker_threads from 'worker_threads';
 
 const serverVersion = require('../../package.json').version;
 
@@ -196,10 +195,18 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 }
             }
 
-            let volume: any;
+            // let volume: any;
             let pluginReader: PluginReader;
             if (zipOptions?.unzippedPath && fs.existsSync(zipOptions?.unzippedPath)) {
-                volume = link(fs, ['', path.join(zipOptions.unzippedPath, 'fs')]);
+                if (worker_threads.isMainThread) {
+                    const fsDir = path.join(zipOptions.unzippedPath, 'fs')
+                    if (fs.existsSync(fsDir))
+                        process.chdir(fsDir);
+                    else
+                        process.chdir(zipOptions.unzippedPath);
+                }
+
+                // volume = link(fs, ['', path.join(zipOptions.unzippedPath, 'fs')]);
                 pluginReader = name => {
                     const filename = path.join(zipOptions.unzippedPath, name);
                     if (!fs.existsSync(filename))
@@ -208,18 +215,20 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 };
             }
             else {
+                // this code path was used in testing and should be unreachable.
+
                 const admZip = new AdmZip(zipData);
-                volume = new Volume();
-                for (const entry of admZip.getEntries()) {
-                    if (entry.isDirectory)
-                        continue;
-                    if (!entry.entryName.startsWith('fs/'))
-                        continue;
-                    const name = entry.entryName.substring('fs/'.length);
-                    volume.mkdirpSync(path.dirname(name));
-                    const data = entry.getData();
-                    volume.writeFileSync(name, data);
-                }
+                // volume = new Volume();
+                // for (const entry of admZip.getEntries()) {
+                //     if (entry.isDirectory)
+                //         continue;
+                //     if (!entry.entryName.startsWith('fs/'))
+                //         continue;
+                //     const name = entry.entryName.substring('fs/'.length);
+                //     volume.mkdirpSync(path.dirname(name));
+                //     const data = entry.getData();
+                //     volume.writeFileSync(name, data);
+                // }
 
                 pluginReader = name => {
                     const entry = admZip.getEntry(name);
@@ -235,9 +244,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             const pnp = getPluginNodePath(pluginId);
             pluginConsole?.log('node modules', pnp);
             params.require = (name: string) => {
-                if (name === 'fakefs' || (name === 'fs' && !packageJson.scrypted.realfs)) {
-                    return volume;
-                }
                 if (name === 'realfs') {
                     return require('fs');
                 }
