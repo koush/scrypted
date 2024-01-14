@@ -2,13 +2,13 @@ import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject 
 import pathToFfmpeg from 'ffmpeg-static';
 import fs from 'fs';
 import https from 'https';
-import mimeType from 'mime';
 import Graph from 'node-dijkstra';
 import os from 'os';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
 import { MediaObject } from "./mediaobject";
 import { MediaObjectRemote } from "./plugin-api";
+import send from 'send';
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything
@@ -78,7 +78,7 @@ export abstract class MediaManagerBase implements MediaManager {
                 }
 
                 const ab = await fs.promises.readFile(filename);
-                const mt = mimeType.getType(data.toString());
+                const mt = send.mime.lookup(filename);
                 const mo = this.createMediaObject(ab, mt);
                 return mo;
             }
@@ -231,7 +231,7 @@ export abstract class MediaManagerBase implements MediaManager {
 
     ensureMediaObjectRemote(mediaObject: string | MediaObjectInterface): MediaObjectRemote {
         if (typeof mediaObject === 'string') {
-            const mime = mimeType.getType(mediaObject);
+            const mime = send.mime.lookup(mediaObject);
             return this.createMediaObjectRemote(mediaObject, mime);
         }
         return mediaObject as MediaObjectRemote;
