@@ -7,17 +7,17 @@ import { timeoutPromise } from "@scrypted/common/src/promise-utils";
 import sdk, { AudioSensor, FFmpegInput, MotionSensor, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import child_process from "child_process";
 import fs from 'fs';
-import mkdirp from 'mkdirp';
+import { mkdirp } from 'mkdirp';
 import net from 'net';
+import path from 'path';
 import { Duplex, Readable, Writable } from 'stream';
 import { } from '../../common';
-import { AudioRecordingCodecType, CameraRecordingConfiguration, DataStreamConnection, RecordingPacket } from '../../hap';
+import { AudioRecordingCodecType, CameraRecordingConfiguration, RecordingPacket } from '../../hap';
 import type { HomeKitPlugin } from "../../main";
-import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
-import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
-import { NAL_TYPE_DELIMITER, NAL_TYPE_FU_A, NAL_TYPE_IDR, NAL_TYPE_PPS, NAL_TYPE_SEI, NAL_TYPE_SPS, NAL_TYPE_STAP_A } from "./h264-packetizer";
-import path from 'path';
 import { getDebugMode } from "./camera-debug-mode-storage";
+import { HksvVideoClip, VIDEO_CLIPS_NATIVE_ID, getCameraRecordingFiles } from './camera-recording-files';
+import { FORCE_OPUS, checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
+import { NAL_TYPE_DELIMITER, NAL_TYPE_FU_A, NAL_TYPE_IDR, NAL_TYPE_PPS, NAL_TYPE_SEI, NAL_TYPE_SPS, NAL_TYPE_STAP_A } from "./h264-packetizer";
 
 const { log, mediaManager, deviceManager } = sdk;
 

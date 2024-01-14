@@ -1,8 +1,8 @@
 
 import sdk, { FFmpegInput, MediaObject, VideoClip, VideoClipOptions } from '@scrypted/sdk';
-import path from 'path';
 import fs from 'fs';
-import mkdirp from 'mkdirp';
+import { mkdirp } from 'mkdirp';
+import path from 'path';
 
 const { mediaManager } = sdk;
 export const VIDEO_CLIPS_NATIVE_ID = 'save-video-clips';
@@ -97,16 +97,6 @@ export async function getVideoClips(options?: VideoClipOptions, id?: string): Pr
 
     if (options?.endTime)
         ret = ret.filter(clip => clip.startTime + clip.duration < options.endTime);
-
-    if (options?.reverseOrder)
-        ret = ret.reverse();
-
-    if (options?.startId) {
-        const startIndex = ret.findIndex(c => c.id === options.startId);
-        if (startIndex === -1)
-            throw new Error('startIndex not found');
-        ret = ret.slice(startIndex);
-    }
 
     if (options?.count)
         ret = ret.slice(0, options.count);
