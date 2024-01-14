@@ -19,6 +19,8 @@ import { httpFetch } from '../../../server/src/fetch/http-fetch';
 
 let fetcher: typeof httpFetch | typeof domFetch;
 try {
+    if (process.arch === 'browser' as any)
+        throw new Error();
     require('net');
     require('events');
     fetcher = httpFetch;
