@@ -113,6 +113,7 @@ app.use(bodyParser.raw({ type: 'application/zip', limit: 100000000 }) as any)
 
 async function start(mainFilename: string, options?: {
     onRuntimeCreated?: (runtime: ScryptedRuntime) => Promise<void>,
+    restart?: () => void,
 }) {
     const volumeDir = getScryptedVolume();
     await fs.promises.mkdir(volumeDir, {
@@ -379,7 +380,10 @@ async function start(mainFilename: string, options?: {
             });
         }
 
-        process.exit();
+        if (options?.restart)
+            options.restart();
+        else
+            process.exit();
     });
 
     app.get('/web/component/backup', async (req, res) => {
