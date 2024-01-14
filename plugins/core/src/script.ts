@@ -3,7 +3,6 @@ import { scryptedEval } from "./scrypted-eval";
 import { monacoEvalDefaults } from "./monaco";
 import { createScriptDevice, ScriptDeviceImpl } from "@scrypted/common/src/eval/scrypted-eval";
 import { ScriptCoreNativeId } from "./script-core";
-import { PluginAPIProxy } from "../../../server/src/plugin/plugin-api";
 
 const { deviceManager } = sdk;
 

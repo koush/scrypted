@@ -3,6 +3,7 @@ import fs from 'fs';
 import type { TranspileOptions } from "typescript";
 import vm from "vm";
 import { ScriptDevice } from "./monaco/script-device";
+import path from 'path';
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -22,9 +23,13 @@ export async function tsCompile(source: string, options: TranspileOptions = null
     return ts.transpileModule(source, options).outputText;
 }
 
+export function readFileAsString(f: string) {
+    return fs.readFileSync(f).toString();;
+}
+
 function getTypeDefs() {
-    const scryptedTypesDefs = fs.readFileSync('@types/sdk/types.d.ts').toString();
-    const scryptedIndexDefs = fs.readFileSync('@types/sdk/index.d.ts').toString();
+    const scryptedTypesDefs = readFileAsString('@types/sdk/types.d.ts');
+    const scryptedIndexDefs = readFileAsString('@types/sdk/index.d.ts');
     return {
         scryptedIndexDefs,
         scryptedTypesDefs,
@@ -104,7 +109,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
 }
 
 export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
-    const bufferTypeDefs = fs.readFileSync('@types/node/buffer.d.ts').toString();
+    const bufferTypeDefs= readFileAsString('@types/node/buffer.d.ts');
 
     const safeLibs = {
         bufferTypeDefs,
