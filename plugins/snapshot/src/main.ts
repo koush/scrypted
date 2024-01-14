@@ -1,6 +1,6 @@
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
-import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise } from "@scrypted/common/src/promise-utils";
+import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
@@ -288,8 +288,14 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             // periodic snapshot should get the immediately available picture.
             // the debounce has already triggered a refresh for the next go around.
             if (periodicSnapshot && this.currentPicture) {
+                const cp = this.currentPicture;
                 debounced.catch(() => {});
-                picture = this.currentPicture;
+                try {
+                    picture = await timeoutPromise(1000, debounced);
+                }
+                catch (e) {
+                    picture = cp;
+                }
             }
             else {
                 picture = await debounced;
