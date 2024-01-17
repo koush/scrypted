@@ -30,8 +30,8 @@ import AdmZip from 'adm-zip';
 
 export type Runtime = ScryptedRuntime;
 
-if (!semver.gte(process.version, '16.0.0')) {
-    throw new Error('"node" version out of date. Please update node to v16 or higher.')
+if (!semver.gte(process.version, '18.0.0')) {
+    throw new Error('"node" version out of date. Please update node to v18 or higher.')
 }
 
 process.on('unhandledRejection', error => {
