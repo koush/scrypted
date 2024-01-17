@@ -1,26 +1,26 @@
-import OnOffToSwitch from './OnOffToSwitch';
-import BrightnessToSwitchMultilevel from './BrightnessToSwitchMultilevel';
-import { CommandClassHandler as CommandClassHandlerClass } from './ZwaveDeviceBase';
-import BinarySensorToStateSensor from './BinarySensorToStateSensor';
-import LockToDoorLock from './LockToDoorLock';
-import BatteryToBattery from './BatteryToBattery';
-import ThermometerToSensorMultilevel from './ThermometerToSensorMultilevel';
-import HumidityToSensorMultilevel from './HumiditySensorToSensorMultilevel';
-import LuminanceSensorToSensorMultilevel from './LuminanceSensorToSensorMultilevel';
-import UltravioletSensorMultilevel from './UltravioletSensorToSensorMultilevel';
-import SettingsToConfiguration from './SettingsToConfiguration';
-import EntryToBarrierOperator from './EntryToBarrierOperator';
-import EntrySensorToBarriorOperator from './EntrySensorToBarrierOperator';
-import ColorSettingRgbToColor from './ColorSettingRgbToColor';
-import { NotificationType } from './Notification';
-import { EntrySensorToAccessControl } from './EntrySensorToAccessControl';
-import { FloodSensorToWaterAlarm } from './FloodSensorToWaterAlarm';
-import { PasswordStoreToUserCode } from './PasswordStoreToUserCode';
-import { TamperSensorToHomeSecurity } from './TamperSensorToHomeSecurity';
-import { PowerSensorToPowerManagement } from './PowerSensorToPowerManagement';
-import { ZWaveNode } from 'zwave-js';
-import {CommandClasses, ValueID} from '@zwave-js/core'
 import { ScryptedInterface } from '@scrypted/sdk';
+import { CommandClasses, ValueID } from '@zwave-js/core';
+import { ZWaveNode } from 'zwave-js';
+import BatteryToBattery from './BatteryToBattery';
+import BinarySensorToStateSensor from './BinarySensorToStateSensor';
+import BrightnessToSwitchMultilevel from './BrightnessToSwitchMultilevel';
+import ColorSettingRgbToColor from './ColorSettingRgbToColor';
+import { EntrySensorToAccessControl } from './EntrySensorToAccessControl';
+import EntrySensorToBarriorOperator from './EntrySensorToBarrierOperator';
+import EntryToBarrierOperator from './EntryToBarrierOperator';
+import { FloodSensorToWaterAlarm } from './FloodSensorToWaterAlarm';
+import HumidityToSensorMultilevel from './HumiditySensorToSensorMultilevel';
+import LockToDoorLock from './LockToDoorLock';
+import LuminanceSensorToSensorMultilevel from './LuminanceSensorToSensorMultilevel';
+import OnOffToSwitch from './OnOffToSwitch';
+import { PasswordStoreToUserCode } from './PasswordStoreToUserCode';
+import { PowerSensorToPowerManagement } from './PowerSensorToPowerManagement';
+import SettingsToConfiguration from './SettingsToConfiguration';
+import { SmokeAlarmToCO2Sensor } from './SmokeAlarmToBinarySensor';
+import { TamperSensorToHomeSecurity } from './TamperSensorToHomeSecurity';
+import ThermometerToSensorMultilevel from './ThermometerToSensorMultilevel';
+import UltravioletSensorMultilevel from './UltravioletSensorToSensorMultilevel';
+import { CommandClassHandler as CommandClassHandlerClass } from './ZwaveDeviceBase';
 
 var CommandClassMap: {[ccId: string]: CommandClassInfo} = {};
 
@@ -72,25 +72,26 @@ export function getCommandClassIndex(commandClass: number, index: number): Comma
     return CommandClassMap[`${commandClass}#${index}`];
 }
 
-addCommandClassIndex(CommandClasses['Binary Switch'], 'currentValue', OnOffToSwitch, 'OnOff');
-addCommandClassIndex(CommandClasses['Multilevel Switch'], 'currentValue', BrightnessToSwitchMultilevel, 'Brightness', 'OnOff');
-addCommandClassIndex(CommandClasses['Color'], 'currentValue', ColorSettingRgbToColor, 'ColorSettingRgb', 'ColorSettingTemperature');
-addCommandClassIndex(CommandClasses['Binary Sensor'], 'Any', BinarySensorToStateSensor, 'BinarySensor');
-addCommandClassIndex(CommandClasses['Door Lock'], 'currentMode', LockToDoorLock, 'Lock');
-addCommandClassIndex(CommandClasses['Battery'], 'level', BatteryToBattery, 'Battery');
-addCommandClassIndex(CommandClasses['Entry Control'], 'currentValue', EntryToBarrierOperator, 'Entry');
-addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Air temperature', ThermometerToSensorMultilevel, 'Thermometer');
-addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Humidity', HumidityToSensorMultilevel, 'HumiditySensor');
-addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Illuminance', LuminanceSensorToSensorMultilevel, 'LuminanceSensor');
-addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Ultraviolet', UltravioletSensorMultilevel, 'UltravioletSensor');
+addCommandClassIndex(CommandClasses['Binary Switch'], 'currentValue', OnOffToSwitch, ScryptedInterface.OnOff);
+addCommandClassIndex(CommandClasses['Multilevel Switch'], 'currentValue', BrightnessToSwitchMultilevel, ScryptedInterface.Brightness, ScryptedInterface.OnOff);
+addCommandClassIndex(CommandClasses['Color'], 'currentValue', ColorSettingRgbToColor, ScryptedInterface.ColorSettingRgb, ScryptedInterface.ColorSettingTemperature);
+addCommandClassIndex(CommandClasses['Binary Sensor'], 'Any', BinarySensorToStateSensor, ScryptedInterface.BinarySensor);
+addCommandClassIndex(CommandClasses['Door Lock'], 'currentMode', LockToDoorLock, ScryptedInterface.Lock);
+addCommandClassIndex(CommandClasses['Battery'], 'level', BatteryToBattery, ScryptedInterface.Battery);
+addCommandClassIndex(CommandClasses['Entry Control'], 'currentValue', EntryToBarrierOperator, ScryptedInterface.Entry);
+addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Air temperature', ThermometerToSensorMultilevel, ScryptedInterface.Thermometer);
+addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Humidity', HumidityToSensorMultilevel, ScryptedInterface.HumiditySensor);
+addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Illuminance', LuminanceSensorToSensorMultilevel, ScryptedInterface.LuminanceSensor);
+addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Ultraviolet', UltravioletSensorMultilevel, ScryptedInterface.UltravioletSensor);
 
-addCommandClassIndex(CommandClasses['Notification'], 'Access Control', EntrySensorToAccessControl, 'EntrySensor');
-addCommandClassIndex(CommandClasses['Notification'], 'Water Alarm', FloodSensorToWaterAlarm, 'FloodSensor');
+addCommandClassIndex(CommandClasses['Notification'], 'Access Control', EntrySensorToAccessControl, ScryptedInterface.EntrySensor);
+addCommandClassIndex(CommandClasses['Notification'], 'Water Alarm', FloodSensorToWaterAlarm, ScryptedInterface.FloodSensor);
 addCommandClassIndex(CommandClasses['Notification'], 'Home Security', TamperSensorToHomeSecurity, ScryptedInterface.TamperSensor);
-addCommandClassIndex(CommandClasses['Notification'], 'Power Management', PowerSensorToPowerManagement, 'PowerSensor');
+addCommandClassIndex(CommandClasses['Notification'], 'Power Management', PowerSensorToPowerManagement, ScryptedInterface.PowerSensor);
+addCommandClassIndex(CommandClasses['Notification'], 'Smoke Alarm', SmokeAlarmToCO2Sensor, ScryptedInterface.CO2Sensor);
 
-addCommandClassIndex(CommandClasses['Barrier Operator'], 'currentState', EntryToBarrierOperator, 'Entry');
-addCommandClassIndex(CommandClasses['Barrier Operator'], 'position', EntrySensorToBarriorOperator, 'EntrySensor');
+addCommandClassIndex(CommandClasses['Barrier Operator'], 'currentState', EntryToBarrierOperator, ScryptedInterface.Entry);
+addCommandClassIndex(CommandClasses['Barrier Operator'], 'position', EntrySensorToBarriorOperator, ScryptedInterface.EntrySensor);
 
-addCommandClass(CommandClasses['Configuration'], SettingsToConfiguration, 'Settings');
-addCommandClass(CommandClasses['User Code'], PasswordStoreToUserCode, 'PasswordStore');
+addCommandClass(CommandClasses['Configuration'], SettingsToConfiguration, ScryptedInterface.Settings);
+addCommandClass(CommandClasses['User Code'], PasswordStoreToUserCode, ScryptedInterface.PasswordStore);

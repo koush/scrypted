@@ -65,6 +65,7 @@ export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh, Sett
     }
 
     onValueChanged(valueId: ZWaveNodeValueUpdatedArgs) {
+        this.console.log('value changed', valueId);
         var cc = getCommandClassIndex(valueId.commandClass, valueId.property as number);
         if (!cc) {
             cc = getCommandClass(valueId.commandClass);
