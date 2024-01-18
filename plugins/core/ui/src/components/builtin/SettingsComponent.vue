@@ -71,6 +71,9 @@
           ><v-toolbar-title>Server Management</v-toolbar-title></v-toolbar
         >
         <v-card-actions>
+          <v-btn text href="/web/component/backup" color="info">Backup</v-btn>
+          <v-btn text color="info" @click="restoreClick">Restore</v-btn>
+          <input type="file" ref="restoreFile" style="display: none;" @change="restore"/>
           <v-spacer></v-spacer>
           <v-dialog v-model="restart" width="500">
             <template v-slot:activator="{ on }">
@@ -126,6 +129,22 @@ export default {
     this.checkUpdateAvailable();
   },
   methods: {
+    async restoreClick() {
+      const restoreFile = this.$refs.restoreFile;
+      restoreFile.click();
+    },
+    async restore() {
+      const restoreFile = this.$refs.restoreFile;
+      const file = restoreFile.files[0];
+      if (!file)
+        return;
+      console.log(file);
+      const fileBlob = new Blob([file]);
+      await fetch('/web/component/restore', {
+        method: 'POST',
+        body: fileBlob,
+      });
+    },
     async checkUpdateAvailable() {
       const info = await this.$scrypted.systemManager.getComponent("info");
       const version = await info.getVersion();

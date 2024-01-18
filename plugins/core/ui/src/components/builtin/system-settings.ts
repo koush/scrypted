@@ -42,15 +42,28 @@ export function createSystemSettingsDevice(systemManager: SystemManager): Scrypt
             const results = systemSettings.map(async d => {
                 const settings = await d.getSettings();
                 for (const setting of settings) {
+                    const subgroup  = setting.group;
                     if (d.pluginId === '@scrypted/core')
                         setting.group = 'General';
                     else
                         setting.group = d.name;
+                    setting.subgroup = subgroup;
                     setting.key = d.id + ':' + setting.key;
                 }
                 return settings;
             });
-            return (await Promise.all(results)).flat();
+            const ret = (await Promise.all(results)).flat();
+            ret.sort((a, b) => {
+                if (a.group === 'General') {
+                    if (b.group === 'General')
+                        return 0;
+                    return -1;
+                }
+                if (b.group === 'General')
+                    return 1;
+                return 0;
+            });
+            return ret;
         },
         async putSetting(key, value) {
             const [id, realKey] = key.split(':');
