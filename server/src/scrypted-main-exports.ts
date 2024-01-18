@@ -11,7 +11,6 @@ export function isChildProcess() {
 }
 
 function start(mainFilename: string, options?: {
-    restart?: () => void,
     onRuntimeCreated?: (runtime: Runtime) => Promise<void>,
 }) {
     if (!global.gc) {
