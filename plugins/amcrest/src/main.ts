@@ -495,6 +495,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             return this.onvifIntercom.startIntercom(media);
         }
 
+        const doorbellType = this.storage.getItem('doorbellType');
+        
         // not sure if this all works, since i don't actually have a doorbell.
         // good luck!
         const channel = this.getRtspChannel() || '1';
@@ -505,12 +507,29 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         const args = ffmpegInput.inputArguments.slice();
         args.unshift('-hide_banner');
 
-        args.push(
-            "-vn",
-            '-acodec', 'aac',
-            '-f', 'adts',
-            'pipe:3',
-        );
+        let contentType: string;
+
+        if (doorbellType == DAHUA_DOORBELL_TYPE) {
+            args.push(
+                "-vn",
+                '-acodec', 'pcm_alaw',
+                '-ac', '1',
+                '-ar', '8000',
+                '-sample_fmt', 's16',
+                '-f', 'alaw',
+                'pipe:3',
+            );
+            contentType = 'Audio/G.711A';
+        }
+        else {
+            args.push(
+                      "-vn",
+                      '-acodec', 'aac',
+                      '-f', 'adts',
+                      'pipe:3',
+                      );
+            contentType = 'Audio/AAC';
+        }
 
         this.console.log('ffmpeg intercom', args);
 
@@ -533,7 +552,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 url,
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'Audio/AAC',
+                    'Content-Type': contentType,
                     'Content-Length': '9999999'
                 },
                 responseType: 'readable',
