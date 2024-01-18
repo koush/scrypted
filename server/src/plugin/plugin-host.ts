@@ -84,9 +84,11 @@ export class PluginHost {
     }
 
     async upsertDevice(upsert: Device) {
+        const newDevice = !this.scrypted.findPluginDevice(this.pluginId, upsert.nativeId);
         const { pluginDevicePromise, interfacesChanged } = this.scrypted.upsertDevice(this.pluginId, upsert);
         const pi = await pluginDevicePromise;
-        await this.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
+        if (newDevice)
+            await this.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
         // fetch a new device instance if the descriptor changed.
         // plugin may return the same instance.
         // this avoids device and mixin churn.
