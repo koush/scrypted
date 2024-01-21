@@ -1,6 +1,6 @@
 {
   "name": "scrypted",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "description": "",
   "main": "./dist/packages/cli/src/main.js",
   "bin": {
@@ -19,6 +19,7 @@
     "@scrypted/client": "^1.3.3",
     "@scrypted/types": "^0.2.99",
     "engine.io-client": "^6.5.3",
+    "http-auth-utils": "^6.0.0",
     "readline-sync": "^1.4.10",
     "semver": "^7.5.4",
     "tslib": "^2.6.2"
