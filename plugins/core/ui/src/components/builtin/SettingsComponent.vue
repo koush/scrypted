@@ -21,27 +21,18 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn
-            v-if="!canUpdate"
-            small
-            text
-            href="https://github.com/koush/scrypted#installation"
-            >More Information</v-btn
-          >
+          <v-btn v-if="!canUpdate" small text href="https://github.com/koush/scrypted#installation">More
+            Information</v-btn>
           <v-dialog v-else v-model="updateAndRestart" width="500">
             <template v-slot:activator="{ on }">
-              <v-btn small text color="red" v-on="on"
-                >Update and Restart Scrypted</v-btn
-              >
+              <v-btn small text color="red" v-on="on">Update and Restart Scrypted</v-btn>
             </template>
 
             <v-card color="red" dark>
               <v-card-title primary-title>Restart Scrypted</v-card-title>
 
-              <v-card-text
-                >Are you sure you want to restart the Scrypted
-                service?</v-card-text
-              >
+              <v-card-text>Are you sure you want to restart the Scrypted
+                service?</v-card-text>
 
               <v-card-text>{{ restartStatus }}</v-card-text>
               <v-divider></v-divider>
@@ -67,13 +58,11 @@
       </v-card>
 
       <v-card class="mt-2" v-if="showRestart">
-        <v-toolbar
-          ><v-toolbar-title>Server Management</v-toolbar-title></v-toolbar
-        >
+        <v-toolbar><v-toolbar-title>Server Management</v-toolbar-title></v-toolbar>
         <v-card-actions>
-          <v-btn text href="/web/component/backup" color="info">Backup</v-btn>
+          <v-btn text :href="backupUrl" color="info">Backup</v-btn>
           <v-btn text color="info" @click="restoreClick">Restore</v-btn>
-          <input type="file" ref="restoreFile" style="display: none;" @change="restore"/>
+          <input type="file" ref="restoreFile" style="display: none;" @change="restore" />
           <v-spacer></v-spacer>
           <v-dialog v-model="restart" width="500">
             <template v-slot:activator="{ on }">
@@ -83,10 +72,8 @@
             <v-card color="red" dark>
               <v-card-title primary-title>Restart Scrypted</v-card-title>
 
-              <v-card-text
-                >Are you sure you want to restart the Scrypted
-                service?</v-card-text
-              >
+              <v-card-text>Are you sure you want to restart the Scrypted
+                service?</v-card-text>
 
               <v-card-text>{{ restartStatus }}</v-card-text>
               <v-divider></v-divider>
@@ -106,7 +93,8 @@
 <script>
 import { checkServerUpdate } from "../plugin/plugin";
 import Settings from "../../interfaces/Settings.vue"
-import {createSystemSettingsDevice} from './system-settings';
+import { createSystemSettingsDevice } from './system-settings';
+import { combineBaseUrl, getCurrentBaseUrl } from "../../../../../../packages/client/src";
 
 export default {
   components: {
@@ -124,6 +112,12 @@ export default {
       showRestart: false,
     };
   },
+  computed: {
+    backupUrl() {
+      const baseUrl = getCurrentBaseUrl();
+      return combineBaseUrl(baseUrl, 'web/component/backup');
+    },
+  },
   mounted() {
     this.loadEnv();
     this.checkUpdateAvailable();
@@ -140,7 +134,9 @@ export default {
         return;
       console.log(file);
       const fileBlob = new Blob([file]);
-      await fetch('/web/component/restore', {
+      const baseUrl = getCurrentBaseUrl();
+      const restoreUrl = combineBaseUrl(baseUrl, 'web/component/restore');
+      await fetch(restoreUrl, {
         method: 'POST',
         body: fileBlob,
       });

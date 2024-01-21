@@ -137,7 +137,7 @@ export default {
         // cert may need to be reaccepted? Server is down? Go to the
         // server root to force the network error to bypass the PWA cache.
         if (
-          e.toString().includes("Network Error") &&
+          (e.toString().includes("Network Error") || e.toString().includes("Load failed")) &&
           window.location.href.startsWith("https:")
         ) {
           window.location = "/";
