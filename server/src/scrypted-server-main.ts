@@ -339,13 +339,10 @@ async function start(mainFilename: string, options?: {
 
     app.post('/web/component/restore', async (req, res) => {
         const buffers: Buffer[] = [];
-        let zip: AdmZip;
         req.on('data', b => buffers.push(b));
         try {
             await once(req, 'end');
-            zip = new AdmZip(Buffer.concat(buffers));
-            if (!zip.test())
-                throw new Error('backup zip test failed.');
+            await scrypted.backup.restore(Buffer.concat(buffers))
         }
         catch (e) {
             res.send({
@@ -353,59 +350,11 @@ async function start(mainFilename: string, options?: {
             });
             return;
         }
-        try {
-            scrypted.kill();
-            await sleep(5000);
-            await db.close();
-
-            await fs.promises.rm(volumeDir, {
-                recursive: true,
-                force: true,
-            });
-
-            await fs.promises.mkdir(volumeDir, {
-                recursive: true
-            });
-
-            zip.extractAllTo(dbPath, true);
-
-            res.send({
-                success: true,
-            });
-        }
-        catch (e) {
-            res.send({
-                error: "Error during restore.",
-            });
-        }
-
-        scrypted.serviceControl.restart();
     });
 
     app.get('/web/component/backup', async (req, res) => {
         try {
-            const backupDbPath = path.join(volumeDir, 'backup.db');
-            await fs.promises.rm(backupDbPath, {
-                recursive: true,
-                force: true,
-            });
-
-            const backupDb = new Level(backupDbPath);
-            await backupDb.open();
-            for await (const [key, value] of db.iterator()) {
-                await backupDb.put(key, value);
-            }
-            await backupDb.close();
-
-            const backupZip = path.join(volumeDir, 'backup.zip');
-            await fs.promises.rm(backupZip, {
-                recursive: true,
-                force: true,
-            });
-
-            const zip = new AdmZip();
-            await zip.addLocalFolderPromise(backupDbPath, {});
-            const zipBuffer = await zip.toBufferPromise();
+            const zipBuffer = await scrypted.backup.createBackup();
             // the file is a normal zip file, but an extension is added to prevent safari, etc, from unzipping it automatically.
             res.header('Content-Disposition', 'attachment; filename="scrypted.zip.backup"')
             res.send(zipBuffer);

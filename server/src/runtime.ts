@@ -46,6 +46,7 @@ import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
+import { Backup } from './services/backup';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -102,6 +103,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     addressSettings = new AddressSettings(this);
     usersService = new UsersService(this);
     info = new Info();
+    backup = new Backup(this);
     pluginHosts = new Map<string, RuntimeHost>();
 
     constructor(public mainFilename: string, public datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
@@ -443,6 +445,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 return this.addressSettings;
             case "users":
                 return this.usersService;
+            case 'backup':
+                return this.backup;
         }
     }
 
