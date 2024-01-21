@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import Level from '../level';
+import { sleep } from '../sleep';
 import { getScryptedVolume } from '../plugin/plugin-volume';
 import AdmZip from 'adm-zip';
 import { ScryptedRuntime } from '../runtime';
@@ -33,5 +34,30 @@ export class Backup {
         const zip = new AdmZip();
         await zip.addLocalFolderPromise(backupDbPath, {});
         return zip.toBufferPromise();
+    }
+
+    async restore(b: Buffer): Promise<void> {
+        const volumeDir = getScryptedVolume();
+        const dbPath = path.join(volumeDir, 'scrypted.db');
+
+        const zip = new AdmZip(b);
+        if (!zip.test())
+            throw new Error('backup zip test failed.');
+
+        this.runtime.kill();
+        await sleep(5000);
+        await this.runtime.datastore.close();
+
+        await fs.promises.rm(volumeDir, {
+            recursive: true,
+            force: true,
+        });
+
+        await fs.promises.mkdir(volumeDir, {
+            recursive: true
+        });
+
+        zip.extractAllTo(dbPath, true);
+        this.runtime.serviceControl.restart();
     }
 }

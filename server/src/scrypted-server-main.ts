@@ -339,13 +339,10 @@ async function start(mainFilename: string, options?: {
 
     app.post('/web/component/restore', async (req, res) => {
         const buffers: Buffer[] = [];
-        let zip: AdmZip;
         req.on('data', b => buffers.push(b));
         try {
             await once(req, 'end');
-            zip = new AdmZip(Buffer.concat(buffers));
-            if (!zip.test())
-                throw new Error('backup zip test failed.');
+            await scrypted.backup.restore(Buffer.concat(buffers))
         }
         catch (e) {
             res.send({
@@ -353,33 +350,6 @@ async function start(mainFilename: string, options?: {
             });
             return;
         }
-        try {
-            scrypted.kill();
-            await sleep(5000);
-            await db.close();
-
-            await fs.promises.rm(volumeDir, {
-                recursive: true,
-                force: true,
-            });
-
-            await fs.promises.mkdir(volumeDir, {
-                recursive: true
-            });
-
-            zip.extractAllTo(dbPath, true);
-
-            res.send({
-                success: true,
-            });
-        }
-        catch (e) {
-            res.send({
-                error: "Error during restore.",
-            });
-        }
-
-        scrypted.serviceControl.restart();
     });
 
     app.get('/web/component/backup', async (req, res) => {
