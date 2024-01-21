@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-      "module": "commonjs",
+      "module": "Node16",
       "target": "esnext",
       "noImplicitAny": true,
       "outDir": "./dist",
@@ -8,7 +8,7 @@
       "sourceMap": true,
       "inlineSources": true,
       "declaration": true,
-      "resolveJsonModule": true,
+      "moduleResolution": "Node16",
   },
   "include": [
       "src/**/*"

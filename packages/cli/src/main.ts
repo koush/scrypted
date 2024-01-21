@@ -4,17 +4,12 @@ import { connectScryptedClient } from '@scrypted/client';
 import { FFmpegInput, ScryptedMimeTypes } from '@scrypted/types';
 import child_process from 'child_process';
 import fs from 'fs';
-import https from 'https';
 import path from 'path';
 import readline from 'readline-sync';
 import semver from 'semver';
 import { authHttpFetch } from '../../../common/src/http-auth-fetch';
 import { installServe, serveMain } from './service';
 import { connectShell } from './shell';
-
-const httpsAgent = new https.Agent({
-    rejectUnauthorized: false,
-});
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -249,7 +244,6 @@ async function main() {
         console.log('   npx scrypted install @scrypted/rtsp');
         console.log('   npx scrypted install @scrypted/rtsp/0.0.51');
         console.log('   npx scrypted install @scrypted/rtsp/0.0.51 192.168.2.100');
-        process.exit(1);
     }
 }
 
