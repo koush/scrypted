@@ -19,6 +19,8 @@ function parseValue(value: string, setting: StorageSetting, readDefaultValue: ()
         return parseInt(value) || readDefaultValue() || 0;
     }
     if (type === 'array') {
+        if (!value)
+            return readDefaultValue() || [];
         try {
             return JSON.parse(value);
         }
