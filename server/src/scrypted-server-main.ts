@@ -149,6 +149,10 @@ async function start(mainFilename: string, options?: {
         realm: 'Scrypted',
     }, async (username, password, callback) => {
         const user = await db.tryGet(ScryptedUser, username);
+        if (!user) {
+            callback(false);
+            return;
+        }
 
         const salted = user.salt + password;
         const hash = crypto.createHash('sha256');

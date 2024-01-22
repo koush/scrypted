@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import readline from 'readline-sync';
 import semver from 'semver';
-import { authHttpFetch } from '../../../common/src/http-auth-fetch';
+import { httpFetch } from '../../../server/src/fetch/http-fetch';
 import { installServe, serveMain } from './service';
 import { connectShell } from './shell';
 
@@ -40,6 +40,12 @@ interface LoginFile {
     [host: string]: Login;
 }
 
+function basicAuthHeaders(username: string, password: string) {
+    const headers = new Headers();
+    headers.set('Authorization', `Basic ${Buffer.from(username + ":" + password).toString('base64')}`);
+    return headers;
+}
+
 async function doLogin(host: string) {
     host = toIpAndPort(host);
 
@@ -49,16 +55,15 @@ async function doLogin(host: string) {
     });
 
     const url = `https://${host}/login`;
-    const response = await authHttpFetch({
+    const response = await httpFetch({
         method: 'GET',
-        credential: {
-            username,
-            password,
-        },
+        headers: basicAuthHeaders(username, password),
         url,
         rejectUnauthorized: false,
         responseType: 'json',
     });
+    if (response.body.error)
+        throw new Error(response.body.error);
 
     fs.mkdirSync(scryptedHome, {
         recursive: true,
@@ -76,13 +81,10 @@ async function doLogin(host: string) {
 
     login[host] = response.body;
     fs.writeFileSync(loginPath, JSON.stringify(login));
-    return login;
+    return login[host];
 }
 
-async function getOrDoLogin(host: string): Promise<{
-    username: string,
-    token: string,
-}> {
+async function getOrDoLogin(host: string): Promise<Login> {
     let login: LoginFile;
     try {
         login = JSON.parse(fs.readFileSync(loginPath).toString());
@@ -91,11 +93,12 @@ async function getOrDoLogin(host: string): Promise<{
 
         if (!login[host].username || !login[host].token)
             throw new Error();
+
+        return login[host];
     }
     catch (e) {
-        login = await doLogin(host);
+        return doLogin(host);
     }
-    return login[host];
 }
 
 async function runCommand() {
@@ -145,8 +148,8 @@ async function main() {
     }
     else if (process.argv[2] === 'login') {
         const ip = process.argv[3] || '127.0.0.1';
-        const token = await doLogin(ip);
-        console.log('login successful. token:', token);
+        const login = await doLogin(ip);
+        console.log('login successful. token:', login.token);
     }
     else if (process.argv[2] === 'command') {
         const { sdk, pendingResult } = await runCommand();
@@ -198,16 +201,15 @@ async function main() {
 
         const login = await getOrDoLogin(ip);
         const url = `https://${ip}/web/component/script/install/${pkg}`;
-        const response = await authHttpFetch({
+        const response = await httpFetch({
             method: 'POST',
-            credential: {
-                username: login.username,
-                password: login.token,
-            },
+            headers: basicAuthHeaders(login.username, login.token),
             url,
             rejectUnauthorized: false,
             responseType: 'json',
         });
+        if (response.body.error)
+            throw new Error(response.body.error);
 
         console.log('install successful. id:', response.body.id);
     }
