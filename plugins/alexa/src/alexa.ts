@@ -1,4 +1,4 @@
-export declare type DisplayCategory = 'ACTIVITY_TRIGGER' | 'CAMERA' | 'CONTACT_SENSOR' | 'DOOR' | 'DOORBELL' | 'GARAGE_DOOR' | 'LIGHT' | 'MICROWAVE' | 'MOTION_SENSOR' | 'OTHER' | 'SCENE_TRIGGER' | 'SECURITY_PANEL' | 'SMARTLOCK' | 'SMARTPLUG' | 'SPEAKER' | 'SWITCH' | 'TEMPERATURE_SENSOR' | 'THERMOSTAT' | 'TV';
+export declare type DisplayCategory = 'ACTIVITY_TRIGGER' | 'CAMERA' | 'CONTACT_SENSOR' | 'DOOR' | 'DOORBELL' | 'GARAGE_DOOR' | 'LIGHT' | 'MICROWAVE' | 'MOTION_SENSOR' | 'OTHER' | 'SCENE_TRIGGER' | 'SECURITY_PANEL' | 'SMARTLOCK' | 'SMARTPLUG' | 'SPEAKER' | 'SWITCH' | 'TEMPERATURE_SENSOR' | 'THERMOSTAT' | 'TV' | 'FAN';
 
 /*
 COMMON DIRECTIVES AND RESPONSES
@@ -116,7 +116,7 @@ export interface ErrorPayload {
     message: string;
 }
 
-export interface ChangePayload {
+export interface ChangePayload extends Payload {
     change: {
         cause: {
             type: "APP_INTERACTION" | "PERIODIC_POLL" | "PHYSICAL_INTERACTION" | "VOICE_INTERACTION" | "RULE_TRIGGER";
