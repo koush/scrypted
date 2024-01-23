@@ -54,15 +54,6 @@ fi
 echo "Setting permissions on $SCRYPTED_HOME"
 chown -R $SERVICE_USER $SCRYPTED_HOME
 
-echo "Optional:"
-readyn "Edit docker-compose.yml to add external storage for Scrypted NVR?"
-
-if [ "$yn" == "y" ]
-then
-    apt install nano
-    nano $DOCKER_COMPOSE_YML
-fi
-
 set +e
 
 echo "docker compose down"
@@ -85,3 +76,6 @@ echo "Scrypted is now running at: https://localhost:10443/"
 echo "Note that it is https and that you'll be asked to approve/ignore the website certificate."
 echo
 echo
+echo "Optional:"
+echo "Scrypted NVR Recording storage directory can be configured with an additional script:"
+echo "https://docs.scrypted.app/scrypted-nvr/installation.html#docker-volume"
