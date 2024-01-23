@@ -119,6 +119,12 @@ then
 
     DIR="/mnt/scrypted-nvr"
 else
+    if [ ! -d "$1" ]
+    then
+        echo "$1 is not a valid directory."
+        exit 1
+    fi
+
     stopscrypted
 
     DIR="$1"
