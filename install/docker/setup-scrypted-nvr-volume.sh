@@ -22,6 +22,22 @@ then
     exit 1
 fi
 
+NVR_MOUNT_LINE=$(cat "$DOCKER_COMPOSE_YML" | grep :/nvr)
+if [ -z "$NVR_MOUNT_LINE" ]
+then
+    echo "Unexpected contents in $DOCKER_COMPOSE_YML. Rerun the Scrypted docker compose installer."
+    exit 1
+fi
+
+function backup() {
+    BACKUP_FILE="$1".scrypted-bak
+    if [ ! -f "$BACKUP_FILE" ]
+    then
+        cp "$1" "$BACKUP_FILE"
+    fi
+}
+
+backup "$DOCKER_COMPOSE_YML"
 
 function readyn() {
     while true; do
@@ -42,6 +58,15 @@ then
     exit 1
 fi
 
+function stopscrypted() {
+    cd "$SCRYPTED_HOME"
+    echo ""
+    echo "Stopping the Scrypted container. If there are any errors during disk setup, Scrypted will need to be manually restarted with:"
+    echo "cd $SCRYPTED_HOME && docker compose up -d"
+    echo ""
+    docker compose down
+}
+
 BLOCK_DEVICE="/dev/$1"
 if [ -b "$BLOCK_DEVICE" ]
 then
@@ -50,6 +75,8 @@ then
     then
         exit 1
     fi
+
+    stopscrypted
 
     umount "$BLOCK_DEVICE"1 2> /dev/null
     umount "$BLOCK_DEVICE"2 2> /dev/null
@@ -64,12 +91,12 @@ then
     mkfs -F -t ext4 "$BLOCK_DEVICE"1
     sync
 
+    # parse/evaluate blkid line as env vars
     for attr in $(blkid | grep "$BLOCK_DEVICE")
     do
         e=$(echo $attr | grep =)
         if [ ! -z "$e" ]
         then
-            # echo "$e"
             export "$e"
         fi
     done
@@ -81,10 +108,7 @@ then
 
     echo "UUID: $UUID"
     set -e
-    if [ ! -f "/etc/fstab.scrypted-bak" ]
-    then
-        cp /etc/fstab /etc/fstab.scrypted-bak
-    fi
+    backup "/etc/fstab"
     grep -v "scrypted-nvr" /etc/fstab > /tmp/fstab && cp /tmp/fstab /etc/fstab
     # ensure newline
     sed -i -e '$a\' /etc/fstab
@@ -92,6 +116,19 @@ then
     echo "PARTLABEL=scrypted-nvr     /mnt/scrypted-nvr    ext4   defaults 0 0" >> /etc/fstab
     mount -a
     set +e
+
+    DIR="/mnt/scrypted-nvr"
 else
-    DIR=$1
+    stopscrypted
+
+    DIR="$1"
 fi
+
+ESCAPED_DIR=$(echo "$DIR" | sed s/\\//\\\\\\//g)
+
+set -e
+sed -i s/'^.*:\/nvr'/"            - $ESCAPED_DIR:\/nvr"/ "$DOCKER_COMPOSE_YML"
+sed -i s/'^.*SCRYPTED_NVR_VOLUME.*$'/"            - SCRYPTED_NVR_VOLUME=\/nvr"/ "$DOCKER_COMPOSE_YML"
+set +e
+
+cd "$SCRYPTED_HOME" && docker compose up -d
