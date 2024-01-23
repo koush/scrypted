@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.91.0",
+  "version": "0.91.1",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",
@@ -62,7 +62,7 @@
     "build": "tsc --outDir dist",
     "postbuild": "node test/check-build-output.js",
     "beta": "npm publish --tag beta",
-    "postbeta": "npm version minor && git add package.json && npm run build && git commit -m postbeta",
+    "postbeta": "npm version patch && git add package.json && npm run build && git commit -m postbeta",
     "release": "npm publish",
     "prepublishOnly": "npm run build",
     "postrelease": "git tag v$npm_package_version && git push origin v$npm_package_version && npm version minor && git add package.json && git commit -m postrelease",

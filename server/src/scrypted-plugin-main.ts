@@ -8,6 +8,7 @@ import { RpcMessage } from "./rpc";
 
 function start(mainFilename: string) {
     const pluginId = process.argv[3];
+    console.log('starting plugin', pluginId);
     module.paths.push(getPluginNodePath(pluginId));
 
     if (process.argv[2] === 'child-thread') {
