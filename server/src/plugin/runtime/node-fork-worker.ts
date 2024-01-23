@@ -21,9 +21,7 @@ export class NodeForkWorker extends ChildProcessWorker {
 
         this.worker = child_process.fork(mainFilename, ['child', this.pluginId], {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-            env: Object.assign({}, process.env, env, {
-                NODE_PATH: path.join(getPluginNodePath(this.pluginId), 'node_modules'),
-            }),
+            env: Object.assign({}, process.env, env),
             serialization: 'advanced',
             execArgv,
         });

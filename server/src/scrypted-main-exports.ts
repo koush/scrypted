@@ -1,9 +1,10 @@
-import v8 from 'v8';
-import vm from 'vm';
+import dns from 'dns';
 import process from 'process';
 import semver from 'semver';
-import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
+import v8 from 'v8';
+import vm from 'vm';
 import { PluginError } from './plugin/plugin-error';
+import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
 import type { Runtime } from './scrypted-server-main';
 
 export function isChildProcess() {
@@ -26,7 +27,7 @@ function start(mainFilename: string, options?: {
     // This causes issues with clients that are on "IPv6" networks that are
     // actually busted and fail to connect to npm's IPv6 address.
     // The workaround is to favor IPv4.
-    process.env['NODE_OPTIONS'] = '--dns-result-order=ipv4first';
+    dns.setDefaultResultOrder('ipv4first');
 
     startPeriodicGarbageCollection();
 

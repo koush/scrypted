@@ -16,9 +16,7 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
 
         this.worker = new worker_threads.Worker(mainFilename, {
             argv: ['child-thread', this.pluginId],
-            env: Object.assign({}, process.env, env, {
-                NODE_PATH: path.join(getPluginNodePath(this.pluginId), 'node_modules'),
-            }),
+            env: Object.assign({}, process.env, env),
         });
 
         this.worker.on('exit', () => {

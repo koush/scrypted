@@ -1,11 +1,15 @@
-import { startPluginRemote } from "./plugin/plugin-remote-worker";
-import { RpcMessage } from "./rpc";
-import worker_threads from "worker_threads";
-import v8 from 'v8';
 import net from 'net';
+import v8 from 'v8';
+import worker_threads from "worker_threads";
+import { getPluginNodePath } from "./plugin/plugin-npm-dependencies";
+import { startPluginRemote } from "./plugin/plugin-remote-worker";
 import { SidebandSocketSerializer } from "./plugin/socket-serializer";
+import { RpcMessage } from "./rpc";
 
 function start(mainFilename: string) {
+    const pluginId = process.argv[3];
+    module.paths.push(getPluginNodePath(pluginId));
+
     if (process.argv[2] === 'child-thread') {
         const peer = startPluginRemote(mainFilename, process.argv[3], (message, reject) => {
             try {
