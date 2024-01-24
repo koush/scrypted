@@ -514,10 +514,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!o.boundingBox)
         continue;
 
-      o.zones = []
       const box = normalizeBox(o.boundingBox, detection.inputDimensions);
 
       let included: boolean;
+      // need a way to explicitly include package zone.
+      if (o.zones)
+        included = true;
+      else
+        o.zones = [];
       for (const [zone, zoneValue] of Object.entries(this.zones)) {
         if (zoneValue.length < 3) {
           // this.console.warn(zone, 'Zone is unconfigured, skipping.');
