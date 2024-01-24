@@ -1,4 +1,4 @@
-
+import path from 'path'
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
@@ -971,6 +971,7 @@ class PrebufferSession {
 
     const clientPromise = await listenSingleRtspClient({
       hostname,
+      pathToken: path.join(crypto.randomBytes(8).toString('hex'), this.mixin.id),
       createServer: duplex => {
         sdp = addTrackControls(sdp);
         server = new FileRtspServer(duplex, sdp);
