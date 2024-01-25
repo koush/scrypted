@@ -48,7 +48,7 @@ echo "Created $DOCKER_COMPOSE_YML"
 curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/docker-compose.yml | sed s/SET_THIS_TO_SOME_RANDOM_TEXT/"$(echo $RANDOM | md5sum | head -c 32)"/g > $DOCKER_COMPOSE_YML
 if [ -d /dev/dri ]
 then
-    sed -i 's/'#' - \/dev\/dri/- \/dev\/dri/g' $DOCKER_COMPOSE_YML
+    sed -i 's/'#' "\/dev\/dri/"\/dev\/dri/g' $DOCKER_COMPOSE_YML
 fi
 
 echo "Setting permissions on $SCRYPTED_HOME"
