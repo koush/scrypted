@@ -164,11 +164,12 @@ export class SynologyApiClient {
         const response = await this.client.get<SynologyApiResponse<T>>(url ?? await this.getApiPath(params.api), { params });
 
         if (!response.data?.success) {
-            if (response.data?.error?.code) {
+            const errorCode = response.data?.error?.code;
+            if (errorCode) {
                 const errorCodeLookup = { ...errorCodeDescriptions, ...extraErrorCodes }
-                throw new Error(`${errorCodeLookup[response.data.error.code]} (error code ${response.data.error.code})`)
+                throw new SynologyApiError(`${errorCodeLookup[errorCode]} (error code ${errorCode})`, errorCode)
             } else {
-                throw new Error(`Synology API call failed with status code ${response.status}`);
+                throw new SynologyApiError(`Synology API call failed with status code ${response.status}`);
             }
         }
 
@@ -186,7 +187,17 @@ export interface SynologyApiInfo {
     maxVersion: number;
 }
 
-export interface SynologyApiError {
+export class SynologyApiError extends Error {
+    code?: string;
+    constructor(message: string, code?: string) {
+        super(message);
+        
+        this.name = 'SynologyApiError';
+        this.code = code;
+    }
+}
+
+export interface SynologyApiErrorObject {
     code: string;
 }
 
@@ -198,7 +209,7 @@ interface SynologyApiRequestParams {
 
 interface SynologyApiResponse<T> {
     data?: T;
-    error?: SynologyApiError;
+    error?: SynologyApiErrorObject;
     success: boolean;
 }
 
