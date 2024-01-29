@@ -33,17 +33,56 @@ export default {
       const termSvcRaw = this.$scrypted.systemManager.getDeviceByName("@scrypted/core");
       const termSvc = await termSvcRaw.getDevice("terminalservice");
       const termSvcDirect = await this.$scrypted.connectRPCObject(termSvc);
-      const queue = createAsyncQueue();
+      const dataQueue = createAsyncQueue();
+      const ctrlQueue = createAsyncQueue();
 
-      queue.enqueue(JSON.stringify({ interactive: true }));
-      queue.enqueue(JSON.stringify({ dim: { cols: term.cols, rows: term.rows } }));
+      ctrlQueue.enqueue({ interactive: true });
+      ctrlQueue.enqueue({ dim: { cols: term.cols, rows: term.rows } });
 
-      term.onData(data => queue.enqueue(Buffer.from(data, 'utf8')));
-      term.onBinary(data => queue.enqueue(Buffer.from(data, 'binary')));
-      term.onResize(dim => queue.enqueue(JSON.stringify({ dim })));
+      let bufferedLength = 0;
+      const MAX_BUFFERED_LENGTH = 64000;
+      async function dataQueueEnqueue(data) {
+        bufferedLength += data.length;
+        const promise = dataQueue.enqueue(data).then(() => bufferedLength -= data.length);
+        if (bufferedLength >= MAX_BUFFERED_LENGTH) {
+          term.setOption("disableStdin", true);
+          await promise;
+          if (bufferedLength < MAX_BUFFERED_LENGTH)
+            term.setOption("disableStdin", false);
+        }
+      }
 
-      const localGenerator = queue.queue;
-      const remoteGenerator = await termSvcDirect.connectStream(localGenerator);
+      term.onData(data => dataQueueEnqueue(Buffer.from(data, 'utf8')));
+      term.onBinary(data => dataQueueEnqueue(Buffer.from(data, 'binary')));
+      term.onResize(dim => {
+        ctrlQueue.enqueue({ dim });
+        ctrlQueue.enqueue(Buffer.alloc(0));
+      });
+
+      async function* localGenerator() {
+        while (true) {
+          const ctrlBuffers = ctrlQueue.clear();
+          if (ctrlBuffers.length) {
+            for (const ctrl of ctrlBuffers) {
+              yield JSON.stringify(ctrl);
+            }
+            continue;
+          }
+
+          const dataBuffers = dataQueue.clear();
+          if (dataBuffers.length === 0) {
+            const buf = await dataQueue.dequeue();
+            if (buf.length)
+              yield buf;
+            continue;
+          }
+
+          const concat = Buffer.concat(dataBuffers);
+          if (concat.length)
+            yield concat;
+        }
+      }
+      const remoteGenerator = await termSvcDirect.connectStream(localGenerator());
 
       for await (const message of remoteGenerator) {
         if (!message) {
