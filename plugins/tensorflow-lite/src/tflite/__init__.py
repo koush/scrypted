@@ -70,7 +70,7 @@ class TensorFlowLitePlugin(
             nonlocal model
 
             if defaultModel:
-                model = "yolov8n_full_integer_quant_320"
+                model = "efficientdet_lite0_320_ptq"
             self.yolo = "yolo" in model
             self.yolov8 = "yolov8" in model
 
