@@ -2,9 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import Level from '../level';
 import { sleep } from '../sleep';
-import { getScryptedVolume } from '../plugin/plugin-volume';
+import { getPluginsVolume, getScryptedVolume } from '../plugin/plugin-volume';
 import AdmZip from 'adm-zip';
 import { ScryptedRuntime } from '../runtime';
+import { getPluginNodePath } from '../plugin/plugin-npm-dependencies';
 
 export class Backup {
     constructor(public runtime: ScryptedRuntime) {}
@@ -48,13 +49,17 @@ export class Backup {
         await sleep(5000);
         await this.runtime.datastore.close();
 
-        await fs.promises.rm(volumeDir, {
+        // nuke the existing database path
+        await fs.promises.rm(dbPath, {
             recursive: true,
             force: true,
         });
 
-        await fs.promises.mkdir(volumeDir, {
-            recursive: true
+        // nuke all the plugins and associated files downloaded by thhem.
+        // first run after restore will reinstall everything.
+        await fs.promises.rm(getPluginsVolume(), {
+            recursive: true,
+            force: true,
         });
 
         zip.extractAllTo(dbPath, true);

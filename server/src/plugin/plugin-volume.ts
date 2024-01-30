@@ -7,9 +7,15 @@ export function getScryptedVolume() {
     return volumeDir;
 }
 
-export function getPluginVolume(pluginId: string) {
+export function getPluginsVolume() {
     const volume = getScryptedVolume();
-    const pluginVolume = path.join(volume, 'plugins', pluginId);
+    const pluginsVolume = path.join(volume, 'plugins');
+    return pluginsVolume;
+}
+
+export function getPluginVolume(pluginId: string) {
+    const volume = getPluginsVolume();
+    const pluginVolume = path.join(volume, pluginId);
     return pluginVolume;
 }
 
