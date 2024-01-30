@@ -1,6 +1,6 @@
 import sdk, { Camera, Device, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from "@scrypted/sdk";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
-import { SynologyApiClient, SynologyCamera, SynologyCameraStream } from "./api/synology-api-client";
+import { SynologyApiClient, SynologyApiError, SynologyCamera, SynologyCameraStream } from "./api/synology-api-client";
 
 const { deviceManager } = sdk;
 
@@ -162,10 +162,11 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
 }
 
 class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings, DeviceProvider {
-    private cameras: SynologyCamera[];
+    private cameras: SynologyCamera[] = [];
     private cameraDevices: Map<string, SynologyCameraDevice> = new Map();
     api: SynologyApiClient;
     private startup: Promise<void>;
+    private discovering: boolean;
 
     constructor(nativeId?: string) {
         super(nativeId);
@@ -177,66 +178,23 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
     }
 
     public async discoverDevices(duration: number): Promise<void> {
-        const url = this.getSetting('url');
-        const username = this.getSetting('username');
-        const password = this.getSetting('password');
-        const otpCode = this.getSetting('otpCode');
-        const mfaDeviceId = this.getSetting('mfaDeviceId');
+        if (this.discovering) return;
+        this.discovering = true;
 
-        this.log.clearAlerts();
-
-        if (!url) {
-            this.log.a('Must provide URL.');
-            return
-        }
-
-        if (!username) {
-            this.log.a('Must provide username.');
-            return
-        }
-
-        if (!password) {
-            this.log.a('Must provide password.');
-            return
-        }
-
-        if (!this.api || url !== this.api.url) {
-            this.api = new SynologyApiClient(url);
-        }
+        this.console.info(`Fetching list of cameras from Synology server...`);
 
         try {
-            const newMfaDeviceId = await this.api.login(username, password, otpCode ? parseInt(otpCode) : undefined, !!otpCode, 'Scrypted', mfaDeviceId);
-
-            // If a OTP was present, store the device ID to allow us to skip the OTP requirement next login.
-            if (otpCode) {
-                this.storage.setItem('mfaDeviceId', newMfaDeviceId);
+            if (!await this.tryLogin()) {
+                return;
             }
-        }
-        catch (e) {
-            this.log.a(`login error: ${e}`);
-            this.console.error('login error', e);
 
-            // Clear device ID upon login failure, since it's likely useless now
-            this.storage.removeItem('mfaDeviceId');
-
-            return;
-        }
-        finally {
-            // Clear the OTP setting if provided since it's a temporary code
-            if (otpCode) {
-                this.storage.removeItem('otpCode');
-                this.onDeviceEvent(ScryptedInterface.Settings, undefined);
-            }
-        }
-
-        try {
             this.cameras = await this.api.listCameras();
 
             if (!this.cameras) {
                 this.console.error('Cameras failed to load. Retrying in 10 seconds.');
                 setTimeout(() => {
                     this.discoverDevices(0);
-                }, 100000);
+                }, 10000);
                 return;
             }
 
@@ -285,6 +243,8 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
         catch (e) {
             this.log.a(`device discovery error: ${e}`);
             this.console.error('device discovery error', e);
+        } finally {
+            this.discovering = false;
         }
     }
 
@@ -353,7 +313,81 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
             return;
         }
         this.storage.setItem(key, value.toString());
-        this.discoverDevices(0);
+
+        // Delaying discover in case user updated multiple settings, so that it doesn't run until all have been set
+        setTimeout(() => this.discoverDevices(0), 200);
+    }
+
+    private async tryLogin(): Promise<boolean> {
+        this.console.info('Logging into Synology...');
+
+        const url = this.getSetting('url');
+        const username = this.getSetting('username');
+        const password = this.getSetting('password');
+        const otpCode = this.getSetting('otpCode');
+        const mfaDeviceId = this.getSetting('mfaDeviceId');
+
+        this.log.clearAlerts();
+
+        if (!url) {
+            this.log.a('Must provide URL.');
+            return
+        }
+
+        if (!username) {
+            this.log.a('Must provide username.');
+            return
+        }
+
+        if (!password) {
+            this.log.a('Must provide password.');
+            return
+        }
+
+        if (!this.api || url !== this.api.url) {
+            this.api = new SynologyApiClient(url);
+        }
+
+        let successful = false;
+        for (let attempt=1; attempt<=3; attempt++) {
+            try {
+                const newMfaDeviceId = await this.api.login(username, password, otpCode ? parseInt(otpCode) : undefined, !!otpCode, 'Scrypted', mfaDeviceId);
+
+                // If a OTP was present, store the device ID to allow us to skip the OTP requirement next login.
+                if (otpCode) {
+                    this.storage.setItem('mfaDeviceId', newMfaDeviceId);
+                }
+
+                successful = true;
+            }
+            catch (e) {
+                this.log.a(`login error on attempt ${attempt}: ${e}`);
+                this.console.error(`login error on attempt ${attempt}`, e);
+
+                if (e instanceof SynologyApiError) {
+                    break;
+                } else {
+                    // Retry on failures that aren't Synology-specific, such as timeouts
+                    await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+                    continue;
+                }
+            }
+            finally {
+                // Clear the OTP setting if provided since it's a temporary code
+                if (otpCode) {
+                    this.storage.removeItem('otpCode');
+                    this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+                }
+            }           
+        }
+
+        if (successful) {
+            this.console.info(`Successfully logged into Synology`);
+        } else {
+            this.console.info(`Failed to log into Synology`);
+        }
+
+        return successful;
     }
 }
 

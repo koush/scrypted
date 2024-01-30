@@ -89,6 +89,13 @@ USER_HOME=$(eval echo ~$SERVICE_USER)
 echo "Setting permissions on $USER_HOME/.scrypted"
 chown -R $SERVICE_USER $USER_HOME/.scrypted
 
+echo "Stopping docker service if it exists..."
+cd $USER_HOME/.scrypted
+echo "docker compose down"
+sudo -u $SERVICE_USER docker compose down 2> /dev/null
+echo "docker compose rm -rf"
+sudo -u $SERVICE_USER docker rm -f /scrypted /scrypted-watchtower 2> /dev/null
+
 echo "Installing Scrypted..."
 RUN sudo -u $SERVICE_USER npx -y scrypted@latest install-server
 

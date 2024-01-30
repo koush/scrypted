@@ -26,6 +26,10 @@ then
     fi
 fi
 
+echo "Stopping local service if it is running..."
+systemctl stop scrypted.service 2> /dev/null
+systemctl disable scrypted.service 2> /dev/null
+
 USER_HOME=$(eval echo ~$SERVICE_USER)
 SCRYPTED_HOME=$USER_HOME/.scrypted
 mkdir -p $SCRYPTED_HOME

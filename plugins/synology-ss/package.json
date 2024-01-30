@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/synology-ss",
-   "version": "0.0.16",
+   "version": "0.0.17",
    "description": "A Synology Surveillance Station plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -36,10 +36,10 @@
       ]
    },
    "dependencies": {
-      "axios": "^0.24.0"
+      "axios": "^1.0.0"
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk",
-      "@types/node": "^16.6.1"
+      "@types/node": "^18.0.0"
    }
 }
