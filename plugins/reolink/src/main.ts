@@ -3,7 +3,7 @@ import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, Intercom, MediaO
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { OnvifCameraAPI, connectCameraAPI } from './onvif-api';
+import { OnvifCameraAPI, OnvifEvent, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
 import { AIState, DevInfo, Enc, ReolinkCameraClient } from './reolink-api';
@@ -49,6 +49,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
                 await this.updateDevice();
                 this.updatePtzCaps();
             },
+        },
+        doorbellUseOnvifDetections: {
+            hide: true,
+            defaultValue: true,
         }
     });
 
@@ -80,6 +84,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
     }
 
     async getObjectTypes(): Promise<ObjectDetectionTypes> {
+        if (this.storageSettings.values.doorbell && this.storageSettings.values.doorbellUseOnvifDetections) {
+            return {
+                classes: ['person'],
+            };
+        }
+
         try {
             const ai: AIState = this.storageSettings.values.hasObjectDetector[0]?.value;
             const classes: string[] = [];
@@ -228,9 +238,35 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
 
         if (this.storageSettings.values.doorbell) {
             const ret = await listenEvents(this, await this.createOnvifClient(), this.storageSettings.values.motionTimeout * 1000);
+            if (!this.storageSettings.values.doorbellUseOnvifDetections) {
+                startAI(ret, ret.triggerMotion);
+            }
+            else {
+                ret.on('onvifEvent', (eventTopic: string, dataValue: any) => {
+                    if (eventTopic.includes('PeopleDetect')) {
+                        if (dataValue) {
+                            ret.emit('event', OnvifEvent.MotionStart);
+
+                            const od: ObjectsDetected = {
+                                timestamp: Date.now(),
+                                detections: [
+                                    {
+                                        className: 'person',
+                                        score: 1,
+                                    }
+                                ],
+                            };
+                            sdk.deviceManager.onDeviceEvent(this.nativeId, ScryptedInterface.ObjectDetector, od);
+                        }
+                        else {
+                            ret.emit('event', OnvifEvent.MotionStop);
+                        }
+                    }
+                });
+            }
+
             ret.on('close', () => killed = true);
             ret.on('error', () => killed = true);
-            startAI(ret, ret.triggerMotion);
             return ret;
         }
 
