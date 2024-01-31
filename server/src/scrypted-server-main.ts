@@ -220,14 +220,6 @@ async function start(mainFilename: string, options?: {
     }
 
     app.use(async (req, res, next) => {
-        const defaultAuthentication = getDefaultAuthentication(req);
-        if (defaultAuthentication) {
-            res.locals.username = defaultAuthentication._id;
-            res.locals.aclId = defaultAuthentication.aclId;
-            next();
-            return;
-        }
-
         // the remote address may be ipv6 prefixed so use a fuzzy match.
         // eg ::ffff:192.168.2.124
         if (process.env.SCRYPTED_ADMIN_USERNAME
@@ -307,6 +299,15 @@ async function start(mainFilename: string, options?: {
         else if (req.query['scryptedToken']) {
             checkToken(req.query.scryptedToken.toString());
         }
+
+        if (!res.locals.username) {
+            const defaultAuthentication = getDefaultAuthentication(req);
+            if (defaultAuthentication) {
+                res.locals.username = defaultAuthentication._id;
+                res.locals.aclId = defaultAuthentication.aclId;
+            }
+        }
+
         next();
     });
 
@@ -637,22 +638,6 @@ async function start(mainFilename: string, options?: {
             return;
         }
 
-        // env based anon user login
-        const defaultAuthentication = getDefaultAuthentication(req);
-        if (defaultAuthentication) {
-            const userToken = new UserToken(defaultAuthentication._id, defaultAuthentication.aclId, Date.now());
-            res.send({
-                ...createTokens(userToken),
-                expiration: ONE_DAY_MILLISECONDS,
-                username: defaultAuthentication,
-                // TODO: do not return the token from a short term auth mechanism?
-                token: defaultAuthentication?.token,
-                ...alternateAddresses,
-                hostname,
-            });
-            return;
-        }
-
         // basic auth
         if (req.protocol === 'https' && req.headers.authorization) {
             const username = await new Promise(resolve => {
@@ -697,6 +682,22 @@ async function start(mainFilename: string, options?: {
             })
         }
         catch (e) {
+            // env based anon user login
+            const defaultAuthentication = getDefaultAuthentication(req);
+            if (defaultAuthentication) {
+                const userToken = new UserToken(defaultAuthentication._id, defaultAuthentication.aclId, Date.now());
+                res.send({
+                    ...createTokens(userToken),
+                    expiration: ONE_DAY_MILLISECONDS,
+                    username: defaultAuthentication,
+                    // TODO: do not return the token from a short term auth mechanism?
+                    token: defaultAuthentication?.token,
+                    ...alternateAddresses,
+                    hostname,
+                });
+                return;
+            }
+
             res.send({
                 error: e?.message || 'Unknown Error.',
                 hasLogin,
