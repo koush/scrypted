@@ -1,7 +1,7 @@
 import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "./werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCInputMediaObjectTrack, RTCMediaObjectTrack, RTCOutputMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCInputMediaObjectTrack, RTCOutputMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { logIsLocalIceTransport } from "./werift-util";
@@ -227,6 +227,11 @@ export async function createTrackForwarder(options: {
             if (msection.codec === 'opus')
                 return msection.rtpmap.clock === 48000;
             if (msection.codec !== 'pcm_mulaw' && msection.codec !== 'pcm_alaw')
+                return false;
+            // alexa doesn't support these though they're required by webrtc spec...
+            if (msection.codec === 'pcm_mulaw' && !audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU'))
+                return false;
+            if (msection.codec === 'pcm_alaw' && !audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA'))
                 return false;
             return msection.rtpmap.clock === 8000;
         },
