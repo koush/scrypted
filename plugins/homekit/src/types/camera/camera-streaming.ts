@@ -63,7 +63,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             });
 
             const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-            let addressOverride = await getAddressOverride();
+            let addressOverride = await getAddressOverride(socketType);
 
             if (addressOverride) {
                 const infos = Object.values(os.networkInterfaces()).flat().map(i => i?.address);

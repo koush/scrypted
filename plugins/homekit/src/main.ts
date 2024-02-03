@@ -2,7 +2,7 @@ import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin'
 import sdk, { DeviceProvider, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import packageJson from "../package.json";
-import { getAddressOverride } from "./address-override";
+import { getAddressOverride, getAddressOverrides } from "./address-override";
 import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
@@ -411,7 +411,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         if (bind === 'All Addresses')
             bind = undefined;
         else if (!bind || bind === 'Default' || bind === 'Server Address')
-            bind = await getAddressOverride();
+            return getAddressOverrides();
         return bind;
     }
 
