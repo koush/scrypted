@@ -76,6 +76,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 + 'The http(s) URL that retrieves a jpeg image from your camera.',
             placeholder: 'https://ip:1234/cgi-bin/snapshot.jpg',
         },
+        periodicSnapshotTimeout: {
+            title: 'Periodic snapshot timeout',
+            description: 'The amount of time (in seconds) to wait for a periodic snapshot.',
+            defaultValue: 1,
+            placeholder: '1',
+        },
         snapshotsFromPrebuffer: {
             title: 'Snapshots from Prebuffer',
             description: 'Prefer snapshots from the Rebroadcast Plugin prebuffer when available. This setting uses considerable CPU to convert a video stream into a snapshot. The Default setting will use the camera snapshot and fall back to prebuffer on failure.',
@@ -270,6 +276,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         let picture: Buffer;
         const eventSnapshot = options?.reason === 'event';
         const periodicSnapshot = options?.reason === 'periodic';
+        const { periodicSnapshotTimeout } = this.storageSettings.values;
 
         try {
             const debounced = this.snapshotDebouncer({
@@ -291,9 +298,10 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 const cp = this.currentPicture;
                 debounced.catch(() => {});
                 try {
-                    picture = await timeoutPromise(1000, debounced);
+                    picture = await timeoutPromise(periodicSnapshotTimeout * 1000, debounced);
                 }
                 catch (e) {
+                    this.debugConsole.log(`Periodic snapshot took longer than ${periodicSnapshotTimeout} seconds to retrieve, using previous snapshot.`)
                     picture = cp;
                 }
             }
