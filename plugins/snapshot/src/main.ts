@@ -283,12 +283,14 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 id: options?.id,
                 reason: options?.reason,
             }, eventSnapshot ? 0 : 2000, async () => {
+                const snapshotTimer = Date.now();
                 let picture = await this.takePictureInternal();
                 picture = await this.cropAndScale(picture);
                 this.clearCachedPictures();
                 this.currentPicture = picture;
                 this.currentPictureTime = Date.now();
                 this.lastAvailablePicture = picture;
+                this.debugConsole.debug(`Periodic snapshot took ${(this.currentPictureTime - snapshotTimer) / 1000} seconds to retrieve.`)
                 return picture;
             });
 
