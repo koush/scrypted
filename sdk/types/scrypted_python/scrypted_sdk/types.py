@@ -697,6 +697,7 @@ class RequestPictureOptions(TypedDict):
     bulkRequest: bool  # Flag that hints whether multiple cameras are being refreshed by this user request. Can be used to prefetch the snapshots.
     id: str
     periodicRequest: bool  # Flag that hints whether this user request is happening due to a periodic refresh.
+    periodicTimeout: float  # The maximum time in milliseconds to wait for the periodic picture to be taken.
     picture: PictureDimensions  # The native dimensions of the camera.
     reason: Any | Any  # periodic: The requestor will request the snapshot periodically so a recent cached image may be returned. event: The requestor needs an image for event processing or thumbnail. Cached or error images will not be returned.
 
