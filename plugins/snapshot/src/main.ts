@@ -293,11 +293,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 const cp = this.currentPicture;
                 debounced.catch(() => {});
                 try {
-                    picture = await (options.periodicTimeout ? timeoutPromise(options.periodicTimeout, debounced) : debounced);
+                    picture = await (options.timeout ? timeoutPromise(options.timeout, debounced) : debounced);
                 }
                 catch (e) {
-                    if (options.periodicTimeout)
-                        this.debugConsole.debug(`Periodic snapshot took longer than ${options.periodicTimeout} seconds to retrieve, falling back to cached picture.`)
+                    if (options.timeout)
+                        this.debugConsole.debug(`Periodic snapshot took longer than ${options.timeout} seconds to retrieve, falling back to cached picture.`)
 
                     picture = cp;
                 }

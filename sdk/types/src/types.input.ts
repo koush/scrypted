@@ -454,9 +454,9 @@ export interface RequestPictureOptions extends PictureOptions {
    */
   bulkRequest?: boolean;
   /**
-   * The maximum time in milliseconds to wait for the periodic picture to be taken.
+   * The maximum time in milliseconds to wait for the picture.
    */
-  periodicTimeout?: number;
+  timeout?: number;
 }
 /**
  * Camera devices can take still photos.
