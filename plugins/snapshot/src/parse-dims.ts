@@ -81,7 +81,7 @@ export async function processImageOp(input: string | FFmpegInput | Buffer, op: I
     if (filenameOrBuffer && loadSharp()) {
         const vips = await loadVipsImage(filenameOrBuffer, sourceId);
 
-        const resize = width != null && {
+        const resize = (width != null || height != null) && {
             width,
             height,
         };
