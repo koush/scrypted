@@ -219,10 +219,6 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-        const id = mixinDeviceState.id;
-        if (this.createdMixins.has(id)) {
-            return this.createdMixins.get(id);
-        }
         const ret = new WebhookMixin({
             mixinDevice,
             mixinDeviceState,
@@ -231,7 +227,8 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
             group: "Webhook",
             groupKey: "webhook",
         });
-        this.createdMixins.set(id, ret);
+
+        this.createdMixins.set(ret.id, ret);
         return ret;
     }
 
