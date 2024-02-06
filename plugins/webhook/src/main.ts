@@ -110,7 +110,7 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
                 if (p) {
                     parameters = JSON.parse(p);
                 }
-                
+
                 const result = await device[methodOrProperty](...parameters);
                 if (request.headers['accept']?.includes('application/json')) {
                     response?.send(JSON.stringify({ result }), {
@@ -140,7 +140,7 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
                 });
             }
             else {
-                response?.send(value.toString());
+                response?.send(value?.toString());
             }
         }
         else {
@@ -163,6 +163,13 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
         const id = pathSegments[1];
 
         const device = systemManager.getDeviceById<ScryptedDevice & Settings>(id);
+        if (!device) {
+            this.console.error('no such device');
+            response.send('Not Found', {
+                code: 404,
+            })
+            return;
+        }
         this.console.log('device', id, device.name);
 
         if (!device.mixins.includes(this.id)) {
@@ -212,6 +219,10 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
+        const id = mixinDeviceState.id.toString()
+        if (this.createdMixins.has(id)) {
+            return this.createdMixins.get(id);
+        }
         const ret = new WebhookMixin({
             mixinDevice,
             mixinDeviceState,
@@ -220,13 +231,12 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
             group: "Webhook",
             groupKey: "webhook",
         });
-
-        this.createdMixins.set(ret.id, ret);
+        this.createdMixins.set(id, ret);
         return ret;
     }
 
     async releaseMixin(id: string, mixinDevice: any): Promise<void> {
-        this.createdMixins.delete(id);
+        this.createdMixins.delete(id.toString());
     }
 }
 
