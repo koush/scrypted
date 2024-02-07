@@ -67,6 +67,13 @@ function stopscrypted() {
     docker compose down
 }
 
+function removefstab() {
+    backup "/etc/fstab"
+    grep -v "scrypted-nvr" /etc/fstab > /tmp/fstab && cp /tmp/fstab /etc/fstab
+    # ensure newline
+    sed -i -e '$a\' /etc/fstab
+}
+
 BLOCK_DEVICE="/dev/$1"
 if [ -b "$BLOCK_DEVICE" ]
 then
@@ -108,10 +115,7 @@ then
 
     echo "UUID: $UUID"
     set -e
-    backup "/etc/fstab"
-    grep -v "scrypted-nvr" /etc/fstab > /tmp/fstab && cp /tmp/fstab /etc/fstab
-    # ensure newline
-    sed -i -e '$a\' /etc/fstab
+    removescryptedfstab
     mkdir -p /mnt/scrypted-nvr
     echo "PARTLABEL=scrypted-nvr     /mnt/scrypted-nvr    ext4   defaults 0 0" >> /etc/fstab
     mount -a
@@ -126,6 +130,8 @@ else
     fi
 
     stopscrypted
+
+    removescryptedfstab
 
     DIR="$1"
 fi
