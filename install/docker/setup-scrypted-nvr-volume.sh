@@ -67,7 +67,7 @@ function stopscrypted() {
     docker compose down
 }
 
-function removefstab() {
+function removescryptedfstab() {
     backup "/etc/fstab"
     grep -v "scrypted-nvr" /etc/fstab > /tmp/fstab && cp /tmp/fstab /etc/fstab
     # ensure newline
