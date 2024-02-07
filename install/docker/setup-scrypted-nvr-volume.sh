@@ -59,12 +59,12 @@ then
 fi
 
 function stopscrypted() {
-    cd "$SCRYPTED_HOME"
+    cd $SCRYPTED_HOME
     echo ""
     echo "Stopping the Scrypted container. If there are any errors during disk setup, Scrypted will need to be manually restarted with:"
     echo "cd $SCRYPTED_HOME && docker compose up -d"
     echo ""
-    docker compose down
+    sudo -u $SERVICE_USER docker compose down 2> /dev/null
 }
 
 function removescryptedfstab() {
@@ -143,4 +143,5 @@ sed -i s/'^.*:\/nvr'/"            - $ESCAPED_DIR:\/nvr"/ "$DOCKER_COMPOSE_YML"
 sed -i s/'^.*SCRYPTED_NVR_VOLUME.*$'/"            - SCRYPTED_NVR_VOLUME=\/nvr"/ "$DOCKER_COMPOSE_YML"
 set +e
 
-cd "$SCRYPTED_HOME" && docker compose up -d
+cd $SCRYPTED_HOME
+sudo -u $SERVICE_USER docker compose up -d
