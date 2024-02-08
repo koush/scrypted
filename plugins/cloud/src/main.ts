@@ -1,9 +1,13 @@
+import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios from 'axios';
 import bpmux from 'bpmux';
+import * as cloudflared from 'cloudflared';
 import crypto from 'crypto';
 import { once } from 'events';
+import { backOff } from "exponential-backoff";
+import fs, { mkdirSync, renameSync, rmSync } from 'fs';
 import http from 'http';
 import HttpProxy from 'http-proxy';
 import https from 'https';
@@ -11,17 +15,12 @@ import upnp from 'nat-upnp';
 import net from 'net';
 import os from 'os';
 import path from 'path';
-import { Duplex, Readable } from 'stream';
+import { Duplex } from 'stream';
 import tls from 'tls';
+import { readLine } from '../../../common/src/read-stream';
 import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { PushManager } from './push';
-import { readLine } from '../../../common/src/read-stream';
 import { qsparse, qsstringify } from "./qs";
-import * as cloudflared from 'cloudflared';
-import fs, { mkdirSync, renameSync, rmSync } from 'fs';
-import { backOff } from "exponential-backoff";
-import ip from 'ip';
-import { Deferred } from "@scrypted/common/src/deferred";
 
 // import { registerDuckDns } from "./greenlock";
 
@@ -644,7 +643,18 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         return this.getSSLHostname() || SCRYPTED_SERVER;
     }
 
-    async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
+    async convert(data: Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer> {
+        // if cloudflare is enabled and the plugin isn't set up as a custom domain, try to use the cloudflare url for
+        // short lived urls.
+        if (this.cloudflareTunnel && this.storageSettings.values.forwardingMode !== 'Custom Domain') {
+            const params = new URLSearchParams(toMimeType.split(';')[1] || '');
+            if (params.get('short-lived') === 'true') {
+                const u = new URL(data.toString(), this.cloudflareTunnel);
+                u.host = this.cloudflareTunnelHost;
+                u.port = '';
+                return Buffer.from(u.toString());
+            }
+        }
         return this.whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.getHostname()}`);
     }
 
