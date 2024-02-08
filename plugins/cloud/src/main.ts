@@ -1,7 +1,6 @@
 import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
-import axios from 'axios';
 import bpmux from 'bpmux';
 import * as cloudflared from 'cloudflared';
 import crypto from 'crypto';
@@ -19,6 +18,7 @@ import { Duplex } from 'stream';
 import tls from 'tls';
 import { readLine } from '../../../common/src/read-stream';
 import { createSelfSignedCertificate } from '../../../server/src/cert';
+import { httpFetch } from '../../../server/src/fetch/http-fetch';
 import { PushManager } from './push';
 import { qsparse, qsstringify } from "./qs";
 
@@ -333,7 +333,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 const url = new URL('https://www.duckdns.org/update');
                 url.searchParams.set('domains', this.storageSettings.values.duckDnsHostname);
                 url.searchParams.set('token', this.storageSettings.values.duckDnsToken);
-                await axios(url.toString());
+                await httpFetch({
+                    url: url.toString(),
+                });
             }
             catch (e) {
                 this.console.error('Duck DNS Erorr', e);
@@ -364,7 +366,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             ip = this.cloudflareTunnelHost;
         }
         else {
-            ip = (await axios(`https://${SCRYPTED_SERVER}/_punch/ip`)).data.ip;
+            ip = (await httpFetch({
+                url: `https://${SCRYPTED_SERVER}/_punch/ip`,
+                responseType: 'json',
+            })).body.ip;
         }
 
         if (this.storageSettings.values.forwardingMode === 'Custom Domain' || this.cloudflareTunnelHost)
@@ -399,11 +404,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             if (!hostname)
                 hostname = 'localhost';
             url.searchParams.set('url', `https://${hostname}:${upnp_port}${pluginPath}/testPortForward`);
-            const response = await axios(url.toString());
-            this.console.log('test data:', response.data);
-            if (response.data.error)
-                throw new Error(response.data.error);
-            if (response.data.data !== this.randomBytes)
+            const response = await httpFetch({
+                url: url.toString(),
+                responseType: 'json',
+            });
+            this.console.log('test data:', response.body);
+            if (response.body.error)
+                throw new Error(response.body.error);
+            if (response.body.data !== this.randomBytes)
                 throw new Error('Server received data that did not match this server.');
             this.log.a("Port Forward Test Succeeded.");
         }
@@ -493,13 +501,15 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             scope: local.pathname,
             ttl,
         })
-        const scope = await axios(`https://${this.getHostname()}/_punch/scope?${q}`, {
+        const scope = await httpFetch({
+            url: `https://${this.getHostname()}/_punch/scope?${q}`,
             headers: {
                 Authorization: `Bearer ${token_info}`
             },
+            responseType: 'json',
         })
 
-        const { userToken, userTokenSignature } = scope.data;
+        const { userToken, userTokenSignature } = scope.body;
         const tokens = qsstringify({
             user_token: userToken,
             user_token_signature: userTokenSignature
@@ -575,16 +585,18 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const { token_info } = this.storageSettings.values;
         if (!token_info)
             throw new Error('Scrypted Cloud is not logged in. Skipping home.scrypted.app registration.');
-        const response = await axios(`https://${SCRYPTED_SERVER}/_punch/register?${q}`, {
+        const response = await httpFetch({
+            url: `https://${SCRYPTED_SERVER}/_punch/register?${q}`,
             headers: {
                 Authorization: `Bearer ${token_info}`
             },
+            responseType: 'json',
         });
-        this.console.log('registered', response.data);
+        this.console.log('registered', response.body);
         this.storageSettings.values.lastPersistedRegistrationId = registration_id;
         this.storageSettings.values.lastPersistedUpnpPort = upnp_port;
         this.storageSettings.values.registrationSecret = registration_secret;
-        return response.data;
+        return response.body;
     }
 
     async setupCloudPush() {
@@ -895,10 +907,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                             });
                             const tmp = `${bin}.tmp`;
 
-                            const stream = await axios('https://github.com/scryptedapp/cloudflared/releases/download/2023.8.2/cloudflared-darwin-arm64', {
-                                responseType: 'stream',
+                            const stream = await httpFetch({
+                                url: 'https://github.com/scryptedapp/cloudflared/releases/download/2023.8.2/cloudflared-darwin-arm64',
+                                responseType: 'readable',
                             });
-                            const write = stream.data.pipe(fs.createWriteStream(tmp));
+                            const write = stream.body.pipe(fs.createWriteStream(tmp));
                             await once(write, 'close');
                             renameSync(tmp, bin);
                             fs.chmodSync(bin, 0o0755)
