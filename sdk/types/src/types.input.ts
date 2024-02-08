@@ -453,6 +453,10 @@ export interface RequestPictureOptions extends PictureOptions {
    * Flag that hints whether multiple cameras are being refreshed by this user request. Can be used to prefetch the snapshots.
    */
   bulkRequest?: boolean;
+  /**
+   * The maximum time in milliseconds to wait for the picture.
+   */
+  timeout?: number;
 }
 /**
  * Camera devices can take still photos.
