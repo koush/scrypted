@@ -846,16 +846,20 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.console.log('scrypted server requested a connection:', random);
 
                 const registrationId = await this.manager.registrationId;
-                this.ensureReverseConnections(registrationId);
 
-                const client = tls.connect(4001, SCRYPTED_SERVER, {
+                const { address } = message;
+                const [serverHost, serverPort] = address?.split(':') || [SCRYPTED_SERVER, 4001];
+
+                this.ensureReverseConnections(registrationId, serverPort, serverHost);
+
+                const client = tls.connect(serverPort, serverHost, {
                     rejectUnauthorized: false,
                 });
                 client.on('close', () => this.console.log('scrypted server connection ended:', random));
                 client.write(registrationId + '\n');
                 const mux: any = new bpmux.BPMux(client as any);
                 mux.on('handshake', async (socket: Duplex) => {
-                    this.ensureReverseConnections(registrationId);
+                    this.ensureReverseConnections(registrationId, serverPort, serverHost);
 
                     this.console.warn('mux connection required');
 
@@ -999,14 +1003,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    ensureReverseConnections(registrationId: string) {
+    ensureReverseConnections(registrationId: string, serverPort: number, serverHost: string) {
         while (this.reverseConnections.size < 10) {
-            this.createReverseConnection(registrationId);
+            this.createReverseConnection(registrationId, serverPort, serverHost);
         }
     }
 
-    async createReverseConnection(registrationId: string) {
-        const client = tls.connect(4001, SCRYPTED_SERVER, {
+    async createReverseConnection(registrationId: string, serverPort: number, serverHost: string) {
+        const client = tls.connect(serverPort, serverHost, {
             rejectUnauthorized: false,
         });
         this.reverseConnections.add(client);
@@ -1017,7 +1021,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.reverseConnections.delete(client);
 
             if (claimed)
-                this.ensureReverseConnections(registrationId);
+                this.ensureReverseConnections(registrationId, serverPort, serverHost);
         });
         client.write(`reverse:${registrationId}\n`);
 
