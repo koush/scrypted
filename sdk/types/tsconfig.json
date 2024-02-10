@@ -10,6 +10,6 @@
         "strict": true
     },
     "include": [
-        "gen/**/*"
+        "src/**/*"
     ],
 }
