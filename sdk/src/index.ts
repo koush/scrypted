@@ -13,6 +13,25 @@ export class ScryptedDeviceBase extends DeviceBase {
 
   constructor(public readonly nativeId?: string) {
     super();
+
+    addScryptedInterfaceProperties({
+      thisObject: this,
+      getSet: (field: keyof DeviceState) => {
+        return (value: any) => {
+          this._lazyLoadDeviceState();
+          if (!this._deviceState)
+            console.warn('device state is unavailable. the device must be discovered with deviceManager.onDeviceDiscovered or deviceManager.onDevicesChanged before the state can be set.');
+          else
+            this._deviceState[field] = value;
+        }
+      },
+      getGet: (field: keyof DeviceState) => {
+        return () => {
+          this._lazyLoadDeviceState();
+          return this._deviceState?.[field];
+        }
+      }
+    })
   }
 
   get storage() {
@@ -109,6 +128,25 @@ export interface MixinDeviceOptions<T> {
       this._deviceState = deviceManager.createDeviceState(this._deviceState.id, this._deviceState.setState);
     }
     this.mixinProviderNativeId = options.mixinProviderNativeId;
+
+    addScryptedInterfaceProperties({
+      thisObject: this,
+      getSet: (field: keyof DeviceState) => {
+        return (value: any) => {
+          this._lazyLoadDeviceState();
+          if (!this._deviceState)
+            console.warn('device state is unavailable. the device must be discovered with deviceManager.onDeviceDiscovered or deviceManager.onDevicesChanged before the state can be set.');
+          else
+            this._deviceState[field] = value;
+        }
+      },
+      getGet: (field: keyof DeviceState) => {
+        return () => {
+          this._lazyLoadDeviceState();
+          return this._deviceState?.[field];
+        }
+      }
+    })
   }
 
   get storage() {
@@ -164,39 +202,26 @@ export interface MixinDeviceOptions<T> {
   }
 }
 
-
-(function () {
-  function _createGetState(state: any) {
-    return function () {
-      this._lazyLoadDeviceState();
-      return this._deviceState?.[state];
-    };
-  }
-
-  function _createSetState(state: any) {
-    return function (value: any) {
-      this._lazyLoadDeviceState();
-      if (!this._deviceState)
-        console.warn('device state is unavailable. the device must be discovered with deviceManager.onDeviceDiscovered or deviceManager.onDevicesChanged before the state can be set.');
-      else
-        this._deviceState[state] = value;
-    };
-  }
-
+function addScryptedInterfaceProperties<T>(
+  {
+    thisObject, 
+    getSet, 
+    getGet,
+  }: 
+  {
+    thisObject: ScryptedDeviceBase | MixinDeviceBase<T>,
+    getSet: (field: keyof DeviceState) => (value: any) => void, 
+    getGet: (field: keyof DeviceState) => () => any
+  }) {
   for (const field of Object.values(ScryptedInterfaceProperty)) {
     if (field === ScryptedInterfaceProperty.nativeId)
       continue;
-    Object.defineProperty(ScryptedDeviceBase.prototype, field, {
-      set: _createSetState(field),
-      get: _createGetState(field),
-    });
-    Object.defineProperty(MixinDeviceBase.prototype, field, {
-      set: _createSetState(field),
-      get: _createGetState(field),
+    Object.defineProperty(thisObject, field, {
+      set: getSet(field),
+      get: getGet(field),
     });
   }
-})();
-
+}
 
 export const sdk: ScryptedStatic = {} as any;
 declare const deviceManager: DeviceManager;
