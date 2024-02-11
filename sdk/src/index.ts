@@ -6,10 +6,10 @@ import { DeviceBase, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, TY
  * @category Core Reference
  */
 export class ScryptedDeviceBase extends DeviceBase {
-  private _storage: Storage;
-  private _log: Logger;
-  private _console: Console;
-  private _deviceState: DeviceState;
+  private _storage: Storage | undefined;
+  private _log: Logger | undefined;
+  private _console: Console | undefined;
+  private _deviceState: DeviceState | undefined;
 
   constructor(public readonly nativeId?: string) {
     super();
@@ -31,7 +31,7 @@ export class ScryptedDeviceBase extends DeviceBase {
 
   get console() {
     if (!this._console) {
-      this._console = deviceManager.getDeviceConsole(this.nativeId);
+      this._console = deviceManager.getDeviceConsole?.(this.nativeId);
     }
 
     return this._console;
@@ -43,10 +43,10 @@ export class ScryptedDeviceBase extends DeviceBase {
     });
   }
 
-  getMediaObjectConsole(mediaObject: MediaObject): Console {
+  getMediaObjectConsole(mediaObject: MediaObject): Console | undefined {
     if (typeof mediaObject.sourceId !== 'string')
       return this.console;
-    return deviceManager.getMixinConsole(mediaObject.sourceId, this.nativeId);
+    return deviceManager.getMixinConsole?.(mediaObject.sourceId, this.nativeId);
   }
 
   _lazyLoadDeviceState() {
@@ -86,10 +86,10 @@ export interface MixinDeviceOptions<T> {
   mixinProviderNativeId: ScryptedNativeId;
   mixinDevice: T;
   mixinDeviceInterfaces: ScryptedInterface[];
-  private _storage: Storage;
-  private mixinStorageSuffix: string;
-  private _log: Logger;
-  private _console: Console;
+  private _storage: Storage | undefined;
+  private mixinStorageSuffix: string | undefined;
+  private _log: Logger | undefined;
+  private _console: Console | undefined;
   private _deviceState: DeviceState;
   private _listeners = new Set<EventListenerRegister>();
 
@@ -125,7 +125,7 @@ export interface MixinDeviceOptions<T> {
       if (deviceManager.getMixinConsole)
         this._console = deviceManager.getMixinConsole(this.id, this.mixinProviderNativeId);
       else
-        this._console = deviceManager.getDeviceConsole(this.mixinProviderNativeId);
+        this._console = deviceManager.getDeviceConsole?.(this.mixinProviderNativeId);
     }
 
     return this._console;
@@ -137,10 +137,10 @@ export interface MixinDeviceOptions<T> {
     });
   }
 
-  getMediaObjectConsole(mediaObject: MediaObject): Console {
+  getMediaObjectConsole(mediaObject: MediaObject): Console | undefined {
     if (typeof mediaObject.sourceId !== 'string')
       return this.console;
-    return deviceManager.getMixinConsole(mediaObject.sourceId, this.mixinProviderNativeId);
+    return deviceManager.getMixinConsole?.(mediaObject.sourceId, this.mixinProviderNativeId);
   }
 
   /**
