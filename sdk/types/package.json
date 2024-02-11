@@ -10,7 +10,7 @@
     "build": "rimraf dist gen && typedoc && ts-node ./src/build.ts && tsc"
   },
   "devDependencies": {
-    "@types/node": "^18.19.15",
+    "@types/rimraf": "^3.0.2",
     "rimraf": "^3.0.2",
     "ts-node": "^10.9.1"
   },

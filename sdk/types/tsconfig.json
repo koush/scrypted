@@ -6,10 +6,9 @@
         "esModuleInterop": true,
         "sourceMap": true,
         "declaration": true,
-        "outDir": "dist",
-        "strict": true
+        "outDir": "dist"
     },
     "include": [
-        "src/**/*"
+        "gen/**/*"
     ],
 }
