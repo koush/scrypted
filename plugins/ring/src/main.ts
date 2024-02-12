@@ -171,7 +171,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             }
             catch (e) {
                 if (this.loginClient.promptFor2fa) {
-                    this.log.a('Check your email or texts for your Ring login code, then enter it into the Two Factor Code setting to conplete login.');
+                    this.log.a('Check your email or texts for your Ring login code, then enter it into the Two Factor Code setting to complete login.');
                     return;
                 }
                 this.console.error(e);

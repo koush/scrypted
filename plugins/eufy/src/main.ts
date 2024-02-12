@@ -237,10 +237,10 @@ class EufyPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
     this.client.on('device added', this.deviceAdded.bind(this));
     this.client.on('station added', this.stationAdded.bind(this));
     this.client.on('tfa request', () => {
-      this.log.a('Login failed: 2FA is enabled, check your email or texts for your code, then enter it into the Two Factor Code setting to conplete login.');
+      this.log.a('Login failed: 2FA is enabled, check your email or texts for your code, then enter it into the Two Factor Code setting to complete login.');
     });
     this.client.on('captcha request', (id, captcha) => {
-      this.log.a(`Login failed: Captcha was requested, fill out the Captcha setting to conplete login. </br> <img src="${captcha}" />`);
+      this.log.a(`Login failed: Captcha was requested, fill out the Captcha setting to complete login. </br> <img src="${captcha}" />`);
       this.storageSettings.putSetting('captchaId', id);
     });
     this.client.on('connect', () => {
