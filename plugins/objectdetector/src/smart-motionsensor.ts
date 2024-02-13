@@ -37,7 +37,14 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             choices: [
             ],
         },
+        minScore: {
+            title: 'Minimum Score',
+            description: 'The minimum score required for a detection to trigger the motion sensor.',
+            type: 'number',
+            defaultValue: 0.7,
+        },
     });
+
     listener: EventListenerRegister;
     timeout: NodeJS.Timeout;
     lastPicture: Promise<MediaObject>;
@@ -135,6 +142,8 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
         this.listener = objectDetector.listen(ScryptedInterface.ObjectDetector, (source, details, data) => {
             const detected: ObjectsDetected = data;
             const match = detected.detections?.find(d => {
+                if (d.score && d.score < this.storageSettings.values.minScore)
+                    return false;
                 if (!detections.includes(d.className))
                     return false;
                 const zones: string[] = this.storageSettings.values.zones;
