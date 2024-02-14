@@ -940,7 +940,7 @@ export interface DeviceManager {
   /**
    * Get the console for the device given a native id.
    */
-  getMixinConsole?(mixinId: string, nativeId?: ScryptedNativeId): Console;
+  getMixinConsole(mixinId: string, nativeId?: ScryptedNativeId): Console;
 
   /**
    * Get the device state maintained by Scrypted. Setting properties on this state will update the state in Scrypted.
@@ -950,7 +950,7 @@ export interface DeviceManager {
   /**
    * Create a device state object that will trap all state setting calls. Used internally by mixins and fork.
    */
-  createDeviceState?(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState;
+  createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): WritableDeviceState;
 
   /**
    * Get the storage for a mixin.
@@ -1867,7 +1867,7 @@ export interface MixinProvider {
   /**
    * Create a mixin that can be applied to the supplied device.
    */
-  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any>;
+  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any>;
 
   /**
    * Release a mixin device that was previously returned from getMixin.
@@ -2278,7 +2278,10 @@ export interface PluginFork<T> {
 
 export declare interface DeviceState {
   id?: string;
-  setState?(property: string, value: any): Promise<void>;
+}
+
+export interface WritableDeviceState extends DeviceState {
+  setState(property: string, value: any): Promise<void>;
 }
 
 export interface ScryptedInterfaceDescriptor {
@@ -2354,18 +2357,18 @@ export interface ScryptedStatic {
    * Start a new instance of the plugin, returning an instance of the new process
    * and the result of the fork method.
    */
-  fork?<T>(): PluginFork<T>;
+  fork<T>(): PluginFork<T>;
   /**
    * Initiate the Scrypted RPC wire protocol on a socket.
    * @param socket
    * @param options
    */
-  connect?(socket: NodeNetSocket, options?: ConnectOptions): void;
+  connect(socket: NodeNetSocket, options?: ConnectOptions): void;
   /**
    * Attempt to retrieve an RPC object by directly connecting to the plugin
    * that created the object. All operations on this object will bypass routing
    * through the Scrypted Server which typically manages plugin communication.
    * This is ideal for sending large amounts of data.
    */
-  connectRPCObject?<T>(value: T): Promise<T>;
+  connectRPCObject<T>(value: T): Promise<T>;
 }

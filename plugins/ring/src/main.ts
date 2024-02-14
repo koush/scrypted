@@ -88,7 +88,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             title: 'Legacy RTSP Streaming',
             description: 'Enable legacy RTSP Stream support. No longer supported and is being phased out by Ring.',
             type: 'boolean',
-            persistedDefaultValue: true,
+            persistedDefaultValue: false,
         },
     });
 
@@ -171,7 +171,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings 
             }
             catch (e) {
                 if (this.loginClient.promptFor2fa) {
-                    this.log.a('Check your email or texts for your Ring login code, then enter it into the Two Factor Code setting to conplete login.');
+                    this.log.a('Check your email or texts for your Ring login code, then enter it into the Two Factor Code setting to complete login.');
                     return;
                 }
                 this.console.error(e);

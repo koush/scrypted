@@ -1,4 +1,4 @@
-import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointAccessControlAllowOrigin, EndpointManager, EventDetails, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
+import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointAccessControlAllowOrigin, EndpointManager, EventDetails, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager, WritableDeviceState } from '@scrypted/types';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { AccessControls } from './acl';
 import { BufferSerializer } from '../rpc-buffer-serializer';
@@ -200,8 +200,8 @@ export class DeviceManagerImpl implements DeviceManager {
     mixinStorage = new Map<string, Map<string, StorageImpl>>();
 
     constructor(public systemManager: SystemManagerImpl,
-        public getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console,
-        public getMixinConsole?: (mixinId: string, nativeId?: ScryptedNativeId) => Console) {
+        public getDeviceConsole: (nativeId?: ScryptedNativeId) => Console,
+        public getMixinConsole: (mixinId: string, nativeId?: ScryptedNativeId) => Console) {
     }
 
     async requestRestart() {
@@ -218,7 +218,7 @@ export class DeviceManagerImpl implements DeviceManager {
         return new Proxy(handler, handler);
     }
 
-    createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState {
+    createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): WritableDeviceState {
         const handler = new DeviceStateProxyHandler(this, id, setState);
         return new Proxy(handler, handler);
     }
@@ -524,6 +524,9 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             pluginHostAPI: api,
             pluginRemoteAPI: undefined,
             serverVersion: hostInfo?.serverVersion,
+            connect: undefined,
+            fork: undefined,
+            connectRPCObject: undefined,
         };
 
         delete peer.params.getRemote;

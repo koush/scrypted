@@ -167,7 +167,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         }
 
         if (!report) {
-            this.console.warn(`${eventDetails.eventInterface}.${eventDetails.property} not supported for device ${eventSource.type}`);
+            debug(`${eventDetails.eventInterface}.${eventDetails.property} not supported for device ${eventSource.type}`);
             return;
         }
 

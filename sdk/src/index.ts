@@ -1,5 +1,5 @@
 export * from '../types/gen/index';
-import type { DeviceManager, DeviceState, EndpointManager, EventListenerRegister, Logger, MediaManager, MediaObject, ScryptedInterface, ScryptedNativeId, ScryptedStatic, SystemManager } from '../types/gen/index';
+import type { DeviceManager, DeviceState, EndpointManager, EventListenerRegister, Logger, MediaManager, MediaObject, ScryptedInterface, ScryptedNativeId, ScryptedStatic, SystemManager, WritableDeviceState } from '../types/gen/index';
 import { DeviceBase, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, TYPES_VERSION } from '../types/gen/index';
 
 /**
@@ -95,7 +95,7 @@ export interface MixinDeviceOptions<T> {
   mixinProviderNativeId: ScryptedNativeId;
   mixinDeviceInterfaces: ScryptedInterface[];
   mixinStorageSuffix?: string;
-  mixinDeviceState: DeviceState;
+  mixinDeviceState: WritableDeviceState;
 }
 
 /**
@@ -109,7 +109,7 @@ export interface MixinDeviceOptions<T> {
   private mixinStorageSuffix: string | undefined;
   private _log: Logger | undefined;
   private _console: Console | undefined;
-  private _deviceState: DeviceState;
+  private _deviceState: WritableDeviceState;
   private _listeners = new Set<EventListenerRegister>();
 
   constructor(options: MixinDeviceOptions<T>) {

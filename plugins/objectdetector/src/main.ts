@@ -1115,8 +1115,9 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
 
       const runningDetections = this.runningObjectDetections;
 
-      let allowStart = 1;
-      if (runningDetections.length) {
+      let allowStart = 2;
+      // always allow 2 cameras to push past cpu throttling
+      if (runningDetections.length > 2) {
         const cpuPerDetector = this.cpuUsage / runningDetections.length;
         allowStart = Math.ceil(1 / cpuPerDetector) - runningDetections.length;
         if (allowStart <= 0)
