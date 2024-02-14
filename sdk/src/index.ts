@@ -164,27 +164,6 @@ export interface MixinDeviceOptions<T> {
   }
 }
 
-function addScryptedInterfaceProperties<T>(
-  {
-    thisObject, 
-    getSet, 
-    getGet,
-  }: 
-  {
-    thisObject: ScryptedDeviceBase | MixinDeviceBase<T>,
-    getSet: (field: keyof DeviceState) => (value: any) => void, 
-    getGet: (field: keyof DeviceState) => () => any
-  }) {
-  for (const field of Object.values(ScryptedInterfaceProperty)) {
-    if (field === ScryptedInterfaceProperty.nativeId)
-      continue;
-    Object.defineProperty(thisObject, field, {
-      set: getSet(field),
-      get: getGet(field),
-    });
-  }
-}
-
 (function () {
   function _createGetState<T>(deviceBase: ScryptedDeviceBase | MixinDeviceBase<T>, state: ScryptedInterfaceProperty) {
     return function () {
