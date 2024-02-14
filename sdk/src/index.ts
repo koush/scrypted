@@ -9,7 +9,7 @@ export class ScryptedDeviceBase extends DeviceBase {
   private _storage: Storage | undefined;
   private _log: Logger | undefined;
   private _console: Console | undefined;
-  public _deviceState: DeviceState | undefined;
+  private _deviceState: DeviceState | undefined;
 
   constructor(public readonly nativeId?: string) {
     super();
@@ -90,7 +90,7 @@ export interface MixinDeviceOptions<T> {
   private mixinStorageSuffix: string | undefined;
   private _log: Logger | undefined;
   private _console: Console | undefined;
-  public _deviceState: WritableDeviceState;
+  private _deviceState: WritableDeviceState;
   private _listeners = new Set<EventListenerRegister>();
 
   constructor(options: MixinDeviceOptions<T>) {
@@ -189,6 +189,7 @@ function addScryptedInterfaceProperties<T>(
   function _createGetState<T>(deviceBase: ScryptedDeviceBase | MixinDeviceBase<T>, state: ScryptedInterfaceProperty) {
     return function () {
       deviceBase._lazyLoadDeviceState();
+      // @ts-ignore: accessing private property
       return deviceBase._deviceState?.[state];
     };
   }
@@ -196,9 +197,11 @@ function addScryptedInterfaceProperties<T>(
   function _createSetState<T>(deviceBase: ScryptedDeviceBase | MixinDeviceBase<T>, state: ScryptedInterfaceProperty) {
     return function (value: any) {
       deviceBase._lazyLoadDeviceState();
+      // @ts-ignore: accessing private property
       if (!deviceBase._deviceState)
         console.warn('device state is unavailable. the device must be discovered with deviceManager.onDeviceDiscovered or deviceManager.onDevicesChanged before the state can be set.');
       else
+      // @ts-ignore: accessing private property
         deviceBase._deviceState[state] = value;
     };
   }
