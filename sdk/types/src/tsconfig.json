@@ -4,12 +4,7 @@
         "target": "ES2020",
         "noImplicitAny": true,
         "esModuleInterop": true,
-        "sourceMap": true,
-        "declaration": true,
-        "outDir": "dist",
+        "noEmit": true,
         "strict": true
-    },
-    "include": [
-        "gen/**/*"
-    ],
+    }
 }
