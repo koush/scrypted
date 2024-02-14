@@ -1526,7 +1526,7 @@ class Logger:
 class DeviceManager:
     """DeviceManager is the interface used by DeviceProvider to report new devices, device states, and device events to Scrypted."""
 
-    def createDeviceState(self, id: str, setState: Any) -> DeviceState:
+    def createDeviceState(self, id: str, setState: Any) -> WritableDeviceState:
         pass
 
     def getDeviceConsole(self, nativeId: str = None) -> Console:
@@ -3083,6 +3083,13 @@ class VideoFrame:
     queued: float
     timestamp: float
     async def flush(self, count: float = None) -> None:
+        pass
+
+
+class WritableDeviceState:
+
+    id: str
+    async def setState(self, property: str, value: Any) -> None:
         pass
 
 

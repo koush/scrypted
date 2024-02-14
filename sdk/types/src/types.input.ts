@@ -935,12 +935,12 @@ export interface DeviceManager {
   /**
    * Get the console for the device given a native id.
    */
-  getDeviceConsole?(nativeId?: ScryptedNativeId): Console;
+  getDeviceConsole(nativeId?: ScryptedNativeId): Console;
 
   /**
    * Get the console for the device given a native id.
    */
-  getMixinConsole?(mixinId: string, nativeId?: ScryptedNativeId): Console;
+  getMixinConsole(mixinId: string, nativeId?: ScryptedNativeId): Console;
 
   /**
    * Get the device state maintained by Scrypted. Setting properties on this state will update the state in Scrypted.
@@ -950,7 +950,7 @@ export interface DeviceManager {
   /**
    * Create a device state object that will trap all state setting calls. Used internally by mixins and fork.
    */
-  createDeviceState?(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState;
+  createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): WritableDeviceState;
 
   /**
    * Get the storage for a mixin.
@@ -2278,7 +2278,10 @@ export interface PluginFork<T> {
 
 export declare interface DeviceState {
   id?: string;
-  setState?(property: string, value: any): Promise<void>;
+}
+
+export interface WritableDeviceState extends DeviceState {
+  setState(property: string, value: any): Promise<void>;
 }
 
 export interface ScryptedInterfaceDescriptor {
@@ -2360,7 +2363,7 @@ export interface ScryptedStatic {
    * @param socket
    * @param options
    */
-  connect?(socket: NodeNetSocket, options?: ConnectOptions): void;
+  connect(socket: NodeNetSocket, options?: ConnectOptions): void;
   /**
    * Attempt to retrieve an RPC object by directly connecting to the plugin
    * that created the object. All operations on this object will bypass routing
