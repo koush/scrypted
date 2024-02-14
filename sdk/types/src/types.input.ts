@@ -1867,7 +1867,7 @@ export interface MixinProvider {
   /**
    * Create a mixin that can be applied to the supplied device.
    */
-  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any>;
+  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any>;
 
   /**
    * Release a mixin device that was previously returned from getMixin.

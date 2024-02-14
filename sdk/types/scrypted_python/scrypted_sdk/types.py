@@ -1100,7 +1100,7 @@ class MixinProvider:
     async def canMixin(self, type: ScryptedDeviceType, interfaces: list[str]) -> list[str]:
         pass
 
-    async def getMixin(self, mixinDevice: Any, mixinDeviceInterfaces: list[ScryptedInterface], mixinDeviceState: DeviceState) -> Any:
+    async def getMixin(self, mixinDevice: Any, mixinDeviceInterfaces: list[ScryptedInterface], mixinDeviceState: WritableDeviceState) -> Any:
         pass
 
     async def releaseMixin(self, id: str, mixinDevice: Any) -> None:
