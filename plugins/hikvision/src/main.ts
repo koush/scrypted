@@ -62,9 +62,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         let ignoreCameraNumber: boolean;
 
-        let motionPingsNeeded = parseInt(this.storage.getItem('motionPings')) || 1;
-        const motionTimeoutDuration = (parseInt(this.storage.getItem('motionTimeout')) || 10) * 1000;
-        let motionPings = 0;
+        const motionTimeoutDuration = 20000;
         events.on('event', async (event: HikvisionCameraEvent, cameraNumber: string, inactive: boolean) => {
             if (event === HikvisionCameraEvent.MotionDetected
                 || event === HikvisionCameraEvent.LineDetection
@@ -101,16 +99,11 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                     }
                 }
 
-                motionPings++;
-                // this.console.log(this.name, 'motion pings', motionPings);
-
-                // this.console.error('### Detected motion, camera: ', cameraNumber);
-                this.motionDetected = motionPings >= motionPingsNeeded;
+                this.motionDetected = true;
                 clearTimeout(motionTimeout);
                 // motion seems to be on a 1 second pulse
                 motionTimeout = setTimeout(() => {
                     this.motionDetected = false;
-                    motionPings = 0;
                 }, motionTimeoutDuration);
             }
         })
@@ -323,25 +316,6 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         if (!twoWayAudio)
             twoWayAudio = isDoorbell ? 'Hikvision' : 'None';
-
-        ret.unshift(
-            {
-                subgroup: 'Advanced',
-                key: 'motionTimeout',
-                title: 'Motion Timeout',
-                description: 'Duration to report motion after the last motion ping.',
-                value: parseInt(this.storage.getItem('motionTimeout')) || 10,
-                type: 'number',
-            },
-            {
-                subgroup: 'Advanced',
-                key: 'motionPings',
-                title: 'Motion Ping Count',
-                description: 'Number of motion pings needed to trigger motion.',
-                value: parseInt(this.storage.getItem('motionPings')) || 1,
-                type: 'number',
-            },
-        );
 
         ret.push(
             {

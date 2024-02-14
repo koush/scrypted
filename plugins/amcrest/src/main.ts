@@ -159,6 +159,16 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async listenEvents() {
+        let motionTimeout: NodeJS.Timeout;
+
+        const motionTimeoutDuration = 20000;
+        const resetMotionTimeout = () => {
+            clearTimeout(motionTimeout);
+            motionTimeout = setTimeout(() => {
+                this.motionDetected = false;
+            }, motionTimeoutDuration);
+        }
+
         const client = new AmcrestCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
         const events = await client.listenEvents();
         const doorbellType = this.storage.getItem('doorbellType');
@@ -176,9 +186,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             }
             if (event === AmcrestEvent.MotionStart) {
                 this.motionDetected = true;
+                resetMotionTimeout();
             }
             else if (event === AmcrestEvent.MotionStop) {
-                this.motionDetected = false;
+                // use resetMotionTimeout
             }
             else if (event === AmcrestEvent.AudioStart) {
                 this.audioDetected = true;
