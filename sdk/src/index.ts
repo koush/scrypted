@@ -50,7 +50,7 @@ export class ScryptedDeviceBase extends DeviceBase {
 
   get console() {
     if (!this._console) {
-      this._console = deviceManager.getDeviceConsole?.(this.nativeId);
+      this._console = deviceManager.getDeviceConsole(this.nativeId);
     }
 
     return this._console;
@@ -163,7 +163,7 @@ export interface MixinDeviceOptions<T> {
       if (deviceManager.getMixinConsole)
         this._console = deviceManager.getMixinConsole(this.id, this.mixinProviderNativeId);
       else
-        this._console = deviceManager.getDeviceConsole?.(this.mixinProviderNativeId);
+        this._console = deviceManager.getDeviceConsole(this.mixinProviderNativeId);
     }
 
     return this._console;

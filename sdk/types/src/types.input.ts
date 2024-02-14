@@ -935,7 +935,7 @@ export interface DeviceManager {
   /**
    * Get the console for the device given a native id.
    */
-  getDeviceConsole?(nativeId?: ScryptedNativeId): Console;
+  getDeviceConsole(nativeId?: ScryptedNativeId): Console;
 
   /**
    * Get the console for the device given a native id.
