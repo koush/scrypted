@@ -186,14 +186,14 @@ function addScryptedInterfaceProperties<T>(
 }
 
 (function () {
-  function _createGetState<T>(deviceBase: ScryptedDeviceBase | MixinDeviceBase<T>, state: keyof DeviceState) {
+  function _createGetState<T>(deviceBase: ScryptedDeviceBase | MixinDeviceBase<T>, state: ScryptedInterfaceProperty) {
     return function () {
       deviceBase._lazyLoadDeviceState();
       return deviceBase._deviceState?.[state];
     };
   }
 
-  function _createSetState<T>(deviceBase: ScryptedDeviceBase | MixinDeviceBase<T>, state: keyof DeviceState) {
+  function _createSetState<T>(deviceBase: ScryptedDeviceBase | MixinDeviceBase<T>, state: ScryptedInterfaceProperty) {
     return function (value: any) {
       deviceBase._lazyLoadDeviceState();
       if (!deviceBase._deviceState)
