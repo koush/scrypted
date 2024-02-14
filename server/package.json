@@ -4,7 +4,7 @@
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",
-    "@scrypted/types": "^0.3.4",
+    "@scrypted/types": "^0.3.7",
     "adm-zip": "^0.5.10",
     "body-parser": "^1.20.2",
     "cookie-parser": "^1.4.6",

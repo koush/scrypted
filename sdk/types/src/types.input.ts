@@ -2357,7 +2357,7 @@ export interface ScryptedStatic {
    * Start a new instance of the plugin, returning an instance of the new process
    * and the result of the fork method.
    */
-  fork?<T>(): PluginFork<T>;
+  fork<T>(): PluginFork<T>;
   /**
    * Initiate the Scrypted RPC wire protocol on a socket.
    * @param socket
@@ -2370,5 +2370,5 @@ export interface ScryptedStatic {
    * through the Scrypted Server which typically manages plugin communication.
    * This is ideal for sending large amounts of data.
    */
-  connectRPCObject?<T>(value: T): Promise<T>;
+  connectRPCObject<T>(value: T): Promise<T>;
 }
