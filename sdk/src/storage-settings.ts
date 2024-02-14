@@ -2,7 +2,11 @@ import sdk, { ScryptedInterface, Setting, Settings, SettingValue } from ".";
 
 const { systemManager } = sdk;
 
-function parseValue(value: string, setting: StorageSetting, readDefaultValue: () => any, rawDevice?: boolean) {
+function parseValue(value: string | null | undefined, setting: StorageSetting, readDefaultValue: () => any, rawDevice?: boolean) {
+    if (value === null || value === undefined) {
+        return readDefaultValue();
+    }
+
     const type = setting.multiple ? 'array' : setting.type;
 
     if (type === 'boolean') {
@@ -174,9 +178,6 @@ export class StorageSettings<T extends string> implements Settings {
             return setting.defaultValue;
         };
         const item = this.device.storage.getItem(key);
-        if (!item) {
-            throw new Error(`key ${key} not found`)
-        }
         const ret = parseValue(item, setting, readDefaultValue, rawDevice);
         return setting.mapGet ? setting.mapGet(ret) : ret;
     }
