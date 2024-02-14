@@ -117,7 +117,7 @@ then
     set -e
     removescryptedfstab
     mkdir -p /mnt/scrypted-nvr
-    echo "PARTLABEL=scrypted-nvr     /mnt/scrypted-nvr    ext4   defaults 0 0" >> /etc/fstab
+    echo "PARTLABEL=scrypted-nvr     /mnt/scrypted-nvr    ext4   defaults,nofail 0 0" >> /etc/fstab
     mount -a
     set +e
 
