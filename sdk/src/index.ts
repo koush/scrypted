@@ -65,7 +65,7 @@ export class ScryptedDeviceBase extends DeviceBase {
   getMediaObjectConsole(mediaObject: MediaObject): Console | undefined {
     if (typeof mediaObject.sourceId !== 'string')
       return this.console;
-    return deviceManager.getMixinConsole?.(mediaObject.sourceId, this.nativeId);
+    return deviceManager.getMixinConsole(mediaObject.sourceId, this.nativeId);
   }
 
   _lazyLoadDeviceState() {
@@ -115,7 +115,7 @@ export interface MixinDeviceOptions<T> {
   constructor(options: MixinDeviceOptions<T>) {
     super();
 
-    this.nativeId = systemManager.getDeviceById(this.id!)?.nativeId;
+    this.nativeId = systemManager.getDeviceById(this.id!).nativeId;
     this.mixinDevice = options.mixinDevice;
     this.mixinDeviceInterfaces = options.mixinDeviceInterfaces;
     this.mixinStorageSuffix = options.mixinStorageSuffix;
@@ -125,7 +125,7 @@ export interface MixinDeviceOptions<T> {
     // if the device state came from another node worker thread.
     // This should ultimately be removed at some point in the future.
     if ((this._deviceState as any).__rpcproxy_traps_all_properties && deviceManager.createDeviceState && typeof this._deviceState.id === 'string') {
-      this._deviceState = deviceManager.createDeviceState(this._deviceState.id, this._deviceState.setState!);
+      this._deviceState = deviceManager.createDeviceState(this._deviceState.id, this._deviceState.setState);
     }
     this.mixinProviderNativeId = options.mixinProviderNativeId;
 
@@ -143,7 +143,7 @@ export interface MixinDeviceOptions<T> {
       getGet: (field: keyof DeviceState) => {
         return () => {
           this._lazyLoadDeviceState();
-          return this._deviceState?.[field];
+          return this._deviceState[field];
         }
       }
     })
@@ -178,7 +178,7 @@ export interface MixinDeviceOptions<T> {
   getMediaObjectConsole(mediaObject: MediaObject): Console | undefined {
     if (typeof mediaObject.sourceId !== 'string')
       return this.console;
-    return deviceManager.getMixinConsole?.(mediaObject.sourceId, this.mixinProviderNativeId);
+    return deviceManager.getMixinConsole(mediaObject.sourceId, this.mixinProviderNativeId);
   }
 
   /**
