@@ -10,7 +10,7 @@ function newDeviceProxy(id: string, systemManager: SystemManagerImpl) {
     return new Proxy(handler, handler);
 }
 
-class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
+class DeviceProxyHandler implements PrimitiveProxyHandler<any> {
     customProperties: Map<string | number | symbol, any>;
     device: Promise<ScryptedDevice>;
     constructor(public id: string, public systemManager: SystemManagerImpl) {
