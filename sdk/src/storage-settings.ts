@@ -177,8 +177,7 @@ export class StorageSettings<T extends string> implements Settings {
             }
             return setting.defaultValue;
         };
-        const item = this.device.storage.getItem(key);
-        const ret = parseValue(item, setting, readDefaultValue, rawDevice);
+        const ret = parseValue(this.device.storage.getItem(key), setting, readDefaultValue, rawDevice);
         return setting.mapGet ? setting.mapGet(ret) : ret;
     }
 
