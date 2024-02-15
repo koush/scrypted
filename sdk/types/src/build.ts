@@ -22,8 +22,8 @@ function toTypescriptType(type: any): string {
 }
 
 for (const name of Object.values(ScryptedInterface)) {
-    const td = schema.children.find((child) => child.name === name);
-    const children = td.children || [];
+    const td = schema.children?.find((child) => child.name === name);
+    const children = td?.children || [];
     const properties = children.filter((child) => child.kindString === 'Property').map((child) => child.name);
     const methods = children.filter((child) => child.kindString === 'Method').map((child) => child.name);
     ScryptedInterfaceDescriptors[name] = {
@@ -46,7 +46,7 @@ ${Object.entries(allProperties).map(([property, {type, flags}]) => `  ${property
 }
 
 export class DeviceBase implements DeviceState {
-${Object.entries(allProperties).map(([property, {type, flags}]) => `  ${property}${flags.isOptional ? '?' : ''}: ${toTypescriptType(type)}`).join('\n')};
+${Object.entries(allProperties).map(([property, {type, flags}]) => `  ${property}${flags.isOptional ? '?' : '!'}: ${toTypescriptType(type)}`).join('\n')};
 }
 `;
 
@@ -138,12 +138,15 @@ function selfSignature(method: any) {
     return params.join(', ');
 }
 
-const enums = schema.children.filter((child: any) => child.kindString === 'Enumeration');
-const interfaces = schema.children.filter((child: any) => Object.values(ScryptedInterface).includes(child.name));
+const enums = schema.children?.filter((child: any) => child.kindString === 'Enumeration') ?? [];
+const interfaces = schema.children?.filter((child: any) => Object.values(ScryptedInterface).includes(child.name)) ?? [];
 let python = '';
 
 for (const iface of ['Logger', 'DeviceManager', 'SystemManager', 'MediaManager', 'EndpointManager']) {
-    interfaces.push(schema.children.find((child: any) => child.name === iface));
+    const child = schema.children?.find((child: any) => child.name === iface);
+
+    if (child)
+        interfaces.push(child);
 }
 
 let seen = new Set<string>();
@@ -226,14 +229,16 @@ for (const td of interfaces) {
 
 let pythonEnums = ''
 for (const e of enums) {
-    pythonEnums += `
+    if (e.children) {    
+        pythonEnums += `
 class ${e.name}(str, Enum):
 ${toDocstring(e)}
 `
     for (const val of e.children) {
-        if ('type' in val && 'value' in val.type)
+        if (val.type && 'value' in val.type)
             pythonEnums += `    ${val.name} = "${val.type.value}"
 `;
+        }
     }
 }
 
@@ -282,7 +287,7 @@ ScryptedInterfaceDescriptors = ${JSON.stringify(ScryptedInterfaceDescriptors, nu
 `
 
 while (discoveredTypes.size) {
-    const unknowns = schema.children.filter((child: any) => discoveredTypes.has(child.name) && !enums.find((e: any) => e.name === child.name));
+    const unknowns = schema.children?.filter((child: any) => discoveredTypes.has(child.name) && !enums.find((e: any) => e.name === child.name)) ?? [];
 
     const newSeen = new Set([...seen, ...discoveredTypes]);
     discoveredTypes.clear();
