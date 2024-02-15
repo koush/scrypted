@@ -1,8 +1,8 @@
 {
-   "name": "@scrypted/hikvision",
-   "version": "0.0.200",
-   "description": "Hikvision Plugin for Scrypted",
-   "author": "Scrypted",
+   "name": "@vityevato/hikvision-doorbell",
+   "version": "0.0.1",
+   "description": "Hikvision Doorbell Plugin for Scrypted",
+   "author": "Roman Sokolov",
    "license": "Apache",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -21,10 +21,11 @@
       "scrypted",
       "plugin",
       "hikvision",
-      "camera"
+      "camera",
+      "doorbell"
    ],
    "scrypted": {
-      "name": "Hikvision Plugin",
+      "name": "Hikvision Doorbell Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
@@ -42,7 +43,8 @@
       "http-auth-client": "^0.4.1",
       "ip": "^1.1.8",
       "lodash": "^4.17.21",
-      "xml2js": "^0.6.0"
+      "xml2js": "^0.6.0",
+      "sip": "git+https://github.com/kirm/sip.js.git"
    },
    "devDependencies": {
       "@types/ip": "^1.1.3",

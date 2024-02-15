@@ -1,4 +1,5 @@
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Lock, LockState } from "@scrypted/sdk";
+/*
+import sdk, { ScryptedDeviceBase, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Lock, LockState } from "@scrypted/sdk";
 import { PassThrough } from "stream";
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
@@ -7,18 +8,13 @@ import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 import { HikvisionCameraAPI_KV6113, HikvisionCameraEvent_KV6113 } from "./hikvision-camera-api-kv6113";
 
-class DummyDevice extends ScryptedDeviceBase implements Lock, Settings {
+class HikvisionLock extends ScryptedDeviceBase implements Lock, Settings {
     timeout: NodeJS.Timeout;
 
     constructor(nativeId: string) {
         super(nativeId);
 
-        this.on = this.on || false;
-        this.lockState = this.lockState || LockState.Locked;
-        this.running = this.running || false;
-        this.motionDetected = false;
-        this.binaryState = false;
-        this.occupied = false;
+        this.lockState = this.lockState || LockState.Unlocked;
     }
 
     lock(): Promise<void> {
@@ -176,3 +172,4 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
 
     }
 }
+*/

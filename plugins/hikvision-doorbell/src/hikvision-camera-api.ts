@@ -137,6 +137,8 @@ export class HikvisionCameraAPI {
         return response.body;
     }
 
+    
+
     async listenEvents(): Promise<Destroyable> {
         // support multiple cameras listening to a single single stream 
         if (!this.listenerPromise) {
@@ -270,6 +272,10 @@ export class HikvisionCameraAPI {
     }
 
     async closeDoor() {
+        throw Error("Method not implemented.");
+    }
+
+    async setFakeSip (enabled: boolean, ip: string , port: number) {
         throw Error("Method not implemented.");
     }
 

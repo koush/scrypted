@@ -6,6 +6,7 @@ import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 import { HikvisionCameraAPI_KV6113, HikvisionCameraEvent_KV6113 } from "./hikvision-camera-api-kv6113";
+import { SipManager } from "./sip-manager";
 
 const { mediaManager } = sdk;
 
@@ -18,6 +19,7 @@ function channelToCameraNumber(channel: string) {
 class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, Lock {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     client: HikvisionCameraAPI;
+    sipManager: SipManager;
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
 
@@ -26,6 +28,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         this.updateDevice();
         this.updateDeviceInfo();
+        this.installSip();
     }
 
     lock(): Promise<void> {
@@ -70,6 +73,16 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
             info.serialNumber = deviceInfo.serialNumber;
         }
         this.info = info;
+    }
+
+    installSip() {
+        (async () => {
+            this.sipManager = new SipManager (this.getIPAddress(), this.console, this.storage);
+            await this.sipManager.startGateway (6060);
+            const ip = this.sipManager.localIp;
+            const port = this.sipManager.localPort;
+            await this.getClient().setFakeSip (true, ip, port)
+        })();
     }
 
     getHttpPort(): string {
@@ -381,6 +394,9 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
 
     async startIntercom(media: MediaObject): Promise<void> {
+
+        await this.sipManager.answer();
+        
         if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
             this.activeIntercom?.kill();
             this.activeIntercom = undefined;

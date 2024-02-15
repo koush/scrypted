@@ -2,7 +2,6 @@ import { HttpFetchResponse } from '../../../server/src/fetch/http-fetch'
 import { AuthFetchCredentialState, HttpFetchOptions, HttpFetchResponseType, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { Readable, PassThrough } from 'stream';
 import sdk from '@scrypted/sdk';
-import { isLoopback, isV4Format, isV6Format } from 'ip';
 import net, { Server } from 'net';
 import crypto from 'crypto';
 import { resolve } from 'path';
@@ -17,6 +16,7 @@ import { EventEmitter } from 'events';
 import { getDeviceInfo } from './probe';
 import { AuthRequestOptions, AuthRequst, AuthRequestBody } from './auth-request'
 import { IncomingMessage, OutgoingHttpHeaders } from 'http';
+import { localServiceIpAddress } from './utils';
 
 const isapiEventListenerID: String = "1"; // Other value than '1' does not work in KV6113
 const messagePrefixSize = 692;
@@ -50,7 +50,6 @@ export class HikvisionCameraAPI_KV6113 extends HikvisionCameraAPI {
     private eventServer?: Server;
     private eventServerLastSocket?: Socket;
     private eventBuffer: Buffer;
-    private isIpv4: boolean;
     private eventServerUserName: String;
     private eventServerPassword: String;
     private listener: Destroyable;
@@ -83,6 +82,14 @@ export class HikvisionCameraAPI_KV6113 extends HikvisionCameraAPI {
         return getDeviceInfo({...this.credential}, this.endpoint);
     }
 
+    emitEvent(eventName: string | symbol, ...args: any[]) {
+        try {
+            this.listener.emit(eventName, ...args);
+        } catch (error) {
+            setTimeout(() => this.listener.emit(eventName, ...args), 250);    
+        }
+    }
+
     async listenEvents() {
         // support multiple cameras listening to a single single stream 
         if (!this.listener) {
@@ -111,6 +118,32 @@ export class HikvisionCameraAPI_KV6113 extends HikvisionCameraAPI {
         const data = '<RemoteControlDoor><cmd>resume</cmd></RemoteControlDoor>';
         await this.request({
             url: `http://${this.endpoint}/ISAPI/AccessControl/RemoteControl/door/1`,
+            method: 'PUT',
+            responseType: 'readable',
+        }, data);
+    }
+
+    async setFakeSip (enabled: boolean, ip: string = '127.0.0.1', port: number = 5060)
+    {
+
+        const data = '<SIPServer>' +
+        '<id>1</id>' +
+        '<localPort>5060</localPort>' +
+        '<streamID>1</streamID>' +
+        '<Standard>' +
+        `<enabled>${enabled ? "true" : "false"}</enabled>` +
+        `<proxy>${ip}</proxy>` +
+        `<proxyPort>${port}</proxyPort>` +
+        '<displayName>Doorbell</displayName>' +
+        '<userName>fakeuser</userName>' +
+        '<authID>10101</authID>' +
+        '<password>fakepassword</password>' +
+        '<expires>60</expires>' +
+        '</Standard>' +
+        '</SIPServer>';
+        
+        await this.request({
+            url: `http://${this.endpoint}/ISAPI/System/Network/SIP/1`,
             method: 'PUT',
             responseType: 'readable',
         }, data);
@@ -214,19 +247,7 @@ export class HikvisionCameraAPI_KV6113 extends HikvisionCameraAPI {
             });
         });
 
-        let host = "localhost";
-        try {
-            const typeCheck = this.isIpv4 ? isV4Format : isV6Format;
-            for (const address of await sdk.endpointManager.getLocalAddresses()) {
-                if (!isLoopback(address) && typeCheck(address)) {
-                    host = address;
-                    break;
-                }
-            }
-        }
-        catch (e) {
-        }
-
+        let host = await localServiceIpAddress (this.ip);
 
         let result = new Promise<void>((resolve, reject) => {
             server.on('listening', () =>  {
@@ -252,7 +273,7 @@ export class HikvisionCameraAPI_KV6113 extends HikvisionCameraAPI {
 
             server.on ('close', async () => {
                 await this.deleteHttpHosts();
-                this.listener.emit ('close');
+                this.emitEvent ('close');
             });
         });
 
@@ -273,7 +294,7 @@ export class HikvisionCameraAPI_KV6113 extends HikvisionCameraAPI {
 
         for (const [name, event] of Object.entries(HikvisionCameraEvent_KV6113)) {
             if (marker == event) {
-                this.listener.emit('event', event, cameraNumber, inactive);
+                this.emitEvent('event', event, cameraNumber, inactive);
                 this.console.debug (`Camera event emited: "${name}"`);        
                 return;
             }
