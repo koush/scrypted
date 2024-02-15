@@ -28,7 +28,7 @@ interface MixinTableEntry {
 export const RefreshSymbol = Symbol('ScryptedDeviceRefresh');
 export const QueryInterfaceSymbol = Symbol("ScryptedPluginDeviceQueryInterface");
 
-export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
+export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
     scrypted: ScryptedRuntime;
     id: string;
     mixinTable: MixinTable[];

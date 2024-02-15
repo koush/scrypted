@@ -27,14 +27,14 @@ export interface ScryptedDevice {
    */
   probe(): Promise<boolean>;
 
-  id?: string;
+  id: string;
   nativeId?: ScryptedNativeId;
-  pluginId?: string;
-  interfaces?: string[];
-  mixins?: string[];
+  pluginId: string;
+  interfaces: string[];
+  mixins: string[];
   name?: string;
   info?: DeviceInformation;
-  providedInterfaces?: string[];
+  providedInterfaces: string[];
   providedName?: ScryptedDeviceType;
   providedRoom?: string;
   providedType?: ScryptedDeviceType;
@@ -2277,7 +2277,7 @@ export interface PluginFork<T> {
 }
 
 export declare interface DeviceState {
-  id?: string;
+  id: string;
 }
 
 export interface WritableDeviceState extends DeviceState {

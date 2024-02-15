@@ -38,13 +38,21 @@ for (const name of Object.values(ScryptedInterface)) {
 const properties = Object.values(ScryptedInterfaceDescriptors).map(d => d.properties).flat();
 const methods = Object.values(ScryptedInterfaceDescriptors).map(d => d.methods).flat();
 
+const requiredProperties = [
+    'id',
+    'interfaces',
+    'providedInterfaces',
+    'pluginId',
+    'mixins',
+];
+
 const deviceStateContents = `
 export interface DeviceState {
-${Object.entries(allProperties).map(([property, type]) => `  ${property}?: ${toTypescriptType(type)}`).join('\n')}
+${Object.entries(allProperties).map(([property, type]) => `  ${property}${!requiredProperties.includes(property) ? '?' : ''}: ${toTypescriptType(type)}`).join('\n')};
 }
 
 export class DeviceBase implements DeviceState {
-${Object.entries(allProperties).map(([property, type]) => `  ${property}?: ${toTypescriptType(type)}`).join('\n')}
+${Object.entries(allProperties).map(([property, type]) => `  ${property}${!requiredProperties.includes(property) ? '?' : ''}: ${toTypescriptType(type)}`).join('\n')};
 }
 `;
 
