@@ -96,7 +96,7 @@ export interface MixinDeviceOptions<T> {
   constructor(options: MixinDeviceOptions<T>) {
     super();
 
-    this.nativeId = systemManager.getDeviceById(this.id!).nativeId;
+    this.nativeId = systemManager.getDeviceById(this.id).nativeId;
     this.mixinDevice = options.mixinDevice;
     this.mixinDeviceInterfaces = options.mixinDeviceInterfaces;
     this.mixinStorageSuffix = options.mixinStorageSuffix;
@@ -123,7 +123,7 @@ export interface MixinDeviceOptions<T> {
   get console() {
     if (!this._console) {
       if (deviceManager.getMixinConsole)
-        this._console = deviceManager.getMixinConsole(this.id!, this.mixinProviderNativeId);
+        this._console = deviceManager.getMixinConsole(this.id, this.mixinProviderNativeId);
       else
         this._console = deviceManager.getDeviceConsole(this.mixinProviderNativeId);
     }
@@ -147,7 +147,7 @@ export interface MixinDeviceOptions<T> {
    * Fire an event for this device.
    */
   onDeviceEvent(eventInterface: string, eventData: any): Promise<void> {
-    return deviceManager.onMixinEvent(this.id!, this, eventInterface, eventData);
+    return deviceManager.onMixinEvent(this.id, this, eventInterface, eventData);
   }
 
   _lazyLoadDeviceState() {
