@@ -10,6 +10,7 @@ import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from 
 import { startRtpForwarderProcess } from "./rtp-forwarders";
 import { getFFmpegRtpAudioOutputArguments, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive } from "./werift-util";
+import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
 
 const { mediaManager } = sdk;
 
@@ -105,6 +106,8 @@ export async function createRTCPeerConnectionSource(options: {
             };
 
             const setupVideoTransceiver = (transceiver: RTCRtpTransceiver) => {
+                const videoPacketSize = 64000;
+                let h264Repacketizer = new H264Repacketizer(console, videoPacketSize - 12)
                 const videoTransceiver = transceiver;
                 videoTransceiver.mid = '1';
                 videoTransceiver.onTrack.subscribe((track) => {
@@ -116,7 +119,10 @@ export async function createRTCPeerConnectionSource(options: {
                             const naluTypes = getNaluTypesInNalu(rtp.payload);
                             console.log('video packet types', ...[...naluTypes]);
                         }
-                        rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
+                        const repacketized = h264Repacketizer.repacketize(rtp);
+                        for (const packet of repacketized) {
+                            rtspServer.sendTrack(videoTrack, packet.serialize(), false);
+                        }
                     });
                     track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
 
