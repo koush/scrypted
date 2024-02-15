@@ -8,6 +8,7 @@ import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
 import { sleep } from "@scrypted/common/src/sleep";
 import axios from "axios";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 
 const { deviceManager } = sdk;
 
@@ -72,7 +73,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         for (const k of filter) {
             keys.delete(k);
         }
-        if (keys.size > 0)
+        if (keys.size > 0 && this.storageSettings.values.debugLog)
             ret?.console.log('update packet', packet.payload);
         return ret;
     }
@@ -228,7 +229,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     };
 
     debugLog(message: string, ...parameters: any[]) {
-        if (this.storage.getItem('debug'))
+        if (this.storageSettings.values.debugLog)
             this.console.log(message, ...parameters);
     }
 
@@ -543,33 +544,42 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         return this.storage.getItem(key);
     }
 
+    rediscover() {
+        this.discoverDevices(0);
+        this.updateManagementUrl();
+    }
+
+    storageSettings = new StorageSettings(this, {
+        username: {
+            title: 'Username',
+            onPut: () => this.rediscover(),
+        },
+        password: {
+            title: 'Password',
+            type: 'password',
+            onPut: () => this.rediscover(),
+        },
+        ip: {
+            title: 'Unifi Protect IP',
+            placeholder: '192.168.1.100',
+            onPut: () => this.rediscover(),
+        },
+        useConnectionHost: {
+            title: 'Use Connection Host',
+            group: 'Advanced',
+            description: 'Uses the connection host to connect to the RTSP Stream. This is required in stacked UNVR configurations. Disabling this setting will always use the configured Unifi Protect IP as the RTSP stream IP.',
+            type: 'boolean',
+        },
+        debugLog: {
+            title: 'Debug Log',
+            description: 'Enable debug log to see additional logging.',
+            group: 'Advanced',
+            type: 'boolean',
+        },
+    });
+
     async getSettings(): Promise<Setting[]> {
-        const ret: Setting[] = [
-            {
-                key: 'username',
-                title: 'Username',
-                value: this.getSetting('username') || '',
-            },
-            {
-                key: 'password',
-                title: 'Password',
-                type: 'password',
-                value: this.getSetting('password') || '',
-            },
-            {
-                key: 'ip',
-                title: 'Unifi Protect IP',
-                placeholder: '192.168.1.100',
-                value: this.getSetting('ip') || '',
-            },
-            {
-                key: 'useConnectionHost',
-                title: 'Use Connection Host',
-                description: 'Uses the connection host to connect to the RTSP Stream. This is required in stacked UNVR configurations. Disabling this setting will always use the configured Unifi Protect IP as the RTSP stream IP.',
-                type: 'boolean',
-                value: this.getSetting('useConnectionHost') !== 'false',
-            }
-        ];
+        const ret = await this.storageSettings.getSettings();
 
         if (!isInstanceableProviderModeEnabled()) {
             ret.push({
@@ -578,6 +588,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 value: '',
                 description: 'To add more than one Unifi Protect application, you will need to migrate the plugin to multi-application mode. Type "MIGRATE" in the textbox to confirm.',
                 placeholder: 'MIGRATE',
+                group: 'Advanced',
             });
         }
         return ret;
@@ -603,10 +614,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             return;
         }
 
-        this.storage.setItem(key, value.toString());
-        this.discoverDevices(0);
-
-        this.updateManagementUrl();
+        return this.storageSettings.putSetting(key, value);
     }
 }
 
