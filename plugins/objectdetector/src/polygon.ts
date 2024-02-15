@@ -25,3 +25,14 @@ export function normalizeBox(boundingBox: [number, number, number, number], inpu
     y2 = y2 * 100 / inputDimensions[1];
     return [[x, y], [x2, y], [x2, y2], [x, y2]];
 }
+
+export function polygonArea(p: Point[]): number {
+    let area = 0;
+    const n = p.length;
+    for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        area += p[i][0] * p[j][1];
+        area -= p[j][0] * p[i][1];
+    }
+    return Math.abs(area / 2);
+}
