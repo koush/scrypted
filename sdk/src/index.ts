@@ -137,7 +137,7 @@ export interface MixinDeviceOptions<T> {
     });
   }
 
-  getMediaObjectConsole(mediaObject: MediaObject): Console | undefined {
+  getMediaObjectConsole(mediaObject: MediaObject): Console {
     if (typeof mediaObject.sourceId !== 'string')
       return this.console;
     return deviceManager.getMixinConsole(mediaObject.sourceId, this.mixinProviderNativeId);
