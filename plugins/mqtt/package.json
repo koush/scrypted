@@ -29,7 +29,6 @@
       ]
    },
    "dependencies": {
-      "@types/node": "^16.6.1",
       "aedes": "^0.46.1",
       "axios": "^0.23.0",
       "mqtt": "^4.2.8",
@@ -37,9 +36,10 @@
       "websocket-stream": "^5.5.2"
    },
    "devDependencies": {
-      "@scrypted/sdk": "file:../../sdk",
       "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/node": "^18.4.2",
       "@types/nunjucks": "^3.2.0"
    },
-   "version": "0.0.76"
+   "version": "0.0.77"
 }
