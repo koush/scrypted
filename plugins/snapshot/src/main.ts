@@ -2,7 +2,7 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import https from 'https';
 import os from 'os';
@@ -519,13 +519,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const fontFile = path.join(unzippedFs, 'Lato-Bold.ttf');
 
         if (!errorBackground) {
-            const black = path.join(unzippedFs, 'black.jpg');
             return ffmpegFilterImage([
-                '-i', black,
+                '-f', 'lavfi',
+                '-i', 'color=black:size=1920x1080',
             ], {
                 console: this.debugConsole,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
-                blur: true,
                 text: {
                     fontFile,
                     text,
@@ -723,7 +722,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
         return undefined;
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any> {
         const ret = new SnapshotMixin(this, {
             mixinDevice,
             mixinDeviceInterfaces,
