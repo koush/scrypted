@@ -519,13 +519,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const fontFile = path.join(unzippedFs, 'Lato-Bold.ttf');
 
         if (!errorBackground) {
-            const black = path.join(unzippedFs, 'black.jpg');
             return ffmpegFilterImage([
-                '-i', black,
+                '-f', 'lavfi',
+                '-i', 'color=black:size=1920x1080',
             ], {
                 console: this.debugConsole,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
-                blur: true,
                 text: {
                     fontFile,
                     text,
