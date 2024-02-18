@@ -82,7 +82,7 @@ export interface MixinDeviceOptions<T> {
 /**
  * @category Mixin Reference
  */
- export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
+export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   mixinProviderNativeId: ScryptedNativeId;
   mixinDevice: T;
   mixinDeviceInterfaces: ScryptedInterface[];
@@ -96,7 +96,6 @@ export interface MixinDeviceOptions<T> {
   constructor(options: MixinDeviceOptions<T>) {
     super();
 
-    this.nativeId = systemManager.getDeviceById(this.id).nativeId;
     this.mixinDevice = options.mixinDevice;
     this.mixinDeviceInterfaces = options.mixinDeviceInterfaces;
     this.mixinStorageSuffix = options.mixinStorageSuffix;
@@ -165,23 +164,27 @@ export interface MixinDeviceOptions<T> {
 }
 
 (function () {
-  function _createGetState<T>(deviceBase: ScryptedDeviceBase | MixinDeviceBase<T>, state: ScryptedInterfaceProperty) {
+  function _createGetState(state: ScryptedInterfaceProperty) {
     return function () {
-      deviceBase._lazyLoadDeviceState();
-      // @ts-ignore: accessing private property
-      return deviceBase._deviceState?.[state];
+      // @ts-ignore: this as any
+      this._lazyLoadDeviceState();
+      // @ts-ignore: this as any
+      return this._deviceState?.[state];
     };
   }
 
-  function _createSetState<T>(deviceBase: ScryptedDeviceBase | MixinDeviceBase<T>, state: ScryptedInterfaceProperty) {
+  function _createSetState(state: ScryptedInterfaceProperty) {
     return function (value: any) {
-      deviceBase._lazyLoadDeviceState();
-      // @ts-ignore: accessing private property
-      if (!deviceBase._deviceState)
+      // @ts-ignore: this as any
+      this._lazyLoadDeviceState();
+      // @ts-ignore: this as any
+      if (!this._deviceState) {
         console.warn('device state is unavailable. the device must be discovered with deviceManager.onDeviceDiscovered or deviceManager.onDevicesChanged before the state can be set.');
-      else
-      // @ts-ignore: accessing private property
-        deviceBase._deviceState[state] = value;
+      }
+      else {
+        // @ts-ignore: this as any
+        this._deviceState[state] = value;
+      }
     };
   }
 
@@ -189,12 +192,12 @@ export interface MixinDeviceOptions<T> {
     if (field === ScryptedInterfaceProperty.nativeId)
       continue;
     Object.defineProperty(ScryptedDeviceBase.prototype, field, {
-      set: _createSetState(ScryptedDeviceBase.prototype, field),
-      get: _createGetState(ScryptedDeviceBase.prototype, field),
+      set: _createSetState(field),
+      get: _createGetState(field),
     });
     Object.defineProperty(MixinDeviceBase.prototype, field, {
-      set: _createSetState(MixinDeviceBase.prototype, field),
-      get: _createGetState(MixinDeviceBase.prototype, field),
+      set: _createSetState(field),
+      get: _createGetState(field),
     });
   }
 })();
