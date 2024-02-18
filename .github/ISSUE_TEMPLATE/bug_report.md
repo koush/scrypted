@@ -16,7 +16,8 @@ Before opening an issue, view the device's Console logs in the Scrypted Manageme
 * Server setup assistance. Use Discord, Reddit, or Github Discussions.
 * Hardware setup assistance. Use Discord, Reddit, or Github Discussions.
 * Feature Requests. Use Discord, Reddit, or Github Discussions.
-* Packet loss in your camera logs. (this is wifi/network congestion)
+* Packet loss in your camera logs. This is wifi/network congestion.
+* HomeKit weirdness. See HomeKit troubleshooting guide.
 
 However, if something **was working**, and is now **no longer working**, you may create a Github issue.
 Created issues that do not meet these requirements or are improperly filled out will be immediately closed.

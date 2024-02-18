@@ -1201,7 +1201,7 @@ export interface AmbientLightSensor {
   /**
    * The ambient light in lux.
    */
-  ambientLight: number;
+  ambientLight?: number;
 }
 export interface OccupancySensor {
   occupied?: boolean;
