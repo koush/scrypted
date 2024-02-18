@@ -1,6 +1,6 @@
 import { Deferred } from '@scrypted/common/src/deferred';
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetectionZone, ObjectDetector, ObjectsDetected, Point, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, VideoFrame, VideoFrameGenerator } from '@scrypted/sdk';
+import sdk, { Camera, DeviceCreator, DeviceCreatorSettings, DeviceProvider, DeviceState, EventListenerRegister, MediaObject, MediaStreamDestination, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionModel, ObjectDetectionTypes, ObjectDetectionZone, ObjectDetector, ObjectsDetected, Point, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, VideoFrame, VideoFrameGenerator, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
@@ -109,7 +109,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return !this.detectorSignal.finished;
   }
 
-  constructor(public plugin: ObjectDetectionPlugin, mixinDevice: VideoCamera & Camera & MotionSensor & ObjectDetector & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, public model: ObjectDetectionModel, group: string, public hasMotionType: boolean) {
+  constructor(public plugin: ObjectDetectionPlugin, mixinDevice: VideoCamera & Camera & MotionSensor & ObjectDetector & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, public model: ObjectDetectionModel, group: string, public hasMotionType: boolean) {
     super({
       mixinDevice, mixinDeviceState,
       mixinProviderNativeId: providerNativeId,
@@ -865,7 +865,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements MixinProvider {
   currentMixins = new Set<ObjectDetectionMixin>();
 
-  constructor(mixinDevice: ObjectDetection, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, public plugin: ObjectDetectionPlugin, public model: ObjectDetectionModel) {
+  constructor(mixinDevice: ObjectDetection, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState, public plugin: ObjectDetectionPlugin, public model: ObjectDetectionModel) {
     super({ mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId: plugin.nativeId });
 
     // trigger mixin creation. todo: fix this to not be stupid hack.
@@ -905,7 +905,7 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
     }
   }
 
-  async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
+  async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState) {
     let objectDetection = systemManager.getDeviceById<ObjectDetection>(this.id);
     const hasMotionType = this.model.classes.includes('motion');
     const group = hasMotionType ? 'Motion Detection' : 'Object Detection';
@@ -1173,7 +1173,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     return [ScryptedInterface.MixinProvider];
   }
 
-  async getMixin(mixinDevice: ObjectDetection, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
+  async getMixin(mixinDevice: ObjectDetection, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any> {
     const model = await mixinDevice.getDetectionModel();
     const ret = new ObjectDetectorMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this, model);
     this.currentMixins.add(ret);
