@@ -1028,7 +1028,8 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     if (runningDetections.find(o => o.id === mixin.id))
       return false;
 
-    if (!runningDetections.length)
+    // always allow 2 cameras to push past cpu throttling
+    if (runningDetections.length < 2)
       return true;
 
     const cpuPerDetector = this.cpuUsage / runningDetections.length;
