@@ -140,7 +140,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
         if (this.storageSettings.values.ptz?.length) {
             interfaces.push(ScryptedInterface.PanTiltZoom);
         }
-        if (this.storageSettings.values.hasObjectDetector) {
+        if (this.storageSettings.values.hasObjectDetector || (this.storageSettings.values.doorbellUseOnvifDetections && this.storageSettings.values.doorbell)) {
             interfaces.push(ScryptedInterface.ObjectDetector);
         }
         await this.provider.updateDevice(this.nativeId, name, interfaces, type);
@@ -205,10 +205,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
                         return;
 
                     hasSucceeded = true;
-                    if (!this.storageSettings.values.hasObjectDetector) {
-                        this.storageSettings.values.hasObjectDetector = ai.data;
-                        this.updateDevice();
-                    }
                     const od: ObjectsDetected = {
                         timestamp: Date.now(),
                         detections: [],
