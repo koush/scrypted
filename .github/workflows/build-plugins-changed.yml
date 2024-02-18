@@ -32,7 +32,9 @@ jobs:
             # Loop through each changed directory
             for dir in $changed_dirs; do
                 pushd "./plugins/$dir"
+                echo "plugins/$dir > npm install"
                 npm install
+                echo "plugins/$dir > npm run build"
                 npm run build
                 popd
             done
