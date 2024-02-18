@@ -918,7 +918,7 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
 
   async releaseMixin(id: string, mixinDevice: ObjectDetectionMixin) {
     this.currentMixins.delete(mixinDevice);
-    return mixinDevice.release();
+    return mixinDevice?.release();
   }
 
   release(): void {
@@ -1185,7 +1185,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     // what does this mean to make a mixin provider no longer available?
     // just ignore it until reboot?
     this.currentMixins.delete(mixinDevice);
-    return mixinDevice.release();
+    return mixinDevice?.release();
   }
 
   async getCreateDeviceSettings(): Promise<Setting[]> {
