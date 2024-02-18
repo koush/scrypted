@@ -15,7 +15,9 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+        with:  
+            fetch-depth: 2
+      - uses: actions/setup-node@v4
         with:
           node-version: 18
 
@@ -25,7 +27,7 @@ jobs:
       - name: Build changed plugins
         run: |
             # Get the list of changed directories in /plugins
-            changed_dirs=$(git diff --name-only HEAD~1 HEAD ./plugins | awk -F/ '{print $2}' | uniq)
+            changed_dirs=$(git diff --name-only HEAD^ HEAD ./plugins | awk -F/ '{print $2}' | uniq)
             
             # Loop through each changed directory
             for dir in $changed_dirs; do
