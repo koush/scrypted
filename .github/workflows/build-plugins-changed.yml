@@ -31,14 +31,9 @@ jobs:
             
             # Loop through each changed directory
             for dir in $changed_dirs; do
-                cd "/plugins/$dir" || continue
-            
-                # Run npm install
+                pushd "./plugins/$dir"
                 npm install
-            
-                # Run npm run build
                 npm run build
-            
-                cd - >/dev/null || continue
+                popd
             done
         
