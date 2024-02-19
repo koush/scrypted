@@ -100,10 +100,7 @@ addSupportedType({
 
         const accessory = makeAccessory(device, homekitPlugin);
 
-        const detectAudio = storage.getItem('detectAudio') === 'true';
-        const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
-        const linkedMotionSensor = storage.getItem('linkedMotionSensor');
-        const isRecordingEnabled = !!linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService
+        const isRecordingEnabled = device.interfaces.includes(ScryptedInterface.MotionSensor);
 
         let configuration: CameraRecordingConfiguration;
         const openRecordingStreams = new Map<number, Deferred<any>>();
@@ -209,14 +206,12 @@ addSupportedType({
         accessory.configureController(controller);
 
         if (controller.motionService) {
-            const motionDevice = systemManager.getDeviceById<MotionSensor & AudioSensor>(linkedMotionSensor) || device;
+            const motionDevice = device;
             if (!motionDevice) {
                 return;
             }
 
-            const motionDetected = needAudioMotionService ?
-                () => !!motionDevice.audioDetected || !!motionDevice.motionDetected :
-                () => !!motionDevice.motionDetected;
+            const motionDetected = () => !!motionDevice.motionDetected;
 
             const { motionService } = controller;
             bindCharacteristic(motionDevice,

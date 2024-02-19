@@ -2,12 +2,12 @@ import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/c
 import sdk, { ScryptedInterface, SettingValue } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { createHAPUsernameStorageSettingsDict } from "./hap-utils";
-const { log } = sdk;
 
 export const HOMEKIT_MIXIN = 'mixin:@scrypted/homekit';
 
 export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
     storageSettings = new StorageSettings(this, {
+        ...createHAPUsernameStorageSettingsDict(this, undefined, 'Pairing'),
         standalone: {
             subgroup: 'Pairing',
             title: 'Standalone Accessory Mode',
@@ -23,7 +23,6 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
             // todo: change this at some point.
             persistedDefaultValue: false,
         },
-        ...createHAPUsernameStorageSettingsDict(this, undefined, 'Pairing'),
     });
 
     constructor(options: SettingsMixinDeviceOptions<T>) {
@@ -39,7 +38,8 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
     }
 
     alertReload() {
-        log.a(`You must reload the HomeKit plugin for the changes to ${this.name} to take effect.`);
+        sdk.log.a(`The HomeKit plugin will reload momentarily for the changes to ${this.name} to take effect.`);
+        sdk.deviceManager.requestRestart();
     }
 
     async getMixinSettings() {
