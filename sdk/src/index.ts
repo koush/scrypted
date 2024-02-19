@@ -174,8 +174,8 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
         console.warn('device state is unavailable. the device must be discovered with deviceManager.onDeviceDiscovered or deviceManager.onDevicesChanged before the state can be set.');
       }
       else {
-      // @ts-ignore: accessing private property
-      this._deviceState[state] = value;
+        // @ts-ignore: accessing private property
+        this._deviceState[state] = value;
       }
     };
   }
