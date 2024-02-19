@@ -26,18 +26,18 @@ export class Scheduler {
             schedule.saturday,
         ];
 
-        const date = new Date();
-        date.setHours(schedule.hour);
-        date.setMinutes(schedule.minute);
-
         const ret: ScryptedDevice = {
             async setName() { },
             async setType() { },
             async setRoom() { },
             async setMixins() { },
-            async probe() { return true },
+            async probe() { return true; },
             listen(event: EventListenerOptions, callback, source?: ScryptedDeviceBase) {
                 function reschedule(): Date {
+                    const date = new Date();
+                    date.setHours(schedule.hour);
+                    date.setMinutes(schedule.minute);
+
                     const now = Date.now();
                     for (let i = 0; i < 8; i++) {
                         const future = new Date(date.getTime() + i * 24 * 60 * 60 * 1000);
@@ -65,7 +65,7 @@ export class Scheduler {
                         eventId: undefined,
                         eventInterface: 'Scheduler',
                         eventTime: Date.now(),
-                    }, prevWhen)
+                    }, prevWhen);
                 }
 
                 function setupTimer() {
@@ -87,8 +87,13 @@ export class Scheduler {
                         timeout = null;
                         when = null;
                     }
-                }
-            }
+                };
+            },
+            id: "",
+            pluginId: "",
+            interfaces: [],
+            mixins: [],
+            providedInterfaces: []
         }
 
         ret.name = 'Scheduler';
