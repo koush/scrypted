@@ -1862,7 +1862,7 @@ export interface MixinProvider {
   /**
    * Called by the system to determine if this provider can create a mixin for the supplied device. Returns null if a mixin can not be created, otherwise returns a list of new interfaces (which may be an empty list) that are provided by the mixin.
    */
-  canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]>;
+  canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[] | null>;
 
   /**
    * Create a mixin that can be applied to the supplied device.
