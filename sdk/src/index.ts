@@ -159,25 +159,23 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
 
 (function () {
   function _createGetState(state: ScryptedInterfaceProperty) {
-    return function () {
-      // @ts-ignore: this as any
+    return function <T>(this: ScryptedDeviceBase | MixinDeviceBase<T>) {
       this._lazyLoadDeviceState();
-      // @ts-ignore: this as any
+      // @ts-ignore: accessing private property
       return this._deviceState?.[state];
     };
   }
 
   function _createSetState(state: ScryptedInterfaceProperty) {
-    return function (value: any) {
-      // @ts-ignore: this as any
+    return function <T>(this: ScryptedDeviceBase | MixinDeviceBase<T>, value: any) {
       this._lazyLoadDeviceState();
-      // @ts-ignore: this as any
+      // @ts-ignore: accessing private property
       if (!this._deviceState) {
         console.warn('device state is unavailable. the device must be discovered with deviceManager.onDeviceDiscovered or deviceManager.onDevicesChanged before the state can be set.');
       }
       else {
-        // @ts-ignore: this as any
-        this._deviceState[state] = value;
+      // @ts-ignore: accessing private property
+      this._deviceState[state] = value;
       }
     };
   }
