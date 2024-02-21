@@ -1,22 +1,21 @@
-import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
+import type { homegraph_v1 } from "@googleapis/homegraph/v1";
+import sdk, { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk';
 import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands } from 'actions-on-google/dist/service/smarthome/api/v1';
-import { supportedTypes } from './common';
 import axios from 'axios';
-import throttle from 'lodash/throttle';
+import { GoogleAuth } from "google-auth-library";
 import http from 'http';
-import './types';
+import throttle from 'lodash/throttle';
 import './commands';
-import type { homegraph_v1 } from "@googleapis/homegraph/v1"
-import { GoogleAuth } from "google-auth-library"
+import { supportedTypes } from './common';
+import './types';
 
-import { commandHandlers } from './handlers';
 import { canAccess } from './commands/camerastream';
+import { commandHandlers } from './handlers';
 
-import { URL } from 'url';
 import { homegraph } from '@googleapis/homegraph';
-import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
+import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
+import { URL } from 'url';
 
 import ciao, { Protocol } from '@homebridge/ciao';
 
@@ -520,11 +519,15 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         if (authorization !== this.localAuthorization) {
             if (!this.validAuths.has(authorization)) {
                 try {
-                    await axios.get('https://home.scrypted.app/_punch/getcookie', {
+                    const getcookieResponse = await axios.get('https://home.scrypted.app/_punch/getcookie', {
                         headers: {
                             'Authorization': authorization,
                         }
                     });
+                    // new tokens will contain a lot of information, including the expiry and client id.
+                    // validate this. old tokens will be grandfathered in.
+                    if (getcookieResponse.data.expiry && getcookieResponse.data.clientId !== 'google')
+                        throw new Error('client id mismatch');
                     this.validAuths.add(authorization);
                 }
                 catch (e) {

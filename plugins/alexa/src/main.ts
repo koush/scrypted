@@ -599,11 +599,15 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             try {
                 debug("making authorization request to Scrypted");
 
-                await axios.get('https://home.scrypted.app/_punch/getcookie', {
+                const getcookieResponse = await axios.get('https://home.scrypted.app/_punch/getcookie', {
                     headers: {
                         'Authorization': authorization,
                     }
                 });
+                // new tokens will contain a lot of information, including the expiry and client id.
+                // validate this. old tokens will be grandfathered in.
+                if (getcookieResponse.data.expiry && getcookieResponse.data.clientId !== 'amazon')
+                    throw new Error('client id mismatch');
                 this.validAuths.add(authorization);
             }
             catch (e) {
