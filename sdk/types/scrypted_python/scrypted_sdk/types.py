@@ -1097,7 +1097,7 @@ class Microphone:
 class MixinProvider:
     """MixinProviders can add and intercept interfaces to other devices to add or augment their behavior."""
 
-    async def canMixin(self, type: ScryptedDeviceType, interfaces: list[str]) -> list[str]:
+    async def canMixin(self, type: ScryptedDeviceType, interfaces: list[str]) -> None | list[str]:
         pass
 
     async def getMixin(self, mixinDevice: Any, mixinDeviceInterfaces: list[ScryptedInterface], mixinDeviceState: WritableDeviceState) -> Any:
