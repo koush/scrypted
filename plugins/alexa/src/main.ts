@@ -47,7 +47,11 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             onPut(oldValue: boolean, newValue: boolean) {
                 DEBUG = newValue;
             }
-        }
+        },
+        pairedUserId: {
+            title: "Pairing Key",
+            description: "The pairing key used to validate requests from Alexa. Clear this key or delete the plugin to allow pairing with a different Alexa login.",
+        },
     });
 
     accessToken: Promise<string>;
@@ -608,6 +612,13 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
                 // validate this. old tokens will be grandfathered in.
                 if (getcookieResponse.data.expiry && getcookieResponse.data.clientId !== 'amazon')
                     throw new Error('client id mismatch');
+                if (!this.storageSettings.values.pairedUserId) {
+                    this.storageSettings.values.pairedUserId = getcookieResponse.data.id;
+                }
+                else if (this.storageSettings.values.pairedUserId !== getcookieResponse.data.id) {
+                    this.log.a('This plugin is already paired with a different account. Clear the existing key in the plugin settings to pair this plugin with a different account.');
+                    throw new Error('user id mismatch');
+                }
                 this.validAuths.add(authorization);
             }
             catch (e) {
