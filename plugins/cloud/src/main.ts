@@ -73,6 +73,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             hide: true,
             persistedDefaultValue: crypto.randomBytes(8).toString('hex'),
         },
+        serverId: {
+            hide: true,
+            persistedDefaultValue: crypto.randomBytes(8).toString('hex'),
+        },
         forwardingMode: {
             title: "Port Forwarding Mode",
             description: "The port forwarding mode used to expose the HTTPS port. If port forwarding is disabled or unavailable, Scrypted Cloud will fall back to push to initiate connections with this Scrypted server. Port Forwarding and UPNP are optional but will significantly speed up cloud connections.",
@@ -577,6 +581,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const q = qsstringify({
             upnp_port,
             registration_id,
+            server_id: this.storageSettings.values.serverId,
             sender_id: DEFAULT_SENDER_ID,
             registration_secret,
             hostname,
