@@ -155,7 +155,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             json: true,
         },
         cloudflareEnabled: {
-            group: 'Advanced',
+            group: 'Cloudflare',
             title: 'Cloudflare',
             type: 'boolean',
             description: 'Optional: Create a Cloudflare Tunnel to this server at a random domain name. Providing a Cloudflare token will allow usage of a custom domain name.',
@@ -163,7 +163,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             onPut: () => deviceManager.requestRestart(),
         },
         cloudflaredTunnelToken: {
-            group: 'Advanced',
+            group: 'Cloudflare',
             title: 'Cloudflare Tunnel Token',
             description: 'Optional: Enter the Cloudflare token from the Cloudflare Dashbaord to track and manage the tunnel remotely.',
             onPut: () => {
@@ -171,14 +171,20 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             },
         },
         cloudflaredTunnelUrl: {
-            group: 'Advanced',
+            group: 'Cloudflare',
             title: 'Cloudflare Tunnel URL',
             description: 'Cloudflare Tunnel URL is a randomized cloud connection, unless a Cloudflare Tunnel Token is provided.',
             readonly: true,
             mapGet: () => this.cloudflareTunnel || 'Unavailable',
         },
+        serverName: {
+            group: 'Connection',
+            title: 'Server Name',
+            description: 'The name of this server. This is used to identify this server in the Scrypted Cloud.',
+            persistedDefaultValue: os.hostname()?.split('.')[0] || 'Scrypted Server',
+        },
         register: {
-            group: 'Advanced',
+            group: 'Connection',
             title: 'Register',
             type: 'button',
             onPut: () => {
@@ -187,7 +193,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             description: 'Register server with Scrypted Cloud.',
         },
         testPortForward: {
-            group: 'Advanced',
+            group: 'Connection',
             title: 'Test Port Forward',
             type: 'button',
             onPut: () => this.testPortForward(),
@@ -246,7 +252,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         this.storageSettings.settings.securePort.onGet = async () => {
             return {
-                group: this.storageSettings.values.forwardingMode === 'Disabled' ? 'Advanced' : undefined,
+                group: this.storageSettings.values.forwardingMode === 'Disabled' ? 'Cloudflare' : undefined,
                 title: this.storageSettings.values.forwardingMode === 'Disabled' ? 'Cloudflare Port' : 'Forward Port',
             }
         };
@@ -582,6 +588,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             upnp_port,
             registration_id,
             server_id: this.storageSettings.values.serverId,
+            server_name: this.storageSettings.values.serverName,
             sender_id: DEFAULT_SENDER_ID,
             registration_secret,
             hostname,
@@ -705,8 +712,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async getOauthUrl(): Promise<string> {
         const args = qsstringify({
-            hostname: os.hostname(),
             registration_id: await this.manager.registrationId,
+            server_id: this.storageSettings.values.serverId,
+            server_name: this.storageSettings.values.serverName,
             sender_id: DEFAULT_SENDER_ID,
             redirect_uri: `https://${SCRYPTED_SERVER}/web/oauth/callback`,
         })

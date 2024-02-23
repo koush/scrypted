@@ -42,7 +42,7 @@
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "bpmux": "^8.2.1",
-      "cloudflared": "^0.5.1",
+      "cloudflared": "^0.4.0",
       "exponential-backoff": "^3.1.1",
       "http-proxy": "^1.18.1",
       "nat-upnp": "file:./external/node-nat-upnp"
@@ -53,5 +53,5 @@
       "@types/nat-upnp": "^1.1.5",
       "@types/node": "^20.11.19"
    },
-   "version": "0.2.6"
+   "version": "0.2.7"
 }
