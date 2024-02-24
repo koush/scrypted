@@ -223,7 +223,7 @@ export function parseRtpMap(mline: ReturnType<typeof parseMLine>, rtpmap: string
             codec = 'pcm_mulaw';
             ffmpegEncoder = 'pcm_mulaw';
         }
-        if (mline.payloadTypes?.includes(8)) {
+        else if (mline.payloadTypes?.includes(8)) {
             codec = 'pcm_alaw';
             ffmpegEncoder = 'pcm_alaw';
         }
