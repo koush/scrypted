@@ -1,81 +1,80 @@
-/*
-import sdk, { ScryptedDeviceBase, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Lock, LockState } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, SettingValue, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, Lock, LockState, Readme } from "@scrypted/sdk";
 import { PassThrough } from "stream";
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
-import { HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
-import { HikvisionCameraAPI_KV6113, HikvisionCameraEvent_KV6113 } from "./hikvision-camera-api-kv6113";
+import { HikvisionDoorbellAPI, HikvisionDoorbellEvent } from "./doorbell-api";
+import { HikvisionProvider } from "./main";
+import * as fs from 'fs/promises';
+import { join } from 'path';
 
-class HikvisionLock extends ScryptedDeviceBase implements Lock, Settings {
-    timeout: NodeJS.Timeout;
+const { deviceManager } = sdk;
 
-    constructor(nativeId: string) {
-        super(nativeId);
+export class HikvisionLock extends ScryptedDeviceBase implements Lock, Settings, Readme {
+
+    // timeout: NodeJS.Timeout;
+
+    private provider: HikvisionProvider;
+
+    constructor(nativeId: string, provider: HikvisionProvider) {
+        super (nativeId);
 
         this.lockState = this.lockState || LockState.Unlocked;
+        this.provider = provider;
+        
+        // provider.updateLock (nativeId, this.name);
+    }
+
+    async getReadmeMarkdown(): Promise<string> 
+    {
+        const fileName = join (process.cwd(), 'LOCK_README.md');
+        const result = await fs.readFile (fileName, 'utf-8');
+        return result;
     }
 
     lock(): Promise<void> {
-        return this.turnOff();
+        return this.getClient().closeDoor();
     }
     unlock(): Promise<void> {
-        return this.turnOn();
+        return this.getClient().openDoor();
     }
-    start(): Promise<void> {
-        return this.turnOn();
-    }
-    stop(): Promise<void> {
-        return this.turnOff();
-    }
+
     async getSettings(): Promise<Setting[]> {
+        const cameraNativeId = this.storage.getItem (HikvisionProvider.CAMERA_NATIVE_ID_KEY);
+        const state = deviceManager.getDeviceState (cameraNativeId);
         return [
             {
-                key: 'reset',
-                title: 'Reset Sensor',
+                key: 'parentDevice',
+                title: 'Main Doorbell',
                 description: 'Reset the motion sensor and binary sensor after the given seconds. Enter 0 to never reset.',
-                value: this.storage.getItem('reset') || '10',
-                placeholder: '10',
+                value: state.id,
+                readonly: true,
+                type: 'device',
             }
         ]
     }
     async putSetting(key: string, value: SettingValue): Promise<void> {
         this.storage.setItem(key, value.toString());
-        clearTimeout(this.timeout);
     }
 
-    // note that turnOff locks the lock
-    // this is because, the turnOff should put everything into a "safe"
-    // state that does not get attention in the UI.
-    // devices that are on, running, or unlocked are generally highlighted.
-    async turnOff(): Promise<void> {
-        clearTimeout(this.timeout);
-        this.on = false;
-        this.lockState = LockState.Locked;
-        this.running = false;
-        this.motionDetected = false;
-        this.binaryState = false;
-        this.occupied = false;
-    }
-    async turnOn(): Promise<void> {
-        clearTimeout(this.timeout);
-        this.on = true;
-        this.lockState = LockState.Unlocked;
-        this.running = true;
-        this.motionDetected = true;
-        this.binaryState = true;
-        this.occupied = true;
+    getClient(): HikvisionDoorbellAPI
+    {
+        const ip = this.storage.getItem ('ip');
+        const port = this.storage.getItem ('port');
+        const user = this.storage.getItem ('user');
+        const pass = this.storage.getItem ('pass');
 
-        let reset = parseInt(this.storage.getItem('reset'));
-        if (!reset && reset !== 0)
-            reset = 10;
-        if (reset) {
-            this.timeout = setTimeout(() => this.turnOff(), reset * 1000);
-        }
+        return this.provider.createSharedClient(ip, port, user, pass, this.console, this.storage);
     }
+
+    static deviceInterfaces: string[] = [
+        ScryptedInterface.Lock,
+        ScryptedInterface.Settings,
+        ScryptedInterface.Readme
+    ];
 }
-
+/*
 class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
     devices = new Map<string, DummyDevice>();
 

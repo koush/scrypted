@@ -41,3 +41,12 @@ export function q(a) {
     return a;
   }
   
+export let awaitTimeout = delay =>
+  new Promise(resolve => setTimeout(resolve, delay));
+
+
+export function timeOutPromise<R> (timeoutMs: number, timeoutResult: R, executor)
+{
+    const wait = new Promise<R> (executor)
+    return Promise.race ([wait, awaitTimeout(timeoutMs).then (()=> timeoutResult)]);
+}

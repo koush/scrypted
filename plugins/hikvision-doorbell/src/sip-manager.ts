@@ -1,12 +1,14 @@
 import sdk from '@scrypted/sdk';
 // import { send } from "process";
-import sip from "sip";
-import digest from "sip/digest";
-import { localServiceIpAddress, rString, udpSocketType, unq } from './utils';
+import sip from "./sip/sip";
+import digest from "./sip/digest";
+import { localServiceIpAddress, rString, udpSocketType, unq, awaitTimeout} from './utils';
 import { isLoopback, isV4Format, isV6Format } from 'ip';
 import { Interface } from 'readline';
 import { resolve } from 'path';
 import dgram from 'node:dgram';
+import { timeoutPromise } from "@scrypted/common/src/promise-utils";
+
 
 
 enum DialogStatus 
@@ -29,9 +31,6 @@ interface SipState
 
 const waitResponseTimeout = 5000; // in miliseconds
 const clientRegistrationExpires = 3600; // in seconds
-const realm = 'calmLand';
-const awaitTimeout = delay =>
-  new Promise(resolve => setTimeout(resolve, delay));
 
 export interface SipRegistration
 {
@@ -51,20 +50,21 @@ export class SipManager {
   constructor(private ip: string, private console: Console, private storage: Storage) {
   }
 
-  async startClient()
+  async startClient (creds: SipRegistration)
   {
     this.clientMode = true;
 
-    sip.stop && sip.stop();
+    this.stop();
     await this.startServer();
 
-    this.clientCreds = {
-      user: '4442',
-      password: '4443',
-      ip: '10.210.210.150',
-      port: 5060,
-      callId: '4442'
-    }
+    this.clientCreds = creds;
+    // {
+    //   user: '4442',
+    //   password: '4443',
+    //   ip: '10.210.210.150',
+    //   port: 5060,
+    //   callId: '4442'
+    // }
 
     return this.register();
   }
@@ -77,11 +77,16 @@ export class SipManager {
 
     this.clientMode = false;
 
-    sip.stop && sip.stop();
+    this.stop();
     if (port) {
       this.localPort = port;
     }
     return this.startServer (!port);
+  }
+
+  stop() {
+    sip.stop && sip.stop();
+    this.clearState();
   }
 
   async answer()
@@ -96,15 +101,19 @@ export class SipManager {
       rs.content = this.fakeSdpContent();
       rs.headers['Content-Type'] = 'application/sdp';
       
-      const waitAck = new Promise (resolve => { 
-        this.state = {
-          status: DialogStatus.Answer,
-          msg: ring,
-          waitAck: resolve
-        }
-      });
-      sip.send (rs);
-      await Promise.race ([waitAck, awaitTimeout (waitResponseTimeout)]);
+      try {
+        await timeoutPromise<void> (waitResponseTimeout, new Promise<void> (resolve => { 
+          this.state = {
+            status: DialogStatus.Answer,
+            msg: ring,
+            waitAck: resolve
+          }
+          sip.send (rs);
+        }));
+      } catch (error) {
+        this.console.error (`Wait Ack error: ${error}`);
+      }
+      // await Promise.race ([waitAck, awaitTimeout (waitResponseTimeout)]);
 
       this.state = {
         status: DialogStatus.AnswerAc,
@@ -112,20 +121,27 @@ export class SipManager {
       }
       const byeMsg = this.bye (ring);
 
-      const waitOk = new Promise<boolean> (resolve => {
+      try 
+      {
+         const doit = new Promise<boolean> (resolve => {
 
-        sip.send (byeMsg, (rs) => {
-          this.console.log (`BYE response:\n${sip.stringify (rs)}`);
-          if (rs.status == 200) {
-            this.state.status = DialogStatus.HangupAc;
-            resolve(true);
-          }
+          sip.send (byeMsg, (rs) => {
+            this.console.log (`BYE response:\n${sip.stringify (rs)}`);
+            if (rs.status == 200) {
+              this.state.status = DialogStatus.HangupAc;
+              resolve(true);
+            }
+          });
+          this.state.status = DialogStatus.Hangup;
+  
         });
-        this.state.status = DialogStatus.Hangup;
 
-      });
+        var result = await timeoutPromise<boolean> (waitResponseTimeout, doit);
+      } catch (error) {
+        this.console.error (`Wait OK error: ${error}`);
+      }
 
-      const result = await Promise.race ([waitOk, awaitTimeout(waitResponseTimeout).then (()=> false)])
+      // const result = await Promise.race ([waitOk, awaitTimeout(waitResponseTimeout).then (()=> false)])
       if (!result) {
         this.console.error (`When BYE, timeut occurred`);
       }
@@ -143,27 +159,9 @@ export class SipManager {
 
   private incomeRegister(rq: any): boolean {
 
-    //looking up user info
-    // var callNumber = sip.parseUri(rq.headers.to.uri).user;
-    // var userinfo = this.registry[callNumber];
-    // let context = { realm: realm, algoritm: 'MD5', qop: 'auth' };
-
-    // if (!userinfo) { // we don't know this user and answer with a challenge to hide this fact 
-    //   sip.send(digest.challenge(context, sip.makeResponse(rq, 401, 'Authentication Required')));
-    // }
-    // else {
-    //   userinfo.session = userinfo.session || context;
-    //   // if (!digest.authenticateRequest(userinfo.session, rq, { user:  userinfo.user, password: userinfo.password })) {
-      //   userinfo.session = context;
-      //   sip.send(digest.challenge(userinfo.session, sip.makeResponse(rq, 401, 'Authentication Required')));
-      // }
-      // else {
-        // userinfo.contact = rq.headers.contact;
-        let rs = sip.makeResponse(rq, 200, 'OK');
-        rs.headers.contact = rq.headers.contact;
-        sip.send(rs);
-      // }
-    // }
+    let rs = sip.makeResponse(rq, 200, 'OK');
+    rs.headers.contact = rq.headers.contact;
+    sip.send(rs);
 
     return true;
 
@@ -179,13 +177,13 @@ export class SipManager {
       try 
       {
 
-        sip.start({
+        await sip.start({
           logger: { 
             send: (message, addrInfo) => {  
               this.console.log(`send to ${addrInfo.address}:\n${sip.stringify(message)}`); 
             },
             recv: (message, addrInfo) => {  
-              this.console.log(`recvto ${addrInfo.address}:\n${sip.stringify(message)}`); 
+              this.console.log(`recv to ${addrInfo.address}:\n${sip.stringify(message)}`); 
             }
           },
           address: this.localIp,
@@ -239,7 +237,7 @@ export class SipManager {
 
       } 
       catch (error) {
-        this.console.error (`Starting server error (attempt ${times}): ${error}`);
+        this.console.error (`Starting server error (attempts ${times}): ${error}`);
         // changing server port
         if (findFreePort) {
           this.localPort = await this.getFreeUdpPort (this.localIp, udpSocketType (this.localIp));
@@ -391,10 +389,6 @@ export class SipManager {
         cseq: { seq: 1, method: 'REGISTER' }
       }
     }  
-
-    // Via: SIP/2.0/UDP 10.210.210.210:5060;rport;branch=z9hG4bK1503903609
-    // User-Agent: YATE/5.5.0
-    // Max-Forwards: 70
 
     this.state = {
       status: DialogStatus.Regitering,

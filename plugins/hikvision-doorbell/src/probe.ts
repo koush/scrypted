@@ -1,14 +1,10 @@
-import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { checkStatus } from '../../../server/src/fetch';
+import { AuthRequst } from './auth-request'
 
-export async function getDeviceInfo(credential: AuthFetchCredentialState, address: string) {
-    const response = await authHttpFetch({
-        credential,
-        url: `http://${address}/ISAPI/System/deviceInfo`,
-        ignoreStatusCode: true,
-        responseType: 'text',
-        rejectUnauthorized: false,
-    });
+
+export async function getDeviceInfo(auth: AuthRequst, address: string) {
+
+    const response = await auth.request (`http://${address}/ISAPI/System/deviceInfo`, {responseType: 'text'});
 
     if (response.body.includes('notActivated'))
         throw new Error(`Camera must be first be activated at http://${address}.`);

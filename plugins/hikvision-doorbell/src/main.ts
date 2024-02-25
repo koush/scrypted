@@ -1,14 +1,27 @@
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Lock, LockState } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, LockState } from "@scrypted/sdk";
 import { PassThrough } from "stream";
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
-import { HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
-import { HikvisionCameraAPI_KV6113, HikvisionCameraEvent_KV6113 } from "./hikvision-camera-api-kv6113";
-import { SipManager } from "./sip-manager";
+import { HikvisionDoorbellAPI, HikvisionDoorbellEvent } from "./doorbell-api";
+import { SipManager, SipRegistration } from "./sip-manager";
+import { parseBooleans, parseNumbers } from "xml2js/lib/processors";
+import { once, EventEmitter } from 'node:events';
+import { timeoutPromise } from "@scrypted/common/src/promise-utils";
+import { HikvisionLock } from "./lock"
 
-const { mediaManager } = sdk;
+const { mediaManager, deviceManager } = sdk;
+
+const EXPOSE_LOCK_KEY: string = 'exposeLock';
+
+const SIP_MODE_KEY: string = 'sipMode';
+const SIP_CLIENT_CALLID_KEY: string = 'sipClientCallId';
+const SIP_CLIENT_USER_KEY: string = 'sipClientUser';
+const SIP_CLIENT_PASSWORD_KEY: string = 'sipClientPassword';
+const SIP_CLIENT_PROXY_IP_KEY: string = 'sipClientProxyIp';
+const SIP_CLIENT_PROXY_PORT_KEY: string = 'sipClientProxyPort';
+
+const OPEN_LOCK_AUDIO_NOTIFY_DURASTION: number = 3000  // mSeconds
 
 function channelToCameraNumber(channel: string) {
     if (!channel)
@@ -16,36 +29,34 @@ function channelToCameraNumber(channel: string) {
     return channel.substring(0, channel.length - 2);
 }
 
-class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, Lock {
+enum SipMode {
+    Off = "Don't use SIP",
+    Client = "Connect to SIP Proxy", 
+    Server = "Emulate SIP Proxy"
+}
+
+class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot 
+{
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
-    client: HikvisionCameraAPI;
-    sipManager: SipManager;
-    onvifIntercom = new OnvifIntercom(this);
+    client: HikvisionDoorbellAPI;
+    sipManager?: SipManager;
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
+
+    private controlEvents: EventEmitter = new EventEmitter();
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
         this.updateDevice();
+        this.updateSip();
         this.updateDeviceInfo();
-        this.installSip();
+        // setImmediate (() => this.updateLock());
     }
 
-    lock(): Promise<void> {
-        return this.getClient().closeDoor();
-    }
-    unlock(): Promise<void> {
-        return this.getClient().openDoor();
-    }
-
-    cameraModel(model: string): typeof HikvisionCameraAPI {
-        switch (model) {
-            case 'DS-KV6113-PE1(C)':
-                return HikvisionCameraAPI_KV6113;
-                
-            default:
-                return HikvisionCameraAPI;
-        }
+    destroy(): void
+    {
+        this.sipManager?.stop();
+        this.getEventApi()?.destroy();
     }
 
     async reboot() {
@@ -75,13 +86,30 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         this.info = info;
     }
 
-    installSip() {
+    updateSip() {
         (async () => {
-            this.sipManager = new SipManager (this.getIPAddress(), this.console, this.storage);
-            await this.sipManager.startGateway (6060);
-            const ip = this.sipManager.localIp;
-            const port = this.sipManager.localPort;
-            await this.getClient().setFakeSip (true, ip, port)
+
+            if (this.sipManager) {
+                this.sipManager.stop();
+            }
+            const mode = this.getSipMode();
+            if (mode !== SipMode.Off)
+            {
+                this.sipManager = new SipManager (this.getIPAddress(), this.console, this.storage);
+
+                switch (mode) {
+                    case SipMode.Client:
+                        await this.sipManager.startClient (this.getSipClientCreds())
+                        break;
+                
+                    default:
+                        await this.sipManager.startGateway (6060);
+                        const ip = this.sipManager.localIp;
+                        const port = this.sipManager.localPort;
+                        await this.getClient().setFakeSip (true, ip, port)
+                        break;
+                }
+            }
         })();
     }
 
@@ -89,17 +117,10 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         return this.storage.getItem('httpPort') || '80';
     }
 
-    async listenEvents() {
+    async listenEvents() 
+    {
         let motionTimeout: NodeJS.Timeout;
-        const Model = this.cameraModel(this.info.model);
-        const api = (this.provider as HikvisionProvider).createSharedClient(
-            Model,
-            this.getIPAddress(), 
-            this.getHttpPort(), 
-            this.getUsername(), 
-            this.getPassword(), 
-            this.console,
-            this.storage);
+        const api = this.getEventApi();
         const events = await api.listenEvents();
 
         let ignoreCameraNumber: boolean;
@@ -108,14 +129,11 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         let motionPingsNeeded = parseInt(this.storage.getItem('motionPings')) || 1;
         const motionTimeoutDuration = (parseInt(this.storage.getItem('motionTimeout')) || 10) * 1000;
         let motionPings = 0;
-        events.on('event', async (event: HikvisionCameraEvent | HikvisionCameraEvent_KV6113, cameraNumber: string, inactive: boolean) => {
-            if (   event === HikvisionCameraEvent.MotionDetected
-                || event === HikvisionCameraEvent.LineDetection
-                || event === HikvisionCameraEvent.FieldDetection
-                || event === HikvisionCameraEvent_KV6113.Motion 
-                || event === HikvisionCameraEvent_KV6113.CaseBurglaryAlert // hmm
-                ) {
-
+        events.on('event', async (event: HikvisionDoorbellEvent, cameraNumber: string, inactive: boolean) => {
+            if (event === HikvisionDoorbellEvent.Motion 
+                || event === HikvisionDoorbellEvent.CaseBurglaryAlert // hmm
+                ) 
+            {
                 // check if the camera+channel field is in use, and filter events.
                 if (this.getRtspChannel()) {
                     // it is possible to set it up to use a camera number
@@ -159,19 +177,37 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                     motionPings = 0;
                 }, motionTimeoutDuration);
             }
-            else if (event === HikvisionCameraEvent_KV6113.TalkInvite) {
+            else if (event === HikvisionDoorbellEvent.TalkInvite) 
+            {
                 // clearTimeout(pulseTimeout);
                 // pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
                 this.binaryState = true;
+                setImmediate( () =>{
+                    this.controlEvents.emit (event);
+                });
             }
-            else if (event === HikvisionCameraEvent_KV6113.TalkHangup) {
+            else if (event === HikvisionDoorbellEvent.TalkHangup) 
+            {
                 this.binaryState = false;
+                setImmediate( () =>{
+                    this.controlEvents.emit (event);
+                });
             }
-            else if (event === HikvisionCameraEvent_KV6113.OpenDoor) {
-                this.lockState = LockState.Unlocked;
+            else if (event === HikvisionDoorbellEvent.OpenDoor) 
+            {
+                const provider = this.provider as HikvisionProvider;
+                const lock = await provider.getLockDevice (this.nativeId);
+                if (lock)
+                    lock.lockState = LockState.Unlocked;
+
+                setTimeout(() => this.stopSipRinging(), OPEN_LOCK_AUDIO_NOTIFY_DURASTION);
             }
-            else if (event === HikvisionCameraEvent_KV6113.CloseDoor) {
-                this.lockState = LockState.Locked;
+            else if (event === HikvisionDoorbellEvent.CloseDoor) 
+            {
+                const provider = this.provider as HikvisionProvider;
+                const lock = await provider.getLockDevice (this.nativeId);
+                if (lock)
+                    lock.lockState = LockState.Locked;
             }
         })
 
@@ -179,8 +215,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
     }
 
     createClient() {
-        const Model = this.cameraModel(this.info.model);
-        return new Model(this.getIPAddress(), this.getHttpPort(), this.getUsername(), this.getPassword(), this.console, this.storage);
+        return new HikvisionDoorbellAPI(this.getIPAddress(), this.getHttpPort(), this.getUsername(), this.getPassword(), this.console, this.storage);
     }
 
     getClient() {
@@ -300,27 +335,28 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         return false;
     }
 
-    updateDevice() {
-        const doorbellType = this.storage.getItem('doorbellType');
-        const isDoorbell = doorbellType === 'true';
-
-        const twoWayAudio = this.storage.getItem('twoWayAudio') === 'true'
-            || this.storage.getItem('twoWayAudio') === 'ONVIF'
-            || this.storage.getItem('twoWayAudio') === 'Hikvision';
+    updateDevice() 
+    {
+        const twoWayAudio = this.storage.getItem ('twoWayAudio') === 'true';
 
         const interfaces = this.provider.getInterfaces();
-        let type: ScryptedDeviceType = undefined;
-        if (isDoorbell) {
-            type = ScryptedDeviceType.Doorbell;
-            interfaces.push(ScryptedInterface.BinarySensor)
+        if (twoWayAudio) {
+            interfaces.push (ScryptedInterface.Intercom);
         }
-        if (isDoorbell || twoWayAudio) {
-            interfaces.push(ScryptedInterface.Intercom);
+        interfaces.push (ScryptedInterface.BinarySensor)
+        this.provider.updateDevice (this.nativeId, this.name, interfaces, ScryptedDeviceType.Doorbell);
+    }
+
+    async updateLock () 
+    {
+        const enabled = parseBooleans (this.storage.getItem (EXPOSE_LOCK_KEY));
+        const provider = this.provider as HikvisionProvider;
+        if (enabled) {
+            return provider.enableLock (this.nativeId);
         }
-
-        interfaces.push(ScryptedInterface.Lock);
-
-        this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
+        else {
+            return provider.disableLock (this.nativeId);
+        }
     }
 
     async putSetting(key: string, value: string) {
@@ -328,33 +364,46 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         this.detectedChannels = undefined;
         super.putSetting(key, value);
 
+        if (key === EXPOSE_LOCK_KEY) {
+            this.updateLock();
+        }
+
         this.updateDevice();
+        this.updateSip();
         this.updateDeviceInfo();
+    }
+
+    onLockRemoved() 
+    {
+        super.putSetting(EXPOSE_LOCK_KEY, 'false');
+        this.updateDevice();
     }
 
     async getOtherSettings(): Promise<Setting[]> {
         const ret = await super.getOtherSettings();
 
-        const doorbellType = this.storage.getItem('doorbellType');
-        const isDoorbell = doorbellType === 'true';
-
-        let twoWayAudio = this.storage.getItem('twoWayAudio');
-
-        const choices = [
-            'Hikvision',
-            'ONVIF',
-        ];
-
-        if (!isDoorbell)
-            choices.unshift('None');
-
-        twoWayAudio = choices.find(c => c === twoWayAudio);
-
-        if (!twoWayAudio)
-            twoWayAudio = isDoorbell ? 'Hikvision' : 'None';
-
         ret.unshift(
             {
+                key: EXPOSE_LOCK_KEY,
+                title: 'Expose Door Lock Controller',
+                description: 'The doorbell may have the capability to control door opening. Enabling this feature will result in the creation of a separate (linked) device of the "Lock" type, which implements the door lock control',
+                value: parseBooleans (this.storage.getItem (EXPOSE_LOCK_KEY)) || false,
+                type: 'boolean',
+            },
+            {
+                key: SIP_MODE_KEY,
+                title: 'SIP Mode',
+                description: '',
+                choices: Object.values (SipMode),
+                combobox: true,
+                value: this.storage.getItem (SIP_MODE_KEY) || SipMode.Off,
+                type: 'string'
+            }
+        );
+
+        ret.unshift (...this.sipSettings());
+
+        ret.unshift({
                 subgroup: 'Advanced',
                 key: 'motionTimeout',
                 title: 'Motion Timeout',
@@ -372,40 +421,14 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
             },
         );
 
-        ret.push(
-            {
-                title: 'Doorbell',
-                type: 'boolean',
-                description: 'This device is a Hikvision doorbell.',
-                value: isDoorbell,
-                key: 'doorbellType',
-            },
-            {
-                title: 'Two Way Audio',
-                value: twoWayAudio,
-                key: 'twoWayAudio',
-                description: 'Hikvision cameras may support both Hikvision and ONVIF two way audio protocols. ONVIF generally performs better when supported.',
-                choices,
-            },
-        );
-
         return ret;
     }
 
 
     async startIntercom(media: MediaObject): Promise<void> {
 
-        await this.sipManager.answer();
+        await this.stopSipRinging();
         
-        if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
-            this.activeIntercom?.kill();
-            this.activeIntercom = undefined;
-            const options = await this.getConstructedVideoStreamOptions();
-            const stream = options[0];
-            this.onvifIntercom.url = stream.url;
-            return this.onvifIntercom.startIntercom(media);
-        }
-
         const channel = this.getRtspChannel() || '1';
         let codec: string;
         let format: string;
@@ -469,7 +492,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
             passthrough.end();
             this.stopIntercom();
         });
-
+        
         put.finally(() => forwarder.kill());
     }
 
@@ -477,15 +500,113 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         this.activeIntercom?.kill();
         this.activeIntercom = undefined;
 
-        if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
-            return this.onvifIntercom.stopIntercom();
-        }
         await this.getClient().closeTwoWayAudio(this.getRtspChannel() || '1');
+    }
+
+    private getEventApi()
+    {
+        return (this.provider as HikvisionProvider).createSharedClient(
+            this.getIPAddress(), 
+            this.getHttpPort(), 
+            this.getUsername(), 
+            this.getPassword(), 
+            this.console,
+            this.storage);
+    }
+
+    private async stopSipRinging ()
+    {
+        if (this.binaryState && this.sipManager)
+        {
+            try 
+            {
+                const hup = timeoutPromise (5000, once (this.controlEvents, HikvisionDoorbellEvent.TalkHangup));
+                await Promise.all ([hup, this.sipManager.answer()])
+            } catch (error) {
+                this.console.error (`Stop SIP ringing error: ${error}`);
+            }
+        }
+    }
+
+    private sipSettings(): Setting[]
+    {
+        switch (this.getSipMode()) {
+            case SipMode.Client:
+                return [
+                    {
+                        subgroup: 'Connect to SIP Proxy',
+                        key: SIP_CLIENT_PROXY_IP_KEY,
+                        title: 'Proxy IP Address',
+                        description: 'IP address of the SIP proxy to which this plugin (device) will join as a SIP telephony subscriber',
+                        value: this.storage.getItem(SIP_CLIENT_PROXY_IP_KEY) || '',
+                        type: 'string',
+                    },
+                    {
+                        subgroup: 'Connect to SIP Proxy',
+                        key: SIP_CLIENT_PROXY_PORT_KEY,
+                        title: 'Proxy Port',
+                        description: 'SIP proxy port to which this plugin (device) will join as a SIP telephony subscriber',
+                        value: parseInt(this.storage.getItem(SIP_CLIENT_PROXY_PORT_KEY)) || 5060,
+                        type: 'number',
+                    },
+                    {
+                        subgroup: 'Connect to SIP Proxy',
+                        key: SIP_CLIENT_USER_KEY,
+                        title: 'Username',
+                        description: 'Username for registration on SIP proxy',
+                        value: this.storage.getItem(SIP_CLIENT_USER_KEY),
+                        placeholder: 'Username',
+                        type: 'string',
+                    },
+                    {
+                        subgroup: 'Connect to SIP Proxy',
+                        key: SIP_CLIENT_PASSWORD_KEY,
+                        title: 'Password',
+                        description: 'Password for registration on SIP proxy',
+                        value: this.storage.getItem(SIP_CLIENT_PASSWORD_KEY) || '',
+                        type: 'password',
+                    },
+                    {
+                        subgroup: 'Connect to SIP Proxy',
+                        key: SIP_CLIENT_CALLID_KEY,
+                        title: 'Caller ID',
+                        description: 'Caller ID for registration on SIP proxy',
+                        value: this.storage.getItem(SIP_CLIENT_CALLID_KEY),
+                        placeholder: 'CallId',
+                        type: 'string',
+                    },
+                ];
+        
+            default:
+                break;
+        }
+        return []
+    }
+
+    private getSipMode() {
+        return this.storage.getItem (SIP_MODE_KEY) || SipMode.Off;
+    }
+
+    private getSipClientCreds(): SipRegistration
+    {
+        return {
+            user: this.storage.getItem (SIP_CLIENT_USER_KEY) || '',
+            password: this.storage.getItem (SIP_CLIENT_PASSWORD_KEY) || '',
+            ip: this.storage.getItem (SIP_CLIENT_PROXY_IP_KEY) || '',
+            port: parseNumbers (this.storage.getItem (SIP_CLIENT_PROXY_PORT_KEY) || '5060'),
+            callId: this.storage.getItem (SIP_CLIENT_CALLID_KEY) || ''
+          }
     }
 }
 
-class HikvisionProvider extends RtspProvider {
-    clients: Map<string, HikvisionCameraAPI>;
+export class HikvisionProvider extends RtspProvider 
+{
+    static CAMERA_NATIVE_ID_KEY: string = 'cameraNativeId';
+    
+    clients: Map<string, HikvisionDoorbellAPI>;
+    lockDevices: Map<string, HikvisionLock>;
+
+    private static LOCK_DEVICE_PREFIX = 'hik-lock:';
 
     constructor() {
         super();
@@ -499,22 +620,65 @@ class HikvisionProvider extends RtspProvider {
         ];
     }
 
-    createSharedClient(Model: typeof HikvisionCameraAPI, ip: string, port: string, username: string, password: string, console: Console, storage: Storage) {
+    createSharedClient (ip: string, port: string, username: string, password: string, console: Console, storage: Storage) 
+    {
         if (!this.clients)
             this.clients = new Map();
 
         const key = `${ip}#${port}#${username}#${password}`;
         const check = this.clients.get(key);
-        if (check)
+        if (check) 
             return check;
         
-        const client = new Model(ip, port, username, password, console, storage);
-        this.clients.set(key, client);
+        const client = new HikvisionDoorbellAPI (ip, port, username, password, console, storage);
+        this.clients.set (key, client);
         return client;
     }
 
     createCamera(nativeId: string) {
         return new HikvisionCamera(nativeId, this);
+    }
+
+    async getDevice (nativeId: string): Promise<any>
+    {
+        if (this.isLockId (nativeId))
+        {
+            if (typeof (this.lockDevices) === 'undefined') {
+                this.lockDevices = new Map();
+            }
+
+            let ret = this.lockDevices.get (nativeId);
+            if (!ret) 
+            {
+                ret = new HikvisionLock (nativeId, this);
+                if (ret)
+                    this.lockDevices.set(nativeId, ret);
+            }
+            return ret;
+        }
+        return super.getDevice (nativeId);
+    }
+
+    async getLockDevice (cameraNativeId: string): Promise<HikvisionLock>
+    {
+        const nativeId = this.lockIdFrom (cameraNativeId);
+        return this.getDevice (nativeId);
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+
+        this.console.error(`Release device: ${id}, ${nativeId}`);
+        if (this.isLockId (nativeId))
+        {
+            const camera = this.getCameraDeviceForLockId (nativeId);
+            camera.onLockRemoved();
+            this.lockDevices.delete (nativeId);
+            return;
+        }
+        const camera = this.devices.get (nativeId) as HikvisionCamera;
+        await this.disableLock (nativeId);
+        this.devices.delete(nativeId);
+        camera?.destroy();
     }
 
     async createDevice(settings: DeviceCreatorSettings, nativeId?: string): Promise<string> {
@@ -525,7 +689,7 @@ class HikvisionProvider extends RtspProvider {
         const skipValidate = settings.skipValidate?.toString() === 'true';
         let twoWayAudio: string;
         if (!skipValidate) {
-            const api = new HikvisionCameraAPI(`${settings.ip}`, `${settings.httpPort || '80'}`, username, password, this.console, this.storage);
+            const api = new HikvisionDoorbellAPI(`${settings.ip}`, `${settings.httpPort || '80'}`, username, password, this.console, this.storage);
             try {
                 const deviceInfo = await api.getDeviceInfo();
 
@@ -543,7 +707,7 @@ class HikvisionProvider extends RtspProvider {
 
             try {
                 if (await api.checkTwoWayAudio()) {
-                    twoWayAudio = 'Hikvision';
+                    twoWayAudio = 'true';
                 }
             }
             catch (e) {
@@ -562,8 +726,46 @@ class HikvisionProvider extends RtspProvider {
         device.setHttpPortOverride(settings.httpPort?.toString());
         if (twoWayAudio)
             device.putSetting('twoWayAudio', twoWayAudio);
+        device.updateSip();
         device.updateDeviceInfo();
         return nativeId;
+    }
+
+
+    async enableLock (cameraNativeId: string)
+    {
+        const camera = await this.getDevice (cameraNativeId) as HikvisionCamera
+        const user = camera.storage.getItem ('username');
+        const pass = camera.storage.getItem ('password');
+        const nativeId = this.lockIdFrom (cameraNativeId);
+        const name = `${camera.name} (Door Lock)`
+        await this.updateLock (nativeId, name);
+        const lock = await this.getDevice (nativeId) as HikvisionLock;
+        lock.putSetting ('user', user);
+        lock.putSetting ('pass', pass);
+        lock.putSetting ('ip', camera.getIPAddress());
+        lock.putSetting ('port', camera.getHttpPort());
+        lock.putSetting (HikvisionProvider.CAMERA_NATIVE_ID_KEY, cameraNativeId);
+    }
+
+    async disableLock (cameraNativeId: string)
+    {
+        const nativeId = this.lockIdFrom (cameraNativeId);
+        const state = deviceManager.getDeviceState (nativeId);
+        if (state?.nativeId === nativeId) {
+            return deviceManager.onDeviceRemoved (nativeId)
+        }
+    }
+
+    async updateLock (nativeId: string, name?: string)
+    {
+        await deviceManager.onDeviceDiscovered({
+            nativeId,
+            name,
+            interfaces: HikvisionLock.deviceInterfaces,
+            type: ScryptedDeviceType.Lock
+        });
+
     }
 
     async getCreateDeviceSettings(): Promise<Setting[]> {
@@ -595,6 +797,28 @@ class HikvisionProvider extends RtspProvider {
                 type: 'boolean',
             }
         ]
+    }
+
+    private lockIdFrom (cameraNativeId: string): string {
+        return `${HikvisionProvider.LOCK_DEVICE_PREFIX}${cameraNativeId}`
+    }
+
+    private cameraIdFrom (lockNativeId: string): string {
+        return lockNativeId.substring (HikvisionProvider.LOCK_DEVICE_PREFIX.length);
+    }
+
+    private isLockId (nativeId: string):boolean {
+        return nativeId.startsWith (HikvisionProvider.LOCK_DEVICE_PREFIX);
+    }
+
+    private getCameraDeviceForLockId (lockNativeId): HikvisionCamera
+    {
+        const cameraId = this.cameraIdFrom (lockNativeId);
+        const state = deviceManager.getDeviceState (cameraId);
+        if (state?.nativeId === cameraId) {
+            return this.devices?.get (cameraId);
+        }
+        return null;
     }
 }
 
