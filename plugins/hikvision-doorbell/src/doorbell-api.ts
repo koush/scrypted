@@ -372,7 +372,11 @@ export class HikvisionDoorbellAPI
             this.console.log(`Install result: ${result.statusCode}`);
             
         } catch (error) {
-            this.console.error(`Install error: ${error}`);            
+            this.console.error(`Install error: ${error}`); 
+            if (error.code === 'EHOSTUNREACH') { 
+                // if host unreached we rethrows error for restarting of the installation process
+                throw error;
+            }           
         }
     }
 

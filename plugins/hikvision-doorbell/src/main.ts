@@ -20,8 +20,11 @@ const SIP_CLIENT_USER_KEY: string = 'sipClientUser';
 const SIP_CLIENT_PASSWORD_KEY: string = 'sipClientPassword';
 const SIP_CLIENT_PROXY_IP_KEY: string = 'sipClientProxyIp';
 const SIP_CLIENT_PROXY_PORT_KEY: string = 'sipClientProxyPort';
+const SIP_SERVER_PORT_KEY: string = 'sipServerPort';
+const SIP_SERVER_INSTALL_ON_KEY: string = 'sipServerInstallOnDevice';
 
 const OPEN_LOCK_AUDIO_NOTIFY_DURASTION: number = 3000  // mSeconds
+const UNREACHED_REPEAT_TIMEOUT: number = 10000  // mSeconds
 
 function channelToCameraNumber(channel: string) {
     if (!channel)
@@ -103,10 +106,14 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                         break;
                 
                     default:
-                        await this.sipManager.startGateway (6060);
-                        const ip = this.sipManager.localIp;
-                        const port = this.sipManager.localPort;
-                        await this.getClient().setFakeSip (true, ip, port)
+                        let port = parseInt (this.storage.getItem (SIP_SERVER_PORT_KEY));
+                        if (port) {
+                            await this.sipManager.startGateway (port);    
+                        }
+                        else {
+                            await this.sipManager.startGateway();    
+                        }
+                        this.installSipSettingsOnDevice();
                         break;
                 }
             }
@@ -362,6 +369,12 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
     async putSetting(key: string, value: string) {
         this.client = undefined;
         this.detectedChannels = undefined;
+
+        // remove 0 port for autoselect port number
+        if (key === SIP_SERVER_PORT_KEY && value === '0') { 
+            value = '';
+        }
+
         super.putSetting(key, value);
 
         if (key === EXPOSE_LOCK_KEY) {
@@ -528,6 +541,32 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         }
     }
 
+    /// Installs fake SIP settings on physical device, 
+    /// if appropriate option is enabled (autoinstall)
+    private installSipSettingsOnDeviceTimeout: NodeJS.Timeout;
+    private async installSipSettingsOnDevice()
+    {
+        clearTimeout (this.installSipSettingsOnDeviceTimeout);
+        if (this.getSipMode() === SipMode.Server
+            && this.sipManager) 
+        {
+            const autoinstall = parseBooleans (this.storage.getItem (SIP_SERVER_INSTALL_ON_KEY))
+            const ip = this.sipManager.localIp;
+            const port = this.sipManager.localPort;
+            if (autoinstall) { 
+                try {
+                    await this.getClient().setFakeSip (true, ip, port)
+                } catch (e) {
+                    this.console.error (`Error installing fake SIP settings: ${e}`);
+                    if (e.code === 'EHOSTUNREACH') {
+                        // repeat if unreached
+                        this.installSipSettingsOnDeviceTimeout = setTimeout (() => this.installSipSettingsOnDevice(), UNREACHED_REPEAT_TIMEOUT);
+                    }
+                }
+            }
+        }
+    }
+
     private sipSettings(): Setting[]
     {
         switch (this.getSipMode()) {
@@ -577,6 +616,36 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                     },
                 ];
         
+            case SipMode.Server:
+                return [
+                    {
+                        subgroup: 'Emulate SIP Proxy',
+                        key: 'sipServerIp',
+                        title: 'Interface IP Address',
+                        description: 'Address of the interface on which the fake SIP proxy listens',
+                        value: this.sipManager?.localIp || 'localhost',
+                        type: 'string',
+                        readonly: true
+                    },
+                    {
+                        subgroup: 'Emulate SIP Proxy',
+                        key: SIP_SERVER_PORT_KEY,
+                        title: 'Port',
+                        description: 'Address of the interface on which the fake SIP proxy listens (for information)',
+                        value: parseInt (this.storage.getItem (SIP_SERVER_PORT_KEY)),
+                        type: 'integer',
+                        placeholder: `Port ${this.sipManager?.localPort || 0} is selected automatically`
+                    },
+                    {
+                        subgroup: 'Emulate SIP Proxy',
+                        key: SIP_SERVER_INSTALL_ON_KEY,
+                        title: 'Autoinstall Fake SIP Proxy',
+                        description: 'Install fake SIP proxy settings on a physical device (Hikvision Doorbell) automatically',
+                        value: parseBooleans (this.storage.getItem (SIP_SERVER_INSTALL_ON_KEY)) || false,
+                        type: 'boolean'
+                    },
+                ];
+
             default:
                 break;
         }

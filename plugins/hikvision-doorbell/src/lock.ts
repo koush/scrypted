@@ -46,11 +46,19 @@ export class HikvisionLock extends ScryptedDeviceBase implements Lock, Settings,
         return [
             {
                 key: 'parentDevice',
-                title: 'Main Doorbell',
-                description: 'Reset the motion sensor and binary sensor after the given seconds. Enter 0 to never reset.',
+                title: 'Linked Doorbell Device Name',
+                description: 'The name of the associated doorbell device (for information)',
                 value: state.id,
                 readonly: true,
                 type: 'device',
+            },
+            {
+                key: 'ip',
+                title: 'IP Address',
+                description: 'IP address of the physical device (for information)',
+                value: this.storage.getItem ('ip'),
+                readonly: true,
+                type: 'string',
             }
         ]
     }
