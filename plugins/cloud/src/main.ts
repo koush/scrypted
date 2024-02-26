@@ -27,7 +27,7 @@ import { qsparse, qsstringify } from "./qs";
 const { deviceManager, endpointManager, systemManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
-const SCRYPTED_SERVER = 'home.scrypted.app';
+const SCRYPTED_SERVER = localStorage.getItem('scrypted-server') || 'home.scrypted.app';
 
 const SCRYPTED_CLOUD_MESSAGE_PATH = '/_punch/cloudmessage';
 
