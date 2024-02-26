@@ -27,7 +27,7 @@ import { qsparse, qsstringify } from "./qs";
 const { deviceManager, endpointManager, systemManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
-const SCRYPTED_SERVER = 'home.scrypted.app';
+const SCRYPTED_SERVER = 'home.koushikdutta.com';
 
 const SCRYPTED_CLOUD_MESSAGE_PATH = '/_punch/cloudmessage';
 
@@ -68,6 +68,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         },
         registrationSecret: {
             hide: true,
+            persistedDefaultValue: crypto.randomBytes(8).toString('base64'),
         },
         cloudMessageToken: {
             hide: true,
@@ -307,7 +308,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
 
         this.manager.registrationId.then(async registrationId => {
-            if (this.storageSettings.values.lastPersistedRegistrationId !== registrationId || !this.storageSettings.values.registrationSecret)
+            if (this.storageSettings.values.lastPersistedRegistrationId !== registrationId)
                 this.sendRegistrationId(registrationId);
         })
 
@@ -522,6 +523,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const { userToken, userTokenSignature } = scope.body;
         const tokens = qsstringify({
             user_token: userToken,
+            // no longer exists. this is a legacy field.
             user_token_signature: userTokenSignature
         })
 
@@ -561,37 +563,47 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     getAuthority() {
-        const upnp_port = this.storageSettings.values.forwardingMode === 'Custom Domain' ? 443 : this.storageSettings.values.upnpPort;
-        const hostname = this.storageSettings.values.forwardingMode === 'Custom Domain'
+        const { forwardingMode } = this.storageSettings.values;
+        if (forwardingMode === 'Disabled')
+            return {};
+
+        const upnp_port = forwardingMode === 'Custom Domain' ? 443 : this.storageSettings.values.upnpPort;
+        const hostname = forwardingMode === 'Custom Domain'
             ? this.storageSettings.values.hostname
             : this.storageSettings.values.duckDnsToken && this.storageSettings.values.duckDnsHostname;
 
         if (upnp_port === 443 && !hostname) {
-            const error = this.storageSettings.values.forwardingMode === 'Custom Domain'
+            const error = forwardingMode === 'Custom Domain'
                 ? 'Hostname is required for port Custom Domain setup.'
                 : 'Port 443 requires Custom Domain configuration.';
             this.log.a(error);
             throw new Error(error);
         }
 
+        if (!hostname) {
+            return {
+                upnp_port,
+                port: upnp_port,
+            };
+        }
+
         return {
             upnp_port,
+            port: upnp_port,
             hostname,
         }
     }
 
     async sendRegistrationId(registration_id: string) {
-        const { upnp_port, hostname } = this.getAuthority();
-        const registration_secret = this.storageSettings.values.registrationSecret || crypto.randomBytes(8).toString('base64');
+        const authority = this.getAuthority();
 
         const q = qsstringify({
-            upnp_port,
+            ...authority,
             registration_id,
             server_id: this.storageSettings.values.serverId,
             server_name: this.storageSettings.values.serverName,
             sender_id: DEFAULT_SENDER_ID,
-            registration_secret,
-            hostname,
+            registration_secret: this.storageSettings.values.registrationSecret,
         });
 
         const { token_info } = this.storageSettings.values;
@@ -606,8 +618,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
         this.console.log('registered', response.body);
         this.storageSettings.values.lastPersistedRegistrationId = registration_id;
-        this.storageSettings.values.lastPersistedUpnpPort = upnp_port;
-        this.storageSettings.values.registrationSecret = registration_secret;
+        this.storageSettings.values.lastPersistedUpnpPort = authority.upnp_port;
         return response.body;
     }
 
@@ -711,8 +722,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async getOauthUrl(): Promise<string> {
+        const authority = this.getAuthority();
+
         const args = qsstringify({
+            ...authority,
+
             registration_id: await this.manager.registrationId,
+            registration_secret: this.storageSettings.values.registrationSecret,
             server_id: this.storageSettings.values.serverId,
             server_name: this.storageSettings.values.serverName,
             sender_id: DEFAULT_SENDER_ID,
