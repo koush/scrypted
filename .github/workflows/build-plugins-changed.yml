@@ -32,6 +32,17 @@ jobs:
             # Loop through each changed directory
             for dir in $changed_dirs; do
                 pushd "./plugins/$dir"
+
+                if [[ "$dir" == "core" ]]; then
+                  # core plugin requires ui to be built
+                  pushd "./ui"
+                  echo "plugins/$dir/ui > npm install"
+                  npm install
+                  echo "plugins/$dir/ui > npm run build"
+                  npm run build
+                  popd
+                fi
+
                 echo "plugins/$dir > npm install"
                 npm install
                 echo "plugins/$dir > npm run build"

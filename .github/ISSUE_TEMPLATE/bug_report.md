@@ -51,7 +51,7 @@ If applicable, add screenshots to help explain your problem.
  - Device: [e.g. Amcrest]
 
 **Client (please complete the following information, if applicable):**
- - Software: [e.g. Home app, NVR app, Alexa]
+ - Software: [e.g. Home app, NVR app, Alexa, Browser]
 
 **Additional context**
 Add any other context about the problem here.
