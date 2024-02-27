@@ -179,12 +179,6 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
 
 export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, DeviceProvider, BufferConverter, MixinProvider, Settings {
     storageSettings = new StorageSettings(this, {
-        maximumCompatibilityMode: {
-            title: 'Maximum Compatibility Mode',
-            description: 'Enables maximum compatibility with WebRTC clients by using the most conservative transcode options.',
-            defaultValue: false,
-            type: 'boolean',
-        },
         iceInterfaceAddresses: {
             title: 'ICE Interface Addresses',
             description: 'The ICE interface addresses to bind and share with the peer.',
@@ -195,9 +189,17 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             ],
             defaultValue: 'Default',
         },
+        maximumCompatibilityMode: {
+            group: 'Advanced',
+            title: 'Maximum Compatibility Mode',
+            description: 'Enables maximum compatibility with WebRTC clients by using the most conservative transcode options.',
+            defaultValue: false,
+            type: 'boolean',
+        },
         useTurnServer: {
+            group: 'Advanced',
             title: 'Use TURN Servers',
-            description: 'Use a intermediary server to send video streams. Reduces performance and should only be used with restrictive NATs.',
+            description: 'Uses a intermediary server to send video streams when necessary. Traverses around restrictive NATs.',
             type: 'boolean',
             defaultValue: true,
         },
