@@ -102,6 +102,13 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
     this._deviceState = options.mixinDeviceState;
     this.nativeId = systemManager.getDeviceById(this.id).nativeId;
     this.mixinProviderNativeId = options.mixinProviderNativeId;
+
+    // RpcProxy will trap all properties, and the following check/hack will determine
+    // if the device state came from another node worker thread.
+    // This should ultimately be discouraged and warned at some point in the future.
+    if ((this._deviceState as any).__rpcproxy_traps_all_properties && typeof this._deviceState.id === 'string') {
+      this._deviceState = deviceManager.createDeviceState(this._deviceState.id, this._deviceState.setState);
+    }
   }
 
   get storage() {
