@@ -300,23 +300,33 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         this.setupProxyServer();
         this.setupCloudPush();
-
-        this.manager.on('registrationId', async (registrationId) => {
-            // currently the fcm registration id never changes, so, there's no need.
-            // if ever adding clockwork push, uncomment this.
-            this.sendRegistrationId(registrationId);
-        });
-
-        this.manager.registrationId.then(async registrationId => {
-            if (this.storageSettings.values.lastPersistedRegistrationId !== registrationId)
-                this.sendRegistrationId(registrationId);
-        })
-
         this.updateCors();
+
+        const observeRegistrations = () => {
+            this.manager.on('registrationId', async (registrationId) => {
+                // currently the fcm registration id never changes, so, there's no need.
+                // if ever adding clockwork push, uncomment this.
+                this.sendRegistrationId(registrationId);
+            });
+
+            this.upnpInterval = setInterval(() => this.refreshPortForward(), 30 * 60 * 1000);
+            this.refreshPortForward();
+        }
 
         if (!this.storageSettings.values.token_info && process.env.SCRYPTED_CLOUD_TOKEN) {
             this.storageSettings.values.token_info = process.env.SCRYPTED_CLOUD_TOKEN;
-            this.manager.registrationId.then(r => this.sendRegistrationId(r));
+            this.manager.registrationId.then(r => {
+                this.sendRegistrationId(r, true);
+                observeRegistrations();
+            });
+        }
+        else {
+            this.manager.registrationId.then(async registrationId => {
+                if (this.storageSettings.values.lastPersistedRegistrationId !== registrationId)
+                    this.sendRegistrationId(registrationId);
+            });
+
+            observeRegistrations();
         }
     }
 
@@ -373,14 +383,16 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
             ip = this.storageSettings.values.duckDnsHostname;
         }
-        else if (this.cloudflareTunnelHost) {
-            ip = this.cloudflareTunnelHost;
-        }
         else {
-            ip = (await httpFetch({
-                url: `https://${SCRYPTED_SERVER}/_punch/ip`,
-                responseType: 'json',
-            })).body.ip;
+            if (!this.cloudflareTunnelHost) {
+                ip = (await httpFetch({
+                    url: `https://${SCRYPTED_SERVER}/_punch/ip`,
+                    responseType: 'json',
+                })).body.ip;
+            }
+
+            if (this.cloudflareTunnelHost)
+                ip = this.cloudflareTunnelHost
         }
 
         if (this.storageSettings.values.forwardingMode === 'Custom Domain' || this.cloudflareTunnelHost)
@@ -394,6 +406,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
             const registrationId = await this.manager.registrationId;
             const data = await this.sendRegistrationId(registrationId);
+            if (data?.error)
+                return;
             if (ip !== 'localhost' && ip !== data.ip_address && ip !== this.cloudflareTunnelHost) {
                 this.log.a(`Scrypted Cloud could not verify the IP Address of your custom domain ${this.storageSettings.values.hostname}.`);
             }
@@ -594,7 +608,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    async sendRegistrationId(registration_id: string) {
+    async sendRegistrationId(registration_id: string, force?: boolean) {
         const authority = this.getAuthority();
 
         const q = qsstringify({
@@ -604,6 +618,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             server_name: this.storageSettings.values.serverName,
             sender_id: DEFAULT_SENDER_ID,
             registration_secret: this.storageSettings.values.registrationSecret,
+            force: force ? 'true' : '',
         });
 
         const { token_info } = this.storageSettings.values;
@@ -616,6 +631,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             },
             responseType: 'json',
         });
+        const error = response.body?.error;
+        if (error) {
+            this.console.log('registration error', response.body);
+            this.log.a(error);
+            return response.body;
+        }
+
         this.console.log('registered', response.body);
         this.storageSettings.values.lastPersistedRegistrationId = registration_id;
         this.storageSettings.values.lastPersistedUpnpPort = authority.upnp_port;
@@ -833,9 +855,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.secureServer.listen(this.storageSettings.values.securePort, '0.0.0.0');
         await once(this.secureServer, 'listening');
         this.storageSettings.values.securePort = this.securePort = (this.secureServer.address() as any).port;
-
-        this.upnpInterval = setInterval(() => this.refreshPortForward(), 30 * 60 * 1000);
-        this.refreshPortForward();
 
         const agent = new http.Agent({ maxSockets: Number.MAX_VALUE, keepAlive: true });
         this.proxy = HttpProxy.createProxy({
