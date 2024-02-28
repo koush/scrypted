@@ -1,4 +1,4 @@
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, LockState } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, LockState, Readme } from "@scrypted/sdk";
 import { PassThrough } from "stream";
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -9,6 +9,8 @@ import { parseBooleans, parseNumbers } from "xml2js/lib/processors";
 import { once, EventEmitter } from 'node:events';
 import { timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { HikvisionLock } from "./lock"
+import * as fs from 'fs/promises';
+import { join } from 'path';
 
 const { mediaManager, deviceManager } = sdk;
 
@@ -33,12 +35,12 @@ function channelToCameraNumber(channel: string) {
 }
 
 enum SipMode {
-    Off = "Don't use SIP",
+    Off = "Don't Use SIP",
     Client = "Connect to SIP Proxy", 
     Server = "Emulate SIP Proxy"
 }
 
-class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot 
+class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, Readme 
 {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     client: HikvisionDoorbellAPI;
@@ -53,7 +55,6 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         this.updateDevice();
         this.updateSip();
         this.updateDeviceInfo();
-        // setImmediate (() => this.updateLock());
     }
 
     destroy(): void
@@ -62,6 +63,12 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         this.getEventApi()?.destroy();
     }
 
+    async getReadmeMarkdown(): Promise<string> 
+    {
+        const fileName = join (process.cwd(), 'DOORBELL_README.md');
+        return fs.readFile (fileName, 'utf-8');
+    }
+    
     async reboot() {
         const client = this.getClient();
         await client.reboot();
@@ -350,7 +357,8 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         if (twoWayAudio) {
             interfaces.push (ScryptedInterface.Intercom);
         }
-        interfaces.push (ScryptedInterface.BinarySensor)
+        interfaces.push (ScryptedInterface.BinarySensor);
+        interfaces.push (ScryptedInterface.Readme);
         this.provider.updateDevice (this.nativeId, this.name, interfaces, ScryptedDeviceType.Doorbell);
     }
 

@@ -1,10 +1,5 @@
-import sdk, { ScryptedDeviceBase, SettingValue, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, Lock, LockState, Readme } from "@scrypted/sdk";
-import { PassThrough } from "stream";
-import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
-import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
-import { HikvisionDoorbellAPI, HikvisionDoorbellEvent } from "./doorbell-api";
+import sdk, { ScryptedDeviceBase, SettingValue, ScryptedInterface, Setting, Settings, Lock, LockState, Readme } from "@scrypted/sdk";
+import { HikvisionDoorbellAPI } from "./doorbell-api";
 import { HikvisionProvider } from "./main";
 import * as fs from 'fs/promises';
 import { join } from 'path';
@@ -29,8 +24,7 @@ export class HikvisionLock extends ScryptedDeviceBase implements Lock, Settings,
     async getReadmeMarkdown(): Promise<string> 
     {
         const fileName = join (process.cwd(), 'LOCK_README.md');
-        const result = await fs.readFile (fileName, 'utf-8');
-        return result;
+        return fs.readFile (fileName, 'utf-8');
     }
 
     lock(): Promise<void> {

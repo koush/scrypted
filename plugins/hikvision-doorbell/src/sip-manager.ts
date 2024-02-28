@@ -1,11 +1,7 @@
-import sdk from '@scrypted/sdk';
-// import { send } from "process";
 import sip from "./sip/sip";
 import digest from "./sip/digest";
-import { localServiceIpAddress, rString, udpSocketType, unq, awaitTimeout} from './utils';
-import { isLoopback, isV4Format, isV6Format } from 'ip';
-import { Interface } from 'readline';
-import { resolve } from 'path';
+import { localServiceIpAddress, rString, udpSocketType, unq } from './utils';
+import { isV4Format } from 'ip';
 import dgram from 'node:dgram';
 import { timeoutPromise } from "@scrypted/common/src/promise-utils";
 
