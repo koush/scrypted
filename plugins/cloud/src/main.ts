@@ -184,6 +184,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             description: 'The name of this server. This is used to identify this server in the Scrypted Cloud.',
             persistedDefaultValue: os.hostname()?.split('.')[0] || 'Scrypted Server',
         },
+        connectHomeScryptedApp: {
+            group: 'Connection',
+            title: `Connect to ${SCRYPTED_SERVER}`,
+            description: `Connect this server to ${SCRYPTED_SERVER}. This is required to use the Scrypted Cloud.`,
+            type: 'boolean',
+            persistedDefaultValue: true,
+        },
         register: {
             group: 'Connection',
             title: 'Register',
@@ -298,7 +305,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         if (!this.storageSettings.values.certificate)
             this.storageSettings.values.certificate = createSelfSignedCertificate();
 
-        this.setupProxyServer();
+        const proxy = this.setupProxyServer();
         this.setupCloudPush();
         this.updateCors();
 
@@ -317,7 +324,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.storageSettings.values.token_info = process.env.SCRYPTED_CLOUD_TOKEN;
             this.manager.registrationId.then(r => {
                 this.sendRegistrationId(r, true);
-                observeRegistrations();
+                proxy.then(observeRegistrations);
             });
         }
         else {
@@ -326,7 +333,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     this.sendRegistrationId(registrationId);
             });
 
-            observeRegistrations();
+            proxy.then(observeRegistrations);
         }
     }
 
@@ -450,7 +457,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         let { upnpPort } = this.storageSettings.values;
 
         if (!upnpPort)
-            upnpPort = Math.round(Math.random() * 30000 + 20000);
+            upnpPort = Math.round(Math.random() * 20000 + 40000);
 
         if (this.storageSettings.values.forwardingMode === 'Disabled') {
             this.updatePortForward(upnpPort);
@@ -621,27 +628,45 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             force: force ? 'true' : '',
         });
 
-        const { token_info } = this.storageSettings.values;
-        if (!token_info)
-            throw new Error('Scrypted Cloud is not logged in. Skipping home.scrypted.app registration.');
-        const response = await httpFetch({
-            url: `https://${SCRYPTED_SERVER}/_punch/register?${q}`,
-            headers: {
-                Authorization: `Bearer ${token_info}`
-            },
-            responseType: 'json',
-        });
-        const error = response.body?.error;
-        if (error) {
-            this.console.log('registration error', response.body);
-            this.log.a(error);
-            return response.body;
+        if (!this.storageSettings.values.connectHomeScryptedApp) {
+            return {
+                error: `Scrypted Cloud connection to ${SCRYPTED_SERVER} is disabled.`,
+            };
         }
 
-        this.console.log('registered', response.body);
-        this.storageSettings.values.lastPersistedRegistrationId = registration_id;
-        this.storageSettings.values.lastPersistedUpnpPort = authority.upnp_port;
-        return response.body;
+        const { token_info } = this.storageSettings.values;
+        if (!token_info) {
+            const error = `Login to the Scrypted Cloud plugin to reach this server from the cloud, or disable this alert in the Scrypted Cloud plugin Connection settings.`;
+            this.log.a(error);
+            return {
+                error,
+            };
+        }
+        try {
+            const response = await httpFetch({
+                url: `https://${SCRYPTED_SERVER}/_punch/register?${q}`,
+                headers: {
+                    Authorization: `Bearer ${token_info}`
+                },
+                responseType: 'json',
+            })
+            const error = response.body?.error;
+            if (error) {
+                this.console.log('registration error', response.body);
+                this.log.a(error);
+                return response.body;
+            }
+
+            this.console.log('registered', response.body);
+            this.storageSettings.values.lastPersistedRegistrationId = registration_id;
+            this.storageSettings.values.lastPersistedUpnpPort = authority.upnp_port;
+            return response.body;
+        }
+        catch (e) {
+            return {
+                error: e.toString(),
+            };
+        }
     }
 
     async setupCloudPush() {
