@@ -400,6 +400,20 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         this.updateDevice();
     }
 
+    async getSettings(): Promise<Setting[]> 
+    {
+        // we need override this method for removing `noaudio` property, 
+        // which does not work properly.
+
+        let ret = await super.getSettings();
+        const idx = ret.findIndex((el) => { return el.key === 'noAudio'; });
+        if (idx !== -1) {
+            ret.splice(idx, 1);
+        }
+
+        return ret;
+    }
+
     async getOtherSettings(): Promise<Setting[]> {
         const ret = await super.getOtherSettings();
 
@@ -407,14 +421,14 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
             {
                 key: EXPOSE_LOCK_KEY,
                 title: 'Expose Door Lock Controller',
-                description: 'The doorbell may have the capability to control door opening. Enabling this feature will result in the creation of a separate (linked) device of the "Lock" type, which implements the door lock control',
+                description: 'The doorbell may have the capability to control door opening. Enabling this feature will result in the creation of a separate (linked) device of the "Lock" type, which implements the door lock control.',
                 value: parseBooleans (this.storage.getItem (EXPOSE_LOCK_KEY)) || false,
                 type: 'boolean',
             },
             {
                 key: SIP_MODE_KEY,
                 title: 'SIP Mode',
-                description: '',
+                description: 'Setting up a way to interact with the doorbell in order to receive calls. Read more about how in this device description.',
                 choices: Object.values (SipMode),
                 combobox: true,
                 value: this.storage.getItem (SIP_MODE_KEY) || SipMode.Off,
@@ -630,7 +644,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                         subgroup: 'Emulate SIP Proxy',
                         key: 'sipServerIp',
                         title: 'Interface IP Address',
-                        description: 'Address of the interface on which the fake SIP proxy listens',
+                        description: 'Address of the interface on which the fake SIP proxy listens. Readonly property, for information.',
                         value: this.sipManager?.localIp || 'localhost',
                         type: 'string',
                         readonly: true
@@ -639,7 +653,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                         subgroup: 'Emulate SIP Proxy',
                         key: SIP_SERVER_PORT_KEY,
                         title: 'Port',
-                        description: 'Address of the interface on which the fake SIP proxy listens (for information)',
+                        description: 'Specify the desired port. If you leave the field blank, the port will be assigned automatically. In this case, the selected port will be displayed in the field placeholder.',
                         value: parseInt (this.storage.getItem (SIP_SERVER_PORT_KEY)),
                         type: 'integer',
                         placeholder: `Port ${this.sipManager?.localPort || 0} is selected automatically`

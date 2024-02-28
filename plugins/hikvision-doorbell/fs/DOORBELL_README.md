@@ -6,7 +6,6 @@ At the moment, plugin was tested with the DS-KV6113PE1[C] model `doorbell` , in 
 - the `doorbell` is connected to a local SIP proxy (asterisk);
 - the `doorbell` is connected to a fake SIP proxy, which this plugin runs.
 
-
 ## Settings
 
 ### Support door lock opening
@@ -17,7 +16,7 @@ The lock controller is linked to this device. Therefore, when the doorbell is de
 
 ### Setting up a receiving call (the ability to ringing)
 
-In order for the `doorbell` to make a call, it must be configured accordingly, and this device must also be configured to receive calls from the doorbell.
+In order for the `doorbell` to make a call, it must be configured accordingly, and this plugin device must also be configured to receive calls from the doorbell.
 
 The interaction mode is configured using the **SIP Mode** combobox. The plugin supports three modes of receiving calls, description below.
 
