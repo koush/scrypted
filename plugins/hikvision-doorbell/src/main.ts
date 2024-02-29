@@ -101,6 +101,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
             if (this.sipManager) {
                 this.sipManager.stop();
+                delete this.sipManager;
             }
             const mode = this.getSipMode();
             if (mode !== SipMode.Off)
@@ -214,7 +215,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                 if (lock)
                     lock.lockState = LockState.Unlocked;
 
-                setTimeout(() => this.stopSipRinging(), OPEN_LOCK_AUDIO_NOTIFY_DURASTION);
+                setTimeout(() => this.stopRinging(), OPEN_LOCK_AUDIO_NOTIFY_DURASTION);
             }
             else if (event === HikvisionDoorbellEvent.CloseDoor) 
             {
@@ -462,7 +463,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
     async startIntercom(media: MediaObject): Promise<void> {
 
-        await this.stopSipRinging();
+        await this.stopRinging();
         
         const channel = this.getRtspChannel() || '1';
         let codec: string;
@@ -549,9 +550,11 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
             this.storage);
     }
 
-    private async stopSipRinging ()
+    private async stopRinging ()
     {
-        if (this.binaryState && this.sipManager)
+        if (!this.binaryState) return;
+
+        if (this.sipManager)
         {
             try 
             {
@@ -560,6 +563,9 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
             } catch (error) {
                 this.console.error (`Stop SIP ringing error: ${error}`);
             }
+        }
+        else {
+            await this.getClient().stopRinging();
         }
     }
 

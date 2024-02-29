@@ -1,6 +1,6 @@
 # Hikvision Doorbell (beta)
 
-At the moment, plugin was tested with the DS-KV6113PE1[C] model `doorbell` , in the following modes:
+At the moment, plugin was tested with the **DS-KV6113PE1[C]** model `doorbell` with firmware version: **V2.2.65 build 231213**, in the following modes:
 
 - the `doorbell` is connected to the `Hik-Connect` service;
 - the `doorbell` is connected to a local SIP proxy (asterisk);

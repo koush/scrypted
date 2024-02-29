@@ -305,6 +305,19 @@ export class HikvisionDoorbellAPI
         }, data);
     }
 
+    async stopRinging() {
+        await this.request({
+            url: `http://${this.endpoint}/ISAPI/VideoIntercom/callSignal?format=json`,
+            method: 'PUT',
+            responseType: 'readable',
+        }, '{"CallSignal":{"cmdType":"answer"}}');
+        await this.request({
+            url: `http://${this.endpoint}/ISAPI/VideoIntercom/callSignal?format=json`,
+            method: 'PUT',
+            responseType: 'readable',
+        }, '{"CallSignal":{"cmdType":"hangUp"}}');
+    }
+
     async setFakeSip (enabled: boolean, ip: string = '127.0.0.1', port: number = 5060)
     {
 
