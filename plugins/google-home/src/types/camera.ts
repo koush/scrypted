@@ -12,11 +12,11 @@ addSupportedType({
         ret.attributes = {
             cameraStreamSupportedProtocols: [
                 // this may be supported on gen 2 hub?
-                // "webrtc",
                 "progressive_mp4",
-                "hls",
-                "dash",
-                "smooth_stream",
+                // "hls",
+                // "dash",
+                // "smooth_stream",
+                "webrtc",
             ],
             cameraStreamNeedAuthToken: true,
             cameraStreamNeedDrmEncryption: false

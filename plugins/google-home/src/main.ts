@@ -10,7 +10,7 @@ import { supportedTypes } from './common';
 import './types';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 
-import { canAccess } from './commands/camerastream';
+import { canAccess, signalCamera } from './commands/camerastream';
 import { commandHandlers } from './handlers';
 
 import { homegraph } from '@googleapis/homegraph';
@@ -93,6 +93,12 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
     constructor() {
         super();
+
+        endpointManager.setAccessControlAllowOrigin({
+            origins: [
+                'https://www.gstatic.com',
+            ],
+        });
 
         if (this.jwt) {
             this.googleAuthClient = googleAuth.fromJSON(this.jwt);
@@ -532,6 +538,38 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             });
             return;
         }
+        this.console.log(request.body);
+
+        if (request.url.startsWith('/endpoint/@scrypted/google-home/public/signaling/')) {
+            if (request.method === 'OPTIONS') {
+                response.send('', {
+                    headers: {
+                        'Access-Control-Allow-Origin': request.headers.origin,
+                        'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+                        'Access-Control-Allow-Headers': request.headers['access-control-request-headers'],
+                    },
+                    code: 200,
+                });
+                return;
+            }
+
+            const token = request.headers['authorization'].split('Bearer ')[1];
+            const camera = canAccess(token);
+            if (!camera) {
+                this.console.error(`request failed due to invalid authorization`);
+                response.send('Invalid Token', {
+                    code: 500,
+                });
+            }
+
+            const answer = await signalCamera(camera, JSON.parse(request.body));
+            response.send(JSON.stringify(answer), {
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            return;
+        }
 
         const { authorization } = request.headers;
         if (authorization !== this.localAuthorization) {
@@ -565,7 +603,6 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             }
         }
 
-        this.console.log(request.body);
         const body = JSON.parse(request.body);
         try {
             let result: any;
