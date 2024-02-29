@@ -1,5 +1,5 @@
 import sdk, { ScryptedDeviceBase, SettingValue, ScryptedInterface, Setting, Settings, Lock, LockState, Readme } from "@scrypted/sdk";
-import { HikvisionDoorbellAPI } from "./doorbell-api";
+import { HikvisionDoorbellAPI } from "./hikvision-camera-api";
 import { HikvisionProvider } from "./main";
 import * as fs from 'fs/promises';
 import { join } from 'path';
