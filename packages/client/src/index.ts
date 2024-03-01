@@ -336,6 +336,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
         const baseUrlCheck = checkScryptedClientLogin({
             baseUrl,
+            previousLoginResult: options?.previousLoginResult,
         });
         loginCheckPromises.push(baseUrlCheck);
 
