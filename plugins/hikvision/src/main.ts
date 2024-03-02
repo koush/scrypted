@@ -407,6 +407,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         const put = this.getClient().request({
             url,
+            method: 'PUT',
             responseType: 'readable',
             headers: {
                 'Content-Type': 'application/octet-stream',
@@ -442,7 +443,12 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
             this.stopIntercom();
         });
 
-        put.finally(() => forwarder.kill());
+        // the put request will be open until the passthrough is closed.
+        put.then(response => {
+            if (response.statusCode !== 200)
+                forwarder.kill();
+        })
+        .catch(() => forwarder.kill());
     }
 
     async stopIntercom(): Promise<void> {
