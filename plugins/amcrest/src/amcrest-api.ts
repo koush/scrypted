@@ -125,4 +125,20 @@ export class AmcrestCameraClient {
             this.console.log(response.body);
         }
     }
+
+    async unlock(): Promise<boolean> {
+        const response = await this.request({
+            url: `http://${this.ip}/cgi-bin/accessControl.cgi?action=openDoor&channel=1&UserID=101&Type=Remote`,
+            responseType: 'text',
+        });
+        return response.body.includes('OK');
+    }
+
+    async lock(): Promise<boolean> {
+        const response = await this.request({
+            url: `http://${this.ip}/cgi-bin/accessControl.cgi?action=closeDoor&channel=1&UserID=101&Type=Remote`,
+            responseType: 'text',
+        });
+        return response.body.includes('OK');
+    }
 }
