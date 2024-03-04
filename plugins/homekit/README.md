@@ -52,6 +52,9 @@ This almost always due to your camera bitrate being too high for remote streamin
 1) Use a lower bitrate substream for Remote Streaming.
 2) Enable Transcoding on Remote Streaming.
 
+Other things to check:
+1) Ensure the Home app has cellular network permission.
+
 
 ### mDNS Advertiser Options
 
