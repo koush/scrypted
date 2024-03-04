@@ -32,8 +32,10 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 
 ### HomeKit Discovery and Pairing Issues
 
-If HomeKit is not discoverable, make sure LAN/WLAN multicast is enabled on your router.
-If HomeKit fails while pairing during a Docker install, ensure host networking is being used.
+* Ensure all your Home hubs are online and updated. Power cycling them is recommended in case one is stuck.
+* Ensure LAN/WLAN multicast is enabled on your router.
+* Ensure the iOS device you are using for pairing is on the same network (pairing will fail on cellular).
+* Ensure the Docker installation (if applicable) is using host networking. This configuration is the default if the official Scrypted Docker compose install script was used.
 
 ### HomeKit Live Streaming Timeout (Recordings may be working)
 
