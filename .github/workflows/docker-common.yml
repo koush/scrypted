@@ -12,7 +12,7 @@ jobs:
       matrix:
         NODE_VERSION: [
           "18",
-          # "20"
+          "20"
         ]
         BASE: ["jammy"]
         FLAVOR: ["full", "lite"]
