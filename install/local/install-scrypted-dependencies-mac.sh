@@ -75,7 +75,7 @@ if [ "$PYTHON_VERSION" != "3.10" ]
 then
     RUN python$PYTHON_VERSION -m pip install typing
 fi
-RUN python$PYTHON_VERSION -m pip install debugpy typing_extensions opencv-python psutil ptpython
+RUN python$PYTHON_VERSION -m pip install debugpy typing_extensions opencv-python psutil
 
 echo "Installing Scrypted Launch Agent..."
 

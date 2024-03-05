@@ -58,7 +58,7 @@ RUN apt-get -y install \
 RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
 
 RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install debugpy typing_extensions psutil ptpython
+RUN python3 -m pip install debugpy typing_extensions psutil
 
 ################################################################
 # End section generated from template/Dockerfile.full.header
