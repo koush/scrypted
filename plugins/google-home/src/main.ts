@@ -1,5 +1,5 @@
 import type { homegraph_v1 } from "@googleapis/homegraph/v1";
-import sdk, { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, SettingValue, Settings } from '@scrypted/sdk';
+import sdk, { EngineIOHandler, EventDetails, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, SettingValue, Settings } from '@scrypted/sdk';
 import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands } from 'actions-on-google/dist/service/smarthome/api/v1';
 import axios from 'axios';
 import { GoogleAuth } from "google-auth-library";
@@ -75,7 +75,8 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
     get localAuthorization() {
         return this.storageSettings.values.localAuthorization;
     }
-    reportQueue = new Set<string>();
+    // ids and their interfaces changed
+    reportQueue = new Map<string, Set<string>>();
     reportStateThrottled = throttle(() => this.reportState(), 2000);
     throttleSync = throttle(() => this.requestSync(), 15000, {
         leading: false,
@@ -113,7 +114,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
         systemManager.listen((source, details) => {
             if (source && details.property)
-                this.queueReportState(source);
+                this.queueReportState(source, details);
         });
 
         systemManager.listen((eventSource, eventDetails) => {
@@ -243,14 +244,19 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         }
     }
 
-    async queueReportState(device: ScryptedDevice) {
+    async queueReportState(device: ScryptedDevice, details: EventDetails) {
         if (this.storage.getItem(`link-${device.id}`) !== this.linkTracker)
             return;
 
         if (!await this.isSyncable(device))
             return;
 
-        this.reportQueue.add(device.id);
+        let set = this.reportQueue.get(device.id);
+        if (!set) {
+            set = new Set();
+            this.reportQueue.set(device.id, set);
+        }
+        set.add(details.eventInterface)
         this.reportStateThrottled();
     }
 
@@ -417,7 +423,8 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
     }
 
     async reportState() {
-        const reporting = new Set(this.reportQueue);
+        const reporting = new Set(this.reportQueue.keys());
+        const map = new Map(this.reportQueue);
         this.reportQueue.clear();
 
         const report: homegraph_v1.Schema$ReportStateAndNotificationRequest = {
@@ -449,7 +456,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                     this.notificationsState[device.id] = notificationsState;
                 }
 
-                const notifications = await supportedType.notifications?.(device, notificationsState);
+                const notifications = await supportedType.notifications?.(device, map.get(id));
                 const hasNotifications = notifications && !!Object.keys(notifications).length;
                 // don't report state on devices with no state
                 if (!Object.keys(status).length && !hasNotifications)

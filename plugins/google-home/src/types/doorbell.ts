@@ -30,8 +30,8 @@ addSupportedType({
         const ret = queryResponse(device);
         return ret;
     },
-    async notifications(device: ScryptedDevice & BinarySensor, notificationsState: any) {
-        if (!device.binaryState)
+    async notifications(device: ScryptedDevice & BinarySensor, interfaces: Set<string>) {
+        if (!interfaces?.has(ScryptedInterface.BinarySensor) || !device.binaryState)
             return {};
 
         const ret = {
