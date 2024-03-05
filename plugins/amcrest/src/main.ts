@@ -1,6 +1,6 @@
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, PictureOptions, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
@@ -22,7 +22,7 @@ function findValue(blob: string, prefix: string, key: string) {
     return parts[1];
 }
 
-class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, VideoRecorder, Reboot {
+class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, Lock, VideoRecorder, Reboot {
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
@@ -272,6 +272,16 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         if (doorbellType == DAHUA_DOORBELL_TYPE) {
             ret.push(
                 {
+                    title: 'Enable Dahua Lock',
+                    key: 'enableDahuaLock',
+                    description: 'Some Dahua Doorbells have a built in lock/door access control.',
+                    type: 'boolean',
+                    value: (this.storage.getItem('enableDahuaLock') === 'true').toString(),
+                }
+            );
+
+            ret.push(
+                {
                     title: 'Multiple Call Buttons',
                     key: 'multipleCallIds',
                     description: 'Some Dahua Doorbells integrate multiple Call Buttons for apartment buildings.',
@@ -462,6 +472,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         if (isDoorbell || twoWayAudio) {
             interfaces.push(ScryptedInterface.Intercom);
         }
+        const enableDahuaLock = this.storage.getItem('enableDahuaLock') === 'true';
+        if (isDoorbell && doorbellType === DAHUA_DOORBELL_TYPE && enableDahuaLock) {
+            interfaces.push(ScryptedInterface.Lock);
+        }
         const continuousRecording = this.storage.getItem('continuousRecording') === 'true';
         if (continuousRecording)
             interfaces.push(ScryptedInterface.VideoRecorder);
@@ -597,6 +611,18 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
     showRtspUrlOverride() {
         return false;
+    }
+
+    async lock(): Promise<void> {
+        if (!this.client.lock()) {
+            this.console.error("Could not lock");
+        }
+    }
+
+    async unlock(): Promise<void> {
+        if (!this.client.unlock()) {
+            this.console.error("Could not unlock");
+        }
     }
 }
 

@@ -39,6 +39,8 @@ Each 'Channel' or (camera) Device attached to the NVR must be configured as sepa
 * `Snapshot URL Override` camera's IP address (preferred) or specific port number of NVR for that camera (may work). That is: `http://<camera IP address>/cgi-bin/snapshot.cgi` or `http://<NVR IP address>:<NVR port # for camera>/cgi-bin/snapshot.cgi`
 * `Channel Number Override` camera's channel number as known to DVR
 
+## Dahua Lock/Unlock
+Dahua DTO video intercoms have built-in access control for locks/doors. If you have set the Amcrest plugin up with `Doorbell Type` set to `Dahua Doorbell`, you can enable support for remotely locking/unlocking by enabling/toggle the option `Enable Dahua Lock`.
 
 # Troubleshooting
 ## General
