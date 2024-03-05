@@ -617,7 +617,7 @@ class PluginRemote:
                 print(str_requirements)
 
                 f = open(requirementstxt, 'wb')
-                f.write(requirements)
+                f.write(str_requirements.encode())
                 f.close()
 
                 try:
@@ -651,7 +651,7 @@ class PluginRemote:
                     raise Exception('non-zero result from pip %s' % result)
 
                 f = open(installed_requirementstxt, 'wb')
-                f.write(requirements)
+                f.write(str_requirements.encode())
                 f.close()
             else:
                 print('requirements.txt (up to date)')
