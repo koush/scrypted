@@ -1,4 +1,4 @@
-import { AuthFetchCredentialState, HttpFetchOptions, HttpFetchResponseType, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { IncomingMessage } from 'http';
 import { Readable } from 'stream';
 import { getDeviceInfo } from './probe';
@@ -118,12 +118,12 @@ export class HikvisionCameraAPI {
         }
     }
 
-    async jpegSnapshot(channel: string): Promise<Buffer> {
+    async jpegSnapshot(channel: string, timeout = 10000): Promise<Buffer> {
         const url = `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/picture?snapShotImageType=JPEG`
 
         const response = await this.request({
             url: url,
-            timeout: 60000,
+            timeout,
         });
 
         return response.body;

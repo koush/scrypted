@@ -270,7 +270,7 @@ export class OnvifCameraAPI {
         return this.rtspUrls.get(profileToken);
     }
 
-    async jpegSnapshot(profileToken?: string): Promise<Buffer | undefined> {
+    async jpegSnapshot(profileToken?: string, timeout = 10000): Promise<Buffer | undefined> {
         if (!profileToken)
             profileToken = await this.getMainProfileToken();
         if (!this.snapshotUrls.has(profileToken)) {
@@ -294,7 +294,7 @@ export class OnvifCameraAPI {
 
         const response = await this.request({
             url: snapshotUri,
-            timeout: 60000,
+            timeout,
         });
 
         return response.body;

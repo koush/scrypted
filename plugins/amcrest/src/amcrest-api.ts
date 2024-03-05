@@ -69,10 +69,10 @@ export class AmcrestCameraClient {
         return getDeviceInfo(this.credential, this.ip);
     }
 
-    async jpegSnapshot(): Promise<Buffer> {
+    async jpegSnapshot(timeout = 10000): Promise<Buffer> {
         const response = await this.request({
             url: `http://${this.ip}/cgi-bin/snapshot.cgi`,
-            timeout: 60000,
+            timeout,
         });
 
         return response.body;

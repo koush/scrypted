@@ -127,7 +127,7 @@ export class ReolinkCameraClient {
         };
     }
 
-    async jpegSnapshot() {
+    async jpegSnapshot(timeout = 10000) {
         const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'Snap');
@@ -138,7 +138,7 @@ export class ReolinkCameraClient {
 
         const response = await this.request({
             url,
-            timeout: 60000,
+            timeout,
         });
 
         return response.body;

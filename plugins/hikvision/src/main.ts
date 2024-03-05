@@ -1,4 +1,4 @@
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting } from "@scrypted/sdk";
 import { PassThrough } from "stream";
 import xml2js from 'xml2js';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
@@ -121,9 +121,9 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         return this.client;
     }
 
-    async takeSmartCameraPicture(): Promise<MediaObject> {
+    async takeSmartCameraPicture(options?: RequestPictureOptions): Promise<MediaObject> {
         const api = this.getClient();
-        return mediaManager.createMediaObject(await api.jpegSnapshot(this.getRtspChannel()), 'image/jpeg');
+        return mediaManager.createMediaObject(await api.jpegSnapshot(this.getRtspChannel(), options?.timeout), 'image/jpeg');
     }
 
     async getRtspUrlSettings(): Promise<Setting[]> {

@@ -1,7 +1,7 @@
-import { DeviceState, MixinDeviceBase, MixinDeviceOptions, MixinProvider, PanTiltZoom, PanTiltZoomCommand, PanTiltZoomMovement, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import { MixinProvider, PanTiltZoom, PanTiltZoomCommand, PanTiltZoomMovement, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
-import { connectCameraAPI } from "./onvif-api";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '../../../common/src/settings-mixin';
+import { connectCameraAPI } from "./onvif-api";
 
 export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements PanTiltZoom, Settings {
     storageSettings = new StorageSettings(this, {
@@ -121,7 +121,7 @@ export class OnvifPTZMixinProvider extends ScryptedDeviceBase implements MixinPr
         ];
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any> {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any> {
         return new OnvifPtzMixin({
             group: 'ONVIF PTZ',
             groupKey: 'ptz',
