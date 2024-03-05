@@ -59,7 +59,11 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
         s.close()
 
         async def interact(connection) -> None:
-            global_dict = {**globals(), "print": print_formatted_text}
+            global_dict = {
+                **globals(),
+                "print": print_formatted_text,
+                "help": lambda *args, **kwargs: print_formatted_text("Help is not available in this environment"),
+            }
             locals_dict = {
                 "device": device,
                 "systemManager": systemManager,
@@ -76,7 +80,6 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
         # Start the REPL server
         telnet_server = TelnetServer(interact=interact, port=telnet_port, enable_cpr=False)
         telnet_server.start()
-        print(f"Running telnet server on port {telnet_port}...")
 
         future.set_result(telnet_port)
 
@@ -84,7 +87,6 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
 
     def handle_connection(conn):
         filter = conn.recv(1024).decode()
-        print(f"Filter: {filter}")
 
         future = concurrent.futures.Future()
         loop.call_soon_threadsafe(loop.create_task, start_telnet_repl(future, filter))
@@ -96,14 +98,10 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
             pass  # ignore telnet negotiation
         telnet_client.set_option_negotiation_callback(telnet_negotiation_cb)
 
-        print('Connected to telnet server')
-
         # initialize telnet terminal
+        # this tells the telnet server we are a vt100 terminal
         telnet_client.get_socket().sendall(b'\xff\xfb\x18\xff\xfa\x18\x00\x61\x6e\x73\x69\xff\xf0')
         telnet_client.get_socket().sendall(b'\r\n')
-        #telnet_client.get_socket().sendall(b'\xff\xfa\x18\x39\x36\x2c\x32\x34\xff\xf0')
-        #telnet_client.get_socket().sendall(b'\r\n')
-
 
         # Bridge the connection to the telnet server, two way
         def forward_to_telnet():
@@ -113,12 +111,21 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
                     break
                 telnet_client.write(data)
         def forward_to_socket():
+            prompt_count = 0
             while True:
                 data = telnet_client.read_some()
                 if not data:
                     conn.sendall('REPL exited'.encode())
                     break
-                print(data)
+                if b">>>" in data:
+                    # This is an ugly hack - somewhere in ptpython, the
+                    # initial prompt is being printed many times. Normal
+                    # telnet clients handle it properly, but xtermjs doesn't
+                    # like it. We just replace the first few with spaces
+                    # so it's not too ugly.
+                    prompt_count += 1
+                    if prompt_count < 5:
+                        data = data.replace(b">>>", b"   ")
                 conn.sendall(data)
 
         threading.Thread(target=forward_to_telnet).start()
@@ -132,5 +139,4 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
     threading.Thread(target=accept_connection).start()
 
     proxy_port = sock.getsockname()[1]
-    print(f"Running proxy server on port {proxy_port}...")
     return proxy_port
