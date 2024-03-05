@@ -23,8 +23,8 @@ jobs:
           "18-jammy-full",
           "18-jammy-lite",
           # "18-jammy-thin",
-          # "20-jammy-full",
-          # "20-jammy-lite",
+          "20-jammy-full",
+          "20-jammy-lite",
           # "20-jammy-thin",
         ]
         SUPERVISOR: ["", ".s6"]
