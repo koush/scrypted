@@ -41,6 +41,16 @@ import rpc
 import rpc_reader
 
 
+REQUIREMENTS_TEMPLATE = """
+# system requirements
+ptpython
+
+# plugin requirements
+{}
+""".strip()
+
+
+
 class ClusterObject(TypedDict):
     id: str
     port: int
@@ -568,81 +578,84 @@ class PluginRemote:
             if not os.path.exists(python_prefix):
                 os.makedirs(python_prefix)
 
+            plugin_requirements = ""
             if 'requirements.txt' in zip.namelist():
                 requirements = zip.open('requirements.txt').read()
-                str_requirements = requirements.decode('utf8')
+                plugin_requirements = requirements.decode('utf8')
 
-                requirementstxt = os.path.join(
-                    python_prefix, 'requirements.txt')
-                installed_requirementstxt = os.path.join(
-                    python_prefix, 'requirements.installed.txt')
+            str_requirements = REQUIREMENTS_TEMPLATE.format(plugin_requirements)
 
-                need_pip = True
+            requirementstxt = os.path.join(
+                python_prefix, 'requirements.txt')
+            installed_requirementstxt = os.path.join(
+                python_prefix, 'requirements.installed.txt')
+
+            need_pip = True
+            try:
+                existing = open(installed_requirementstxt).read()
+                need_pip = existing != str_requirements
+            except:
+                pass
+
+            if need_pip:
                 try:
-                    existing = open(installed_requirementstxt).read()
-                    need_pip = existing != str_requirements
+                    for de in os.listdir(plugin_volume):
+                        if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
+                            filePath = os.path.join(plugin_volume, de)
+                            print('Removing old dependencies: %s' %
+                                  filePath)
+                            try:
+                                shutil.rmtree(filePath)
+                            except:
+                                pass
                 except:
                     pass
 
-                if need_pip:
-                    try:
-                        for de in os.listdir(plugin_volume):
-                            if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
-                                filePath = os.path.join(plugin_volume, de)
-                                print('Removing old dependencies: %s' %
-                                      filePath)
-                                try:
-                                    shutil.rmtree(filePath)
-                                except:
-                                    pass
-                    except:
-                        pass
+                os.makedirs(python_prefix)
 
-                    os.makedirs(python_prefix)
+                print('requirements.txt (outdated)')
+                print(str_requirements)
 
-                    print('requirements.txt (outdated)')
-                    print(str_requirements)
+                f = open(requirementstxt, 'wb')
+                f.write(requirements)
+                f.close()
 
-                    f = open(requirementstxt, 'wb')
-                    f.write(requirements)
-                    f.close()
+                try:
+                    pythonVersion = packageJson['scrypted']['pythonVersion']
+                except:
+                    pythonVersion = None
 
-                    try:
-                        pythonVersion = packageJson['scrypted']['pythonVersion']
-                    except:
-                        pythonVersion = None
+                pipArgs = [
+                    sys.executable,
+                    '-m', 'pip', 'install', '-r', requirementstxt,
+                    '--prefix', python_prefix
+                ]
+                if pythonVersion:
+                    print('Specific Python version requested. Forcing reinstall.')
+                    # prevent uninstalling system packages.
+                    pipArgs.append('--ignore-installed')
+                    # force reinstall even if it exists in system packages.
+                    pipArgs.append('--force-reinstall')
 
-                    pipArgs = [
-                        sys.executable,
-                        '-m', 'pip', 'install', '-r', requirementstxt,
-                        '--prefix', python_prefix
-                    ]
-                    if pythonVersion:
-                        print('Specific Python version requested. Forcing reinstall.')
-                        # prevent uninstalling system packages.
-                        pipArgs.append('--ignore-installed')
-                        # force reinstall even if it exists in system packages.
-                        pipArgs.append('--force-reinstall')
+                p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-                    p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                while True:
+                    line = p.stdout.readline()
+                    if not line:
+                        break
+                    line = line.decode('utf8').rstrip('\r\n')
+                    print(line)
+                result = p.wait()
+                print('pip install result %s' % result)
+                if result:
+                    raise Exception('non-zero result from pip %s' % result)
 
-                    while True:
-                        line = p.stdout.readline()
-                        if not line:
-                            break
-                        line = line.decode('utf8').rstrip('\r\n')
-                        print(line)
-                    result = p.wait()
-                    print('pip install result %s' % result)
-                    if result:
-                        raise Exception('non-zero result from pip %s' % result)
-
-                    f = open(installed_requirementstxt, 'wb')
-                    f.write(requirements)
-                    f.close()
-                else:
-                    print('requirements.txt (up to date)')
-                    print(str_requirements)
+                f = open(installed_requirementstxt, 'wb')
+                f.write(requirements)
+                f.close()
+            else:
+                print('requirements.txt (up to date)')
+                print(str_requirements)
 
             sys.path.insert(0, zipPath)
             if platform.system() != 'Windows':
