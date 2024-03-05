@@ -16,11 +16,11 @@ choco upgrade -y python39
 $SCRYPTED_WINDOWS_PYTHON_VERSION="-3.9"
 
 # Refresh environment variables for py and npx to work
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
 
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install --upgrade pip
-py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install debugpy typing_extensions typing opencv-python
+py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install debugpy typing_extensions typing opencv-python ptpython
 
 npx -y scrypted@latest install-server
 
