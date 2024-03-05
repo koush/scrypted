@@ -291,7 +291,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             // the debounce has already triggered a refresh for the next go around.
             if (periodicSnapshot && this.currentPicture) {
                 const cp = this.currentPicture;
-                debounced.catch(() => {});
+                debounced.catch(() => { });
                 try {
                     picture = await (options.timeout ? timeoutPromise(options.timeout, debounced) : debounced);
                 }
@@ -682,8 +682,13 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             const search = new URLSearchParams(pathname.split('?')[1]);
             const mixin = this.mixinDevices.get(id);
             let buffer: Buffer;
+            let timeout = parseInt(search.get('timeout'));
+            // make web requests timeout after 5 seconds by default.
+            if (isNaN(timeout))
+                timeout = 5000;
             const rpo: RequestPictureOptions = {
                 reason: search.get('reason') as 'event' | 'periodic',
+                timeout,
                 picture: {
                     width: parseInt(search.get('width')) || undefined,
                     height: parseInt(search.get('height')) || undefined,
