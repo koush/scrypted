@@ -827,6 +827,14 @@ def main(rpcTransport: rpc_reader.RpcTransport):
 
 
 def plugin_main(rpcTransport: rpc_reader.RpcTransport):
+    if True:
+        main(rpcTransport)
+        return
+
+    # 03/05/2024
+    # Not sure why this code below was necessary. I thought it was gstreamer needing to
+    # be initialized on the main thread, but that no longer seems to be the case.
+
     # gi import will fail on windows (and posisbly elsewhere)
     # if it does, try starting without it.
     try:
