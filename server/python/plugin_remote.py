@@ -7,6 +7,7 @@ import os
 import platform
 import shutil
 from plugin_pip import install_with_pip, remove_pip_dirs, need_requirements
+import signal
 import sys
 import threading
 import time
@@ -46,6 +47,30 @@ ptpython
 """.strip()
 
 
+asyncio_signal_handlers = {}
+
+def add_asyncio_signal_handler(signum: signal._SIGNUM, callback, *args) -> None:
+        asyncio_signal_handlers[signum] = (callback, args)
+
+def remove_asyncio_signal_handler(signum: signal._SIGNUM) -> None:
+    asyncio_signal_handlers.pop(signum, None)
+
+# This monkeypatching is necessary to allow an asyncio loop outside the main
+# thread to handle signals. This is necessary for the REPL to work properly
+# when glib is initialized in the main thread.
+# Not well-tested since most plugins that rely on glib don't try to set up
+# signal handlers.
+def setup_asyncio_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
+    def signal_handler(signum, frame):
+        if signum in asyncio_signal_handlers:
+            callback, args = asyncio_signal_handlers[signum]
+            loop.call_soon_threadsafe(callback, *args)
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGQUIT, signal_handler)
+
+    loop.add_signal_handler = add_asyncio_signal_handler
+    loop.remove_signal_handler = remove_asyncio_signal_handler
 
 class ClusterObject(TypedDict):
     id: str
@@ -814,9 +839,7 @@ async def plugin_async_main(loop: AbstractEventLoop, rpcTransport: rpc_reader.Rp
         os._exit(0)
 
 
-def main(rpcTransport: rpc_reader.RpcTransport):
-    loop = asyncio.new_event_loop()
-
+def main(loop: asyncio.AbstractEventLoop, rpcTransport: rpc_reader.RpcTransport):
     def gc_runner():
         gc.collect()
         loop.call_later(10, gc_runner)
@@ -827,6 +850,8 @@ def main(rpcTransport: rpc_reader.RpcTransport):
 
 
 def plugin_main(rpcTransport: rpc_reader.RpcTransport):
+    async_loop = asyncio.new_event_loop()
+
     # gi import will fail on windows (and posisbly elsewhere)
     # if it does, try starting without it.
     try:
@@ -840,8 +865,10 @@ def plugin_main(rpcTransport: rpc_reader.RpcTransport):
         # seems optional on other platforms.
         loop = GLib.MainLoop()
 
+        setup_asyncio_signal_handlers(async_loop)
+
         worker = threading.Thread(target=main, args=(
-            rpcTransport,), name="asyncio-main")
+            async_loop, rpcTransport,), name="asyncio-main")
         worker.start()
 
         loop.run()
@@ -850,7 +877,7 @@ def plugin_main(rpcTransport: rpc_reader.RpcTransport):
         pass
 
     # reattempt without gi outside of the exception handler in case the plugin fails.
-    main(rpcTransport)
+    main(async_loop, rpcTransport)
 
 
 def plugin_fork(conn: multiprocessing.connection.Connection):
