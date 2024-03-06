@@ -160,6 +160,7 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
                 **globals(),
                 "print": repl_print,
                 "help": lambda *args, **kwargs: repl_print("Help is not available in this environment"),
+                "input": lambda *args, **kwargs: repl_print("Input is not available in this environment"),
             }
             locals_dict = {
                 "device": device,
