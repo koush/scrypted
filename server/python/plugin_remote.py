@@ -41,6 +41,12 @@ import rpc
 import rpc_reader
 
 
+OPTIONAL_REQUIREMENTS = """
+ptpython
+""".strip()
+
+
+
 class ClusterObject(TypedDict):
     id: str
     port: int
@@ -337,6 +343,7 @@ class PluginRemote:
         self.pluginId = pluginId
         self.hostInfo = hostInfo
         self.loop = loop
+        self.replPort = None
         self.__dict__['__proxy_oneway_methods'] = [
             'notify',
             'updateDeviceState',
@@ -567,81 +574,100 @@ class PluginRemote:
             if not os.path.exists(python_prefix):
                 os.makedirs(python_prefix)
 
+            str_requirements = ""
             if 'requirements.txt' in zip.namelist():
                 requirements = zip.open('requirements.txt').read()
                 str_requirements = requirements.decode('utf8')
 
-                requirementstxt = os.path.join(
-                    python_prefix, 'requirements.txt')
-                installed_requirementstxt = os.path.join(
-                    python_prefix, 'requirements.installed.txt')
+            installed_optional_requirementstxt = os.path.join(
+                python_prefix, 'optional-requirements.installed.txt')
+            optional_requirementstxt = os.path.join(
+                python_prefix, 'optional-requirements.txt')
+            requirementstxt = os.path.join(
+                python_prefix, 'requirements.txt')
+            installed_requirementstxt = os.path.join(
+                python_prefix, 'requirements.installed.txt')
 
-                need_pip = True
+            def install_with_pip(want_requirements: str, requirementstxt: str, installed_requirementstxt: str, ignore_error: bool = False):
+                os.makedirs(python_prefix, exist_ok=True)
+
+                print(f'{os.path.basename(requirementstxt)} (outdated)')
+                print(want_requirements)
+
+                f = open(requirementstxt, 'wb')
+                f.write(want_requirements.encode())
+                f.close()
+
+                try:
+                    pythonVersion = packageJson['scrypted']['pythonVersion']
+                except:
+                    pythonVersion = None
+
+                pipArgs = [
+                    sys.executable,
+                    '-m', 'pip', 'install', '-r', requirementstxt,
+                    '--prefix', python_prefix
+                ]
+                if pythonVersion:
+                    print('Specific Python version requested. Forcing reinstall.')
+                    # prevent uninstalling system packages.
+                    pipArgs.append('--ignore-installed')
+                    # force reinstall even if it exists in system packages.
+                    pipArgs.append('--force-reinstall')
+
+                p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+                while True:
+                    line = p.stdout.readline()
+                    if not line:
+                        break
+                    line = line.decode('utf8').rstrip('\r\n')
+                    print(line)
+                result = p.wait()
+                print('pip install result %s' % result)
+                if result:
+                    if not ignore_error:
+                        raise Exception('non-zero result from pip %s' % result)
+                    else:
+                        print('ignoring non-zero result from pip %s' % result)
+                else:
+                    f = open(installed_requirementstxt, 'wb')
+                    f.write(want_requirements.encode())
+                    f.close()
+
+            need_pip = True
+            if str_requirements:
                 try:
                     existing = open(installed_requirementstxt).read()
                     need_pip = existing != str_requirements
                 except:
                     pass
+            if not need_pip:
+                try:
+                    existing = open(installed_optional_requirementstxt).read()
+                    need_pip = existing != OPTIONAL_REQUIREMENTS
+                except:
+                    need_pip = True
 
-                if need_pip:
-                    try:
-                        for de in os.listdir(plugin_volume):
-                            if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
-                                filePath = os.path.join(plugin_volume, de)
-                                print('Removing old dependencies: %s' %
-                                      filePath)
-                                try:
-                                    shutil.rmtree(filePath)
-                                except:
-                                    pass
-                    except:
-                        pass
+            if need_pip:
+                try:
+                    for de in os.listdir(plugin_volume):
+                        if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
+                            filePath = os.path.join(plugin_volume, de)
+                            print('Removing old dependencies: %s' %
+                                  filePath)
+                            try:
+                                shutil.rmtree(filePath)
+                            except:
+                                pass
+                except:
+                    pass
 
-                    os.makedirs(python_prefix)
-
-                    print('requirements.txt (outdated)')
-                    print(str_requirements)
-
-                    f = open(requirementstxt, 'wb')
-                    f.write(requirements)
-                    f.close()
-
-                    try:
-                        pythonVersion = packageJson['scrypted']['pythonVersion']
-                    except:
-                        pythonVersion = None
-
-                    pipArgs = [
-                        sys.executable,
-                        '-m', 'pip', 'install', '-r', requirementstxt,
-                        '--prefix', python_prefix
-                    ]
-                    if pythonVersion:
-                        print('Specific Python version requested. Forcing reinstall.')
-                        # prevent uninstalling system packages.
-                        pipArgs.append('--ignore-installed')
-                        # force reinstall even if it exists in system packages.
-                        pipArgs.append('--force-reinstall')
-
-                    p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-                    while True:
-                        line = p.stdout.readline()
-                        if not line:
-                            break
-                        line = line.decode('utf8').rstrip('\r\n')
-                        print(line)
-                    result = p.wait()
-                    print('pip install result %s' % result)
-                    if result:
-                        raise Exception('non-zero result from pip %s' % result)
-
-                    f = open(installed_requirementstxt, 'wb')
-                    f.write(requirements)
-                    f.close()
-                else:
-                    print('requirements.txt (up to date)')
-                    print(str_requirements)
+                install_with_pip(OPTIONAL_REQUIREMENTS, optional_requirementstxt, installed_optional_requirementstxt, ignore_error=True)
+                install_with_pip(str_requirements, requirementstxt, installed_requirementstxt, ignore_error=False)
+            else:
+                print('requirements.txt (up to date)')
+                print(str_requirements)
 
             sys.path.insert(0, zipPath)
             if platform.system() != 'Windows':
@@ -744,7 +770,14 @@ class PluginRemote:
 
         if not forkMain:
             from main import create_scrypted_plugin  # type: ignore
-            return await rpc.maybe_await(create_scrypted_plugin())
+            pluginInstance = await rpc.maybe_await(create_scrypted_plugin())
+            try:
+                from plugin_repl import createREPLServer
+                self.replPort = await createREPLServer(sdk, pluginInstance)
+            except Exception as e:
+                print(f"Warning: Python REPL cannot be loaded: {e}")
+                self.replPort = 0
+            return pluginInstance
 
         from main import fork  # type: ignore
         forked = await rpc.maybe_await(fork())
@@ -795,7 +828,13 @@ class PluginRemote:
         pass
 
     async def getServicePort(self, name):
-        pass
+        if name == "repl":
+            if self.replPort is None:
+                raise Exception('REPL unavailable: Plugin not loaded.')
+            if self.replPort == 0:
+                raise Exception('REPL unavailable: Python REPL not available.')
+            return self.replPort
+        raise Exception(f'unknown service {name}')
 
     async def start_stats_runner(self):
         update_stats = await self.peer.getParam('updateStats')
