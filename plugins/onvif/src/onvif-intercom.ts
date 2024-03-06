@@ -176,6 +176,7 @@ export class OnvifIntercom implements Intercom {
                 encoderArguments: [
                     '-acodec', defaultMatch.ffmpegEncoder,
                     '-ar', defaultMatch.clock.toString(),
+                    "-b:a", "64k",
                     '-ac', defaultMatch.channels?.toString() || '1',
                 ],
             }

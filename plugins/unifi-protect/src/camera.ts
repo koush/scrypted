@@ -3,12 +3,13 @@ import { fitHeightToWidth } from "@scrypted/common/src/resolution-utils";
 import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, NotifierOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, Online, PanTiltZoom, PanTiltZoomCommand, PictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { once } from "events";
-import { Readable } from "stream";
+import { PassThrough, Readable } from "stream";
 import WS from 'ws';
 import { UnifiProtect } from "./main";
 import { MOTION_SENSOR_TIMEOUT, UnifiMotionDevice, debounceMotionDetected } from './motion';
 import { FeatureFlagsShim } from "./shim";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
+import { readLength } from '@scrypted/common/src/read-stream';
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -135,14 +136,15 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         args.push(
             "-acodec", "aac",
             "-profile:a", "aac_low",
-            "-threads", "0",
+            // "-threads", "0",
             "-avioflags", "direct",
             '-fflags', '+flush_packets', '-flush_packets', '1',
             "-flags", "+global_header",
             "-ar", camera.talkbackSettings.samplingRate.toString(),
             "-ac", camera.talkbackSettings.channels.toString(),
-            "-b:a", "16k",
+            "-b:a", "64k",
             "-f", "adts",
+            "-muxdelay", "0",
             `pipe:3`,
         );
 
@@ -165,16 +167,33 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
             try {
                 while (websocket.readyState === WS.OPEN) {
-                    await once(socket, 'readable');
-                    while (true) {
-                        const data = socket.read();
-                        if (!data)
-                            break;
-                        websocket.send(data, e => {
-                            if (e) {
-                                safeKillFFmpeg(cp);
-                            }
-                        });
+                    // this parses out full adts packets to ensure there's no truncation on ws message boundary, but
+                    // does not seem to matter.
+                    // preferring this as it seems to be the "right" thing to do.
+                    if (true) {
+                        const buffers: Buffer[] = [];
+                        do {
+                            const header = await readLength(socket, 7);
+                            const frameLength = ((header[3] & 0x03) << 11) | (header[4] << 3) | ((header[5] & 0xE0) >> 5);
+                            const need = frameLength - 7;
+                            const data = await readLength(socket, need);
+                            buffers.push(header, data);
+                        }
+                        while (socket.readableLength > 7 && buffers.length < 10);
+                        websocket.send(Buffer.concat(buffers));
+                    }
+                    else {
+                        await once(socket, 'readable');
+                        while (true) {
+                            const data = socket.read();
+                            if (!data)
+                                break;
+                            websocket.send(data, e => {
+                                if (e) {
+                                    safeKillFFmpeg(cp);
+                                }
+                            });
+                        }
                     }
                 }
             }
