@@ -5,8 +5,8 @@
     // "scrypted.serverRoot": "/server",
 
     // lxc installation
-    "scrypted.debugHost": "scrypted-server",
-    "scrypted.serverRoot": "/root/.scrypted",
+    // "scrypted.debugHost": "scrypted-server",
+    // "scrypted.serverRoot": "/root/.scrypted",
 
     // windows installation
     // "scrypted.debugHost": "koushik-windows",
@@ -17,8 +17,8 @@
     // "scrypted.serverRoot": "/home/pi/.scrypted",
 
     // local checkout
-    // "scrypted.debugHost": "127.0.0.1",
-    // "scrypted.serverRoot": "/Users/koush/.scrypted",
+    "scrypted.debugHost": "127.0.0.1",
+    "scrypted.serverRoot": "/Users/koush/.scrypted",
 
     "scrypted.pythonRemoteRoot": "${config:scrypted.serverRoot}/volume/plugin.zip",
     "python.analysis.extraPaths": [

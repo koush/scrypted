@@ -41,7 +41,7 @@ import rpc
 import rpc_reader
 
 
-OPTIONAL_REQUIREMENTS = """
+SCRYPTED_REQUIREMENTS = """
 ptpython
 """.strip()
 
@@ -574,25 +574,33 @@ class PluginRemote:
             if not os.path.exists(python_prefix):
                 os.makedirs(python_prefix)
 
-            str_requirements = ""
-            if 'requirements.txt' in zip.namelist():
-                str_requirements = zip.open('requirements.txt').read().decode('utf8')
 
-            optional_requirements_basename = os.path.join(
-                python_prefix, 'requirements.optional')
+            def read_requirements(filename: str) -> str:
+                if filename in zip.namelist():
+                    return zip.open(filename).read().decode('utf8')
+                return ''
+
+            str_requirements = read_requirements('requirements.txt')
+            str_optional_requirements = read_requirements('requirements.optional.txt')
+
+            scrypted_requirements_basename = os.path.join(
+                python_prefix, 'requirements.scrypted')
             requirements_basename = os.path.join(
                 python_prefix, 'requirements')
+            optional_requirements_basename = os.path.join(
+                python_prefix, 'requirements.optional')
 
             need_pip = True
             if str_requirements:
                 need_pip = need_requirements(requirements_basename, str_requirements)
             if not need_pip:
-                need_pip = need_requirements(optional_requirements_basename, OPTIONAL_REQUIREMENTS)
+                need_pip = need_requirements(scrypted_requirements_basename, SCRYPTED_REQUIREMENTS)
 
             if need_pip:
                 remove_pip_dirs(plugin_volume)
-                install_with_pip(python_prefix, packageJson, OPTIONAL_REQUIREMENTS, optional_requirements_basename, ignore_error=True)
+                install_with_pip(python_prefix, packageJson, SCRYPTED_REQUIREMENTS, scrypted_requirements_basename, ignore_error=True)
                 install_with_pip(python_prefix, packageJson, str_requirements, requirements_basename, ignore_error=False)
+                install_with_pip(python_prefix, packageJson, str_optional_requirements, optional_requirements_basename, ignore_error=True)
             else:
                 print('requirements.txt (up to date)')
                 print(str_requirements)

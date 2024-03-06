@@ -1,15 +1,7 @@
 # needed by libav to_ndarray
 numpy>=1.16.2
 
-# gobject instrospection for gstreamer.
-PyGObject>=3.30.4; sys_platform != 'win32'
-
-# libav doesnt work on arm7
-av>=10.0.0; sys_platform != 'linux' or platform_machine == 'x86_64' or platform_machine == 'aarch64'
-
-# pyvips is not available on windows, and is preinstalled as part of the installer scripts on
-# mac and linux.
-pyvips; sys_platform != 'win32'
+av>=10.0.0
 
 # in case pyvips fails to load, use a pillow fallback.
 # pillow for anything not intel linux, pillow-simd is available on x64 linux

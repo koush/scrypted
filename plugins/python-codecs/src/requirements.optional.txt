@@ -1,0 +1,6 @@
+# gobject instrospection for gstreamer.
+PyGObject>=3.30.4; sys_platform != 'win32'
+
+# pyvips is not available on windows, and is preinstalled as part of the installer scripts on
+# mac and linux.
+pyvips; sys_platform != 'win32'
