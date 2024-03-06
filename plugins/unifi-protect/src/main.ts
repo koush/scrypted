@@ -1,14 +1,15 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, Device, ScryptedInterface, ObjectsDetected, ObjectDetectionResult } from "@scrypted/sdk";
-import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '@scrypted/common/src/provider-plugin';
-import { defaultSensorTimeout, UnifiCamera } from "./camera";
-import { FeatureFlagsShim, LastSeenShim } from "./shim";
-import { UnifiSensor } from "./sensor";
+import { sleep } from "@scrypted/common/src/sleep";
+import sdk, { Device, DeviceProvider, ObjectDetectionResult, ObjectsDetected, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings } from "@scrypted/sdk";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import axios from "axios";
+import { UnifiCamera } from "./camera";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
-import { sleep } from "@scrypted/common/src/sleep";
-import axios from "axios";
-import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import { debounceMotionDetected } from "./motion";
+import { UnifiSensor } from "./sensor";
+import { FeatureFlagsShim, LastSeenShim } from "./shim";
+import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect";
 
 const { deviceManager } = sdk;
 
@@ -64,10 +65,12 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
         Object.assign(device, packet.payload);
 
-        const ret = this.sensors.get(packet.action.id) ||
-            this.locks.get(packet.action.id) ||
-            this.cameras.get(packet.action.id) ||
-            this.lights.get(packet.action.id);
+        const nativeId = this.getNativeId(device, false);
+
+        const ret = this.sensors.get(nativeId) ||
+            this.locks.get(nativeId) ||
+            this.cameras.get(nativeId) ||
+            this.lights.get(nativeId);
 
         const keys = new Set(Object.keys(packet.payload));
         for (const k of filter) {
@@ -76,13 +79,6 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         if (keys.size > 0 && this.storageSettings.values.debugLog)
             ret?.console.log('update packet', packet.payload);
         return ret;
-    }
-
-    sanityCheckMotion(device: UnifiCamera | UnifiSensor | UnifiLight, payload: ProtectNvrUpdatePayloadCameraUpdate & LastSeenShim) {
-        if (device.motionDetected && payload.lastSeen > payload.lastMotion + defaultSensorTimeout) {
-            // something weird happened, lets set unset any motion state
-            device.setMotionDetected(false);
-        }
     }
 
     public async loginFetch(url: string, options?: { method?: string, signal?: AbortSignal, responseType?: axios.ResponseType }) {
@@ -132,13 +128,12 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     return;
 
                 const payload = updatePacket.payload as any as ProtectNvrUpdatePayloadCameraUpdate & LastSeenShim;
-                this.sanityCheckMotion(unifiDevice as any, payload);
 
                 if (updatePacket.action.modelKey !== "camera")
                     return;
 
                 const unifiCamera = unifiDevice as UnifiCamera;
-                if (payload.lastRing && unifiCamera.binaryState && payload.lastSeen > payload.lastRing + unifiCamera.getSensorTimeout()) {
+                if (payload.lastRing && unifiCamera.binaryState && payload.lastSeen > payload.lastRing + 25000) {
                     // something weird happened, lets set unset any binary sensor state
                     unifiCamera.binaryState = false;
                 }
@@ -207,11 +202,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         unifiCamera.resetRingTimeout();
                     }
                     else if (payload.type === 'motion') {
-                        unifiCamera.setMotionDetected(true);
-                        unifiCamera.lastMotion = payload.start;
-                        // i don't think this is necessary anymore?
-                        // the event stream will set and unset motion.
-                        unifiCamera.resetMotionTimeout();
+                        debounceMotionDetected(unifiCamera);
                     }
                 }
 
@@ -340,7 +331,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: camera.name,
-                    nativeId: camera.id,
+                    nativeId: this.getNativeId(camera, true),
                     info: {
                         manufacturer: 'Ubiquiti',
                         model: camera.type,
@@ -387,7 +378,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: sensor.name,
-                    nativeId: sensor.id,
+                    nativeId: this.getNativeId(sensor, true),
                     info: {
                         manufacturer: 'Ubiquiti',
                         model: sensor.type,
@@ -414,7 +405,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: light.name,
-                    nativeId: light.id,
+                    nativeId: this.getNativeId(light, true),
                     info: {
                         manufacturer: 'Ubiquiti',
                         model: light.type,
@@ -438,7 +429,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: lock.name,
-                    nativeId: lock.id,
+                    nativeId: this.getNativeId(lock, true),
                     info: {
                         manufacturer: 'Ubiquiti',
                         model: lock.type,
@@ -470,7 +461,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     continue;
                 const nativeId = camera.id + '-packageCamera';
                 const d: Device = {
-                    providerNativeId: camera.id,
+                    providerNativeId: this.getNativeId(camera, true),
                     name: camera.name + ' Package Camera',
                     nativeId,
                     info: {
@@ -489,7 +480,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 };
 
                 await deviceManager.onDevicesChanged({
-                    providerNativeId: camera.id,
+                    providerNativeId: this.getNativeId(camera, true),
                     devices: [d],
                 });
             }
@@ -513,25 +504,27 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             return this.lights.get(nativeId);
         if (this.locks.has(nativeId))
             return this.locks.get(nativeId);
-        const camera = this.api.cameras.find(camera => camera.id === nativeId);
+
+        const id = this.findId(nativeId);
+        const camera = this.api.cameras.find(camera => camera.id === id);
         if (camera) {
             const ret = new UnifiCamera(this, nativeId, camera);
             this.cameras.set(nativeId, ret);
             return ret;
         }
-        const sensor = this.api.sensors.find(sensor => sensor.id === nativeId);
+        const sensor = this.api.sensors.find(sensor => sensor.id === id);
         if (sensor) {
             const ret = new UnifiSensor(this, nativeId, sensor);
             this.sensors.set(nativeId, ret);
             return ret;
         }
-        const light = this.api.lights.find(light => light.id === nativeId);
+        const light = this.api.lights.find(light => light.id === id);
         if (light) {
             const ret = new UnifiLight(this, nativeId, light);
             this.lights.set(nativeId, ret);
             return ret;
         }
-        const lock = this.api.doorlocks?.find(lock => lock.id === nativeId);
+        const lock = this.api.doorlocks?.find(lock => lock.id === id);
         if (lock) {
             const ret = new UnifiLock(this, nativeId, lock);
             this.locks.set(nativeId, ret);
@@ -576,7 +569,56 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             group: 'Advanced',
             type: 'boolean',
         },
+        idMaps: {
+            hide: true,
+            json: true,
+            defaultValue: {
+                mac: {},
+                anonymousDeviceId: {},
+                id: {},
+                nativeId: {},
+            },
+        }
     });
+
+    findId(nativeId: string) {
+        // the native id should be mapped to an id...
+        return this.storageSettings.values.idMaps.nativeId?.[nativeId] || nativeId;
+    }
+
+    getNativeId(device: any, update: boolean) {
+        const { id, mac, anonymousDeviceId } = device;
+        const idMaps = this.storageSettings.values.idMaps;
+
+        // try to find an existing nativeId given the mac and anonymous device id
+        const found = (mac && idMaps.mac[mac]) || (anonymousDeviceId && idMaps.anonymousDeviceId[anonymousDeviceId]);
+
+        // use the found id if one exists (device got provisioned a new id), otherwise use the id provided by the device.
+        const nativeId = found || id;
+
+        if (!update)
+            return nativeId;
+
+        // map the mac and anonymous device id to the native id.
+        if (mac) {
+            idMaps.mac ||= {};
+            idMaps.mac[mac] = nativeId;
+        }
+        if (anonymousDeviceId) {
+            idMaps.anonymousDeviceId ||= {};
+            idMaps.anonymousDeviceId[anonymousDeviceId] = nativeId;
+        }
+
+        // map the id and native id to each other.
+        idMaps.id ||= {};
+        idMaps.id[id] = nativeId;
+
+        idMaps.nativeId ||= {};
+        idMaps.nativeId[nativeId] = id;
+
+        this.storageSettings.values.idMaps = idMaps;
+        return nativeId;
+    }
 
     async getSettings(): Promise<Setting[]> {
         const ret = await this.storageSettings.getSettings();
