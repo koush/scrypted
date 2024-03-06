@@ -412,7 +412,9 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         if (!camera)
             return;
         this.on = !!camera.ledSettings?.isEnabled;
-        this.online = !!camera.isConnected;
+        const online = !!camera.isConnected;
+        if (online !== this.online)
+            this.online = online;
         if (!!camera.isMotionDetected)
             debounceMotionDetected(this);
 
