@@ -166,7 +166,6 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
 
         server_task: asyncio.Task = None
         def ready_cb():
-            print(f"Telnet REPL server ready on port {telnet_port}")
             future.set_result((telnet_port, lambda: loop.call_soon_threadsafe(server_task.cancel)))
 
         # Start the REPL server
@@ -228,7 +227,6 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
     def accept_connection():
         while True:
             conn, addr = sock.accept()
-            print(f"Accepted connection from {addr}")
             threading.Thread(target=handle_connection, args=(conn,)).start()
 
     threading.Thread(target=accept_connection).start()
