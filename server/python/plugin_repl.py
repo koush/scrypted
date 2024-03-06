@@ -85,7 +85,8 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
 
     loop = asyncio.get_event_loop()
 
-    def handle_connection(conn):
+    def handle_connection(conn: socket.socket):
+        conn.settimeout(None)
         filter = conn.recv(1024).decode()
 
         future = concurrent.futures.Future()

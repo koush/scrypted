@@ -41,12 +41,8 @@ import rpc
 import rpc_reader
 
 
-REQUIREMENTS_TEMPLATE = """
-# system requirements
+OPTIONAL_REQUIREMENTS = """
 ptpython
-
-# plugin requirements
-{}
 """.strip()
 
 
@@ -578,46 +574,28 @@ class PluginRemote:
             if not os.path.exists(python_prefix):
                 os.makedirs(python_prefix)
 
-            plugin_requirements = ""
+            str_requirements = ""
             if 'requirements.txt' in zip.namelist():
                 requirements = zip.open('requirements.txt').read()
-                plugin_requirements = requirements.decode('utf8')
+                str_requirements = requirements.decode('utf8')
 
-            str_requirements = REQUIREMENTS_TEMPLATE.format(plugin_requirements)
-
+            installed_optional_requirementstxt = os.path.join(
+                python_prefix, 'optional-requirements.installed.txt')
+            optional_requirementstxt = os.path.join(
+                python_prefix, 'optional-requirements.txt')
             requirementstxt = os.path.join(
                 python_prefix, 'requirements.txt')
             installed_requirementstxt = os.path.join(
                 python_prefix, 'requirements.installed.txt')
 
-            need_pip = True
-            try:
-                existing = open(installed_requirementstxt).read()
-                need_pip = existing != str_requirements
-            except:
-                pass
+            def install_with_pip(want_requirements: str, requirementstxt: str, installed_requirementstxt: str, ignore_error: bool = False):
+                os.makedirs(python_prefix, exist_ok=True)
 
-            if need_pip:
-                try:
-                    for de in os.listdir(plugin_volume):
-                        if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
-                            filePath = os.path.join(plugin_volume, de)
-                            print('Removing old dependencies: %s' %
-                                  filePath)
-                            try:
-                                shutil.rmtree(filePath)
-                            except:
-                                pass
-                except:
-                    pass
-
-                os.makedirs(python_prefix)
-
-                print('requirements.txt (outdated)')
-                print(str_requirements)
+                print(f'{os.path.basename(requirementstxt)} (outdated)')
+                print(want_requirements)
 
                 f = open(requirementstxt, 'wb')
-                f.write(requirements)
+                f.write(want_requirements.encode())
                 f.close()
 
                 try:
@@ -648,11 +626,45 @@ class PluginRemote:
                 result = p.wait()
                 print('pip install result %s' % result)
                 if result:
-                    raise Exception('non-zero result from pip %s' % result)
+                    if not ignore_error:
+                        raise Exception('non-zero result from pip %s' % result)
+                    else:
+                        print('ignoring non-zero result from pip %s' % result)
+                else:
+                    f = open(installed_requirementstxt, 'wb')
+                    f.write(want_requirements.encode())
+                    f.close()
 
-                f = open(installed_requirementstxt, 'wb')
-                f.write(requirements)
-                f.close()
+            need_pip = True
+            if str_requirements:
+                try:
+                    existing = open(installed_requirementstxt).read()
+                    need_pip = existing != str_requirements
+                except:
+                    pass
+            if not need_pip:
+                try:
+                    existing = open(installed_optional_requirementstxt).read()
+                    need_pip = existing != OPTIONAL_REQUIREMENTS
+                except:
+                    need_pip = True
+
+            if need_pip:
+                try:
+                    for de in os.listdir(plugin_volume):
+                        if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
+                            filePath = os.path.join(plugin_volume, de)
+                            print('Removing old dependencies: %s' %
+                                  filePath)
+                            try:
+                                shutil.rmtree(filePath)
+                            except:
+                                pass
+                except:
+                    pass
+
+                install_with_pip(OPTIONAL_REQUIREMENTS, optional_requirementstxt, installed_optional_requirementstxt, ignore_error=True)
+                install_with_pip(str_requirements, requirementstxt, installed_requirementstxt, ignore_error=False)
             else:
                 print('requirements.txt (up to date)')
                 print(str_requirements)
