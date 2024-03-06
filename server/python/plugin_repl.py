@@ -10,7 +10,10 @@ import prompt_toolkit.key_binding.key_processor
 from prompt_toolkit.contrib.telnet.server import TelnetServer, TelnetConnection
 from prompt_toolkit.shortcuts import clear_title, set_title
 from ptpython.repl import embed, PythonRepl
+import ptpython.key_bindings
 import ptpython.python_input
+import ptpython.history_browser
+import ptpython.layout
 import socket
 import telnetlib
 import threading
@@ -32,13 +35,17 @@ def get_app_patched() -> Application[Any]:
     stack = inspect.stack()
     for frame in stack:
         self_var = frame.frame.f_locals.get("self")
-        if self_var and isinstance(self_var, Application):
+        if self_var is not None and isinstance(self_var, Application):
             return self_var
     return default_get_app()
 prompt_toolkit.application.current.get_app = get_app_patched
 prompt_toolkit.key_binding.key_processor.get_app = get_app_patched
 prompt_toolkit.contrib.telnet.server.get_app = get_app_patched
 ptpython.python_input.get_app = get_app_patched
+ptpython.key_bindings.get_app = get_app_patched
+ptpython.history_browser.get_app = get_app_patched
+ptpython.layout.get_app = get_app_patched
+
 
 async def run_async_patched(self: PythonRepl) -> None:
     # This is a patched version of PythonRepl.run_async to handle an
@@ -71,7 +78,9 @@ async def run_async_patched(self: PythonRepl) -> None:
                     text = await loop.run_in_executor(None, self.read)
                 except EOFError:
                     return
-                except AssertionError as e:
+                except asyncio.CancelledError:
+                    return
+                except AssertionError:
                     return
                 except BaseException:
                     # Something went wrong while reading input.
