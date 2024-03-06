@@ -6,7 +6,7 @@ import gc
 import os
 import platform
 import shutil
-import subprocess
+from plugin_pip import install_with_pip, remove_pip_dirs, need_requirements
 import sys
 import threading
 import time
@@ -576,95 +576,23 @@ class PluginRemote:
 
             str_requirements = ""
             if 'requirements.txt' in zip.namelist():
-                requirements = zip.open('requirements.txt').read()
-                str_requirements = requirements.decode('utf8')
+                str_requirements = zip.open('requirements.txt').read().decode('utf8')
 
-            installed_optional_requirementstxt = os.path.join(
-                python_prefix, 'optional-requirements.installed.txt')
-            optional_requirementstxt = os.path.join(
-                python_prefix, 'optional-requirements.txt')
-            requirementstxt = os.path.join(
-                python_prefix, 'requirements.txt')
-            installed_requirementstxt = os.path.join(
-                python_prefix, 'requirements.installed.txt')
-
-            def install_with_pip(want_requirements: str, requirementstxt: str, installed_requirementstxt: str, ignore_error: bool = False):
-                os.makedirs(python_prefix, exist_ok=True)
-
-                print(f'{os.path.basename(requirementstxt)} (outdated)')
-                print(want_requirements)
-
-                f = open(requirementstxt, 'wb')
-                f.write(want_requirements.encode())
-                f.close()
-
-                try:
-                    pythonVersion = packageJson['scrypted']['pythonVersion']
-                except:
-                    pythonVersion = None
-
-                pipArgs = [
-                    sys.executable,
-                    '-m', 'pip', 'install', '-r', requirementstxt,
-                    '--prefix', python_prefix
-                ]
-                if pythonVersion:
-                    print('Specific Python version requested. Forcing reinstall.')
-                    # prevent uninstalling system packages.
-                    pipArgs.append('--ignore-installed')
-                    # force reinstall even if it exists in system packages.
-                    pipArgs.append('--force-reinstall')
-
-                p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-                while True:
-                    line = p.stdout.readline()
-                    if not line:
-                        break
-                    line = line.decode('utf8').rstrip('\r\n')
-                    print(line)
-                result = p.wait()
-                print('pip install result %s' % result)
-                if result:
-                    if not ignore_error:
-                        raise Exception('non-zero result from pip %s' % result)
-                    else:
-                        print('ignoring non-zero result from pip %s' % result)
-                else:
-                    f = open(installed_requirementstxt, 'wb')
-                    f.write(want_requirements.encode())
-                    f.close()
+            optional_requirements_basename = os.path.join(
+                python_prefix, 'requirements.optional')
+            requirements_basename = os.path.join(
+                python_prefix, 'requirements')
 
             need_pip = True
             if str_requirements:
-                try:
-                    existing = open(installed_requirementstxt).read()
-                    need_pip = existing != str_requirements
-                except:
-                    pass
+                need_pip = need_requirements(requirements_basename, str_requirements)
             if not need_pip:
-                try:
-                    existing = open(installed_optional_requirementstxt).read()
-                    need_pip = existing != OPTIONAL_REQUIREMENTS
-                except:
-                    need_pip = True
+                need_pip = need_requirements(optional_requirements_basename, OPTIONAL_REQUIREMENTS)
 
             if need_pip:
-                try:
-                    for de in os.listdir(plugin_volume):
-                        if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
-                            filePath = os.path.join(plugin_volume, de)
-                            print('Removing old dependencies: %s' %
-                                  filePath)
-                            try:
-                                shutil.rmtree(filePath)
-                            except:
-                                pass
-                except:
-                    pass
-
-                install_with_pip(OPTIONAL_REQUIREMENTS, optional_requirementstxt, installed_optional_requirementstxt, ignore_error=True)
-                install_with_pip(str_requirements, requirementstxt, installed_requirementstxt, ignore_error=False)
+                remove_pip_dirs(plugin_volume)
+                install_with_pip(python_prefix, packageJson, OPTIONAL_REQUIREMENTS, optional_requirements_basename, ignore_error=True)
+                install_with_pip(python_prefix, packageJson, str_requirements, requirements_basename, ignore_error=False)
             else:
                 print('requirements.txt (up to date)')
                 print(str_requirements)
