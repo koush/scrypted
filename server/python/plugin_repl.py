@@ -7,6 +7,7 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.application import Application
 import prompt_toolkit.application.current
 import prompt_toolkit.key_binding.key_processor
+import prompt_toolkit.contrib.telnet.server
 from prompt_toolkit.contrib.telnet.server import TelnetServer, TelnetConnection
 from prompt_toolkit.shortcuts import clear_title, set_title
 from ptpython.repl import embed, PythonRepl
