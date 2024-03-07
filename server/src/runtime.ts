@@ -9,7 +9,7 @@ import fs from 'fs';
 import http, { ServerResponse } from 'http';
 import https from 'https';
 import net from 'net';
-import type { spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
+import type { spawn as ptySpawn } from '@homebridge/node-pty-prebuilt-multiarch';
 import path from 'path';
 import { ParsedQs } from 'qs';
 import semver from 'semver';
@@ -129,7 +129,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
         this.shellio.on('connection', connection => {
             try {
-                const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
+                const spawn = require('@homebridge/node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
                 const cp = spawn(process.env.SHELL, [], {
                 });
                 cp.onData(data => connection.send(data));
