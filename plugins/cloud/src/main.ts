@@ -557,8 +557,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 origins: [
                     `http://${SCRYPTED_SERVER}`,
                     `https://${SCRYPTED_SERVER}`,
-                    // chromecast receiver. move this into google home and chromecast plugins?
-                    'https://koush.github.io',
                     ...this.storageSettings.values.additionalCorsOrigins,
                 ],
             });

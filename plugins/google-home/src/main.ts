@@ -97,7 +97,10 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
         endpointManager.setAccessControlAllowOrigin({
             origins: [
+                // webrtc signaling
                 'https://www.gstatic.com',
+                // chromecast receiver
+                'https://koush.github.io',
             ],
         });
 
