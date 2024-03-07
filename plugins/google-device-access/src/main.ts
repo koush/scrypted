@@ -147,7 +147,15 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         let streamExtensionToken: string;
         let _answerSdp: string;
 
+        const options = {
+            requiresOffer: true,
+            disableTrickle: true,
+        };
         const answerSession: RTCSignalingSession = {
+            __proxy_props: {
+                options,
+            },
+            options,
             createLocalDescription: async (type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> => {
                 if (type !== 'answer')
                     throw new Error('Google Camera only supports RTC answer');
@@ -187,10 +195,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
             },
 
             getOptions: async () => {
-                return {
-                    requiresOffer: true,
-                    disableTrickle: true,
-                }
+                return options;
             }
         }
 
