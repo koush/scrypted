@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/core",
-   "version": "0.3.4",
+   "version": "0.3.6",
    "description": "Scrypted Core plugin. Provides the UI, websocket, and engine.io APIs.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -39,6 +39,7 @@
       ]
    },
    "dependencies": {
+      "@homebridge/node-pty-prebuilt-multiarch": "^0.11.12",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "mime": "^3.0.0",

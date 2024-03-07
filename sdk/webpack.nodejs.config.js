@@ -50,6 +50,7 @@ if (process.env.WEBPACK_ANALYZER) {
 const alias = {};
 const polyfills = [
     'node-pty-prebuilt-multiarch',
+    '@homebridge/node-pty-prebuilt-multiarch',
     'node-forge',
     'sharp',
     'source-map-support/register',
