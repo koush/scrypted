@@ -41,14 +41,11 @@ import rpc_reader
 SCRYPTED_REQUIREMENTS = """
 ptpython
 wheel
-debugpy
 """.strip()
 
 SCRYPTED_DEBUGPY_REQUIREMENTS = """
 debugpy
 """.strip()
-
-
 
 class ClusterObject(TypedDict):
     id: str
