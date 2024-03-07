@@ -33,8 +33,10 @@ export class VoicemailHandler extends SipRequestHandler {
     handle(request: SipRequest) {
         const lastVoicemailMessageTimestamp : number = Number.parseInt( this.sipCamera.storage.getItem('lastVoicemailMessageTimestamp') ) || -1
         const message : string = request.content.toString()
-        if( message.startsWith('*#8**40*0*0*') || message.startsWith('*#8**40*1*0*') ) {
-            this.aswmIsEnabled = message.startsWith('*#8**40*1*0*');
+        let matches : Array<RegExpMatchArray> = [...message.matchAll(/\*#8\*\*40\*([01])\*([01])\*/gm)]
+        if( matches && matches.length > 0 && matches[0].length > 0 ) {
+            this.sipCamera.console.debug(  "Answering machine state: " + matches[0][1] + " / Welcome message state: " + matches[0][2] );
+            this.aswmIsEnabled = matches[0][1] == '1';
             if( this.isEnabled() ) {
                 this.sipCamera.console.debug("Handling incoming answering machine reply")
                 const messages : string[] = message.split(';')
@@ -60,6 +62,8 @@ export class VoicemailHandler extends SipRequestHandler {
                     this.sipCamera.console.debug("No new messages since: " + lastVoicemailMessageTimestamp + " lastMessage: " + lastMessageTimestamp)
                 }
             }
+        } else {
+            this.sipCamera.console.debug("Not handling message: " + message)
         }
     }
 
