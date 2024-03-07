@@ -544,9 +544,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const { userToken, userTokenSignature } = scope.body;
         const tokens = qsstringify({
             user_token: userToken,
-            // no longer exists. this is a legacy field.
-            user_token_signature: userTokenSignature
-        })
+        });
 
         const url = `${baseUrl}${local.pathname}?${tokens}`;
         this.whitelisted.set(local.pathname, url);
