@@ -24,7 +24,7 @@ RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/in
 # https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
 RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list
 RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-RUN apt-get -y update && apt-get -y install libedgetpu1-max
+RUN apt-get -y update && apt-get -y install libedgetpu1-std
 
 ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
