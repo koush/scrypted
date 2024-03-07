@@ -28,10 +28,7 @@ from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
 
-try:
-    from typing import TypedDict
-except:
-    from typing_extensions import TypedDict
+from typing import TypedDict
 
 import hashlib
 import multiprocessing
@@ -43,6 +40,12 @@ import rpc_reader
 
 SCRYPTED_REQUIREMENTS = """
 ptpython
+wheel
+debugpy
+""".strip()
+
+SCRYPTED_DEBUGPY_REQUIREMENTS = """
+debugpy
 """.strip()
 
 
@@ -587,6 +590,7 @@ class PluginRemote:
                 python_prefix, 'requirements.scrypted')
             requirements_basename = os.path.join(
                 python_prefix, 'requirements')
+            debug_requirements_basename = os.path.join(python_prefix, 'requirements.debug')
             optional_requirements_basename = os.path.join(
                 python_prefix, 'requirements.optional')
 
@@ -595,12 +599,17 @@ class PluginRemote:
                 need_pip = need_requirements(requirements_basename, str_requirements)
             if not need_pip:
                 need_pip = need_requirements(scrypted_requirements_basename, SCRYPTED_REQUIREMENTS)
+            python_debugpy_target = os.environ['SCRYPTED_DEBUGPY_TARGET']
+            if not need_pip and python_debugpy_target:
+                need_pip = need_requirements(debug_requirements_basename, SCRYPTED_DEBUGPY_REQUIREMENTS)
 
             if need_pip:
                 remove_pip_dirs(plugin_volume)
                 install_with_pip(python_prefix, packageJson, SCRYPTED_REQUIREMENTS, scrypted_requirements_basename, ignore_error=True)
                 install_with_pip(python_prefix, packageJson, str_requirements, requirements_basename, ignore_error=False)
                 install_with_pip(python_prefix, packageJson, str_optional_requirements, optional_requirements_basename, ignore_error=True)
+                if python_debugpy_target:
+                    install_with_pip(python_debugpy_target, packageJson, SCRYPTED_DEBUGPY_REQUIREMENTS, debug_requirements_basename, ignore_error=True, target=True)
             else:
                 print('requirements.txt (up to date)')
                 print(str_requirements)

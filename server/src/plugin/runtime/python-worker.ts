@@ -7,8 +7,19 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { createRpcDuplexSerializer } from '../../rpc-serializer';
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
+import { getPluginVolume } from '../plugin-volume';
 
 export class PythonRuntimeWorker extends ChildProcessWorker {
+    static {
+        try {
+            const portablePython = require('@bjia56/portable-python-3.9') as string;
+            if (portablePython && typeof portablePython === 'string')
+                process.env.SCRYPTED_PYTHON_PATH = portablePython;
+        }
+        catch (e) {
+        }
+    }
+
     serializer: ReturnType<typeof createRpcDuplexSerializer>;
 
     constructor(pluginId: string, options: RuntimeWorkerOptions) {
@@ -70,13 +81,18 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         args.push(this.pluginId);
 
         const types = require.resolve('@scrypted/types');
-        const PYTHONPATH = types.substring(0, types.indexOf('types') + 'types'.length);
+        const SCRYPTED_DEBUGPY_TARGET = path.join(getPluginVolume(pluginId), 'python-debugpy');
+        const PYTHONPATH = [
+            types.substring(0, types.indexOf('types') + 'types'.length),
+            SCRYPTED_DEBUGPY_TARGET
+        ].join(':');
         this.worker = child_process.spawn(pythonPath, args, {
             // stdin, stdout, stderr, peer in, peer out
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
             env: Object.assign({
                 PYTHONUNBUFFERED: '1',
                 PYTHONPATH,
+                SCRYPTED_DEBUGPY_TARGET,
             }, gstEnv, process.env, env),
         });
 

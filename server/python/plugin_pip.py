@@ -46,6 +46,8 @@ def install_with_pip(
     requirements_str: str,
     requirements_basename: str,
     ignore_error: bool = False,
+    site_packages: str = None,
+    target: bool = False,
 ):
     requirementstxt, installed_requirementstxt = get_requirements_files(requirements_basename)
 
@@ -70,7 +72,7 @@ def install_with_pip(
         "install",
         "-r",
         requirementstxt,
-        "--prefix",
+        "--prefix" if not target else "--target",
         python_prefix,
     ]
     if pythonVersion:
@@ -80,7 +82,15 @@ def install_with_pip(
         # force reinstall even if it exists in system packages.
         pipArgs.append("--force-reinstall")
 
-    p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    env = None
+    if site_packages:
+        env = dict(os.environ)
+        PYTHONPATH = env['PYTHONPATH'] or ''
+        PYTHONPATH += ':' + site_packages
+        env["PYTHONPATH"] = PYTHONPATH
+        print("PYTHONPATH", env["PYTHONPATH"])
+    p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
     while True:
         line = p.stdout.readline()

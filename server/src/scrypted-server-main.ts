@@ -26,7 +26,6 @@ import { getNpmPackageInfo } from './services/plugin';
 import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
-import AdmZip from 'adm-zip';
 
 export type Runtime = ScryptedRuntime;
 
