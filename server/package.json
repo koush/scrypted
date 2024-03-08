@@ -56,6 +56,7 @@
   "main": "dist/scrypted-main-exports.js",
   "types": "dist/scrypted-main-exports.d.ts",
   "scripts": {
+    "postinstall": "node scripts/postinstall.js",
     "preserve": "npm run build",
     "serve": "node --expose-gc dist/scrypted-main.js",
     "serve-no-build": "node --expose-gc dist/scrypted-main.js",

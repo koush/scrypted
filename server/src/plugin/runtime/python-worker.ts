@@ -81,11 +81,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         args.push(this.pluginId);
 
         const types = require.resolve('@scrypted/types');
-        const SCRYPTED_DEBUGPY_TARGET = path.join(getPluginVolume(pluginId), 'python-debugpy');
-        const PYTHONPATH = [
-            types.substring(0, types.indexOf('types') + 'types'.length),
-            SCRYPTED_DEBUGPY_TARGET
-        ].join(':');
+        const PYTHONPATH = types.substring(0, types.indexOf('types') + 'types'.length);
         this.worker = child_process.spawn(pythonPath, args, {
             // stdin, stdout, stderr, peer in, peer out
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
@@ -94,7 +90,6 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
                 SCRYPTED_BASE_VERSION: '20240308',
                 PYTHONUNBUFFERED: '1',
                 PYTHONPATH,
-                SCRYPTED_DEBUGPY_TARGET,
             }, gstEnv, process.env, env),
         });
 
