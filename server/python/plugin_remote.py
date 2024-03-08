@@ -3,10 +3,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import gc
+import hashlib
+import multiprocessing
+import multiprocessing.connection
 import os
 import platform
 import shutil
-from plugin_pip import install_with_pip, remove_pip_dirs, need_requirements
+import ssl
 import sys
 import threading
 import time
@@ -17,10 +20,12 @@ from asyncio.futures import Future
 from asyncio.streams import StreamReader, StreamWriter
 from collections.abc import Mapping
 from io import StringIO
-from os import sys
-from typing import Any, Optional, Set, Tuple
+from typing import Any, Optional, Set, Tuple, TypedDict
 
+import rpc
+import rpc_reader
 import scrypted_python.scrypted_sdk.types
+from plugin_pip import install_with_pip, need_requirements, remove_pip_dirs
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 EventDetails,
@@ -28,14 +33,13 @@ from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
 
-from typing import TypedDict
+default_create_default_context = ssl.create_default_context
+def new_create_default_context(*args, **kwargs):
+    capath = os.path.dirname(os.path.dirname(sys.executable)) + "/lib/python3.9/site-packages/pip/_vendor/certifi/cacert.pem"
+    return default_create_default_context(*args, cafile=capath, **kwargs)   
 
-import hashlib
-import multiprocessing
-import multiprocessing.connection
-
-import rpc
-import rpc_reader
+ssl.create_default_context = new_create_default_context
+ssl._create_default_https_context = new_create_default_context
 
 class ClusterObject(TypedDict):
     id: str
