@@ -90,6 +90,8 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             // stdin, stdout, stderr, peer in, peer out
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
             env: Object.assign({
+                // rev this if the base python version or server characterstics change.
+                SCRYPTED_BASE_VERSION: '20240308',
                 PYTHONUNBUFFERED: '1',
                 PYTHONPATH,
                 SCRYPTED_DEBUGPY_TARGET,

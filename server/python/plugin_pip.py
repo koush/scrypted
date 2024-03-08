@@ -47,7 +47,6 @@ def install_with_pip(
     requirements_basename: str,
     ignore_error: bool = False,
     site_packages: str = None,
-    target: bool = False,
 ):
     requirementstxt, installed_requirementstxt = get_requirements_files(requirements_basename)
 
@@ -72,7 +71,7 @@ def install_with_pip(
         "install",
         "-r",
         requirementstxt,
-        "--prefix" if not target else "--target",
+        "--target",
         python_prefix,
     ]
     if pythonVersion:

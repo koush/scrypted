@@ -563,16 +563,15 @@ class PluginRemote:
             python_versioned_directory = '%s-%s-%s' % (
                 python_version, platform.system(), platform.machine())
             SCRYPTED_BASE_VERSION = os.environ.get('SCRYPTED_BASE_VERSION')
-            if SCRYPTED_BASE_VERSION:
-                python_versioned_directory += '-' + SCRYPTED_BASE_VERSION
+            python_versioned_directory += '-' + SCRYPTED_BASE_VERSION
 
-            python_prefix = os.path.join(
+            pip_target = os.path.join(
                 plugin_volume, python_versioned_directory)
 
-            print('python prefix: %s' % python_prefix)
+            print('pip target: %s' % pip_target)
 
-            if not os.path.exists(python_prefix):
-                os.makedirs(python_prefix)
+            if not os.path.exists(pip_target):
+                os.makedirs(pip_target)
 
 
             def read_requirements(filename: str) -> str:
@@ -584,12 +583,12 @@ class PluginRemote:
             str_optional_requirements = read_requirements('requirements.optional.txt')
 
             scrypted_requirements_basename = os.path.join(
-                python_prefix, 'requirements.scrypted')
+                pip_target, 'requirements.scrypted')
             requirements_basename = os.path.join(
-                python_prefix, 'requirements')
-            debug_requirements_basename = os.path.join(python_prefix, 'requirements.debug')
+                pip_target, 'requirements')
+            debug_requirements_basename = os.path.join(pip_target, 'requirements.debug')
             optional_requirements_basename = os.path.join(
-                python_prefix, 'requirements.optional')
+                pip_target, 'requirements.optional')
 
             need_pip = True
             if str_requirements:
@@ -602,31 +601,17 @@ class PluginRemote:
 
             if need_pip:
                 remove_pip_dirs(plugin_volume)
-                install_with_pip(python_prefix, packageJson, SCRYPTED_REQUIREMENTS, scrypted_requirements_basename, ignore_error=True)
-                install_with_pip(python_prefix, packageJson, str_requirements, requirements_basename, ignore_error=False)
-                install_with_pip(python_prefix, packageJson, str_optional_requirements, optional_requirements_basename, ignore_error=True)
+                install_with_pip(pip_target, packageJson, SCRYPTED_REQUIREMENTS, scrypted_requirements_basename, ignore_error=True)
+                install_with_pip(pip_target, packageJson, str_requirements, requirements_basename, ignore_error=False)
+                install_with_pip(pip_target, packageJson, str_optional_requirements, optional_requirements_basename, ignore_error=True)
                 if python_debugpy_target:
-                    install_with_pip(python_debugpy_target, packageJson, SCRYPTED_DEBUGPY_REQUIREMENTS, debug_requirements_basename, ignore_error=True, target=True)
+                    install_with_pip(python_debugpy_target, packageJson, SCRYPTED_DEBUGPY_REQUIREMENTS, debug_requirements_basename, ignore_error=True)
             else:
                 print('requirements.txt (up to date)')
                 print(str_requirements)
 
             sys.path.insert(0, zipPath)
-            if platform.system() != 'Windows':
-                # local/lib/dist-packages seen on python3.10 on ubuntu.
-                # TODO: find a way to programatically get this value, or switch to venv.
-                dist_packages = os.path.join(
-                    python_prefix, 'local', 'lib', python_version, 'dist-packages')
-                if os.path.exists(dist_packages):
-                    site_packages = dist_packages
-                else:
-                    site_packages = os.path.join(
-                        python_prefix, 'lib', python_version, 'site-packages')
-            else:
-                site_packages = os.path.join(
-                    python_prefix, 'Lib', 'site-packages')
-            print('site-packages: %s' % site_packages)
-            sys.path.insert(0, site_packages)
+            sys.path.insert(0, pip_target)
         else:
             zip = zipfile.ZipFile(options['filename'])
 
