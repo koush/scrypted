@@ -7,13 +7,13 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { createRpcDuplexSerializer } from '../../rpc-serializer';
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
-import type {PortablePython as PortablePythonType} from '@bjia56/portable-python'
+import type {PortablePython as PortablePythonType} from 'py'
 
 export class PythonRuntimeWorker extends ChildProcessWorker {
     static {
         try {
-            const PortablePython  = require('@bjia56/portable-python').PortablePython as typeof PortablePythonType;
-            const py = new PortablePython("3.9", path.join(path.dirname(__dirname), '..', '..', 'py'));
+            const PortablePython  = require('py').PortablePython as typeof PortablePythonType;
+            const py = new PortablePython("3.9");
             const portablePython = py.executablePath;
             if (fs.existsSync(portablePython))
                 process.env.SCRYPTED_PYTHON_PATH = portablePython;
