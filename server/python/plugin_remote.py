@@ -9,7 +9,6 @@ import multiprocessing.connection
 import os
 import platform
 import shutil
-import ssl
 import sys
 import threading
 import time
@@ -32,14 +31,6 @@ from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 ScryptedInterfaceMethods,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
-
-default_create_default_context = ssl.create_default_context
-def new_create_default_context(*args, **kwargs):
-    capath = os.path.dirname(os.path.dirname(sys.executable)) + "/lib/python3.9/site-packages/pip/_vendor/certifi/cacert.pem"
-    return default_create_default_context(*args, cafile=capath, **kwargs)   
-
-ssl.create_default_context = new_create_default_context
-ssl._create_default_https_context = new_create_default_context
 
 class ClusterObject(TypedDict):
     id: str
