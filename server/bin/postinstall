@@ -17,11 +17,8 @@ async function installScryptedServerRequirements() {
     await py.install();
     python = py.executablePath;
 
-    await pipInstall('wheel');
     await pipInstall('debugpy');
     await pipInstall('psutil').catch(() => {});
-    await pipInstall('prompt_toolkit');
-    await pipInstall('ptpython');
 }
 
 installScryptedServerRequirements();

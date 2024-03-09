@@ -32,6 +32,11 @@ from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
 
+SCRYPTED_REQUIREMENTS = """
+ptpython
+wheel
+""".strip()
+
 class ClusterObject(TypedDict):
     id: str
     port: int
@@ -571,13 +576,14 @@ class PluginRemote:
                 pip_target, 'requirements.scrypted')
             requirements_basename = os.path.join(
                 pip_target, 'requirements')
-            debug_requirements_basename = os.path.join(pip_target, 'requirements.debug')
             optional_requirements_basename = os.path.join(
                 pip_target, 'requirements.optional')
 
             need_pip = True
             if str_requirements:
                 need_pip = need_requirements(requirements_basename, str_requirements)
+            if not need_pip:
+                need_pip = need_requirements(scrypted_requirements_basename, SCRYPTED_REQUIREMENTS)
 
             if need_pip:
                 remove_pip_dirs(plugin_volume)
