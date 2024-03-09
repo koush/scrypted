@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const child_process = require('child_process');
 const python = require('@bjia56/portable-python-3.9');
 const { once } = require('events');
