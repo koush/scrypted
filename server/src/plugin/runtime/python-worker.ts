@@ -13,7 +13,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
     static {
         try {
             const PortablePython  = require('@bjia56/portable-python').PortablePython as typeof PortablePythonType;
-            const py = new PortablePython("3.9");
+            const py = new PortablePython("3.9", path.join(path.dirname(__dirname), '..', '..', 'py'));
             const portablePython = py.executablePath;
             if (fs.existsSync(portablePython))
                 process.env.SCRYPTED_PYTHON_PATH = portablePython;

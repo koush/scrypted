@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+const path = require('path');
 const child_process = require('child_process');
 const { PortablePython } = require('@bjia56/portable-python')
 const { once } = require('events');
@@ -13,7 +14,7 @@ async function pipInstall(pkg) {
 }
 
 async function installScryptedServerRequirements() {
-    const py = new PortablePython("3.9");
+    const py = new PortablePython("3.9", path.join(path.dirname(__dirname), 'py'));
     await py.install();
     python = py.executablePath;
 
