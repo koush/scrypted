@@ -547,8 +547,8 @@ class PluginRemote:
 
             python_versioned_directory = '%s-%s-%s' % (
                 python_version, platform.system(), platform.machine())
-            SCRYPTED_BASE_VERSION = os.environ.get('SCRYPTED_BASE_VERSION')
-            python_versioned_directory += '-' + SCRYPTED_BASE_VERSION
+            SCRYPTED_PYTHON_VERSION = os.environ.get('SCRYPTED_PYTHON_VERSION')
+            python_versioned_directory += '-' + SCRYPTED_PYTHON_VERSION
 
             pip_target = os.path.join(
                 plugin_volume, python_versioned_directory)

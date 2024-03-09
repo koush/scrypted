@@ -87,7 +87,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
             env: Object.assign({
                 // rev this if the base python version or server characterstics change.
-                SCRYPTED_BASE_VERSION: '20240308',
+                SCRYPTED_PYTHON_VERSION: '20240308',
                 PYTHONUNBUFFERED: '1',
                 PYTHONPATH,
             }, gstEnv, process.env, env),
