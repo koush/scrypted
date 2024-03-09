@@ -1,9 +1,9 @@
 {
   "name": "@scrypted/server",
-  "version": "0.94.17",
+  "version": "0.94.18",
   "description": "",
   "dependencies": {
-    "@bjia56/portable-python-3.9": "^0.1.10",
+    "@bjia56/portable-python": "^0.1.3",
     "@mapbox/node-pre-gyp": "^1.0.11",
     "@scrypted/types": "^0.3.13",
     "adm-zip": "^0.5.10",
@@ -56,7 +56,6 @@
   "main": "dist/scrypted-main-exports.js",
   "types": "dist/scrypted-main-exports.d.ts",
   "scripts": {
-    "dependencies": "node bin/dependencies",
     "preserve": "npm run build",
     "serve": "node --expose-gc dist/scrypted-main.js",
     "serve-no-build": "node --expose-gc dist/scrypted-main.js",
