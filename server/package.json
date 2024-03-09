@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.94.19",
+  "version": "0.94.20",
   "description": "",
   "dependencies": {
     "@bjia56/portable-python": "^0.1.3",
