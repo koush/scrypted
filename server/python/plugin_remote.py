@@ -587,6 +587,7 @@ class PluginRemote:
 
             if need_pip:
                 remove_pip_dirs(plugin_volume)
+                install_with_pip(pip_target, packageJson, SCRYPTED_REQUIREMENTS, scrypted_requirements_basename, ignore_error=True)
                 install_with_pip(pip_target, packageJson, str_requirements, requirements_basename, ignore_error=False)
                 install_with_pip(pip_target, packageJson, str_optional_requirements, optional_requirements_basename, ignore_error=True)
             else:
