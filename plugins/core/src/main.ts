@@ -220,7 +220,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     }
 
     async onConnection(request: HttpRequest, ws: WebSocket): Promise<void> {
-        if (await this.checkService(request, ws, 'console') || await this.checkService(request, ws, 'repl')) {
+        if (await this.checkService(request, ws, 'console')) {
             return;
         }
 
