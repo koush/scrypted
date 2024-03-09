@@ -26,7 +26,7 @@
     </v-flex>
 
     <v-flex xs12 v-if="showRepl" ref="replEl">
-      <REPLCard :deviceId="id"></REPLCard>
+      <PtyComponent title="REPL" :hello="device.nativeId + '\n'" nativeId="replservice" :control="false" :options="{ pluginId: device.pluginId }"></PtyComponent>
     </v-flex>
     <v-flex xs12 md7>
       <v-layout row wrap>
@@ -199,7 +199,7 @@ import "vue-slider-component/theme/material.css";
 
 import LogCard from "./builtin/LogCard.vue";
 import ConsoleCard from "./ConsoleCard.vue";
-import REPLCard from "./REPLCard.vue";
+import PtyComponent from "./builtin/PtyComponent.vue";
 import {
   getComponentWebPath,
   getDeviceViewPath,
@@ -381,7 +381,7 @@ export default {
     VueSlider,
     LogCard,
     ConsoleCard,
-    REPLCard,
+    PtyComponent,
     Readme,
 
     Storage,

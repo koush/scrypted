@@ -103,8 +103,8 @@ module.exports = {
   devServer: {
     disableHostCheck: true,
     host: '127.0.0.1',
-    https: true,
-    port: 8081,
+    // https: true,
+    port: 8082,
     progress: false,
     proxy: {
       '^/(login|logout|static|endpoint|whitelist|web|engine.io)': proxyOpts,

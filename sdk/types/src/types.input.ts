@@ -1480,7 +1480,7 @@ export interface VideoFrameGenerator {
  * Generic bidirectional stream connection.
  */
 export interface StreamService {
-  connectStream(input: AsyncGenerator<any, void>): Promise<AsyncGenerator<any, void>>;
+  connectStream(input?: AsyncGenerator<any, void>, options?: any): Promise<AsyncGenerator<any, void>>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.

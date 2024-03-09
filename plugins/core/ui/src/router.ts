@@ -9,7 +9,7 @@ import PluginComponent from "./components/plugin/PluginComponent.vue";
 import InstallPlugin from "./components/plugin/InstallPlugin.vue";
 import LogComponent from "./components/builtin/LogComponent.vue";
 import SettingsComponent from "./components/builtin/SettingsComponent.vue";
-import ShellComponent from "./components/builtin/ShellComponent.vue";
+import PtyComponent from "./components/builtin/PtyComponent.vue";
 import UsersComponent from "./components/UsersComponent.vue";
 
 let router = new VueRouter({
@@ -28,7 +28,12 @@ let router = new VueRouter({
       },
       {
         path: "/component/shell",
-        component: ShellComponent,
+        component: PtyComponent,
+        props: {
+          title: "Terminal",
+          nativeId: "terminalservice",
+          control: true,
+        }
       },
       {
         path: "/component/plugin",

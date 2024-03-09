@@ -1380,7 +1380,7 @@ class StartStop:
 class StreamService:
     """Generic bidirectional stream connection."""
 
-    async def connectStream(self, input: Any) -> Any:
+    async def connectStream(self, input: Any = None, options: Any = None) -> Any:
         pass
 
 

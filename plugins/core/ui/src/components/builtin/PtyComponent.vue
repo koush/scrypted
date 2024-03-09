@@ -1,6 +1,6 @@
 <template>
   <v-card raised>
-    <v-toolbar dark color="blue"> Terminal </v-toolbar>
+    <v-toolbar dark color="blue">{{ title }}</v-toolbar>
     <div ref="terminal" style="height: 700px"></div>
   </v-card>
 </template>
@@ -10,6 +10,14 @@ import { FitAddon } from "xterm-addon-fit";
 import { createAsyncQueue } from "@scrypted/common/src/async-queue";
 
 export default {
+  props: {
+    nativeId: String,
+    title: String,
+    // data sent to the pty service (repl/console) to route to correct device.
+    hello: String,
+    options: Object,
+    control: Boolean,
+  },
   mounted() {
     const term = new Terminal({
       theme: this.$vuetify.theme.dark
@@ -31,10 +39,18 @@ export default {
   methods: {
     async setupShell(term) {
       const termSvcRaw = this.$scrypted.systemManager.getDeviceByName("@scrypted/core");
-      const termSvc = await termSvcRaw.getDevice("terminalservice");
+      const termSvc = await termSvcRaw.getDevice(this.$props.nativeId);
       const termSvcDirect = await this.$scrypted.connectRPCObject(termSvc);
       const dataQueue = createAsyncQueue();
+
+      if (this.$props.hello) {
+        const hello = Buffer.from(this.$props.hello, 'utf8');
+        dataQueue.enqueue(hello);
+      }
+
       const ctrlQueue = createAsyncQueue();
+      if (!this.$props.control)
+        ctrlQueue.end();
 
       ctrlQueue.enqueue({ interactive: true });
       ctrlQueue.enqueue({ dim: { cols: term.cols, rows: term.rows } });
@@ -82,7 +98,7 @@ export default {
             yield concat;
         }
       }
-      const remoteGenerator = await termSvcDirect.connectStream(localGenerator());
+      const remoteGenerator = await termSvcDirect.connectStream(localGenerator(), this.$props.options);
 
       for await (const message of remoteGenerator) {
         if (!message) {

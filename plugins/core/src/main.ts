@@ -12,6 +12,7 @@ import { MediaCore } from './media-core';
 import { newScript, ScriptCore, ScriptCoreNativeId } from './script-core';
 import { TerminalService, TerminalServiceNativeId } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
+import { ReplService, ReplServiceNativeId } from './repl-service';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
 
@@ -38,6 +39,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     aggregateCore: AggregateCore;
     automationCore: AutomationCore;
     users: UsersCore;
+    replService: ReplService;
     terminalService: TerminalService;
     localAddresses: string[];
     storageSettings = new StorageSettings(this, {
@@ -91,6 +93,16 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                 {
                     name: 'Terminal Service',
                     nativeId: TerminalServiceNativeId,
+                    interfaces: [ScryptedInterface.StreamService],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+        })();
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'REPL Service',
+                    nativeId: ReplServiceNativeId,
                     interfaces: [ScryptedInterface.StreamService],
                     type: ScryptedDeviceType.Builtin,
                 },
@@ -172,6 +184,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.users ||= new UsersCore();
         if (nativeId === TerminalServiceNativeId)
             return this.terminalService ||= new TerminalService();
+        if (nativeId === ReplServiceNativeId)
+            return this.replService ||= new ReplService();
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
