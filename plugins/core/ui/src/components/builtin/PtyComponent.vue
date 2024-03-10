@@ -1,7 +1,7 @@
 <template>
   <v-card raised>
     <v-toolbar dark color="blue">{{ title }}
-      <v-tooltip bottom>
+      <v-tooltip bottom v-if="copyButton">
         <template v-slot:activator="{ on }">
           <v-btn @click="copy" v-on="on" text
             ><v-icon small> far fa-copy</v-icon>
@@ -17,7 +17,7 @@
         </template>
         <span>Toggle Expand</span>
       </v-tooltip>
-      <v-tooltip bottom>
+      <v-tooltip bottom v-if="clearButton">
         <template v-slot:activator="{ on }">
           <v-btn @click="clear" v-on="on" text
             ><v-icon small>fas fa-trash</v-icon>
