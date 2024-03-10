@@ -28,7 +28,6 @@
       "interfaces": [
          "@scrypted/launcher-ignore",
          "HttpRequestHandler",
-         "EngineIOHandler",
          "DeviceProvider",
          "SystemSettings",
          "Settings"

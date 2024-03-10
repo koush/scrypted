@@ -12,7 +12,7 @@ import { MediaCore } from './media-core';
 import { newScript, ScriptCore, ScriptCoreNativeId } from './script-core';
 import { TerminalService, TerminalServiceNativeId } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
-import { ReplService, ReplServiceNativeId } from './repl-service';
+import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
 
@@ -31,7 +31,7 @@ interface RoutedHttpRequest extends HttpRequest {
     params: { [key: string]: string };
 }
 
-class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, DeviceProvider, Settings {
+class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, DeviceProvider, Settings {
     router: any = Router();
     publicRouter: any = Router();
     mediaCore: MediaCore;
@@ -39,7 +39,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     aggregateCore: AggregateCore;
     automationCore: AutomationCore;
     users: UsersCore;
-    replService: ReplService;
+    consoleService: PluginSocketService;
+    replService: PluginSocketService;
     terminalService: TerminalService;
     localAddresses: string[];
     storageSettings = new StorageSettings(this, {
@@ -185,7 +186,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         if (nativeId === TerminalServiceNativeId)
             return this.terminalService ||= new TerminalService();
         if (nativeId === ReplServiceNativeId)
-            return this.replService ||= new ReplService();
+            return this.replService ||= new PluginSocketService(ReplServiceNativeId, 'repl');
+        if (nativeId === ConsoleServiceNativeId)
+            return this.consoleService ||= new PluginSocketService(ConsoleServiceNativeId, 'console');
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
@@ -196,35 +199,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         if (!request.url.startsWith(check))
             return null;
         return check;
-    }
-
-    async checkService(request: HttpRequest, ws: WebSocket, name: string): Promise<boolean> {
-        // only allow admin users to access these services.
-        if (request.aclId)
-            return false;
-        const check = this.checkEngineIoEndpoint(request, name);
-        if (!check)
-            return false;
-        const deviceId = request.url.substr(check.length).split('/')[0];
-        const plugins = await systemManager.getComponent('plugins');
-        const { nativeId, pluginId } = await plugins.getDeviceInfo(deviceId);
-        const port = await plugins.getRemoteServicePort(pluginId, name);
-        const socket = net.connect(port);
-        socket.on('close', () => ws.close());
-        socket.on('data', data => ws.send(data));
-        socket.resume();
-        socket.write(nativeId?.toString() || 'undefined');
-        ws.onclose = () => socket.destroy();
-        ws.onmessage = message => socket.write(message.data);
-        return true;
-    }
-
-    async onConnection(request: HttpRequest, ws: WebSocket): Promise<void> {
-        if (await this.checkService(request, ws, 'console')) {
-            return;
-        }
-
-        ws.close();
     }
 
     async handlePublicFinal(request: HttpRequest, response: HttpResponse) {

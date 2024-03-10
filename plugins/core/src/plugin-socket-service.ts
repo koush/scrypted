@@ -4,29 +4,20 @@ import { once } from 'events';
 import net from 'net';
 
 export const ReplServiceNativeId = 'replservice';
+export const ConsoleServiceNativeId = 'consoleservice';
 
-export class ReplService extends ScryptedDeviceBase implements StreamService {
-    constructor(nativeId?: ScryptedNativeId) {
-        super(ReplServiceNativeId);
+export class PluginSocketService extends ScryptedDeviceBase implements StreamService {
+    constructor(nativeId: ScryptedNativeId, public serviceName: string) {
+        super(nativeId);
     }
 
-    /*
-     * The input to this stream can send buffers for normal terminal data and strings
-     * for control messages. Control messages are JSON-formatted.
-     *
-     * The current implemented control messages:
-     *
-     *   Start: { "interactive": boolean, "cmd": string[] }
-     *   Resize: { "dim": { "cols": number, "rows": number } }
-     *   EOF: { "eof": true }
-     */
     async connectStream(input?: AsyncGenerator<Buffer | string, void>, options?: any): Promise<AsyncGenerator<Buffer, void>> {
         const pluginId = options?.pluginId as string;
         if (!pluginId)
             throw new Error('must provide pluginId');
 
         const plugins = await sdk.systemManager.getComponent('plugins');
-        const replPort: number = await plugins.getRemoteServicePort(pluginId, 'repl');
+        const replPort: number = await plugins.getRemoteServicePort(pluginId, this.serviceName);
 
         const socket = net.connect(replPort);
         await once(socket, 'connect');
@@ -60,6 +51,8 @@ export class ReplService extends ScryptedDeviceBase implements StreamService {
 
                     yield await queue.dequeue();
                 }
+            }
+            catch (e) {
             }
             finally {
                 socket.destroy();
