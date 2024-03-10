@@ -1,18 +1,16 @@
 import { readFileAsString, tsCompile } from '@scrypted/common/src/eval/scrypted-eval';
-import sdk, { DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
+import sdk, { DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
-import fs from 'fs';
-import net from 'net';
 import os from 'os';
 import Router from 'router';
 import { AggregateCore, AggregateCoreNativeId } from './aggregate-core';
 import { AutomationCore, AutomationCoreNativeId } from './automations-core';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
-import { newScript, ScriptCore, ScriptCoreNativeId } from './script-core';
+import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
+import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
-import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
 
@@ -104,6 +102,16 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                 {
                     name: 'REPL Service',
                     nativeId: ReplServiceNativeId,
+                    interfaces: [ScryptedInterface.StreamService],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+        })();
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Console Service',
+                    nativeId: ConsoleServiceNativeId,
                     interfaces: [ScryptedInterface.StreamService],
                     type: ScryptedDeviceType.Builtin,
                 },
