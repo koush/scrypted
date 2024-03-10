@@ -4,9 +4,6 @@
 [submodule "plugins/myq/src/myq"]
 	path = plugins/myq/src/myq
 	url = ../../koush/myq.git
-[submodule "plugins/tensorflow/face-api.js"]
-	path = external/face-api.js
-	url = ../../koush/face-api.js
 [submodule "external/ring-client-api"]
 	path = external/ring-client-api
 	url = ../../koush/ring
