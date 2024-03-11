@@ -588,6 +588,7 @@ class NotifierOptions(TypedDict):
     data: Any
     dir: NotificationDirection
     lang: str
+    recordedEvent: RecordedEvent
     renotify: bool
     requireInteraction: bool
     silent: bool

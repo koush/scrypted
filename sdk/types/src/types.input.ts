@@ -221,6 +221,7 @@ export interface NotifierOptions {
   tag?: string;
   timestamp?: number;
   vibrate?: VibratePattern;
+  recordedEvent?: RecordedEvent;
 }
 
 /**
