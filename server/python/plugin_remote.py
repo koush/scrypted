@@ -373,15 +373,15 @@ class PluginRemote:
         asyncio.run_coroutine_threadsafe(self.print_async(
             nativeId, *values, sep=sep, end=end, flush=flush), self.loop)
 
-    async def loadZip(self, packageJson, zipData, options: dict = None):
+    async def loadZip(self, packageJson, zipFile: str, options: dict = None):
         try:
-            return await self.loadZipWrapped(packageJson, zipData, options)
+            return await self.loadZipWrapped(packageJson, zipFile, options)
         except:
             print('plugin start/fork failed')
             traceback.print_exc()
             raise
 
-    async def loadZipWrapped(self, packageJson, zipData, options: dict = None):
+    async def loadZipWrapped(self, packageJson, zipFile: str, options: dict = None):
         sdk = ScryptedStatic()
 
         clusterId = options['clusterId']
@@ -510,25 +510,22 @@ class PluginRemote:
 
         forkMain = options and options.get('fork')
 
+        # python debugger needs a predictable path for the plugin.zip,
+        # as the vscode python extension doesn't seem to have a way
+        # to read the package.json to configure the python remoteRoot.
+        debug = options and options.get('debug', None)
+        if debug:
+            scrypted_volume = os.environ.get('SCRYPTED_VOLUME')
+            zipPath = os.path.join(scrypted_volume, 'plugin.zip')
+            shutil.copyfile(zipFile, zipPath)
+        else:
+            zipPath = zipFile
+
+
+        zip = zipfile.ZipFile(zipPath)
+
         if not forkMain:
             multiprocessing.set_start_method('spawn')
-
-            zipPath: str
-
-            if isinstance(zipData, str):
-                zipPath = (options and options.get(
-                    'filename', None)) or zipData
-                if zipPath != zipData:
-                    shutil.copyfile(zipData, zipPath)
-            else:
-                zipPath = options['filename']
-                f = open(zipPath, 'wb')
-                f.write(zipData)
-                f.close()
-
-            zipData = None
-
-            zip = zipfile.ZipFile(zipPath)
 
             plugin_volume = os.environ.get('SCRYPTED_PLUGIN_VOLUME')
 
@@ -596,8 +593,6 @@ class PluginRemote:
 
             sys.path.insert(0, zipPath)
             sys.path.insert(0, pip_target)
-        else:
-            zip = zipfile.ZipFile(options['filename'])
 
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
@@ -664,8 +659,8 @@ class PluginRemote:
                         await remote.setNativeId(nativeId, ds.id, ds.storage)
                     forkOptions = (options or {}).copy()
                     forkOptions['fork'] = True
-                    forkOptions['filename'] = zipPath
-                    return await remote.loadZip(packageJson, zipData, forkOptions)
+                    forkOptions['debug'] = debug
+                    return await remote.loadZip(packageJson, zipFile, forkOptions)
 
                 pluginFork.result = asyncio.create_task(getFork())
                 return pluginFork

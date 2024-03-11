@@ -5,6 +5,7 @@ import fs from 'fs';
 import net from 'net';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
+import worker_threads from 'worker_threads';
 import { computeClusterObjectHash } from '../cluster/cluster-hash';
 import { ClusterObject, ConnectRPCObject } from '../cluster/connect-rpc-object';
 import { listenZero } from '../listen-zero';
@@ -18,7 +19,6 @@ import { DeviceManagerImpl, PluginReader, attachPluginRemote, setupPluginRemote 
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
-import worker_threads from 'worker_threads';
 
 const serverVersion = require('../../package.json').version;
 
@@ -380,7 +380,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             }
 
             try {
-                peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
+                const filename = zipOptions?.debug ? '/plugin/main.nodejs.js' : `/${pluginId}/main.nodejs.js`;
+                peer.evalLocal(script, filename, params);
 
                 if (zipOptions?.fork) {
                     // pluginConsole?.log('plugin forked');

@@ -1,10 +1,8 @@
+import v8 from 'v8';
+import worker_threads from "worker_threads";
 import { EventEmitter } from "ws";
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
-import worker_threads from "worker_threads";
-import path from 'path';
-import { getPluginNodePath } from "../plugin-npm-dependencies";
-import v8 from 'v8';
 
 export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
     terminated: boolean;

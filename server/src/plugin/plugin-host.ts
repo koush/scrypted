@@ -131,6 +131,7 @@ export class PluginHost {
         const pluginVolume = ensurePluginVolume(this.pluginId);
 
         this.startPluginHost(logger, {
+            SCRYPTED_VOLUME: volume,
             SCRYPTED_PLUGIN_VOLUME: pluginVolume,
         }, pluginDebug);
 
@@ -249,19 +250,11 @@ export class PluginHost {
 
             const fail = 'Plugin failed to load. View Console for more information.';
             try {
-                const isPython = runtime === 'python';
                 const loadZipOptions: PluginRemoteLoadZipOptions = {
                     clusterId: scrypted.clusterId,
                     clusterSecret: scrypted.clusterSecret,
-                    // if debugging, use a normalized path for sourcemap resolution, otherwise
-                    // prefix with module path.
-                    filename: isPython
-                        ? pluginDebug
-                            ? `${volume}/plugin.zip`
-                            : zipFile
-                        : pluginDebug
-                            ? '/plugin/main.nodejs.js'
-                            : `/${this.pluginId}/main.nodejs.js`,
+                    // debug flag can be used to affect path resolution for sourcemaps etc.
+                    debug: !!pluginDebug,
                     unzippedPath: this.unzippedPath,
                 };
                 // original implementation sent the zipBuffer, sending the zipFile name now.

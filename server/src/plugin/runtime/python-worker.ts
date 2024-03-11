@@ -2,12 +2,12 @@ import child_process from 'child_process';
 import fs from "fs";
 import os from "os";
 import path from 'path';
+import type { PortablePython as PortablePythonType } from 'py';
 import { Readable, Writable } from 'stream';
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { createRpcDuplexSerializer } from '../../rpc-serializer';
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
-import type {PortablePython as PortablePythonType} from 'py'
 
 export class PythonRuntimeWorker extends ChildProcessWorker {
     static {
