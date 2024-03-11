@@ -18,7 +18,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@scrypted/types": "^0.3.4",
+    "@scrypted/types": "^0.3.15",
     "engine.io-client": "^6.5.3",
     "follow-redirects": "^1.15.4",
     "rimraf": "^5.0.5"
