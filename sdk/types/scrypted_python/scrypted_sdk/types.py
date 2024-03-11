@@ -171,6 +171,7 @@ class ScryptedInterface(str, Enum):
     Scriptable = "Scriptable"
     ScryptedDevice = "ScryptedDevice"
     ScryptedPlugin = "ScryptedPlugin"
+    ScryptedPluginRuntime = "ScryptedPluginRuntime"
     ScryptedUser = "ScryptedUser"
     SecuritySystem = "SecuritySystem"
     Settings = "Settings"
@@ -760,6 +761,11 @@ class ScriptSource(TypedDict):
     name: str
     script: str
 
+class ScrypedRuntimeArguments(TypedDict):
+
+    arguments: list[str]
+    executable: str
+
 class ScryptedUserAccessControl(TypedDict):
     """ScryptedUserAccessControl describes the list of devices that may be accessed by the user."""
 
@@ -1340,6 +1346,10 @@ class ScryptedPlugin:
         pass
 
 
+class ScryptedPluginRuntime:
+
+    scryptedRuntimeArguments: ScrypedRuntimeArguments
+
 class ScryptedUser:
     """ScryptedUser represents a user managed by Scrypted. This interface can not be implemented, only extended by Mixins."""
 
@@ -1695,6 +1705,7 @@ class ScryptedInterfaceProperty(str, Enum):
     providerId = "providerId"
     room = "room"
     type = "type"
+    scryptedRuntimeArguments = "scryptedRuntimeArguments"
     on = "on"
     brightness = "brightness"
     colorTemperature = "colorTemperature"
@@ -1966,6 +1977,14 @@ class DeviceState:
     @type.setter
     def type(self, value: ScryptedDeviceType):
         self.setScryptedProperty("type", value)
+
+    @property
+    def scryptedRuntimeArguments(self) -> ScrypedRuntimeArguments:
+        return self.getScryptedProperty("scryptedRuntimeArguments")
+
+    @scryptedRuntimeArguments.setter
+    def scryptedRuntimeArguments(self, value: ScrypedRuntimeArguments):
+        self.setScryptedProperty("scryptedRuntimeArguments", value)
 
     @property
     def on(self) -> bool:
@@ -2409,6 +2428,13 @@ ScryptedInterfaceDescriptors = {
       "getPluginJson"
     ],
     "properties": []
+  },
+  "ScryptedPluginRuntime": {
+    "name": "ScryptedPluginRuntime",
+    "methods": [],
+    "properties": [
+      "scryptedRuntimeArguments"
+    ]
   },
   "OnOff": {
     "name": "OnOff",

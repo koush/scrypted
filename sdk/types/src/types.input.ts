@@ -45,6 +45,13 @@ export interface ScryptedDevice {
 export interface ScryptedPlugin {
   getPluginJson(): Promise<any>;
 }
+export interface ScrypedRuntimeArguments {
+  executable?: string;
+  arguments?: string[];
+}
+export interface ScryptedPluginRuntime {
+  scryptedRuntimeArguments?: ScrypedRuntimeArguments;
+}
 export interface EventListenerOptions {
   /**
    * This EventListener will denoise events, and will not be called unless the state changes.
@@ -1998,6 +2005,7 @@ export interface LauncherApplication {
 export enum ScryptedInterface {
   ScryptedDevice = "ScryptedDevice",
   ScryptedPlugin = "ScryptedPlugin",
+  ScryptedPluginRuntime = "ScryptedPluginRuntime",
   OnOff = "OnOff",
   Brightness = "Brightness",
   ColorSettingTemperature = "ColorSettingTemperature",
@@ -2170,14 +2178,14 @@ export interface RTCMediaObjectTrack {
 /**
  * @category WebRTC Reference
  */
-export interface RTCOutputMediaObjectTrack extends RTCMediaObjectTrack{
+export interface RTCOutputMediaObjectTrack extends RTCMediaObjectTrack {
   replace(mediaObject: MediaObject): Promise<void>;
 }
 
 /**
  * @category WebRTC Reference
  */
-export interface RTCInputMediaObjectTrack extends RTCMediaObjectTrack{
+export interface RTCInputMediaObjectTrack extends RTCMediaObjectTrack {
   setPlayback(options: {
     audio: boolean,
     video: boolean,
