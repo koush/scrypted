@@ -109,11 +109,16 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
 }
 
 export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
-    const bufferTypeDefs= readFileAsString('@types/node/buffer.d.ts');
+    const safeLibs: any = {};
 
-    const safeLibs = {
-        bufferTypeDefs,
-    };
+    for (const safeLib of [
+        '@types/node/globals.d.ts',
+        '@types/node/buffer.d.ts',
+        '@types/node/fs.d.ts',
+        '@types/node/net.d.ts',
+    ]) {
+        safeLibs[`node_modules/${safeLib}`] = readFileAsString(safeLib)
+    }
 
     const libs = Object.assign(getTypeDefs(), extraLibs);
 
@@ -169,10 +174,12 @@ export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
             "node_modules/@types/scrypted__sdk/index.d.ts"
         );
 
-        monaco.languages.typescript.typescriptDefaults.addExtraLib(
-            safeLibs.bufferTypeDefs,
-            "node_modules/@types/node/buffer.d.ts"
-        );
+        for (const lib of Object.keys(safeLibs)) {
+            monaco.languages.typescript.typescriptDefaults.addExtraLib(
+                safeLibs[lib],
+                lib,
+            );
+        }
     }
 
     return `(function() {
