@@ -761,7 +761,7 @@ class ScriptSource(TypedDict):
     name: str
     script: str
 
-class ScrypedRuntimeArguments(TypedDict):
+class ScryptedRuntimeArguments(TypedDict):
 
     arguments: list[str]
     executable: str
@@ -1348,7 +1348,7 @@ class ScryptedPlugin:
 
 class ScryptedPluginRuntime:
 
-    scryptedRuntimeArguments: ScrypedRuntimeArguments
+    scryptedRuntimeArguments: ScryptedRuntimeArguments
 
 class ScryptedUser:
     """ScryptedUser represents a user managed by Scrypted. This interface can not be implemented, only extended by Mixins."""
@@ -1979,11 +1979,11 @@ class DeviceState:
         self.setScryptedProperty("type", value)
 
     @property
-    def scryptedRuntimeArguments(self) -> ScrypedRuntimeArguments:
+    def scryptedRuntimeArguments(self) -> ScryptedRuntimeArguments:
         return self.getScryptedProperty("scryptedRuntimeArguments")
 
     @scryptedRuntimeArguments.setter
-    def scryptedRuntimeArguments(self, value: ScrypedRuntimeArguments):
+    def scryptedRuntimeArguments(self, value: ScryptedRuntimeArguments):
         self.setScryptedProperty("scryptedRuntimeArguments", value)
 
     @property

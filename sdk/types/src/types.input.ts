@@ -45,12 +45,12 @@ export interface ScryptedDevice {
 export interface ScryptedPlugin {
   getPluginJson(): Promise<any>;
 }
-export interface ScrypedRuntimeArguments {
+export interface ScryptedRuntimeArguments {
   executable?: string;
   arguments?: string[];
 }
 export interface ScryptedPluginRuntime {
-  scryptedRuntimeArguments?: ScrypedRuntimeArguments;
+  scryptedRuntimeArguments?: ScryptedRuntimeArguments;
 }
 export interface EventListenerOptions {
   /**
