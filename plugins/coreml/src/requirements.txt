@@ -1,5 +1,5 @@
 #
-coremltools==7.0b2
+coremltools==7.1
 
 # pillow for anything not intel linux, pillow-simd is available on x64 linux
 Pillow>=5.4.1; sys_platform != 'linux' or platform_machine != 'x86_64'
