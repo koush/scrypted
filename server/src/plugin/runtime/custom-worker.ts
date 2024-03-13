@@ -53,7 +53,7 @@ export class CustomRuntimeWorker extends ChildProcessWorker {
 
     setupRpcPeer(peer: RpcPeer): void {
         const peerin = this.worker.stdio[3] as Writable;
-        const peerout = this.worker.stdio[this.fork ? 3 : 4] as Readable;
+        const peerout = this.worker.stdio[4] as Readable;
 
         const serializer = this.serializer = createRpcDuplexSerializer(peerin);
         serializer.setupRpcPeer(peer);
