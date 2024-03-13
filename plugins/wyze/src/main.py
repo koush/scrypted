@@ -484,8 +484,8 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
         self.wyze_iotc: wyzecam.WyzeIOTC = None
         self.last_ts = 0
 
-        if sys.platform != "linux":
-            self.print("Wyze plugin must be installed under Scrypted for Linux.")
+        if sys.platform.find("linux"):
+            self.print("Wyze plugin must be installed under Scrypted for Linux. Found: " + sys.platform)
             return
 
         if platform.machine() == "x86_64":
