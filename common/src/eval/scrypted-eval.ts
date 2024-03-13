@@ -114,8 +114,12 @@ export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
     for (const safeLib of [
         '@types/node/globals.d.ts',
         '@types/node/buffer.d.ts',
+        '@types/node/process.d.ts',
+        '@types/node/events.d.ts',
+        '@types/node/stream.d.ts',
         '@types/node/fs.d.ts',
         '@types/node/net.d.ts',
+        '@types/node/child_process.d.ts',
     ]) {
         safeLibs[`node_modules/${safeLib}`] = readFileAsString(safeLib)
     }

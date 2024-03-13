@@ -115,7 +115,7 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
             }
             catch (e) {
                 worker.terminate();
-                throw e;
+                // throw e;
             }
         }
 
