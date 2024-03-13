@@ -1,5 +1,4 @@
 import { ScryptedStatic, SystemManager } from '@scrypted/types';
-import AdmZip from 'adm-zip';
 import { once } from 'events';
 import fs from 'fs';
 import net from 'net';
@@ -15,10 +14,12 @@ import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { prepareConsoles } from './plugin-console';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
-import { DeviceManagerImpl, PluginReader, attachPluginRemote, setupPluginRemote } from './plugin-remote';
+import { DeviceManagerImpl, attachPluginRemote, setupPluginRemote } from './plugin-remote';
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
+import { getPluginVolume } from './plugin-volume';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
+import { prepareZip } from './runtime/node-worker-common';
 
 const serverVersion = require('../../package.json').version;
 
@@ -75,8 +76,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             }
             throw new Error(`unknown service ${name}`);
         },
-        async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions: PluginRemoteLoadZipOptions) {
-            const { clusterId, clusterSecret } = zipOptions;
+        async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, getZip: () => Promise<Buffer>, zipOptions: PluginRemoteLoadZipOptions) {
+            const { clusterId, clusterSecret, zipHash } = zipOptions;
+            const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, getZip);
 
             const onProxySerialization = (value: any, proxyId: string, sourcePeerPort?: number) => {
                 const properties = RpcPeer.prepareProxyProperties(value) || {};
@@ -194,50 +196,20 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     return value;
                 }
             }
-
-            // let volume: any;
-            let pluginReader: PluginReader;
-            if (zipOptions?.unzippedPath && fs.existsSync(zipOptions?.unzippedPath)) {
-                if (worker_threads.isMainThread) {
-                    const fsDir = path.join(zipOptions.unzippedPath, 'fs')
-                    if (fs.existsSync(fsDir))
-                        process.chdir(fsDir);
-                    else
-                        process.chdir(zipOptions.unzippedPath);
-                }
-
-                // volume = link(fs, ['', path.join(zipOptions.unzippedPath, 'fs')]);
-                pluginReader = name => {
-                    const filename = path.join(zipOptions.unzippedPath, name);
-                    if (!fs.existsSync(filename))
-                        return;
-                    return fs.readFileSync(filename);
-                };
+            if (worker_threads.isMainThread) {
+                const fsDir = path.join(unzippedPath, 'fs')
+                if (fs.existsSync(fsDir))
+                    process.chdir(fsDir);
+                else
+                    process.chdir(unzippedPath);
             }
-            else {
-                // this code path was used in testing and should be unreachable.
 
-                const admZip = new AdmZip(zipData);
-                // volume = new Volume();
-                // for (const entry of admZip.getEntries()) {
-                //     if (entry.isDirectory)
-                //         continue;
-                //     if (!entry.entryName.startsWith('fs/'))
-                //         continue;
-                //     const name = entry.entryName.substring('fs/'.length);
-                //     volume.mkdirpSync(path.dirname(name));
-                //     const data = entry.getData();
-                //     volume.writeFileSync(name, data);
-                // }
-
-                pluginReader = name => {
-                    const entry = admZip.getEntry(name);
-                    if (!entry)
-                        return;
-                    return entry.getData();
-                }
-            }
-            zipData = undefined;
+            const pluginReader = (name: string) => {
+                const filename = path.join(unzippedPath, name);
+                if (!fs.existsSync(filename))
+                    return;
+                return fs.readFileSync(filename);
+            };
 
             const pluginConsole = getPluginConsole?.();
             params.console = pluginConsole;
@@ -248,9 +220,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     return require('fs');
                 }
                 try {
-                    if (name.startsWith('.') && zipOptions?.unzippedPath) {
+                    if (name.startsWith('.') && unzippedPath) {
                         try {
-                            const c = path.join(zipOptions.unzippedPath, name);
+                            const c = path.join(unzippedPath, name);
                             const module = require(c);
                             return module;
                         }
@@ -314,7 +286,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             peer.getParam('updateStats').then(updateStats => startStatsUpdater(allMemoryStats, updateStats));
 
             const main = pluginReader('main.nodejs.js');
-            pluginReader = undefined;
             const script = main.toString();
 
             scrypted.connect = (socket, options) => {
@@ -328,6 +299,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     packageJson,
                     env: process.env,
                     pluginDebug: undefined,
+                    zipFile,
+                    unzippedPath,
+                    zipHash,
                 });
 
                 const result = (async () => {
@@ -368,7 +342,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                     const forkOptions = Object.assign({}, zipOptions);
                     forkOptions.fork = true;
-                    return remote.loadZip(packageJson, zipData, forkOptions)
+                    return remote.loadZip(packageJson, getZip, forkOptions)
                 })();
 
                 result.catch(() => ntw.kill());

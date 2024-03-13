@@ -1,11 +1,9 @@
-import { Device, EngineIOHandler } from '@scrypted/types';
-import AdmZip from 'adm-zip';
+import { Device, EngineIOHandler, ScryptedInterface } from '@scrypted/types';
 import crypto from 'crypto';
 import * as io from 'engine.io';
 import fs from 'fs';
 import net from 'net';
 import os from 'os';
-import path from 'path';
 import { Duplex } from 'stream';
 import WebSocket from 'ws';
 import { Plugin } from '../db-types';
@@ -25,6 +23,7 @@ import { LazyRemote } from './plugin-lazy-remote';
 import { setupPluginRemote } from './plugin-remote';
 import { WebSocketConnection } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
+import { prepareZipSync } from './runtime/node-worker-common';
 import { RuntimeWorker } from './runtime/runtime-worker';
 
 const serverVersion = require('../../package.json').version;
@@ -60,6 +59,8 @@ export class PluginHost {
     };
     killed = false;
     consoleServer: Promise<ConsoleServer>;
+    zipHash: string;
+    zipFile: string;
     unzippedPath: string;
 
     kill() {
@@ -120,15 +121,24 @@ export class PluginHost {
         this.pluginId = plugin._id;
         this.pluginName = plugin.packageJson?.name;
         this.packageJson = plugin.packageJson;
-        let zipBuffer = Buffer.from(plugin.zip, 'base64');
-        // allow garbage collection of the base 64 contents
-        plugin = undefined;
 
         const pluginDeviceId = scrypted.findPluginDevice(this.pluginId)._id;
         const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(this.pluginId));
 
         const volume = getScryptedVolume();
         const pluginVolume = ensurePluginVolume(this.pluginId);
+
+        {
+            const zipBuffer = Buffer.from(plugin.zip, 'base64');
+            // allow garbage collection of the base 64 contents
+            plugin = undefined;
+            const hash = crypto.createHash('md5').update(zipBuffer).digest().toString('hex');
+            this.zipHash = hash;
+
+            const { zipFile, unzippedPath } = prepareZipSync(pluginVolume, hash, () => zipBuffer);
+            this.zipFile = zipFile;
+            this.unzippedPath = unzippedPath;
+        }
 
         this.startPluginHost(logger, {
             SCRYPTED_VOLUME: volume,
@@ -197,33 +207,6 @@ export class PluginHost {
 
         this.api = new PluginHostAPI(scrypted, this.pluginId, this, mediaManager);
 
-        const zipDir = path.join(pluginVolume, 'zip');
-        const extractVersion = "1-";
-        const hash = extractVersion + crypto.createHash('md5').update(zipBuffer).digest().toString('hex');
-        const zipFilename = `${hash}.zip`;
-        const zipFile = path.join(zipDir, zipFilename);
-        this.unzippedPath = path.join(zipDir, 'unzipped')
-        {
-            const zipDirTmp = zipDir + '.tmp';
-            if (!fs.existsSync(zipFile)) {
-                fs.rmSync(zipDirTmp, {
-                    recursive: true,
-                    force: true,
-                });
-                fs.rmSync(zipDir, {
-                    recursive: true,
-                    force: true,
-                });
-                fs.mkdirSync(zipDirTmp, {
-                    recursive: true,
-                });
-                fs.writeFileSync(path.join(zipDirTmp, zipFilename), zipBuffer);
-                const admZip = new AdmZip(zipBuffer);
-                admZip.extractAllTo(path.join(zipDirTmp, 'unzipped'), true);
-                fs.renameSync(zipDirTmp, zipDir);
-            }
-        }
-
         logger.log('i', `loading ${this.pluginName}`);
         logger.log('i', 'pid ' + this.worker?.pid);
 
@@ -231,9 +214,10 @@ export class PluginHost {
         const init = (async () => {
             const remote = await remotePromise;
 
-            for (const pluginDevice of scrypted.findPluginDevices(self.pluginId)) {
-                await remote.setNativeId(pluginDevice.nativeId, pluginDevice._id, pluginDevice.storage || {});
-            }
+            await Promise.all(
+                scrypted.findPluginDevices(self.pluginId)
+                    .map(pluginDevice => remote.setNativeId(pluginDevice.nativeId, pluginDevice._id, pluginDevice.storage || {}))
+            );
 
             const waitDebug = pluginDebug?.waitDebug;
             if (waitDebug) {
@@ -255,13 +239,12 @@ export class PluginHost {
                     clusterSecret: scrypted.clusterSecret,
                     // debug flag can be used to affect path resolution for sourcemaps etc.
                     debug: !!pluginDebug,
-                    unzippedPath: this.unzippedPath,
+                    zipHash: this.zipHash,
                 };
                 // original implementation sent the zipBuffer, sending the zipFile name now.
                 // can switch back for non-local plugins.
-                const modulePromise = remote.loadZip(this.packageJson, zipFile, loadZipOptions);
+                const modulePromise = remote.loadZip(this.packageJson, async () => fs.promises.readFile(this.zipFile), loadZipOptions);
                 // allow garbage collection of the zip buffer
-                zipBuffer = undefined;
                 const module = await modulePromise;
                 logger.log('i', `loaded ${this.pluginName}`);
                 logger.clearAlert(fail)
@@ -290,6 +273,12 @@ export class PluginHost {
         let { runtime } = this.packageJson.scrypted;
         runtime ||= 'node';
 
+        const pluginDevice = this.scrypted.findPluginDevice(this.pluginId);
+        const customRuntime = pluginDevice.state.interfaces.value.includes(ScryptedInterface.ScryptedPluginRuntime);
+        if (customRuntime) {
+            runtime = 'custom';
+        }
+
         const workerHost = this.scrypted.pluginHosts.get(runtime);
         if (!workerHost)
             throw new Error(`Unsupported Scrypted runtime: ${this.packageJson.scrypted.runtime}`);
@@ -298,7 +287,10 @@ export class PluginHost {
             packageJson: this.packageJson,
             env,
             pluginDebug,
-        });
+            unzippedPath: this.unzippedPath,
+            zipFile: this.zipFile,
+            zipHash: this.zipHash,
+        }, this.scrypted);
 
         this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
             if (connected) {

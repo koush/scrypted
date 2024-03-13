@@ -455,15 +455,13 @@ export interface WebSocketCustomHandler {
     methods: WebSocketMethods;
 }
 
-export type PluginReader = (name: string) => Buffer;
-
 export interface PluginRemoteAttachOptions {
     createMediaManager?: (systemManager: SystemManager, deviceManager: DeviceManagerImpl) => Promise<MediaManager>;
     getServicePort?: (name: string, ...args: any[]) => Promise<number>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
-    onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions: PluginRemoteLoadZipOptions) => Promise<any>;
+    onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, getZip: () => Promise<Buffer>, zipOptions: PluginRemoteLoadZipOptions) => Promise<any>;
     onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<void>;
 }
 
@@ -637,7 +635,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 done(ret);
             },
 
-            async loadZip(packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) {
+            async loadZip(packageJson: any, getZip: () => Promise<Buffer>, zipOptions?: PluginRemoteLoadZipOptions) {
                 const params: any = {
                     __filename: undefined,
                     deviceManager,
@@ -660,7 +658,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 params.pluginRuntimeAPI = ret;
 
                 try {
-                    return await options.onLoadZip(ret, params, packageJson, zipData, zipOptions);
+                    return await options.onLoadZip(ret, params, packageJson, getZip, zipOptions);
                 }
                 catch (e) {
                     console.error('plugin start/fork failed', e)

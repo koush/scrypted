@@ -46,6 +46,7 @@ import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
+import { CustomRuntimeWorker } from './plugin/runtime/custom-worker';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -60,7 +61,7 @@ interface HttpPluginData {
     pluginDevice: PluginDevice
 }
 
-export type RuntimeHost = (mainFilename: string, pluginId: string, options: RuntimeWorkerOptions) => RuntimeWorker;
+export type RuntimeHost = (mainFilename: string, pluginId: string, options: RuntimeWorkerOptions, runtime: ScryptedRuntime) => RuntimeWorker;
 
 export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     clusterId = crypto.randomBytes(3).toString('hex');
@@ -99,6 +100,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         // ensure that all the users are loaded from the db.
         this.usersService.getAllUsers();
 
+        this.pluginHosts.set('custom', (_, pluginId, options, runtime) => new CustomRuntimeWorker(pluginId, options, runtime));
         this.pluginHosts.set('python', (_, pluginId, options) => new PythonRuntimeWorker(pluginId, options));
         this.pluginHosts.set('node', (mainFilename, pluginId, options) => new NodeForkWorker(mainFilename, pluginId, options));
 

@@ -21,6 +21,7 @@ from collections.abc import Mapping
 from io import StringIO
 from typing import Any, Optional, Set, Tuple, TypedDict
 
+import plugin_volume as pv
 import rpc
 import rpc_reader
 import scrypted_python.scrypted_sdk.types
@@ -373,15 +374,15 @@ class PluginRemote:
         asyncio.run_coroutine_threadsafe(self.print_async(
             nativeId, *values, sep=sep, end=end, flush=flush), self.loop)
 
-    async def loadZip(self, packageJson, zipFile: str, options: dict = None):
+    async def loadZip(self, packageJson, getZip: Any, options: dict):
         try:
-            return await self.loadZipWrapped(packageJson, zipFile, options)
+            return await self.loadZipWrapped(packageJson, getZip, options)
         except:
             print('plugin start/fork failed')
             traceback.print_exc()
             raise
 
-    async def loadZipWrapped(self, packageJson, zipFile: str, options: dict = None):
+    async def loadZipWrapped(self, packageJson, getZip: Any, options: dict):
         sdk = ScryptedStatic()
 
         clusterId = options['clusterId']
@@ -509,25 +510,35 @@ class PluginRemote:
         sdk.connectRPCObject = connectRPCObject
 
         forkMain = options and options.get('fork')
+        debug = options.get('debug', None)
+        plugin_volume = pv.ensure_plugin_volume(self.pluginId)
+        plugin_zip_paths = pv.prep(plugin_volume, options.get('zipHash'))
 
-        # python debugger needs a predictable path for the plugin.zip,
-        # as the vscode python extension doesn't seem to have a way
-        # to read the package.json to configure the python remoteRoot.
-        debug = options and options.get('debug', None)
         if debug:
-            scrypted_volume = os.environ.get('SCRYPTED_VOLUME')
+            scrypted_volume = pv.get_scrypted_volume()
+            # python debugger needs a predictable path for the plugin.zip,
+            # as the vscode python extension doesn't seem to have a way
+            # to read the package.json to configure the python remoteRoot.
             zipPath = os.path.join(scrypted_volume, 'plugin.zip')
-            shutil.copyfile(zipFile, zipPath)
         else:
-            zipPath = zipFile
+            zipPath = plugin_zip_paths.get('zip_file')
 
+        if not os.path.exists(zipPath) or debug:
+            os.makedirs(os.path.dirname(zipPath), exist_ok=True)
+            zipData = await getZip()
+            zipPathTmp = zipPath + '.tmp'
+            with open(zipPathTmp, 'wb') as f:
+                f.write(zipData)
+            try:
+                os.remove(zipPath)
+            except:
+                pass
+            os.rename(zipPathTmp, zipPath)
 
         zip = zipfile.ZipFile(zipPath)
 
         if not forkMain:
             multiprocessing.set_start_method('spawn')
-
-            plugin_volume = os.environ.get('SCRYPTED_PLUGIN_VOLUME')
 
             # it's possible to run 32bit docker on aarch64, which cause pip requirements
             # to fail because pip only allows filtering on machine, even if running a different architeture.
@@ -558,7 +569,7 @@ class PluginRemote:
             print('pip target: %s' % pip_target)
 
             if not os.path.exists(pip_target):
-                os.makedirs(pip_target)
+                os.makedirs(pip_target, exist_ok=True)
 
 
             def read_requirements(filename: str) -> str:
@@ -657,10 +668,10 @@ class PluginRemote:
                     await remote.setSystemState(self.systemManager.getSystemState())
                     for nativeId, ds in self.nativeIds.items():
                         await remote.setNativeId(nativeId, ds.id, ds.storage)
-                    forkOptions = (options or {}).copy()
+                    forkOptions = options.copy()
                     forkOptions['fork'] = True
                     forkOptions['debug'] = debug
-                    return await remote.loadZip(packageJson, zipFile, forkOptions)
+                    return await remote.loadZip(packageJson, getZip, forkOptions)
 
                 pluginFork.result = asyncio.create_task(getFork())
                 return pluginFork

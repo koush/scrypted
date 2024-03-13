@@ -159,11 +159,7 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
 
 export interface PluginRemoteLoadZipOptions {
     debug?: boolean;
-    /**
-     * The path that the zip is currently unzipped at on the server. May not
-     * exist on the "remote", if it is not the same machine.
-     */
-    unzippedPath?: string;
+    zipHash: string;
     fork?: boolean;
 
     clusterId: string;
@@ -171,7 +167,7 @@ export interface PluginRemoteLoadZipOptions {
 }
 
 export interface PluginRemote {
-    loadZip(packageJson: any, zipData: Buffer | string, options: PluginRemoteLoadZipOptions): Promise<any>;
+    loadZip(packageJson: any, getZip: () => Promise<Buffer>, options: PluginRemoteLoadZipOptions): Promise<any>;
     setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState } }): Promise<void>;
     setNativeId(nativeId: ScryptedNativeId, id: string, storage: { [key: string]: any }): Promise<void>;
     updateDeviceState(id: string, state: { [property: string]: SystemDeviceState }): Promise<void>;
