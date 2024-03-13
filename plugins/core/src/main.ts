@@ -202,13 +202,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
     async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
-    checkEngineIoEndpoint(request: HttpRequest, name: string) {
-        const check = `/endpoint/@scrypted/core/engine.io/${name}/`;
-        if (!request.url.startsWith(check))
-            return null;
-        return check;
-    }
-
     async handlePublicFinal(request: HttpRequest, response: HttpResponse) {
         // need to strip off the query.
         const incomingPathname = request.url.split('?')[0];
