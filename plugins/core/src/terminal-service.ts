@@ -180,7 +180,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                                             throw new Error();
                                     }
                                     catch (e) {
-                                        spawn = require('@homebridge/node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
+                                        spawn = require('@scrypted/node-pty').spawn as typeof ptySpawn;
                                     }
                                     cp = new InteractiveTerminal(parsed.cmd, spawn);
                                 }

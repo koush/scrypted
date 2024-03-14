@@ -1,1 +1,0 @@
-const homebridgenodeptyprebuiltmultiarch = __non_webpack_require__('@homebridge/node-pty-prebuilt-multiarch'); module.exports = homebridgenodeptyprebuiltmultiarch;
