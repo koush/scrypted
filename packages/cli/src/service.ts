@@ -117,6 +117,9 @@ export async function serveMain(installVersion?: string) {
         await installServe(installVersion, true);
     }
 
+    if (process.env.SCRYPTED_INSTALL_ENVIRONMENT === 'lxc')
+        process.env.SCRYPTED_FFMPEG_PATH = '/usr/bin/ffmpeg';
+
     process.env.SCRYPTED_NPM_SERVE = 'true';
     process.env.SCRYPTED_VOLUME = volume;
     process.env.SCRYPTED_CAN_EXIT = 'true';
