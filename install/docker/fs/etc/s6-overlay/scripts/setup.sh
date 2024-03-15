@@ -16,7 +16,7 @@ mkdir -p /var/run/avahi-daemon
 
 # delete existing pids if they exist
 [ -e /var/run/dbus.pid ] && rm -f /var/run/dbus.pid
-[ -e /var/run/dbus/pid ] && rm -f /var/run/dbus/pid 
+[ -e /var/run/dbus/pid ] && rm -f /var/run/dbus/pid
 [ -e /run/dbus/pid ] && rm -f /run/dbus/pid
 [ -e /var/run/avahi-daemon/pid ] && rm -f /var/run/avahi-daemon/pid
 [ -e /var/run/dbus/system_bus_socket ] && rm -f /var/run/dbus/system_bus_socket
@@ -33,3 +33,7 @@ if [ ! -z "$DSM_HOSTNAME" ]; then
 else
   sed -i "s/.*host-name.*/#host-name=/" /etc/avahi/avahi-daemon.conf
 fi
+
+# nscd is required for static ffmpeg to perform DNS resolution
+mkdir -p /var/run/nscd
+nscd
