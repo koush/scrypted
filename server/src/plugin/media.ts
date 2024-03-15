@@ -1,5 +1,5 @@
 import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject as MediaObjectInterface, MediaObjectOptions, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
-import pathToFfmpeg from 'ffmpeg-static';
+import { getFfmpegPath } from '@scrypted/ffmpeg-static';
 import fs from 'fs';
 import https from 'https';
 import Graph from 'node-dijkstra';
@@ -189,7 +189,7 @@ export abstract class MediaManagerBase implements MediaManager {
             return f;
 
         const defaultPath = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-        return pathToFfmpeg || defaultPath;
+        return getFfmpegPath() || defaultPath;
     }
 
     async getFilesPath(): Promise<string> {
