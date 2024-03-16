@@ -85,7 +85,7 @@ The latest troubleshooting guide for all known streaming or recording issues can
 
         settings.push({
             title: 'RTP Sender',
-            group: 'Debug',
+            subgroup: 'Debug',
             key: 'rtpSender',
             description: 'The RTP Sender used by Scrypted. FFMpeg is stable. Scrypted is experimental and much faster.',
             choices: [
@@ -100,7 +100,7 @@ The latest troubleshooting guide for all known streaming or recording issues can
 
         settings.push({
             title: 'Debug Mode',
-            group: 'Debug',
+            subgroup: 'Debug',
             key: 'debugMode',
             description: 'Force transcoding on this camera for streaming and recording. This setting can be used to diagnose errors with HomeKit functionality. Enable the Rebroadcast plugin for more robust transcoding options.',
             choices: [
