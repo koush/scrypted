@@ -1,7 +1,7 @@
 import sdk from '@scrypted/sdk';
 import net from 'net';
 
-export async function getAddressOverride(type: 'udp6' | 'udp4') {
+export async function getScryptedServerAddress(type: 'udp6' | 'udp4') {
     try {
         const addresses = await sdk.endpointManager.getLocalAddresses();
         if (type === 'udp6') {
@@ -13,7 +13,7 @@ export async function getAddressOverride(type: 'udp6' | 'udp4') {
     }
 }
 
-export async function getAddressOverrides() {
+export async function getScryptedServerAddresses() {
     try {
         const addresses = await sdk.endpointManager.getLocalAddresses();
         return addresses;
