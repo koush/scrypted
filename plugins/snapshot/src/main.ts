@@ -572,6 +572,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
         },
     });
     mixinDevices = new Map<string, SnapshotMixin>();
+    authenticatedPath = sdk.endpointManager.getAuthenticatedPath(this.nativeId)
 
     constructor(nativeId?: string) {
         super(nativeId);
@@ -643,9 +644,8 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             return this.console;
     }
 
-
     async getLocalSnapshot(id: string, iface: string, search: string) {
-        const endpoint = await sdk.endpointManager.getAuthenticatedPath(this.nativeId);
+        const endpoint = await this.authenticatedPath;
         const ret = url.resolve(path.join(endpoint, id, iface, `${Date.now()}.jpg`) + `${search}`, '');
         return Buffer.from(ret);
     }
