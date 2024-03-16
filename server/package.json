@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.94.27",
+  "version": "0.94.28",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",
@@ -48,7 +48,7 @@
     "@types/ws": "^8.5.10"
   },
   "optionalDependencies": {
-    "@scrypted/node-pty": "^1.0.5"
+    "@scrypted/node-pty": "^1.0.9"
   },
   "bin": {
     "scrypted-serve": "bin/scrypted-serve"
