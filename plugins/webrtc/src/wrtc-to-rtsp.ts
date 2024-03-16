@@ -1,16 +1,14 @@
-import { BundlePolicy, RTCIceCandidate, RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket } from "./werift";
-// import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
-import { FullIntraRequest } from "../../../external/werift/packages/rtp/src/rtcp/psfb/fullIntraRequest";
 import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { getNaluTypesInNalu, RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
+import { FullIntraRequest } from "../../../external/werift/packages/rtp/src/rtcp/psfb/fullIntraRequest";
 import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { startRtpForwarderProcess } from "./rtp-forwarders";
 import { getFFmpegRtpAudioOutputArguments, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
+import { BundlePolicy, RTCIceCandidate, RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket } from "./werift";
 import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive, logIsLocalIceTransport } from "./werift-util";
-import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
 
 const { mediaManager } = sdk;
 
@@ -121,8 +119,6 @@ export async function createRTCPeerConnectionSource(options: {
             };
 
             const setupVideoTransceiver = (transceiver: RTCRtpTransceiver) => {
-                const videoPacketSize = 64000;
-                let h264Repacketizer = new H264Repacketizer(console, videoPacketSize - 12)
                 const videoTransceiver = transceiver;
                 videoTransceiver.mid = '1';
                 videoTransceiver.onTrack.subscribe((track) => {
@@ -134,10 +130,7 @@ export async function createRTCPeerConnectionSource(options: {
                             const naluTypes = getNaluTypesInNalu(rtp.payload);
                             console.log('video packet types', ...[...naluTypes]);
                         }
-                        const repacketized = h264Repacketizer.repacketize(rtp);
-                        for (const packet of repacketized) {
-                            rtspServer.sendTrack(videoTrack, packet.serialize(), false);
-                        }
+                        rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
                     });
                     track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
 
