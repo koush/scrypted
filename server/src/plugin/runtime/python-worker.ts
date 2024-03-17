@@ -3,7 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from 'path';
 import { PortablePython } from 'py';
-import { Readable, Writable, PassThrough } from 'stream';
+import { PassThrough, Readable, Writable } from 'stream';
 import { installScryptedServerRequirements, version as packagedPythonVersion } from '../../../bin/packaged-python';
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { createRpcDuplexSerializer } from '../../rpc-serializer';
@@ -103,7 +103,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
                 env: Object.assign({
                     // rev this if the base python version or server characteristics change.
-                    SCRYPTED_PYTHON_VERSION: '20240308.1',
+                    SCRYPTED_PYTHON_VERSION: '20240317',
                     PYTHONUNBUFFERED: '1',
                     PYTHONPATH,
                 }, gstEnv, process.env, env),
