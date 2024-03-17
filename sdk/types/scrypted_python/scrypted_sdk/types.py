@@ -184,6 +184,7 @@ class ScryptedInterface(str, Enum):
     VOCSensor = "VOCSensor"
     VideoCamera = "VideoCamera"
     VideoCameraConfiguration = "VideoCameraConfiguration"
+    VideoCameraMask = "VideoCameraMask"
     VideoClips = "VideoClips"
     VideoFrameGenerator = "VideoFrameGenerator"
     VideoRecorder = "VideoRecorder"
@@ -318,6 +319,10 @@ class PictureDimensions(TypedDict):
 
     height: float
     width: float
+
+class PrivacyMask(TypedDict):
+
+    points: list[Point]
 
 class RequestMediaStreamAdaptiveOptions(TypedDict):
 
@@ -657,6 +662,10 @@ class Position(TypedDict):
     accuracyRadius: float  # The accuracy radius of this position in meters.
     latitude: float
     longitude: float
+
+class PrivacyMasks(TypedDict):
+
+    masks: list[PrivacyMask]
 
 class RecordedEvent(TypedDict):
 
@@ -1457,6 +1466,15 @@ class VideoCameraConfiguration:
         pass
 
 
+class VideoCameraMask:
+
+    async def getPrivacyMasks(self) -> PrivacyMasks:
+        pass
+
+    async def setPrivacyMasks(self, masks: PrivacyMasks) -> None:
+        pass
+
+
 class VideoClips:
 
     async def getVideoClip(self, videoId: str) -> MediaObject:
@@ -1793,6 +1811,8 @@ class ScryptedInterfaceMethods(str, Enum):
     stopDisplay = "stopDisplay"
     getVideoStream = "getVideoStream"
     getVideoStreamOptions = "getVideoStreamOptions"
+    getPrivacyMasks = "getPrivacyMasks"
+    setPrivacyMasks = "setPrivacyMasks"
     getRecordingStream = "getRecordingStream"
     getRecordingStreamCurrentTime = "getRecordingStreamCurrentTime"
     getRecordingStreamOptions = "getRecordingStreamOptions"
@@ -2584,6 +2604,14 @@ ScryptedInterfaceDescriptors = {
     "methods": [
       "getVideoStream",
       "getVideoStreamOptions"
+    ],
+    "properties": []
+  },
+  "VideoCameraMask": {
+    "name": "VideoCameraMask",
+    "methods": [
+      "getPrivacyMasks",
+      "setPrivacyMasks"
     ],
     "properties": []
   },

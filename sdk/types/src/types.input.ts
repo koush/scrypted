@@ -816,6 +816,19 @@ export interface Intercom {
   stopIntercom(): Promise<void>;
 }
 
+export interface PrivacyMask {
+  points: Point[];
+}
+
+export interface PrivacyMasks {
+  masks: PrivacyMask[];
+}
+
+export interface VideoCameraMask {
+  getPrivacyMasks(): Promise<PrivacyMasks>;
+  setPrivacyMasks(masks: PrivacyMasks): Promise<void>;
+}
+
 export enum PanTiltZoomMovement {
   Absolute = "Absolute",
   Relative = "Relative"
@@ -2022,6 +2035,7 @@ export enum ScryptedInterface {
   Microphone = "Microphone",
   Display = "Display",
   VideoCamera = "VideoCamera",
+  VideoCameraMask = "VideoCameraMask",
   VideoRecorder = "VideoRecorder",
   VideoRecorderManagement = "VideoRecorderManagement",
   PanTiltZoom = "PanTiltZoom",
