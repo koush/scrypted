@@ -20,4 +20,5 @@ module.exports.installScryptedServerRequirements = async function installScrypte
 
     await pipInstall(python, 'debugpy');
     await pipInstall(python, 'psutil').catch(() => { });
+    return python;
 }

@@ -4,7 +4,7 @@ import os from "os";
 import path from 'path';
 import { PortablePython } from 'py';
 import { Readable, Writable, PassThrough } from 'stream';
-import { version as packagedPythonVersion } from '../../../bin/packaged-python';
+import { installScryptedServerRequirements, version as packagedPythonVersion } from '../../../bin/packaged-python';
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { createRpcDuplexSerializer } from '../../rpc-serializer';
 import { ChildProcessWorker } from "./child-process-worker";
@@ -119,25 +119,32 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             const peerin = this.peerin = new PassThrough();
             const peerout = this.peerout = new PassThrough();
 
-            const py = new PortablePython(pluginPythonVersion, path.dirname(options.unzippedPath));
-            this.pythonInstallationComplete = false;
-            py.install()
-                .then(() => {
-                    pythonPath = py.executablePath;
-                    // is this possible?
-                    if (!fs.existsSync(pythonPath))
-                        throw new Error('Installation failed. Portable python not found.');
-                    setup();
+            const finishSetup = () => {
+                setup();
 
-                    peerin.pipe(this.worker.stdio[3] as Writable);
-                    (this.worker.stdio[4] as Readable).pipe(peerout);
-                })
-                .catch(() => {
-                    process.nextTick(() => {
-                        this.emit('error', new Error('Failed to install portable python.'));
+                peerin.pipe(this.worker.stdio[3] as Writable);
+                (this.worker.stdio[4] as Readable).pipe(peerout);
+            };
+
+            const py = new PortablePython(pluginPythonVersion, path.dirname(options.unzippedPath));
+            if (fs.existsSync(py.executablePath)) {
+                pythonPath = py.executablePath;
+                finishSetup();
+            }
+            else {
+                this.pythonInstallationComplete = false;
+                installScryptedServerRequirements(pluginPythonVersion, path.dirname(options.unzippedPath))
+                    .then(executablePath => {
+                        pythonPath = executablePath;
+                        finishSetup();
                     })
-                })
-                .finally(() => this.pythonInstallationComplete = true);
+                    .catch(() => {
+                        process.nextTick(() => {
+                            this.emit('error', new Error('Failed to install portable python.'));
+                        })
+                    })
+                    .finally(() => this.pythonInstallationComplete = true);
+            }
         }
         else {
             setup();
