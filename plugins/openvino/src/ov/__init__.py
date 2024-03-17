@@ -78,6 +78,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             model = 'yolov8n_320'
         self.yolo = 'yolo' in model
         self.yolov8 = "yolov8" in model
+        self.yolov9 = "yolov9" in model
         self.sigmoid = model == 'yolo-v4-tiny-tf'
 
         print(f'model/mode/precision: {model}/{mode}/{precision}')
@@ -137,6 +138,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                     'yolo-v4-tiny-tf',
                     'yolov8n',
                     'yolov8n_320',
+                    'yolov9c_320',
                 ],
                 'value': model,
             },
@@ -183,7 +185,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
             infer_request = self.compiled_model.create_infer_request()
             # the input_tensor can be created with the shared_memory=True parameter,
             # but that seems to cause issues on some platforms.
-            if self.yolov8:
+            if self.yolov8 or self.yolov9:
                 im = np.stack([input])
                 im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
                 im = im.astype(np.float32) / 255.0
@@ -201,8 +203,8 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
 
             objs = []
 
-            if self.yolov8:
-                objs = yolo.parse_yolov8(infer_request.outputs[0].data[0])
+            if self.yolov8 or self.yolov9:
+                objs = yolo.parse_yolov8(infer_request.output_tensors[0].data[0])
                 return objs
 
             if self.yolo:
