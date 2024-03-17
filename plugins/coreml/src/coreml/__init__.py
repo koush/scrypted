@@ -38,6 +38,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             model = "yolov8n_320"
         self.yolo = "yolo" in model
         self.yolov8 = "yolov8" in model
+        self.yolov9 = "yolov9" in model
         model_version = "v2"
 
         print(f"model: {model}")
@@ -58,6 +59,19 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     f"https://github.com/koush/coreml-models/raw/main/{model}/{model}.mlmodel",
                     f"{model}.mlmodel",
                 )
+            elif self.yolov9:
+                files = [
+                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{model}.mlmodel",
+                    f"{model}/{model}.mlpackage/Manifest.json",
+                ]
+
+                for f in files:
+                    p = self.downloadFile(
+                        f"https://github.com/koush/coreml-models/raw/main/{f}",
+                        f"{model_version}/{f}",
+                    )
+                    modelFile = os.path.dirname(p)
             else:
                 files = [
                     f"{model}/{model}.mlpackage/Data/com.apple.CoreML/FeatureDescriptions.json",
@@ -106,6 +120,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     "yolov4-tiny",
                     "yolov8n",
                     "yolov8n_320",
+                    "yolov9c_320",
                 ],
                 "value": model,
             },
@@ -128,7 +143,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
 
         # run in executor if this is the plugin loop
         if self.yolo:
-            input_name = "image" if self.yolov8 else "input_1"
+            input_name = "image" if self.yolov8 or self.yolov9 else "input_1"
             if asyncio.get_event_loop() is self.loop:
                 out_dict = await asyncio.get_event_loop().run_in_executor(
                     predictExecutor, lambda: self.model.predict({input_name: input})
@@ -136,10 +151,8 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
             else:
                 out_dict = self.model.predict({input_name: input})
 
-            if self.yolov8:
-                out_blob = out_dict["var_914"]
-                var_914 = out_dict["var_914"]
-                results = var_914[0]
+            if self.yolov8 or self.yolov9:
+                results = list(out_dict.values())[0][0]
                 objs = yolo.parse_yolov8(results)
                 ret = self.create_detection_result(objs, src_size, cvss)
                 return ret
