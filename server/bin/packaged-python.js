@@ -14,7 +14,7 @@ async function pipInstall(python, pkg) {
 }
 
 module.exports.installScryptedServerRequirements = async function installScryptedServerRequirements(version, dest) {
-    const py = new PortablePython(version || require('./packaged-python'), dest);
+    const py = new PortablePython(version || require('./packaged-python').version, dest);
     await py.install();
     let python = py.executablePath;
 
