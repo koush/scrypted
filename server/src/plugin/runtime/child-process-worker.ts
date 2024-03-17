@@ -4,7 +4,7 @@ import child_process from 'child_process';
 import { RpcMessage, RpcPeer } from "../../rpc";
 
 export abstract class ChildProcessWorker extends EventEmitter implements RuntimeWorker {
-    worker: child_process.ChildProcess;
+    protected worker: child_process.ChildProcess;
 
     constructor(public pluginId: string, options: RuntimeWorkerOptions) {
         super();
@@ -28,10 +28,6 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
 
     get stderr() {
         return this.worker.stderr;
-    }
-
-    get killed() {
-        return this.worker.killed;
     }
 
     kill(): void {

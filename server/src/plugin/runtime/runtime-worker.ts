@@ -16,7 +16,6 @@ export interface RuntimeWorker {
     pid: number;
     stdout: Readable;
     stderr: Readable;
-    killed: boolean;
 
     kill(): void;
 

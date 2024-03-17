@@ -1,24 +1,2 @@
 #!/usr/bin/env node
-
-const child_process = require('child_process');
-const { PortablePython } = require('py')
-const { once } = require('events');
-let python;
-
-async function pipInstall(pkg) {
-    const cp = child_process.spawn(python, ['-m', 'pip', 'install', pkg], { stdio: 'inherit' });
-    const [exitCode] = await once(cp, 'exit');
-    if (exitCode)
-        throw new Error('non-zero exit code: ' + exitCode);
-}
-
-async function installScryptedServerRequirements() {
-    const py = new PortablePython("3.9");
-    await py.install();
-    python = py.executablePath;
-
-    await pipInstall('debugpy');
-    await pipInstall('psutil').catch(() => {});
-}
-
-installScryptedServerRequirements();
+require('./packaged-python').installScryptedServerRequirements();

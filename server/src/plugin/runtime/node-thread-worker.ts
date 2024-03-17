@@ -41,10 +41,6 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
         return this.worker.stderr;
     }
 
-    get killed() {
-        return this.terminated;
-    }
-
     kill(): void {
         if (!this.worker)
             return;
