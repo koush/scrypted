@@ -484,7 +484,7 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
         // round the temperature to 1 digit to prevent state noise.
         this.temperature = Math.round(10 * device.traits['sdm.devices.traits.Temperature'].ambientTemperatureCelsius) / 10;
         this.humidity = Math.round(10 * device.traits["sdm.devices.traits.Humidity"].ambientHumidityPercent) / 10;
-        this.temperatureUnit = device.traits['sdm.devices.traits.Settings'] === 'FAHRENHEIT' ? TemperatureUnit.F : TemperatureUnit.C;
+        this.temperatureUnit = device.traits['sdm.devices.traits.Settings']?.temperatureScale === 'FAHRENHEIT' ? TemperatureUnit.F : TemperatureUnit.C;
         const heat = device.traits?.['sdm.devices.traits.ThermostatTemperatureSetpoint']?.heatCelsius;
         const cool = device.traits?.['sdm.devices.traits.ThermostatTemperatureSetpoint']?.coolCelsius;
 

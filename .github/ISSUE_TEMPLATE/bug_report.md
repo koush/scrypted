@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-# Github Issues are not a Support Forum or Disussion Board
+# Github Issues are not a Support or Discussion Forum
 
 Before opening an issue, view the device's Console logs in the Scrypted Management web interface.
 

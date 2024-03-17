@@ -136,7 +136,7 @@ export async function loadVipsImage(data: Buffer | string, sourceId: string) {
     loadSharp();
 
     const image = sharpInstance(data, {
-        failOnError: false,
+        failOn: 'none'
     });
     const metadata = await image.metadata();
     const vipsImage = new VipsImage(image, metadata, sourceId);
