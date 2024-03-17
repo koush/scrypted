@@ -55,9 +55,13 @@ export function waitIceConnected(pc: RTCPeerConnection) {
 }
 
 export function waitClosed(pc: RTCPeerConnection) {
-    return statePromise(pc.connectionStateChange, () => {
-        return isPeerConnectionClosed(pc) || isPeerIceConnectionClosed(pc);
-    })
+    const connectPromise = statePromise(pc.connectionStateChange, () => {
+        return isPeerConnectionClosed(pc);
+    });
+    const iceConnectPromise = statePromise(pc.iceConnectionStateChange, () => {
+        return isPeerIceConnectionClosed(pc);
+    });
+    return Promise.any([connectPromise, iceConnectPromise]);
 }
 
 export function logConnectionState(console: Console, pc: RTCPeerConnection) {

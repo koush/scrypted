@@ -678,23 +678,10 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
         this.toMimeType = ScryptedMimeTypes.RTCConnectionManagement;
     }
 
-    async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+    async convertInternal(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
         const session = data as RTCSignalingSession;
         const maximumCompatibilityMode = !!this.plugin.storageSettings.values.maximumCompatibilityMode;
         const clientOptions = await legacyGetSignalingSessionOptions(session);
-
-        const result = zygote();
-
-        const cleanup = new Deferred<string>();
-
-        this.plugin.activeConnections++;
-        result.worker.on('exit', () => {
-            this.plugin.activeConnections--;
-            cleanup.resolve('worker exited');
-        });
-        cleanup.promise.finally(() => {
-            result.worker.terminate()
-        });
 
         const { createConnection } = await result.result;
         const connection = await createConnection({}, undefined, session,
@@ -711,9 +698,28 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
         await connection.negotiateRTCSignalingSession();
         await connection.waitConnected();
 
-        // await connection.negotiateRTCSignalingSession();
-
         return connection;
+    }
+
+    async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+        const result = zygote();
+        this.plugin.activeConnections++;
+        const cleanup = new Deferred<string>();
+        result.worker.on('exit', () => {
+            this.plugin.activeConnections--;
+            cleanup.resolve('worker exited');
+        });
+        cleanup.promise.finally(() => {
+            result.worker.terminate()
+        });
+
+        try {
+            return await timeoutPromise(2 * 60 * 1000, this.convertInternal(result, cleanup, data, fromMimeType, toMimeType, options));
+        }
+        catch (e) {
+            cleanup.resolve(e.toString());
+            throw e;
+        }
     }
 }
 
