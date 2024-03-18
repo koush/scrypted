@@ -7,6 +7,7 @@ import { PassThrough, Readable, Writable } from 'stream';
 import { installScryptedServerRequirements, version as packagedPythonVersion } from '../../../bin/packaged-python';
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { createRpcDuplexSerializer } from '../../rpc-serializer';
+import { getPluginVolume } from '../plugin-volume';
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
 
@@ -22,8 +23,6 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         catch (e) {
         }
     }
-
-    static pythonInstalls = new Map<string, Promise<string>>();
 
     serializer: ReturnType<typeof createRpcDuplexSerializer>;
     peerin: Writable;
@@ -128,30 +127,32 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
                 (this.worker.stdio[4] as Readable).pipe(peerout);
             };
 
-            const py = new PortablePython(pluginPythonVersion);
+            const pyVersion = require('py/package.json').version;
+            const pyPath = path.join(getPluginVolume(pluginId), 'py');
+            const portableInstallPath = path.join(pyPath, pyVersion);
+
+            const py = new PortablePython(pluginPythonVersion, portableInstallPath);
             if (fs.existsSync(py.executablePath)) {
                 pythonPath = py.executablePath;
                 finishSetup();
             }
             else {
-                this.pythonInstallationComplete = false;
-                let install = PythonRuntimeWorker.pythonInstalls.get(pluginPythonVersion);
-                if (!install) {
-                    install = installScryptedServerRequirements(pluginPythonVersion);
-                    install.catch(() => { });
-                    PythonRuntimeWorker.pythonInstalls.set(pluginPythonVersion, install);
-                }
-
-                install.then(executablePath => {
-                    pythonPath = executablePath;
-                    finishSetup();
-                })
-                    .catch(() => {
+                (async () => {
+                    try {
+                        this.pythonInstallationComplete = false;
+                        await fs.promises.rm(pyPath, { recursive: true, force: true }).catch(() => { });
+                        pythonPath = await installScryptedServerRequirements(pluginPythonVersion, portableInstallPath);
+                        finishSetup();
+                    }
+                    catch (e) {
                         process.nextTick(() => {
                             this.emit('error', new Error('Failed to install portable python.'));
-                        })
-                    })
-                    .finally(() => this.pythonInstallationComplete = true);
+                        });
+                    }
+                    finally {
+                        this.pythonInstallationComplete = true
+                    }
+                })();
             }
         }
         else {
