@@ -174,20 +174,7 @@ export class ReolinkCameraClient {
         return response.body?.[0]?.value?.DevInfo;
     }
 
-    async ptz(command: PanTiltZoomCommand) {
-        let op = '';
-        if (command.pan < 0)
-            op += 'Left';
-        else if (command.pan > 0)
-            op += 'Right'
-        if (command.tilt < 0)
-            op += 'Down';
-        else if (command.tilt > 0)
-            op += 'Up';
-
-        if (!op)
-            return;
-
+    async ptzOp(op: string) {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'PtzCtrl');
@@ -234,5 +221,30 @@ export class ReolinkCameraClient {
 
         this.console.log(await c1);
         this.console.log(await c2);
+    }
+
+    async ptz(command: PanTiltZoomCommand) {
+        let op = '';
+        if (command.pan < 0)
+            op += 'Left';
+        else if (command.pan > 0)
+            op += 'Right'
+        if (command.tilt < 0)
+            op += 'Down';
+        else if (command.tilt > 0)
+            op += 'Up';
+
+        if (op) {
+            await this.ptzOp(op);
+        }
+
+        if (command.zoom < 0)
+            op = 'ZoomInc';
+        else if (command.zoom > 0)
+            op = 'ZoomDec';
+
+        if (op) {
+            await this.ptzOp(op);
+        }
     }
 }

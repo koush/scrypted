@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/reolink",
-   "version": "0.0.61",
+   "version": "0.0.62",
    "description": "Reolink Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
