@@ -54,7 +54,7 @@ export function isLocalIceTransport(pc: RTCPeerConnection) {
     let isLocalNetwork = true;
     let destinationId: string;
     for (const ice of pc.iceTransports) {
-        const { remoteAddr, localCandidate } = (ice.connection as any).nominated[1];
+        const { remoteAddr, localCandidate } = (ice.connection as any).nominated;
         const [address, port] = remoteAddr;
         if (!destinationId)
             destinationId = address;

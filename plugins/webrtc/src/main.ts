@@ -649,7 +649,7 @@ export async function fork() {
                 cleanup.promise.finally(() => socket.destroy());
 
                 const dc = pc.createDataChannel('rpc');
-                dc.message.subscribe(message => socket.write(message));
+                dc.onMessage.subscribe(message => socket.write(message));
 
                 const debouncer = new DataChannelDebouncer({
                     send: u8 => dc.send(Buffer.from(u8)),
