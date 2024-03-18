@@ -239,9 +239,9 @@ export class ReolinkCameraClient {
         }
 
         if (command.zoom < 0)
-            op = 'ZoomInc';
-        else if (command.zoom > 0)
             op = 'ZoomDec';
+        else if (command.zoom > 0)
+            op = 'ZoomInc';
 
         if (op) {
             await this.ptzOp(op);
