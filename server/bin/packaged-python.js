@@ -3,7 +3,7 @@ const { PortablePython } = require('py')
 const { once } = require('events');
 
 module.exports = {
-    version: '3.10',
+    version: '3.11',
 }
 
 async function pipInstall(python, pkg) {

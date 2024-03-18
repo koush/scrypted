@@ -23,6 +23,8 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         }
     }
 
+    static pythonInstalls = new Map<string, Promise<string>>();
+
     serializer: ReturnType<typeof createRpcDuplexSerializer>;
     peerin: Writable;
     peerout: Readable;
@@ -126,18 +128,24 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
                 (this.worker.stdio[4] as Readable).pipe(peerout);
             };
 
-            const py = new PortablePython(pluginPythonVersion, path.dirname(options.unzippedPath));
+            const py = new PortablePython(pluginPythonVersion);
             if (fs.existsSync(py.executablePath)) {
                 pythonPath = py.executablePath;
                 finishSetup();
             }
             else {
                 this.pythonInstallationComplete = false;
-                installScryptedServerRequirements(pluginPythonVersion, path.dirname(options.unzippedPath))
-                    .then(executablePath => {
-                        pythonPath = executablePath;
-                        finishSetup();
-                    })
+                let install = PythonRuntimeWorker.pythonInstalls.get(pluginPythonVersion);
+                if (!install) {
+                    install = installScryptedServerRequirements(pluginPythonVersion);
+                    install.catch(() => { });
+                    PythonRuntimeWorker.pythonInstalls.set(pluginPythonVersion, install);
+                }
+
+                install.then(executablePath => {
+                    pythonPath = executablePath;
+                    finishSetup();
+                })
                     .catch(() => {
                         process.nextTick(() => {
                             this.emit('error', new Error('Failed to install portable python.'));
