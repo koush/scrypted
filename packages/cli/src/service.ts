@@ -117,6 +117,7 @@ export async function serveMain(installVersion?: string) {
         await installServe(installVersion, true);
     }
 
+    // todo: remove at some point after core lxc updater rolls out.
     if (process.env.SCRYPTED_INSTALL_ENVIRONMENT === 'lxc')
         process.env.SCRYPTED_FFMPEG_PATH = '/usr/bin/ffmpeg';
 
@@ -134,7 +135,7 @@ export async function serveMain(installVersion?: string) {
 
         if (fs.existsSync(EXIT_FILE)) {
             console.log('Exiting.');
-            process.exit();
+            process.exit(1);
         }
         else if (fs.existsSync(UPDATE_FILE)) {
             console.log('Update requested. Installing.');
@@ -142,7 +143,7 @@ export async function serveMain(installVersion?: string) {
                 console.error('Update failed', e);
             });
             console.log('Exiting.');
-            process.exit();
+            process.exit(1);
         }
         else {
             console.log(`Service unexpectedly exited. Restarting momentarily.`);
