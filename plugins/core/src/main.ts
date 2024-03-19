@@ -11,6 +11,7 @@ import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
+import { checkLxcDependencies } from './platform/lxc';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
 
@@ -64,6 +65,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
 
     constructor() {
         super();
+
+        checkLxcDependencies();
 
         this.indexHtml = readFileAsString('dist/index.html');
 
