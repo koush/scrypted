@@ -138,10 +138,14 @@ export async function serveMain(installVersion?: string) {
         }
         else if (fs.existsSync(UPDATE_FILE)) {
             console.log('Update requested. Installing.');
-            await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
+            await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest').catch(e => {
+                console.error('Update failed', e);
+            });
+            console.log('Exiting.');
+            process.exit();
         }
         else {
-            console.log(`Service exited. Restarting momentarily.`);
+            console.log(`Service unexpectedly exited. Restarting momentarily.`);
             await sleep(10000);
         }
     }
