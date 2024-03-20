@@ -850,6 +850,12 @@ class VideoFrameGeneratorOptions(TypedDict):
     queue: float
     resize: Any
 
+class MediaConverterTypes(TypedDict):
+    """[fromMimeType, toMimeType]"""
+
+    pass
+
+
 class TamperState(TypedDict):
 
     pass
@@ -1088,7 +1094,7 @@ class LuminanceSensor:
 
 class MediaConverter:
 
-    converters: list[tuple[str, str]]
+    converters: list[MediaConverterTypes]
     async def convertMedia(self, data: Any, fromMimeType: str, toMimeType: str, options: MediaObjectOptions = None) -> Any:
         pass
 
@@ -2228,11 +2234,11 @@ class DeviceState:
         self.setScryptedProperty("toMimeType", value)
 
     @property
-    def converters(self) -> list[tuple[str, str]]:
+    def converters(self) -> list[MediaConverterTypes]:
         return self.getScryptedProperty("converters")
 
     @converters.setter
-    def converters(self, value: list[tuple[str, str]]):
+    def converters(self, value: list[MediaConverterTypes]):
         self.setScryptedProperty("converters", value)
 
     @property

@@ -1186,7 +1186,6 @@ export interface Scriptable {
 /**
  * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type.
  * May optionally accept string urls if accept-url is a fromMimeType parameter.
- * 
  * @deprecated
  */
 export interface BufferConverter {
@@ -1195,10 +1194,14 @@ export interface BufferConverter {
   fromMimeType?: string;
   toMimeType?: string;
 }
+/**
+ * [fromMimeType, toMimeType]
+ */
+export type MediaConverterTypes = [string, string];
 export interface MediaConverter {
   convertMedia(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<MediaObject | Buffer | any>;
 
-  converters?: [string, string][];
+  converters?: MediaConverterTypes[];
 }
 /**
  * Settings viewing and editing of device configurations that describe or modify behavior.
@@ -1454,7 +1457,7 @@ export interface ObjectDetectionZone {
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
-  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame, void>|MediaObject, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
+  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame, void> | MediaObject, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }

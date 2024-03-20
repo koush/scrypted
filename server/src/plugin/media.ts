@@ -204,7 +204,7 @@ export abstract class MediaManagerBase implements MediaManager {
     }
 
     getConverters(): IdBufferConverter[] {
-        const converters = Object.entries(this.getSystemState())
+        const bufferConverters = Object.entries(this.getSystemState())
             .filter(([id, state]) => state[ScryptedInterfaceProperty.interfaces]?.value?.includes(ScryptedInterface.BufferConverter))
             .map(([id]) => {
                 const device = this.getDeviceById<BufferConverter>(id);
@@ -222,7 +222,7 @@ export abstract class MediaManagerBase implements MediaManager {
         const mediaConverters = Object.entries(this.getSystemState())
             .filter(([id, state]) => state[ScryptedInterfaceProperty.interfaces]?.value?.includes(ScryptedInterface.MediaConverter))
             .map(([id]) => {
-                const device = this.getDeviceById<MediaConverter>(id);
+                const device = this.getDeviceById<MediaConverter & BufferConverter>(id);
 
                 return (device.converters || []).map(([fromMimeType, toMimeType]) => {
                     return {
@@ -231,13 +231,16 @@ export abstract class MediaManagerBase implements MediaManager {
                         fromMimeType,
                         toMimeType,
                         convert(data, fromMimeType, toMimeType, options?) {
-                            return device.convertMedia(data, fromMimeType, toMimeType, options);
+                            // MediaConverter is injected the plugin's node runtime which may be compiled against an
+                            // older sdk that does not have MediaConverter. use the older convert method instead.
+                            // once BufferConverter is removed, this can be simplified to device.convertMedia.
+                            return (device.convertMedia || device.convert)(data, fromMimeType, toMimeType, options);
                         },
                     } as IdBufferConverter;
                 });
             });
 
-        converters.push(...mediaConverters.flat());
+        const converters = [...mediaConverters.flat(), ...bufferConverters];
 
         // builtins should be after system converters. these should not be overriden by system,
         // as it could cause system instability with misconfiguration.
