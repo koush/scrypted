@@ -245,7 +245,11 @@ export interface Notifier {
 export interface MediaObject {
   mimeType: string;
   sourceId?: string;
+
+  toMimeTypes?: string[];
+  convert?<T>(toMimeType: string): Promise<T>;
 }
+
 /**
  * StartStop represents a device that can be started, stopped, and possibly paused and resumed. Typically vacuum cleaners or washers.
  */
@@ -1590,6 +1594,12 @@ export interface MediaObjectOptions {
    * The device id of the source of the MediaObject.
    */
   sourceId?: string;
+}
+
+export interface MediaObjectCreateOptions extends MediaObjectOptions {
+  toMimeTypes?: string[];
+  convert?<T>(toMimeType: string): Promise<T>;
+
   [key: string]: TopLevelSerializableType;
 }
 
@@ -1630,19 +1640,19 @@ export interface MediaManager {
   /**
    * Create a MediaObject from FFmpeg input arguments.
    */
-  createFFmpegMediaObject(ffmpegInput: FFmpegInput, options?: MediaObjectOptions): Promise<MediaObject>;
+  createFFmpegMediaObject<T extends MediaObjectCreateOptions>(ffmpegInput: FFmpegInput, options?: T): Promise<MediaObject & T>;
 
   /**
    * Create a MediaObject from an URL. The mime type will be determined dynamically while resolving the url.
    */
-  createMediaObjectFromUrl<T extends MediaObjectOptions>(data: string, options?: T): Promise<MediaObject>;
+  createMediaObjectFromUrl<T extends MediaObjectCreateOptions>(data: string, options?: T): Promise<MediaObject & T>;
 
   /**
    * Create a MediaObject.
    * If the data is a buffer, JSON object, or primitive type, it will be serialized.
    * All other objects will be objects will become RPC objects.
    */
-  createMediaObject<T extends MediaObjectOptions>(data: any | Buffer, mimeType: string, options?: T): Promise<MediaObject & T>;
+  createMediaObject<T extends MediaObjectCreateOptions>(data: any | Buffer, mimeType: string, options?: T): Promise<MediaObject & T>;
 
   /**
    * Get the path to ffmpeg on the host system.
@@ -1755,9 +1765,12 @@ export interface EndpointManager {
   getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
-   * Get an URL pathname for a device that can be accessed without authentication. This is a relative path that can be used in browser sessions.
+   * Get an URL pathname for a device. This is a relative path that can be used in browser sessions.
    */
   getPath(nativeId?: ScryptedNativeId, options?: {
+    /**
+     * A public endpoint that does not require authentication with the local Scrypted server.
+     */
     public?: boolean,
   }): Promise<string>;
 

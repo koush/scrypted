@@ -1661,13 +1661,13 @@ class MediaManager:
     async def convertMediaObjectToUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
 
-    async def createFFmpegMediaObject(self, ffmpegInput: FFmpegInput, options: MediaObjectOptions = None) -> MediaObject:
+    async def createFFmpegMediaObject(self, ffmpegInput: FFmpegInput, options: Any = None) -> Union[MediaObject, Any]:
         pass
 
     async def createMediaObject(self, data: Any, mimeType: str, options: Any = None) -> Union[MediaObject, Any]:
         pass
 
-    async def createMediaObjectFromUrl(self, data: str, options: Any = None) -> MediaObject:
+    async def createMediaObjectFromUrl(self, data: str, options: Any = None) -> Union[MediaObject, Any]:
         pass
 
     async def getFFmpegPath(self) -> str:
