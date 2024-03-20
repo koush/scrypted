@@ -323,6 +323,7 @@ class PictureDimensions(TypedDict):
 
 class PrivacyMask(TypedDict):
 
+    name: str
     points: list[Point]
 
 class RequestMediaStreamAdaptiveOptions(TypedDict):

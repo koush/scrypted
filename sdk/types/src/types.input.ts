@@ -821,6 +821,7 @@ export interface Intercom {
 }
 
 export interface PrivacyMask {
+  name?: string;
   points: Point[];
 }
 

@@ -1,13 +1,13 @@
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { fitHeightToWidth } from "@scrypted/common/src/resolution-utils";
-import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, NotifierOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, Online, PanTiltZoom, PanTiltZoomCommand, PictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, NotifierOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, Online, PanTiltZoom, PanTiltZoomCommand, PictureOptions, PrivacyMasks, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration, VideoCameraMask } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { once } from "events";
 import { PassThrough, Readable } from "stream";
 import WS from 'ws';
 import { UnifiProtect } from "./main";
 import { MOTION_SENSOR_TIMEOUT, UnifiMotionDevice, debounceMotionDetected } from './motion';
-import { FeatureFlagsShim } from "./shim";
+import { FeatureFlagsShim, PrivacyZone } from "./shim";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 import { readLength } from '@scrypted/common/src/read-stream';
 
@@ -41,7 +41,7 @@ export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, Vi
     }
 }
 
-export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector, DeviceProvider, OnOff, PanTiltZoom, Online, UnifiMotionDevice {
+export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector, DeviceProvider, OnOff, PanTiltZoom, Online, UnifiMotionDevice, VideoCameraMask {
     motionTimeout: NodeJS.Timeout;
     detectionTimeout: NodeJS.Timeout;
     ringTimeout: NodeJS.Timeout;
@@ -61,6 +61,40 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
         this.updateState(protectCamera);
         this.console.log(protectCamera);
+    }
+
+    async getPrivacyMasks(): Promise<PrivacyMasks> {
+        const camera = this.findCamera();
+        const privacyZones = (camera as any).privacyZones as PrivacyZone[] || [];
+
+        const masks: PrivacyMasks = {
+            masks: privacyZones.map(zone => {
+                return {
+                    id: zone.id.toString(),
+                    name: zone.name,
+                    points: zone.points,
+                }
+            }),
+        };
+
+        return masks;
+    }
+
+    async setPrivacyMasks(masks: PrivacyMasks): Promise<void> {
+        const privacyZones: PrivacyZone[] = masks.masks.map((mask, index) => {
+            return {
+                id: index,
+                name: mask.name || `Privacy Zone ${index}`,
+                points: mask.points,
+                color: 'red',
+            }
+        });
+
+        const camera = this.findCamera() as any;
+
+        await this.protect.api.updateCamera(camera, {
+            privacyZones,
+        } as any);
     }
 
     async ptzCommand(command: PanTiltZoomCommand): Promise<void> {

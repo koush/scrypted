@@ -345,6 +345,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         ScryptedInterface.Settings,
                         ScryptedInterface.Camera,
                         ScryptedInterface.VideoCamera,
+                        ScryptedInterface.VideoCameraMask,
                         ScryptedInterface.VideoCameraConfiguration,
                         ScryptedInterface.MotionSensor,
                     ],
