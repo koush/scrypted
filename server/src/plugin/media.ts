@@ -1,14 +1,14 @@
-import { BufferConverter, DeviceManager, FFmpegInput, MediaConverter, MediaManager, MediaObject as MediaObjectInterface, MediaObjectOptions, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import { getFfmpegPath } from '@scrypted/ffmpeg-static';
+import { BufferConverter, DeviceManager, FFmpegInput, MediaConverter, MediaManager, MediaObjectCreateOptions, MediaObject as MediaObjectInterface, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import fs from 'fs';
 import https from 'https';
 import Graph from 'node-dijkstra';
 import os from 'os';
 import path from 'path';
+import send from 'send';
 import MimeType from 'whatwg-mimetype';
 import { MediaObject } from "./mediaobject";
 import { MediaObjectRemote } from "./plugin-api";
-import send from 'send';
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything
@@ -224,9 +224,9 @@ export abstract class MediaManagerBase implements MediaManager {
             .map(([id]) => {
                 const device = this.getDeviceById<MediaConverter & BufferConverter>(id);
 
-                return (device.converters || []).map(([fromMimeType, toMimeType]) => {
+                return (device.converters || []).map(([fromMimeType, toMimeType], index) => {
                     return {
-                        id,
+                        id: `${id}-${index}`,
                         name: device.name,
                         fromMimeType,
                         toMimeType,
@@ -289,9 +289,7 @@ export abstract class MediaManagerBase implements MediaManager {
         return url.data.toString();
     }
 
-    createMediaObjectRemote<T extends MediaObjectOptions>(data: any | Buffer | Promise<string | Buffer>, mimeType: string, options?: T): MediaObjectRemote & T {
-        if (typeof data === 'string')
-            throw new Error('string is not a valid type. if you intended to send a url, use createMediaObjectFromUrl.');
+    createMediaObjectRemote<T extends MediaObjectCreateOptions>(data: any | Buffer | Promise<string | Buffer>, mimeType: string, options?: T): MediaObjectRemote & T {
         if (!mimeType)
             throw new Error('no mimeType provided');
         if (mimeType === ScryptedMimeTypes.MediaObject)
@@ -301,40 +299,25 @@ export abstract class MediaManagerBase implements MediaManager {
             data = Buffer.from(JSON.stringify(data));
 
         const sourceId = typeof options?.sourceId === 'string' ? options?.sourceId : this.getPluginDeviceId();
-        if (sourceId) {
-            options ||= {} as T;
-            options.sourceId = sourceId;
-        }
+        options ||= {} as T;
+        options.sourceId = sourceId;
 
         return new MediaObject(mimeType, data, options) as MediaObject & T;
     }
 
-    async createFFmpegMediaObject(ffMpegInput: FFmpegInput, options?: MediaObjectOptions): Promise<MediaObjectInterface> {
+    async createFFmpegMediaObject<T extends MediaObjectCreateOptions>(ffMpegInput: FFmpegInput, options?: T): Promise<MediaObjectInterface & T> {
         return this.createMediaObjectRemote(Buffer.from(JSON.stringify(ffMpegInput)), ScryptedMimeTypes.FFmpegInput, options);
     }
 
-    async createMediaObjectFromUrl(data: string, options?: MediaObjectOptions): Promise<MediaObjectInterface> {
+    async createMediaObjectFromUrl<T extends MediaObjectCreateOptions>(data: string, options?: T): Promise<MediaObjectInterface & T> {
         const url = new URL(data);
         const scheme = url.protocol.slice(0, -1);
         const mimeType = ScryptedMimeTypes.SchemePrefix + scheme;
 
-        const sourceId = typeof options?.sourceId === 'string' ? options?.sourceId : this.getPluginDeviceId();
-        class MediaObjectImpl implements MediaObjectRemote {
-            __proxy_props = {
-                mimeType,
-                sourceId,
-            }
-
-            mimeType = mimeType;
-            sourceId = sourceId;
-            async getData(): Promise<Buffer | string> {
-                return Promise.resolve(data);
-            }
-        }
-        return new MediaObjectImpl();
+        return this.createMediaObjectRemote(data, mimeType, options);
     }
 
-    async createMediaObject<T extends MediaObjectOptions>(data: any, mimeType: string, options?: T): Promise<MediaObjectInterface & T> {
+    async createMediaObject<T extends MediaObjectCreateOptions>(data: any, mimeType: string, options?: T): Promise<MediaObjectInterface & T> {
         return this.createMediaObjectRemote(data, mimeType, options);
     }
 
@@ -364,6 +347,49 @@ export abstract class MediaManagerBase implements MediaManager {
         const mediaNode: any = {};
         nodes['mediaObject'] = mediaNode;
         nodes['output'] = {};
+
+        const minimumWeight = .000001;
+
+        for (const toMimeType of mediaObject.toMimeTypes instanceof Array ? mediaObject.toMimeTypes : []) {
+            console.log('biultin toMimeType', toMimeType);
+            const id = `media-${toMimeType}`;
+            converterMap.set(id, {
+                id,
+                name: `MediaObject to ${toMimeType}`,
+                fromMimeType: mediaObject.mimeType,
+                toMimeType,
+                convert: async (data, fromMimeType, toMimeType) => {
+                    return mediaObject.convert(toMimeType);
+                }
+            });
+
+            // connect the media object to the intrinsic target mime type
+            mediaNode[id] = minimumWeight;
+
+            const node: { [edge: string]: number } = nodes[id] = {};
+            const convertedMime = new MimeType(toMimeType);
+
+            // target output matches
+            if (mimeMatches(outputMime, convertedMime) || toMimeType === ScryptedMimeTypes.MediaObject) {
+                node['output'] = minimumWeight;
+            }
+
+            // connect the intrinsic converter to other converters
+            for (const candidate of converters) {
+                try {
+                    const candidateMime = new MimeType(candidate.fromMimeType);
+                    if (!mimeMatches(convertedMime, candidateMime))
+                        continue;
+                    const outputWeight = parseFloat(candidateMime.parameters.get('converter-weight')) || (candidateMime.essence === '*/*' ? 1000 : 1);
+                    const candidateId = candidate.id;
+                    node[candidateId] = outputWeight;
+                }
+                catch (e) {
+                    // console.warn(candidate.name, 'skipping converter due to error', e)
+                }
+            }
+        }
+
         for (const converter of converters) {
             try {
                 const inputMime = new MimeType(converter.fromMimeType);
