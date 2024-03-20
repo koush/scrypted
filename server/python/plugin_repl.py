@@ -116,12 +116,19 @@ async def eval_async_patched(self: PythonRepl, line: str) -> object:
     """
     scrypted_loop: asyncio.AbstractEventLoop = self.scrypted_loop
 
+    def task_done_cb(future: concurrent.futures.Future, task: asyncio.Task):
+        try:
+            result = task.result()
+            future.set_result(result)
+        except BaseException as e:
+            future.set_exception(e)
+
     def eval_in_scrypted(future: concurrent.futures.Future, code, *args, **kwargs):
         try:
             result = eval(code, *args, **kwargs)
             if _has_coroutine_flag(code):
                 task = scrypted_loop.create_task(result)
-                task.add_done_callback(lambda task: future.set_result(task.result()))
+                task.add_done_callback(partial(task_done_cb, future))
             else:
                 future.set_result(result)
         except BaseException as e:
@@ -256,10 +263,7 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
         conn.settimeout(None)
         filter = conn.recv(1024).decode()
         server_started_future = concurrent.futures.Future()
-
-        if sys.platform == "win32":
-            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        repl_loop = asyncio.new_event_loop()
+        repl_loop = asyncio.SelectorEventLoop()
 
         # we're not in the main loop, so can't handle any signals anyways
         repl_loop.add_signal_handler = lambda sig, cb: None
