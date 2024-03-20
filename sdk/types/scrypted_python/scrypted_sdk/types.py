@@ -138,6 +138,7 @@ class ScryptedInterface(str, Enum):
     LauncherApplication = "LauncherApplication"
     Lock = "Lock"
     LuminanceSensor = "LuminanceSensor"
+    MediaConverter = "MediaConverter"
     MediaPlayer = "MediaPlayer"
     Microphone = "Microphone"
     MixinProvider = "MixinProvider"
@@ -618,6 +619,7 @@ class ObjectDetectionGeneratorSession(TypedDict):
 class ObjectDetectionModel(TypedDict):
 
     classes: list[str]  # Classes of objects that can be recognized. This can include motion or the names of specific people.
+    decoder: bool
     inputFormat: Any | Any | Any
     inputSize: list[float]
     name: str
@@ -1084,6 +1086,13 @@ class LuminanceSensor:
 
     luminance: float
 
+class MediaConverter:
+
+    converters: list[tuple[str, str]]
+    async def convertMedia(self, data: Any, fromMimeType: str, toMimeType: str, options: MediaObjectOptions = None) -> Any:
+        pass
+
+
 class MediaPlayer:
     """MediaPlayer allows media playback on screen or speaker devices, such as Chromecasts or TVs."""
 
@@ -1154,7 +1163,7 @@ class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         pass
 
-    async def generateObjectDetections(self, videoFrames: VideoFrame, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
+    async def generateObjectDetections(self, videoFrames: MediaObject | VideoFrame, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
         pass
 
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
@@ -1628,12 +1637,6 @@ class SystemManager:
 
 class MediaManager:
 
-    async def addConverter(self, converter: BufferConverter) -> None:
-        pass
-
-    async def clearConverters(self) -> None:
-        pass
-
     async def convertMediaObject(self, mediaObject: MediaObject, toMimeType: str) -> Any:
         pass
 
@@ -1751,6 +1754,7 @@ class ScryptedInterfaceProperty(str, Enum):
     online = "online"
     fromMimeType = "fromMimeType"
     toMimeType = "toMimeType"
+    converters = "converters"
     binaryState = "binaryState"
     tampered = "tampered"
     powerDetected = "powerDetected"
@@ -1853,6 +1857,7 @@ class ScryptedInterfaceMethods(str, Enum):
     skipNext = "skipNext"
     skipPrevious = "skipPrevious"
     convert = "convert"
+    convertMedia = "convertMedia"
     getSettings = "getSettings"
     putSetting = "putSetting"
     armSecuritySystem = "armSecuritySystem"
@@ -2221,6 +2226,14 @@ class DeviceState:
     @toMimeType.setter
     def toMimeType(self, value: str):
         self.setScryptedProperty("toMimeType", value)
+
+    @property
+    def converters(self) -> list[tuple[str, str]]:
+        return self.getScryptedProperty("converters")
+
+    @converters.setter
+    def converters(self, value: list[tuple[str, str]]):
+        self.setScryptedProperty("converters", value)
 
     @property
     def binaryState(self) -> bool:
@@ -2798,6 +2811,15 @@ ScryptedInterfaceDescriptors = {
     "properties": [
       "fromMimeType",
       "toMimeType"
+    ]
+  },
+  "MediaConverter": {
+    "name": "MediaConverter",
+    "methods": [
+      "convertMedia"
+    ],
+    "properties": [
+      "converters"
     ]
   },
   "Settings": {

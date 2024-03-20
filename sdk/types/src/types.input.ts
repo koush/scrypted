@@ -1186,12 +1186,19 @@ export interface Scriptable {
 /**
  * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type.
  * May optionally accept string urls if accept-url is a fromMimeType parameter.
+ * 
+ * @deprecated
  */
 export interface BufferConverter {
   convert(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<MediaObject | Buffer | any>;
 
   fromMimeType?: string;
   toMimeType?: string;
+}
+export interface MediaConverter {
+  convertMedia(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<MediaObject | Buffer | any>;
+
+  converters?: [string, string][];
 }
 /**
  * Settings viewing and editing of device configurations that describe or modify behavior.
@@ -1429,6 +1436,7 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
   settings: Setting[];
   triggerClasses?: string[];
   prebuffer?: number;
+  decoder?: boolean;
 }
 export interface ObjectDetectionGeneratorResult {
   __json_copy_serialize_children: true;
@@ -1446,7 +1454,7 @@ export interface ObjectDetectionZone {
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
-  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame, void>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
+  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame, void>|MediaObject, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
@@ -1586,12 +1594,6 @@ export interface MediaObjectOptions {
  * @category Media Reference
  */
 export interface MediaManager {
-  /**
-   * Add an convertor to consider for use when converting MediaObjects.
-   */
-  addConverter(converter: BufferConverter): Promise<void>;
-  clearConverters(): Promise<void>;
-
   /**
    * Convert a media object to a Buffer, primtive type, or RPC Object.
    */
@@ -2058,6 +2060,7 @@ export enum ScryptedInterface {
   MediaPlayer = "MediaPlayer",
   Online = "Online",
   BufferConverter = "BufferConverter",
+  MediaConverter = "MediaConverter",
   Settings = "Settings",
   BinarySensor = "BinarySensor",
   TamperSensor = "TamperSensor",
