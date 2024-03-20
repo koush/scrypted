@@ -321,23 +321,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
-  getCurrentFrameGenerator() {
-    let frameGenerator: string = this.frameGenerator;
-    return frameGenerator;
-  }
-
-  async createFrameGenerator(signal: Deferred<void>,
-    frameGenerator: string,
+  async createFrameGenerator(frameGenerator: string,
     options: {
       suppress?: boolean,
-    }, updatePipelineStatus: (status: string) => void): Promise<AsyncGenerator<VideoFrame, any, unknown>> {
+    }, updatePipelineStatus: (status: string) => void): Promise<AsyncGenerator<VideoFrame, any, unknown> | MediaObject> {
 
     const destination: MediaStreamDestination = this.hasMotionType ? 'low-resolution' : 'local-recorder';
-    const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(frameGenerator);
-    if (!videoFrameGenerator)
-      throw new Error('invalid VideoFrameGenerator');
-    if (!options?.suppress)
-      this.console.log(videoFrameGenerator.name, '+', this.objectDetection.name);
     updatePipelineStatus('getVideoStream');
     const stream = await this.cameraDevice.getVideoStream({
       prebuffer: this.model.prebuffer,
@@ -345,6 +334,18 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       // ask rebroadcast to mute audio, not needed.
       audio: null,
     });
+
+    if (this.model.decoder) {
+      if (!options?.suppress)
+      this.console.log(this.objectDetection.name, '(with builtin decoder)');
+      return stream;
+    }
+
+    const videoFrameGenerator = systemManager.getDeviceById<VideoFrameGenerator>(frameGenerator);
+    if (!videoFrameGenerator)
+      throw new Error('invalid VideoFrameGenerator');
+    if (!options?.suppress)
+      this.console.log(videoFrameGenerator.name, '+', this.objectDetection.name);
     updatePipelineStatus('generateVideoFrames');
 
     try {
@@ -412,11 +413,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     let longObjectDetectionWarning = false;
 
-    const frameGenerator = this.getCurrentFrameGenerator();
+    const frameGenerator = this.model.decoder ? undefined : this.getFrameGenerator();
     for await (const detected of
       await sdk.connectRPCObject(
-        await this.objectDetection.generateObjectDetections(
-          await this.createFrameGenerator(signal,
+        await this.objectDetection.generateObjectDetections( 
+          await this.createFrameGenerator(
             frameGenerator,
             options,
             updatePipelineStatus), {
@@ -651,7 +652,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return BUILTIN_MOTION_SENSOR_REPLACE;
   }
 
-  get frameGenerator() {
+  getFrameGenerator() {
     let frameGenerator = this.storageSettings.values.newPipeline as string;
     if (frameGenerator === 'Default')
       frameGenerator = this.plugin.storageSettings.values.defaultDecoder || 'Default';
