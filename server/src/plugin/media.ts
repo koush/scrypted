@@ -1,4 +1,4 @@
-import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject as MediaObjectInterface, MediaObjectOptions, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
+import { BufferConverter, DeviceManager, FFmpegInput, MediaConverter, MediaManager, MediaObject as MediaObjectInterface, MediaObjectOptions, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import { getFfmpegPath } from '@scrypted/ffmpeg-static';
 import fs from 'fs';
 import https from 'https';
@@ -218,6 +218,26 @@ export abstract class MediaManagerBase implements MediaManager {
                     },
                 } as IdBufferConverter;
             });
+
+        const mediaConverters = Object.entries(this.getSystemState())
+            .filter(([id, state]) => state[ScryptedInterfaceProperty.interfaces]?.value?.includes(ScryptedInterface.MediaConverter))
+            .map(([id]) => {
+                const device = this.getDeviceById<MediaConverter>(id);
+
+                return (device.converters || []).map(([fromMimeType, toMimeType]) => {
+                    return {
+                        id,
+                        name: device.name,
+                        fromMimeType,
+                        toMimeType,
+                        convert(data, fromMimeType, toMimeType, options?) {
+                            return device.convertMedia(data, fromMimeType, toMimeType, options);
+                        },
+                    } as IdBufferConverter;
+                });
+            });
+
+        converters.push(...mediaConverters.flat());
 
         // builtins should be after system converters. these should not be overriden by system,
         // as it could cause system instability with misconfiguration.
