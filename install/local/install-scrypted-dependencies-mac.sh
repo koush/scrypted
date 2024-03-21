@@ -39,7 +39,7 @@ launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist || echo ""
 echo "Installing Scrypted dependencies..."
 RUN_IGNORE xcode-select --install
 RUN brew update
-RUN_IGNORE brew install node@18
+RUN_IGNORE brew install node@20
 # snapshot plugin and others
 RUN brew install libvips
 # dlib
@@ -81,17 +81,17 @@ echo "Installing Scrypted Launch Agent..."
 
 RUN mkdir -p ~/Library/LaunchAgents
 
-NODE_PATH=$(brew --prefix node@18)
+NODE_PATH=$(brew --prefix node@20)
 if [ ! -d "$NODE_PATH" ]
 then
-    echo "Unable to determine node@18 path."
+    echo "Unable to determine node@20 path."
     exit 1
 fi
 
 NODE_BIN_PATH=$NODE_PATH/bin
 if [ ! -d "$NODE_BIN_PATH" ]
 then
-    echo "Unable to determine node@18 bin path."
+    echo "Unable to determine node@20 bin path."
     echo "$NODE_BIN_PATH does not exist."
     exit 1
 fi

@@ -31,8 +31,11 @@ ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
 
-RUN test -f "/usr/bin/ffmpeg"
+RUN test -f "/usr/bin/ffmpeg" && test -f "/usr/bin/python" && test -f "/usr/bin/python3.9" && test -f "/usr/bin/python3.10"
 ENV SCRYPTED_FFMPEG_PATH="/usr/bin/ffmpeg"
+ENV SCRYPTED_PYTHON_PATH="/usr/bin/python"
+ENV SCRYPTED_PYTHON39_PATH="/usr/bin/python3.9"
+ENV SCRYPTED_PYTHON310_PATH="/usr/bin/python3.10"
 
 ENV SCRYPTED_DOCKER_FLAVOR="full"
 

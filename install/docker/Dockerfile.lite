@@ -10,7 +10,7 @@ RUN apt-get update && apt-get -y install \
     apt-get -y update && \
     apt-get -y upgrade
 
-ARG NODE_VERSION=18
+ARG NODE_VERSION=20
 RUN apt-get install -y ca-certificates curl gnupg
 RUN mkdir -p /etc/apt/keyrings
 RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg
@@ -20,18 +20,15 @@ RUN apt-get update && apt-get install -y nodejs
 # intel opencl gpu for openvino
 RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-graphics.sh | bash
 
-# Coral Edge TPU
-# https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
-RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-RUN apt-get -y update && apt-get -y install libedgetpu1-std
-
 ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
 
-RUN test -f "/usr/bin/ffmpeg"
+RUN test -f "/usr/bin/ffmpeg" && test -f "/usr/bin/python" && test -f "/usr/bin/python3.9" && test -f "/usr/bin/python3.10"
 ENV SCRYPTED_FFMPEG_PATH="/usr/bin/ffmpeg"
+ENV SCRYPTED_PYTHON_PATH="/usr/bin/python"
+ENV SCRYPTED_PYTHON39_PATH="/usr/bin/python3.9"
+ENV SCRYPTED_PYTHON310_PATH="/usr/bin/python3.10"
 
 ENV SCRYPTED_DOCKER_FLAVOR="lite"

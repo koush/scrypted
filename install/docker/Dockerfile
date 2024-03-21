@@ -1,4 +1,4 @@
-ARG BASE="18-jammy-full"
+ARG BASE="20-jammy-full"
 FROM ghcr.io/koush/scrypted-common:${BASE}
 
 WORKDIR /
@@ -16,6 +16,6 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION="20241303"
+ENV SCRYPTED_BASE_VERSION="20240321"
 
 CMD npm --prefix /server exec scrypted-serve

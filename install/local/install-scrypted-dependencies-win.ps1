@@ -8,7 +8,7 @@ sc.exe stop scrypted.exe
 iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
 # Install node.js
-choco upgrade -y nodejs-lts --version=18.19.1
+choco upgrade -y nodejs-lts --version=20.11.1
 
 # Install Python
 choco upgrade -y python39
