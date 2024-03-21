@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # base tools and development stuff
 RUN apt-get update && apt-get -y install \
     curl software-properties-common apt-utils \
-    ffmpeg && \
+    python3 && \
     apt-get -y update && \
     apt-get -y upgrade
 
@@ -25,9 +25,8 @@ ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
 
-RUN test -f "/usr/bin/ffmpeg" && test -f "/usr/bin/python" && test -f "/usr/bin/python3.10"
-ENV SCRYPTED_FFMPEG_PATH="/usr/bin/ffmpeg"
-ENV SCRYPTED_PYTHON_PATH="/usr/bin/python"
+RUN test -f "/usr/bin/ffmpeg" && test -f "/usr/bin/python3" && test -f "/usr/bin/python3.10"
+ENV SCRYPTED_PYTHON_PATH="/usr/bin/python3"
 ENV SCRYPTED_PYTHON310_PATH="/usr/bin/python3.10"
 
 ENV SCRYPTED_DOCKER_FLAVOR="lite"
