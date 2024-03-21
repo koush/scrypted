@@ -1,4 +1,4 @@
-import { MediaObjectOptions, RTCConnectionManagement, RTCSignalingSession, ScryptedStatic } from "@scrypted/types";
+import { MediaObjectCreateOptions, RTCConnectionManagement, RTCSignalingSession, ScryptedStatic } from "@scrypted/types";
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
 import { Deferred } from "../../../common/src/deferred";
@@ -316,15 +316,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             }
         }
 
-        // the alternate urls must have a valid response.
-        const loginCheckPromises = [...urlsToCheck].map(async baseUrl => {
-            const loginCheck = await checkScryptedClientLogin({
-                baseUrl,
-                previousLoginResult: options?.previousLoginResult,
-            });
-
+        function validateLoginResult(loginCheck: Awaited<ReturnType<typeof checkScryptedClientLogin>>) {
             if (loginCheck.error || loginCheck.redirect)
-                throw new Error('login error');
+                throw new ScryptedClientLoginError(loginCheck);
 
             if (!loginCheck.authorization || !loginCheck.username || !loginCheck.queryToken) {
                 console.error(loginCheck);
@@ -332,12 +326,22 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             }
 
             return loginCheck;
+        }
+
+        // the alternate urls must have a valid response.
+        const loginCheckPromises = [...urlsToCheck].map(baseUrl => {
+            return checkScryptedClientLogin({
+                baseUrl,
+                previousLoginResult: options?.previousLoginResult,
+            })
+                .then(validateLoginResult);
         });
 
         const baseUrlCheck = checkScryptedClientLogin({
             baseUrl,
             previousLoginResult: options?.previousLoginResult,
-        });
+        })
+            .then(validateLoginResult);
         loginCheckPromises.push(baseUrlCheck);
 
         let loginCheck: Awaited<ReturnType<typeof checkScryptedClientLogin>>;
@@ -687,7 +691,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         } = scrypted;
         console.log('api attached', Date.now() - start);
 
-        mediaManager.createMediaObject = async<T extends MediaObjectOptions>(data: any, mimeType: string, options: T) => {
+        mediaManager.createMediaObject = async<T extends MediaObjectCreateOptions>(data: any, mimeType: string, options: T) => {
             return new MediaObject(mimeType, data, options) as any;
         }
 
@@ -866,6 +870,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 cloudAddress,
             },
             connectRPCObject,
+            fork: undefined,
+            connect: undefined,
         }
 
         socket.on('close', () => {
