@@ -13,14 +13,16 @@ import { RuntimeWorkerOptions } from "./runtime-worker";
 
 export class PythonRuntimeWorker extends ChildProcessWorker {
     static {
-        try {
-            const py = new PortablePython(packagedPythonVersion);
-            const portablePython = py.executablePath;
-            // is this possible?
-            if (fs.existsSync(portablePython))
-                process.env.SCRYPTED_PYTHON_PATH = portablePython;
-        }
-        catch (e) {
+        if (!fs.existsSync(process.env.SCRYPTED_PYTHON_PATH)) {
+            try {
+                const py = new PortablePython(packagedPythonVersion);
+                const portablePython = py.executablePath;
+                // is this possible?
+                if (fs.existsSync(portablePython))
+                    process.env.SCRYPTED_PYTHON_PATH = portablePython;
+            }
+            catch (e) {
+            }
         }
     }
 
@@ -85,7 +87,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         }
 
         let pythonPath = process.env.SCRYPTED_PYTHON_PATH;
-        const pluginPythonVersion = options.packageJson.scrypted.pythonVersion?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonVersion?.default;
+        const pluginPythonVersion: string = options.packageJson.scrypted.pythonVersion?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonVersion?.default;
 
         if (!pythonPath) {
             if (os.platform() === 'win32') {
@@ -114,53 +116,64 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             this.worker.stderr.pipe(this.stderr);
         };
 
-
         // if the plugin requests a specific python, then install it via portable python
-        if (pluginPythonVersion) {
-            const peerin = this.peerin = new PassThrough();
-            const peerout = this.peerout = new PassThrough();
-
-            const finishSetup = () => {
-                setup();
-
-                peerin.pipe(this.worker.stdio[3] as Writable);
-                (this.worker.stdio[4] as Readable).pipe(peerout);
-            };
-
-            const pyVersion = require('py/package.json').version;
-            const pyPath = path.join(getPluginVolume(pluginId), 'py');
-            const portableInstallPath = path.join(pyPath, pyVersion);
-
-            const py = new PortablePython(pluginPythonVersion, portableInstallPath);
-            if (fs.existsSync(py.executablePath)) {
-                pythonPath = py.executablePath;
-                finishSetup();
-            }
-            else {
-                (async () => {
-                    try {
-                        this.pythonInstallationComplete = false;
-                        await fs.promises.rm(pyPath, { recursive: true, force: true }).catch(() => { });
-                        pythonPath = await installScryptedServerRequirements(pluginPythonVersion, portableInstallPath);
-                        finishSetup();
-                    }
-                    catch (e) {
-                        process.nextTick(() => {
-                            this.emit('error', new Error('Failed to install portable python.'));
-                        });
-                    }
-                    finally {
-                        this.pythonInstallationComplete = true
-                    }
-                })();
-            }
-        }
-        else {
+        if (!pluginPythonVersion) {
             setup();
             this.peerin = this.worker.stdio[3] as Writable;
             this.peerout = this.worker.stdio[4] as Readable;
             this.setupWorker();
+            return;
         }
+
+        const strippedPythonVersion = pluginPythonVersion.replace('.', '');
+        const envPython = process.env[`SCRYPTED_PYTHON${strippedPythonVersion}_PATH`];
+        if (fs.existsSync(envPython)) {
+            pythonPath = envPython;
+            setup();
+            this.peerin = this.worker.stdio[3] as Writable;
+            this.peerout = this.worker.stdio[4] as Readable;
+            this.setupWorker();
+            return;
+        }
+
+        const peerin = this.peerin = new PassThrough();
+        const peerout = this.peerout = new PassThrough();
+
+        const finishSetup = () => {
+            setup();
+
+            peerin.pipe(this.worker.stdio[3] as Writable);
+            (this.worker.stdio[4] as Readable).pipe(peerout);
+        };
+
+        const pyVersion = require('py/package.json').version;
+        const pyPath = path.join(getPluginVolume(pluginId), 'py');
+        const portableInstallPath = path.join(pyPath, pyVersion);
+
+        const py = new PortablePython(pluginPythonVersion, portableInstallPath);
+        if (fs.existsSync(py.executablePath)) {
+            pythonPath = py.executablePath;
+            finishSetup();
+        }
+        else {
+            (async () => {
+                try {
+                    this.pythonInstallationComplete = false;
+                    await fs.promises.rm(pyPath, { recursive: true, force: true }).catch(() => { });
+                    pythonPath = await installScryptedServerRequirements(pluginPythonVersion, portableInstallPath);
+                    finishSetup();
+                }
+                catch (e) {
+                    process.nextTick(() => {
+                        this.emit('error', new Error('Failed to install portable python.'));
+                    });
+                }
+                finally {
+                    this.pythonInstallationComplete = true
+                }
+            })();
+        }
+
     }
 
     setupRpcPeer(peer: RpcPeer): void {
