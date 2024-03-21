@@ -19,6 +19,14 @@ export async function checkLxcDependencies() {
             needRestart = true;
     }
 
+    if (!fs.existsSync('/var/run/avahi-daemon/socket')) {
+        const cp = child_process.spawn('sh', ['-c', 'apt install avahi-daemon']);
+        const [exitCode] = await once(cp, 'exit');
+        if (exitCode !== 0)
+            sdk.log.a('Failed to install avahi-daemon.');
+        else
+            needRestart = true;
+    }
 
     const scryptedService = fs.readFileSync('scrypted.service').toString();
     const installedScryptedService = fs.readFileSync('/etc/systemd/system/scrypted.service').toString();
