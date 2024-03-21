@@ -10,6 +10,7 @@ import prompt_toolkit.application.current
 import prompt_toolkit.key_binding.key_processor
 import prompt_toolkit.contrib.telnet.server
 from prompt_toolkit.contrib.telnet.server import TelnetServer, TelnetConnection
+from prompt_toolkit.output.color_depth import ColorDepth
 from prompt_toolkit.shortcuts import clear_title, set_title
 from ptpython.repl import embed, PythonRepl, _has_coroutine_flag
 import ptpython.key_bindings
@@ -27,6 +28,10 @@ from typing import List, Dict, Any
 from scrypted_python.scrypted_sdk import ScryptedStatic, ScryptedDevice
 
 from rpc import maybe_await
+
+
+# Our client is xtermjs, so no need to perform any color depth detection
+ColorDepth.default = lambda *args, **kwargs: ColorDepth.DEPTH_4_BIT
 
 
 # This section is a bit of a hack - prompt_toolkit has many assumptions
@@ -267,6 +272,7 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
 
         # we're not in the main loop, so can't handle any signals anyways
         repl_loop.add_signal_handler = lambda sig, cb: None
+        repl_loop.remove_signal_handler = lambda sig: True
 
         def finish_setup():
             telnet_port, exit_server = server_started_future.result()
