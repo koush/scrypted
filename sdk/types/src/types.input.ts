@@ -292,61 +292,6 @@ export interface TemperatureSettingStatus {
 export interface TemperatureSetting {
   temperatureSetting?: TemperatureSettingStatus;
   setTemperature(command: TemperatureCommand): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  setThermostatMode(mode: ThermostatMode): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  setThermostatSetpoint(degrees: number): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  setThermostatSetpointHigh(high: number): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  setThermostatSetpointLow(low: number): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatAvailableModes?: ThermostatMode[];
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatMode?: ThermostatMode;
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatActiveMode?: ThermostatMode;
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatSetpoint?: number;
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatSetpointHigh?: number;
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatSetpointLow?: number;
 }
 export enum HumidityMode {
   Humidify = "Humidify",
@@ -681,6 +626,11 @@ export interface MediaStreamFeedback {
  */
 export interface Microphone {
   getAudioStream(): Promise<MediaObject>;
+}
+
+export interface MicrophoneVolume {
+  microphoneVolume?: number;
+  setMicrophoneVolume(microphoneVolume: number): Promise<void>;
 }
 
 /**

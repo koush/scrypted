@@ -4,14 +4,20 @@ import { commandHandlers } from "../handlers";
 
 commandHandlers['action.devices.commands.ThermostatTemperatureSetpoint'] = async (device: ScryptedDevice & TemperatureSetting, execution) => {
     const ret = executeResponse(device);
-    device.setThermostatSetpoint(execution.params.thermostatTemperatureSetpoint);
+    device.setTemperature({
+        setpoint: execution.params.thermostatTemperatureSetpoint,
+    });
     return ret;
 }
 
 commandHandlers['action.devices.commands.ThermostatTemperatureSetRange'] = async (device: ScryptedDevice & TemperatureSetting, execution) => {
     const ret = executeResponse(device);
-    device.setThermostatSetpointLow(execution.params.thermostatTemperatureSetpointLow);
-    device.setThermostatSetpointHigh(execution.params.thermostatTemperatureSetpointHigh);
+    device.setTemperature({
+        setpoint: [
+            execution.params.thermostatTemperatureSetpointLow,
+            execution.params.thermostatTemperatureSetpointHigh,
+        ]
+    })
     return ret;
 }
 
@@ -32,6 +38,8 @@ function fromGoogleMode(mode: string): ThermostatMode {
 
 commandHandlers['action.devices.commands.ThermostatSetMode'] = async (device: ScryptedDevice & TemperatureSetting, execution) => {
     const ret = executeResponse(device);
-    device.setThermostatMode(fromGoogleMode(execution.params.thermostatMode));
+    device.setTemperature({
+        mode: fromGoogleMode(execution.params.thermostatMode),
+    });
     return ret;
 }

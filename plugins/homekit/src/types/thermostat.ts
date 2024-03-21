@@ -1,5 +1,5 @@
 import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM10Sensor, PM25Sensor, VOCSensor, NOXSensor, CO2Sensor } from '@scrypted/sdk';
-import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
+import { addSupportedType, bindCharacteristic, DummyDevice, } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { addAirQualitySensor, addCarbonDioxideSensor, addFan, makeAccessory } from './common';
 import type { HomeKitPlugin } from "../main";
@@ -71,7 +71,7 @@ addSupportedType({
                 case Characteristic.TargetHeatingCoolingState.COOL:
                     return ThermostatMode.Cool;
                 case Characteristic.TargetHeatingCoolingState.AUTO:
-                    if (device.thermostatAvailableModes.includes(ThermostatMode.HeatCool)) {
+                    if (device.temperatureSetting?.availableModes?.includes(ThermostatMode.HeatCool)) {
                         return ThermostatMode.HeatCool;
                     } else {
                         return ThermostatMode.Auto;
@@ -80,19 +80,21 @@ addSupportedType({
         }
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.CurrentHeatingCoolingState,
-            () => toCurrentMode(device.thermostatActiveMode));
+            () => toCurrentMode(device.temperatureSetting?.activeMode));
 
         service.getCharacteristic(Characteristic.TargetHeatingCoolingState)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 callback();
-                device.setThermostatMode(fromTargetMode(value as number));
+                device.setTemperature({
+                    mode: fromTargetMode(value as number),
+                });
             })
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetHeatingCoolingState,
-            () => toTargetMode(device.thermostatMode));
-        
-        if (!device.thermostatAvailableModes.includes(ThermostatMode.Auto) &&
-                !device.thermostatAvailableModes.includes(ThermostatMode.HeatCool)) {
+            () => toTargetMode(device.temperatureSetting?.mode));
+
+        if (!device.temperatureSetting?.availableModes?.includes(ThermostatMode.Auto) &&
+            !device.temperatureSetting?.availableModes?.includes(ThermostatMode.HeatCool)) {
             service.getCharacteristic(Characteristic.TargetHeatingCoolingState).setProps({
                 maxValue: Characteristic.TargetHeatingCoolingState.COOL // Disable 'Auto' mode
             });
@@ -101,30 +103,49 @@ addSupportedType({
         service.getCharacteristic(Characteristic.TargetTemperature)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 callback();
-                device.setThermostatSetpoint(value as number);
+                device.setTemperature({
+                    setpoint: value as number,
+                });
             });
 
-        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetTemperature,
-            () => Math.max(device.thermostatSetpoint || 0, 10));
+        const getSetPoint = (index: number) => Math.max((device.temperatureSetting?.setpoint instanceof Array ? device.temperatureSetting?.setpoint[index] : device.temperatureSetting?.setpoint) || 0, 10);
 
-        if (device.thermostatAvailableModes.includes(ThermostatMode.HeatCool)) {
+        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetTemperature,
+            () => getSetPoint(0));
+
+        if (device.temperatureSetting?.availableModes?.includes(ThermostatMode.HeatCool)) {
+            let debounceTimeout: NodeJS.Timeout;
+            let l: number;
+            let h: number;
+            const debounce = () => {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(() => {
+                    device.setTemperature({
+                        setpoint: [l || h, h || l],
+                    })
+                }, 5000);
+            };
+
             service.getCharacteristic(Characteristic.HeatingThresholdTemperature)
                 .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                     callback();
-                    device.setThermostatSetpointLow(value as number);
+                    l = value as number;
+                    debounce();
                 });
 
+
             bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.HeatingThresholdTemperature,
-                () => Math.max(device.thermostatSetpointLow || 0, 10));
+                () => getSetPoint(0));
 
             service.getCharacteristic(Characteristic.CoolingThresholdTemperature)
                 .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                     callback();
-                    device.setThermostatSetpointHigh(value as number);
+                    h = value as number;
+                    debounce();
                 });
 
             bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.CoolingThresholdTemperature,
-                () => Math.max(device.thermostatSetpointHigh || 0, 10));
+                () => getSetPoint(1));
 
             // sets props after binding initial state to avoid warnings in logs
             service.getCharacteristic(Characteristic.CoolingThresholdTemperature).setProps({

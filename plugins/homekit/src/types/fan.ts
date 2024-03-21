@@ -1,9 +1,8 @@
-import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM10Sensor, PM25Sensor, VOCSensor, NOXSensor, CO2Sensor } from '@scrypted/sdk';
-import { addSupportedType, bindCharacteristic, DummyDevice } from '../common';
+import { AirQualitySensor, CO2Sensor, Fan, HumidityMode, HumiditySensor, HumiditySetting, NOXSensor, OnOff, PM10Sensor, PM25Sensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VOCSensor } from '@scrypted/sdk';
+import { DummyDevice, addSupportedType, bindCharacteristic } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
-import { addAirQualitySensor, addCarbonDioxideSensor, addFan, makeAccessory } from './common';
 import type { HomeKitPlugin } from "../main";
-import { probe } from './onoff-base';
+import { addAirQualitySensor, addCarbonDioxideSensor, addFan, makeAccessory } from './common';
 
 addSupportedType({
     type: ScryptedDeviceType.Fan,
@@ -45,7 +44,7 @@ addSupportedType({
             const maxSetTemp = 32.222 // 90F
             const minGetTemp = -17.7778 // 0F
             const maxGetTemp = 71.1111 // 160F
-    
+
             function toCurrentMode(mode: ThermostatMode) {
                 switch (mode) {
                     case ThermostatMode.Off:
@@ -56,7 +55,7 @@ addSupportedType({
                         return Characteristic.CurrentHeaterCoolerState.HEATING;
                 }
             }
-    
+
             function toTargetMode(mode: ThermostatMode) {
                 switch (mode) {
                     case ThermostatMode.Cool:
@@ -67,7 +66,7 @@ addSupportedType({
                         return Characteristic.TargetHeaterCoolerState.AUTO;
                 }
             }
-    
+
             function fromTargetMode(mode: number) {
                 switch (mode) {
                     case Characteristic.TargetHeaterCoolerState.HEAT:
@@ -84,22 +83,22 @@ addSupportedType({
                 minValue: minGetTemp, // default = -270, change to -20C or 0F (-17.7778C)
                 maxValue: maxGetTemp // default = 100, change to 60C or 160F (71.1111C)
             });
-    
+
             heaterCoolerService.getCharacteristic(Characteristic.CoolingThresholdTemperature).setProps({
                 minStep: minStep, // 0.1
                 minValue: minSetTemp, // default = 10, change to 9C or 50F (10C)
                 maxValue: maxSetTemp // default = 35, change to 32C or 90F (32.2222C)
             });
-            
+
             heaterCoolerService.getCharacteristic(Characteristic.HeatingThresholdTemperature).setProps({
                 minStep: minStep, // 0.1
                 minValue: minSetTemp, // default = 0, change to 9C or 50F (10C)
                 maxValue: maxSetTemp // default = 25, change to 32C or 90F (32.2222C)
             });
-    
+
             let targetState: number[] = [];
 
-            for (const mode of device.thermostatAvailableModes) {
+            for (const mode of device.temperatureSetting?.availableModes || []) {
                 const hkMode = toTargetMode(mode);
 
                 if (hkMode && !targetState.includes(hkMode))
@@ -109,7 +108,7 @@ addSupportedType({
             targetState.sort();
 
             const minTargetState = targetState[0];
-            const maxTargetState = targetState[targetState.length -1];
+            const maxTargetState = targetState[targetState.length - 1];
 
             heaterCoolerService.getCharacteristic(Characteristic.TargetHeaterCoolerState).setProps({
                 maxValue: maxTargetState,
@@ -119,7 +118,7 @@ addSupportedType({
 
             let currentState: number[] = [];
 
-            for (const mode of device.thermostatAvailableModes) {
+            for (const mode of device.temperatureSetting?.availableModes || []) {
                 const hkMode = toCurrentMode(mode);
 
                 if (hkMode && !currentState.includes(hkMode))
@@ -129,7 +128,7 @@ addSupportedType({
             currentState.sort();
 
             const minCurrentState = currentState[0];
-            const maxCurrentState = currentState[currentState.length -1];
+            const maxCurrentState = currentState[currentState.length - 1];
 
             heaterCoolerService.getCharacteristic(Characteristic.CurrentHeaterCoolerState).setProps({
                 maxValue: maxCurrentState,
@@ -138,60 +137,66 @@ addSupportedType({
             });
 
             bindCharacteristic(device, ScryptedInterface.TemperatureSetting, heaterCoolerService, Characteristic.Active,
-                () => device.thermostatActiveMode !== ThermostatMode.Off);
-    
+                () => device.temperatureSetting?.activeMode !== ThermostatMode.Off);
+
             heaterCoolerService.getCharacteristic(Characteristic.Active).on(CharacteristicEventTypes.SET, (value, callback) => {
                 callback();
-                if (value)
-                    device.setThermostatMode(ThermostatMode.On);
-                else
-                    device.setThermostatMode(ThermostatMode.Off);
+                device.setTemperature({
+                    mode: value ? ThermostatMode.On : ThermostatMode.Off,
+                });
             });
 
-            bindCharacteristic(device, ScryptedInterface.TemperatureSetting, heaterCoolerService, Characteristic.CurrentHeaterCoolerState,() => {
-                const mode = device.thermostatActiveMode;
+            bindCharacteristic(device, ScryptedInterface.TemperatureSetting, heaterCoolerService, Characteristic.CurrentHeaterCoolerState, () => {
+                const mode = device.temperatureSetting?.activeMode;
                 const s = toCurrentMode(mode);
                 return s ?? minCurrentState;
             });
-    
+
             heaterCoolerService.getCharacteristic(Characteristic.TargetHeaterCoolerState)
                 .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                     callback();
 
                     const s = fromTargetMode(value as number);
-                    device.setThermostatMode(s ?? ThermostatMode.Off);
+                    device.setTemperature({
+                        mode: s ?? ThermostatMode.Off,
+                    });
                 })
-    
-            bindCharacteristic(device, ScryptedInterface.TemperatureSetting, heaterCoolerService, Characteristic.TargetHeaterCoolerState,() => {
-                const mode = device.thermostatMode;
+
+            bindCharacteristic(device, ScryptedInterface.TemperatureSetting, heaterCoolerService, Characteristic.TargetHeaterCoolerState, () => {
+                const mode = device.temperatureSetting?.mode;
                 const s = toTargetMode(mode);
                 return s ?? minTargetState;
             });
-    
+
             heaterCoolerService.getCharacteristic(Characteristic.HeatingThresholdTemperature)
                 .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                     callback();
-                    device.setThermostatSetpoint(value as number);
+                    device.setTemperature({
+                        setpoint: value as number,
+                    });
                 });
-    
+
+            const getSetPoint = () => Math.max((device.temperatureSetting?.setpoint instanceof Array ? device.temperatureSetting?.setpoint[0] : device.temperatureSetting?.setpoint) || 0, 10);
             bindCharacteristic(device, ScryptedInterface.TemperatureSetting, heaterCoolerService, Characteristic.HeatingThresholdTemperature,
-                () => Math.max(device.thermostatSetpoint || 0, 10));
-    
+                getSetPoint);
+
             heaterCoolerService.getCharacteristic(Characteristic.CoolingThresholdTemperature)
                 .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                     callback();
-                    device.setThermostatSetpoint(value as number);
+                    device.setTemperature({
+                        setpoint: value as number,
+                    });
                 });
-    
+
             bindCharacteristic(device, ScryptedInterface.TemperatureSetting, heaterCoolerService, Characteristic.CoolingThresholdTemperature,
-                () => Math.max(device.thermostatSetpoint || 0, 10));
-    
+                getSetPoint);
+
             bindCharacteristic(device, ScryptedInterface.Thermometer, heaterCoolerService, Characteristic.CurrentTemperature,
                 () => device.temperature || 0);
 
             bindCharacteristic(device, ScryptedInterface.Thermometer, heaterCoolerService, Characteristic.TemperatureDisplayUnits,
                 () => device.temperatureUnit === TemperatureUnit.F ? Characteristic.TemperatureDisplayUnits.FAHRENHEIT : Characteristic.TemperatureDisplayUnits.CELSIUS);
-    
+
             heaterCoolerService.getCharacteristic(Characteristic.TemperatureDisplayUnits)
                 .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                     callback();
@@ -208,7 +213,7 @@ addSupportedType({
                     });
                 });
             }
-    
+
             if (device.fan?.maxSpeed !== undefined) {
                 bindCharacteristic(device, ScryptedInterface.Fan, heaterCoolerService, Characteristic.RotationSpeed,
                     () => {
@@ -314,7 +319,7 @@ addSupportedType({
                     });
                 });
             }
-    
+
             if (device.fan?.maxSpeed !== undefined) {
                 bindCharacteristic(device, ScryptedInterface.Fan, humidityService, Characteristic.RotationSpeed,
                     () => {

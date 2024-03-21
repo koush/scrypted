@@ -1428,25 +1428,7 @@ class TemperatureSetting:
     """TemperatureSetting represents a thermostat device."""
 
     temperatureSetting: TemperatureSettingStatus
-    thermostatActiveMode: ThermostatMode
-    thermostatAvailableModes: list[ThermostatMode]
-    thermostatMode: ThermostatMode
-    thermostatSetpoint: float
-    thermostatSetpointHigh: float
-    thermostatSetpointLow: float
     async def setTemperature(self, command: TemperatureCommand) -> None:
-        pass
-
-    async def setThermostatMode(self, mode: ThermostatMode) -> None:
-        pass
-
-    async def setThermostatSetpoint(self, degrees: float) -> None:
-        pass
-
-    async def setThermostatSetpointHigh(self, high: float) -> None:
-        pass
-
-    async def setThermostatSetpointLow(self, low: float) -> None:
         pass
 
 
@@ -1743,12 +1725,6 @@ class ScryptedInterfaceProperty(str, Enum):
     paused = "paused"
     docked = "docked"
     temperatureSetting = "temperatureSetting"
-    thermostatActiveMode = "thermostatActiveMode"
-    thermostatAvailableModes = "thermostatAvailableModes"
-    thermostatMode = "thermostatMode"
-    thermostatSetpoint = "thermostatSetpoint"
-    thermostatSetpointHigh = "thermostatSetpointHigh"
-    thermostatSetpointLow = "thermostatSetpointLow"
     temperature = "temperature"
     temperatureUnit = "temperatureUnit"
     humidity = "humidity"
@@ -1810,10 +1786,6 @@ class ScryptedInterfaceMethods(str, Enum):
     resume = "resume"
     dock = "dock"
     setTemperature = "setTemperature"
-    setThermostatMode = "setThermostatMode"
-    setThermostatSetpoint = "setThermostatSetpoint"
-    setThermostatSetpointHigh = "setThermostatSetpointHigh"
-    setThermostatSetpointLow = "setThermostatSetpointLow"
     setTemperatureUnit = "setTemperatureUnit"
     getPictureOptions = "getPictureOptions"
     takePicture = "takePicture"
@@ -2089,54 +2061,6 @@ class DeviceState:
     @temperatureSetting.setter
     def temperatureSetting(self, value: TemperatureSettingStatus):
         self.setScryptedProperty("temperatureSetting", value)
-
-    @property
-    def thermostatActiveMode(self) -> ThermostatMode:
-        return self.getScryptedProperty("thermostatActiveMode")
-
-    @thermostatActiveMode.setter
-    def thermostatActiveMode(self, value: ThermostatMode):
-        self.setScryptedProperty("thermostatActiveMode", value)
-
-    @property
-    def thermostatAvailableModes(self) -> list[ThermostatMode]:
-        return self.getScryptedProperty("thermostatAvailableModes")
-
-    @thermostatAvailableModes.setter
-    def thermostatAvailableModes(self, value: list[ThermostatMode]):
-        self.setScryptedProperty("thermostatAvailableModes", value)
-
-    @property
-    def thermostatMode(self) -> ThermostatMode:
-        return self.getScryptedProperty("thermostatMode")
-
-    @thermostatMode.setter
-    def thermostatMode(self, value: ThermostatMode):
-        self.setScryptedProperty("thermostatMode", value)
-
-    @property
-    def thermostatSetpoint(self) -> float:
-        return self.getScryptedProperty("thermostatSetpoint")
-
-    @thermostatSetpoint.setter
-    def thermostatSetpoint(self, value: float):
-        self.setScryptedProperty("thermostatSetpoint", value)
-
-    @property
-    def thermostatSetpointHigh(self) -> float:
-        return self.getScryptedProperty("thermostatSetpointHigh")
-
-    @thermostatSetpointHigh.setter
-    def thermostatSetpointHigh(self, value: float):
-        self.setScryptedProperty("thermostatSetpointHigh", value)
-
-    @property
-    def thermostatSetpointLow(self) -> float:
-        return self.getScryptedProperty("thermostatSetpointLow")
-
-    @thermostatSetpointLow.setter
-    def thermostatSetpointLow(self, value: float):
-        self.setScryptedProperty("thermostatSetpointLow", value)
 
     @property
     def temperature(self) -> float:
@@ -2563,20 +2487,10 @@ ScryptedInterfaceDescriptors = {
   "TemperatureSetting": {
     "name": "TemperatureSetting",
     "methods": [
-      "setTemperature",
-      "setThermostatMode",
-      "setThermostatSetpoint",
-      "setThermostatSetpointHigh",
-      "setThermostatSetpointLow"
+      "setTemperature"
     ],
     "properties": [
-      "temperatureSetting",
-      "thermostatActiveMode",
-      "thermostatAvailableModes",
-      "thermostatMode",
-      "thermostatSetpoint",
-      "thermostatSetpointHigh",
-      "thermostatSetpointLow"
+      "temperatureSetting"
     ]
   },
   "Thermometer": {

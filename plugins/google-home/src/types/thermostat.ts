@@ -25,7 +25,7 @@ addSupportedType({
         const ret = syncResponse(device, 'action.devices.types.THERMOSTAT');
         ret.traits.push('action.devices.traits.TemperatureSetting');
 
-        const availableModes = device.thermostatAvailableModes.map(mode => toGoogleMode(mode)).filter(mode => !!mode);
+        const availableModes = (device.temperatureSetting?.availableModes || []).map(mode => toGoogleMode(mode)).filter(mode => !!mode);
 
         ret.attributes.availableThermostatModes = availableModes;
 
@@ -41,11 +41,14 @@ addSupportedType({
     async query(device: ScryptedDevice & Thermometer & TemperatureSetting) {
         const ret = queryResponse(device);
 
-        ret.thermostatMode = toGoogleMode(device.thermostatMode);
+ 
+        const getSetPoint = (index: number) => (device.temperatureSetting?.setpoint instanceof Array ? device.temperatureSetting?.setpoint[index] : device.temperatureSetting?.setpoint) || device.temperature;
+
+        ret.thermostatMode = toGoogleMode(device.temperatureSetting?.mode);
         ret.thermostatTemperatureAmbient = device.temperature || 22.22;
-        ret.thermostatTemperatureSetpoint = device.thermostatSetpoint || device.temperature;
-        ret.thermostatTemperatureSetpointHigh = device.thermostatSetpointHigh || device.temperature;
-        ret.thermostatTemperatureSetpointLow = device.thermostatSetpointLow || device.temperature;
+        ret.thermostatTemperatureSetpoint = getSetPoint(0);
+        ret.thermostatTemperatureSetpointHigh = getSetPoint(1);
+        ret.thermostatTemperatureSetpointLow = getSetPoint(0);
 
         return ret;
     },
