@@ -628,9 +628,18 @@ export interface Microphone {
   getAudioStream(): Promise<MediaObject>;
 }
 
-export interface MicrophoneVolume {
-  microphoneVolume?: number;
-  setMicrophoneVolume(microphoneVolume: number): Promise<void>;
+export interface AudioVolumes {
+  [key: string]: number;
+}
+
+export interface AudioVolumeControl {
+  audioVolumes?: AudioVolumes;
+  /**
+   * Set audio volumes for the device. Common keys are 'microphone', 'intercom',
+   * and 'speaker'.
+   * @param audioVolumes
+   */
+  setAudioVolumes(audioVolumes: AudioVolumes): Promise<void>;
 }
 
 /**
@@ -2002,6 +2011,7 @@ export enum ScryptedInterface {
   HumiditySensor = "HumiditySensor",
   Camera = "Camera",
   Microphone = "Microphone",
+  AudioVolumeControl = "AudioVolumeControl",
   Display = "Display",
   VideoCamera = "VideoCamera",
   VideoCameraMask = "VideoCameraMask",

@@ -109,6 +109,7 @@ class ScryptedInterface(str, Enum):
     AirQualitySensor = "AirQualitySensor"
     AmbientLightSensor = "AmbientLightSensor"
     AudioSensor = "AudioSensor"
+    AudioVolumeControl = "AudioVolumeControl"
     Battery = "Battery"
     BinarySensor = "BinarySensor"
     Brightness = "Brightness"
@@ -410,6 +411,11 @@ class AirPurifierState(TypedDict):
     mode: AirPurifierMode
     speed: float
     status: AirPurifierStatus
+
+class AudioVolumes(TypedDict):
+
+    pass
+
 
 class ColorHsv(TypedDict):
     """Represents an HSV color value component."""
@@ -880,6 +886,13 @@ class AmbientLightSensor:
 class AudioSensor:
 
     audioDetected: bool
+
+class AudioVolumeControl:
+
+    audioVolumes: AudioVolumes
+    async def setAudioVolumes(self, audioVolumes: AudioVolumes) -> None:
+        pass
+
 
 class Battery:
     """Battery retrieves the battery level of battery powered devices."""
@@ -1728,6 +1741,7 @@ class ScryptedInterfaceProperty(str, Enum):
     temperature = "temperature"
     temperatureUnit = "temperatureUnit"
     humidity = "humidity"
+    audioVolumes = "audioVolumes"
     recordingActive = "recordingActive"
     ptzCapabilities = "ptzCapabilities"
     lockState = "lockState"
@@ -1790,6 +1804,7 @@ class ScryptedInterfaceMethods(str, Enum):
     getPictureOptions = "getPictureOptions"
     takePicture = "takePicture"
     getAudioStream = "getAudioStream"
+    setAudioVolumes = "setAudioVolumes"
     startDisplay = "startDisplay"
     stopDisplay = "stopDisplay"
     getVideoStream = "getVideoStream"
@@ -2085,6 +2100,14 @@ class DeviceState:
     @humidity.setter
     def humidity(self, value: float):
         self.setScryptedProperty("humidity", value)
+
+    @property
+    def audioVolumes(self) -> AudioVolumes:
+        return self.getScryptedProperty("audioVolumes")
+
+    @audioVolumes.setter
+    def audioVolumes(self, value: AudioVolumes):
+        self.setScryptedProperty("audioVolumes", value)
 
     @property
     def recordingActive(self) -> bool:
@@ -2524,6 +2547,15 @@ ScryptedInterfaceDescriptors = {
       "getAudioStream"
     ],
     "properties": []
+  },
+  "AudioVolumeControl": {
+    "name": "AudioVolumeControl",
+    "methods": [
+      "setAudioVolumes"
+    ],
+    "properties": [
+      "audioVolumes"
+    ]
   },
   "Display": {
     "name": "Display",

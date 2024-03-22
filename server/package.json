@@ -1,11 +1,11 @@
 {
   "name": "@scrypted/server",
-  "version": "0.94.42",
+  "version": "0.94.43",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",
     "@scrypted/ffmpeg-static": "^6.1.0-build1",
-    "@scrypted/types": "^0.3.27",
+    "@scrypted/types": "^0.3.28",
     "adm-zip": "^0.5.12",
     "body-parser": "^1.20.2",
     "cookie-parser": "^1.4.6",
