@@ -87,7 +87,6 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         }
 
         let pythonPath = process.env.SCRYPTED_PYTHON_PATH;
-        const pluginPythonVersion: string = options.packageJson.scrypted.pythonVersion?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonVersion?.default;
 
         if (!pythonPath) {
             if (os.platform() === 'win32') {
@@ -116,6 +115,10 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             this.worker.stderr.pipe(this.stderr);
         };
 
+        let pluginPythonVersion: string = options.packageJson.scrypted.pythonVersion?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonVersion?.default;
+        if (process.env.SCRYPTED_PORTABLE_PYTHON && !pluginPythonVersion)
+            pluginPythonVersion = packagedPythonVersion;
+
         // if the plugin requests a specific python, then install it via portable python
         if (!pluginPythonVersion) {
             setup();
@@ -126,8 +129,8 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         }
 
         const strippedPythonVersion = pluginPythonVersion.replace('.', '');
-        const envPython = process.env[`SCRYPTED_PYTHON${strippedPythonVersion}_PATH`];
-        if (fs.existsSync(envPython)) {
+        const envPython = !process.env.SCRYPTED_PORTABLE_PYTHON && process.env[`SCRYPTED_PYTHON${strippedPythonVersion}_PATH`];
+        if (envPython) {
             pythonPath = envPython;
             setup();
             this.peerin = this.worker.stdio[3] as Writable;
@@ -173,7 +176,6 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
                 }
             })();
         }
-
     }
 
     setupRpcPeer(peer: RpcPeer): void {
