@@ -33,6 +33,7 @@
                 // which has no wheels for coreml tools or tflite-runtime
                 "SCRYPTED_PYTHON_PATH": "/opt/homebrew/bin/python3.11",
                 "SCRYPTED_PYTHON310_PATH": "/opt/homebrew/bin/python3.10",
+                // "SCRYPTED_PORTABLE_PYTHON": "true",
                 // "SCRYPTED_SHARED_WORKER": "true",
                 // "SCRYPTED_DISABLE_AUTHENTICATION": "true",
                 // "DEBUG": "*",

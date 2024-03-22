@@ -86,7 +86,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             }
         }
 
-        let pythonPath = process.env.SCRYPTED_PYTHON_PATH;
+        let pythonPath = !process.env.SCRYPTED_PORTABLE_PYTHON && process.env.SCRYPTED_PYTHON_PATH;
 
         if (!pythonPath) {
             if (os.platform() === 'win32') {
