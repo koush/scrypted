@@ -11,7 +11,7 @@ export async function checkLxcDependencies() {
 
     let needRestart = false;
     if (!process.version.startsWith('v20.')) {
-        const cp = child_process.spawn('sh', ['-c', 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs']);
+        const cp = child_process.spawn('sh', ['-c', 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt install -y nodejs']);
         const [exitCode] = await once(cp, 'exit');
         if (exitCode !== 0)
             sdk.log.a('Failed to install Node.js 20.x.');
@@ -20,7 +20,7 @@ export async function checkLxcDependencies() {
     }
 
     if (!fs.existsSync('/var/run/avahi-daemon/socket')) {
-        const cp = child_process.spawn('sh', ['-c', 'apt update && apt install avahi-daemon && apt upgrade']);
+        const cp = child_process.spawn('sh', ['-c', 'apt update -y && apt install -y avahi-daemon && apt upgrade -y']);
         const [exitCode] = await once(cp, 'exit');
         if (exitCode !== 0)
             sdk.log.a('Failed to install avahi-daemon.');
