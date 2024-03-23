@@ -1,15 +1,16 @@
-import traceback
 import asyncio
+import time
+import traceback
+from typing import Any, AsyncGenerator, List, Union
+
 import scrypted_sdk
 from scrypted_sdk import Setting, SettingValue
-from typing import Any, List, Union
+
 import gstreamer
 import libav
-import vipsimage
 import pilimage
-import time
+import vipsimage
 import zygote
-import os
 
 Gst = None
 try:
@@ -201,20 +202,23 @@ def multiprocess_exit():
 
 
 class CodecFork:
+    def timeoutExit():
+        print("Frame yield timed out, exiting pipeline.")
+        multiprocess_exit()
+
     async def generateVideoFrames(self, iter, src: str, firstFrameOnly=False):
         start = time.time()
         loop = asyncio.get_event_loop()
 
-        def timeoutExit():
-            print("Frame yield timed out, exiting pipeline.")
-            multiprocess_exit()
-
         try:
             while True:
+                self.timeout.cancel()
+                self.timeout = loop.call_later(10, self.timeoutExit)
                 data = await asyncio.wait_for(iter.__anext__(), timeout=10)
-                timeout = loop.call_later(10, timeoutExit)
+                self.timeout.cancel()
+                self.timeout = loop.call_later(10, self.timeoutExit)
                 yield data
-                timeout.cancel()
+
                 if firstFrameOnly:
                     break
         except Exception:
@@ -231,7 +235,10 @@ class CodecFork:
         h264Decoder: str,
         h265Decoder: str,
         postProcessPipeline: str,
-    ) -> scrypted_sdk.VideoFrame:
+    ) -> AsyncGenerator[scrypted_sdk.VideoFrame, Any]:
+        loop = asyncio.get_event_loop()
+        self.timeout = loop.call_later(10, self.timeoutExit)
+
         async for data in self.generateVideoFrames(
             gstreamer.generateVideoFramesGstreamer(
                 mediaObject, options, h264Decoder, h265Decoder, postProcessPipeline
@@ -245,7 +252,10 @@ class CodecFork:
         self,
         mediaObject: scrypted_sdk.MediaObject,
         options: scrypted_sdk.VideoFrameGeneratorOptions = None,
-    ) -> scrypted_sdk.VideoFrame:
+    ) -> AsyncGenerator[scrypted_sdk.VideoFrame, Any]:
+        loop = asyncio.get_event_loop()
+        self.timeout = loop.call_later(10, self.timeoutExit)
+
         async for data in self.generateVideoFrames(
             libav.generateVideoFramesLibav(mediaObject, options),
             "libav",
