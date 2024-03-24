@@ -1,6 +1,7 @@
 import asyncio
 import time
 import traceback
+import os
 from typing import Any, AsyncGenerator, List, Union
 
 import scrypted_sdk
@@ -202,7 +203,7 @@ def multiprocess_exit():
 
 
 class CodecFork:
-    def timeoutExit():
+    def timeoutExit(self):
         print("Frame yield timed out, exiting pipeline.")
         multiprocess_exit()
 
