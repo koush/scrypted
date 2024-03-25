@@ -60,6 +60,7 @@ export class OnvifIntercom implements Intercom {
         let transportDict: ReturnType<typeof parseSemicolonDelimited>;
         let tcp = false;
         try {
+            throw new Error()
             const headers: any = {
                 Require,
                 Transport: `RTP/AVP;unicast;client_port=${rtp}-${rtcp}`,
@@ -151,7 +152,7 @@ export class OnvifIntercom implements Intercom {
                     }
 
                     const elapsedRtpTimeMs = Math.abs(pending.header.timestamp - p.header.timestamp) / 8000 * 1000;
-                    if (elapsedRtpTimeMs <= 60) {
+                    if (elapsedRtpTimeMs <= 160) {
                         pending.payload = Buffer.concat([pending.payload, p.payload]);
                         return;
                     }
