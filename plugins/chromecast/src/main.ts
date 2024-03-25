@@ -183,7 +183,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
         media = await mediaManager.createMediaObjectFromUrl(media);
       }
     }
-    else if (options?.mimeType?.startsWith('image/')) {
+    else if (options?.mimeType?.startsWith('image/') || options?.mimeType?.startsWith('audio/')) {
       url = await mediaManager.convertMediaObjectToInsecureLocalUrl(media, options?.mimeType);
     }
 
