@@ -133,15 +133,15 @@ export async function serveMain(installVersion?: string) {
 
         await startServer(installDir);
 
-        if (fs.existsSync(EXIT_FILE)) {
-            console.log('Exiting.');
-            process.exit(1);
-        }
-        else if (fs.existsSync(UPDATE_FILE)) {
+        if (fs.existsSync(UPDATE_FILE)) {
             console.log('Update requested. Installing.');
             await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest').catch(e => {
                 console.error('Update failed', e);
             });
+            console.log('Exiting.');
+            process.exit(1);
+        }
+        else if (fs.existsSync(EXIT_FILE)) {
             console.log('Exiting.');
             process.exit(1);
         }
