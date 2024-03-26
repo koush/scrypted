@@ -9,6 +9,7 @@ import { getDeviceInfo } from './probe';
 
 export const detectionMap = {
     human: 'person',
+    vehicle: 'car',
 }
 
 export function getChannel(channel: string) {
@@ -167,6 +168,7 @@ export class HikvisionCameraAPI {
                     events.emit('end');
                 });
                 stream.on('error', e => {
+                    this.listenerPromise = undefined;
                     events.emit('error', e);
                 });
                 stream.socket.setKeepAlive(true);

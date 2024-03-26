@@ -167,8 +167,8 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                 } as ObjectDetectionResult;
             });
 
-            detections = detections.filter(d => d);
-            if (!detections.length)
+            detections = detections?.filter(d => d);
+            if (!detections?.length)
                 return;
 
             // if (inputDimensions === undefined && loadSharp()) {
@@ -216,7 +216,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
     async getObjectTypes(): Promise<ObjectDetectionTypes> {
         return {
             classes: [
-                'person',
+                ...Object.values(detectionMap),
             ]
         }
     }
