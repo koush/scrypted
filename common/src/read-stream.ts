@@ -136,12 +136,17 @@ export async function readLine(readable: Readable) {
 }
 
 export async function readString(readable: Readable | Promise<Readable>) {
-  let data = '';
+  const buffer = await readBuffer(readable);
+  return buffer.toString();
+}
+
+export async function readBuffer(readable: Readable | Promise<Readable>) {
+  const buffers: Buffer[] = [];
   readable = await readable;
   readable.on('data', buffer => {
-    data += buffer.toString();
+    buffers.push(buffer);
   });
   readable.resume();
   await once(readable, 'end')
-  return data;
+  return Buffer.concat(buffers);
 }
