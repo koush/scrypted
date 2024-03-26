@@ -1,7 +1,7 @@
 import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { readLine } from '@scrypted/common/src/read-stream';
 import { parseHeaders, readBody, readMessage } from '@scrypted/common/src/rtsp-server';
-import contentDisposition from 'content-disposition';
+import contentType from 'content-type';
 import { IncomingMessage } from 'http';
 import { EventEmitter, Readable } from 'stream';
 import { Destroyable } from '../../rtsp/src/rtsp';
@@ -173,7 +173,7 @@ export class HikvisionCameraAPI {
 
                 const ct = stream.headers['content-type'];
                 // make content type parsable as content disposition filename
-                const cd = contentDisposition.parse(ct.replace('/', ''));
+                const cd = contentType.parse(ct);
                 let { boundary } = cd.parameters;
                 boundary = `--${boundary}`;
                 const boundaryEnd = `${boundary}--`;
@@ -200,7 +200,6 @@ export class HikvisionCameraAPI {
 
                         try {
                             if (!headers['content-type'].includes('application/xml') && lastSmartDetection) {
-                                const cd = contentDisposition.parse(headers['content-disposition'] || 'empty');
                                 if (!headers['content-type']?.startsWith('image/jpeg')) {
                                     continue;
                                 }

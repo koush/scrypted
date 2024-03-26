@@ -1,6 +1,74 @@
 import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
-import { Readable } from 'stream';
+import { readLine } from '@scrypted/common/src/read-stream';
+import { parseHeaders, readBody, readMessage } from '@scrypted/common/src/rtsp-server';
+import contentType from 'content-type';
+import { IncomingMessage } from 'http';
+import { EventEmitter, Readable } from 'stream';
+import { Destroyable } from '../../rtsp/src/rtsp';
 import { getDeviceInfo } from './probe';
+import { Point } from '@scrypted/sdk';
+
+// {
+//     "Action" : "Cross",
+//     "Class" : "Normal",
+//     "CountInGroup" : 1,
+//     "DetectRegion" : [
+//        [ 455, 260 ],
+//        [ 3586, 260 ],
+//        [ 3768, 7580 ],
+//        [ 382, 7451 ]
+//     ],
+//     "Direction" : "Enter",
+//     "EventID" : 10181,
+//     "GroupID" : 0,
+//     "Name" : "Rule1",
+//     "Object" : {
+//        "Action" : "Appear",
+//        "BoundingBox" : [ 2856, 1280, 3880, 4880 ],
+//        "Center" : [ 3368, 3080 ],
+//        "Confidence" : 0,
+//        "LowerBodyColor" : [ 0, 0, 0, 0 ],
+//        "MainColor" : [ 0, 0, 0, 0 ],
+//        "ObjectID" : 863,
+//        "ObjectType" : "Human",
+//        "RelativeID" : 0,
+//        "Speed" : 0
+//     },
+//     "PTS" : 43380319830.0,
+//     "RuleID" : 2,
+//     "Track" : [],
+//     "UTC" : 1711446999,
+//     "UTCMS" : 701
+//  }
+export interface AmcrestObjectDetails {
+    Action: string;
+    BoundingBox: Point;
+    Center: Point;
+    Confidence: number;
+    LowerBodyColor: [number, number, number, number];
+    MainColor: [number, number, number, number];
+    ObjectID: number;
+    ObjectType: string;
+    RelativeID: number;
+    Speed: number;
+}
+
+export interface AmcrestEventData {
+    Action: string;
+    Class: string;
+    CountInGroup: number;
+    DetectRegion: Point[];
+    Direction: string;
+    EventID: number;
+    GroupID: number;
+    Name: string;
+    Object: AmcrestObjectDetails;
+    PTS: number;
+    RuleID: number;
+    Track: any[];
+    UTC: number;
+    UTCMS: number;
+}
 
 export enum AmcrestEvent {
     MotionStart = "Code=VideoMotion;action=Start",
@@ -18,6 +86,10 @@ export enum AmcrestEvent {
     DahuaTalkHangup = "Code=PassiveHungup;action=Start",
     DahuaCallDeny = "Code=HungupPhone;action=Pulse",
     DahuaTalkPulse = "Code=_CallNoAnswer_;action=Pulse",
+    SmartMotionHuman = "Code=SmartMotionHuman;action=Start",
+    SmartMotionVehicle = "Code=Vehicle;action=Start",
+    CrossLineDetection = "Code=CrossLineDetection;action=Start",
+    CrossRegionDetection = "Code=CrossRegionDetection;action=Start",
 }
 
 export class AmcrestCameraClient {
@@ -78,7 +150,8 @@ export class AmcrestCameraClient {
         return response.body;
     }
 
-    async listenEvents() {
+    async listenEvents(): Promise<Destroyable> {
+        const events = new EventEmitter();
         const url = `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[All]`;
         console.log('preparing event listener', url);
 
@@ -86,32 +159,102 @@ export class AmcrestCameraClient {
             url,
             responseType: 'readable',
         });
-        const stream = response.body;
+        const stream: IncomingMessage = response.body;
+        (events as any).destroy = () => {
+            stream.destroy();
+            events.removeAllListeners();
+        };
+        stream.on('close', () => {
+            events.emit('close');
+        });
+        stream.on('end', () => {
+            events.emit('end');
+        });
+        stream.on('error', e => {
+            events.emit('error', e);
+        });
         stream.socket.setKeepAlive(true);
 
-        stream.on('data', (buffer: Buffer) => {
-            const data = buffer.toString();
-            const parts = data.split(';');
-            let index: string;
-            try {
-                for (const part of parts) {
-                    if (part.startsWith('index')) {
-                        index = part.split('=')[1]?.trim();
+
+        const ct = stream.headers['content-type'];
+        // make content type parsable as content disposition filename
+        const cd = contentType.parse(ct);
+        let { boundary } = cd.parameters;
+        boundary = `--${boundary}`;
+        const boundaryEnd = `${boundary}--`;
+
+
+        (async () => {
+            while (true) {
+                let ignore = await readLine(stream);
+                ignore = ignore.trim();
+                if (!ignore)
+                    continue;
+                if (ignore === boundaryEnd)
+                    continue;
+                if (ignore !== boundary) {
+                    this.console.error('expected boundary but found', ignore);
+                    throw new Error('expected boundary');
+                }
+
+                const message = await readMessage(stream);
+                events.emit('data', message);
+                message.unshift('');
+                const headers = parseHeaders(message);
+                const body = await readBody(stream, headers);
+
+                const data = body.toString();
+                events.emit('data', data);
+
+                const parts = data.split(';');
+                let index: string;
+                try {
+                    for (const part of parts) {
+                        if (part.startsWith('index')) {
+                            index = part.split('=')[1]?.trim();
+                        }
+                    }
+                }
+                catch (e) {
+                    this.console.error('error parsing index', data);
+                }
+                let jsonData: any;
+                try {
+                    for (const part of parts) {
+                        if (part.startsWith('data')) {
+                            jsonData = JSON.parse(part.split('=')[1]?.trim());
+                        }
+                    }
+                }
+                catch (e) {
+                    this.console.error('error parsing data', data);
+                }
+
+                for (const event of Object.values(AmcrestEvent)) {
+                    if (data.indexOf(event) !== -1) {
+                        events.emit('event', event, index, data);
+
+                        if (event === AmcrestEvent.SmartMotionHuman) {
+                            events.emit('smart', 'person', jsonData);
+                        }
+                        else if (event === AmcrestEvent.SmartMotionVehicle) {
+                            events.emit('smart', 'vehicle', jsonData);
+                        }
+                        else if (event === AmcrestEvent.CrossLineDetection || event === AmcrestEvent.CrossRegionDetection) {
+                            const eventData: AmcrestEventData = jsonData;
+                            if (eventData?.Object?.ObjectType === 'Human') {
+                                events.emit('smart', 'person', eventData);
+                            }
+                            else if (eventData?.Object?.ObjectType === 'Vehicle') {
+                                events.emit('smart', 'car', eventData);
+                            }
+                        }
                     }
                 }
             }
-            catch (e) {
-                this.console.error('error parsing index', data);
-            }
-            // this.console?.log('event', data);
-            for (const event of Object.values(AmcrestEvent)) {
-                if (data.indexOf(event) !== -1) {
-                    stream.emit('event', event, index, data);
-                }
-            }
-        });
-
-        return stream;
+        })()
+            .catch(() => stream.destroy());
+        return events as any as Destroyable;
     }
 
     async enableContinousRecording(channel: number) {

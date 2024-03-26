@@ -1,11 +1,11 @@
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
+import { AmcrestCameraClient, AmcrestEvent, AmcrestEventData } from "./amcrest-api";
 
 const { mediaManager } = sdk;
 
@@ -28,6 +28,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     client: AmcrestCameraClient;
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     onvifIntercom = new OnvifIntercom(this);
+    hasSmartDetection: boolean;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
@@ -36,6 +37,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             this.storage.removeItem('amcrestDoorbell');
         }
 
+        this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
     }
@@ -184,7 +186,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 if (idx.toString() !== channelNumber)
                     return;
             }
-            if (event === AmcrestEvent.MotionStart) {
+            if (event === AmcrestEvent.MotionStart
+                || event === AmcrestEvent.SmartMotionHuman
+                || event === AmcrestEvent.SmartMotionVehicle
+                || event === AmcrestEvent.CrossLineDetection
+                || event === AmcrestEvent.CrossRegionDetection) {
                 this.motionDetected = true;
                 resetMotionTimeout();
             }
@@ -229,6 +235,26 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
                 this.binaryState = true;
             }
+        });
+
+        events.on('smart', (className: string, data: AmcrestEventData) => {
+            if (!this.hasSmartDetection) {
+                this.hasSmartDetection = true;
+                this.storage.setItem('hasSmartDetection', 'true');
+                this.updateDevice();
+            }
+
+            const detected: ObjectsDetected = {
+                timestamp: Date.now(),
+                detections: [
+                    {
+                        score: 1,
+                        className,
+                    }
+                ],
+            };
+
+            this.onDeviceEvent(ScryptedInterface.ObjectDetector, detected);
         });
 
         return events;
@@ -472,13 +498,19 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         if (isDoorbell || twoWayAudio) {
             interfaces.push(ScryptedInterface.Intercom);
         }
+
         const enableDahuaLock = this.storage.getItem('enableDahuaLock') === 'true';
         if (isDoorbell && doorbellType === DAHUA_DOORBELL_TYPE && enableDahuaLock) {
             interfaces.push(ScryptedInterface.Lock);
         }
+
         const continuousRecording = this.storage.getItem('continuousRecording') === 'true';
         if (continuousRecording)
             interfaces.push(ScryptedInterface.VideoRecorder);
+
+        if (this.hasSmartDetection)
+            interfaces.push(ScryptedInterface.ObjectDetector);
+
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
@@ -521,7 +553,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
 
         const doorbellType = this.storage.getItem('doorbellType');
-        
+
         // not sure if this all works, since i don't actually have a doorbell.
         // good luck!
         const channel = this.getRtspChannel() || '1';
@@ -548,11 +580,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
         else {
             args.push(
-                      "-vn",
-                      '-acodec', 'aac',
-                      '-f', 'adts',
-                      'pipe:3',
-                      );
+                "-vn",
+                '-acodec', 'aac',
+                '-f', 'adts',
+                'pipe:3',
+            );
             contentType = 'Audio/AAC';
         }
 

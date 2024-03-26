@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/amcrest",
-   "version": "0.0.135",
+   "version": "0.0.136",
    "description": "Amcrest Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -36,9 +36,11 @@
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk"
+      "@scrypted/sdk": "file:../../sdk",
+      "content-type": "^1.0.5"
    },
    "devDependencies": {
-      "@types/node": "^20.10.8"
+      "@types/content-type": "^1.1.8",
+      "@types/node": "^20.11.30"
    }
 }
