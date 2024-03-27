@@ -623,7 +623,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 method: 'POST',
                 headers: {
                     'Content-Type': contentType,
-                    'Content-Length': '9999999'
+                    'Content-Length': '9999999',
                 },
                 responseType: 'readable',
             }, passthrough);

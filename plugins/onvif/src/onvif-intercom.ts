@@ -60,7 +60,6 @@ export class OnvifIntercom implements Intercom {
         let transportDict: ReturnType<typeof parseSemicolonDelimited>;
         let tcp = false;
         try {
-            throw new Error()
             const headers: any = {
                 Require,
                 Transport: `RTP/AVP;unicast;client_port=${rtp}-${rtcp}`,
@@ -98,7 +97,7 @@ export class OnvifIntercom implements Intercom {
         this.camera.console.log('backchannel transport', transportDict);
 
         const availableMatches = audioBackchannel.rtpmaps.filter(rtpmap => rtpmap.ffmpegEncoder);
-        const defaultMatch = audioBackchannel.rtpmaps.find(rtpmap => rtpmap.ffmpegEncoder);
+        const defaultMatch = audioBackchannel.rtpmaps.find(rtpmap => rtpmap.ffmpegEncoder === 'pcm_mulaw') || audioBackchannel.rtpmaps.find(rtpmap => rtpmap.ffmpegEncoder);
 
         if (!defaultMatch)
             throw new Error('no supported codec was found for back channel');
