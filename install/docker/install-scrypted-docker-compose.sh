@@ -69,16 +69,16 @@ chown -R $SERVICE_USER $SCRYPTED_HOME
 set +e
 
 echo "docker compose down"
-sudo -u $SERVICE_USER docker compose down 2> /dev/null
+sudo -u $SERVICE_USER docker-compose down 2> /dev/null
 echo "docker compose rm -rf"
 sudo -u $SERVICE_USER docker rm -f /scrypted /scrypted-watchtower 2> /dev/null
 
 set -e
 
 echo "docker compose pull"
-sudo -u $SERVICE_USER docker compose pull
+sudo -u $SERVICE_USER docker-compose pull
 echo "docker compose up -d"
-sudo -u $SERVICE_USER docker compose up -d
+sudo -u $SERVICE_USER docker-compose up -d
 
 echo
 echo
