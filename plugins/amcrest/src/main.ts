@@ -599,6 +599,16 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 'pipe:3',
             );
             contentType = 'Audio/AAC';
+            // args.push(
+            //     "-vn",
+            //     '-acodec', 'pcm_mulaw',
+            //     '-ac', '1',
+            //     '-ar', '8000',
+            //     '-sample_fmt', 's16',
+            //     '-f', 'mulaw',
+            //     'pipe:3',
+            // );
+            // contentType = 'Audio/G.711A';
         }
 
         this.console.log('ffmpeg intercom', args);
@@ -618,6 +628,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             // seems the dahua doorbells preferred 1024 chunks. should investigate adts
             // parsing and sending multipart chunks instead.
             const passthrough = new PassThrough();
+            const abortController = new AbortController();
             this.getClient().request({
                 url,
                 method: 'POST',
@@ -625,8 +636,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                     'Content-Type': contentType,
                     'Content-Length': '9999999',
                 },
+                signal: abortController.signal,
                 responseType: 'readable',
-            }, passthrough);
+            }, passthrough)
+                .catch(() => { })
+                .finally(() => this.console.log('request finished'))
 
             try {
                 while (true) {
@@ -638,7 +652,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             }
             finally {
                 this.console.log('audio finished');
-                passthrough.end();
+                passthrough.destroy();
+                abortController.abort();
             }
 
             this.stopIntercom();

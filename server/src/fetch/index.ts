@@ -5,6 +5,7 @@ export interface HttpFetchOptionsBase<B> {
     family?: 4 | 6;
     method?: string;
     headers?: HeadersInit;
+    signal?: AbortSignal,
     timeout?: number;
     rejectUnauthorized?: boolean;
     ignoreStatusCode?: boolean;
@@ -128,7 +129,7 @@ export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T)
         method: getFetchMethod(options),
         credentials: options.withCredentials ? 'include' : undefined,
         headers,
-        signal: options.timeout ? AbortSignal.timeout(options.timeout) : undefined,
+        signal: options.signal || options.timeout ? AbortSignal.timeout(options.timeout) : undefined,
         body,
     });
 

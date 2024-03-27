@@ -101,6 +101,8 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
         timeout: options.timeout,
     });
 
+    options.signal?.addEventListener('abort', () => request.destroy(new Error('abort')));
+
     if (body)
         body.pipe(request);
     else
