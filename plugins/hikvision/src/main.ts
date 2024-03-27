@@ -110,7 +110,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
                 || event === HikvisionCameraEvent.RegionExit
                 || event === HikvisionCameraEvent.FieldDetection) {
 
-                if (!checkCameraNumber(cameraNumber))
+                if (!await checkCameraNumber(cameraNumber))
                     return;
 
                 this.motionDetected = true;
@@ -135,7 +135,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
 
             const [channelId] = xml.EventNotificationAlert.channelID;
-            if (!checkCameraNumber(channelId)) {
+            if (!await checkCameraNumber(channelId)) {
                 this.console.warn('chann fail')
                 return;
             }
