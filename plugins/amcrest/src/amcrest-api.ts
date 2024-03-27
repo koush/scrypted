@@ -238,7 +238,7 @@ export class AmcrestCameraClient {
                             events.emit('smart', 'person', jsonData);
                         }
                         else if (event === AmcrestEvent.SmartMotionVehicle) {
-                            events.emit('smart', 'vehicle', jsonData);
+                            events.emit('smart', 'car', jsonData);
                         }
                         else if (event === AmcrestEvent.CrossLineDetection || event === AmcrestEvent.CrossRegionDetection) {
                             const eventData: AmcrestEventData = jsonData;
