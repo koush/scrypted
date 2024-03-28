@@ -1,6 +1,6 @@
 {
    "name": "@vityevato/hikvision-doorbell",
-   "version": "0.0.1",
+   "version": "0.0.3",
    "description": "Hikvision Doorbell Plugin for Scrypted",
    "author": "Roman Sokolov",
    "license": "Apache",

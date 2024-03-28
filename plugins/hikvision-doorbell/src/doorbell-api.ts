@@ -1,20 +1,14 @@
-import { HttpFetchResponse } from '@scrypted/server/src/fetch/http-fetch'
-import { AuthFetchCredentialState, HttpFetchOptions, HttpFetchResponseType, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { HikvisionAPI } from "../../hikvision/src/hikvision-api-interfaces"
+import { HttpFetchOptions } from '@scrypted/common/src/http-auth-fetch';
 import { Readable, PassThrough } from 'stream';
 import { MediaStreamOptions } from '@scrypted/sdk';
 import net, { Server } from 'net';
-import crypto from 'crypto';
-import { resolve } from 'path';
-import { rejects } from 'assert';
 import { AddressInfo } from 'net';
-import { hostname } from 'os';
-import { Socket } from 'dgram';
-import ip from 'ip';
 import { Destroyable } from "../../rtsp/src/rtsp";
 import { EventEmitter } from 'events';
 import { getDeviceInfo } from './probe';
 import { AuthRequestOptions, AuthRequst, AuthRequestBody } from './auth-request'
-import { IncomingMessage, OutgoingHttpHeaders } from 'http';
+import { OutgoingHttpHeaders } from 'http';
 import { localServiceIpAddress } from './utils';
 import libip from 'ip';
 import xml2js from 'xml2js';
@@ -53,7 +47,7 @@ export class HikvisionDoorbell_Destroyable extends EventEmitter implements Destr
     }
 }
 
-export class HikvisionDoorbellAPI 
+export class HikvisionDoorbellAPI implements HikvisionAPI 
 {
     endpoint: string;
     auth: AuthRequst;

@@ -1,6 +1,6 @@
 import sdk, { ScryptedDeviceBase, SettingValue, ScryptedInterface, Setting, Settings, Lock, LockState, Readme } from "@scrypted/sdk";
 import { HikvisionDoorbellAPI } from "./doorbell-api";
-import { HikvisionProvider } from "./main";
+import { HikvisionDoorbellProvider } from "./main";
 import * as fs from 'fs/promises';
 import { join } from 'path';
 
@@ -10,9 +10,9 @@ export class HikvisionLock extends ScryptedDeviceBase implements Lock, Settings,
 
     // timeout: NodeJS.Timeout;
 
-    private provider: HikvisionProvider;
+    private provider: HikvisionDoorbellProvider;
 
-    constructor(nativeId: string, provider: HikvisionProvider) {
+    constructor(nativeId: string, provider: HikvisionDoorbellProvider) {
         super (nativeId);
 
         this.lockState = this.lockState || LockState.Unlocked;
@@ -35,7 +35,7 @@ export class HikvisionLock extends ScryptedDeviceBase implements Lock, Settings,
     }
 
     async getSettings(): Promise<Setting[]> {
-        const cameraNativeId = this.storage.getItem (HikvisionProvider.CAMERA_NATIVE_ID_KEY);
+        const cameraNativeId = this.storage.getItem (HikvisionDoorbellProvider.CAMERA_NATIVE_ID_KEY);
         const state = deviceManager.getDeviceState (cameraNativeId);
         return [
             {
