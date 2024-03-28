@@ -124,30 +124,42 @@ export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T)
         body = createStringOrBufferBody(headers, body);
     }
 
-    const { url } = options;
-    const response = await fetch(url, {
-        method: getFetchMethod(options),
-        credentials: options.withCredentials ? 'include' : undefined,
-        headers,
-        signal: options.signal || options.timeout ? AbortSignal.timeout(options.timeout) : undefined,
-        body,
-    });
-
-    if (!options?.ignoreStatusCode) {
-        try {
-            checkStatus(response.status);
-        }
-        catch (e) {
-            response.arrayBuffer().catch(() => { });
-            throw e;
-        }
+    let controller: AbortController;
+    let timeout: NodeJS.Timeout;
+    if (options.timeout) {
+        controller = new AbortController();
+        timeout = setTimeout(() => controller.abort(), options.timeout);
     }
 
-    return {
-        statusCode: response.status,
-        headers: response.headers,
-        body: await domFetchParseIncomingMessage(response, options.responseType),
-    };
+    try {
+        const { url } = options;
+        const response = await fetch(url, {
+            method: getFetchMethod(options),
+            credentials: options.withCredentials ? 'include' : undefined,
+            headers,
+            signal: controller?.signal || options.signal,
+            body,
+        });
+
+        if (!options?.ignoreStatusCode) {
+            try {
+                checkStatus(response.status);
+            }
+            catch (e) {
+                response.arrayBuffer().catch(() => { });
+                throw e;
+            }
+        }
+
+        return {
+            statusCode: response.status,
+            headers: response.headers,
+            body: await domFetchParseIncomingMessage(response, options.responseType),
+        };
+    }
+    finally {
+        clearTimeout(timeout);
+    }
 }
 
 function ensureType<T>(v: T) {

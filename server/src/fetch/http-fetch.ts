@@ -93,44 +93,61 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
         }
     }
 
+    let controller: AbortController;
+    let timeout: NodeJS.Timeout;
+    if (options.timeout) {
+        controller = new AbortController();
+        timeout = setTimeout(() => controller.abort(), options.timeout);
+    }
+
     const request = proto.request(url, {
         method: getFetchMethod(options),
         rejectUnauthorized: options.rejectUnauthorized,
         family: options.family,
         headers: nodeHeaders,
+        signal: controller?.signal || options.signal,
         timeout: options.timeout,
     });
 
-    options.signal?.addEventListener('abort', () => request.destroy(new Error('abort')));
+    if (controller)
+        options.signal?.addEventListener('abort', () => controller.abort('abort'));
+    else
+        options.signal?.addEventListener('abort', () => request.destroy(new Error('abort')));
 
     if (body)
         body.pipe(request);
     else
         request.end();
-    const [response] = await once(request, 'response') as [IncomingMessage];
 
-    if (!options?.ignoreStatusCode) {
-        try {
-            checkStatus(response.statusCode);
+    try {
+        const [response] = await once(request, 'response') as [IncomingMessage];
+
+        if (!options?.ignoreStatusCode) {
+            try {
+                checkStatus(response.statusCode);
+            }
+            catch (e) {
+                readMessageBuffer(response).catch(() => { });
+                throw e;
+            }
         }
-        catch (e) {
-            readMessageBuffer(response).catch(() => { });
-            throw e;
+
+        const incomingHeaders = new Headers();
+        for (const [k, v] of Object.entries(response.headers)) {
+            for (const vv of (typeof v === 'string' ? [v] : v)) {
+                incomingHeaders.append(k, vv)
+            }
         }
+
+        return {
+            statusCode: response.statusCode,
+            headers: incomingHeaders,
+            body: await httpFetchParseIncomingMessage(response, options.responseType),
+        };
     }
-
-    const incomingHeaders = new Headers();
-    for (const [k, v] of Object.entries(response.headers)) {
-        for (const vv of (typeof v === 'string' ? [v] : v)) {
-            incomingHeaders.append(k, vv)
-        }
+    finally {
+        clearTimeout(timeout);
     }
-
-    return {
-        statusCode: response.statusCode,
-        headers: incomingHeaders,
-        body: await httpFetchParseIncomingMessage(response, options.responseType),
-    };
 }
 
 function ensureType<T>(v: T) {
