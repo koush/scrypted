@@ -27,14 +27,14 @@ export interface ScryptedDevice {
    */
   probe(): Promise<boolean>;
 
-  id?: string;
+  id: string;
   nativeId?: ScryptedNativeId;
-  pluginId?: string;
-  interfaces?: string[];
-  mixins?: string[];
+  pluginId: string;
+  interfaces: string[];
+  mixins: string[];
   name?: string;
   info?: DeviceInformation;
-  providedInterfaces?: string[];
+  providedInterfaces: string[];
   providedName?: ScryptedDeviceType;
   providedRoom?: string;
   providedType?: ScryptedDeviceType;
@@ -44,6 +44,13 @@ export interface ScryptedDevice {
 }
 export interface ScryptedPlugin {
   getPluginJson(): Promise<any>;
+}
+export interface ScryptedRuntimeArguments {
+  executable?: string;
+  arguments?: string[];
+}
+export interface ScryptedPluginRuntime {
+  scryptedRuntimeArguments?: ScryptedRuntimeArguments;
 }
 export interface EventListenerOptions {
   /**
@@ -221,6 +228,7 @@ export interface NotifierOptions {
   tag?: string;
   timestamp?: number;
   vibrate?: VibratePattern;
+  recordedEvent?: RecordedEvent;
 }
 
 /**
@@ -237,7 +245,11 @@ export interface Notifier {
 export interface MediaObject {
   mimeType: string;
   sourceId?: string;
+
+  toMimeTypes?: string[];
+  convert?<T>(toMimeType: string): Promise<T>;
 }
+
 /**
  * StartStop represents a device that can be started, stopped, and possibly paused and resumed. Typically vacuum cleaners or washers.
  */
@@ -280,61 +292,6 @@ export interface TemperatureSettingStatus {
 export interface TemperatureSetting {
   temperatureSetting?: TemperatureSettingStatus;
   setTemperature(command: TemperatureCommand): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  setThermostatMode(mode: ThermostatMode): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  setThermostatSetpoint(degrees: number): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  setThermostatSetpointHigh(high: number): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  setThermostatSetpointLow(low: number): Promise<void>;
-
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatAvailableModes?: ThermostatMode[];
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatMode?: ThermostatMode;
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatActiveMode?: ThermostatMode;
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatSetpoint?: number;
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatSetpointHigh?: number;
-  /**
-   * @deprecated
-   * @param mode
-   */
-  thermostatSetpointLow?: number;
 }
 export enum HumidityMode {
   Humidify = "Humidify",
@@ -453,6 +410,10 @@ export interface RequestPictureOptions extends PictureOptions {
    * Flag that hints whether multiple cameras are being refreshed by this user request. Can be used to prefetch the snapshots.
    */
   bulkRequest?: boolean;
+  /**
+   * The maximum time in milliseconds to wait for the picture.
+   */
+  timeout?: number;
 }
 /**
  * Camera devices can take still photos.
@@ -667,6 +628,20 @@ export interface Microphone {
   getAudioStream(): Promise<MediaObject>;
 }
 
+export interface AudioVolumes {
+  [key: string]: number;
+}
+
+export interface AudioVolumeControl {
+  audioVolumes?: AudioVolumes;
+  /**
+   * Set audio volumes for the device. Common keys are 'microphone', 'intercom',
+   * and 'speaker'.
+   * @param audioVolumes
+   */
+  setAudioVolumes(audioVolumes: AudioVolumes): Promise<void>;
+}
+
 /**
  * VideoCamera devices can capture video streams.
  */
@@ -804,6 +779,20 @@ export interface Intercom {
   stopIntercom(): Promise<void>;
 }
 
+export interface PrivacyMask {
+  name?: string;
+  points: Point[];
+}
+
+export interface PrivacyMasks {
+  masks: PrivacyMask[];
+}
+
+export interface VideoCameraMask {
+  getPrivacyMasks(): Promise<PrivacyMasks>;
+  setPrivacyMasks(masks: PrivacyMasks): Promise<void>;
+}
+
 export enum PanTiltZoomMovement {
   Absolute = "Absolute",
   Relative = "Relative"
@@ -931,12 +920,12 @@ export interface DeviceManager {
   /**
    * Get the console for the device given a native id.
    */
-  getDeviceConsole?(nativeId?: ScryptedNativeId): Console;
+  getDeviceConsole(nativeId?: ScryptedNativeId): Console;
 
   /**
    * Get the console for the device given a native id.
    */
-  getMixinConsole?(mixinId: string, nativeId?: ScryptedNativeId): Console;
+  getMixinConsole(mixinId: string, nativeId?: ScryptedNativeId): Console;
 
   /**
    * Get the device state maintained by Scrypted. Setting properties on this state will update the state in Scrypted.
@@ -946,7 +935,7 @@ export interface DeviceManager {
   /**
    * Create a device state object that will trap all state setting calls. Used internally by mixins and fork.
    */
-  createDeviceState?(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState;
+  createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): WritableDeviceState;
 
   /**
    * Get the storage for a mixin.
@@ -1161,12 +1150,22 @@ export interface Scriptable {
 /**
  * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type.
  * May optionally accept string urls if accept-url is a fromMimeType parameter.
+ * @deprecated
  */
 export interface BufferConverter {
   convert(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<MediaObject | Buffer | any>;
 
   fromMimeType?: string;
   toMimeType?: string;
+}
+/**
+ * [fromMimeType, toMimeType]
+ */
+export type MediaConverterTypes = [string, string];
+export interface MediaConverter {
+  convertMedia(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<MediaObject | Buffer | any>;
+
+  converters?: MediaConverterTypes[];
 }
 /**
  * Settings viewing and editing of device configurations that describe or modify behavior.
@@ -1197,7 +1196,7 @@ export interface AmbientLightSensor {
   /**
    * The ambient light in lux.
    */
-  ambientLight: number;
+  ambientLight?: number;
 }
 export interface OccupancySensor {
   occupied?: boolean;
@@ -1404,6 +1403,7 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
   settings: Setting[];
   triggerClasses?: string[];
   prebuffer?: number;
+  decoder?: boolean;
 }
 export interface ObjectDetectionGeneratorResult {
   __json_copy_serialize_children: true;
@@ -1421,7 +1421,7 @@ export interface ObjectDetectionZone {
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
-  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame, void>, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
+  generateObjectDetections(videoFrames: AsyncGenerator<VideoFrame, void> | MediaObject, session: ObjectDetectionGeneratorSession): Promise<AsyncGenerator<ObjectDetectionGeneratorResult, void>>;
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
   getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
@@ -1476,7 +1476,7 @@ export interface VideoFrameGenerator {
  * Generic bidirectional stream connection.
  */
 export interface StreamService {
-  connectStream(input: AsyncGenerator<any, void>): Promise<AsyncGenerator<any, void>>;
+  connectStream(input?: AsyncGenerator<any, void>, options?: any): Promise<AsyncGenerator<any, void>>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -1554,6 +1554,12 @@ export interface MediaObjectOptions {
    * The device id of the source of the MediaObject.
    */
   sourceId?: string;
+}
+
+export interface MediaObjectCreateOptions extends MediaObjectOptions {
+  toMimeTypes?: string[];
+  convert?<T>(toMimeType: string): Promise<T>;
+
   [key: string]: TopLevelSerializableType;
 }
 
@@ -1561,12 +1567,6 @@ export interface MediaObjectOptions {
  * @category Media Reference
  */
 export interface MediaManager {
-  /**
-   * Add an convertor to consider for use when converting MediaObjects.
-   */
-  addConverter(converter: BufferConverter): Promise<void>;
-  clearConverters(): Promise<void>;
-
   /**
    * Convert a media object to a Buffer, primtive type, or RPC Object.
    */
@@ -1600,19 +1600,19 @@ export interface MediaManager {
   /**
    * Create a MediaObject from FFmpeg input arguments.
    */
-  createFFmpegMediaObject(ffmpegInput: FFmpegInput, options?: MediaObjectOptions): Promise<MediaObject>;
+  createFFmpegMediaObject<T extends MediaObjectCreateOptions>(ffmpegInput: FFmpegInput, options?: T): Promise<MediaObject & T>;
 
   /**
    * Create a MediaObject from an URL. The mime type will be determined dynamically while resolving the url.
    */
-  createMediaObjectFromUrl<T extends MediaObjectOptions>(data: string, options?: T): Promise<MediaObject>;
+  createMediaObjectFromUrl<T extends MediaObjectCreateOptions>(data: string, options?: T): Promise<MediaObject & T>;
 
   /**
    * Create a MediaObject.
    * If the data is a buffer, JSON object, or primitive type, it will be serialized.
    * All other objects will be objects will become RPC objects.
    */
-  createMediaObject<T extends MediaObjectOptions>(data: any | Buffer, mimeType: string, options?: T): Promise<MediaObject & T>;
+  createMediaObject<T extends MediaObjectCreateOptions>(data: any | Buffer, mimeType: string, options?: T): Promise<MediaObject & T>;
 
   /**
    * Get the path to ffmpeg on the host system.
@@ -1725,9 +1725,12 @@ export interface EndpointManager {
   getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
-   * Get an URL pathname for a device that can be accessed without authentication. This is a relative path that can be used in browser sessions.
+   * Get an URL pathname for a device. This is a relative path that can be used in browser sessions.
    */
   getPath(nativeId?: ScryptedNativeId, options?: {
+    /**
+     * A public endpoint that does not require authentication with the local Scrypted server.
+     */
     public?: boolean,
   }): Promise<string>;
 
@@ -1858,12 +1861,12 @@ export interface MixinProvider {
   /**
    * Called by the system to determine if this provider can create a mixin for the supplied device. Returns null if a mixin can not be created, otherwise returns a list of new interfaces (which may be an empty list) that are provided by the mixin.
    */
-  canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]>;
+  canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[] | null | undefined | void>;
 
   /**
    * Create a mixin that can be applied to the supplied device.
    */
-  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any>;
+  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any>;
 
   /**
    * Release a mixin device that was previously returned from getMixin.
@@ -1993,6 +1996,7 @@ export interface LauncherApplication {
 export enum ScryptedInterface {
   ScryptedDevice = "ScryptedDevice",
   ScryptedPlugin = "ScryptedPlugin",
+  ScryptedPluginRuntime = "ScryptedPluginRuntime",
   OnOff = "OnOff",
   Brightness = "Brightness",
   ColorSettingTemperature = "ColorSettingTemperature",
@@ -2007,8 +2011,10 @@ export enum ScryptedInterface {
   HumiditySensor = "HumiditySensor",
   Camera = "Camera",
   Microphone = "Microphone",
+  AudioVolumeControl = "AudioVolumeControl",
   Display = "Display",
   VideoCamera = "VideoCamera",
+  VideoCameraMask = "VideoCameraMask",
   VideoRecorder = "VideoRecorder",
   VideoRecorderManagement = "VideoRecorderManagement",
   PanTiltZoom = "PanTiltZoom",
@@ -2031,6 +2037,7 @@ export enum ScryptedInterface {
   MediaPlayer = "MediaPlayer",
   Online = "Online",
   BufferConverter = "BufferConverter",
+  MediaConverter = "MediaConverter",
   Settings = "Settings",
   BinarySensor = "BinarySensor",
   TamperSensor = "TamperSensor",
@@ -2165,14 +2172,14 @@ export interface RTCMediaObjectTrack {
 /**
  * @category WebRTC Reference
  */
-export interface RTCOutputMediaObjectTrack extends RTCMediaObjectTrack{
+export interface RTCOutputMediaObjectTrack extends RTCMediaObjectTrack {
   replace(mediaObject: MediaObject): Promise<void>;
 }
 
 /**
  * @category WebRTC Reference
  */
-export interface RTCInputMediaObjectTrack extends RTCMediaObjectTrack{
+export interface RTCInputMediaObjectTrack extends RTCMediaObjectTrack {
   setPlayback(options: {
     audio: boolean,
     video: boolean,
@@ -2273,8 +2280,11 @@ export interface PluginFork<T> {
 }
 
 export declare interface DeviceState {
-  id?: string;
-  setState?(property: string, value: any): Promise<void>;
+  id: string;
+}
+
+export interface WritableDeviceState extends DeviceState {
+  setState(property: string, value: any): Promise<void>;
 }
 
 export interface ScryptedInterfaceDescriptor {
@@ -2350,18 +2360,18 @@ export interface ScryptedStatic {
    * Start a new instance of the plugin, returning an instance of the new process
    * and the result of the fork method.
    */
-  fork?<T>(): PluginFork<T>;
+  fork<T>(): PluginFork<T>;
   /**
    * Initiate the Scrypted RPC wire protocol on a socket.
    * @param socket
    * @param options
    */
-  connect?(socket: NodeNetSocket, options?: ConnectOptions): void;
+  connect(socket: NodeNetSocket, options?: ConnectOptions): void;
   /**
    * Attempt to retrieve an RPC object by directly connecting to the plugin
    * that created the object. All operations on this object will bypass routing
    * through the Scrypted Server which typically manages plugin communication.
    * This is ideal for sending large amounts of data.
    */
-  connectRPCObject?<T>(value: T): Promise<T>;
+  connectRPCObject<T>(value: T): Promise<T>;
 }

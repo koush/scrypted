@@ -1,13 +1,14 @@
 {
     "compilerOptions": {
-        "module": "commonjs",
-        "target": "ES2021",
+        "module": "NodeNext",
+        "target": "ESNext",
         "resolveJsonModule": true,
-        "moduleResolution": "Node16",
+        "moduleResolution": "NodeNext",
         "esModuleInterop": true,
         "sourceMap": true
     },
     "include": [
-        "src/**/*"
+        "src/**/*",
+        "test/**/*",
     ]
 }

@@ -1,8 +1,12 @@
 
 {
     // docker installation
-    // "scrypted.debugHost": "koushik-ubuntu",
+    // "scrypted.debugHost": "scrypted-server",
     // "scrypted.serverRoot": "/server",
+
+    // lxc installation
+    // "scrypted.debugHost": "scrypted-server",
+    // "scrypted.serverRoot": "/root/.scrypted",
 
     // windows installation
     // "scrypted.debugHost": "koushik-windows",

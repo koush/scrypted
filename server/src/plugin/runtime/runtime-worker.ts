@@ -6,6 +6,9 @@ import net from "net";
 export interface RuntimeWorkerOptions {
     packageJson: any;
     pluginDebug: PluginDebug;
+    zipFile: string,
+    unzippedPath: string;
+    zipHash: string;
     env: any;
 }
 
@@ -13,7 +16,6 @@ export interface RuntimeWorker {
     pid: number;
     stdout: Readable;
     stderr: Readable;
-    killed: boolean;
 
     kill(): void;
 

@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/hikvision",
-   "version": "0.0.134",
+   "version": "0.0.146",
    "description": "Hikvision Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -37,11 +37,12 @@
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "@types/xml2js": "^0.4.11",
-      "lodash": "^4.17.21",
-      "xml2js": "^0.6.0"
+      "@types/xml2js": "^0.4.14",
+      "content-type": "^1.0.5",
+      "xml2js": "^0.6.2"
    },
    "devDependencies": {
-      "@types/node": "^18.15.11"
+      "@types/content-type": "^1.1.8",
+      "@types/node": "^20.11.30"
    }
 }

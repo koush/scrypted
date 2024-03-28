@@ -22,11 +22,11 @@
     </v-flex>
 
     <v-flex xs12 v-if="showConsole" ref="consoleEl">
-      <ConsoleCard :deviceId="id"></ConsoleCard>
+      <PtyComponent :reconnect="true" :clearButton="true" @clear="clearConsole" :copyButton="true" title="Console" :hello="(device.nativeId || 'undefined') " nativeId="consoleservice" :control="false" :options="{ pluginId: device.pluginId }"></PtyComponent>
     </v-flex>
 
     <v-flex xs12 v-if="showRepl" ref="replEl">
-      <REPLCard :deviceId="id"></REPLCard>
+      <PtyComponent :copyButton="true" title="REPL" :hello="(device.nativeId || 'undefined')" nativeId="replservice" :control="false" :options="{ pluginId: device.pluginId }"></PtyComponent>
     </v-flex>
     <v-flex xs12 md7>
       <v-layout row wrap>
@@ -198,8 +198,7 @@ import VueSlider from "vue-slider-component";
 import "vue-slider-component/theme/material.css";
 
 import LogCard from "./builtin/LogCard.vue";
-import ConsoleCard from "./ConsoleCard.vue";
-import REPLCard from "./REPLCard.vue";
+import PtyComponent from "./builtin/PtyComponent.vue";
 import {
   getComponentWebPath,
   getDeviceViewPath,
@@ -380,8 +379,7 @@ export default {
     PluginAdvancedUpdate,
     VueSlider,
     LogCard,
-    ConsoleCard,
-    REPLCard,
+    PtyComponent,
     Readme,
 
     Storage,
@@ -473,6 +471,12 @@ export default {
     },
     onChange() {
       // console.log(JSON.stringify(this.device));
+    },
+    async clearConsole() {
+      const plugins = await this.$scrypted.systemManager.getComponent(
+        "plugins"
+      );
+      plugins.clearConsole(this.device.id);
     },
     cleanupListener() {
       if (this.listener) {

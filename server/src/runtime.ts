@@ -9,7 +9,6 @@ import fs from 'fs';
 import http, { ServerResponse } from 'http';
 import https from 'https';
 import net from 'net';
-import type { spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
 import path from 'path';
 import { ParsedQs } from 'qs';
 import semver from 'semver';
@@ -40,13 +39,14 @@ import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-wo
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
+import { Backup } from './services/backup';
 import { CORSControl } from './services/cors';
 import { Info } from './services/info';
 import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
-import { Backup } from './services/backup';
+import { CustomRuntimeWorker } from './plugin/runtime/custom-worker';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -61,7 +61,7 @@ interface HttpPluginData {
     pluginDevice: PluginDevice
 }
 
-export type RuntimeHost = (mainFilename: string, pluginId: string, options: RuntimeWorkerOptions) => RuntimeWorker;
+export type RuntimeHost = (mainFilename: string, pluginId: string, options: RuntimeWorkerOptions, runtime: ScryptedRuntime) => RuntimeWorker;
 
 export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     clusterId = crypto.randomBytes(3).toString('hex');
@@ -74,17 +74,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     devicesLogger = this.logger.getLogger('device', 'Devices');
     wss = new WebSocketServer({ noServer: true });
     wsAtomic = 0;
-    shellio: IOServer = new io.Server({
-        pingTimeout: 120000,
-        perMessageDeflate: true,
-        cors: (req, callback) => {
-            const header = this.getAccessControlAllowOrigin(req.headers);
-            callback(undefined, {
-                origin: header,
-                credentials: true,
-            })
-        },
-    });
     connectRPCObjectIO: IOServer = new io.Server({
         pingTimeout: 120000,
         perMessageDeflate: true,
@@ -111,52 +100,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         // ensure that all the users are loaded from the db.
         this.usersService.getAllUsers();
 
+        this.pluginHosts.set('custom', (_, pluginId, options, runtime) => new CustomRuntimeWorker(pluginId, options, runtime));
         this.pluginHosts.set('python', (_, pluginId, options) => new PythonRuntimeWorker(pluginId, options));
         this.pluginHosts.set('node', (mainFilename, pluginId, options) => new NodeForkWorker(mainFilename, pluginId, options));
 
         app.disable('x-powered-by');
 
         this.addMiddleware();
-
-        app.all('/engine.io/shell', (req, res) => {
-            if (res.locals.aclId) {
-                res.writeHead(401);
-                res.end();
-                return;
-            }
-            this.shellHandler(req, res);
-        });
-
-        this.shellio.on('connection', connection => {
-            try {
-                const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
-                const cp = spawn(process.env.SHELL, [], {
-                });
-                cp.onData(data => connection.send(data));
-                connection.on('message', message => {
-                    if (Buffer.isBuffer(message)) {
-                        cp.write(message.toString());
-                        return;
-                    }
-
-                    try {
-                        const parsed = JSON.parse(message.toString());
-                        if (parsed.dim) {
-                            cp.resize(parsed.dim.cols, parsed.dim.rows);
-                        }
-                    } catch (e) {
-                        // we should only get here if an outdated core plugin
-                        // is sending us string data instead of buffer data
-                        cp.write(message.toString());
-                    }
-                });
-                connection.on('close', () => cp.kill());
-                cp.onExit(() => connection.close());
-            }
-            catch (e) {
-                connection.close();
-            }
-        });
 
         app.all('/engine.io/connectRPCObject', (req, res) => this.connectRPCObjectHandler(req, res));
 
@@ -303,33 +253,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             pluginHost,
             pluginDevice,
         };
-    }
-
-    async shellHandler(req: Request, res: Response) {
-        const isUpgrade = isConnectionUpgrade(req.headers);
-
-        const end = (code: number, message: string) => {
-            if (isUpgrade) {
-                const socket = res.socket;
-                socket.write(`HTTP/1.1 ${code} ${message}\r\n` +
-                    '\r\n');
-                socket.destroy();
-            }
-            else {
-                res.status(code);
-                res.send(message);
-            }
-        };
-
-        if (!res.locals.username) {
-            end(401, 'Not Authorized');
-            return;
-        }
-
-        if ((req as any).upgradeHead)
-            this.shellio.handleUpgrade(req, res.socket, (req as any).upgradeHead)
-        else
-            this.shellio.handleRequest(req, res);
     }
 
     async connectRPCObjectHandler(req: Request, res: Response) {

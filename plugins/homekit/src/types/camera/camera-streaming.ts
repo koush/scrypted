@@ -12,8 +12,8 @@ import sdk, { Camera, FFmpegInput, Intercom, MediaStreamFeedback, RequestMediaSt
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
-import { getAddressOverride } from '../../address-override';
-import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
+import { getScryptedServerAddress, getScryptedServerAddresses } from '../../address-override';
+import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamRequestCallback, StreamRequestTypes, StreamingRequest } from '../../hap';
 import type { HomeKitPlugin } from "../../main";
 import { createSnapshotHandler } from '../camera/camera-snapshot';
 import { getDebugMode } from './camera-debug-mode-storage';
@@ -22,10 +22,7 @@ import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
 import { CameraStreamingSession } from './camera-streaming-session';
 import { getStreamingConfiguration } from './camera-utils';
 
-
 const { mediaManager } = sdk;
-const v4Regex = /^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/
-const v4v6Regex = /^::ffff:[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/;
 
 async function getPort(socketType: SocketType, address: string): Promise<{ socket: dgram.Socket, port: number }> {
     const socket = dgram.createSocket(socketType);
@@ -63,20 +60,43 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             });
 
             const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-            let addressOverride = await getAddressOverride(socketType);
+            const scryptedServerAddresses = await getScryptedServerAddresses();
+            // plugin scope or device scope?
+            if (!scryptedServerAddresses?.length) {
+                console.warn('===========================================================================');
+                console.warn('Scrypted Server Addresses are not set in Scrypted settings.');
+                console.warn('If there are issues streaming, set this address to your wired IP address manually.');
+                console.warn('More information can be found in the HomeKit Plugin README.');
+                console.warn('===========================================================================');
 
-            if (addressOverride) {
+                sdk.log.a('Scrypted Server Addresses are not set in Scrypted settings. More information can be found in the HomeKit Plugin README.');
+            }
+
+            let { sourceAddress } = request;
+            if (socketType === 'udp4' && sourceAddress.startsWith('::ffff:'))
+                sourceAddress = sourceAddress.replace('::ffff:', '');
+
+            const found = scryptedServerAddresses?.find(address => address.includes(sourceAddress));
+            if (!found && scryptedServerAddresses?.length) {
+                console.warn('Connection source address was not found in the list of configured Scrypted Server Addresses. Overriding.', {
+                    sourceAddress,
+                    scryptedServerAddresses
+                });
+
+                const tryAddress = await getScryptedServerAddress(socketType);
                 const infos = Object.values(os.networkInterfaces()).flat().map(i => i?.address);
-                if (!infos.find(address => address === addressOverride)) {
-                    const error = 'The provided Scrypted Server Address was not found in the list of network addresses and may be invalid and will not be used (DHCP assignment change?): ' + addressOverride;
+                if (!infos.find(address => address === tryAddress)) {
+                    const error = 'The provided Scrypted Server Address was not found in the list of network addresses and may be invalid and will not be used (DHCP assignment change?): ' + tryAddress;
                     console.error(error);
                     sdk.log.a(error);
-                    addressOverride = undefined;
+                }
+                else {
+                    sourceAddress = tryAddress;
                 }
             }
 
-            const { socket: videoReturn, port: videoPort } = await getPort(socketType, addressOverride);
-            const { socket: audioReturn, port: audioPort } = await getPort(socketType, addressOverride);
+            const { socket: videoReturn, port: videoPort } = await getPort(socketType, sourceAddress);
+            const { socket: audioReturn, port: audioPort } = await getPort(socketType, sourceAddress);
             videoReturn.setSendBufferSize(1024 * 1024);
             audioReturn.setSendBufferSize(1024 * 1024);
 
@@ -133,62 +153,18 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     srtp_salt: request.audio.srtp_salt,
                     port: audioPort,
                     ssrc: audiossrc,
-                }
+                },
+                addressOverride: sourceAddress,
             }
 
-            console.log('destination address', session.prepareRequest.targetAddress, session.prepareRequest.video.port, session.prepareRequest.audio.port);
-            // plugin scope or device scope?
-            if (addressOverride) {
-                console.log('using address override', addressOverride);
-                response.addressOverride = addressOverride;
-            }
-            else {
-                console.warn('===========================================================================');
-                console.warn('The Scrypted Server Address is not set in the Scrypted settings.');
-                console.warn('If there are issues streaming, set this address to your wired IP address manually.');
-                console.warn('More information can be found in the HomeKit Plugin README.');
-                console.warn('===========================================================================');
-
-                sdk.log.a('The Scrypted Server Address should be set in the Scrypted settings. More information can be found in the HomeKit Plugin README.');
-
-                // HAP-NodeJS has weird default address determination behavior. Ideally it should use
-                // the same IP address as the incoming socket, because that is by definition reachable.
-                // But it seems to rechoose a matching address based on the interface. This guessing
-                // can be error prone if that interface offers multiple addresses, some of which
-                // may not be reachable.
-                // Return the incoming address, assuming the sanity checks pass. Otherwise, fall through
-                // to the HAP-NodeJS implementation.
-                // let check: string;
-                // if (request.addressVersion === 'ipv4') {
-                //     const localAddress = request.connection.localAddress;
-                //     if (v4Regex.exec(localAddress)) {
-                //         check = localAddress;
-                //     }
-                //     else if (v4v6Regex.exec(localAddress)) {
-                //         // if this is a v4 over v6 address, parse it out.
-                //         check = localAddress.substring('::ffff:'.length);
-                //     }
-                // }
-                // else if (request.addressVersion === 'ipv6' && !v4Regex.exec(request.connection.localAddress)) {
-                //     check = request.connection.localAddress;
-                // }
-
-                // // ignore the IP if it is APIPA (Automatic Private IP Addressing)
-                // if (check?.startsWith('169.')) {
-                //     check = undefined;
-                // }
-
-                // // sanity check this address.
-                // if (check) {
-                //     const infos = os.networkInterfaces()[request.connection.networkInterface];
-                //     if (infos && infos.find(info => info.address === check)) {
-                //         response.addressOverride = check;
-                //     }
-                // }
-            }
-
-            console.log('source address', response.addressOverride, videoPort, audioPort);
-            // console.log('prepareStream response', response);
+            console.log('addresses', {
+                sourceAddress,
+                sourceVideoPort: videoPort,
+                sourceAudioPort: audioPort,
+                targetAddress: session.prepareRequest.targetAddress,
+                targetVidioPort: session.prepareRequest.video.port,
+                targetAudioPort: session.prepareRequest.audio.port,
+            });
 
             callback(null, response);
         },

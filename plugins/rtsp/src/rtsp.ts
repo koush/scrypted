@@ -1,5 +1,5 @@
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
-import sdk, { MediaObject, MediaStreamUrl, PictureOptions, ResponseMediaStreamOptions, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue } from "@scrypted/sdk";
+import sdk, { MediaObject, MediaStreamUrl, PictureOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue } from "@scrypted/sdk";
 import url from 'url';
 import { CameraBase, CameraProviderBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 
@@ -234,8 +234,8 @@ export abstract class RtspSmartCamera extends RtspCamera {
         this.listener.then(l => l.emit('error', new Error("new settings")));
     }
 
-    async takePicture(option?: PictureOptions) {
-        return this.takeSmartCameraPicture(option);;
+    async takePicture(options?: RequestPictureOptions) {
+        return this.takeSmartCameraPicture(options);
     }
 
     abstract takeSmartCameraPicture(options?: PictureOptions): Promise<MediaObject>;

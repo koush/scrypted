@@ -97,7 +97,7 @@ export class OnvifIntercom implements Intercom {
         this.camera.console.log('backchannel transport', transportDict);
 
         const availableMatches = audioBackchannel.rtpmaps.filter(rtpmap => rtpmap.ffmpegEncoder);
-        const defaultMatch = audioBackchannel.rtpmaps.find(rtpmap => rtpmap.ffmpegEncoder);
+        const defaultMatch = audioBackchannel.rtpmaps.find(rtpmap => rtpmap.ffmpegEncoder === 'pcm_mulaw') || audioBackchannel.rtpmaps.find(rtpmap => rtpmap.ffmpegEncoder);
 
         if (!defaultMatch)
             throw new Error('no supported codec was found for back channel');
@@ -151,7 +151,7 @@ export class OnvifIntercom implements Intercom {
                     }
 
                     const elapsedRtpTimeMs = Math.abs(pending.header.timestamp - p.header.timestamp) / 8000 * 1000;
-                    if (elapsedRtpTimeMs <= 60) {
+                    if (elapsedRtpTimeMs <= 160) {
                         pending.payload = Buffer.concat([pending.payload, p.payload]);
                         return;
                     }
@@ -176,6 +176,7 @@ export class OnvifIntercom implements Intercom {
                 encoderArguments: [
                     '-acodec', defaultMatch.ffmpegEncoder,
                     '-ar', defaultMatch.clock.toString(),
+                    "-b:a", "64k",
                     '-ac', defaultMatch.channels?.toString() || '1',
                 ],
             }

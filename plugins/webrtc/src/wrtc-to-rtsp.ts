@@ -1,15 +1,14 @@
-import { BundlePolicy, RTCIceCandidate, RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket } from "./werift";
-// import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
-import { FullIntraRequest } from "../../../external/werift/packages/rtp/src/rtcp/psfb/fullIntraRequest";
 import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { getNaluTypesInNalu, RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
+import { FullIntraRequest } from "../../../external/werift/packages/rtp/src/rtcp/psfb/fullIntraRequest";
 import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { startRtpForwarderProcess } from "./rtp-forwarders";
 import { getFFmpegRtpAudioOutputArguments, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive } from "./werift-util";
+import { BundlePolicy, RTCIceCandidate, RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket } from "./werift";
+import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive, logIsLocalIceTransport } from "./werift-util";
 
 const { mediaManager } = sdk;
 
@@ -17,6 +16,14 @@ export interface RTCPeerConnectionPipe {
     mediaObject: MediaObject;
     intercom: Promise<Intercom>;
     pcClose: Promise<unknown>;
+}
+
+function ignoreDeferred(...d: Deferred<any>[]) {
+    d.forEach(d => d.promise.catch(() => { }));
+}
+
+function ignorePromise(...p: Promise<any>[]) {
+    p.forEach(p => p.catch(() => { }));
 }
 
 export async function createRTCPeerConnectionSource(options: {
@@ -34,13 +41,14 @@ export async function createRTCPeerConnectionSource(options: {
     const sessionControl = new Deferred<RTCSessionControl>();
     const peerConnection = new Deferred<RTCPeerConnection>();
     const intercom = new Deferred<Intercom>();
+    ignoreDeferred(sessionControl, intercom);
 
     const cleanup = () => {
         console.log('webrtc/rtsp cleaning up');
-        clientPromise.then(client => client.destroy());
-        sessionControl.promise.then(sc => sc.endSession());
-        peerConnection.promise.then(pc => pc.close());
-        intercom.promise.then(intercom => intercom.stopIntercom());
+        clientPromise.then(client => client.destroy()).catch(() => {});
+        sessionControl.promise.then(sc => sc.endSession()).catch(() => {});
+        peerConnection.promise.then(pc => pc.close()).catch(() => {});
+        ignorePromise(intercom.promise.then(intercom => intercom.stopIntercom()));
     };
 
     clientPromise.then(socket => socket.on('close', cleanup));
@@ -68,6 +76,18 @@ export async function createRTCPeerConnectionSource(options: {
 
             logConnectionState(console, ret);
             peerConnection.resolve(ret);
+
+            (async () => {
+                try {
+                    if (ret.remoteIsBundled)
+                        await waitConnected(ret);
+                    else
+                        await waitIceConnected(ret);
+                    logIsLocalIceTransport(console, ret);
+                }
+                catch (e) {
+                }
+            })();
         }
 
         let audioTrack: string;
@@ -81,12 +101,6 @@ export async function createRTCPeerConnectionSource(options: {
             let gotVideo = false;
 
             const pc = await peerConnection.promise;
-            pc.iceConnectionStateChange.subscribe(() => {
-                console.log('iceConnectionState', pc.iceConnectionState);
-            });
-            pc.connectionStateChange.subscribe(() => {
-                console.log('connectionState', pc.connectionState);
-            });
 
             const setupAudioTranscevier = (transciever: RTCRtpTransceiver) => {
                 audioTransceiver = transciever;

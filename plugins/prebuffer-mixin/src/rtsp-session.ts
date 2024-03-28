@@ -65,17 +65,6 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
     try {
         await rtspClient.options();
         const sdpResponse = await rtspClient.describe();
-        const contentBase = sdpResponse.headers['content-base'];
-        if (contentBase) {
-            const url = new URL(contentBase, rtspClient.url);
-            const existing = new URL(rtspClient.url);
-            for (const p of existing.searchParams) {
-                url.searchParams.append(p[0], p[1]);
-            }
-            url.username = existing.username;
-            url.password = existing.password;
-            rtspClient.url = url.toString();
-        }
         let sdp = sdpResponse.body.toString().trim();
         console.log('sdp', sdp);
 

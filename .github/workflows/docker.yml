@@ -20,12 +20,8 @@ jobs:
     strategy:
       matrix:
         BASE: [
-          "18-jammy-full",
-          "18-jammy-lite",
-          # "18-jammy-thin",
-          # "20-jammy-full",
-          # "20-jammy-lite",
-          # "20-jammy-thin",
+          "20-jammy-full",
+          "20-jammy-lite",
         ]
         SUPERVISOR: ["", ".s6"]
     steps:
@@ -85,19 +81,15 @@ jobs:
           push: true
           tags: |
             ${{ format('koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
-            ${{ matrix.BASE == '18-jammy-full' && matrix.SUPERVISOR == '.s6' && format('koush/scrypted:{0}', github.event.inputs.tag) || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-full' && matrix.SUPERVISOR == '' && 'koush/scrypted:full' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-lite' && matrix.SUPERVISOR == '' && 'koush/scrypted:lite' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-thin' && matrix.SUPERVISOR == '' && 'koush/scrypted:thin' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-lite' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:lite-s6' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-thin' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:thin-s6' || '' }}
+            ${{ matrix.BASE == '20-jammy-full' && matrix.SUPERVISOR == '.s6' && format('koush/scrypted:{0}', github.event.inputs.tag) || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-full' && matrix.SUPERVISOR == '' && 'koush/scrypted:full' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-lite' && matrix.SUPERVISOR == '' && 'koush/scrypted:lite' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-lite' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:lite-s6' || '' }}
 
             ${{ format('ghcr.io/koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
-            ${{ matrix.BASE == '18-jammy-full' && matrix.SUPERVISOR == '.s6' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.tag) || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-full' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:full' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-lite' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:lite' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-thin' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:thin' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-lite' && matrix.SUPERVISOR == '.s6' && 'ghcr.io/koush/scrypted:lite-s6' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '18-jammy-thin' && matrix.SUPERVISOR == '.s6' && 'ghcr.io/koush/scrypted:thin-s6' || '' }}
+            ${{ matrix.BASE == '20-jammy-full' && matrix.SUPERVISOR == '.s6' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.tag) || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-full' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:full' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-lite' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:lite' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-lite' && matrix.SUPERVISOR == '.s6' && 'ghcr.io/koush/scrypted:lite-s6' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

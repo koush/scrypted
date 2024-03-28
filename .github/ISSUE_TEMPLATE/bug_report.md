@@ -7,11 +7,20 @@ assignees: ''
 
 ---
 
-# Github Issues is not a Forum
+# Github Issues are not a Support or Discussion Forum
 
-**This issue tracker is not for hardware support or feature requests**. If you are troubleshooting adding a device for the first time, use Discord, Reddit, or Github Discussions. However, if something **was working**, and is now **no longer working**, you may create a Github issue.
+Before opening an issue, view the device's Console logs in the Scrypted Management web interface.
+
+**DO NOT OPEN ISSUES FOR ANY OF THE FOLLOWING:**
+
+* Server setup assistance. Use Discord, Reddit, or Github Discussions.
+* Hardware setup assistance. Use Discord, Reddit, or Github Discussions.
+* Feature Requests. Use Discord, Reddit, or Github Discussions.
+* Packet loss in your camera logs. This is wifi/network congestion.
+* HomeKit weirdness. See HomeKit troubleshooting guide.
+
+However, if something **was working**, and is now **no longer working**, you may create a Github issue.
 Created issues that do not meet these requirements or are improperly filled out will be immediately closed.
-
 
 # New Issue Instructions
 
@@ -34,16 +43,15 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+**Server (please complete the following information):**
+ - OS: [e.g. Ubuntu]
+ - Installation Method: [e.g. Desktop App, Docker, Local]
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+**Hardware Model (please complete the following information):**
+ - Device: [e.g. Amcrest]
+
+**Client (please complete the following information, if applicable):**
+ - Software: [e.g. Home app, NVR app, Alexa, Browser]
 
 **Additional context**
 Add any other context about the problem here.

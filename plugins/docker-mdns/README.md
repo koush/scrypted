@@ -1,3 +1,0 @@
-# Docker MDNS Proxy
-
-Prototype.

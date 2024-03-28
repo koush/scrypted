@@ -1,11 +1,11 @@
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, PictureOptions, Reboot, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
+import { AmcrestCameraClient, AmcrestEvent, AmcrestEventData } from "./amcrest-api";
 
 const { mediaManager } = sdk;
 
@@ -22,12 +22,13 @@ function findValue(blob: string, prefix: string, key: string) {
     return parts[1];
 }
 
-class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, VideoRecorder, Reboot {
+class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, Lock, VideoRecorder, Reboot, ObjectDetector {
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     onvifIntercom = new OnvifIntercom(this);
+    hasSmartDetection: boolean;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
@@ -36,6 +37,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             this.storage.removeItem('amcrestDoorbell');
         }
 
+        this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
     }
@@ -159,6 +161,16 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async listenEvents() {
+        let motionTimeout: NodeJS.Timeout;
+
+        const motionTimeoutDuration = 20000;
+        const resetMotionTimeout = () => {
+            clearTimeout(motionTimeout);
+            motionTimeout = setTimeout(() => {
+                this.motionDetected = false;
+            }, motionTimeoutDuration);
+        }
+
         const client = new AmcrestCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
         const events = await client.listenEvents();
         const doorbellType = this.storage.getItem('doorbellType');
@@ -174,11 +186,16 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 if (idx.toString() !== channelNumber)
                     return;
             }
-            if (event === AmcrestEvent.MotionStart) {
+            if (event === AmcrestEvent.MotionStart
+                || event === AmcrestEvent.SmartMotionHuman
+                || event === AmcrestEvent.SmartMotionVehicle
+                || event === AmcrestEvent.CrossLineDetection
+                || event === AmcrestEvent.CrossRegionDetection) {
                 this.motionDetected = true;
+                resetMotionTimeout();
             }
             else if (event === AmcrestEvent.MotionStop) {
-                this.motionDetected = false;
+                // use resetMotionTimeout
             }
             else if (event === AmcrestEvent.AudioStart) {
                 this.audioDetected = true;
@@ -220,7 +237,40 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             }
         });
 
+        events.on('smart', (className: string, data: AmcrestEventData) => {
+            if (!this.hasSmartDetection) {
+                this.hasSmartDetection = true;
+                this.storage.setItem('hasSmartDetection', 'true');
+                this.updateDevice();
+            }
+
+            const detected: ObjectsDetected = {
+                timestamp: Date.now(),
+                detections: [
+                    {
+                        score: 1,
+                        className,
+                    }
+                ],
+            };
+
+            this.onDeviceEvent(ScryptedInterface.ObjectDetector, detected);
+        });
+
         return events;
+    }
+
+    async getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject> {
+        return;
+    }
+
+    async getObjectTypes(): Promise<ObjectDetectionTypes> {
+        return {
+            classes: [
+                'person',
+                'car',
+            ],
+        }
     }
 
     async getOtherSettings(): Promise<Setting[]> {
@@ -259,6 +309,16 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
 
         if (doorbellType == DAHUA_DOORBELL_TYPE) {
+            ret.push(
+                {
+                    title: 'Enable Dahua Lock',
+                    key: 'enableDahuaLock',
+                    description: 'Some Dahua Doorbells have a built in lock/door access control.',
+                    type: 'boolean',
+                    value: (this.storage.getItem('enableDahuaLock') === 'true').toString(),
+                }
+            );
+
             ret.push(
                 {
                     title: 'Multiple Call Buttons',
@@ -307,8 +367,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
     }
 
-    async takeSmartCameraPicture(option?: PictureOptions): Promise<MediaObject> {
-        return this.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
+    async takeSmartCameraPicture(options?: RequestPictureOptions): Promise<MediaObject> {
+        return this.createMediaObject(await this.getClient().jpegSnapshot(options?.timeout), 'image/jpeg');
     }
 
     async getUrlSettings() {
@@ -451,9 +511,19 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         if (isDoorbell || twoWayAudio) {
             interfaces.push(ScryptedInterface.Intercom);
         }
+
+        const enableDahuaLock = this.storage.getItem('enableDahuaLock') === 'true';
+        if (isDoorbell && doorbellType === DAHUA_DOORBELL_TYPE && enableDahuaLock) {
+            interfaces.push(ScryptedInterface.Lock);
+        }
+
         const continuousRecording = this.storage.getItem('continuousRecording') === 'true';
         if (continuousRecording)
             interfaces.push(ScryptedInterface.VideoRecorder);
+
+        if (this.hasSmartDetection)
+            interfaces.push(ScryptedInterface.ObjectDetector);
+
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
@@ -496,7 +566,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
 
         const doorbellType = this.storage.getItem('doorbellType');
-        
+
         // not sure if this all works, since i don't actually have a doorbell.
         // good luck!
         const channel = this.getRtspChannel() || '1';
@@ -523,12 +593,22 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
         else {
             args.push(
-                      "-vn",
-                      '-acodec', 'aac',
-                      '-f', 'adts',
-                      'pipe:3',
-                      );
+                "-vn",
+                '-acodec', 'aac',
+                '-f', 'adts',
+                'pipe:3',
+            );
             contentType = 'Audio/AAC';
+            // args.push(
+            //     "-vn",
+            //     '-acodec', 'pcm_mulaw',
+            //     '-ac', '1',
+            //     '-ar', '8000',
+            //     '-sample_fmt', 's16',
+            //     '-f', 'mulaw',
+            //     'pipe:3',
+            // );
+            // contentType = 'Audio/G.711A';
         }
 
         this.console.log('ffmpeg intercom', args);
@@ -548,15 +628,19 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             // seems the dahua doorbells preferred 1024 chunks. should investigate adts
             // parsing and sending multipart chunks instead.
             const passthrough = new PassThrough();
+            const abortController = new AbortController();
             this.getClient().request({
                 url,
                 method: 'POST',
                 headers: {
                     'Content-Type': contentType,
-                    'Content-Length': '9999999'
+                    'Content-Length': '9999999',
                 },
+                signal: abortController.signal,
                 responseType: 'readable',
-            }, passthrough);
+            }, passthrough)
+                .catch(() => { })
+                .finally(() => this.console.log('request finished'))
 
             try {
                 while (true) {
@@ -568,7 +652,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             }
             finally {
                 this.console.log('audio finished');
-                passthrough.end();
+                passthrough.destroy();
+                abortController.abort();
             }
 
             this.stopIntercom();
@@ -586,6 +671,18 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
     showRtspUrlOverride() {
         return false;
+    }
+
+    async lock(): Promise<void> {
+        if (!this.client.lock()) {
+            this.console.error("Could not lock");
+        }
+    }
+
+    async unlock(): Promise<void> {
+        if (!this.client.unlock()) {
+            this.console.error("Could not unlock");
+        }
     }
 }
 

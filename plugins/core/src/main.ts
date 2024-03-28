@@ -1,17 +1,17 @@
 import { readFileAsString, tsCompile } from '@scrypted/common/src/eval/scrypted-eval';
-import sdk, { DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
+import sdk, { DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
-import fs from 'fs';
-import net from 'net';
 import os from 'os';
 import Router from 'router';
 import { AggregateCore, AggregateCoreNativeId } from './aggregate-core';
 import { AutomationCore, AutomationCoreNativeId } from './automations-core';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
-import { newScript, ScriptCore, ScriptCoreNativeId } from './script-core';
+import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
+import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
+import { checkLxcDependencies } from './platform/lxc';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
 
@@ -30,7 +30,7 @@ interface RoutedHttpRequest extends HttpRequest {
     params: { [key: string]: string };
 }
 
-class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, DeviceProvider, Settings {
+class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, DeviceProvider, Settings {
     router: any = Router();
     publicRouter: any = Router();
     mediaCore: MediaCore;
@@ -38,6 +38,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     aggregateCore: AggregateCore;
     automationCore: AutomationCore;
     users: UsersCore;
+    consoleService: PluginSocketService;
+    replService: PluginSocketService;
     terminalService: TerminalService;
     localAddresses: string[];
     storageSettings = new StorageSettings(this, {
@@ -63,6 +65,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
 
     constructor() {
         super();
+
+        checkLxcDependencies();
 
         this.indexHtml = readFileAsString('dist/index.html');
 
@@ -91,6 +95,26 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                 {
                     name: 'Terminal Service',
                     nativeId: TerminalServiceNativeId,
+                    interfaces: [ScryptedInterface.StreamService],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+        })();
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'REPL Service',
+                    nativeId: ReplServiceNativeId,
+                    interfaces: [ScryptedInterface.StreamService],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+        })();
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Console Service',
+                    nativeId: ConsoleServiceNativeId,
                     interfaces: [ScryptedInterface.StreamService],
                     type: ScryptedDeviceType.Builtin,
                 },
@@ -172,45 +196,13 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.users ||= new UsersCore();
         if (nativeId === TerminalServiceNativeId)
             return this.terminalService ||= new TerminalService();
+        if (nativeId === ReplServiceNativeId)
+            return this.replService ||= new PluginSocketService(ReplServiceNativeId, 'repl');
+        if (nativeId === ConsoleServiceNativeId)
+            return this.consoleService ||= new PluginSocketService(ConsoleServiceNativeId, 'console');
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
-    }
-
-    checkEngineIoEndpoint(request: HttpRequest, name: string) {
-        const check = `/endpoint/@scrypted/core/engine.io/${name}/`;
-        if (!request.url.startsWith(check))
-            return null;
-        return check;
-    }
-
-    async checkService(request: HttpRequest, ws: WebSocket, name: string): Promise<boolean> {
-        // only allow admin users to access these services.
-        if (request.aclId)
-            return false;
-        const check = this.checkEngineIoEndpoint(request, name);
-        if (!check)
-            return false;
-        const deviceId = request.url.substr(check.length).split('/')[0];
-        const plugins = await systemManager.getComponent('plugins');
-        const { nativeId, pluginId } = await plugins.getDeviceInfo(deviceId);
-        const port = await plugins.getRemoteServicePort(pluginId, name);
-        const socket = net.connect(port);
-        socket.on('close', () => ws.close());
-        socket.on('data', data => ws.send(data));
-        socket.resume();
-        socket.write(nativeId?.toString() || 'undefined');
-        ws.onclose = () => socket.destroy();
-        ws.onmessage = message => socket.write(message.data);
-        return true;
-    }
-
-    async onConnection(request: HttpRequest, ws: WebSocket): Promise<void> {
-        if (await this.checkService(request, ws, 'console') || await this.checkService(request, ws, 'repl')) {
-            return;
-        }
-
-        ws.close();
     }
 
     async handlePublicFinal(request: HttpRequest, response: HttpResponse) {

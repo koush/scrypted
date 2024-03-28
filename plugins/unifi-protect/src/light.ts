@@ -1,8 +1,11 @@
-import { ScryptedDeviceBase, MotionSensor, TemperatureUnit, OnOff, Brightness } from "@scrypted/sdk";
+import { Brightness, MotionSensor, OnOff, ScryptedDeviceBase, TemperatureUnit } from "@scrypted/sdk";
 import { UnifiProtect } from "./main";
+import { UnifiMotionDevice, debounceMotionDetected } from "./motion";
 import { ProtectLightConfig } from "./unifi-protect";
 
-export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness, MotionSensor {
+export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness, MotionSensor, UnifiMotionDevice {
+    motionTimeout: NodeJS.Timeout;
+
     constructor(public protect: UnifiProtect, nativeId: string, protectLight: Readonly<ProtectLightConfig>) {
         super(nativeId);
         this.temperatureUnit = TemperatureUnit.C;
@@ -26,7 +29,8 @@ export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness,
     }
 
     findLight() {
-        return this.protect.api.lights.find(light => light.id === this.nativeId);
+        const id = this.protect.findId(this.nativeId);
+        return this.protect.api.lights.find(light => light.id === id);
     }
 
     updateState(light?: Readonly<ProtectLightConfig>) {
@@ -36,7 +40,8 @@ export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness,
         this.on = !!light.isLightOn;
         // The Protect ledLevel settings goes from 1 - 6. HomeKit expects percentages, so we convert it like so.
         this.brightness = (light.lightDeviceSettings.ledLevel - 1) * 20;
-        this.setMotionDetected(!!light.isPirMotionDetected);
+        if (!!light.isPirMotionDetected)
+            debounceMotionDetected(this);
     }
 
     setMotionDetected(motionDetected: boolean) {

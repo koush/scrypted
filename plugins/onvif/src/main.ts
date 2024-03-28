@@ -1,4 +1,4 @@
-import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PanTiltZoom, PanTiltZoomCommand, PictureOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PanTiltZoom, PanTiltZoomCommand, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import { AddressInfo } from "net";
 import onvif from 'onvif';
 import { Stream } from "stream";
@@ -159,7 +159,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         }
     }
 
-    async takeSmartCameraPicture(options?: PictureOptions): Promise<MediaObject> {
+    async takeSmartCameraPicture(options?: RequestPictureOptions): Promise<MediaObject> {
         const client = await this.getClient();
         let snapshot: Buffer;
         let id = options?.id;
@@ -170,7 +170,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
             id = vso?.id;
         }
 
-        snapshot = await client.jpegSnapshot(id);
+        snapshot = await client.jpegSnapshot(id, options?.timeout);
 
         // it is possible that onvif does not support snapshots, in which case return the video stream
         if (!snapshot) {

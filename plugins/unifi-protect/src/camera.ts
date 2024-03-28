@@ -1,13 +1,15 @@
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { fitHeightToWidth } from "@scrypted/common/src/resolution-utils";
-import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, NotifierOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, Online, PanTiltZoom, PanTiltZoomCommand, PictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, NotifierOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, Online, PanTiltZoom, PanTiltZoomCommand, PictureOptions, PrivacyMasks, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration, VideoCameraMask } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { once } from "events";
-import { Readable } from "stream";
+import { PassThrough, Readable } from "stream";
 import WS from 'ws';
 import { UnifiProtect } from "./main";
-import { FeatureFlagsShim } from "./shim";
+import { MOTION_SENSOR_TIMEOUT, UnifiMotionDevice, debounceMotionDetected } from './motion';
+import { FeatureFlagsShim, PrivacyZone } from "./shim";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
+import { readLength } from '@scrypted/common/src/read-stream';
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -39,11 +41,10 @@ export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, Vi
     }
 }
 
-export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector, DeviceProvider, OnOff, PanTiltZoom, Online {
+export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector, DeviceProvider, OnOff, PanTiltZoom, Online, UnifiMotionDevice, VideoCameraMask {
     motionTimeout: NodeJS.Timeout;
     detectionTimeout: NodeJS.Timeout;
     ringTimeout: NodeJS.Timeout;
-    lastMotion: number;
     lastRing: number;
     lastSeen: number;
     intercomProcess?: ChildProcess;
@@ -51,7 +52,6 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
     constructor(public protect: UnifiProtect, nativeId: string, protectCamera: Readonly<ProtectCameraConfigInterface>) {
         super(nativeId);
-        this.lastMotion = protectCamera?.lastMotion;
         this.lastRing = protectCamera?.lastRing;
         this.lastSeen = protectCamera?.lastSeen;
 
@@ -61,6 +61,40 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
         this.updateState(protectCamera);
         this.console.log(protectCamera);
+    }
+
+    async getPrivacyMasks(): Promise<PrivacyMasks> {
+        const camera = this.findCamera();
+        const privacyZones = (camera as any).privacyZones as PrivacyZone[] || [];
+
+        const masks: PrivacyMasks = {
+            masks: privacyZones.map(zone => {
+                return {
+                    id: zone.id.toString(),
+                    name: zone.name,
+                    points: zone.points,
+                }
+            }),
+        };
+
+        return masks;
+    }
+
+    async setPrivacyMasks(masks: PrivacyMasks): Promise<void> {
+        const privacyZones: PrivacyZone[] = masks.masks.map((mask, index) => {
+            return {
+                id: index,
+                name: mask.name || `Privacy Zone ${index}`,
+                points: mask.points,
+                color: 'red',
+            }
+        });
+
+        const camera = this.findCamera() as any;
+
+        await this.protect.api.updateCamera(camera, {
+            privacyZones,
+        } as any);
     }
 
     async ptzCommand(command: PanTiltZoomCommand): Promise<void> {
@@ -136,14 +170,15 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         args.push(
             "-acodec", "aac",
             "-profile:a", "aac_low",
-            "-threads", "0",
+            // "-threads", "0",
             "-avioflags", "direct",
             '-fflags', '+flush_packets', '-flush_packets', '1',
             "-flags", "+global_header",
             "-ar", camera.talkbackSettings.samplingRate.toString(),
             "-ac", camera.talkbackSettings.channels.toString(),
-            "-b:a", "16k",
+            "-b:a", "64k",
             "-f", "adts",
+            "-muxdelay", "0",
             `pipe:3`,
         );
 
@@ -166,16 +201,33 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
             try {
                 while (websocket.readyState === WS.OPEN) {
-                    await once(socket, 'readable');
-                    while (true) {
-                        const data = socket.read();
-                        if (!data)
-                            break;
-                        websocket.send(data, e => {
-                            if (e) {
-                                safeKillFFmpeg(cp);
-                            }
-                        });
+                    // this parses out full adts packets to ensure there's no truncation on ws message boundary, but
+                    // does not seem to matter.
+                    // preferring this as it seems to be the "right" thing to do.
+                    if (true) {
+                        const buffers: Buffer[] = [];
+                        do {
+                            const header = await readLength(socket, 7);
+                            const frameLength = ((header[3] & 0x03) << 11) | (header[4] << 3) | ((header[5] & 0xE0) >> 5);
+                            const need = frameLength - 7;
+                            const data = await readLength(socket, need);
+                            buffers.push(header, data);
+                        }
+                        while (socket.readableLength > 7 && buffers.length < 10);
+                        websocket.send(Buffer.concat(buffers));
+                    }
+                    else {
+                        await once(socket, 'readable');
+                        while (true) {
+                            const data = socket.read();
+                            if (!data)
+                                break;
+                            websocket.send(data, e => {
+                                if (e) {
+                                    safeKillFFmpeg(cp);
+                                }
+                            });
+                        }
                     }
                 }
             }
@@ -226,31 +278,20 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async getSettings(): Promise<Setting[]> {
-        const vsos = await this.getVideoStreamOptions();
+        // const vsos = await this.getVideoStreamOptions();
         return [
-            {
-                title: 'Sensor Timeout',
-                key: 'sensorTimeout',
-                value: this.storage.getItem('sensorTimeout') || defaultSensorTimeout,
-                description: 'Time to wait in seconds before clearing the motion, doorbell button, or object detection state.',
-            }
+            // {
+            //     title: 'Sensor Timeout',
+            //     key: 'sensorTimeout',
+            //     value: this.storage.getItem('sensorTimeout') || defaultSensorTimeout,
+            //     description: 'Time to wait in seconds before clearing the motion, doorbell button, or object detection state.',
+            // }
         ];
     }
 
     async putSetting(key: string, value: string | number | boolean) {
         this.storage.setItem(key, value?.toString() || '');
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
-    }
-
-    getSensorTimeout() {
-        return (parseInt(this.storage.getItem('sensorTimeout')) || 10) * 1000;
-    }
-
-    resetMotionTimeout() {
-        clearTimeout(this.motionTimeout);
-        this.motionTimeout = setTimeout(() => {
-            this.setMotionDetected(false);
-        }, this.getSensorTimeout());
     }
 
     resetDetectionTimeout() {
@@ -261,14 +302,14 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
                 detections: []
             }
             this.onDeviceEvent(ScryptedInterface.ObjectDetector, detect);
-        }, this.getSensorTimeout());
+        }, MOTION_SENSOR_TIMEOUT);
     }
 
     resetRingTimeout() {
         clearTimeout(this.ringTimeout);
         this.ringTimeout = setTimeout(() => {
             this.binaryState = false;
-        }, this.getSensorTimeout());
+        }, MOTION_SENSOR_TIMEOUT);
     }
 
     async getSnapshot(options?: PictureOptions, suffix?: string): Promise<Buffer> {
@@ -287,7 +328,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         catch (e) {
 
         }
-        const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.nativeId}/${suffix}?ts=${Date.now()}${size}`
+        const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.findCamera().id}/${suffix}?ts=${Date.now()}${size}`
 
         const abort = new AbortController();
         const timeout = setTimeout(() => abort.abort('Unifi Protect Snapshot timed out after 10 seconds. Aborted.'), 10000);
@@ -307,7 +348,8 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return this.createMediaObject(buffer, 'image/jpeg');
     }
     findCamera() {
-        return this.protect.api.cameras.find(camera => camera.id === this.nativeId);
+        const id = this.protect.findId(this.nativeId);
+        return this.protect.api.cameras.find(camera => camera.id === id);
     }
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const camera = this.findCamera();
@@ -423,8 +465,11 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         if (!camera)
             return;
         this.on = !!camera.ledSettings?.isEnabled;
-        this.online = !!camera.isConnected;
-        this.setMotionDetected(!!camera.isMotionDetected);
+        const online = !!camera.isConnected;
+        if (online !== this.online)
+            this.online = online;
+        if (!!camera.isMotionDetected)
+            debounceMotionDetected(this);
 
         if (!!camera.featureFlags.canOpticalZoom) {
             this.ptzCapabilities = { pan: false, tilt: false, zoom: true };

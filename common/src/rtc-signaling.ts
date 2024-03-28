@@ -223,7 +223,12 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         }
 
         if (type === 'offer') {
-            let offer = await this.pc.createOffer({
+            let offer: RTCSessionDescriptionInit = this.pc.localDescription;
+            if (offer) {
+                // fast path for duplicate calls to createLocalDescription
+                return toDescription(this.pc.localDescription);
+            }
+            offer = await this.pc.createOffer({
                 offerToReceiveAudio: !!setup.audio,
                 offerToReceiveVideo: !!setup.video,
             });
@@ -232,7 +237,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
                 return toDescription(offer);
             await set;
             await gatheringPromise;
-            offer = await this.pc.createOffer({
+            offer = this.pc.localDescription || await this.pc.createOffer({
                 offerToReceiveAudio: !!setup.audio,
                 offerToReceiveVideo: !!setup.video,
             });

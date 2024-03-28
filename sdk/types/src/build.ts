@@ -2,12 +2,14 @@ import stringifyObject from 'stringify-object';
 import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 import path from 'path';
 import fs from "fs";
+import packageJson from "../package.json"
+import { DeclarationReflection, ProjectReflection, SomeType } from 'typedoc';
 
-const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../gen/schema.json')).toString());
-const typesVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json')).toString()).version;
+const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../gen/schema.json')).toString()) as ProjectReflection;
+const typesVersion = packageJson.version;
 const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = {};
 
-const allProperties: { [property: string]: any } = {};
+const allProperties: { [property: string]: DeclarationReflection } = {};
 
 function toTypescriptType(type: any): string {
     if (type.type === 'literal')
@@ -20,18 +22,18 @@ function toTypescriptType(type: any): string {
 }
 
 for (const name of Object.values(ScryptedInterface)) {
-    const td = schema.children.find((child: any) => child.name === name);
-    const children = td.children || [];
-    const properties = children.filter((child: any) => child.kindString === 'Property').map((child: any) => child.name);
-    const methods = children.filter((child: any) => child.kindString === 'Method').map((child: any) => child.name);
+    const td = schema.children?.find((child) => child.name === name);
+    const children = td?.children || [];
+    const properties = children.filter((child) => child.kindString === 'Property').map((child) => child.name);
+    const methods = children.filter((child) => child.kindString === 'Method').map((child) => child.name);
     ScryptedInterfaceDescriptors[name] = {
         name,
         methods,
         properties,
     };
 
-    for (const p of children.filter((child: any) => child.kindString === 'Property')) {
-        allProperties[p.name] = p.type;
+    for (const p of children.filter((child) => child.kindString === 'Property')) {
+        allProperties[p.name] = p;
     }
 }
 
@@ -40,11 +42,11 @@ const methods = Object.values(ScryptedInterfaceDescriptors).map(d => d.methods).
 
 const deviceStateContents = `
 export interface DeviceState {
-${Object.entries(allProperties).map(([property, type]) => `  ${property}?: ${toTypescriptType(type)}`).join('\n')}
+${Object.entries(allProperties).map(([property, {type, flags}]) => `  ${property}${flags.isOptional ? '?' : ''}: ${toTypescriptType(type)}`).join('\n')};
 }
 
 export class DeviceBase implements DeviceState {
-${Object.entries(allProperties).map(([property, type]) => `  ${property}?: ${toTypescriptType(type)}`).join('\n')}
+${Object.entries(allProperties).map(([property, {type, flags}]) => `  ${property}${flags.isOptional ? '?' : '!'}: ${toTypescriptType(type)}`).join('\n')};
 }
 `;
 
@@ -136,12 +138,15 @@ function selfSignature(method: any) {
     return params.join(', ');
 }
 
-const enums = schema.children.filter((child: any) => child.kindString === 'Enumeration');
-const interfaces = schema.children.filter((child: any) => Object.values(ScryptedInterface).includes(child.name));
+const enums = schema.children?.filter((child: any) => child.kindString === 'Enumeration') ?? [];
+const interfaces = schema.children?.filter((child: any) => Object.values(ScryptedInterface).includes(child.name)) ?? [];
 let python = '';
 
 for (const iface of ['Logger', 'DeviceManager', 'SystemManager', 'MediaManager', 'EndpointManager']) {
-    interfaces.push(schema.children.find((child: any) => child.name === iface));
+    const child = schema.children?.find((child: any) => child.name === iface);
+
+    if (child)
+        interfaces.push(child);
 }
 
 let seen = new Set<string>();
@@ -224,13 +229,16 @@ for (const td of interfaces) {
 
 let pythonEnums = ''
 for (const e of enums) {
-    pythonEnums += `
+    if (e.children) {    
+        pythonEnums += `
 class ${e.name}(str, Enum):
 ${toDocstring(e)}
 `
     for (const val of e.children) {
-        pythonEnums += `    ${val.name} = "${val.type.value}"
+        if (val.type && 'value' in val.type)
+            pythonEnums += `    ${val.name} = "${val.type.value}"
 `;
+        }
     }
 }
 
@@ -260,7 +268,7 @@ class DeviceState:
         pass
 
 `
-for (const [val, type] of Object.entries(allProperties)) {
+for (const [val, {type}] of Object.entries(allProperties)) {
     if (val === 'nativeId')
         continue;
     python += `
@@ -279,7 +287,7 @@ ScryptedInterfaceDescriptors = ${JSON.stringify(ScryptedInterfaceDescriptors, nu
 `
 
 while (discoveredTypes.size) {
-    const unknowns = schema.children.filter((child: any) => discoveredTypes.has(child.name) && !enums.find((e: any) => e.name === child.name));
+    const unknowns = schema.children?.filter((child: any) => discoveredTypes.has(child.name) && !enums.find((e: any) => e.name === child.name)) ?? [];
 
     const newSeen = new Set([...seen, ...discoveredTypes]);
     discoveredTypes.clear();

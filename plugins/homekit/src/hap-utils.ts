@@ -76,13 +76,14 @@ export function getRandomPort() {
 
 export function createHAPUsernameStorageSettingsDict(device: { storage: Storage, name?: string }, group: string, subgroup?: string): StorageSettingsDict<'mac' | 'qrCode' | 'pincode' | 'portOverride' | 'resetAccessory'> {
     const alertReload = () => {
-        sdk.log.a(`You must reload the HomeKit plugin for the changes to ${device.name} to take effect.`);
+        sdk.log.a(`The HomeKit plugin will reload momentarily for the changes to ${device.name} to take effect.`);
+        sdk.deviceManager.requestRestart();
     }
 
     return {
         qrCode: {
             group,
-            subgroup,
+            // subgroup,
             title: "Pairing QR Code",
             type: 'qrcode',
             readonly: true,
@@ -98,7 +99,7 @@ export function createHAPUsernameStorageSettingsDict(device: { storage: Storage,
         },
         pincode: {
             group,
-            subgroup,
+            // subgroup,
             title: "Manual Pairing Code",
             persistedDefaultValue: randomPinCode(),
             readonly: true,

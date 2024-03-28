@@ -3,6 +3,7 @@ import { bindCharacteristic } from "../common";
 import { Accessory, Characteristic, CharacteristicEventTypes, Service, uuid } from '../hap';
 import type { HomeKitPlugin } from "../main";
 import { getService as getOnOffService } from "./onoff-base";
+import { HOMEKIT_MIXIN } from "../homekit-mixin";
 
 const { deviceManager, systemManager } = sdk;
 
@@ -201,7 +202,7 @@ export function mergeOnOffDevicesByType(device: ScryptedDevice & DeviceProvider,
     const children = getChildDevices(device);
     const mergedDevices = [];
     const services = children.map((child: ScryptedDevice & OnOff) => {
-        if (child.type !== type || !child.interfaces.includes(ScryptedInterface.OnOff))
+        if (child.type !== type || !child.interfaces.includes(ScryptedInterface.OnOff) || !child.interfaces.includes(HOMEKIT_MIXIN))
             return undefined;
 
         const onOffService = getOnOffService(child, accessory, Service.Switch)

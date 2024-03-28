@@ -59,12 +59,19 @@ then
 fi
 
 function stopscrypted() {
-    cd "$SCRYPTED_HOME"
+    cd $SCRYPTED_HOME
     echo ""
     echo "Stopping the Scrypted container. If there are any errors during disk setup, Scrypted will need to be manually restarted with:"
     echo "cd $SCRYPTED_HOME && docker compose up -d"
     echo ""
-    docker compose down
+    sudo -u $SERVICE_USER docker compose down 2> /dev/null
+}
+
+function removescryptedfstab() {
+    backup "/etc/fstab"
+    grep -v "scrypted-nvr" /etc/fstab > /tmp/fstab && cp /tmp/fstab /etc/fstab
+    # ensure newline
+    sed -i -e '$a\' /etc/fstab
 }
 
 BLOCK_DEVICE="/dev/$1"
@@ -108,12 +115,9 @@ then
 
     echo "UUID: $UUID"
     set -e
-    backup "/etc/fstab"
-    grep -v "scrypted-nvr" /etc/fstab > /tmp/fstab && cp /tmp/fstab /etc/fstab
-    # ensure newline
-    sed -i -e '$a\' /etc/fstab
+    removescryptedfstab
     mkdir -p /mnt/scrypted-nvr
-    echo "PARTLABEL=scrypted-nvr     /mnt/scrypted-nvr    ext4   defaults 0 0" >> /etc/fstab
+    echo "PARTLABEL=scrypted-nvr     /mnt/scrypted-nvr    ext4   defaults,nofail 0 0" >> /etc/fstab
     mount -a
     set +e
 
@@ -127,6 +131,8 @@ else
 
     stopscrypted
 
+    removescryptedfstab
+
     DIR="$1"
 fi
 
@@ -137,4 +143,5 @@ sed -i s/'^.*:\/nvr'/"            - $ESCAPED_DIR:\/nvr"/ "$DOCKER_COMPOSE_YML"
 sed -i s/'^.*SCRYPTED_NVR_VOLUME.*$'/"            - SCRYPTED_NVR_VOLUME=\/nvr"/ "$DOCKER_COMPOSE_YML"
 set +e
 
-cd "$SCRYPTED_HOME" && docker compose up -d
+cd $SCRYPTED_HOME
+sudo -u $SERVICE_USER docker compose up -d

@@ -1,6 +1,6 @@
 import time
 import scrypted_sdk
-from typing import Any
+from typing import Any, AsyncGenerator
 import vipsimage
 import pilimage
 from generator_common import createVideoFrame, createImageMediaObject
@@ -20,7 +20,7 @@ except:
 async def generateVideoFramesLibav(
     mediaObject: scrypted_sdk.MediaObject,
     options: scrypted_sdk.VideoFrameGeneratorOptions = None,
-) -> scrypted_sdk.VideoFrame:
+) -> AsyncGenerator[scrypted_sdk.VideoFrame, Any]:
     ffmpegInput: scrypted_sdk.FFmpegInput = (
         await scrypted_sdk.mediaManager.convertMediaObjectToJSON(
             mediaObject, scrypted_sdk.ScryptedMimeTypes.FFmpegInput.value

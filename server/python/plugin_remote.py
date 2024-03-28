@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import gc
+import hashlib
+import multiprocessing
+import multiprocessing.connection
 import os
 import platform
 import shutil
-import subprocess
 import sys
 import threading
 import time
@@ -17,10 +19,13 @@ from asyncio.futures import Future
 from asyncio.streams import StreamReader, StreamWriter
 from collections.abc import Mapping
 from io import StringIO
-from os import sys
-from typing import Any, Optional, Set, Tuple
+from typing import Any, Optional, Set, Tuple, TypedDict
 
+import plugin_volume as pv
+import rpc
+import rpc_reader
 import scrypted_python.scrypted_sdk.types
+from plugin_pip import install_with_pip, need_requirements, remove_pip_dirs
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 EventDetails,
@@ -28,18 +33,10 @@ from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
 
-try:
-    from typing import TypedDict
-except:
-    from typing_extensions import TypedDict
-
-import hashlib
-import multiprocessing
-import multiprocessing.connection
-
-import rpc
-import rpc_reader
-
+SCRYPTED_REQUIREMENTS = """
+ptpython
+wheel
+""".strip()
 
 class ClusterObject(TypedDict):
     id: str
@@ -337,6 +334,7 @@ class PluginRemote:
         self.pluginId = pluginId
         self.hostInfo = hostInfo
         self.loop = loop
+        self.replPort = None
         self.__dict__['__proxy_oneway_methods'] = [
             'notify',
             'updateDeviceState',
@@ -376,15 +374,15 @@ class PluginRemote:
         asyncio.run_coroutine_threadsafe(self.print_async(
             nativeId, *values, sep=sep, end=end, flush=flush), self.loop)
 
-    async def loadZip(self, packageJson, zipData, options: dict = None):
+    async def loadZip(self, packageJson, getZip: Any, options: dict):
         try:
-            return await self.loadZipWrapped(packageJson, zipData, options)
+            return await self.loadZipWrapped(packageJson, getZip, options)
         except:
             print('plugin start/fork failed')
             traceback.print_exc()
             raise
 
-    async def loadZipWrapped(self, packageJson, zipData, options: dict = None):
+    async def loadZipWrapped(self, packageJson, getZip: Any, options: dict):
         sdk = ScryptedStatic()
 
         clusterId = options['clusterId']
@@ -512,28 +510,35 @@ class PluginRemote:
         sdk.connectRPCObject = connectRPCObject
 
         forkMain = options and options.get('fork')
+        debug = options.get('debug', None)
+        plugin_volume = pv.ensure_plugin_volume(self.pluginId)
+        plugin_zip_paths = pv.prep(plugin_volume, options.get('zipHash'))
+
+        if debug:
+            scrypted_volume = pv.get_scrypted_volume()
+            # python debugger needs a predictable path for the plugin.zip,
+            # as the vscode python extension doesn't seem to have a way
+            # to read the package.json to configure the python remoteRoot.
+            zipPath = os.path.join(scrypted_volume, 'plugin.zip')
+        else:
+            zipPath = plugin_zip_paths.get('zip_file')
+
+        if not os.path.exists(zipPath) or debug:
+            os.makedirs(os.path.dirname(zipPath), exist_ok=True)
+            zipData = await getZip()
+            zipPathTmp = zipPath + '.tmp'
+            with open(zipPathTmp, 'wb') as f:
+                f.write(zipData)
+            try:
+                os.remove(zipPath)
+            except:
+                pass
+            os.rename(zipPathTmp, zipPath)
+
+        zip = zipfile.ZipFile(zipPath)
 
         if not forkMain:
             multiprocessing.set_start_method('spawn')
-
-            zipPath: str
-
-            if isinstance(zipData, str):
-                zipPath = (options and options.get(
-                    'filename', None)) or zipData
-                if zipPath != zipData:
-                    shutil.copyfile(zipData, zipPath)
-            else:
-                zipPath = options['filename']
-                f = open(zipPath, 'wb')
-                f.write(zipData)
-                f.close()
-
-            zipData = None
-
-            zip = zipfile.ZipFile(zipPath)
-
-            plugin_volume = os.environ.get('SCRYPTED_PLUGIN_VOLUME')
 
             # it's possible to run 32bit docker on aarch64, which cause pip requirements
             # to fail because pip only allows filtering on machine, even if running a different architeture.
@@ -555,112 +560,50 @@ class PluginRemote:
 
             python_versioned_directory = '%s-%s-%s' % (
                 python_version, platform.system(), platform.machine())
-            SCRYPTED_BASE_VERSION = os.environ.get('SCRYPTED_BASE_VERSION')
-            if SCRYPTED_BASE_VERSION:
-                python_versioned_directory += '-' + SCRYPTED_BASE_VERSION
+            SCRYPTED_PYTHON_VERSION = os.environ.get('SCRYPTED_PYTHON_VERSION')
+            python_versioned_directory += '-' + SCRYPTED_PYTHON_VERSION
 
-            python_prefix = os.path.join(
+            pip_target = os.path.join(
                 plugin_volume, python_versioned_directory)
 
-            print('python prefix: %s' % python_prefix)
+            print('pip target: %s' % pip_target)
 
-            if not os.path.exists(python_prefix):
-                os.makedirs(python_prefix)
+            if not os.path.exists(pip_target):
+                os.makedirs(pip_target, exist_ok=True)
 
-            if 'requirements.txt' in zip.namelist():
-                requirements = zip.open('requirements.txt').read()
-                str_requirements = requirements.decode('utf8')
 
-                requirementstxt = os.path.join(
-                    python_prefix, 'requirements.txt')
-                installed_requirementstxt = os.path.join(
-                    python_prefix, 'requirements.installed.txt')
+            def read_requirements(filename: str) -> str:
+                if filename in zip.namelist():
+                    return zip.open(filename).read().decode('utf8')
+                return ''
 
-                need_pip = True
-                try:
-                    existing = open(installed_requirementstxt).read()
-                    need_pip = existing != str_requirements
-                except:
-                    pass
+            str_requirements = read_requirements('requirements.txt')
+            str_optional_requirements = read_requirements('requirements.optional.txt')
 
-                if need_pip:
-                    try:
-                        for de in os.listdir(plugin_volume):
-                            if de.startswith('linux') or de.startswith('darwin') or de.startswith('win32') or de.startswith('python') or de.startswith('node'):
-                                filePath = os.path.join(plugin_volume, de)
-                                print('Removing old dependencies: %s' %
-                                      filePath)
-                                try:
-                                    shutil.rmtree(filePath)
-                                except:
-                                    pass
-                    except:
-                        pass
+            scrypted_requirements_basename = os.path.join(
+                pip_target, 'requirements.scrypted')
+            requirements_basename = os.path.join(
+                pip_target, 'requirements')
+            optional_requirements_basename = os.path.join(
+                pip_target, 'requirements.optional')
 
-                    os.makedirs(python_prefix)
+            need_pip = True
+            if str_requirements:
+                need_pip = need_requirements(requirements_basename, str_requirements)
+            if not need_pip:
+                need_pip = need_requirements(scrypted_requirements_basename, SCRYPTED_REQUIREMENTS)
 
-                    print('requirements.txt (outdated)')
-                    print(str_requirements)
-
-                    f = open(requirementstxt, 'wb')
-                    f.write(requirements)
-                    f.close()
-
-                    try:
-                        pythonVersion = packageJson['scrypted']['pythonVersion']
-                    except:
-                        pythonVersion = None
-
-                    pipArgs = [
-                        sys.executable,
-                        '-m', 'pip', 'install', '-r', requirementstxt,
-                        '--prefix', python_prefix
-                    ]
-                    if pythonVersion:
-                        print('Specific Python version requested. Forcing reinstall.')
-                        # prevent uninstalling system packages.
-                        pipArgs.append('--ignore-installed')
-                        # force reinstall even if it exists in system packages.
-                        pipArgs.append('--force-reinstall')
-
-                    p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-                    while True:
-                        line = p.stdout.readline()
-                        if not line:
-                            break
-                        line = line.decode('utf8').rstrip('\r\n')
-                        print(line)
-                    result = p.wait()
-                    print('pip install result %s' % result)
-                    if result:
-                        raise Exception('non-zero result from pip %s' % result)
-
-                    f = open(installed_requirementstxt, 'wb')
-                    f.write(requirements)
-                    f.close()
-                else:
-                    print('requirements.txt (up to date)')
-                    print(str_requirements)
+            if need_pip:
+                remove_pip_dirs(plugin_volume)
+                install_with_pip(pip_target, packageJson, SCRYPTED_REQUIREMENTS, scrypted_requirements_basename, ignore_error=True)
+                install_with_pip(pip_target, packageJson, str_requirements, requirements_basename, ignore_error=False)
+                install_with_pip(pip_target, packageJson, str_optional_requirements, optional_requirements_basename, ignore_error=True)
+            else:
+                print('requirements.txt (up to date)')
+                print(str_requirements)
 
             sys.path.insert(0, zipPath)
-            if platform.system() != 'Windows':
-                # local/lib/dist-packages seen on python3.10 on ubuntu.
-                # TODO: find a way to programatically get this value, or switch to venv.
-                dist_packages = os.path.join(
-                    python_prefix, 'local', 'lib', python_version, 'dist-packages')
-                if os.path.exists(dist_packages):
-                    site_packages = dist_packages
-                else:
-                    site_packages = os.path.join(
-                        python_prefix, 'lib', python_version, 'site-packages')
-            else:
-                site_packages = os.path.join(
-                    python_prefix, 'Lib', 'site-packages')
-            print('site-packages: %s' % site_packages)
-            sys.path.insert(0, site_packages)
-        else:
-            zip = zipfile.ZipFile(options['filename'])
+            sys.path.insert(0, pip_target)
 
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
@@ -725,10 +668,10 @@ class PluginRemote:
                     await remote.setSystemState(self.systemManager.getSystemState())
                     for nativeId, ds in self.nativeIds.items():
                         await remote.setNativeId(nativeId, ds.id, ds.storage)
-                    forkOptions = (options or {}).copy()
+                    forkOptions = options.copy()
                     forkOptions['fork'] = True
-                    forkOptions['filename'] = zipPath
-                    return await remote.loadZip(packageJson, zipData, forkOptions)
+                    forkOptions['debug'] = debug
+                    return await remote.loadZip(packageJson, getZip, forkOptions)
 
                 pluginFork.result = asyncio.create_task(getFork())
                 return pluginFork
@@ -744,7 +687,14 @@ class PluginRemote:
 
         if not forkMain:
             from main import create_scrypted_plugin  # type: ignore
-            return await rpc.maybe_await(create_scrypted_plugin())
+            pluginInstance = await rpc.maybe_await(create_scrypted_plugin())
+            try:
+                from plugin_repl import createREPLServer
+                self.replPort = await createREPLServer(sdk, pluginInstance)
+            except Exception as e:
+                print(f"Warning: Python REPL cannot be loaded: {e}")
+                self.replPort = 0
+            return pluginInstance
 
         from main import fork  # type: ignore
         forked = await rpc.maybe_await(fork())
@@ -795,7 +745,13 @@ class PluginRemote:
         pass
 
     async def getServicePort(self, name):
-        pass
+        if name == "repl":
+            if self.replPort is None:
+                raise Exception('REPL unavailable: Plugin not loaded.')
+            if self.replPort == 0:
+                raise Exception('REPL unavailable: Python REPL not available.')
+            return self.replPort
+        raise Exception(f'unknown service {name}')
 
     async def start_stats_runner(self):
         update_stats = await self.peer.getParam('updateStats')
@@ -860,6 +816,14 @@ def main(rpcTransport: rpc_reader.RpcTransport):
 
 
 def plugin_main(rpcTransport: rpc_reader.RpcTransport):
+    if True:
+        main(rpcTransport)
+        return
+
+    # 03/05/2024
+    # Not sure why this code below was necessary. I thought it was gstreamer needing to
+    # be initialized on the main thread, but that no longer seems to be the case.
+
     # gi import will fail on windows (and posisbly elsewhere)
     # if it does, try starting without it.
     try:

@@ -172,7 +172,8 @@ export function parseFmtp(msection: string[]) {
 export type MSection = ReturnType<typeof parseMSection>;
 export type RTPMap = ReturnType<typeof parseRtpMap>;
 
-export function parseRtpMap(mlineType: string, rtpmap: string) {
+export function parseRtpMap(mline: ReturnType<typeof parseMLine>, rtpmap: string) {
+    const mlineType = mline.type;
     const match = rtpmap?.match(/a=rtpmap:([\d]+) (.*?)\/([\d]+)(\/([\d]+))?/);
 
     rtpmap = rtpmap?.toLowerCase();
@@ -218,9 +219,23 @@ export function parseRtpMap(mlineType: string, rtpmap: string) {
         codec = 'h265';
     }
     else if (!rtpmap && mlineType === 'audio') {
-        // ffmpeg seems to omit the rtpmap type for pcm alaw when creating sdp?
-        // is this the default?
-        codec = 'pcm_alaw';
+        if (mline.payloadTypes?.includes(0)) {
+            codec = 'pcm_mulaw';
+            ffmpegEncoder = 'pcm_mulaw';
+        }
+        else if (mline.payloadTypes?.includes(8)) {
+            codec = 'pcm_alaw';
+            ffmpegEncoder = 'pcm_alaw';
+        }
+        else {
+            // ffmpeg seems to omit the rtpmap type for pcm alaw when creating sdp?
+            // is this the default?
+            // 2/21/2024: the paylaod types are included in the mline, and this is legacy code
+            // that maybe should be updated to use the mline payload types when no rtpmap(s) are available.
+            // https://en.wikipedia.org/wiki/RTP_payload_formats
+            codec = 'pcm_alaw';
+            ffmpegEncoder = 'pcm_alaw';
+        }
     }
 
     return {
@@ -240,9 +255,9 @@ export function parseMSection(msection: string[]) {
     const control = msection.find(line => line.startsWith(acontrol))?.substring(acontrol.length);
     const mline = parseMLine(msection[0]);
     const rawRtpmaps = msection.filter(line => line.startsWith(artpmap));
-    const rtpmaps = rawRtpmaps.map(line => parseRtpMap(mline.type, line));
+    const rtpmaps = rawRtpmaps.map(line => parseRtpMap(mline, line));
     // if no rtp map is specified, pcm_alaw is used. parsing a null rtpmap is valid.
-    const rtpmap = parseRtpMap(mline.type, rawRtpmaps[0]);
+    const rtpmap = parseRtpMap(mline, rawRtpmaps[0]);
     const { codec } = rtpmap;
     let direction: string;
 

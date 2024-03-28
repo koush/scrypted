@@ -6,7 +6,7 @@ import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect"
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { createZygote } from '@scrypted/common/src/zygote';
-import sdk, { BufferConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import ip from 'ip';
@@ -179,12 +179,6 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
 
 export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, DeviceProvider, BufferConverter, MixinProvider, Settings {
     storageSettings = new StorageSettings(this, {
-        maximumCompatibilityMode: {
-            title: 'Maximum Compatibility Mode',
-            description: 'Enables maximum compatibility with WebRTC clients by using the most conservative transcode options.',
-            defaultValue: false,
-            type: 'boolean',
-        },
         iceInterfaceAddresses: {
             title: 'ICE Interface Addresses',
             description: 'The ICE interface addresses to bind and share with the peer.',
@@ -195,9 +189,17 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             ],
             defaultValue: 'Default',
         },
+        maximumCompatibilityMode: {
+            group: 'Advanced',
+            title: 'Maximum Compatibility Mode',
+            description: 'Enables maximum compatibility with WebRTC clients by using the most conservative transcode options.',
+            defaultValue: false,
+            type: 'boolean',
+        },
         useTurnServer: {
+            group: 'Advanced',
             title: 'Use TURN Servers',
-            description: 'Use a intermediary server to send video streams. Reduces performance and should only be used with restrictive NATs.',
+            description: 'Uses a intermediary server to send video streams when necessary. Traverses around restrictive NATs.',
             type: 'boolean',
             defaultValue: true,
         },
@@ -355,7 +357,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         }
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any> {
         return new WebRTCMixin(this, {
             mixinDevice,
             mixinDeviceInterfaces,
@@ -647,7 +649,7 @@ export async function fork() {
                 cleanup.promise.finally(() => socket.destroy());
 
                 const dc = pc.createDataChannel('rpc');
-                dc.message.subscribe(message => socket.write(message));
+                dc.onMessage.subscribe(message => socket.write(message));
 
                 const debouncer = new DataChannelDebouncer({
                     send: u8 => dc.send(Buffer.from(u8)),
@@ -676,23 +678,10 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
         this.toMimeType = ScryptedMimeTypes.RTCConnectionManagement;
     }
 
-    async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+    async convertInternal(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
         const session = data as RTCSignalingSession;
         const maximumCompatibilityMode = !!this.plugin.storageSettings.values.maximumCompatibilityMode;
         const clientOptions = await legacyGetSignalingSessionOptions(session);
-
-        const result = zygote();
-
-        const cleanup = new Deferred<string>();
-
-        this.plugin.activeConnections++;
-        result.worker.on('exit', () => {
-            this.plugin.activeConnections--;
-            cleanup.resolve('worker exited');
-        });
-        cleanup.promise.finally(() => {
-            result.worker.terminate()
-        });
 
         const { createConnection } = await result.result;
         const connection = await createConnection({}, undefined, session,
@@ -709,9 +698,28 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
         await connection.negotiateRTCSignalingSession();
         await connection.waitConnected();
 
-        // await connection.negotiateRTCSignalingSession();
-
         return connection;
+    }
+
+    async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+        const result = zygote();
+        this.plugin.activeConnections++;
+        const cleanup = new Deferred<string>();
+        result.worker.on('exit', () => {
+            this.plugin.activeConnections--;
+            cleanup.resolve('worker exited');
+        });
+        cleanup.promise.finally(() => {
+            result.worker.terminate()
+        });
+
+        try {
+            return await timeoutPromise(2 * 60 * 1000, this.convertInternal(result, cleanup, data, fromMimeType, toMimeType, options));
+        }
+        catch (e) {
+            cleanup.resolve(e.toString());
+            throw e;
+        }
     }
 }
 

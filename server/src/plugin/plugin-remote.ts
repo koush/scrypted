@@ -1,4 +1,4 @@
-import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointAccessControlAllowOrigin, EndpointManager, EventDetails, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
+import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointAccessControlAllowOrigin, EndpointManager, EventDetails, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager, WritableDeviceState } from '@scrypted/types';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { AccessControls } from './acl';
 import { BufferSerializer } from '../rpc-buffer-serializer';
@@ -200,8 +200,8 @@ export class DeviceManagerImpl implements DeviceManager {
     mixinStorage = new Map<string, Map<string, StorageImpl>>();
 
     constructor(public systemManager: SystemManagerImpl,
-        public getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console,
-        public getMixinConsole?: (mixinId: string, nativeId?: ScryptedNativeId) => Console) {
+        public getDeviceConsole: (nativeId?: ScryptedNativeId) => Console,
+        public getMixinConsole: (mixinId: string, nativeId?: ScryptedNativeId) => Console) {
     }
 
     async requestRestart() {
@@ -218,7 +218,7 @@ export class DeviceManagerImpl implements DeviceManager {
         return new Proxy(handler, handler);
     }
 
-    createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState {
+    createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): WritableDeviceState {
         const handler = new DeviceStateProxyHandler(this, id, setState);
         return new Proxy(handler, handler);
     }
@@ -455,15 +455,13 @@ export interface WebSocketCustomHandler {
     methods: WebSocketMethods;
 }
 
-export type PluginReader = (name: string) => Buffer;
-
 export interface PluginRemoteAttachOptions {
     createMediaManager?: (systemManager: SystemManager, deviceManager: DeviceManagerImpl) => Promise<MediaManager>;
     getServicePort?: (name: string, ...args: any[]) => Promise<number>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
-    onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions: PluginRemoteLoadZipOptions) => Promise<any>;
+    onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, getZip: () => Promise<Buffer>, zipOptions: PluginRemoteLoadZipOptions) => Promise<any>;
     onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<void>;
 }
 
@@ -524,6 +522,9 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             pluginHostAPI: api,
             pluginRemoteAPI: undefined,
             serverVersion: hostInfo?.serverVersion,
+            connect: undefined,
+            fork: undefined,
+            connectRPCObject: undefined,
         };
 
         delete peer.params.getRemote;
@@ -634,7 +635,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 done(ret);
             },
 
-            async loadZip(packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) {
+            async loadZip(packageJson: any, getZip: () => Promise<Buffer>, zipOptions?: PluginRemoteLoadZipOptions) {
                 const params: any = {
                     __filename: undefined,
                     deviceManager,
@@ -657,7 +658,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 params.pluginRuntimeAPI = ret;
 
                 try {
-                    return await options.onLoadZip(ret, params, packageJson, zipData, zipOptions);
+                    return await options.onLoadZip(ret, params, packageJson, getZip, zipOptions);
                 }
                 catch (e) {
                     console.error('plugin start/fork failed', e)

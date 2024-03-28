@@ -1,7 +1,16 @@
-import { AuthFetchCredentialState, HttpFetchOptions, HttpFetchResponseType, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { readLine } from '@scrypted/common/src/read-stream';
+import { parseHeaders, readBody, readMessage } from '@scrypted/common/src/rtsp-server';
+import contentType from 'content-type';
 import { IncomingMessage } from 'http';
-import { Readable } from 'stream';
+import { EventEmitter, Readable } from 'stream';
+import { Destroyable } from '../../rtsp/src/rtsp';
 import { getDeviceInfo } from './probe';
+
+export const detectionMap = {
+    human: 'person',
+    vehicle: 'car',
+}
 
 export function getChannel(channel: string) {
     return channel || '101';
@@ -15,6 +24,8 @@ export enum HikvisionCameraEvent {
     // <eventType>linedetection</eventType>
     // <eventState>inactive</eventState>
     LineDetection = "<eventType>linedetection</eventType>",
+    RegionEntrance = "<eventType>regionEntrance</eventType>",
+    RegionExit = "<eventType>regionExit</eventType>",
     // <eventType>fielddetection</eventType>
     // <eventState>active</eventState>
     // <eventType>fielddetection</eventType>
@@ -31,7 +42,7 @@ export interface HikvisionCameraStreamSetup {
 export class HikvisionCameraAPI {
     credential: AuthFetchCredentialState;
     deviceModel: Promise<string>;
-    listenerPromise: Promise<IncomingMessage>;
+    listenerPromise: Promise<Destroyable>;
 
     constructor(public ip: string, username: string, password: string, public console: Console) {
         this.credential = {
@@ -118,46 +129,117 @@ export class HikvisionCameraAPI {
         }
     }
 
-    async jpegSnapshot(channel: string): Promise<Buffer> {
+    async jpegSnapshot(channel: string, timeout = 10000): Promise<Buffer> {
         const url = `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/picture?snapShotImageType=JPEG`
 
         const response = await this.request({
             url: url,
-            timeout: 60000,
+            timeout,
         });
 
         return response.body;
     }
 
-    async listenEvents() {
+    async listenEvents(): Promise<Destroyable> {
+        const events = new EventEmitter();
+        (events as any).destroy = () => { };
         // support multiple cameras listening to a single single stream 
         if (!this.listenerPromise) {
             const url = `http://${this.ip}/ISAPI/Event/notification/alertStream`;
+
+
+            let lastSmartDetection: string;
 
             this.listenerPromise = this.request({
                 url,
                 responseType: 'readable',
             }).then(response => {
-                const stream = response.body;
+                const stream: IncomingMessage = response.body;
+                (events as any).destroy = () => {
+                    stream.destroy();
+                    events.removeAllListeners();
+                };
+                stream.on('close', () => {
+                    this.listenerPromise = undefined;
+                    events.emit('close');
+                });
+                stream.on('end', () => {
+                    this.listenerPromise = undefined;
+                    events.emit('end');
+                });
+                stream.on('error', e => {
+                    this.listenerPromise = undefined;
+                    events.emit('error', e);
+                });
                 stream.socket.setKeepAlive(true);
 
-                stream.on('data', (buffer: Buffer) => {
-                    const data = buffer.toString();
-                    for (const event of Object.values(HikvisionCameraEvent)) {
-                        if (data.indexOf(event) !== -1) {
-                            const cameraNumber = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
-                            const inactive = data.indexOf('<eventState>inactive</eventState>') !== -1;
-                            stream.emit('event', event, cameraNumber, inactive, data);
+                const ct = stream.headers['content-type'];
+                // make content type parsable as content disposition filename
+                const cd = contentType.parse(ct);
+                let { boundary } = cd.parameters;
+                boundary = `--${boundary}`;
+                const boundaryEnd = `${boundary}--`;
+
+
+                (async () => {
+                    while (true) {
+                        let ignore = await readLine(stream);
+                        ignore = ignore.trim();
+                        if (!ignore)
+                            continue;
+                        if (ignore === boundaryEnd)
+                            continue;
+                        if (ignore !== boundary) {
+                            this.console.error('expected boundary but found', ignore);
+                            throw new Error('expected boundary');
+                        }
+
+                        const message = await readMessage(stream);
+                        events.emit('data', message);
+                        message.unshift('');
+                        const headers = parseHeaders(message);
+                        const body = await readBody(stream, headers);
+
+                        try {
+                            if (!headers['content-type'].includes('application/xml') && lastSmartDetection) {
+                                if (!headers['content-type']?.startsWith('image/jpeg')) {
+                                    continue;
+                                }
+                                events.emit('smart', lastSmartDetection, body);
+                                lastSmartDetection = undefined;
+                                continue;
+                            }
+
+                        }
+                        finally {
+                            // is it possible that smart detections are sent without images?
+                            // if so, flush this detection.
+                            if (lastSmartDetection) {
+                                events.emit('smart', lastSmartDetection);
+                            }
+                        }
+
+                        const data = body.toString();
+                        events.emit('data', data);
+                        for (const event of Object.values(HikvisionCameraEvent)) {
+                            if (data.indexOf(event) !== -1) {
+                                const cameraNumber = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
+                                const inactive = data.indexOf('<eventState>inactive</eventState>') !== -1;
+                                events.emit('event', event, cameraNumber, inactive, data);
+                                if (event === HikvisionCameraEvent.LineDetection
+                                    || event === HikvisionCameraEvent.RegionEntrance
+                                    || event === HikvisionCameraEvent.RegionExit
+                                    || event === HikvisionCameraEvent.FieldDetection) {
+                                    lastSmartDetection = data;
+                                }
+                            }
                         }
                     }
-                });
-                return stream;
+                })()
+                    .catch(() => stream.destroy());
+                return events as any as Destroyable;
             });
             this.listenerPromise.catch(() => this.listenerPromise = undefined);
-            this.listenerPromise.then(stream => {
-                stream.on('close', () => this.listenerPromise = undefined);
-                stream.on('end', () => this.listenerPromise = undefined);
-            });
         }
 
         return this.listenerPromise;

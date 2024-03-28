@@ -1,14 +1,15 @@
 import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { DeviceProvider, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from '@scrypted/sdk';
+import sdk, { DeviceProvider, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import fs from 'fs';
 import packageJson from "../package.json";
-import { getAddressOverride, getAddressOverrides } from "./address-override";
+import { getScryptedServerAddresses } from "./address-override";
 import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
-import { HAPStorage, Accessory, Bridge, Categories, Characteristic, ControllerStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
-import { createHAPUsernameStorageSettingsDict, getHAPUUID, getRandomPort as createRandomPort, logConnections, typeToCategory } from './hap-utils';
-import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
+import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, HAPStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
+import { createHAPUsernameStorageSettingsDict, getRandomPort as createRandomPort, getHAPUUID, logConnections, typeToCategory } from './hap-utils';
+import { HOMEKIT_MIXIN, HomekitMixin } from './homekit-mixin';
 import { addAccessoryDeviceInfo } from './info';
 import { randomPinCode } from './pincode';
 import './types';
@@ -153,7 +154,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         await this.storageSettings.putSetting(key, value);
 
         if (key === this.storageSettings.keys.portOverride) {
-            this.log.a('Reload the HomeKit plugin to apply this change.');
+            this.log.a(`The HomeKit plugin will reload momentarily for the changes to ${this.name} to take effect.`);
         }
     }
 
@@ -165,7 +166,10 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             case MDNSAdvertiser.CIAO:
                 break;
             default:
-                advertiser = MDNSAdvertiser.CIAO;
+                if (fs.existsSync('/var/run/avahi-daemon/'))
+                    advertiser = MDNSAdvertiser.AVAHI;
+                else
+                    advertiser = MDNSAdvertiser.CIAO;
                 break;
         }
         return advertiser;
@@ -373,7 +377,8 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             const has = accessoryIds.has(eventSource?.id);
             if (has && !canMixin) {
                 this.console.log('restart event', eventSource?.id, eventDetails.property, eventData);
-                this.log.a(`${eventSource.name} can no longer be synced. Reload the HomeKit plugin to apply these changes.`);
+                this.log.a(`${eventSource.name} can no longer be synced. HomeKit plugin will reload momentarily.`);
+                deviceManager.requestRestart();
                 return;
             }
 
@@ -411,7 +416,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         if (bind === 'All Addresses')
             bind = undefined;
         else if (!bind || bind === 'Default' || bind === 'Server Address')
-            return getAddressOverrides();
+            return getScryptedServerAddresses();
         return bind;
     }
 
@@ -429,7 +434,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         });
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState) {
         const options: SettingsMixinDeviceOptions<any> = {
             mixinProviderNativeId: this.nativeId,
             mixinDeviceInterfaces,

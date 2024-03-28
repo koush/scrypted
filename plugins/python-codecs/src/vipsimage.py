@@ -104,7 +104,7 @@ class ImageReader(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.BufferConverter)
     def __init__(self, nativeId: str):
         super().__init__(nativeId)
 
-        self.fromMimeType = 'image/*'
+        self.fromMimeType = 'image/*;converter-weight=2'
         self.toMimeType = scrypted_sdk.ScryptedMimeTypes.Image.value
 
     async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: scrypted_sdk.MediaObjectOptions = None) -> Any:

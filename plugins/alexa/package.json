@@ -1,18 +1,19 @@
 {
    "name": "@scrypted/alexa",
-   "version": "0.2.10",
+   "version": "0.3.1",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
       "build": "scrypted-webpack",
-      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prepublishOnly": "scrypted-changelog && NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
       "scrypted-vscode-launch": "scrypted-deploy-debug",
       "scrypted-deploy-debug": "scrypted-deploy-debug",
       "scrypted-debug": "scrypted-debug",
       "scrypted-deploy": "scrypted-deploy",
-      "scrypted-readme": "scrypted-readme",
-      "scrypted-package-json": "scrypted-package-json"
+      "scrypted-changelog": "scrypted-changelog",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-readme": "scrypted-readme"
    },
    "keywords": [
       "scrypted",
@@ -38,8 +39,9 @@
       "uuid": "^9.0.0"
    },
    "devDependencies": {
-      "@types/node": "^18.4.2",
+      "@scrypted/common": "../../common",
       "@scrypted/sdk": "../../sdk",
-      "@scrypted/common": "../../common"
+      "@types/debug": "^4.1.12",
+      "@types/node": "^18.4.2"
    }
 }

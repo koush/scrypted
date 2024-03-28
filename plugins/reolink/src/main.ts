@@ -1,5 +1,5 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PanTiltZoom, PanTiltZoomCommand, PictureOptions, Reboot, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PanTiltZoom, PanTiltZoomCommand, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -140,7 +140,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
         if (this.storageSettings.values.ptz?.length) {
             interfaces.push(ScryptedInterface.PanTiltZoom);
         }
-        if (this.storageSettings.values.hasObjectDetector) {
+        if (this.storageSettings.values.hasObjectDetector || (this.storageSettings.values.doorbellUseOnvifDetections && this.storageSettings.values.doorbell)) {
             interfaces.push(ScryptedInterface.ObjectDetector);
         }
         await this.provider.updateDevice(this.nativeId, name, interfaces, type);
@@ -205,10 +205,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
                         return;
 
                     hasSucceeded = true;
-                    if (!this.storageSettings.values.hasObjectDetector) {
-                        this.storageSettings.values.hasObjectDetector = ai.data;
-                        this.updateDevice();
-                    }
                     const od: ObjectsDetected = {
                         timestamp: Date.now(),
                         detections: [],
@@ -306,8 +302,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
         return ret;
     }
 
-    async takeSmartCameraPicture(option?: PictureOptions): Promise<MediaObject> {
-        return this.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
+    async takeSmartCameraPicture(options?: RequestPictureOptions): Promise<MediaObject> {
+        return this.createMediaObject(await this.getClient().jpegSnapshot(options?.timeout), 'image/jpeg');
     }
 
     async getUrlSettings(): Promise<Setting[]> {

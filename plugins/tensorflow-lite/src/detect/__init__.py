@@ -73,6 +73,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if mediaObject.mimeType == ScryptedMimeTypes.Image.value:
             image = await scrypted_sdk.sdk.connectRPCObject(mediaObject)
         else:
+            print('non image provided')
             image = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.Image.value)
 
         return await self.run_detection_image(image, session)

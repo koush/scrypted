@@ -1,9 +1,12 @@
 import dns from 'dns';
+import dotenv from 'dotenv';
+import path from 'path';
 import process from 'process';
 import semver from 'semver';
 import v8 from 'v8';
 import vm from 'vm';
 import { PluginError } from './plugin/plugin-error';
+import { getScryptedVolume } from './plugin/plugin-volume';
 import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
 import type { Runtime } from './scrypted-server-main';
 
@@ -52,6 +55,10 @@ function start(mainFilename: string, options?: {
                 throw error;
             }
             console.warn('unhandled rejection of RPC Result', error);
+        });
+
+        dotenv.config({
+            path: path.join(getScryptedVolume(), '.env'),
         });
 
         const start = require('./scrypted-server-main').default;

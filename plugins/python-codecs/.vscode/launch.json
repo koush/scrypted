@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Scrypted Debugger",
-            "type": "python",
+            "type": "debugpy",
             "request": "attach",
             "connect": {
                 "host": "${config:scrypted.debugHost}",
@@ -28,7 +28,7 @@
         },
         {
             "name": "Python: Test",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/test.py",
             "console": "internalConsole",

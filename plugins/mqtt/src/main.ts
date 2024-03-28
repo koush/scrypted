@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { createScriptDevice, ScriptDeviceImpl, tsCompile } from '@scrypted/common/src/eval/scrypted-eval';
-import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, EventListenerRegister, MixinProvider, Scriptable, ScriptSource, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, Setting, Settings } from '@scrypted/sdk';
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, EventListenerRegister, MixinProvider, Scriptable, ScriptSource, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, Setting, Settings, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings"
 import aedes, { AedesOptions } from 'aedes';
 import fs from 'fs';
@@ -592,7 +592,7 @@ export class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, 
         return isPublishable(type, interfaces) ? [ScryptedInterface.Settings] : undefined;
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState:WritableDeviceState): Promise<any> {
         return new MqttPublisherMixin(this, {
             mixinDevice,
             mixinDeviceState,

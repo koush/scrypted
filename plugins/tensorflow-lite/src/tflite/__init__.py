@@ -70,7 +70,13 @@ class TensorFlowLitePlugin(
             nonlocal model
 
             if defaultModel:
-                model = "efficientdet_lite0_320_ptq"
+                if edge_tpus and next((obj for obj in edge_tpus if obj['type'] == 'usb'), None):
+                    model = "yolov8n_full_integer_quant_320"
+                    # this model seems completely wacky with lots of false positives.
+                    # might be broken?
+                    # model = "ssdlite_mobiledet_coco_qat_postprocess"
+                else:
+                    model = "efficientdet_lite0_320_ptq"
             self.yolo = "yolo" in model
             self.yolov8 = "yolov8" in model
 

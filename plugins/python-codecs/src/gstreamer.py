@@ -1,7 +1,6 @@
-import asyncio
 import platform
 from asyncio import Future
-from typing import Any
+from typing import Any, AsyncGenerator
 from urllib.parse import urlparse
 
 import scrypted_sdk
@@ -10,12 +9,8 @@ import pilimage
 import vipsimage
 from generator_common import createImageMediaObject, createVideoFrame
 from gst_generator import Gst, createPipelineIterator
-from gstreamer_postprocess import (
-    GstreamerPostProcess,
-    OpenGLPostProcess,
-    VaapiPostProcess,
-    getBands,
-)
+from gstreamer_postprocess import (GstreamerPostProcess, OpenGLPostProcess,
+                                   VaapiPostProcess, getBands)
 from util import optional_chain
 
 
@@ -317,7 +312,7 @@ async def generateVideoFramesGstreamer(
     h264Decoder: str = None,
     h265Decoder: str = None,
     postProcessPipeline: str = None,
-) -> scrypted_sdk.VideoFrame:
+) -> AsyncGenerator[scrypted_sdk.VideoFrame, Any]:
     ffmpegInput: scrypted_sdk.FFmpegInput = (
         await scrypted_sdk.mediaManager.convertMediaObjectToJSON(
             mediaObject, scrypted_sdk.ScryptedMimeTypes.FFmpegInput.value

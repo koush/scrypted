@@ -1,22 +1,22 @@
-import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
+import type { homegraph_v1 } from "@googleapis/homegraph/v1";
+import sdk, { EngineIOHandler, EventDetails, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, SettingValue, Settings } from '@scrypted/sdk';
 import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands } from 'actions-on-google/dist/service/smarthome/api/v1';
-import { supportedTypes } from './common';
 import axios from 'axios';
-import throttle from 'lodash/throttle';
+import { GoogleAuth } from "google-auth-library";
 import http from 'http';
-import './types';
+import throttle from 'lodash/throttle';
 import './commands';
-import type { homegraph_v1 } from "@googleapis/homegraph/v1"
-import { GoogleAuth } from "google-auth-library"
+import { supportedTypes } from './common';
+import './types';
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
 
+import { canAccess, signalCamera } from './commands/camerastream';
 import { commandHandlers } from './handlers';
-import { canAccess } from './commands/camerastream';
 
-import { URL } from 'url';
 import { homegraph } from '@googleapis/homegraph';
-import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
+import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
+import { URL } from 'url';
 
 import ciao, { Protocol } from '@homebridge/ciao';
 
@@ -45,11 +45,38 @@ const googleAuth = new GoogleAuth({
 
 const includeToken = 3;
 
-class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, MixinProvider {
-    linkTracker = localStorage.getItem('linkTracker');
-    agentUserId = localStorage.getItem('agentUserId');
-    localAuthorization = localStorage.getItem('localAuthorization');
-    reportQueue = new Set<string>();
+class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, MixinProvider, Settings {
+    storageSettings = new StorageSettings(this, {
+        // the tracker tracks whether this device has been reported in a sync request payload.
+        // this is because reporting too many devices in the initial sync fails upstream at google.
+        linkTracker: {
+            hide: true,
+            persistedDefaultValue: Math.random().toString(),
+        },
+        agentUserId: {
+            hide: true,
+            persistedDefaultValue: uuidv4(),
+        },
+        localAuthorization: {
+            hide: true,
+            persistedDefaultValue: uuidv4(),
+        },
+        pairedUserId: {
+            title: "Pairing Key",
+            description: "The pairing key used to validate requests from Google Home. Clear this key or delete the plugin to allow pairing with a different Google Home login.",
+        },
+    });
+    get linkTracker() {
+        return this.storageSettings.values.linkTracker;
+    }
+    get agentUserId() {
+        return this.storageSettings.values.agentUserId;
+    }
+    get localAuthorization() {
+        return this.storageSettings.values.localAuthorization;
+    }
+    // ids and their interfaces changed
+    reportQueue = new Map<string, Set<string>>();
     reportStateThrottled = throttle(() => this.reportState(), 2000);
     throttleSync = throttle(() => this.requestSync(), 15000, {
         leading: false,
@@ -68,25 +95,17 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
     constructor() {
         super();
 
+        endpointManager.setAccessControlAllowOrigin({
+            origins: [
+                // webrtc signaling
+                'https://www.gstatic.com',
+                // chromecast receiver
+                'https://koush.github.io',
+            ],
+        });
+
         if (this.jwt) {
             this.googleAuthClient = googleAuth.fromJSON(this.jwt);
-        }
-
-        // the tracker tracks whether this device has been reported in a sync request payload.
-        // this is because reporting too many devices in the initial sync fails upstream at google.
-        if (!this.linkTracker) {
-            this.linkTracker = Math.random().toString();
-            localStorage.setItem('linkTracker', this.linkTracker);
-        }
-
-        if (!this.agentUserId) {
-            this.agentUserId = uuidv4();
-            localStorage.setItem('agentUserId', this.agentUserId);
-        }
-
-        if (!this.localAuthorization) {
-            this.localAuthorization = uuidv4();
-            localStorage.setItem('localAuthorization', this.localAuthorization);
         }
 
         try {
@@ -98,7 +117,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
         systemManager.listen((source, details) => {
             if (source && details.property)
-                this.queueReportState(source);
+                this.queueReportState(source, details);
         });
 
         systemManager.listen((eventSource, eventDetails) => {
@@ -149,6 +168,14 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             });
             service.advertise();
         });
+    }
+
+    getSettings(): Promise<Setting[]> {
+        return this.storageSettings.getSettings();
+    }
+
+    putSetting(key: string, value: SettingValue): Promise<void> {
+        return this.storageSettings.putSetting(key, value);
     }
 
     async isSyncable(device: ScryptedDevice): Promise<boolean> {
@@ -220,14 +247,19 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         }
     }
 
-    async queueReportState(device: ScryptedDevice) {
+    async queueReportState(device: ScryptedDevice, details: EventDetails) {
         if (this.storage.getItem(`link-${device.id}`) !== this.linkTracker)
             return;
 
         if (!await this.isSyncable(device))
             return;
 
-        this.reportQueue.add(device.id);
+        let set = this.reportQueue.get(device.id);
+        if (!set) {
+            set = new Set();
+            this.reportQueue.set(device.id, set);
+        }
+        set.add(details.eventInterface)
         this.reportStateThrottled();
     }
 
@@ -394,7 +426,8 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
     }
 
     async reportState() {
-        const reporting = new Set(this.reportQueue);
+        const reporting = new Set(this.reportQueue.keys());
+        const map = new Map(this.reportQueue);
         this.reportQueue.clear();
 
         const report: homegraph_v1.Schema$ReportStateAndNotificationRequest = {
@@ -426,7 +459,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                     this.notificationsState[device.id] = notificationsState;
                 }
 
-                const notifications = await supportedType.notifications?.(device, notificationsState);
+                const notifications = await supportedType.notifications?.(device, map.get(id));
                 const hasNotifications = notifications && !!Object.keys(notifications).length;
                 // don't report state on devices with no state
                 if (!Object.keys(status).length && !hasNotifications)
@@ -515,16 +548,59 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             });
             return;
         }
+        this.console.log(request.body);
+
+        if (request.url.startsWith('/endpoint/@scrypted/google-home/public/signaling/')) {
+            if (request.method === 'OPTIONS') {
+                response.send('', {
+                    headers: {
+                        'Access-Control-Allow-Origin': request.headers.origin,
+                        'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+                        'Access-Control-Allow-Headers': request.headers['access-control-request-headers'],
+                    },
+                    code: 200,
+                });
+                return;
+            }
+
+            const token = request.headers['authorization'].split('Bearer ')[1];
+            const camera = canAccess(token);
+            if (!camera) {
+                this.console.error(`request failed due to invalid authorization`);
+                response.send('Invalid Token', {
+                    code: 500,
+                });
+            }
+
+            const answer = await signalCamera(camera, JSON.parse(request.body));
+            response.send(JSON.stringify(answer), {
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            return;
+        }
 
         const { authorization } = request.headers;
         if (authorization !== this.localAuthorization) {
             if (!this.validAuths.has(authorization)) {
                 try {
-                    await axios.get('https://home.scrypted.app/_punch/getcookie', {
+                    const getcookieResponse = await axios.get('https://home.scrypted.app/_punch/getcookie', {
                         headers: {
                             'Authorization': authorization,
                         }
                     });
+                    // new tokens will contain a lot of information, including the expiry and client id.
+                    // validate this. old tokens will be grandfathered in.
+                    if (getcookieResponse.data.expiry && getcookieResponse.data.clientId !== 'google')
+                        throw new Error('client id mismatch');
+                    if (!this.storageSettings.values.pairedUserId) {
+                        this.storageSettings.values.pairedUserId = getcookieResponse.data.id;
+                    }
+                    else if (this.storageSettings.values.pairedUserId !== getcookieResponse.data.id) {
+                        this.log.a('This plugin is already paired with a different account. Clear the existing key in the plugin settings to pair this plugin with a different account.');
+                        throw new Error('user id mismatch');
+                    }
                     this.validAuths.add(authorization);
                 }
                 catch (e) {
@@ -537,7 +613,6 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             }
         }
 
-        this.console.log(request.body);
         const body = JSON.parse(request.body);
         try {
             let result: any;

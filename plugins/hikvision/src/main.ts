@@ -1,11 +1,12 @@
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting } from "@scrypted/sdk";
+import crypto from 'crypto';
 import { PassThrough } from "stream";
 import xml2js from 'xml2js';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
-import { HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
+import { HikvisionCameraAPI, HikvisionCameraEvent, detectionMap } from "./hikvision-camera-api";
 
 const { mediaManager } = sdk;
 
@@ -15,15 +16,17 @@ function channelToCameraNumber(channel: string) {
     return channel.substring(0, channel.length - 2);
 }
 
-class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot {
+class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, ObjectDetector {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     client: HikvisionCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
+    hasSmartDetection: boolean;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
+        this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
     }
@@ -62,60 +65,160 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         let ignoreCameraNumber: boolean;
 
-        let motionPingsNeeded = parseInt(this.storage.getItem('motionPings')) || 1;
-        const motionTimeoutDuration = (parseInt(this.storage.getItem('motionTimeout')) || 10) * 1000;
-        let motionPings = 0;
-        events.on('event', async (event: HikvisionCameraEvent, cameraNumber: string, inactive: boolean) => {
-            if (event === HikvisionCameraEvent.MotionDetected
-                || event === HikvisionCameraEvent.LineDetection
-                || event === HikvisionCameraEvent.FieldDetection) {
+        const motionTimeoutDuration = 20000;
 
-                // check if the camera+channel field is in use, and filter events.
-                if (this.getRtspChannel()) {
-                    // it is possible to set it up to use a camera number
-                    // on an nvr IP (which gives RTSP urls through the NVR), but then use a http port
-                    // that gives a filtered event stream from only that camera.
-                    // this this case, the camera numbers will not
-                    // match as they will be always be "1".
-                    // to detect that a camera specific endpoint is being used
-                    // can look at the channel ids, and see if that camera number is found.
-                    // this is different from the use case where the NVR or camera
-                    // is using a port other than 80 (the default).
-                    // could add a setting to have the user explicitly denote nvr usage
-                    // but that is error prone.
-                    const userCameraNumber = this.getCameraNumber();
-                    if (ignoreCameraNumber === undefined && this.detectedChannels) {
-                        const channelIds = (await this.detectedChannels).keys();
-                        ignoreCameraNumber = true;
-                        for (const id of channelIds) {
-                            if (channelToCameraNumber(id) === userCameraNumber) {
-                                ignoreCameraNumber = false;
-                                break;
-                            }
+        // check if the camera+channel field is in use, and filter events.
+        const checkCameraNumber = async (cameraNumber: string) => {
+            // check if the camera+channel field is in use, and filter events.
+            if (this.getRtspChannel()) {
+                // it is possible to set it up to use a camera number
+                // on an nvr IP (which gives RTSP urls through the NVR), but then use a http port
+                // that gives a filtered event stream from only that camera.
+                // this this case, the camera numbers will not
+                // match as they will be always be "1".
+                // to detect that a camera specific endpoint is being used
+                // can look at the channel ids, and see if that camera number is found.
+                // this is different from the use case where the NVR or camera
+                // is using a port other than 80 (the default).
+                // could add a setting to have the user explicitly denote nvr usage
+                // but that is error prone.
+                const userCameraNumber = this.getCameraNumber();
+                if (ignoreCameraNumber === undefined && this.detectedChannels) {
+                    const channelIds = (await this.detectedChannels).keys();
+                    ignoreCameraNumber = true;
+                    for (const id of channelIds) {
+                        if (channelToCameraNumber(id) === userCameraNumber) {
+                            ignoreCameraNumber = false;
+                            break;
                         }
-                    }
-
-                    if (!ignoreCameraNumber && cameraNumber !== userCameraNumber) {
-                        // this.console.error(`### Skipping motion event ${cameraNumber} != ${this.getCameraNumber()}`);
-                        return;
                     }
                 }
 
-                motionPings++;
-                // this.console.log(this.name, 'motion pings', motionPings);
+                if (!ignoreCameraNumber && cameraNumber !== userCameraNumber) {
+                    // this.console.error(`### Skipping motion event ${cameraNumber} != ${this.getCameraNumber()}`);
+                    return false;
+                }
+            }
 
-                // this.console.error('### Detected motion, camera: ', cameraNumber);
-                this.motionDetected = motionPings >= motionPingsNeeded;
+            return true;
+        };
+
+        events.on('event', async (event: HikvisionCameraEvent, cameraNumber: string, inactive: boolean) => {
+            if (event === HikvisionCameraEvent.MotionDetected
+                || event === HikvisionCameraEvent.LineDetection
+                || event === HikvisionCameraEvent.RegionEntrance
+                || event === HikvisionCameraEvent.RegionExit
+                || event === HikvisionCameraEvent.FieldDetection) {
+
+                if (!await checkCameraNumber(cameraNumber))
+                    return;
+
+                this.motionDetected = true;
                 clearTimeout(motionTimeout);
                 // motion seems to be on a 1 second pulse
                 motionTimeout = setTimeout(() => {
                     this.motionDetected = false;
-                    motionPings = 0;
                 }, motionTimeoutDuration);
             }
-        })
+        });
+
+        let inputDimensions: [number, number];
+
+        events.on('smart', async (data: string, image: Buffer) => {
+            if (!this.hasSmartDetection) {
+                this.hasSmartDetection = true;
+                this.storage.setItem('hasSmartDetection', 'true');
+                this.updateDevice();
+            }
+
+            const xml = await xml2js.parseStringPromise(data);
+
+
+            const [channelId] = xml.EventNotificationAlert.channelID;
+            if (!await checkCameraNumber(channelId)) {
+                this.console.warn('chann fail')
+                return;
+            }
+
+            const now = Date.now();
+            let detections: ObjectDetectionResult[] = xml.EventNotificationAlert?.DetectionRegionList?.map(region => {
+                const { DetectionRegionEntry } = region;
+                const dre = DetectionRegionEntry[0];
+                if (!DetectionRegionEntry)
+                    return;
+                const { detectionTarget } = dre;
+                // const { TargetRect } = dre;
+                // const { X, Y, width, height } = TargetRect[0];
+                const [name] = detectionTarget;
+                return {
+                    score: 1,
+                    className: detectionMap[name] || name,
+                    // boundingBox: [
+                    //     parseInt(X),
+                    //     parseInt(Y),
+                    //     parseInt(width),
+                    //     parseInt(height),
+                    // ],
+                    // movement: {
+                    //     moving: true,
+                    //     firstSeen: now,
+                    //     lastSeen: now,
+                    // }
+                } as ObjectDetectionResult;
+            });
+
+            detections = detections?.filter(d => d);
+            if (!detections?.length)
+                return;
+
+            // if (inputDimensions === undefined && loadSharp()) {
+            //     try {
+            //         const { image: i, metadata } = await loadVipsMetadata(image);
+            //         i.destroy();
+            //         inputDimensions = [metadata.width, metadata.height];
+            //     }
+            //     catch (e) {
+            //         inputDimensions = null;
+            //     }
+            //     finally {
+            //     }
+            // }
+
+            let detectionId: string;
+            if (image) {
+                detectionId = crypto.randomBytes(4).toString('hex');
+                this.recentDetections.set(detectionId, image);
+                setTimeout(() => this.recentDetections.delete(detectionId), 10000);
+            }
+
+            const detected: ObjectsDetected = {
+                inputDimensions,
+                detectionId,
+                timestamp: now,
+                detections,
+            };
+
+            this.onDeviceEvent(ScryptedInterface.ObjectDetector, detected);
+        });
 
         return events;
+    }
+
+    recentDetections = new Map<string, Buffer>();
+
+    async getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject> {
+        const image = this.recentDetections.get(detectionId);
+        if (!image)
+            return;
+        return mediaManager.createMediaObject(image, 'image/jpeg');
+    }
+
+    async getObjectTypes(): Promise<ObjectDetectionTypes> {
+        return {
+            classes: [
+                ...Object.values(detectionMap),
+            ]
+        }
     }
 
     createClient() {
@@ -128,9 +231,9 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         return this.client;
     }
 
-    async takeSmartCameraPicture(): Promise<MediaObject> {
+    async takeSmartCameraPicture(options?: RequestPictureOptions): Promise<MediaObject> {
         const api = this.getClient();
-        return mediaManager.createMediaObject(await api.jpegSnapshot(this.getRtspChannel()), 'image/jpeg');
+        return mediaManager.createMediaObject(await api.jpegSnapshot(this.getRtspChannel(), options?.timeout), 'image/jpeg');
     }
 
     async getRtspUrlSettings(): Promise<Setting[]> {
@@ -291,6 +394,9 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
             interfaces.push(ScryptedInterface.Intercom);
         }
 
+        if (this.hasSmartDetection)
+            interfaces.push(ScryptedInterface.ObjectDetector);
+
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
@@ -323,25 +429,6 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         if (!twoWayAudio)
             twoWayAudio = isDoorbell ? 'Hikvision' : 'None';
-
-        ret.unshift(
-            {
-                subgroup: 'Advanced',
-                key: 'motionTimeout',
-                title: 'Motion Timeout',
-                description: 'Duration to report motion after the last motion ping.',
-                value: parseInt(this.storage.getItem('motionTimeout')) || 10,
-                type: 'number',
-            },
-            {
-                subgroup: 'Advanced',
-                key: 'motionPings',
-                title: 'Motion Ping Count',
-                description: 'Number of motion pings needed to trigger motion.',
-                value: parseInt(this.storage.getItem('motionPings')) || 1,
-                type: 'number',
-            },
-        );
 
         ret.push(
             {
@@ -433,7 +520,8 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
 
         const put = this.getClient().request({
             url,
-            responseType: 'readable',
+            method: 'PUT',
+            responseType: 'text',
             headers: {
                 'Content-Type': 'application/octet-stream',
                 // 'Connection': 'close',
@@ -465,10 +553,21 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         forwarder.killPromise.finally(() => {
             this.console.log('audio finished');
             passthrough.end();
+            setTimeout(() => {
+                this.stopIntercom();
+            }, 1000);
+        });
+
+        put.finally(() => {
             this.stopIntercom();
         });
 
-        put.finally(() => forwarder.kill());
+        // the put request will be open until the passthrough is closed.
+        put.then(response => {
+            if (response.statusCode !== 200)
+                forwarder.kill();
+        })
+            .catch(() => forwarder.kill());
     }
 
     async stopIntercom(): Promise<void> {
@@ -601,4 +700,4 @@ class HikvisionProvider extends RtspProvider {
     }
 }
 
-export default new HikvisionProvider();
+export default HikvisionProvider;

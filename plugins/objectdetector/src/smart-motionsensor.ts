@@ -37,7 +37,26 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             choices: [
             ],
         },
+        minScore: {
+            title: 'Minimum Score',
+            description: 'The minimum score required for a detection to trigger the motion sensor.',
+            type: 'number',
+            defaultValue: 0.7,
+        },
+        requireDetectionThumbnail: {
+            title: 'Rquire Detections with Images',
+            description: 'When enabled, this sensor will ignore detections results that do not have images.',
+            type: 'boolean',
+            defaultValue: false,
+        },
+        requireScryptedNvrDetections: {
+            title: 'Require Scrypted Detections',
+            description: 'When enabled, this sensor will ignore onboard camera detections.',
+            type: 'boolean',
+            defaultValue: false,
+        },
     });
+
     listener: EventListenerRegister;
     timeout: NodeJS.Timeout;
     lastPicture: Promise<MediaObject>;
@@ -134,7 +153,15 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
 
         this.listener = objectDetector.listen(ScryptedInterface.ObjectDetector, (source, details, data) => {
             const detected: ObjectsDetected = data;
+
+            if (this.storageSettings.values.requireDetectionThumbnail && !detected.detectionId)
+                return false;
+
             const match = detected.detections?.find(d => {
+                if (this.storageSettings.values.requireScryptedNvrDetections && !d.boundingBox)
+                    return false;
+                if (d.score && d.score < this.storageSettings.values.minScore)
+                    return false;
                 if (!detections.includes(d.className))
                     return false;
                 const zones: string[] = this.storageSettings.values.zones;

@@ -2,7 +2,7 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import https from 'https';
 import os from 'os';
@@ -276,12 +276,14 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 id: options?.id,
                 reason: options?.reason,
             }, eventSnapshot ? 0 : 2000, async () => {
+                const snapshotTimer = Date.now();
                 let picture = await this.takePictureInternal();
                 picture = await this.cropAndScale(picture);
                 this.clearCachedPictures();
                 this.currentPicture = picture;
                 this.currentPictureTime = Date.now();
                 this.lastAvailablePicture = picture;
+                this.debugConsole?.debug(`Periodic snapshot took ${(this.currentPictureTime - snapshotTimer) / 1000} seconds to retrieve.`)
                 return picture;
             });
 
@@ -289,11 +291,15 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             // the debounce has already triggered a refresh for the next go around.
             if (periodicSnapshot && this.currentPicture) {
                 const cp = this.currentPicture;
-                debounced.catch(() => {});
+                debounced.catch(() => { });
+                const timeout = options.timeout || 1000;
                 try {
-                    picture = await timeoutPromise(1000, debounced);
+                    picture = await timeoutPromise(timeout, debounced);
                 }
                 catch (e) {
+                    if (e instanceof TimeoutError)
+                        this.debugConsole?.log(`Periodic snapshot took longer than ${timeout} seconds to retrieve, falling back to cached picture.`)
+
                     picture = cp;
                 }
             }
@@ -514,13 +520,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const fontFile = path.join(unzippedFs, 'Lato-Bold.ttf');
 
         if (!errorBackground) {
-            const black = path.join(unzippedFs, 'black.jpg');
             return ffmpegFilterImage([
-                '-i', black,
+                '-f', 'lavfi',
+                '-i', 'color=black:size=1920x1080',
             ], {
                 console: this.debugConsole,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
-                blur: true,
                 text: {
                     fontFile,
                     text,
@@ -567,6 +572,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
         },
     });
     mixinDevices = new Map<string, SnapshotMixin>();
+    authenticatedPath = sdk.endpointManager.getAuthenticatedPath(this.nativeId)
 
     constructor(nativeId?: string) {
         super(nativeId);
@@ -638,9 +644,8 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             return this.console;
     }
 
-
     async getLocalSnapshot(id: string, iface: string, search: string) {
-        const endpoint = await sdk.endpointManager.getAuthenticatedPath(this.nativeId);
+        const endpoint = await this.authenticatedPath;
         const ret = url.resolve(path.join(endpoint, id, iface, `${Date.now()}.jpg`) + `${search}`, '');
         return Buffer.from(ret);
     }
@@ -678,8 +683,13 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             const search = new URLSearchParams(pathname.split('?')[1]);
             const mixin = this.mixinDevices.get(id);
             let buffer: Buffer;
+            let timeout = parseInt(search.get('timeout'));
+            // make web requests timeout after 5 seconds by default.
+            if (isNaN(timeout))
+                timeout = 5000;
             const rpo: RequestPictureOptions = {
                 reason: search.get('reason') as 'event' | 'periodic',
+                timeout,
                 picture: {
                     width: parseInt(search.get('width')) || undefined,
                     height: parseInt(search.get('height')) || undefined,
@@ -718,7 +728,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
         return undefined;
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any> {
         const ret = new SnapshotMixin(this, {
             mixinDevice,
             mixinDeviceInterfaces,

@@ -132,13 +132,21 @@ export class VipsImage implements Image {
     }
 }
 
+export async function loadVipsMetadata(data: Buffer | string) {
+    const image = sharpInstance(data, {
+        failOn: 'none'
+    });
+    const metadata = await image.metadata();
+    return {
+        image,
+        metadata,
+    }
+}
+
 export async function loadVipsImage(data: Buffer | string, sourceId: string) {
     loadSharp();
 
-    const image = sharpInstance(data, {
-        failOnError: false,
-    });
-    const metadata = await image.metadata();
+    const { image, metadata } = await loadVipsMetadata(data);
     const vipsImage = new VipsImage(image, metadata, sourceId);
     return vipsImage;
 }

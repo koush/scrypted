@@ -1,8 +1,11 @@
-import { ScryptedDeviceBase, MotionSensor, BinarySensor, AudioSensor, HumiditySensor, Thermometer, TemperatureUnit } from "@scrypted/sdk";
-import { ProtectSensorConfig } from "./unifi-protect";
+import { AudioSensor, BinarySensor, HumiditySensor, MotionSensor, ScryptedDeviceBase, TemperatureUnit, Thermometer } from "@scrypted/sdk";
 import { UnifiProtect } from "./main";
+import { UnifiMotionDevice, debounceMotionDetected } from "./motion";
+import { ProtectSensorConfig } from "./unifi-protect";
 
-export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, HumiditySensor, AudioSensor, BinarySensor, MotionSensor {
+export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, HumiditySensor, AudioSensor, BinarySensor, MotionSensor, UnifiMotionDevice {
+    motionTimeout: NodeJS.Timeout;
+
     constructor(public protect: UnifiProtect, nativeId: string, protectSensor: Readonly<ProtectSensorConfig>) {
         super(nativeId);
         this.temperatureUnit = TemperatureUnit.C;
@@ -11,7 +14,8 @@ export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, Humi
     }
 
     findSensor() {
-        return this.protect.api.sensors.find(sensor => sensor.id === this.nativeId);
+        const id = this.protect.findId(this.nativeId);
+        return this.protect.api.sensors.find(sensor => sensor.id === id);
     }
 
     async setTemperatureUnit(temperatureUnit: TemperatureUnit): Promise<void> {
@@ -28,7 +32,8 @@ export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, Humi
         this.binaryState = sensor.isOpened;
         this.audioDetected = !!sensor.alarmTriggeredAt;
         this.flooded = !!sensor.leakDetectedAt;
-        this.setMotionDetected(!!sensor.isMotionDetected);
+        if (!!sensor.isMotionDetected)
+            debounceMotionDetected(this);
     }
 
     setMotionDetected(motionDetected: boolean) {

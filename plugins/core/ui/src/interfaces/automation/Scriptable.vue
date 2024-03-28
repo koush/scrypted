@@ -38,8 +38,6 @@
 
 <script>
 import RPCInterface from "../RPCInterface.vue";
-import types from "!!raw-loader!@scrypted/types/dist/index.d.ts";
-import sdk from "!!raw-loader!@scrypted/sdk/dist/src/index.d.ts";
 import * as monaco from "monaco-editor";
 
 function monacoEvalDefaults() {
@@ -62,33 +60,6 @@ function monacoEvalDefaults() {
           monaco.languages.typescript.ModuleResolutionKind.NodeJs,
       }
     )
-  );
-
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-    `${types}
-    ${sdk}
-    
-    declare global {
-      ${types.replace("export interface", "interface")}
-
-      const log: Logger;
-
-      const deviceManager: DeviceManager;
-      const endpointManager: EndpointManager;
-      const mediaManager: MediaManager;
-      const systemManager: SystemManager;
-      const eventSource: any;
-      const eventDetails: EventDetails;
-      const eventData: any;
-    }
-    `,
-
-    "node_modules/@types/scrypted__sdk/types.d.ts"
-  );
-
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-    sdk,
-    "node_modules/@types/scrypted__sdk/index.d.ts"
   );
 }
 

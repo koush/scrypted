@@ -171,6 +171,8 @@ export default {
       const serviceControl = await this.$scrypted.systemManager.getComponent(
         "service-control"
       );
+      // legacy command that exits npx scrypted.
+      await serviceControl.exit().catch(() => {});
       await serviceControl.restart();
     },
     async doUpdateAndRestart() {

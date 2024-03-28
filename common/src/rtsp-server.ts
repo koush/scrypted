@@ -324,6 +324,7 @@ export class RtspClient extends RtspBase {
     setupOptions = new Map<number, RtspClientTcpSetupOptions>();
     issuedTeardown = false;
     hasGetParameter = true;
+    contentBase: string;
 
     constructor(public url: string) {
         super();
@@ -364,13 +365,18 @@ export class RtspClient extends RtspBase {
     async writeRequest(method: string, headers?: Headers, path?: string, body?: Buffer) {
         headers = headers || {};
 
-        let fullUrl = this.url;
-        if (path) {
+        let fullUrl: string;
+        if (!path) {
+            fullUrl = this.url;
+        }
+        else {
             // a=control may be a full or "relative" url.
-            if (path.includes('rtsp://') || path.includes('rtsps://')) {
+            if (path.includes('rtsp://') || path.includes('rtsps://') || path === '*') {
                 fullUrl = path;
             }
             else {
+                fullUrl = this.contentBase || this.url;
+
                 // strangely, relative RTSP urls do not behave like expected from an HTTP-ish server.
                 // ffmpeg will happily suffix path segments after query strings:
                 // SETUP rtsp://localhost:5554/cam/realmonitor?channel=1&subtype=0/trackID=0 RTSP/1.0
@@ -645,10 +651,13 @@ export class RtspClient extends RtspBase {
     }
 
     async describe(headers?: Headers) {
-        return this.request('DESCRIBE', {
+        const response = await this.request('DESCRIBE', {
             ...(headers || {}),
             Accept: 'application/sdp',
         });
+
+        this.contentBase = response.headers['content-base'] || response.headers['content-location'];;
+        return response;
     }
 
     async setup(options: RtspClientTcpSetupOptions | RtspClientUdpSetupOptions, headers?: Headers) {

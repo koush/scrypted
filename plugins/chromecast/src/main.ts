@@ -183,7 +183,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
         media = await mediaManager.createMediaObjectFromUrl(media);
       }
     }
-    else if (options?.mimeType?.startsWith('image/')) {
+    else if (options?.mimeType?.startsWith('image/') || options?.mimeType?.startsWith('audio/')) {
       url = await mediaManager.convertMediaObjectToInsecureLocalUrl(media, options?.mimeType);
     }
 
@@ -215,7 +215,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     let cameraStreamAuthToken: string;
 
     try {
-      cameraStreamAuthToken= await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
+      cameraStreamAuthToken = await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
     }
     catch (e) {
       this.log.a('Streaming failed. Install and set up Scrypted Cloud to cast this media type.');
@@ -469,6 +469,12 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
   constructor() {
     super(null);
 
+    endpointManager.setAccessControlAllowOrigin({
+      origins: [
+        // chromecast receiver
+        'https://koush.github.io',
+      ],
+    });
 
     this.browser.on('response', response => {
       for (const additional of response.additionals) {
@@ -562,7 +568,7 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
   }
 
   async releaseDevice(id: string, nativeId: string): Promise<void> {
-      
+
   }
 
   async discoverDevices(duration: number) {

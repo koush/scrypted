@@ -6,12 +6,10 @@ export class ServiceControl {
     constructor(public scrypted: ScryptedRuntime) {
     }
 
-    async exit() {
-        fs.writeFileSync('.exit', '');
-        this.restart();
-    }
-
     async restart() {
+        // legacy file necessary to exit the npx scrypted service,
+        // and allow it to be restarted by launchd or systemd.
+        fs.writeFileSync('.exit', '');
         process.exit();
     }
 

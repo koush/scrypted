@@ -2,7 +2,11 @@ import sdk, { ScryptedInterface, Setting, Settings, SettingValue } from ".";
 
 const { systemManager } = sdk;
 
-function parseValue(value: string, setting: StorageSetting, readDefaultValue: () => any, rawDevice?: boolean) {
+function parseValue(value: string | null | undefined, setting: StorageSetting, readDefaultValue: () => any, rawDevice?: boolean) {
+    if (value === null || value === undefined) {
+        return readDefaultValue();
+    }
+
     const type = setting.multiple ? 'array' : setting.type;
 
     if (type === 'boolean') {

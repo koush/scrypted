@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/homekit",
-   "version": "1.2.37",
+   "version": "1.2.43",
    "description": "HomeKit Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -36,7 +36,7 @@
    "dependencies": {
       "@koush/werift-src": "file:../../external/werift",
       "check-disk-space": "^3.4.0",
-      "hap-nodejs": "^0.11.1",
+      "hap-nodejs": "^0.11.2",
       "lodash": "^4.17.21",
       "mkdirp": "^3.0.1"
    },
@@ -44,8 +44,8 @@
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "@types/debug": "^4.1.12",
-      "@types/lodash": "^4.14.202",
-      "@types/node": "^20.11.0",
+      "@types/lodash": "^4.17.0",
+      "@types/node": "^20.11.28",
       "@types/url-parse": "^1.4.11"
    }
 }

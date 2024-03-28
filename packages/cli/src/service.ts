@@ -117,6 +117,10 @@ export async function serveMain(installVersion?: string) {
         await installServe(installVersion, true);
     }
 
+    // todo: remove at some point after core lxc updater rolls out.
+    if (process.env.SCRYPTED_INSTALL_ENVIRONMENT === 'lxc')
+        process.env.SCRYPTED_FFMPEG_PATH = '/usr/bin/ffmpeg';
+
     process.env.SCRYPTED_NPM_SERVE = 'true';
     process.env.SCRYPTED_VOLUME = volume;
     process.env.SCRYPTED_CAN_EXIT = 'true';
@@ -129,16 +133,20 @@ export async function serveMain(installVersion?: string) {
 
         await startServer(installDir);
 
-        if (fs.existsSync(EXIT_FILE)) {
-            console.log('Exiting.');
-            process.exit();
-        }
-        else if (fs.existsSync(UPDATE_FILE)) {
+        if (fs.existsSync(UPDATE_FILE)) {
             console.log('Update requested. Installing.');
-            await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
+            await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest').catch(e => {
+                console.error('Update failed', e);
+            });
+            console.log('Exiting.');
+            process.exit(1);
+        }
+        else if (fs.existsSync(EXIT_FILE)) {
+            console.log('Exiting.');
+            process.exit(1);
         }
         else {
-            console.log(`Service exited. Restarting momentarily.`);
+            console.log(`Service unexpectedly exited. Restarting momentarily.`);
             await sleep(10000);
         }
     }
