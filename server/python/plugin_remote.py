@@ -56,7 +56,7 @@ class DeviceProxy(object):
     def __init__(self, systemManager: SystemManager, id: str):
         self.systemManager = systemManager
         self.id = id
-        self.device: asyncio.Future[Any] = None
+        self.device: asyncio.Future[rpc.RpcProxy] = None
 
     def __getattr__(self, name):
         if name == 'id':
