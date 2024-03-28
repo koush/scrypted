@@ -81,10 +81,7 @@ class DeviceProxy(object):
 
     def __apply__(self, method: str, args: list):
         if not self.device:
-            self.device = Future()
-            asyncio.get_event_loop().create_task(self.systemManager.api.getDeviceById(self.id)).add_done_callback(
-                lambda f: self.device.set_result(f.result())
-            )
+            self.device = asyncio.ensure_future(self.systemManager.api.getDeviceById(self.id))
 
         async def apply():
             device = await self.device
