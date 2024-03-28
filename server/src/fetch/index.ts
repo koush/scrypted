@@ -129,6 +129,8 @@ export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T)
     if (options.timeout) {
         controller = new AbortController();
         timeout = setTimeout(() => controller.abort(), options.timeout);
+
+        options.signal?.addEventListener('abort', () => controller.abort('abort'));
     }
 
     try {

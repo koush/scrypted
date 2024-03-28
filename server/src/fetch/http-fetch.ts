@@ -98,6 +98,8 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
     if (options.timeout) {
         controller = new AbortController();
         timeout = setTimeout(() => controller.abort(), options.timeout);
+
+        options.signal?.addEventListener('abort', () => controller.abort('abort'));
     }
 
     const request = proto.request(url, {
@@ -108,11 +110,6 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
         signal: controller?.signal || options.signal,
         timeout: options.timeout,
     });
-
-    if (controller)
-        options.signal?.addEventListener('abort', () => controller.abort('abort'));
-    else
-        options.signal?.addEventListener('abort', () => request.destroy(new Error('abort')));
 
     if (body)
         body.pipe(request);
