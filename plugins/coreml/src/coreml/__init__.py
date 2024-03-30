@@ -12,13 +12,14 @@ from PIL import Image
 from scrypted_sdk import Setting, SettingValue
 
 import yolo
+import ast
 from predict import Prediction, PredictPlugin, Rectangle
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "CoreML-Predict")
 
 
 def parse_label_contents(contents: str):
-    lines = contents.splitlines()
+    lines = contents.split(',')
     ret = {}
     for row_number, content in enumerate(lines):
         pair = re.split(r"[:\s]+", content.strip(), maxsplit=1)
@@ -28,6 +29,20 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
+
+def parse_labels(userDefined):
+    yolo = userDefined.get("names") or userDefined.get("yolo.names")
+    if yolo:
+        j = ast.literal_eval(yolo)
+        ret = {}
+        for k, v in j.items():
+            ret[int(k)] = v
+        return ret
+
+    classes = userDefined.get("classes")
+    if not classes:
+        raise Exception("no classes found in model metadata")
+    return parse_label_contents(classes)
 
 class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     def __init__(self, nativeId: str | None = None):
@@ -39,30 +54,23 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         self.yolo = "yolo" in model
         self.yolov8 = "yolov8" in model
         self.yolov9 = "yolov9" in model
-        model_version = "v2"
+        self.scrypted_model = "scrypted" in model
+        model_version = "v3"
+        mlmodel = 'model' if self.yolov8 or self.yolov9 else model
 
         print(f"model: {model}")
 
         if not self.yolo:
             # todo convert these to mlpackage
-            labelsFile = self.downloadFile(
-                f"https://github.com/koush/coreml-models/raw/main/{model}/coco_labels.txt",
-                "coco_labels.txt",
-            )
             modelFile = self.downloadFile(
-                f"https://github.com/koush/coreml-models/raw/main/{model}/{model}.mlmodel",
+                f"https://github.com/koush/coreml-models/raw/main/{model}/{mlmodel}.mlmodel",
                 f"{model}.mlmodel",
             )
         else:
-            if self.yolov8:
-                modelFile = self.downloadFile(
-                    f"https://github.com/koush/coreml-models/raw/main/{model}/{model}.mlmodel",
-                    f"{model}.mlmodel",
-                )
-            elif self.yolov9:
+            if self.yolov8 or self.yolov9:
                 files = [
                     f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
-                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{model}.mlmodel",
+                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{mlmodel}.mlmodel",
                     f"{model}/{model}.mlpackage/Manifest.json",
                 ]
 
@@ -77,7 +85,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     f"{model}/{model}.mlpackage/Data/com.apple.CoreML/FeatureDescriptions.json",
                     f"{model}/{model}.mlpackage/Data/com.apple.CoreML/Metadata.json",
                     f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
-                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{model}.mlmodel",
+                    f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{mlmodel}.mlmodel",
                     f"{model}/{model}.mlpackage/Manifest.json",
                 ]
 
@@ -88,11 +96,6 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                     )
                     modelFile = os.path.dirname(p)
 
-            labelsFile = self.downloadFile(
-                f"https://github.com/koush/coreml-models/raw/main/{model}/coco_80cl.txt",
-                f"{model_version}/{model}/coco_80cl.txt",
-            )
-
         self.model = ct.models.MLModel(modelFile)
 
         self.modelspec = self.model.get_spec()
@@ -100,10 +103,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         self.inputheight = self.inputdesc.type.imageType.height
         self.inputwidth = self.inputdesc.type.imageType.width
 
-        labels_contents = open(labelsFile, "r").read()
-        self.labels = parse_label_contents(labels_contents)
-        # csv in mobilenet model
-        # self.modelspec.description.metadata.userDefined['classes']
+        self.labels = parse_labels(self.modelspec.description.metadata.userDefined)
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.2
 
@@ -116,11 +116,13 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
                 "description": "The detection model used to find objects.",
                 "choices": [
                     "Default",
-                    "ssdlite_mobilenet_v2",
-                    "yolov4-tiny",
-                    "yolov8n",
+                    "scrypted_yolov8n_320",
                     "yolov8n_320",
                     "yolov9c_320",
+                    "ssdlite_mobilenet_v2",
+                    "yolov8n",
+                    "yolov9c",
+                    "yolov4-tiny",
                 ],
                 "value": model,
             },
