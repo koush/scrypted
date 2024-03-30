@@ -79,14 +79,19 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         self.yolo = 'yolo' in model
         self.yolov8 = "yolov8" in model
         self.yolov9 = "yolov9" in model
+        self.scrypted_model = "scrypted" in model
         self.sigmoid = model == 'yolo-v4-tiny-tf'
 
         print(f'model/mode/precision: {model}/{mode}/{precision}')
 
+        ovmodel = 'best' if self.scrypted_model else model
+
         model_version = 'v4'
-        xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.xml', f'{model_version}/{precision}/{model}.xml')
-        binFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{model}.bin', f'{model_version}/{precision}/{model}.bin')
-        if self.yolo:
+        xmlFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.xml', f'{model_version}/{precision}/{ovmodel}.xml')
+        binFile = self.downloadFile(f'https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.bin', f'{model_version}/{precision}/{ovmodel}.bin')
+        if self.scrypted_model:
+            labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/scrypted_labels.txt', 'scrypted_labels.txt')
+        elif self.yolo:
             labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/coco_80cl.txt', 'coco_80cl.txt')
         else:
             labelsFile = self.downloadFile('https://raw.githubusercontent.com/koush/openvino-models/main/coco_labels.txt', 'coco_labels.txt')
@@ -132,13 +137,14 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                 'description': 'The detection model used to find objects.',
                 'choices': [
                     'Default',
+                    'scrypted_yolov8n_320',
+                    'yolov8n_320',
+                    'yolov9c_320',
                     'ssd_mobilenet_v1_coco',
                     'ssdlite_mobilenet_v2',
                     'yolo-v3-tiny-tf',
                     'yolo-v4-tiny-tf',
                     'yolov8n',
-                    'yolov8n_320',
-                    'yolov9c_320',
                 ],
                 'value': model,
             },
