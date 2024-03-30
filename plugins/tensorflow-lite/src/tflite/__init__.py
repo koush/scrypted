@@ -79,10 +79,16 @@ class TensorFlowLitePlugin(
                     model = "efficientdet_lite0_320_ptq"
             self.yolo = "yolo" in model
             self.yolov8 = "yolov8" in model
+            self.scrypted_model = "scrypted" in model
 
             print(f'model: {model}')
 
-            if self.yolo:
+            if self.scrypted_model:
+                labelsFile = self.downloadFile(
+                    f"https://raw.githubusercontent.com/koush/tflite-models/{branch}/scrypted_labels.txt",
+                    f"{model_version}/scrypted_labels.txt",
+                )
+            elif self.yolo:
                 labelsFile = self.downloadFile(
                     f"https://raw.githubusercontent.com/koush/tflite-models/{branch}/coco_80cl.txt",
                     f"{model_version}/coco_80cl.txt",
@@ -100,9 +106,10 @@ class TensorFlowLitePlugin(
         self.interpreter_count = 0
 
         def downloadModel():
+            tflite_model = "best_full_integer_quant" if self.scrypted_model else model
             return self.downloadFile(
-                f"https://github.com/koush/tflite-models/raw/{branch}/{model}/{model}{suffix}.tflite",
-                f"{model_version}/{model}{suffix}.tflite",
+                f"https://github.com/koush/tflite-models/raw/{branch}/{model}/{tflite_model}{suffix}.tflite",
+                f"{model_version}/{tflite_model}{suffix}.tflite",
             )
 
         try:
@@ -175,6 +182,7 @@ class TensorFlowLitePlugin(
                     "ssdlite_mobiledet_coco_qat_postprocess",
                     "yolov8n_full_integer_quant",
                     "yolov8n_full_integer_quant_320",
+                    "scrypted_yolov8n_320",
                     "efficientdet_lite0_320_ptq",
                     "efficientdet_lite1_384_ptq",
                     "efficientdet_lite2_448_ptq",
