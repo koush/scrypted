@@ -627,9 +627,10 @@ export async function fork() {
 
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
-            cleanup.promise.finally(() => setTimeout(() => process.exit(), 10000));
+            cleanup.promise.finally(() => setTimeout(() => process.exit(), 30000));
 
             const connection = new WebRTCConnectionManagement(console, clientSession, maximumCompatibilityMode, clientOptions, options);
+            cleanup.promise.finally(() => connection.close().catch(() => { }));
             const { pc } = connection;
             waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
 
