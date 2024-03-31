@@ -151,7 +151,7 @@ export class OnvifIntercom implements Intercom {
                     }
 
                     const elapsedRtpTimeMs = Math.abs(pending.header.timestamp - p.header.timestamp) / 8000 * 1000;
-                    if (elapsedRtpTimeMs <= 160) {
+                    if (elapsedRtpTimeMs <= 160 && pending.payload.length + p.payload.length <= 1024) {
                         pending.payload = Buffer.concat([pending.payload, p.payload]);
                         return;
                     }
