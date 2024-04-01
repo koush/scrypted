@@ -27,7 +27,7 @@ async def to_thread(f):
     return await loop.run_in_executor(toThreadExecutor, f)
 
 async def ensureRGBData(data: bytes, size: Tuple[int, int], format: str):
-    if format != 'rgba':
+    if format == 'rgb':
         return Image.frombuffer('RGB', size, data)
 
     def convert():
@@ -36,6 +36,19 @@ async def ensureRGBData(data: bytes, size: Tuple[int, int], format: str):
             return rgba.convert('RGB')
         finally:
             rgba.close()
+    return await to_thread(convert)
+
+async def ensureRGBAData(data: bytes, size: Tuple[int, int], format: str):
+    if format == 'rgba':
+        return Image.frombuffer('RGBA', size, data)
+
+    # this path should never be possible as all the image sources should be capable of rgba.
+    def convert():
+        rgb = Image.frombuffer('RGB', size, data)
+        try:
+            return rgb.convert('RGBA')
+        finally:
+            rgb.close()
     return await to_thread(convert)
 
 def parse_label_contents(contents: str):
@@ -154,23 +167,36 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         iw, ih = image.width, image.height
         w, h = self.get_input_size()
 
-        resize = None
-        xs = w / iw
-        ys = h / ih
-        def cvss(point):
-            return point[0] / xs, point[1] / ys
+        if w is None or h is None:
+            resize = None
+            w = image.width
+            h = image.height
+            def cvss(point):
+                return point
+        else:
+            resize = None
+            xs = w / iw
+            ys = h / ih
+            def cvss(point):
+                return point[0] / xs, point[1] / ys
 
-        if iw != w or ih != h:
-            resize = {
-                'width': w,
-                'height': h,
-            }
+            if iw != w or ih != h:
+                resize = {
+                    'width': w,
+                    'height': h,
+                }
 
+        format = image.format or self.get_input_format()
         b = await image.toBuffer({
             'resize': resize,
-            'format': image.format or 'rgb',
+            'format': format,
         })
-        data = await ensureRGBData(b, (w, h), image.format)
+
+        if self.get_input_format() == 'rgb':
+            data = await ensureRGBData(b, (w, h), format)
+        elif self.get_input_format() == 'rgba':
+            data = await ensureRGBAData(b, (w, h), format)
+
         try:
             ret = await self.safe_detect_once(data, settings, (iw, ih), cvss)
             return ret
