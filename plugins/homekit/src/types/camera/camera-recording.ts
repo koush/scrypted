@@ -67,12 +67,29 @@ async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
         await timeoutPromise(1000, new Promise(resolve => cp.on('exit', resolve)));
         const h264 = Buffer.concat(buffers);
         let offset = 0;
+        let countedZeroes = 0;
         while (offset < h264.length - 6) {
-            if (h264.readInt32BE(offset) !== 1) {
+            const byte = h264[offset];
+            if (byte === 0) {
+                countedZeroes = Math.min(4, countedZeroes + 1);
                 offset++;
                 continue;
             }
-            offset += 4;
+
+            if (countedZeroes < 2) {
+                countedZeroes = 0;
+                offset++
+                continue;
+            }
+
+            countedZeroes = 0;
+            if (byte !== 1) {
+                offset++;
+                continue;
+            }
+
+            offset++;
+
             let naluType = h264.readUInt8(offset) & 0x1f;
             if (naluType === NAL_TYPE_FU_A) {
                 offset++;
