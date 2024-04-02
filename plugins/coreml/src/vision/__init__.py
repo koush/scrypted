@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import os
 from typing import Any, Tuple
 
+import coremltools as ct
 import Quartz
 import scrypted_sdk
 from Foundation import NSData, NSMakeSize
-from PIL import Image
+from PIL import Image, ImageOps
 from scrypted_sdk import Setting, SettingValue
 
 import Vision
@@ -28,6 +30,30 @@ class VisionPlugin(PredictPlugin):
         }
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.2
+
+        model_version = "v1"
+        model = "inception_resnet_v1"
+        mlmodel = "model"
+
+        files = [
+            f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+            f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{mlmodel}.mlmodel",
+            f"{model}/{model}.mlpackage/Manifest.json",
+        ]
+
+        for f in files:
+            p = self.downloadFile(
+                f"https://github.com/koush/coreml-models/raw/main/{f}",
+                f"{model_version}/{f}",
+            )
+            modelFile = os.path.dirname(p)
+
+        self.model = ct.models.MLModel(modelFile)
+
+        self.modelspec = self.model.get_spec()
+        self.inputdesc = self.modelspec.description.input[0]
+        self.inputwidthResnet = self.inputdesc.type.imageType.width
+        self.inputheightResnet = self.inputdesc.type.imageType.height
 
     async def getSettings(self) -> list[Setting]:
         pass
@@ -101,20 +127,28 @@ class VisionPlugin(PredictPlugin):
             bb = o.boundingBox()
             origin = bb.origin
             size = bb.size
-            # print(confidence, origin.x, origin.y, size.width, size.height)
-            prediction = Prediction(
-                0,
-                confidence,
-                from_bounding_box(
-                    (
-                        origin.x * input.width,
-                        (1 - origin.y - size.height) * input.height,
-                        size.width * input.width,
-                        size.height * input.height,
-                    )
-                ),
-            )
+
+            l = origin.x * input.width
+            t = (1 - origin.y - size.height) * input.height
+            w = size.width * input.width
+            h = size.height * input.height
+            prediction = Prediction(0, confidence, from_bounding_box((l, t, w, h)))
             objs.append(prediction)
+
+            face = input.crop((l, t, l + w, t + h)).convert('RGB')
+
+            if face.width > face.height:
+                scale = 160 / face.width
+                face = face.resize((160, int(face.height * scale)))
+                if face.height < 160:
+                    face = ImageOps.expand(face, border=((0, 160 - face.height)), fill='black')
+            else:
+                scale = 160 / face.height
+                face = face.resize((int(face.width * scale), 160))
+                if face.width < 160:
+                    face = ImageOps.expand(face, border=((160 - face.width, 0)), fill='black')
+
+            descriptor = self.model.predict({"x_1": face})
 
         ret = self.create_detection_result(objs, src_size, cvss)
         return ret
