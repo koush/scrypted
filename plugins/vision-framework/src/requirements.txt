@@ -1,2 +1,0 @@
-pyobjc
-Pillow>=5.4.1

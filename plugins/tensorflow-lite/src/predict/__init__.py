@@ -68,7 +68,7 @@ class Prediction:
         self.score = score
         self.bbox = bbox
 
-class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
+class PredictPlugin(DetectPlugin):
     labels: dict
 
     def __init__(self, nativeId: str | None = None):

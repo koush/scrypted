@@ -2,23 +2,21 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import os
 from typing import Any, Tuple
 
+import Quartz
 import scrypted_sdk
+from Foundation import NSData, NSMakeSize
 from PIL import Image
 from scrypted_sdk import Setting, SettingValue
 
 import Vision
-import Quartz
-from Foundation import NSData, NSMakeSize
-
 from predict import Prediction, PredictPlugin, from_bounding_box
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Vision-Predict")
 
 
-class VisionPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
+class VisionPlugin(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 

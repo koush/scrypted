@@ -44,7 +44,7 @@ def parse_labels(userDefined):
         raise Exception("no classes found in model metadata")
     return parse_label_contents(classes)
 
-class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
+class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProvider):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
@@ -106,6 +106,32 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Set
         self.labels = parse_labels(self.modelspec.description.metadata.userDefined)
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.2
+
+        asyncio.ensure_future(self.prepareVisionFramework(), loop = self.loop)
+
+    async def prepareVisionFramework(self):
+        try:
+            from vision import VisionPlugin
+            if not VisionPlugin:
+                raise Exception("no vision plugin")
+            await scrypted_sdk.deviceManager.onDevicesChanged({
+                "devices": [
+                    {
+                        "nativeId": "vision",
+                        "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                        "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                        ],
+                        "name": "Vision Framework",
+                    }
+                ]
+            })
+        except:
+            pass
+
+    async def getDevice(self, nativeId: str) -> Any:
+        from vision import VisionPlugin
+        return VisionPlugin(nativeId)
 
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"
