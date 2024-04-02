@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import asyncio
 import concurrent.futures
 import os
@@ -11,9 +12,22 @@ import scrypted_sdk
 from Foundation import NSData, NSMakeSize
 from PIL import Image, ImageOps
 from scrypted_sdk import Setting, SettingValue
+import numpy as np
 
 import Vision
 from predict import Prediction, PredictPlugin, from_bounding_box
+
+
+def euclidean_distance(arr1, arr2):
+    return np.linalg.norm(arr1 - arr2)
+
+
+def cosine_similarity(vector_a, vector_b):
+    dot_product = np.dot(vector_a, vector_b)
+    norm_a = np.linalg.norm(vector_a)
+    norm_b = np.linalg.norm(vector_b)
+    similarity = dot_product / (norm_a * norm_b)
+    return similarity
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Vision-Predict")
 
@@ -121,6 +135,7 @@ class VisionPlugin(PredictPlugin):
 
         observations = await future
 
+        last = None
         objs = []
         for o in observations:
             confidence = o.confidence()
@@ -135,20 +150,33 @@ class VisionPlugin(PredictPlugin):
             prediction = Prediction(0, confidence, from_bounding_box((l, t, w, h)))
             objs.append(prediction)
 
-            face = input.crop((l, t, l + w, t + h)).convert('RGB')
+            face = input.crop((l, t, l + w, t + h)).convert("RGB")
 
             if face.width > face.height:
                 scale = 160 / face.width
                 face = face.resize((160, int(face.height * scale)))
                 if face.height < 160:
-                    face = ImageOps.expand(face, border=((0, 160 - face.height)), fill='black')
+                    h  = (160 - face.height) / 2
+                    face = ImageOps.expand(
+                        face, border=((0, math.floor(h), 0, math.ceil(h))), fill="black"
+                    )
             else:
                 scale = 160 / face.height
                 face = face.resize((int(face.width * scale), 160))
                 if face.width < 160:
-                    face = ImageOps.expand(face, border=((160 - face.width, 0)), fill='black')
+                    w = (160 - face.width) / 2
+                    face = ImageOps.expand(
+                        face, border=((math.floor(w), 0, math.ceil(w), 0)), fill="black"
+                    )
 
             descriptor = self.model.predict({"x_1": face})
+
+            descriptor = descriptor["var_2167"]
+            if last is not None:
+                dist = cosine_similarity(descriptor[0], last[0])
+                print(dist)
+
+            last = descriptor
 
         ret = self.create_detection_result(objs, src_size, cvss)
         return ret
