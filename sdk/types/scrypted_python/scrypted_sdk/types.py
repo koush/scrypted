@@ -301,6 +301,7 @@ class ObjectDetectionResult(TypedDict):
     clipPaths: list[ClipPath]  # The detection clip paths that outlines various features or segments, like traced facial features.
     cost: float  # The certainty that this is correct tracked object.
     descriptor: str  # A base64 encoded Float32Array that represents the vector descriptor of the detection. Can be used to compute euclidian distance to determine similarity.
+    embedding: str  # Base64 encoded embedding float32 vector.
     history: ObjectDetectionHistory
     id: str  # The id of the tracked object.
     label: str  # The label of the object, if it was recognized as a familiar object (person, pet, etc).
