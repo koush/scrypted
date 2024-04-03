@@ -192,8 +192,15 @@ export class AmcrestCameraClient {
                     continue;
                 if (ignore === boundaryEnd)
                     continue;
+                // dahua bugs out and sends this.
+                if (ignore === 'HTTP/1.1 200 OK') {
+                    const message = await readMessage(stream);
+                    this.console.log('ignoring dahua http bug', message);
+                    continue;
+                }
                 if (ignore !== boundary) {
                     this.console.error('expected boundary but found', ignore);
+                    this.console.error(response.headers);
                     throw new Error('expected boundary');
                 }
 
