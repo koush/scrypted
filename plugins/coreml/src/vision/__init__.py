@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import concurrent.futures
 import os
 from typing import Any, Tuple
 
 import coremltools as ct
+import numpy as np
 import Quartz
 import scrypted_sdk
 from Foundation import NSData, NSMakeSize
 from PIL import Image, ImageOps
 from scrypted_sdk import Setting, SettingValue
-import numpy as np
 
 import Vision
 from predict import Prediction, PredictPlugin, from_bounding_box
@@ -134,7 +135,6 @@ class VisionPlugin(PredictPlugin):
 
         observations = await future
 
-        last = None
         objs = []
         for o in observations:
             confidence = o.confidence()
@@ -149,21 +149,19 @@ class VisionPlugin(PredictPlugin):
             prediction = Prediction(0, confidence, from_bounding_box((l, t, w, h)))
             objs.append(prediction)
 
+            if confidence < .7:
+                continue
+
             face = input.crop((l, t, l + w, t + h)).copy().convert("RGB").resize((160, 160), Image.BILINEAR)
-            # face to tensor
             image_tensor = np.array(face).astype(np.float32).transpose([2, 0, 1])
             processed_tensor = (image_tensor - 127.5) / 128.0
-            # expand rank
             processed_tensor = np.expand_dims(processed_tensor, axis=0)
 
-            descriptor = self.model.predict({"x_1": processed_tensor})
+            output = self.model.predict({"x_1": processed_tensor})["var_2167"][0]
 
-            descriptor = descriptor["var_2167"]
-            if last is not None:
-                dist = cosine_similarity(descriptor[0], last[0])
-                print(dist)
-
-            last = descriptor
+            b = output.tobytes()
+            embedding = str(base64.encodebytes(b))
+            prediction.embedding = embedding
 
         ret = self.create_detection_result(objs, src_size, cvss)
         return ret

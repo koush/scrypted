@@ -63,10 +63,11 @@ def parse_label_contents(contents: str):
     return ret
 
 class Prediction:
-    def __init__(self, id: int, score: float, bbox: Tuple[float, float, float, float]):
+    def __init__(self, id: int, score: float, bbox: Tuple[float, float, float, float], embedding: str = None):
         self.id = id
         self.score = score
         self.bbox = bbox
+        self.embedding = embedding
 
 class PredictPlugin(DetectPlugin):
     labels: dict
@@ -121,6 +122,8 @@ class PredictPlugin(DetectPlugin):
                 obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
             detection['className'] = className
             detection['score'] = obj.score
+            if obj.embedding is not None:
+                detection['embedding'] = obj.embedding
             detections.append(detection)
 
         if convert_to_src_size:
