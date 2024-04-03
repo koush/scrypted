@@ -19,6 +19,6 @@ export class ImageConverter extends ScryptedDeviceBase implements BufferConverte
         const op = parseImageOp(mime.parameters);
         const ffmpegInput = JSON.parse(data.toString()) as FFmpegInput;
 
-        return processImageOp(ffmpegInput, op, parseFloat(mime.parameters.get('time')), options?.sourceId, this.plugin.debugConsole);
+        return processImageOp(ffmpegInput, op, parseFloat(mime.parameters.get('time')), options?.sourceId, !!this.plugin.debugConsole);
     }
 }

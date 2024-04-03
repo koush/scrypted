@@ -203,6 +203,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             const takePicture = await preparePrebufferSnapshot()
             if (!takePicture)
                 throw e;
+            this.console.error('Snapshot failed, falling back to prebuffer', e);
             return takePicture();
         }
 
@@ -505,6 +506,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return this.progressPicture.promise;
         }
         else {
+            this.console.error('Snapshot failed', e);
             this.errorPicture = singletonPromise(this.errorPicture,
                 () => this.createTextErrorImage('Snapshot Failed'));
             return this.errorPicture.promise;
