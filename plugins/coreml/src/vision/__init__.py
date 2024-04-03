@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import asyncio
 import concurrent.futures
 import os
@@ -45,7 +44,7 @@ class VisionPlugin(PredictPlugin):
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.2
 
-        model_version = "v1"
+        model_version = "v2"
         model = "inception_resnet_v1"
         mlmodel = "model"
 
@@ -150,26 +149,14 @@ class VisionPlugin(PredictPlugin):
             prediction = Prediction(0, confidence, from_bounding_box((l, t, w, h)))
             objs.append(prediction)
 
-            face = input.crop((l, t, l + w, t + h)).convert("RGB")
+            face = input.crop((l, t, l + w, t + h)).copy().convert("RGB").resize((160, 160), Image.BILINEAR)
+            # face to tensor
+            image_tensor = np.array(face).astype(np.float32).transpose([2, 0, 1])
+            processed_tensor = (image_tensor - 127.5) / 128.0
+            # expand rank
+            processed_tensor = np.expand_dims(processed_tensor, axis=0)
 
-            if face.width > face.height:
-                scale = 160 / face.width
-                face = face.resize((160, int(face.height * scale)))
-                if face.height < 160:
-                    h  = (160 - face.height) / 2
-                    face = ImageOps.expand(
-                        face, border=((0, math.floor(h), 0, math.ceil(h))), fill="black"
-                    )
-            else:
-                scale = 160 / face.height
-                face = face.resize((int(face.width * scale), 160))
-                if face.width < 160:
-                    w = (160 - face.width) / 2
-                    face = ImageOps.expand(
-                        face, border=((math.floor(w), 0, math.ceil(w), 0)), fill="black"
-                    )
-
-            descriptor = self.model.predict({"x_1": face})
+            descriptor = self.model.predict({"x_1": processed_tensor})
 
             descriptor = descriptor["var_2167"]
             if last is not None:
