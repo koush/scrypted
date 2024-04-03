@@ -1,6 +1,6 @@
 import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { readLine } from '@scrypted/common/src/read-stream';
-import { parseHeaders, readBody, readMessage } from '@scrypted/common/src/rtsp-server';
+import { parseHeaders, readBody } from '@scrypted/common/src/rtsp-server';
 import contentType from 'content-type';
 import { IncomingMessage } from 'http';
 import { EventEmitter, Readable } from 'stream';
@@ -91,6 +91,26 @@ export enum AmcrestEvent {
     CrossLineDetection = "Code=CrossLineDetection;action=Start",
     CrossRegionDetection = "Code=CrossRegionDetection;action=Start",
 }
+
+
+async function readAmcrestMessage(client: Readable): Promise<string[]> {
+    let currentHeaders: string[] = [];
+    while (true) {
+        const originalLine = await readLine(client);
+        const line = originalLine.trim();
+        if (!line)
+            return currentHeaders;
+        // dahua bugs out and sends message without a newline separating the body:
+        // Content-Length:39
+        // Code=AudioMutation;action=Start;index=0
+        if (!line.includes(':')) {
+            client.unshift(Buffer.from(originalLine + '\n'));
+            return currentHeaders;
+        }
+        currentHeaders.push(line);
+    }
+}
+
 
 export class AmcrestCameraClient {
     credential: AuthFetchCredentialState;
@@ -194,8 +214,13 @@ export class AmcrestCameraClient {
                     continue;
                 // dahua bugs out and sends this.
                 if (ignore === 'HTTP/1.1 200 OK') {
-                    const message = await readMessage(stream);
-                    this.console.log('ignoring dahua http bug', message);
+                    const message = await readAmcrestMessage(stream);
+                    this.console.log('ignoring dahua http message', message);
+                    message.unshift('');
+                    const headers = parseHeaders(message);
+                    const body = await readBody(stream, headers);
+                    if (body)
+                        this.console.log('ignoring dahua http body', body);
                     continue;
                 }
                 if (ignore !== boundary) {
@@ -204,7 +229,7 @@ export class AmcrestCameraClient {
                     throw new Error('expected boundary');
                 }
 
-                const message = await readMessage(stream);
+                const message = await readAmcrestMessage(stream);
                 events.emit('data', message);
                 message.unshift('');
                 const headers = parseHeaders(message);
