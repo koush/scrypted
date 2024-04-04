@@ -27,6 +27,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             json: true
         },
         syncedDevices: {
+            defaultValue: [],
             multiple: true,
             hide: true
         },
@@ -66,7 +67,10 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         alexaHandlers.set('Alexa.Authorization/AcceptGrant', this.onAlexaAuthorization);
         alexaHandlers.set('Alexa.Discovery/Discover', this.onDiscoverEndpoints);
 
-        this.start();
+        this.start()
+            .catch(e => {
+                this.console.error('startup failed', e);
+            })
     }
 
     async start() {
