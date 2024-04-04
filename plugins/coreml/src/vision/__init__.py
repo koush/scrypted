@@ -29,6 +29,7 @@ def cosine_similarity(vector_a, vector_b):
     similarity = dot_product / (norm_a * norm_b)
     return similarity
 
+
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Vision-Predict")
 
 
@@ -149,15 +150,28 @@ class VisionPlugin(PredictPlugin):
             prediction = Prediction(0, confidence, from_bounding_box((l, t, w, h)))
             objs.append(prediction)
 
-            if confidence < .7:
+            if confidence < 0.7:
                 continue
 
-            face = input.crop((l, t, l + w, t + h)).copy().convert("RGB").resize((160, 160), Image.BILINEAR)
+            face = (
+                input.crop((l, t, l + w, t + h))
+                .copy()
+                .convert("RGB")
+                .resize((160, 160), Image.BILINEAR)
+            )
             image_tensor = np.array(face).astype(np.float32).transpose([2, 0, 1])
             processed_tensor = (image_tensor - 127.5) / 128.0
             processed_tensor = np.expand_dims(processed_tensor, axis=0)
 
-            output = self.model.predict({"x_1": processed_tensor})["var_2167"][0]
+            if asyncio.get_event_loop() is self.loop:
+                out_dict = await asyncio.get_event_loop().run_in_executor(
+                    predictExecutor,
+                    lambda: self.model.predict({"x_1": processed_tensor}),
+                )
+            else:
+                out_dict = self.model.predict({"x_1": processed_tensor})
+
+            output = out_dict["var_2167"][0]
 
             b = output.tobytes()
             embedding = str(base64.encodebytes(b))
