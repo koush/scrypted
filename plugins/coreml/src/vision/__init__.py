@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from asyncio import Future
 import base64
 import concurrent.futures
 import os
-from typing import Any, Tuple
+from typing import Any, Tuple, List
 
 import coremltools as ct
 import numpy as np
@@ -12,7 +13,13 @@ import Quartz
 import scrypted_sdk
 from Foundation import NSData, NSMakeSize
 from PIL import Image, ImageOps
-from scrypted_sdk import Setting, SettingValue
+from scrypted_sdk import (
+    Setting,
+    SettingValue,
+    ObjectDetectionSession,
+    ObjectsDetected,
+    ObjectDetectionResult,
+)
 
 import Vision
 from predict import Prediction, PredictPlugin, from_bounding_box
@@ -114,7 +121,21 @@ class VisionPlugin(PredictPlugin):
             if error:
                 loop.call_soon_threadsafe(future.set_exception, Exception())
             else:
-                loop.call_soon_threadsafe(future.set_result, observations)
+                objs = []
+                for o in observations:
+                    confidence = o.confidence()
+                    bb = o.boundingBox()
+                    origin = bb.origin
+                    size = bb.size
+
+                    l = origin.x * input.width
+                    t = (1 - origin.y - size.height) * input.height
+                    w = size.width * input.width
+                    h = size.height * input.height
+                    prediction = Prediction(0, confidence, from_bounding_box((l, t, w, h)))
+                    objs.append(prediction)
+
+                loop.call_soon_threadsafe(future.set_result, objs)
 
         request = (
             Vision.VNDetectFaceRectanglesRequest.alloc().initWithCompletionHandler_(
@@ -126,56 +147,66 @@ class VisionPlugin(PredictPlugin):
         return future
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        if asyncio.get_event_loop() is self.loop:
-            future = await asyncio.get_event_loop().run_in_executor(
-                predictExecutor,
-                lambda: self.predictVision(input),
+        future = await asyncio.get_event_loop().run_in_executor(
+            predictExecutor,
+            lambda: self.predictVision(input),
+        )
+
+        objs = await future
+        ret = self.create_detection_result(objs, src_size, cvss)
+        return ret
+
+    async def setEmbedding(self, d: ObjectDetectionResult, image: scrypted_sdk.Image):
+        try:
+            l, t, w, h = d["boundingBox"]
+            face = await image.toBuffer(
+                {
+                    "crop": {
+                        "left": l,
+                        "top": t,
+                        "width": w,
+                        "height": h,
+                    },
+                    "resize": {
+                        "width": 160,
+                        "height": 160,
+                    },
+                    "format": "rgb",
+                }
             )
-        else:
-            future = await self.predictVision(input)
 
-        observations = await future
-
-        objs = []
-        for o in observations:
-            confidence = o.confidence()
-            bb = o.boundingBox()
-            origin = bb.origin
-            size = bb.size
-
-            l = origin.x * input.width
-            t = (1 - origin.y - size.height) * input.height
-            w = size.width * input.width
-            h = size.height * input.height
-            prediction = Prediction(0, confidence, from_bounding_box((l, t, w, h)))
-            objs.append(prediction)
-
-            if confidence < 0.7:
-                continue
-
-            face = (
-                input.crop((l, t, l + w, t + h))
-                .copy()
-                .convert("RGB")
-                .resize((160, 160), Image.BILINEAR)
-            )
-            image_tensor = np.array(face).astype(np.float32).transpose([2, 0, 1])
+            faceImage = Image.frombuffer("RGB", (160, 160), face)
+            image_tensor = np.array(faceImage).astype(np.float32).transpose([2, 0, 1])
             processed_tensor = (image_tensor - 127.5) / 128.0
             processed_tensor = np.expand_dims(processed_tensor, axis=0)
 
-            if asyncio.get_event_loop() is self.loop:
-                out_dict = await asyncio.get_event_loop().run_in_executor(
-                    predictExecutor,
-                    lambda: self.model.predict({"x_1": processed_tensor}),
-                )
-            else:
-                out_dict = self.model.predict({"x_1": processed_tensor})
+            out_dict = await asyncio.get_event_loop().run_in_executor(
+                predictExecutor,
+                lambda: self.model.predict({"x_1": processed_tensor}),
+            )
 
             output = out_dict["var_2167"][0]
-
             b = output.tobytes()
             embedding = str(base64.encodebytes(b))
-            prediction.embedding = embedding
+            d["embedding"] = embedding
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            pass
 
-        ret = self.create_detection_result(objs, src_size, cvss)
+    async def run_detection_image(
+        self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession
+    ) -> ObjectsDetected:
+        ret = await super().run_detection_image(image, detection_session)
+
+        futures: List[Future] = []
+
+        for d in ret["detections"]:
+            if d["score"] < 0.7:
+                continue
+
+            futures.append(asyncio.ensure_future(self.setEmbedding(d, image)))
+
+        await asyncio.wait(futures)
+
         return ret
