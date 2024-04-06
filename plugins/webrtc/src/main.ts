@@ -487,6 +487,8 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
     }
 
     async onConnection(request: HttpRequest, webSocketUrl: string) {
+        const weriftConfiguration = await this.getWeriftConfiguration();
+
         const cleanup = new Deferred<string>();
         cleanup.promise.then(e => this.console.log('cleaning up rtc connection:', e));
 
@@ -545,21 +547,24 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             this.activeConnections++;
             result.worker.on('exit', () => {
                 this.activeConnections--;
-                cleanup.resolve('worker exited');
-            });
-            cleanup.promise.finally(() => {
-                result.worker.terminate()
+                cleanup.resolve('worker exited (onConnection)');
             });
 
-            const { createConnection } = await result.result;
-            const connection = await createConnection(message, client.port, session,
-                this.storageSettings.values.maximumCompatibilityMode, clientOptions, {
-                configuration: this.getRTCConfiguration(),
-                weriftConfiguration: await this.getWeriftConfiguration(),
-                ipv4Ban: this.storageSettings.values.ipv4Ban,
-            });
-            cleanup.promise.finally(() => connection.close().catch(() => { }));
-            connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
+            let connection: WebRTCConnectionManagement;
+            try {
+                const { createConnection } = await result.result;
+                connection = await createConnection(message, client.port, session,
+                    this.storageSettings.values.maximumCompatibilityMode, clientOptions, {
+                    configuration: this.getRTCConfiguration(),
+                    weriftConfiguration,
+                    ipv4Ban: this.storageSettings.values.ipv4Ban,
+                });
+            }
+            catch (e) {
+                result.worker.terminate();
+                throw e;
+            }
+            handleCleanupConnection(cleanup, connection, result);
 
             timeoutPromise(60000, connection.waitConnected())
                 .catch(() => {
@@ -577,6 +582,14 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             cleanup.resolve('error');
         }
     }
+}
+
+function handleCleanupConnection(cleanup: Deferred<string>, connection: WebRTCConnectionManagement, result: ReturnType<typeof zygote>) {
+    cleanup.promise.finally(() => {
+        connection.close().catch(() => { });
+        setTimeout(() => result.worker.terminate(), 30000)
+    });
+    connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
 }
 
 export async function fork() {
@@ -627,7 +640,6 @@ export async function fork() {
 
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
-            cleanup.promise.finally(() => setTimeout(() => process.exit(), 30000));
 
             const connection = new WebRTCConnectionManagement(console, clientSession, maximumCompatibilityMode, clientOptions, options);
             cleanup.promise.finally(() => connection.close().catch(() => { }));
@@ -680,22 +692,29 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
     }
 
     async convertInternal(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+        const weriftConfiguration = await this.plugin.getWeriftConfiguration();
         const session = data as RTCSignalingSession;
         const maximumCompatibilityMode = !!this.plugin.storageSettings.values.maximumCompatibilityMode;
         const clientOptions = await legacyGetSignalingSessionOptions(session);
 
-        const { createConnection } = await result.result;
-        const connection = await createConnection({}, undefined, session,
-            maximumCompatibilityMode,
-            clientOptions,
-            {
-                configuration: this.plugin.getRTCConfiguration(),
-                weriftConfiguration: await this.plugin.getWeriftConfiguration(),
-                ipv4Ban: this.plugin.storageSettings.values.ipv4Ban,
-            }
-        );
-        cleanup.promise.finally(() => connection.close().catch(() => { }));
-        connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
+        let connection: WebRTCConnectionManagement;
+        try {
+            const { createConnection } = await result.result;
+            connection = await createConnection({}, undefined, session,
+                maximumCompatibilityMode,
+                clientOptions,
+                {
+                    configuration: this.plugin.getRTCConfiguration(),
+                    weriftConfiguration,
+                    ipv4Ban: this.plugin.storageSettings.values.ipv4Ban,
+                }
+            );
+        }
+        catch (e) {
+            result.worker.terminate();
+            throw e;
+        }
+        handleCleanupConnection(cleanup, connection, result);
         await connection.negotiateRTCSignalingSession();
         await connection.waitConnected();
 
@@ -708,10 +727,7 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
         const cleanup = new Deferred<string>();
         result.worker.on('exit', () => {
             this.plugin.activeConnections--;
-            cleanup.resolve('worker exited');
-        });
-        cleanup.promise.finally(() => {
-            result.worker.terminate()
+            cleanup.resolve('worker exited (convert)');
         });
 
         try {
