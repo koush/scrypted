@@ -207,6 +207,7 @@ class VisionPlugin(PredictPlugin):
 
             futures.append(asyncio.ensure_future(self.setEmbedding(d, image)))
 
-        await asyncio.wait(futures)
+        if len(futures):
+            await asyncio.wait(futures)
 
         return ret
