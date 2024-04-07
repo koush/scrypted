@@ -6,7 +6,8 @@
   "exports": {
     ".": "./dist/src/index.js",
     "./acl": "./dist/src/acl.js",
-    "./storage-settings": "./dist/src/storage-settings.js"
+    "./storage-settings": "./dist/src/storage-settings.js",
+    "./settings-mixin": "./dist/src/settings-mixin.js"
   },
   "scripts": {
     "prepublishOnly": "npm run build && cd types && npm version patch && npm publish",

@@ -1,5 +1,6 @@
-import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, {  MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import { SettingsMixinDeviceBase } from "@scrypted/sdk/settings-mixin";
 import fs from 'fs';
 import type { TranspileOptions } from "typescript";
 import vm from "vm";
@@ -28,10 +29,12 @@ export function readFileAsString(f: string) {
 }
 
 function getTypeDefs() {
+    const settingsMixinDefs = readFileAsString('@types/sdk/settings-mixin.d.ts');
     const storageSettingsDefs = readFileAsString('@types/sdk/storage-settings.d.ts');
     const scryptedTypesDefs = readFileAsString('@types/sdk/types.d.ts');
     const scryptedIndexDefs = readFileAsString('@types/sdk/index.d.ts');
     return {
+        settingsMixinDefs,
         storageSettingsDefs,
         scryptedIndexDefs,
         scryptedTypesDefs,
@@ -76,6 +79,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         localStorage: device.storage,
         device,
         exports: {} as any,
+        SettingsMixinDeviceBase,
         ScryptedMimeTypes,
         ScryptedInterface,
         ScryptedDeviceType,
@@ -175,6 +179,11 @@ export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
         `,
 
             "node_modules/@types/scrypted__sdk/types/index.d.ts"
+        );
+
+        monaco.languages.typescript.typescriptDefaults.addExtraLib(
+            libs['settingsMixin'],
+            "node_modules/@types/scrypted__sdk/settings-mixin.d.ts"
         );
 
         monaco.languages.typescript.typescriptDefaults.addExtraLib(
