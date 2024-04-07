@@ -1,9 +1,9 @@
-import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors } from "@scrypted/sdk";
+import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes } from "@scrypted/sdk";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import fs from 'fs';
 import type { TranspileOptions } from "typescript";
 import vm from "vm";
 import { ScriptDevice } from "./monaco/script-device";
-import path from 'path';
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -28,9 +28,11 @@ export function readFileAsString(f: string) {
 }
 
 function getTypeDefs() {
+    const storageSettingsDefs = readFileAsString('@types/sdk/storage-settings.d.ts');
     const scryptedTypesDefs = readFileAsString('@types/sdk/types.d.ts');
     const scryptedIndexDefs = readFileAsString('@types/sdk/index.d.ts');
     return {
+        storageSettingsDefs,
         scryptedIndexDefs,
         scryptedTypesDefs,
     };
@@ -64,6 +66,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         fs: require('realfs'),
         ScryptedDeviceBase,
         MixinDeviceBase,
+        StorageSettings,
         systemManager,
         deviceManager,
         endpointManager,
@@ -73,6 +76,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         localStorage: device.storage,
         device,
         exports: {} as any,
+        ScryptedMimeTypes,
         ScryptedInterface,
         ScryptedDeviceType,
         // @ts-expect-error
@@ -171,6 +175,11 @@ export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
         `,
 
             "node_modules/@types/scrypted__sdk/types/index.d.ts"
+        );
+
+        monaco.languages.typescript.typescriptDefaults.addExtraLib(
+            libs['storageSettings'],
+            "node_modules/@types/scrypted__sdk/storage-settings.d.ts"
         );
 
         monaco.languages.typescript.typescriptDefaults.addExtraLib(
