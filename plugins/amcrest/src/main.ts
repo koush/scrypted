@@ -268,6 +268,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         return {
             classes: [
                 'person',
+                'face',
                 'car',
             ],
         }
