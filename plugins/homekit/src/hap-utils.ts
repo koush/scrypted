@@ -74,13 +74,17 @@ export function getRandomPort() {
     return Math.round(30000 + Math.random() * 20000);
 }
 
-export function createHAPUsernameStorageSettingsDict(device: { storage: Storage, name?: string }, group: string, subgroup?: string): StorageSettingsDict<'mac' | 'qrCode' | 'pincode' | 'portOverride' | 'resetAccessory'> {
+export function createHAPUsernameStorageSettingsDict(device: { storage: Storage, name?: string }, group: string, subgroup?: string): StorageSettingsDict<'mac' | 'addIdentifyingMaterial' | 'qrCode' | 'pincode' | 'portOverride' | 'resetAccessory'> {
     const alertReload = () => {
         sdk.log.a(`The HomeKit plugin will reload momentarily for the changes to ${device.name} to take effect.`);
         sdk.deviceManager.requestRestart();
     }
 
     return {
+        addIdentifyingMaterial: {
+            hide: true,
+            type: 'boolean',
+        },
         qrCode: {
             group,
             // subgroup,

@@ -267,6 +267,9 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     },
                         undefined, 'Pairing'));
                     storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
+                    // TODO: change this value after this current default has been persisted to existing clients.
+                    // changing it now will cause existing accessories be renamed.
+                    storageSettings.settings.addIdentifyingMaterial.persistedDefaultValue = false;
 
                     const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
 
@@ -277,7 +280,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                             published = true;
                             mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
 
-                            await this.publishAccessory(accessory, storageSettings.values.mac, storageSettings.values.pincode, standaloneCategory, storageSettings.values.portOverride);
+                            await this.publishAccessory(accessory, storageSettings.values.mac, storageSettings.values.pincode, standaloneCategory, storageSettings.values.portOverride, storageSettings.values.addIdentifyingMaterial);
                             if (!hasPublished) {
                                 hasPublished = true;
                                 storageSettings.values.qrCode = accessory.setupURI();
@@ -420,7 +423,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         return bind;
     }
 
-    async publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories, port: number) {
+    async publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories, port: number, addIdentifyingMaterial: boolean) {
         const bind = await this.getAdvertiserInterfaceBind();
 
         await accessory.publish({
@@ -428,7 +431,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             port,
             pincode,
             category,
-            addIdentifyingMaterial: true,
+            addIdentifyingMaterial,
             advertiser: this.getAdvertiser(),
             bind,
         });
