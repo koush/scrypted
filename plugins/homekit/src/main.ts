@@ -428,7 +428,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             port,
             pincode,
             category,
-            addIdentifyingMaterial: false,
+            addIdentifyingMaterial: true,
             advertiser: this.getAdvertiser(),
             bind,
         });
