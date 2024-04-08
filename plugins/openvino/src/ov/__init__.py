@@ -75,7 +75,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         
         model = self.storage.getItem('model') or 'Default'
         if model == 'Default':
-            model = 'yolov8n_320'
+            model = 'scrypted_yolov8n_320'
         self.yolo = 'yolo' in model
         self.yolov8 = "yolov8" in model
         self.yolov9 = "yolov9" in model
@@ -137,14 +137,18 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
                 'description': 'The detection model used to find objects.',
                 'choices': [
                     'Default',
+                    'scrypted_yolov9c_320',
                     'scrypted_yolov8n_320',
-                    'yolov8n_320',
+                    'scrypted_yolov9c',
+                    'scrypted_yolov8n',
                     'yolov9c_320',
+                    'yolov8n_320',
+                    'yolov9c',
+                    'yolov8n',
                     'ssd_mobilenet_v1_coco',
                     'ssdlite_mobilenet_v2',
                     'yolo-v3-tiny-tf',
                     'yolo-v4-tiny-tf',
-                    'yolov8n',
                 ],
                 'value': model,
             },

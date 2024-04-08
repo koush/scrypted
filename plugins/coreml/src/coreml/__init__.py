@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ast
 import asyncio
 import concurrent.futures
 import os
+import platform
 import re
 from typing import Any, Tuple
 
@@ -12,7 +14,6 @@ from PIL import Image
 from scrypted_sdk import Setting, SettingValue
 
 import yolo
-import ast
 from predict import Prediction, PredictPlugin, Rectangle
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "CoreML-Predict")
@@ -50,12 +51,16 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
 
         model = self.storage.getItem("model") or "Default"
         if model == "Default":
-            model = "yolov8n_320"
+            # if arch is arm64, use yolov9c, otherwise use yolov8n
+            if platform.machine() == 'arm64':
+                model = "scrypted_yolov9c_320"
+            else:
+                model = "scrypted_yolov8n_320"
         self.yolo = "yolo" in model
         self.yolov8 = "yolov8" in model
         self.yolov9 = "yolov9" in model
         self.scrypted_model = "scrypted" in model
-        model_version = "v3"
+        model_version = "v4"
         mlmodel = 'model' if self.yolov8 or self.yolov9 else model
 
         print(f"model: {model}")
@@ -142,12 +147,15 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
                 "description": "The detection model used to find objects.",
                 "choices": [
                     "Default",
+                    "scrypted_yolov9c_320",
                     "scrypted_yolov8n_320",
+                    "scrypted_yolov9c",
+                    "scrypted_yolov8n",
                     "yolov8n_320",
                     "yolov9c_320",
-                    "ssdlite_mobilenet_v2",
                     "yolov8n",
                     "yolov9c",
+                    "ssdlite_mobilenet_v2",
                     "yolov4-tiny",
                 ],
                 "value": model,
