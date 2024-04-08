@@ -22,8 +22,6 @@ availableModels = [
     "Default",
     "scrypted_yolov9c_320",
     "scrypted_yolov9c",
-    "yolov9c_320",
-    "yolov9c",
     "ssdlite_mobilenet_v2",
     "yolov4-tiny",
 ]
