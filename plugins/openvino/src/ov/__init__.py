@@ -75,7 +75,7 @@ class OpenVINOPlugin(PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.S
         
         model = self.storage.getItem('model') or 'Default'
         if model == 'Default':
-            model = 'scrypted_yolov8n_320'
+            model = 'scrypted_yolov9c_320'
         self.yolo = 'yolo' in model
         self.yolov8 = "yolov8" in model
         self.yolov9 = "yolov9" in model
