@@ -18,9 +18,18 @@ from predict import Prediction, PredictPlugin, Rectangle
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "CoreML-Predict")
 
+availableModels = [
+    "Default",
+    "scrypted_yolov9c_320",
+    "scrypted_yolov9c",
+    "yolov9c_320",
+    "yolov9c",
+    "ssdlite_mobilenet_v2",
+    "yolov4-tiny",
+]
 
 def parse_label_contents(contents: str):
-    lines = contents.split(',')
+    lines = contents.split(",")
     ret = {}
     for row_number, content in enumerate(lines):
         pair = re.split(r"[:\s]+", content.strip(), maxsplit=1)
@@ -45,23 +54,21 @@ def parse_labels(userDefined):
         raise Exception("no classes found in model metadata")
     return parse_label_contents(classes)
 
+
 class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProvider):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
         model = self.storage.getItem("model") or "Default"
-        if model == "Default":
-            # if arch is arm64, use yolov9c, otherwise use yolov8n
-            if platform.machine() == 'arm64':
-                model = "scrypted_yolov9c_320"
-            else:
-                model = "scrypted_yolov8n_320"
+        if model == "Default" or model not in availableModels:
+            if model != "Default":
+                self.storage.setItem("model", "Default")
+            model = "scrypted_yolov9c_320"
         self.yolo = "yolo" in model
-        self.yolov8 = "yolov8" in model
         self.yolov9 = "yolov9" in model
         self.scrypted_model = "scrypted" in model
-        model_version = "v4"
-        mlmodel = 'model' if self.yolov8 or self.yolov9 else model
+        model_version = "v5"
+        mlmodel = "model" if self.yolov9 else model
 
         print(f"model: {model}")
 
@@ -72,7 +79,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
                 f"{model}.mlmodel",
             )
         else:
-            if self.yolov8 or self.yolov9:
+            if self.yolov9:
                 files = [
                     f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
                     f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{mlmodel}.mlmodel",
@@ -112,30 +119,34 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.2
 
-        asyncio.ensure_future(self.prepareVisionFramework(), loop = self.loop)
+        asyncio.ensure_future(self.prepareVisionFramework(), loop=self.loop)
 
     async def prepareVisionFramework(self):
         try:
             from vision import VisionPlugin
+
             if not VisionPlugin:
                 raise Exception("no vision plugin")
-            await scrypted_sdk.deviceManager.onDevicesChanged({
-                "devices": [
-                    {
-                        "nativeId": "vision",
-                        "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
-                        "interfaces": [
-                            scrypted_sdk.ScryptedInterface.ObjectDetection.value,
-                        ],
-                        "name": "Vision Framework",
-                    }
-                ]
-            })
+            await scrypted_sdk.deviceManager.onDevicesChanged(
+                {
+                    "devices": [
+                        {
+                            "nativeId": "vision",
+                            "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                            "interfaces": [
+                                scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                            ],
+                            "name": "Vision Framework",
+                        }
+                    ]
+                }
+            )
         except:
             pass
 
     async def getDevice(self, nativeId: str) -> Any:
         from vision import VisionPlugin
+
         return VisionPlugin(nativeId)
 
     async def getSettings(self) -> list[Setting]:
@@ -145,19 +156,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
                 "key": "model",
                 "title": "Model",
                 "description": "The detection model used to find objects.",
-                "choices": [
-                    "Default",
-                    "scrypted_yolov9c_320",
-                    "scrypted_yolov8n_320",
-                    "scrypted_yolov9c",
-                    "scrypted_yolov8n",
-                    "yolov8n_320",
-                    "yolov9c_320",
-                    "yolov8n",
-                    "yolov9c",
-                    "ssdlite_mobilenet_v2",
-                    "yolov4-tiny",
-                ],
+                "choices": availableModels,
                 "value": model,
             },
         ]
@@ -179,7 +178,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
 
         # run in executor if this is the plugin loop
         if self.yolo:
-            input_name = "image" if self.yolov8 or self.yolov9 else "input_1"
+            input_name = "image" if self.yolov9 else "input_1"
             if asyncio.get_event_loop() is self.loop:
                 out_dict = await asyncio.get_event_loop().run_in_executor(
                     predictExecutor, lambda: self.model.predict({input_name: input})
@@ -187,9 +186,9 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
             else:
                 out_dict = self.model.predict({input_name: input})
 
-            if self.yolov8 or self.yolov9:
+            if self.yolov9:
                 results = list(out_dict.values())[0][0]
-                objs = yolo.parse_yolov8(results)
+                objs = yolo.parse_yolov9(results)
                 ret = self.create_detection_result(objs, src_size, cvss)
                 return ret
 

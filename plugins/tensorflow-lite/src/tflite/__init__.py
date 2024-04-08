@@ -29,6 +29,18 @@ from scrypted_sdk.types import Setting, SettingValue
 import yolo
 from predict import PredictPlugin
 
+availableModels = [
+    "Default",
+    "ssd_mobilenet_v2_coco_quant_postprocess",
+    "tf2_ssd_mobilenet_v2_coco17_ptq",
+    "ssdlite_mobiledet_coco_qat_postprocess",
+    "scrypted_yolov9c_320",
+    "efficientdet_lite0_320_ptq",
+    "efficientdet_lite1_384_ptq",
+    "efficientdet_lite2_448_ptq",
+    "efficientdet_lite3_512_ptq",
+    "efficientdet_lite3x_640_ptq",
+]
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -59,26 +71,32 @@ class TensorFlowLitePlugin(
             edge_tpus = None
             pass
 
-        model_version = "v12"
+        model_version = "v13"
         model = self.storage.getItem("model") or "Default"
+        if model not in availableModels:
+            self.storage.setItem("model", "Default")
+            model = "Default"
         defaultModel = model == "Default"
         branch = "main"
 
         labelsFile = None
+
         def configureModel():
             nonlocal labelsFile
             nonlocal model
 
             if defaultModel:
-                if edge_tpus and next((obj for obj in edge_tpus if obj['type'] == 'usb'), None):
+                if edge_tpus and next(
+                    (obj for obj in edge_tpus if obj["type"] == "usb"), None
+                ):
                     model = "ssdlite_mobiledet_coco_qat_postprocess"
                 else:
                     model = "efficientdet_lite0_320_ptq"
             self.yolo = "yolo" in model
-            self.yolov8 = "yolov8" in model
+            self.yolov9 = "yolov9" in model
             self.scrypted_model = "scrypted" in model
 
-            print(f'model: {model}')
+            print(f"model: {model}")
 
             if self.scrypted_model:
                 labelsFile = self.downloadFile(
@@ -172,20 +190,7 @@ class TensorFlowLitePlugin(
                 "key": "model",
                 "title": "Model",
                 "description": "The detection model used to find objects.",
-                "choices": [
-                    "Default",
-                    "ssd_mobilenet_v2_coco_quant_postprocess",
-                    "tf2_ssd_mobilenet_v2_coco17_ptq",
-                    "ssdlite_mobiledet_coco_qat_postprocess",
-                    "yolov8n_full_integer_quant",
-                    "yolov8n_full_integer_quant_320",
-                    "scrypted_yolov8n_320",
-                    "efficientdet_lite0_320_ptq",
-                    "efficientdet_lite1_384_ptq",
-                    "efficientdet_lite2_448_ptq",
-                    "efficientdet_lite3_512_ptq",
-                    "efficientdet_lite3x_640_ptq",
-                ],
+                "choices": availableModels,
                 "value": model,
             },
         ]
@@ -202,12 +207,12 @@ class TensorFlowLitePlugin(
             interpreter = self.interpreters.get()
             try:
                 if self.yolo:
-                    tensor_index = input_details(interpreter, 'index')
+                    tensor_index = input_details(interpreter, "index")
 
                     im = np.stack([input])
                     i = interpreter.get_input_details()[0]
-                    if i['dtype'] == np.int8:
-                        scale, zero_point = i['quantization']
+                    if i["dtype"] == np.int8:
+                        scale, zero_point = i["quantization"]
                         if scale == 0.003986024297773838 and zero_point == -128:
                             # fast path for quantization 1/255 = 0.003986024297773838
                             im = im.view(np.int8)
@@ -222,16 +227,21 @@ class TensorFlowLitePlugin(
                     interpreter.invoke()
                     output_details = interpreter.get_output_details()
                     output = output_details[0]
-                    x = interpreter.get_tensor(output['index'])
+                    x = interpreter.get_tensor(output["index"])
                     input_scale = self.get_input_details()[0]
                     if x.dtype == np.int8:
-                        scale, zero_point = output['quantization']
+                        scale, zero_point = output["quantization"]
                         threshold = yolo.defaultThreshold / scale + zero_point
                         combined_scale = scale * input_scale
-                        objs = yolo.parse_yolov8(x[0], threshold, scale=lambda v: (v - zero_point) * combined_scale, confidence_scale=lambda v: (v - zero_point) * scale)
+                        objs = yolo.parse_yolov9(
+                            x[0],
+                            threshold,
+                            scale=lambda v: (v - zero_point) * combined_scale,
+                            confidence_scale=lambda v: (v - zero_point) * scale,
+                        )
                     else:
                         # this code path is unused.
-                        objs = yolo.parse_yolov8(x[0], scale=lambda v: v * input_scale)
+                        objs = yolo.parse_yolov9(x[0], scale=lambda v: v * input_scale)
                 else:
                     common.set_input(interpreter, input)
                     interpreter.invoke()

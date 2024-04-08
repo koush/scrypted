@@ -6,7 +6,7 @@ from predict import Prediction, Rectangle
 
 defaultThreshold = .2
 
-def parse_yolov8(results, threshold = defaultThreshold, scale = None, confidence_scale  = None):
+def parse_yolov9(results, threshold = defaultThreshold, scale = None, confidence_scale  = None):
     objs = []
     keep = np.argwhere(results[4:] > threshold)
     for indices in keep:
