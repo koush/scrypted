@@ -122,7 +122,7 @@ class PredictPlugin(DetectPlugin):
                 obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
             detection['className'] = className
             detection['score'] = obj.score
-            if obj.embedding is not None:
+            if hasattr(obj, 'embedding') and obj.embedding is not None:
                 detection['embedding'] = obj.embedding
             detections.append(detection)
 
