@@ -134,6 +134,7 @@ export interface AmcrestEventData {
 export enum AmcrestEvent {
     MotionStart = "Code=VideoMotion;action=Start",
     MotionStop = "Code=VideoMotion;action=Stop",
+    MotionInfo  = "Code=VideoMotionInfo;action=State",
     AudioStart = "Code=AudioMutation;action=Start",
     AudioStop = "Code=AudioMutation;action=Stop",
     TalkInvite = "Code=_DoTalkAction_;action=Invite",

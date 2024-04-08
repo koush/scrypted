@@ -194,6 +194,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 this.motionDetected = true;
                 resetMotionTimeout();
             }
+            else if (event === AmcrestEvent.MotionInfo) {
+                // this seems to be a motion pulse
+                if (this.motionDetected)
+                    resetMotionTimeout();
+            }
             else if (event === AmcrestEvent.MotionStop) {
                 // use resetMotionTimeout
             }
