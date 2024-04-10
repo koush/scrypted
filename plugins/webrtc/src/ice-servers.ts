@@ -1,3 +1,5 @@
+import { RTCIceServer as WeriftRTCIceServer } from "./werift";
+
 const server = "turn.scrypted.app:3478";
 const turn = `turn:${server}`;
 const stun = `stun:${server}`;
@@ -6,24 +8,17 @@ const creds = {
     credential: "bar",
 };
 
-export const turnServer = {
+const turnServer = {
     urls: [turn],
     ...creds,
 };
-export const stunServer = {
+const stunServer = {
     urls: [stun],
     ...creds,
 };
 const googleStunServer = {
     urls: ["stun:stun.l.google.com:19302"],
 };
-export const turnIceServers = [
-    googleStunServer,
-    turnServer,
-];
-export const stunIceServers = [
-    googleStunServer,
-];
 
 function toWerift(s: typeof turnServer | RTCIceServer) {
     return {
@@ -39,6 +34,16 @@ export function toWeriftConfiguration(configuration: RTCConfiguration) {
     }
 }
 
-export const weriftTurnServer = toWerift(turnServer);
-export const weriftStunServer = toWerift(stunServer);
+export const turnServers = [
+    turnServer,
+    stunServer,
+    googleStunServer,
+];
 
+export const stunServers = [
+    stunServer,
+    googleStunServer,
+];
+
+export const weriftTurnServers: WeriftRTCIceServer[] = turnServers.map(toWerift);
+export const weriftStunServers: WeriftRTCIceServer[] = stunServers.map(toWerift);

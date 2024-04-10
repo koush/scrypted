@@ -14,7 +14,7 @@ import net from 'net';
 import os from 'os';
 import { DataChannelDebouncer } from './datachannel-debouncer';
 import { RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement, createRTCPeerConnectionSink, createTrackForwarder } from "./ffmpeg-to-wrtc";
-import { stunServer, turnServer, weriftStunServer, weriftTurnServer } from './ice-servers';
+import { stunServers, turnServers, weriftStunServers, weriftTurnServers } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
 import { MediaStreamTrack, PeerConfig, RTCPeerConnection, defaultPeerConfig } from './werift';
@@ -421,7 +421,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             }
         }
         // google seems to be throttling requests on their open stun server... using a hosted one seems faster.
-        const iceServers = this.storageSettings.values.useTurnServer ? [turnServer] : [stunServer];
+        const iceServers = this.storageSettings.values.useTurnServer ? [...turnServers] : [...stunServers];
         return {
             iceServers,
         };
@@ -439,8 +439,8 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         }
 
         const iceServers = this.storageSettings.values.useTurnServer && !disableTurn
-            ? [weriftStunServer, weriftTurnServer]
-            : [weriftStunServer];
+            ? [...weriftStunServers, ...weriftTurnServers]
+            : [...weriftStunServers];
 
         let iceAdditionalHostAddresses: string[];
         let iceUseIpv4: boolean;
