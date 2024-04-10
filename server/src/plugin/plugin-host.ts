@@ -319,10 +319,6 @@ export class PluginHost {
             logger.log('e', `${this.pluginName} close`);
             disconnect();
         });
-        this.worker.on('disconnect', () => {
-            logger.log('e', `${this.pluginName} disconnected`);
-            disconnect();
-        });
         this.worker.on('exit', async (code, signal) => {
             logger.log('e', `${this.pluginName} exited ${code} ${signal}`);
             disconnect();

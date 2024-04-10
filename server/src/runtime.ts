@@ -627,7 +627,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     setupPluginHostAutoRestart(pluginHost: PluginHost) {
-        pluginHost.worker.once('exit', () => {
+        const restart = () => {
             if (pluginHost.killed)
                 return;
             pluginHost.kill();
@@ -653,7 +653,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     console.error('error restarting plugin', plugin._id, e);
                 }
             }, timeout);
-        });
+        };
+        pluginHost.worker.once('error', restart);
+        pluginHost.worker.once('exit', restart);
+        pluginHost.worker.once('close', restart);
     }
 
     loadPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
