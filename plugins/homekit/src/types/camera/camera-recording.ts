@@ -194,7 +194,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         }
 
         let audioArgs: string[];
-        if (transcodeRecording || isDefinitelyNotAAC || debugMode.audio) {
+        if (!noAudio && (transcodeRecording || isDefinitelyNotAAC || debugMode.audio)) {
             if (!(transcodeRecording || debugMode.audio))
                 console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
 
