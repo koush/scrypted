@@ -102,12 +102,15 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
         options.signal?.addEventListener('abort', () => controller.abort('abort'));
     }
 
+    const signal = controller?.signal || options.signal;
+    signal?.addEventListener('abort', () => request.destroy(new Error('abort')));
+
     const request = proto.request(url, {
         method: getFetchMethod(options),
         rejectUnauthorized: options.rejectUnauthorized,
         family: options.family,
         headers: nodeHeaders,
-        signal: controller?.signal || options.signal,
+        signal,
         timeout: options.timeout,
     });
 
