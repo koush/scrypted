@@ -6,6 +6,7 @@ import nunjucks from 'nunjucks';
 import sdk from "@scrypted/sdk";
 import type { MqttProvider } from './main';
 import { getHsvFromXyColor, getXyYFromHsvColor } from './color-util';
+import { MqttEvent } from './api/mqtt-client';
 
 const { deviceManager } = sdk;
 
@@ -25,7 +26,7 @@ typeMap.set('light', {
         const interfaces = [ScryptedInterface.OnOff, ScryptedInterface.Brightness];
         if (config.color_mode) {
             config.supported_color_modes.forEach(color_mode => {
-                if (color_mode === 'xy')  
+                if (color_mode === 'xy')
                     interfaces.push(ScryptedInterface.ColorSettingHsv);
                 else if (color_mode === 'hs')
                     interfaces.push(ScryptedInterface.ColorSettingHsv);
@@ -246,7 +247,7 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
             return;
         }
 
-        this.debounceCallbacks = new Map<string, Set<(payload: Buffer) => void>>(); 
+        this.debounceCallbacks = new Map<string, Set<(payload: Buffer) => void>>();
 
         const { client } = provider;
         client.on('message', this.listener.bind(this));
@@ -297,7 +298,7 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
         this.console.log('binding...');
         const { client } = this.provider;
 
-        this.debounceCallbacks = new Map<string, Set<(payload: Buffer) => void>>(); 
+        this.debounceCallbacks = new Map<string, Set<(payload: Buffer) => void>>();
 
         if (this.providedInterfaces.includes(ScryptedInterface.Online)) {
             const config = this.loadComponentConfig(ScryptedInterface.Online);
@@ -468,7 +469,7 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
                 config.command_off_template,
                 command, "ON");
         } else {
-            this.publishValue(config.command_topic, 
+            this.publishValue(config.command_topic,
                 undefined, command, command);
         }
     }
@@ -489,7 +490,7 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
                 config.command_on_template,
                 command, "ON");
         } else {
-            this.publishValue(config.command_topic, 
+            this.publishValue(config.command_topic,
                 undefined, command, command);
         }
     }
@@ -506,8 +507,8 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
                 config.brightness_value_template,
                 scaledBrightness, scaledBrightness);
         } else {
-            this.publishValue(config.command_topic, 
-                `{ "state": "${ scaledBrightness === 0 ? 'OFF' : 'ON'}", "brightness": ${scaledBrightness} }`, 
+            this.publishValue(config.command_topic,
+                `{ "state": "${scaledBrightness === 0 ? 'OFF' : 'ON'}", "brightness": ${scaledBrightness} }`,
                 scaledBrightness, 255);
         }
     }
@@ -525,7 +526,7 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
         if (kelvin >= 0 || kelvin <= 100) {
             const min = await this.getTemperatureMinK();
             const max = await this.getTemperatureMaxK();
-            const diff = (max - min) * (kelvin/100);
+            const diff = (max - min) * (kelvin / 100);
             kelvin = Math.round(min + diff);
         }
 
@@ -542,7 +543,7 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
                 config.color_temp_command_template,
                 color, color);
         } else {
-            this.publishValue(config.command_topic, 
+            this.publishValue(config.command_topic,
                 undefined, color, color);
         }
     }
@@ -567,7 +568,7 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
                     config.hs_command_template,
                     color, color);
             } else {
-                this.publishValue(config.command_topic, 
+                this.publishValue(config.command_topic,
                     undefined, color, color);
             }
         } else if (this.colorMode === "xy") {
@@ -589,12 +590,12 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
                     config.xy_command_template,
                     color, color);
             } else {
-                this.publishValue(config.command_topic, 
+                this.publishValue(config.command_topic,
                     undefined, color, color);
             }
-        } 
+        }
     }
-    
+
     async lock(): Promise<void> {
         const config = this.loadComponentConfig(ScryptedInterface.Lock);
         return this.publishValue(config.command_topic,
@@ -610,6 +611,9 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements Onlin
 interface AutoDiscoveryConfig {
     component: string;
     create: (mqttId: string, device: MixinDeviceBase<any>, topic: string) => any;
+    subscriptions?: {
+        [topic: string]: (device: MixinDeviceBase<any>, event: MqttEvent) => void;
+    }
 }
 
 const autoDiscoveryMap = new Map<string, AutoDiscoveryConfig>();
@@ -676,7 +680,25 @@ autoDiscoveryMap.set(ScryptedInterface.HumiditySensor, {
     }
 });
 
-export function publishAutoDiscovery(mqttId: string, client: Client, device: MixinDeviceBase<any>, topic: string, autoDiscoveryPrefix = 'homeassistant') {
+autoDiscoveryMap.set(ScryptedInterface.OnOff, {
+    component: 'switch',
+    create(mqttId, device, topic) {
+        return {
+            payload_on: 'true',
+            payload_off: 'false',
+            state_topic: `${topic}/${ScryptedInterfaceProperty.on}`,
+            command_topic: `${topic}/${ScryptedInterfaceProperty.on}/set`,
+            ...getAutoDiscoveryDevice(device, mqttId),
+        }
+    },
+    subscriptions: {
+        'on/set': (device, event) => {
+            device.on = event.json;
+        }
+    },
+});
+
+export function publishAutoDiscovery(mqttId: string, client: Client, device: MixinDeviceBase<any>, topic: string, subscribe: boolean, autoDiscoveryPrefix = 'homeassistant') {
     for (const iface of device.interfaces) {
         const found = autoDiscoveryMap.get(iface);
         if (!found)
@@ -691,5 +713,36 @@ export function publishAutoDiscovery(mqttId: string, client: Client, device: Mix
         client.publish(configTopic, JSON.stringify(config), {
             retain: true,
         });
+
+        if (subscribe) {
+            const subscriptions = found.subscriptions || {};
+            for (const subscriptionTopic of Object.keys(subscriptions || {})) {
+                const fullTopic = topic + '/' + subscriptionTopic;
+                const cb = subscriptions[subscriptionTopic];
+                client.subscribe(fullTopic)
+                client.on('message', (messageTopic, message) => {
+                    if (fullTopic !== messageTopic && fullTopic !== '/' + messageTopic)
+                        return;
+                    device.console.log('mqtt message', subscriptionTopic, message.toString());
+                    cb(device, {
+                        get text() {
+                            return message.toString();
+                        },
+                        get json() {
+                            try {
+                                return JSON.parse(message.toString());
+                            }
+                            catch (e) {
+                            }
+                        },
+                        get buffer() {
+                            return message;
+                        }
+                    })
+                });
+            }
+        }
+
+        return found;
     }
 }
