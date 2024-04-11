@@ -693,7 +693,11 @@ autoDiscoveryMap.set(ScryptedInterface.OnOff, {
     },
     subscriptions: {
         'on/set': (device, event) => {
-            device.on = event.json;
+            const d = sdk.systemManager.getDeviceById<OnOff>(device.id);
+            if (event.json)
+                d.turnOn();
+            else
+                d.turnOff();
         }
     },
 });
