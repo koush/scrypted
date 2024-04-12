@@ -57,7 +57,10 @@ export default {
                     t += `<tspan x='${x}' dy='${toffset}em'>${Math.round(detection.score * 100) / 100}</tspan>`
                     toffset -= 1.2;
                 }
-                const tname = detection.className + (detection.id ? `: ${detection.id}` : '')
+                const tname = detection.className
+                    + (detection.id || detection.label ? ':' : '')
+                    + (detection.id ? ` ${detection.id}` : '')
+                    + (detection.label ? ` ${detection.label}` : '')
                 t += `<tspan x='${x}' dy='${toffset}em'>${tname}</tspan>`
 
                 const fs = 30 * svgScale;
