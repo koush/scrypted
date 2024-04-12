@@ -100,7 +100,7 @@ class VisionPlugin(PredictPlugin):
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.7
 
-        self.detectModel = self.downloadModel("scrypted_yolov9c_flt_320")
+        self.detectModel = self.downloadModel("scrypted_yolov8n_flt_320")
         self.detectInput = self.detectModel.get_spec().description.input[0].name
 
         self.textModel = self.downloadModel("vgg_english_g2")
@@ -110,7 +110,7 @@ class VisionPlugin(PredictPlugin):
         self.faceInput = self.faceModel.get_spec().description.input[0].name
 
     def downloadModel(self, model: str):
-        model_version = "v3"
+        model_version = "v7"
         mlmodel = "model"
 
         files = [
@@ -244,7 +244,7 @@ class VisionPlugin(PredictPlugin):
 
             out_dict = await asyncio.get_event_loop().run_in_executor(
                 predictExecutor,
-                lambda: self.faceModel.predict({self.textInput: processed_tensor}),
+                lambda: self.faceModel.predict({self.faceInput: processed_tensor}),
             )
 
             output = out_dict["var_2167"][0]
