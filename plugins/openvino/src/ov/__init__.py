@@ -18,6 +18,8 @@ availableModels = [
     "Default",
     "scrypted_yolov9c_320",
     "scrypted_yolov9c",
+    "scrypted_yolov8n_320",
+    "scrypted_yolov8n",
     "ssd_mobilenet_v1_coco",
     "ssdlite_mobilenet_v2",
     "yolo-v3-tiny-tf",
@@ -97,7 +99,7 @@ class OpenVINOPlugin(
                 self.storage.setItem("model", "Default")
             model = "scrypted_yolov9c_320"
         self.yolo = "yolo" in model
-        self.yolov9 = "yolov9" in model
+        self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
         self.sigmoid = model == "yolo-v4-tiny-tf"
 
@@ -105,7 +107,7 @@ class OpenVINOPlugin(
 
         ovmodel = "best" if self.scrypted_model else model
 
-        model_version = "v4"
+        model_version = "v5"
         xmlFile = self.downloadFile(
             f"https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.xml",
             f"{model_version}/{precision}/{ovmodel}.xml",
@@ -219,7 +221,7 @@ class OpenVINOPlugin(
             infer_request = self.compiled_model.create_infer_request()
             # the input_tensor can be created with the shared_memory=True parameter,
             # but that seems to cause issues on some platforms.
-            if self.yolov9:
+            if self.scrypted_yolo:
                 im = np.stack([input])
                 im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
                 im = im.astype(np.float32) / 255.0
@@ -239,7 +241,7 @@ class OpenVINOPlugin(
 
             objs = []
 
-            if self.yolov9:
+            if self.scrypted_yolo:
                 objs = yolo.parse_yolov9(infer_request.output_tensors[0].data[0])
                 return objs
 
