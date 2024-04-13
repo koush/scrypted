@@ -13,7 +13,7 @@ import path from 'path';
 import { ParsedQs } from 'qs';
 import semver from 'semver';
 import { PassThrough } from 'stream';
-import tar from 'tar';
+import { Parser as TarParser } from 'tar';
 import { URL } from "url";
 import WebSocket, { Server as WebSocketServer } from "ws";
 import { computeClusterObjectHash } from './cluster/cluster-hash';
@@ -451,7 +451,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             .finally(() => {
                 if (!ri.sent) {
                     console.warn(pluginId, 'did not send a response before onRequest returned.');
-                    ri.send(`Internal Plugin Error: ${pluginId}` , {
+                    ri.send(`Internal Plugin Error: ${pluginId}`, {
                         code: 500,
                     })
                 }
@@ -543,13 +543,19 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
         console.log('installing package', pkg, version);
 
-        const { body: tarball } = await httpFetch( {
+        const { body: tarball } = await httpFetch({
             url: `${registry.versions[version].dist.tarball}`,
             // force ipv4 in case of busted ipv6.
             family: 4,
         });
         console.log('downloaded tarball', tarball?.length);
-        const parse = new (tar.Parse as any)();
+        try {
+            const pp = new TarParser();
+        }
+        catch (e) {
+            throw new Error(e);
+        }
+        const parse = new TarParser();
         const files: { [name: string]: Buffer } = {};
 
         parse.on('entry', async (entry: any) => {
@@ -595,10 +601,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             return this.installPlugin(plugin);
         })();
 
-        const pt = new PassThrough();
-        pt.write(tarball);
-        pt.push(null);
-        pt.pipe(parse);
+        parse.write(tarball);
+        parse.end();
         return ret;
     }
 
