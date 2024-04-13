@@ -12,7 +12,7 @@ from scrypted_sdk.types import Setting
 
 from predict import PredictPlugin, Prediction, Rectangle
 import numpy as np
-import yolo
+import common.yolo as yolo
 
 availableModels = [
     "Default",

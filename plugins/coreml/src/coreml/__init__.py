@@ -4,7 +4,6 @@ import ast
 import asyncio
 import concurrent.futures
 import os
-import platform
 import re
 from typing import Any, Tuple
 
@@ -13,7 +12,8 @@ import scrypted_sdk
 from PIL import Image
 from scrypted_sdk import Setting, SettingValue
 
-import yolo
+from common import yolo
+from coreml.recognition import CoreMLRecognition
 from predict import Prediction, PredictPlugin, Rectangle
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "CoreML-Predict")
@@ -124,10 +124,6 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
 
     async def prepareVisionFramework(self):
         try:
-            from vision import VisionPlugin
-
-            if not VisionPlugin:
-                raise Exception("no vision plugin")
             await scrypted_sdk.deviceManager.onDevicesChanged(
                 {
                     "devices": [
@@ -146,9 +142,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
             pass
 
     async def getDevice(self, nativeId: str) -> Any:
-        from vision import VisionPlugin
-
-        return VisionPlugin(nativeId)
+        return CoreMLRecognition(nativeId)
 
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"

@@ -24,51 +24,9 @@ import traceback
 
 # import Vision
 from predict import Prediction, PredictPlugin, from_bounding_box
-import yolo
-import math
-
-def softmax(X, theta = 1.0, axis = None):
-    """
-    Compute the softmax of each element along an axis of X.
-
-    Parameters
-    ----------
-    X: ND-Array. Probably should be floats.
-    theta (optional): float parameter, used as a multiplier
-        prior to exponentiation. Default = 1.0
-    axis (optional): axis to compute values along. Default is the
-        first non-singleton axis.
-
-    Returns an array the same size as X. The result will sum to 1
-    along the specified axis.
-    """
-
-    # make X at least 2d
-    y = np.atleast_2d(X)
-
-    # find axis
-    if axis is None:
-        axis = next(j[0] for j in enumerate(y.shape) if j[1] > 1)
-
-    # multiply y against the theta parameter,
-    y = y * float(theta)
-
-    # subtract the max for numerical stability
-    y = y - np.expand_dims(np.max(y, axis = axis), axis)
-
-    # exponentiate y
-    y = np.exp(y)
-
-    # take the sum along the specified axis
-    ax_sum = np.expand_dims(np.sum(y, axis = axis), axis)
-
-    # finally: divide elementwise
-    p = y / ax_sum
-
-    # flatten if X was 1D
-    if len(X.shape) == 1: p = p.flatten()
-
-    return p
+from common import yolo
+from common.softmax import softmax
+from common.text import prepare_text_result, process_text_result
 
 def euclidean_distance(arr1, arr2):
     return np.linalg.norm(arr1 - arr2)
@@ -85,7 +43,7 @@ def cosine_similarity(vector_a, vector_b):
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Vision-Predict")
 
 
-class VisionPlugin(PredictPlugin):
+class CoreMLRecognition(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
@@ -100,7 +58,7 @@ class VisionPlugin(PredictPlugin):
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.7
 
-        self.detectModel = self.downloadModel("scrypted_yolov8n_flt_320")
+        self.detectModel = self.downloadModel("scrypted_yolov9c_flt_320")
         self.detectInput = self.detectModel.get_spec().description.input[0].name
 
         self.textModel = self.downloadModel("vgg_english_g2")
@@ -258,66 +216,12 @@ class VisionPlugin(PredictPlugin):
 
     async def setLabel(self, d: ObjectDetectionResult, image: scrypted_sdk.Image):
         try:
-            new_height = 64
-            new_width = int(d["boundingBox"][2] * new_height / d["boundingBox"][3])
-            textImage = await crop(d, image, new_width, new_height, 'gray', "L")
-            new_width = 256
-            # calculate padding dimensions
-            padding = (0, 0, new_width - textImage.width, 0)
-            # todo: clamp entire edge rather than just center
-            edge_color = textImage.getpixel((textImage.width - 1, textImage.height // 2))
-            # pad image
-            textImage = ImageOps.expand(textImage, padding, fill=edge_color)
-            # pil to numpy
-            image_array = np.array(textImage)
-            image_array = image_array.reshape(textImage.height, textImage.width, 1)
-            image_tensor = image_array.transpose((2, 0, 1)) / 255
-            image_tensor = (image_tensor - 0.5) / 0.5
-
-            image_tensor = np.expand_dims(image_tensor, axis=0)
-
-
+            image_tensor = await prepare_text_result(d, image)
             out_dict = self.textModel.predict({self.textInput: image_tensor})
             preds = out_dict["linear_2"]
-            preds_size = preds.shape[1]
-
-            # softmax preds using scipy
-            preds_prob = softmax(preds, axis=2)
-            # preds_prob = softmax(preds)
-            pred_norm = np.sum(preds_prob, axis=2)
-            preds_prob = preds_prob / np.expand_dims(pred_norm, axis=-1)
-
-            preds_index = np.argmax(preds_prob, axis=2)
-            preds_index = preds_index.reshape(-1)
-
-            characters = "0123456789!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~ €ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-
-            dict_character = list(characters)
-            character = ["[blank]"] + dict_character  # dummy '[blank]' token for CTCLoss (index 0)
-
-            def decode_greedy(text_index, length):
-                """convert text-index into text-label."""
-                texts = []
-                index = 0
-                for l in length:
-                    t = text_index[index : index + l]
-                    # Returns a boolean array where true is when the value is not repeated
-                    a = np.insert(~((t[1:] == t[:-1])), 0, True)
-                    # Returns a boolean array where true is when the value is not in the ignore_idx list
-                    b = ~np.isin(t, np.array(""))
-                    # Combine the two boolean array
-                    c = a & b
-                    # Gets the corresponding character according to the saved indexes
-                    text = "".join(np.array(character)[t[c.nonzero()]])
-                    texts.append(text)
-                    index += l
-                return texts
-
-            preds_str = decode_greedy(preds_index, np.array([preds_size]))
-            d['label'] = preds_str[0].replace('[blank]', '')
+            d['label'] = process_text_result(preds)
 
         except Exception as e:
-
             traceback.print_exc()
             pass
 
@@ -383,23 +287,3 @@ class VisionPlugin(PredictPlugin):
 
         return ret
 
-
-async def crop(d: ObjectDetectionResult, image: scrypted_sdk.Image, width: int, height: int, format: str, pilFormat: str):
-    l, t, w, h = d["boundingBox"]
-    cropped = await image.toBuffer(
-        {
-            "crop": {
-                "left": l,
-                "top": t,
-                "width": w,
-                "height": h,
-            },
-            "resize": {
-                "width": width,
-                "height": height,
-            },
-            "format": format,
-        }
-    )
-    pilImage = Image.frombuffer(pilFormat, (width, height), cropped)
-    return pilImage
