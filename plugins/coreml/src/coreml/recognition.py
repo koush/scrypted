@@ -12,7 +12,7 @@ import numpy as np
 # import Quartz
 import scrypted_sdk
 # from Foundation import NSData, NSMakeSize
-from PIL import Image, ImageOps
+from PIL import Image
 from scrypted_sdk import (
     Setting,
     SettingValue,
@@ -23,9 +23,8 @@ from scrypted_sdk import (
 import traceback
 
 # import Vision
-from predict import Prediction, PredictPlugin, from_bounding_box
+from predict import PredictPlugin
 from common import yolo
-from common.softmax import softmax
 from common.text import prepare_text_result, process_text_result
 
 def euclidean_distance(arr1, arr2):
@@ -41,7 +40,6 @@ def cosine_similarity(vector_a, vector_b):
 
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Vision-Predict")
-
 
 class CoreMLRecognition(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -104,58 +102,58 @@ class CoreMLRecognition(PredictPlugin):
     def get_input_format(self) -> str:
         return "rgb"
 
-    def predictVision(self, input: Image.Image) -> asyncio.Future[list[Prediction]]:
-        buffer = input.tobytes()
-        myData = NSData.alloc().initWithBytes_length_(buffer, len(buffer))
+    # def predictVision(self, input: Image.Image) -> asyncio.Future[list[Prediction]]:
+    #     buffer = input.tobytes()
+    #     myData = NSData.alloc().initWithBytes_length_(buffer, len(buffer))
 
-        input_image = (
-            Quartz.CIImage.imageWithBitmapData_bytesPerRow_size_format_options_(
-                myData,
-                4 * input.width,
-                NSMakeSize(input.width, input.height),
-                Quartz.kCIFormatRGBA8,
-                None,
-            )
-        )
+    #     input_image = (
+    #         Quartz.CIImage.imageWithBitmapData_bytesPerRow_size_format_options_(
+    #             myData,
+    #             4 * input.width,
+    #             NSMakeSize(input.width, input.height),
+    #             Quartz.kCIFormatRGBA8,
+    #             None,
+    #         )
+    #     )
 
-        request_handler = Vision.VNImageRequestHandler.alloc().initWithCIImage_options_(
-            input_image, None
-        )
+    #     request_handler = Vision.VNImageRequestHandler.alloc().initWithCIImage_options_(
+    #         input_image, None
+    #     )
 
-        loop = self.loop
-        future = loop.create_future()
+    #     loop = self.loop
+    #     future = loop.create_future()
 
-        def detect_face_handler(request, error):
-            observations = request.results()
-            if error:
-                loop.call_soon_threadsafe(future.set_exception, Exception())
-            else:
-                objs = []
-                for o in observations:
-                    confidence = o.confidence()
-                    bb = o.boundingBox()
-                    origin = bb.origin
-                    size = bb.size
+    #     def detect_face_handler(request, error):
+    #         observations = request.results()
+    #         if error:
+    #             loop.call_soon_threadsafe(future.set_exception, Exception())
+    #         else:
+    #             objs = []
+    #             for o in observations:
+    #                 confidence = o.confidence()
+    #                 bb = o.boundingBox()
+    #                 origin = bb.origin
+    #                 size = bb.size
 
-                    l = origin.x * input.width
-                    t = (1 - origin.y - size.height) * input.height
-                    w = size.width * input.width
-                    h = size.height * input.height
-                    prediction = Prediction(
-                        0, confidence, from_bounding_box((l, t, w, h))
-                    )
-                    objs.append(prediction)
+    #                 l = origin.x * input.width
+    #                 t = (1 - origin.y - size.height) * input.height
+    #                 w = size.width * input.width
+    #                 h = size.height * input.height
+    #                 prediction = Prediction(
+    #                     0, confidence, from_bounding_box((l, t, w, h))
+    #                 )
+    #                 objs.append(prediction)
 
-                loop.call_soon_threadsafe(future.set_result, objs)
+    #             loop.call_soon_threadsafe(future.set_result, objs)
 
-        request = (
-            Vision.VNDetectFaceRectanglesRequest.alloc().initWithCompletionHandler_(
-                detect_face_handler
-            )
-        )
+    #     request = (
+    #         Vision.VNDetectFaceRectanglesRequest.alloc().initWithCompletionHandler_(
+    #             detect_face_handler
+    #         )
+    #     )
 
-        error = request_handler.performRequests_error_([request], None)
-        return future
+    #     error = request_handler.performRequests_error_([request], None)
+    #     return future
 
     # async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
     #     future = await asyncio.get_event_loop().run_in_executor(
