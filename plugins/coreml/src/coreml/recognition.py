@@ -64,7 +64,9 @@ class CoreMLRecognition(RecognizeDetection):
     
     def predictTextModel(self, input):
         model, inputName = self.textModel
-        return model.predict({inputName: input})
+        out_dict = model.predict({inputName: input})
+        preds = out_dict["linear_2"]
+        return preds
 
     # def predictVision(self, input: Image.Image) -> asyncio.Future[list[Prediction]]:
     #     buffer = input.tobytes()

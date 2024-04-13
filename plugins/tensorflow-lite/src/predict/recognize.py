@@ -137,11 +137,10 @@ class RecognizeDetection(PredictPlugin):
     async def setLabel(self, d: ObjectDetectionResult, image: scrypted_sdk.Image):
         try:
             image_tensor = await prepare_text_result(d, image)
-            out_dict = await asyncio.get_event_loop().run_in_executor(
+            preds = await asyncio.get_event_loop().run_in_executor(
                 predictExecutor,
                 lambda: self.predictTextModel(image_tensor),
             )
-            preds = out_dict["linear_2"]
             d['label'] = process_text_result(preds)
 
         except Exception as e:

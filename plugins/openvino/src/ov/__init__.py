@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import Any, Tuple
 
+import numpy as np
 import openvino.runtime as ov
 import scrypted_sdk
 from PIL import Image
 from scrypted_sdk.other import SettingValue
 from scrypted_sdk.types import Setting
 
-from predict import PredictPlugin, Prediction, Rectangle
-import numpy as np
 import common.yolo as yolo
+from predict import Prediction, PredictPlugin, Rectangle
+
+from .recognition import OpenVINORecognition
 
 availableModels = [
     "Default",
@@ -66,7 +69,7 @@ def dump_device_properties(core):
 
 
 class OpenVINOPlugin(
-    PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings
+    PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings, scrypted_sdk.DeviceProvider
 ):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
@@ -81,6 +84,7 @@ class OpenVINOPlugin(
         if mode == "Default":
             mode = "AUTO"
         mode = mode or "AUTO"
+        self.mode = mode
 
         precision = self.storage.getItem("precision") or "Default"
         if precision == "Default":
@@ -92,6 +96,8 @@ class OpenVINOPlugin(
                 precision = "FP16"
             else:
                 precision = "FP32"
+
+        self.precision = precision
 
         model = self.storage.getItem("model") or "Default"
         if model == "Default" or model not in availableModels:
@@ -110,11 +116,11 @@ class OpenVINOPlugin(
         model_version = "v5"
         xmlFile = self.downloadFile(
             f"https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.xml",
-            f"{model_version}/{precision}/{ovmodel}.xml",
+            f"{model_version}/{model}/{precision}/{ovmodel}.xml",
         )
         binFile = self.downloadFile(
             f"https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.bin",
-            f"{model_version}/{precision}/{ovmodel}.bin",
+            f"{model_version}/{model}/{precision}/{ovmodel}.bin",
         )
         if self.scrypted_model:
             labelsFile = self.downloadFile(
@@ -158,6 +164,8 @@ class OpenVINOPlugin(
 
         labels_contents = open(labelsFile, "r").read()
         self.labels = parse_label_contents(labels_contents)
+
+        asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
 
     async def getSettings(self) -> list[Setting]:
         mode = self.storage.getItem("mode") or "Default"
@@ -304,3 +312,25 @@ class OpenVINOPlugin(
 
         ret = self.create_detection_result(objs, src_size, cvss)
         return ret
+
+    async def prepareRecognitionModels(self):
+        try:
+            await scrypted_sdk.deviceManager.onDevicesChanged(
+                {
+                    "devices": [
+                        {
+                            "nativeId": "recognition",
+                            "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                            "interfaces": [
+                                scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                            ],
+                            "name": "OpenVINO Recognition",
+                        }
+                    ]
+                }
+            )
+        except:
+            pass
+
+    async def getDevice(self, nativeId: str) -> Any:
+        return OpenVINORecognition(self, nativeId)
