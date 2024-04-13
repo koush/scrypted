@@ -29,9 +29,14 @@ export async function getDeviceInfo(credential: AuthFetchCredentialState, addres
         vals[k] = v.trim();
     }
 
-    return {
+    const ret = {
         deviceType: vals.deviceType,
         hardwareVersion: vals.hardwareVersion,
         serialNumber: vals.serialNumber,
-    }
+    };
+
+    if (!ret.deviceType && !ret.hardwareVersion && !ret.serialNumber)
+        throw new Error('not amcrest');
+
+    return ret;
 }
