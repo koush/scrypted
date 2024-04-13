@@ -75,7 +75,8 @@ export class VipsImage implements Image {
                     break
             }
             transformed.resize(typeof options.resize.width === 'number' ? Math.floor(options.resize.width) : undefined, typeof options.resize.height === 'number' ? Math.floor(options.resize.height) : undefined, {
-                fit: "cover",
+                // haven't decided if these are the correct defaults.
+                fit: options.resize.width && options.resize.height ? 'fill' : 'cover',
                 kernel: kernel,
             });
         }
