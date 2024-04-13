@@ -112,14 +112,13 @@ class RecognizeDetection(PredictPlugin):
             processed_tensor = (image_tensor - 127.5) / 128.0
             processed_tensor = np.expand_dims(processed_tensor, axis=0)
 
-            out_dict = await asyncio.get_event_loop().run_in_executor(
+            output = await asyncio.get_event_loop().run_in_executor(
                 predictExecutor,
                 lambda: self.predictFaceModel(processed_tensor)
             )
 
-            output = out_dict["var_2167"][0]
             b = output.tobytes()
-            embedding = str(base64.encodebytes(b))
+            embedding = base64.b64encode(b).decode("utf-8")
             d["embedding"] = embedding
         except Exception as e:
 
@@ -208,6 +207,24 @@ class RecognizeDetection(PredictPlugin):
 
         if len(futures):
             await asyncio.wait(futures)
+
+        last = None
+        for d in ret['detections']:
+            if d["className"] != "face":
+                continue
+            check = d.get("embedding")
+            if check is None:
+                continue
+            # decode base64 string check
+            embedding = base64.b64decode(check)
+            embedding = np.frombuffer(embedding, dtype=np.float32)
+            if last is None:
+                last = embedding
+                continue
+            # convert to numpy float32 arrays
+            similarity = cosine_similarity(last, embedding)
+            print('similarity', similarity)
+            last = embedding
 
         return ret
 

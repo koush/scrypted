@@ -120,15 +120,15 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.2
 
-        asyncio.ensure_future(self.prepareVisionFramework(), loop=self.loop)
+        asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
 
-    async def prepareVisionFramework(self):
+    async def prepareRecognitionModels(self):
         try:
             await scrypted_sdk.deviceManager.onDevicesChanged(
                 {
                     "devices": [
                         {
-                            "nativeId": "vision",
+                            "nativeId": "recognition",
                             "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                             "interfaces": [
                                 scrypted_sdk.ScryptedInterface.ObjectDetection.value,
