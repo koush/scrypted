@@ -213,9 +213,14 @@ export interface ColorHsv {
   v?: number;
 }
 
+export interface NotificationAction {
+  action: string;
+  icon?: string;
+  title: string;
+}
+
 export interface NotifierOptions {
   subtitle?: string;
-  actions?: NotificationAction[];
   badge?: string;
   bodyWithSubtitle?: string;
   body?: string;
@@ -229,6 +234,10 @@ export interface NotifierOptions {
   timestamp?: number;
   vibrate?: VibratePattern;
   recordedEvent?: RecordedEvent;
+
+  // removed from typescript dom?
+  actions?: NotificationAction[];
+  image?: string;
 }
 
 /**

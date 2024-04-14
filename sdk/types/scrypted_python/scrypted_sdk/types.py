@@ -294,6 +294,12 @@ class HttpResponseOptions(TypedDict):
     code: float
     headers: object
 
+class NotificationAction(TypedDict):
+
+    action: str
+    icon: str
+    title: str
+
 class ObjectDetectionResult(TypedDict):
 
     boundingBox: tuple[float, float, float, float]  # x, y, width, height
@@ -602,6 +608,7 @@ class NotifierOptions(TypedDict):
     bodyWithSubtitle: str
     data: Any
     dir: NotificationDirection
+    image: str
     lang: str
     recordedEvent: RecordedEvent
     renotify: bool
