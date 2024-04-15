@@ -82,7 +82,7 @@ export function createHAPUsernameStorageSettingsDict(device: { storage: Storage,
 
     return {
         addIdentifyingMaterial: {
-            hide: true,
+            hide: false,
             type: 'boolean',
         },
         qrCode: {
