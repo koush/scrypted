@@ -11,11 +11,14 @@ import scrypted_sdk
 from PIL import Image
 from scrypted_sdk.other import SettingValue
 from scrypted_sdk.types import Setting
+import concurrent.futures
 
 import common.yolo as yolo
 from predict import Prediction, PredictPlugin, Rectangle
 
 from .recognition import OpenVINORecognition
+
+predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "OpenVINO-Predict")
 
 availableModels = [
     "Default",
@@ -245,7 +248,10 @@ class OpenVINOPlugin(
             # Set input tensor for model with one input
             infer_request.set_input_tensor(input_tensor)
             infer_request.start_async()
-            infer_request.wait()
+            # todo: use the inference queue provided by openvino
+            await asyncio.get_event_loop().run_in_executor(
+                predictExecutor, lambda: infer_request.wait()
+            )
 
             objs = []
 

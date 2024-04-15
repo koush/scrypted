@@ -173,12 +173,9 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
 
         # run in executor if this is the plugin loop
         if self.yolo:
-            if asyncio.get_event_loop() is self.loop:
-                out_dict = await asyncio.get_event_loop().run_in_executor(
-                    predictExecutor, lambda: self.model.predict({self.input_name: input})
-                )
-            else:
-                out_dict = self.model.predict({self.input_name: input})
+            out_dict = await asyncio.get_event_loop().run_in_executor(
+                predictExecutor, lambda: self.model.predict({self.input_name: input})
+            )
 
             if self.scrypted_yolo:
                 results = list(out_dict.values())[0][0]
@@ -216,17 +213,12 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
             ret = self.create_detection_result(objs, src_size, cvss)
             return ret
 
-        if asyncio.get_event_loop() is self.loop:
-            out_dict = await asyncio.get_event_loop().run_in_executor(
-                predictExecutor,
-                lambda: self.model.predict(
-                    {"image": input, "confidenceThreshold": self.minThreshold}
-                ),
-            )
-        else:
-            out_dict = self.model.predict(
+        out_dict = await asyncio.get_event_loop().run_in_executor(
+            predictExecutor,
+            lambda: self.model.predict(
                 {"image": input, "confidenceThreshold": self.minThreshold}
-            )
+            ),
+        )
 
         coordinatesList = out_dict["coordinates"].astype(float)
 
