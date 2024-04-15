@@ -269,7 +269,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
                     // TODO: change this value after this current default has been persisted to existing clients.
                     // changing it now will cause existing accessories be renamed.
-                    storageSettings.settings.addIdentifyingMaterial.persistedDefaultValue = false;
+                    storageSettings.settings.addIdentifyingMaterial.persistedDefaultValue = true;
 
                     const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
 
