@@ -103,7 +103,7 @@ addSupportedType({
         const isRecordingEnabled = device.interfaces.includes(ScryptedInterface.MotionSensor);
 
         let configuration: CameraRecordingConfiguration;
-        const openRecordingStreams = new Set<number>();
+        const openRecordingStreams = new Map<number, AsyncGenerator<RecordingPacket>>();
         if (isRecordingEnabled) {
             recordingDelegate = {
                 updateRecordingConfiguration(newConfiguration: CameraRecordingConfiguration) {
@@ -112,10 +112,12 @@ addSupportedType({
                 handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
                     const ret = handleFragmentsRequests(streamId, device, configuration, console, homekitPlugin, 
                         () => openRecordingStreams.has(streamId));
-                    openRecordingStreams.add(streamId);
+                    openRecordingStreams.set(streamId, ret);
                     return ret;
                 },
                 closeRecordingStream(streamId, reason) {
+                    const r = openRecordingStreams.get(streamId);
+                    r?.throw(new Error(reason?.toString()));
                     openRecordingStreams.delete(streamId);
                 },
                 updateRecordingActive(active) {
