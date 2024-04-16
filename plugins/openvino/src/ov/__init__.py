@@ -107,7 +107,7 @@ class OpenVINOPlugin(
         if model == "Default" or model not in availableModels:
             if model != "Default":
                 self.storage.setItem("model", "Default")
-            model = "scrypted_yolov9c_320"
+            model = "scrypted_yolov8n_320"
         self.yolo = "yolo" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
