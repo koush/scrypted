@@ -703,6 +703,8 @@ autoDiscoveryMap.set(ScryptedInterface.OnOff, {
 });
 
 export function publishAutoDiscovery(mqttId: string, client: Client, device: MixinDeviceBase<any>, topic: string, subscribe: boolean, autoDiscoveryPrefix = 'homeassistant') {
+    const subs = new Set<string>();
+
     for (const iface of device.interfaces) {
         const found = autoDiscoveryMap.get(iface);
         if (!found)
@@ -721,6 +723,8 @@ export function publishAutoDiscovery(mqttId: string, client: Client, device: Mix
         if (subscribe) {
             const subscriptions = found.subscriptions || {};
             for (const subscriptionTopic of Object.keys(subscriptions || {})) {
+                subs.add(subscriptionTopic);
+
                 const fullTopic = topic + '/' + subscriptionTopic;
                 const cb = subscriptions[subscriptionTopic];
                 client.subscribe(fullTopic)
@@ -746,7 +750,7 @@ export function publishAutoDiscovery(mqttId: string, client: Client, device: Mix
                 });
             }
         }
-
-        return found;
     }
+
+    return subs;
 }

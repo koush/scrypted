@@ -320,7 +320,7 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
             const method = messageTopic.substring(this.pathname.length + 1);
             if (!allMethods.includes(method)) {
                 if (!allProperties.includes(method)) {
-                    if (!found?.subscriptions?.[method]) {
+                    if (!found?.has(method)) {
                         this.console.warn('unknown topic', method);
                     }
                 }
