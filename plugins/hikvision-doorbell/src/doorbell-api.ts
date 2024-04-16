@@ -18,7 +18,7 @@ const messagePrefixSize = 692;
 
 export enum HikvisionDoorbellEvent {
     Motion = '00000000',
-    CaseBurglaryAlert = '02000000',
+    CaseTamperAlert = '02000000',
     TalkInvite = "11000000",
     TalkHangup = "12000000",
     OpenDoor = '01000000',
@@ -173,7 +173,7 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
     }
 
     async listenEvents() {
-        // support multiple cameras listening to a single single stream 
+        // support multiple cameras listening to a single stream 
         if (!this.listener) {
 
             await this.runHttpHostsListener();
@@ -300,16 +300,18 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
     }
 
     async stopRinging() {
-        await this.request({
+        let resp = await this.request({
             url: `http://${this.endpoint}/ISAPI/VideoIntercom/callSignal?format=json`,
             method: 'PUT',
-            responseType: 'readable',
+            responseType: 'text',
         }, '{"CallSignal":{"cmdType":"answer"}}');
-        await this.request({
+        this.console.log(`(stopRinging) Answer return: ${resp.statusCode} - ${resp.body}`);
+        resp = await this.request({
             url: `http://${this.endpoint}/ISAPI/VideoIntercom/callSignal?format=json`,
             method: 'PUT',
-            responseType: 'readable',
+            responseType: 'text',
         }, '{"CallSignal":{"cmdType":"hangUp"}}');
+        this.console.log(`(stopRinging) HangUp return: ${resp.statusCode} - ${resp.body}`);
     }
 
     async setFakeSip (enabled: boolean, ip: string = '127.0.0.1', port: number = 5060)

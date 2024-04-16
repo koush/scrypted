@@ -12,7 +12,15 @@ At the moment, plugin was tested with the **DS-KV6113PE1[C]** model `doorbell` w
 
 Most of these doorbells have the ability to control an electromechanical lock. To implement the lock controller software interface in Scrypted, you need to create a separate device with the `Lock` type. Such a device is created automatically if you enable the **Expose Door Lock Controller** checkbox.
 
-The lock controller is linked to this device. Therefore, when the doorbell is deleted, the associated lock controller will also be deleted.
+The lock controller is linked to this device (doorbell). Therefore, when the doorbell is deleted, the associated lock controller will also be deleted.
+
+### Support tamper alert
+
+Most of a doorbells have a tamper alert. To implement the tamper alert software interface in Scrypted, you need to create a separate device with the `Switch` type. Such a device is created automatically if you enable the **Expose Tamper Alert Controller** checkbox. If you leave this checkbox disabled, the tamper signal will be interpreted as a `Motion Detection` event.
+
+If the tamper on the doorbell is triggered, the controller (`Switch`) will **turn on**. You can **turn off** the switch manually in the Scrypted web interface only.
+
+The tamper alert controller is linked to this device (doorbell). Therefore, when the doorbell is deleted, the associated tamper alert controller will also be deleted.
 
 ### Setting up a receiving call (the ability to ringing)
 

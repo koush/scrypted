@@ -1,5 +1,5 @@
 import { HikvisionCamera } from "../../hikvision/src/main"
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, LockState, Readme } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, LockState, Readme } from "@scrypted/sdk";
 import { PassThrough } from "stream";
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { RtspProvider, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -10,12 +10,14 @@ import { parseBooleans, parseNumbers } from "xml2js/lib/processors";
 import { once, EventEmitter } from 'node:events';
 import { timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { HikvisionLock } from "./lock"
+import { HikvisionTamperAlert } from "./tamper-alert"
 import * as fs from 'fs/promises';
 import { join } from 'path';
 
 const { mediaManager, deviceManager } = sdk;
 
 const EXPOSE_LOCK_KEY: string = 'exposeLock';
+const EXPOSE_ALERT_KEY: string = 'exposeAlert';
 
 const SIP_MODE_KEY: string = 'sipMode';
 const SIP_CLIENT_CALLID_KEY: string = 'sipClientCallId';
@@ -116,9 +118,21 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
         const motionTimeoutDuration = (parseInt(this.storage.getItem('motionTimeout')) || 10) * 1000;
         let motionPings = 0;
         events.on('event', async (event: HikvisionDoorbellEvent, cameraNumber: string, inactive: boolean) => {
-            if (event === HikvisionDoorbellEvent.Motion 
-                || event === HikvisionDoorbellEvent.CaseBurglaryAlert // hmm
-                ) 
+            if (event === HikvisionDoorbellEvent.CaseTamperAlert)
+            {
+                const enabled = parseBooleans (this.storage.getItem (EXPOSE_ALERT_KEY));
+                if (enabled)
+                {
+                    const provider = this.provider as HikvisionDoorbellProvider;
+                    const alert = await provider.getAlertDevice (this.nativeId);
+                    if (alert)
+                        alert.turnOn();
+                }
+                else {
+                    event = HikvisionDoorbellEvent.Motion;
+                }
+            }
+            if (event === HikvisionDoorbellEvent.Motion) 
             {
                 // check if the camera+channel field is in use, and filter events.
                 if (this.getRtspChannel()) {
@@ -282,6 +296,18 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
         }
     }
 
+    async updateAlert () 
+    {
+        const enabled = parseBooleans (this.storage.getItem (EXPOSE_ALERT_KEY));
+        const provider = this.provider as HikvisionDoorbellProvider;
+        if (enabled) {
+            return provider.enableAlert (this.nativeId);
+        }
+        else {
+            return provider.disableAlert (this.nativeId);
+        }
+    }
+
     override async putSetting(key: string, value: string) {
         this.client = undefined;
         this.detectedChannels = undefined;
@@ -297,6 +323,10 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
             this.updateLock();
         }
 
+        if (key === EXPOSE_ALERT_KEY) {
+            this.updateAlert();
+        }
+
         this.updateDevice();
         this.updateSip();
         this.updateDeviceInfo();
@@ -305,6 +335,12 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
     onLockRemoved() 
     {
         super.putSetting(EXPOSE_LOCK_KEY, 'false');
+        this.updateDevice();
+    }
+
+    onAlertRemoved() 
+    {
+        super.putSetting(EXPOSE_ALERT_KEY, 'false');
         this.updateDevice();
     }
 
@@ -338,6 +374,13 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
                 title: 'Expose Door Lock Controller',
                 description: 'The doorbell may have the capability to control door opening. Enabling this feature will result in the creation of a separate (linked) device of the "Lock" type, which implements the door lock control.',
                 value: parseBooleans (this.storage.getItem (EXPOSE_LOCK_KEY)) || false,
+                type: 'boolean',
+            },
+            {
+                key: EXPOSE_ALERT_KEY,
+                title: 'Expose Tamper Alert Controller',
+                description: 'The doorbell may have a tamper alert. Enabling this function will lead to the creation of a separate (linked) device of the “Switch” type that implements tamper signaling.',
+                value: parseBooleans (this.storage.getItem (EXPOSE_ALERT_KEY)) || false,
                 type: 'boolean',
             },
             {
@@ -616,8 +659,10 @@ export class HikvisionDoorbellProvider extends RtspProvider
     
     clients: Map<string, HikvisionDoorbellAPI>;
     lockDevices: Map<string, HikvisionLock>;
+    alertDevices: Map<string, HikvisionTamperAlert>;
 
     private static LOCK_DEVICE_PREFIX = 'hik-lock:';
+    private static ALERT_DEVICE_PREFIX = 'hik-alert:';
 
     constructor() {
         super();
@@ -667,6 +712,22 @@ export class HikvisionDoorbellProvider extends RtspProvider
             }
             return ret;
         }
+        else if (this.isAlertId (nativeId)) 
+        {
+            if (typeof (this.alertDevices) === 'undefined') {
+                this.alertDevices = new Map();
+            }
+
+            let ret = this.alertDevices.get (nativeId);
+            if (!ret) 
+            {
+                ret = new HikvisionTamperAlert (nativeId);
+                if (ret)
+                    this.alertDevices.set(nativeId, ret);
+            }
+            return ret;
+        }
+
         return super.getDevice (nativeId);
     }
 
@@ -676,17 +737,28 @@ export class HikvisionDoorbellProvider extends RtspProvider
         return this.getDevice (nativeId);
     }
 
+    async getAlertDevice (cameraNativeId: string): Promise<HikvisionTamperAlert>
+    {
+        const nativeId = this.alertIdFrom (cameraNativeId);
+        return this.getDevice (nativeId);
+    }
+
     override async releaseDevice(id: string, nativeId: string): Promise<void> {
 
         this.console.error(`Release device: ${id}, ${nativeId}`);
+        const camera = this.getCameraDeviceFor (nativeId);
         if (this.isLockId (nativeId))
         {
-            const camera = this.getCameraDeviceForLockId (nativeId);
             camera.onLockRemoved();
             this.lockDevices.delete (nativeId);
             return;
         }
-        const camera = this.devices.get (nativeId) as HikvisionCameraDoorbell;
+        if (this.isAlertId (nativeId))
+        {
+            camera.onAlertRemoved();
+            this.alertDevices.delete (nativeId);
+            return;
+        }
         await this.disableLock (nativeId);
         this.devices.delete(nativeId);
         camera?.destroy();
@@ -742,30 +814,19 @@ export class HikvisionDoorbellProvider extends RtspProvider
         return nativeId;
     }
 
-
     async enableLock (cameraNativeId: string)
     {
-        const camera = await this.getDevice (cameraNativeId) as HikvisionCameraDoorbell
-        const user = camera.storage.getItem ('username');
-        const pass = camera.storage.getItem ('password');
+        const camera = await this.getCameraDeviceFor (cameraNativeId)
         const nativeId = this.lockIdFrom (cameraNativeId);
         const name = `${camera.name} (Door Lock)`
         await this.updateLock (nativeId, name);
-        const lock = await this.getDevice (nativeId) as HikvisionLock;
-        lock.putSetting ('user', user);
-        lock.putSetting ('pass', pass);
-        lock.putSetting ('ip', camera.getIPAddress());
-        lock.putSetting ('port', camera.getHttpPort());
-        lock.putSetting (HikvisionDoorbellProvider.CAMERA_NATIVE_ID_KEY, cameraNativeId);
+        await this.cameraMetaToAux (nativeId, camera);
     }
 
     async disableLock (cameraNativeId: string)
     {
         const nativeId = this.lockIdFrom (cameraNativeId);
-        const state = deviceManager.getDeviceState (nativeId);
-        if (state?.nativeId === nativeId) {
-            return deviceManager.onDeviceRemoved (nativeId)
-        }
+        return this.removingAuxNotify (nativeId)
     }
 
     async updateLock (nativeId: string, name?: string)
@@ -777,6 +838,52 @@ export class HikvisionDoorbellProvider extends RtspProvider
             type: ScryptedDeviceType.Lock
         });
 
+    }
+
+    async enableAlert (cameraNativeId: string)
+    {
+        const camera = await this.getCameraDeviceFor (cameraNativeId)
+        const nativeId = this.alertIdFrom (cameraNativeId);
+        const name = `${camera.name} (Doorbell Tamper Alert)`
+        await this.updateAlert (nativeId, name);
+        await this.cameraMetaToAux (nativeId, camera);
+    }
+
+    async disableAlert (cameraNativeId: string)
+    {
+        const nativeId = this.alertIdFrom (cameraNativeId);
+        return this.removingAuxNotify (nativeId)
+    }
+
+    async updateAlert (nativeId: string, name?: string)
+    {
+        await deviceManager.onDeviceDiscovered({
+            nativeId,
+            name,
+            interfaces: HikvisionTamperAlert.deviceInterfaces,
+            type: ScryptedDeviceType.Switch
+        });
+
+    }
+
+    private async cameraMetaToAux (nativeId: string, camera: HikvisionCameraDoorbell)
+    {
+        const user = camera.storage.getItem ('username');
+        const pass = camera.storage.getItem ('password');
+        const aux = await this.getDevice (nativeId) as Settings;
+        aux.putSetting ('user', user);
+        aux.putSetting ('pass', pass);
+        aux.putSetting ('ip', camera.getIPAddress());
+        aux.putSetting ('port', camera.getHttpPort());
+        aux.putSetting (HikvisionDoorbellProvider.CAMERA_NATIVE_ID_KEY, camera.nativeId);
+    }
+
+    private async removingAuxNotify (nativeId: string)
+    {
+        const state = deviceManager.getDeviceState (nativeId);
+        if (state?.nativeId === nativeId) {
+            return deviceManager.onDeviceRemoved (nativeId)
+        }
     }
 
     override async getCreateDeviceSettings(): Promise<Setting[]> {
@@ -813,18 +920,33 @@ export class HikvisionDoorbellProvider extends RtspProvider
     private lockIdFrom (cameraNativeId: string): string {
         return `${HikvisionDoorbellProvider.LOCK_DEVICE_PREFIX}${cameraNativeId}`
     }
-
-    private cameraIdFrom (lockNativeId: string): string {
-        return lockNativeId.substring (HikvisionDoorbellProvider.LOCK_DEVICE_PREFIX.length);
+    
+    private alertIdFrom (cameraNativeId: string): string {
+        return `${HikvisionDoorbellProvider.ALERT_DEVICE_PREFIX}${cameraNativeId}`
     }
 
     private isLockId (nativeId: string):boolean {
         return nativeId.startsWith (HikvisionDoorbellProvider.LOCK_DEVICE_PREFIX);
     }
 
-    private getCameraDeviceForLockId (lockNativeId): HikvisionCameraDoorbell
+    private isAlertId (nativeId: string):boolean {
+        return nativeId.startsWith (HikvisionDoorbellProvider.ALERT_DEVICE_PREFIX);
+    }
+
+    private cameraIdFrom (nativeId: string): string 
     {
-        const cameraId = this.cameraIdFrom (lockNativeId);
+        if (this.isLockId (nativeId)) {
+            return nativeId.substring (HikvisionDoorbellProvider.LOCK_DEVICE_PREFIX.length);
+        }
+        if (this.isAlertId (nativeId)) {
+            return nativeId.substring (HikvisionDoorbellProvider.ALERT_DEVICE_PREFIX.length);
+        }
+        return nativeId;
+    }
+
+    private getCameraDeviceFor (nativeId): HikvisionCameraDoorbell
+    {
+        const cameraId = this.cameraIdFrom (nativeId);
         const state = deviceManager.getDeviceState (cameraId);
         if (state?.nativeId === cameraId) {
             return this.devices?.get (cameraId);

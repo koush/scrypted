@@ -1,37 +1,40 @@
-import sdk, { ScryptedDeviceBase, SettingValue, ScryptedInterface, Setting, Settings, Lock, LockState, Readme } from "@scrypted/sdk";
-import { HikvisionDoorbellAPI } from "./doorbell-api";
+import sdk, { ScryptedDeviceBase, SettingValue, ScryptedInterface, Setting, Settings, Readme, OnOff } from "@scrypted/sdk";
 import { HikvisionDoorbellProvider } from "./main";
 import * as fs from 'fs/promises';
 import { join } from 'path';
+import { parseBooleans } from "xml2js/lib/processors";
 
 const { deviceManager } = sdk;
 
-export class HikvisionLock extends ScryptedDeviceBase implements Lock, Settings, Readme {
+export class HikvisionTamperAlert extends ScryptedDeviceBase implements OnOff, Settings, Readme {
 
     // timeout: NodeJS.Timeout;
 
-    private provider: HikvisionDoorbellProvider;
+    private static ONOFF_KEY: string = "onoff";
 
-    constructor(nativeId: string, provider: HikvisionDoorbellProvider) {
+    constructor(nativeId: string) {
         super (nativeId);
 
-        this.lockState = this.lockState || LockState.Unlocked;
-        this.provider = provider;
-        
-        // provider.updateLock (nativeId, this.name);
+        this.on = parseBooleans (this.storage.getItem (HikvisionTamperAlert.ONOFF_KEY));
     }
 
     async getReadmeMarkdown(): Promise<string> 
     {
-        const fileName = join (process.cwd(), 'LOCK_README.md');
+        const fileName = join (process.cwd(), 'ALERT_README.md');
         return fs.readFile (fileName, 'utf-8');
     }
 
-    lock(): Promise<void> {
-        return this.getClient().closeDoor();
+    turnOff(): Promise<void> 
+    {
+        this.on = false;
+        this.storage.setItem(HikvisionTamperAlert.ONOFF_KEY, 'false');
+        return;
     }
-    unlock(): Promise<void> {
-        return this.getClient().openDoor();
+    turnOn(): Promise<void> 
+    {
+        this.on = true;
+        this.storage.setItem(HikvisionTamperAlert.ONOFF_KEY, 'true');
+        return;
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -60,18 +63,8 @@ export class HikvisionLock extends ScryptedDeviceBase implements Lock, Settings,
         this.storage.setItem(key, value.toString());
     }
 
-    getClient(): HikvisionDoorbellAPI
-    {
-        const ip = this.storage.getItem ('ip');
-        const port = this.storage.getItem ('port');
-        const user = this.storage.getItem ('user');
-        const pass = this.storage.getItem ('pass');
-
-        return this.provider.createSharedClient(ip, port, user, pass, this.console, this.storage);
-    }
-
     static deviceInterfaces: string[] = [
-        ScryptedInterface.Lock,
+        ScryptedInterface.OnOff,
         ScryptedInterface.Settings,
         ScryptedInterface.Readme
     ];
