@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import os
 import re
+import traceback
 import urllib.request
 from typing import Any, List, Tuple
 
@@ -12,44 +12,9 @@ from PIL import Image
 from scrypted_sdk.types import (ObjectDetectionResult, ObjectDetectionSession,
                                 ObjectsDetected, Setting)
 
+import common.colors
 from detect import DetectPlugin
-import traceback
 
-from .rectangle import (Rectangle, combine_rect, from_bounding_box,
-                        intersect_area, intersect_rect, to_bounding_box)
-
-
-# vips is already multithreaded, but needs to be kicked off the python asyncio thread.
-toThreadExecutor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="image")
-
-async def to_thread(f):
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(toThreadExecutor, f)
-
-async def ensureRGBData(data: bytes, size: Tuple[int, int], format: str):
-    if format == 'rgb':
-        return Image.frombuffer('RGB', size, data)
-
-    def convert():
-        rgba = Image.frombuffer('RGBA', size, data)
-        try:
-            return rgba.convert('RGB')
-        finally:
-            rgba.close()
-    return await to_thread(convert)
-
-async def ensureRGBAData(data: bytes, size: Tuple[int, int], format: str):
-    if format == 'rgba':
-        return Image.frombuffer('RGBA', size, data)
-
-    # this path should never be possible as all the image sources should be capable of rgba.
-    def convert():
-        rgb = Image.frombuffer('RGB', size, data)
-        try:
-            return rgb.convert('RGBA')
-        finally:
-            rgb.close()
-    return await to_thread(convert)
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -80,15 +45,34 @@ class PredictPlugin(DetectPlugin):
         loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
 
     def downloadFile(self, url: str, filename: str):
-        filesPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'files')
-        fullpath = os.path.join(filesPath, filename)
-        if os.path.isfile(fullpath):
+        try:
+            filesPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'files')
+            fullpath = os.path.join(filesPath, filename)
+            if os.path.isfile(fullpath):
+                return fullpath
+            tmp = fullpath + '.tmp'
+            print("Creating directory for", tmp)
+            os.makedirs(os.path.dirname(fullpath), exist_ok=True)
+            print("Downloading", url)
+            response = urllib.request.urlopen(url)
+            if response.getcode() < 200 or response.getcode() >= 300:
+                raise Exception(f"Error downloading")
+            read = 0
+            with open(tmp, "wb") as f:
+                while True:
+                    data = response.read(1024 * 1024)
+                    if not data:
+                        break
+                    read += len(data)
+                    print("Downloaded", read, "bytes")
+                    f.write(data)
+            os.rename(tmp, fullpath)
             return fullpath
-        os.makedirs(os.path.dirname(fullpath), exist_ok=True)
-        tmp = fullpath + '.tmp'
-        urllib.request.urlretrieve(url, tmp)
-        os.rename(tmp, fullpath)
-        return fullpath
+        except:
+            print("Error downloading", url)
+            import traceback
+            traceback.print_exc()
+            raise
 
     def getClasses(self) -> list[str]:
         return list(self.labels.values())
@@ -196,9 +180,9 @@ class PredictPlugin(DetectPlugin):
         })
 
         if self.get_input_format() == 'rgb':
-            data = await ensureRGBData(b, (w, h), format)
+            data = await common.colors.ensureRGBData(b, (w, h), format)
         elif self.get_input_format() == 'rgba':
-            data = await ensureRGBAData(b, (w, h), format)
+            data = await common.colors.ensureRGBAData(b, (w, h), format)
 
         try:
             ret = await self.safe_detect_once(data, settings, (iw, ih), cvss)

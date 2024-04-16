@@ -14,7 +14,8 @@ from scrypted_sdk import Setting, SettingValue
 
 from common import yolo
 from coreml.recognition import CoreMLRecognition
-from predict import Prediction, PredictPlugin, Rectangle
+from predict import Prediction, PredictPlugin
+from predict.rectangle import Rectangle
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "CoreML-Predict")
 
@@ -27,6 +28,7 @@ availableModels = [
     "ssdlite_mobilenet_v2",
     "yolov4-tiny",
 ]
+
 
 def parse_label_contents(contents: str):
     lines = contents.split(",")

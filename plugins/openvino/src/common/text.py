@@ -1,17 +1,20 @@
 from PIL import Image, ImageOps
 from scrypted_sdk import (
-    Setting,
-    SettingValue,
-    ObjectDetectionSession,
-    ObjectsDetected,
     ObjectDetectionResult,
 )
 import scrypted_sdk
 import numpy as np
 from common.softmax import softmax
+from common.colors import ensureRGBData
+import math
 
 async def crop_text(d: ObjectDetectionResult, image: scrypted_sdk.Image, width: int, height: int):
     l, t, w, h = d["boundingBox"]
+    l = math.floor(l)
+    t = math.floor(t)
+    w = math.floor(w)
+    h = math.floor(h)
+    format = image.format or 'rgb'
     cropped = await image.toBuffer(
         {
             "crop": {
@@ -20,15 +23,13 @@ async def crop_text(d: ObjectDetectionResult, image: scrypted_sdk.Image, width: 
                 "width": w,
                 "height": h,
             },
-            "resize": {
-                "width": width,
-                "height": height,
-            },
-            "format": "gray",
+            "format": format,
         }
     )
-    pilImage = Image.frombuffer("L", (width, height), cropped)
-    return pilImage
+    pilImage = await ensureRGBData(cropped, (w, h), format)
+    resized = pilImage.resize((width, height), resample=Image.LANCZOS).convert("L")
+    pilImage.close()
+    return resized
 
 async def prepare_text_result(d: ObjectDetectionResult, image: scrypted_sdk.Image):
     new_height = 64

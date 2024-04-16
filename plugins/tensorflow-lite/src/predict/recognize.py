@@ -38,7 +38,7 @@ def cosine_similarity(vector_a, vector_b):
     return similarity
 
 
-predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Recognize")
+predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "Recognize")
 
 class RecognizeDetection(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -136,6 +136,7 @@ class RecognizeDetection(PredictPlugin):
 
     async def setLabel(self, d: ObjectDetectionResult, image: scrypted_sdk.Image):
         try:
+
             image_tensor = await prepare_text_result(d, image)
             preds = await asyncio.get_event_loop().run_in_executor(
                 predictExecutor,

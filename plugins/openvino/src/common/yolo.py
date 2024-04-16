@@ -1,8 +1,8 @@
-import sys
 from math import exp
 import numpy as np
 
-from predict import Prediction, Rectangle
+from predict import Prediction
+from predict.rectangle import Rectangle
 
 defaultThreshold = .2
 

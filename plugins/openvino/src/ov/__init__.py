@@ -14,11 +14,12 @@ from scrypted_sdk.types import Setting
 import concurrent.futures
 
 import common.yolo as yolo
-from predict import Prediction, PredictPlugin, Rectangle
+from predict import Prediction, PredictPlugin
+from predict.rectangle import Rectangle
 
 from .recognition import OpenVINORecognition
 
-predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "OpenVINO-Predict")
+predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Predict")
 
 availableModels = [
     "Default",
@@ -228,35 +229,15 @@ class OpenVINOPlugin(
         return [self.model_dim, self.model_dim]
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        async def predict():
+        def predict(input_tensor):
             infer_request = self.compiled_model.create_infer_request()
-            # the input_tensor can be created with the shared_memory=True parameter,
-            # but that seems to cause issues on some platforms.
-            if self.scrypted_yolo:
-                im = np.stack([input])
-                im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
-                im = im.astype(np.float32) / 255.0
-                im = np.ascontiguousarray(im)  # contiguous
-                im = ov.Tensor(array=im)
-                input_tensor = im
-            elif self.yolo:
-                input_tensor = ov.Tensor(
-                    array=np.expand_dims(np.array(input), axis=0).astype(np.float32)
-                )
-            else:
-                input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0))
-            # Set input tensor for model with one input
             infer_request.set_input_tensor(input_tensor)
-            infer_request.start_async()
-            # todo: use the inference queue provided by openvino
-            await asyncio.get_event_loop().run_in_executor(
-                predictExecutor, lambda: infer_request.wait()
-            )
+            output_tensors = infer_request.infer()
 
             objs = []
 
             if self.scrypted_yolo:
-                objs = yolo.parse_yolov9(infer_request.output_tensors[0].data[0])
+                objs = yolo.parse_yolov9(output_tensors[0][0])
                 return objs
 
             if self.yolo:
@@ -308,8 +289,27 @@ class OpenVINOPlugin(
 
             return objs
 
+        # the input_tensor can be created with the shared_memory=True parameter,
+        # but that seems to cause issues on some platforms.
+        if self.scrypted_yolo:
+            im = np.stack([input])
+            im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+            im = im.astype(np.float32) / 255.0
+            im = np.ascontiguousarray(im)  # contiguous
+            im = ov.Tensor(array=im)
+            input_tensor = im
+        elif self.yolo:
+            input_tensor = ov.Tensor(
+                array=np.expand_dims(np.array(input), axis=0).astype(np.float32)
+            )
+        else:
+            input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0))
+
         try:
-            objs = await predict()
+            objs = await asyncio.get_event_loop().run_in_executor(
+                predictExecutor, lambda: predict(input_tensor)
+            )
+
         except:
             import traceback
 
