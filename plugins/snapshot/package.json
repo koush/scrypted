@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/snapshot",
-   "version": "0.2.48",
+   "version": "0.2.50",
    "description": "Snapshot Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
