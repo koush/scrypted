@@ -489,7 +489,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         }
     }
     else {
-        console.log('bypassing ffmpeg, perfect codecs');
+        // console.log('bypassing ffmpeg, perfect codecs');
         sdpDeferred.resolve(rtspSdp);
     }
 
