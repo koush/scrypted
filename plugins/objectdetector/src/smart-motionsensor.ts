@@ -44,6 +44,18 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             type: 'number',
             defaultValue: 0.7,
         },
+        requireDetectionThumbnail: {
+            title: 'Require Detections with Images',
+            description: 'When enabled, this sensor will ignore detections results that do not have images.',
+            type: 'boolean',
+            defaultValue: false,
+        },
+        requireScryptedNvrDetections: {
+            title: 'Require Scrypted Detections',
+            description: 'When enabled, this sensor will ignore onboard camera detections.',
+            type: 'boolean',
+            defaultValue: false,
+        },
         labels: {
             group: 'Recognition',
             title: 'Labels',
@@ -58,18 +70,6 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             description: 'The maximum edit distance between the detected label and the desired label. Ie, a distance of 1 will match "abcde" to "abcbe" or "abcd".',
             type: 'number',
             defaultValue: 2,
-        },
-        requireDetectionThumbnail: {
-            title: 'Require Detections with Images',
-            description: 'When enabled, this sensor will ignore detections results that do not have images.',
-            type: 'boolean',
-            defaultValue: false,
-        },
-        requireScryptedNvrDetections: {
-            title: 'Require Scrypted Detections',
-            description: 'When enabled, this sensor will ignore onboard camera detections.',
-            type: 'boolean',
-            defaultValue: false,
         },
     });
 
