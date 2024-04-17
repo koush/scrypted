@@ -44,8 +44,8 @@ class RecognizeDetection(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
-        self.inputheight = 320
-        self.inputwidth = 320
+        self.inputheight = 640
+        self.inputwidth = 640
 
         self.labels = {
             0: "face",
@@ -55,7 +55,7 @@ class RecognizeDetection(PredictPlugin):
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.7
 
-        self.detectModel = self.downloadModel("scrypted_yolov9c_flt_320")
+        self.detectModel = self.downloadModel("scrypted_yolov9c_flt")
         self.textModel = self.downloadModel("vgg_english_g2")
         self.faceModel = self.downloadModel("inception_resnet_v1")
 

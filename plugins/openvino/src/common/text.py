@@ -46,6 +46,11 @@ async def prepare_text_result(d: ObjectDetectionResult, image: scrypted_sdk.Imag
     image_array = np.array(textImage)
     image_array = image_array.reshape(textImage.height, textImage.width, 1)
     image_tensor = image_array.transpose((2, 0, 1)) / 255
+
+    # test normalize contrast
+    # image_tensor = (image_tensor - np.min(image_tensor)) / (np.max(image_tensor) - np.min(image_tensor))
+
+
     image_tensor = (image_tensor - 0.5) / 0.5
 
     image_tensor = np.expand_dims(image_tensor, axis=0)
