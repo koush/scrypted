@@ -45,13 +45,15 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             defaultValue: 0.7,
         },
         labels: {
+            group: 'Recognition',
             title: 'Labels',
-            description: 'The labels that will trigger this smart motion sensor.',
+            description: 'The labels (license numbers, names) that will trigger this smart motion sensor.',
             multiple: true,
             combobox: true,
             choices: [],
         },
         labelDistance: {
+            group: 'Recognition',
             title: 'Label Distance',
             description: 'The maximum edit distance between the detected label and the desired label. Ie, a distance of 1 will match "abcde" to "abcbe" or "abcd".',
             type: 'number',
@@ -198,11 +200,10 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
                         this.console.warn('Camera does not provide Zones in detection event. Zone filter will not be applied.');
                     }
                 }
-                if (d.movement && !d.movement.moving)
-                    return false;
 
+                // when not searching for a label, validate the object is moving.
                 if (!labels?.length)
-                    return true;
+                    return !d.movement || d.movement.moving;
 
                 if (!d.label)
                     return false;
@@ -215,6 +216,7 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
                         continue;
                     if (levenshteinDistance(label, du) <= labelDistance)
                         return true;
+                    this.console.log('No label does not match.', label, du);
                 }
 
                 return false;
