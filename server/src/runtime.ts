@@ -631,22 +631,29 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     setupPluginHostAutoRestart(pluginHost: PluginHost) {
-        const restart = () => {
-            if (pluginHost.killed)
-                return;
-            pluginHost.kill();
-            const timeout = 60000;
-            console.error(`plugin unexpectedly exited, restarting in ${timeout}ms`, pluginHost.pluginId);
-            setTimeout(async () => {
-                const existing = this.plugins[pluginHost.pluginId];
-                if (existing !== pluginHost) {
-                    console.log('scheduled plugin restart cancelled, plugin was restarted by user', pluginHost.pluginId);
-                    return;
-                }
+        const logger = this.getDeviceLogger(this.findPluginDevice(pluginHost.pluginId));
 
+        let timeout: NodeJS.Timeout;
+
+        const restart = () => {
+            if (timeout)
+                return;
+
+            const t = 60000;
+            pluginHost.kill();
+            logger.log('e', `plugin ${pluginHost.pluginId} unexpectedly exited, restarting in ${t}ms`);
+
+            timeout = setTimeout(async () => {
+                timeout = undefined;
                 const plugin = await this.datastore.tryGet(Plugin, pluginHost.pluginId);
                 if (!plugin) {
-                    console.log('scheduled plugin restart cancelled, plugin no longer exists', pluginHost.pluginId);
+                    logger.log('w', `scheduled plugin restart cancelled, plugin no longer exists ${pluginHost.pluginId}`);
+                    return;
+                }
+                
+                const existing = this.plugins[pluginHost.pluginId];
+                if (existing !== pluginHost) {
+                    logger.log('w', `scheduled plugin restart cancelled, plugin was restarted by user ${pluginHost.pluginId}`);
                     return;
                 }
 
@@ -654,10 +661,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     this.runPlugin(plugin);
                 }
                 catch (e) {
-                    console.error('error restarting plugin', plugin._id, e);
+                    logger.log('e', `error restarting plugin ${pluginHost.pluginId}`);
+                    logger.log('e', e.toStrin());
+                    restart();
                 }
-            }, timeout);
+            }, t);
         };
+
         pluginHost.worker.once('error', restart);
         pluginHost.worker.once('exit', restart);
         pluginHost.worker.once('close', restart);
