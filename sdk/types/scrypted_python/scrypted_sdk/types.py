@@ -644,6 +644,7 @@ class ObjectDetectionModel(TypedDict):
 
 class ObjectDetectionSession(TypedDict):
 
+    batch: float
     settings: Any
     sourceId: str
     zones: list[ObjectDetectionZone]

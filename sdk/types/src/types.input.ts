@@ -1408,6 +1408,10 @@ export interface ObjectDetectionGeneratorSession {
   sourceId?: string;
 }
 export interface ObjectDetectionSession extends ObjectDetectionGeneratorSession {
+  /**
+   * Denotes that this is the first sample in a batch of samples.
+   */
+  batch?: number;
 }
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;

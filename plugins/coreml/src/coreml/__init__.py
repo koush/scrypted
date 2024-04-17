@@ -5,7 +5,7 @@ import asyncio
 import concurrent.futures
 import os
 import re
-from typing import Any, Tuple
+from typing import Any, List, Tuple
 
 import coremltools as ct
 import scrypted_sdk
@@ -17,7 +17,7 @@ from coreml.recognition import CoreMLRecognition
 from predict import Prediction, PredictPlugin
 from predict.rectangle import Rectangle
 
-predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "CoreML-Predict")
+predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "CoreML-Predict")
 
 availableModels = [
     "Default",
@@ -169,15 +169,19 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
 
     def get_input_size(self) -> Tuple[float, float]:
         return (self.inputwidth, self.inputheight)
+    
+    async def detect_batch(self, inputs: List[Any]) -> List[Any]:
+        out_dicts = await asyncio.get_event_loop().run_in_executor(
+            predictExecutor, lambda: self.model.predict(inputs)
+        )
+        return out_dicts
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         objs = []
 
         # run in executor if this is the plugin loop
         if self.yolo:
-            out_dict = await asyncio.get_event_loop().run_in_executor(
-                predictExecutor, lambda: self.model.predict({self.input_name: input})
-            )
+            out_dict = await self.queue_batch({self.input_name: input})
 
             if self.scrypted_yolo:
                 results = list(out_dict.values())[0][0]

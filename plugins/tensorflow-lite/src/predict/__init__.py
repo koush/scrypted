@@ -43,6 +43,9 @@ class PredictPlugin(DetectPlugin):
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
         loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+        
+        self.batch: List[Tuple[Any, asyncio.Future]] = []
+        self.batching = 0
 
     def downloadFile(self, url: str, filename: str):
         try:
@@ -137,6 +140,25 @@ class PredictPlugin(DetectPlugin):
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         pass
 
+    async def detect_batch(self, inputs: List[Any]) -> List[Any]:
+        pass
+
+    async def queue_batch(self, input: Any) -> List[Any]:
+        future = asyncio.Future(loop = asyncio.get_event_loop())
+        self.batch.append((input, future))
+        if self.batching:
+            self.batching = self.batching - 1
+            if self.batching:
+                return await future
+        batch = self.batch
+        self.batch = []
+        if len(batch):
+            inputs = [x[0] for x in batch]
+            results = await self.detect_batch(inputs)
+            for i, result in enumerate(results):
+                batch[i][1].set_result(result)
+        return await future
+
     async def safe_detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         try:
             f = self.detect_once(input, settings, src_size, cvss)
@@ -151,6 +173,9 @@ class PredictPlugin(DetectPlugin):
 
     async def run_detection_image(self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession) -> ObjectsDetected:
         settings = detection_session and detection_session.get('settings')
+        batch = (detection_session and detection_session.get('batch')) or 0
+        self.batching += batch
+
         iw, ih = image.width, image.height
         w, h = self.get_input_size()
 
