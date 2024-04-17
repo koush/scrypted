@@ -1,6 +1,7 @@
 import sdk, { Camera, EventListenerRegister, MediaObject, MotionSensor, ObjectDetector, ObjectsDetected, Readme, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings } from "@scrypted/sdk";
 import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
 import type { ObjectDetectionPlugin } from "./main";
+import { levenshteinDistance } from "./edit-distance";
 
 export const SMART_MOTIONSENSOR_PREFIX = 'smart-motionsensor-';
 
@@ -43,8 +44,21 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             type: 'number',
             defaultValue: 0.7,
         },
+        labels: {
+            title: 'Labels',
+            description: 'The labels that will trigger this smart motion sensor.',
+            multiple: true,
+            combobox: true,
+            choices: [],
+        },
+        labelDistance: {
+            title: 'Label Distance',
+            description: 'The maximum edit distance between the detected label and the desired label. Ie, a distance of 1 will match "abcde" to "abcbe" or "abcd".',
+            type: 'number',
+            defaultValue: 2,
+        },
         requireDetectionThumbnail: {
-            title: 'Rquire Detections with Images',
+            title: 'Require Detections with Images',
             description: 'When enabled, this sensor will ignore detections results that do not have images.',
             type: 'boolean',
             defaultValue: false,
@@ -157,6 +171,9 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             if (this.storageSettings.values.requireDetectionThumbnail && !detected.detectionId)
                 return false;
 
+            let { labels, labelDistance } = this.storageSettings.values;
+            labels = labels?.map((l: string) => l.toUpperCase());
+
             const match = detected.detections?.find(d => {
                 if (this.storageSettings.values.requireScryptedNvrDetections && !d.boundingBox)
                     return false;
@@ -181,10 +198,28 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
                         this.console.warn('Camera does not provide Zones in detection event. Zone filter will not be applied.');
                     }
                 }
-                if (!d.movement)
+                if (d.movement && !d.movement.moving)
+                    return false;
+
+                if (!labels?.length)
                     return true;
-                return d.movement.moving;
-            })
+
+                if (!d.label)
+                    return false;
+
+                const du = d.label.toUpperCase();
+                for (const label of labels) {
+                    if (label === du)
+                        return true;
+                    if (!labelDistance)
+                        continue;
+                    if (levenshteinDistance(label, du) <= labelDistance)
+                        return true;
+                }
+
+                return false;
+            });
+
             if (match) {
                 if (!this.motionDetected)
                     console.log('Smart Motion Sensor triggered on', match);
