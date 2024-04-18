@@ -18,7 +18,7 @@ const { systemManager, deviceManager, endpointManager } = sdk;
 export function getAddresses() {
     const addresses: string[] = [];
     for (const [iface, nif] of Object.entries(os.networkInterfaces())) {
-        if (iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')) {
+        if (iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan') || iface.startsWith('net')) {
             addresses.push(iface);
             addresses.push(...nif.map(addr => addr.address));
         }
