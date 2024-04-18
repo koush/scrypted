@@ -1,3 +1,4 @@
+// visual similarity
 const similarCharacters = [
   ['0', 'O', 'D'],
   ['1', 'I'],
@@ -32,6 +33,12 @@ function isSameCharacter(c1: string, c2: string) {
 }
 
 export function levenshteinDistance(str1: string, str2: string): number {
+  // todo: handle lower/uppercase similarity in similarCharacters above.
+  // ie, b is visualy similar to 6, but does not really look like B.
+  // others include e and C. v, u and Y. l, i, 1.
+  str1 = str1.toUpperCase();
+  str2 = str2.toUpperCase();
+
   const len1 = str1.length;
   const len2 = str2.length;
 

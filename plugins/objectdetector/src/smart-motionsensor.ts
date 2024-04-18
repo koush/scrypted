@@ -173,8 +173,7 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             if (this.storageSettings.values.requireDetectionThumbnail && !detected.detectionId)
                 return false;
 
-            let { labels, labelDistance } = this.storageSettings.values;
-            labels = labels?.map((l: string) => l.toUpperCase());
+            const { labels, labelDistance } = this.storageSettings.values;
 
             const match = detected.detections?.find(d => {
                 if (this.storageSettings.values.requireScryptedNvrDetections && !d.boundingBox)
@@ -208,15 +207,14 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
                 if (!d.label)
                     return false;
 
-                const du = d.label.toUpperCase();
                 for (const label of labels) {
-                    if (label === du)
+                    if (label === d.label)
                         return true;
                     if (!labelDistance)
                         continue;
-                    if (levenshteinDistance(label, du) <= labelDistance)
+                    if (levenshteinDistance(label, d.label) <= labelDistance)
                         return true;
-                    this.console.log('No label does not match.', label, du);
+                    this.console.log('No label does not match.', label, d.label);
                 }
 
                 return false;
