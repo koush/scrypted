@@ -188,6 +188,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     detections = payload.smartDetectTypes.map(type => ({
                         className: type,
                         score: payload.score,
+                        label: (payload as any).metadata?.[type]?.name,
                     }));
                 }
                 else {
