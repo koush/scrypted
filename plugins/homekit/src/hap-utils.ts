@@ -66,7 +66,7 @@ export function createHAPUsername() {
 }
 
 export function getAddresses() {
-    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
+    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan') || iface.startsWith('net')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
     return addresses;
 }
 

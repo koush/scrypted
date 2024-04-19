@@ -1,11 +1,11 @@
 name: Build changed plugins
 
 on:
-  push:
-    branches: ["main"]
-    paths: ["plugins/**"]
-  pull_request:
-    paths: ["plugins/**"]
+#   push:
+#     branches: ["main"]
+#     paths: ["plugins/**"]
+#   pull_request:
+#     paths: ["plugins/**"]
   workflow_dispatch:
 
 jobs:
