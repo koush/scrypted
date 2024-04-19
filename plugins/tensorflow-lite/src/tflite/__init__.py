@@ -35,6 +35,7 @@ availableModels = [
     "tf2_ssd_mobilenet_v2_coco17_ptq",
     "ssdlite_mobiledet_coco_qat_postprocess",
     "scrypted_yolov6n_320",
+    "scrypted_yolov6s_320",
     "scrypted_yolov9c_320",
     "scrypted_yolov8n_320",
     "efficientdet_lite0_320_ptq",
