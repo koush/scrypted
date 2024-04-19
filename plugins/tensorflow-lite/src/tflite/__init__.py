@@ -5,7 +5,7 @@ import json
 from PIL import Image
 from pycoral.adapters import detect
 
-from .common import *
+from .tflite_common import *
 
 loaded_py_coral = False
 try:
@@ -26,7 +26,7 @@ import scrypted_sdk
 import tflite_runtime.interpreter as tflite
 from scrypted_sdk.types import Setting, SettingValue
 
-import yolo
+from common import yolo
 from predict import PredictPlugin
 
 availableModels = [
@@ -34,7 +34,9 @@ availableModels = [
     "ssd_mobilenet_v2_coco_quant_postprocess",
     "tf2_ssd_mobilenet_v2_coco17_ptq",
     "ssdlite_mobiledet_coco_qat_postprocess",
+    "scrypted_yolov6n_320",
     "scrypted_yolov9c_320",
+    "scrypted_yolov8n_320",
     "efficientdet_lite0_320_ptq",
     "efficientdet_lite1_384_ptq",
     "efficientdet_lite2_448_ptq",
@@ -243,7 +245,7 @@ class TensorFlowLitePlugin(
                         # this code path is unused.
                         objs = yolo.parse_yolov9(x[0], scale=lambda v: v * input_scale)
                 else:
-                    common.set_input(interpreter, input)
+                    tflite_common.set_input(interpreter, input)
                     interpreter.invoke()
                     objs = detect.get_objects(
                         interpreter, score_threshold=0.2, image_scale=(1, 1)
