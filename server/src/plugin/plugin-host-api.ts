@@ -26,14 +26,13 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     ];
 
     restartDebounced = debounce(async () => {
+        const plugin = await this.scrypted.datastore.tryGet(Plugin, this.pluginId);
         const host = this.scrypted.plugins[this.pluginId];
         if (host?.api !== this) {
             const logger = await this.getLogger(undefined);
             logger.log('w', 'plugin restart was requested, but a different instance was found. restart cancelled.');
             return;
         }
-
-        const plugin = await this.scrypted.datastore.tryGet(Plugin, this.pluginId);
         this.scrypted.runPlugin(plugin);
     }, 15000);
 
