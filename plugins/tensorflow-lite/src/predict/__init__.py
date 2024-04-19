@@ -47,6 +47,7 @@ class PredictPlugin(DetectPlugin):
         
         self.batch: List[Tuple[Any, asyncio.Future]] = []
         self.batching = 0
+        self.batch_flush = None
 
     def downloadFile(self, url: str, filename: str):
         try:
@@ -144,20 +145,36 @@ class PredictPlugin(DetectPlugin):
     async def detect_batch(self, inputs: List[Any]) -> List[Any]:
         pass
 
+    async def run_batch(self):
+        batch = self.batch
+        self.batch = []
+        self.batching = 0
+
+        if len(batch):
+            inputs = [x[0] for x in batch]
+            try:
+                results = await self.detect_batch(inputs)
+                for i, result in enumerate(results):
+                    batch[i][1].set_result(result)
+            except Exception as e:
+                for i, result in enumerate(results):
+                    batch[i][1].set_exception(e)
+
+    async def flush_batch(self):
+        self.batch_flush = None
+        await self.run_batch()
+
     async def queue_batch(self, input: Any) -> List[Any]:
         future = asyncio.Future(loop = asyncio.get_event_loop())
         self.batch.append((input, future))
         if self.batching:
             self.batching = self.batching - 1
             if self.batching:
+                # if there is any sort of error or backlog, .
+                if not self.batch_flush:
+                    self.batch_flush = self.loop.call_later(.5, lambda: asyncio.ensure_future(self.flush_batch()))
                 return await future
-        batch = self.batch
-        self.batch = []
-        if len(batch):
-            inputs = [x[0] for x in batch]
-            results = await self.detect_batch(inputs)
-            for i, result in enumerate(results):
-                batch[i][1].set_result(result)
+        await self.run_batch()
         return await future
 
     async def safe_detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
