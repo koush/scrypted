@@ -162,7 +162,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   getCurrentSettings() {
     const settings = this.model.settings;
     if (!settings)
-      return;
+      return { id : this.id };
 
     const ret: { [key: string]: any } = {};
     for (const setting of settings) {
@@ -183,7 +183,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (this.hasMotionType)
       ret['motionAsObjects'] = true;
 
-    return ret;
+    return {
+      ...ret,
+      id: this.id,
+    };
   }
 
   maybeStartDetection() {
