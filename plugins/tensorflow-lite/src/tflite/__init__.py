@@ -47,6 +47,7 @@ availableModels = [
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
+    lines = [line for line in lines if line.strip()]
     ret = {}
     for row_number, content in enumerate(lines):
         pair = re.split(r"[:\s]+", content.strip(), maxsplit=1)

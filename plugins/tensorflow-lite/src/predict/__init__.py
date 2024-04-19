@@ -15,18 +15,6 @@ from scrypted_sdk.types import (ObjectDetectionResult, ObjectDetectionSession,
 import common.colors
 from detect import DetectPlugin
 
-
-def parse_label_contents(contents: str):
-    lines = contents.splitlines()
-    ret = {}
-    for row_number, content in enumerate(lines):
-        pair = re.split(r'[:\s]+', content.strip(), maxsplit=1)
-        if len(pair) == 2 and pair[0].strip().isdigit():
-            ret[int(pair[0])] = pair[1].strip()
-        else:
-            ret[row_number] = content.strip()
-    return ret
-
 class Prediction:
     def __init__(self, id: int, score: float, bbox: Tuple[float, float, float, float], embedding: str = None):
         self.id = id
