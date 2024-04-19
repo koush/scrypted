@@ -40,9 +40,10 @@ class PredictPlugin(DetectPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
-        # periodic restart because there seems to be leaks in tflite or coral API.
-        loop = asyncio.get_event_loop()
-        loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+        # periodic restart of main plugin because there seems to be leaks in tflite or coral API.
+        if not nativeId:
+            loop = asyncio.get_event_loop()
+            loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
         
         self.batch: List[Tuple[Any, asyncio.Future]] = []
         self.batching = 0
