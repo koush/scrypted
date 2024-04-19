@@ -913,9 +913,10 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
     let objectDetection = systemManager.getDeviceById<ObjectDetection>(this.id);
     const hasMotionType = this.model.classes.includes('motion');
     const group = hasMotionType ? 'Motion Detection' : 'Object Detection';
+    const model = await objectDetection.getDetectionModel({ id: mixinDeviceState.id });
     // const group = objectDetection.name.replace('Plugin', '').trim();
 
-    const ret = new ObjectDetectionMixin(this.plugin, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.model, group, hasMotionType);
+    const ret = new ObjectDetectionMixin(this.plugin, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, model, group, hasMotionType);
     this.currentMixins.add(ret);
     return ret;
   }
