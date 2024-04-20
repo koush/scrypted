@@ -650,7 +650,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     logger.log('w', `scheduled plugin restart cancelled, plugin no longer exists ${pluginHost.pluginId}`);
                     return;
                 }
-                
+
                 const existing = this.plugins[pluginHost.pluginId];
                 if (existing !== pluginHost) {
                     logger.log('w', `scheduled plugin restart cancelled, plugin was restarted by user ${pluginHost.pluginId}`);
