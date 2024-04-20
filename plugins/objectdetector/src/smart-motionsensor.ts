@@ -214,7 +214,7 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
                         continue;
                     if (levenshteinDistance(label, d.label) <= labelDistance)
                         return true;
-                    this.console.log('No label does not match.', label, d.label);
+                    this.console.log('Label does not match.', label, d.label);
                 }
 
                 return false;
