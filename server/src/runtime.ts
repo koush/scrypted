@@ -662,7 +662,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 }
                 catch (e) {
                     logger.log('e', `error restarting plugin ${pluginHost.pluginId}`);
-                    logger.log('e', e.toStrin());
+                    logger.log('e', e.toString());
                     restart();
                 }
             }, t);
