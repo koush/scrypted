@@ -1,1 +1,0 @@
-../all_models/saved_model.pb
