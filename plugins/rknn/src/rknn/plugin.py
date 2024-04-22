@@ -1,6 +1,8 @@
 import asyncio
+import concurrent.futures
 import os
 import platform
+import queue
 from typing import Any, Coroutine, List, Tuple
 import urllib.request
 
@@ -12,12 +14,10 @@ from predict import PredictPlugin, Prediction
 from predict.rectangle import Rectangle
 
 import scrypted_sdk
-from scrypted_sdk import MediaObject, ObjectDetectionSession, ObjectDetectionGeneratorSession, ObjectDetectionGeneratorResult, ObjectDetectionModel, ObjectsDetected, VideoFrame
+from scrypted_sdk import ScryptedDeviceBase, ObjectDetection, MediaObject, ObjectDetectionSession, ObjectDetectionGeneratorSession, ObjectDetectionGeneratorResult, ObjectDetectionModel, ObjectsDetected, VideoFrame
 
 # for Rockchip-optimized models, the postprocessing is slightly different from the original models
 from .optimized.yolo import post_process, IMG_SIZE, LABELS
-
-import time
 
 
 rknn_verbose = False
@@ -44,50 +44,52 @@ def ensure_compatibility():
         raise
 
 
-class RKNNInference:
-    model_path: str
+def thread_executor_main(model_path, core_num, core_mask, job_queue: queue.Queue):
+    rknn = RKNNLite(verbose=rknn_verbose)
+    ret = rknn.load_rknn(model_path)
+    if ret != 0:
+        raise RuntimeError('Failed to load model: {}'.format(ret))
+
+    ret = rknn.init_runtime(core_mask=core_mask)
+    if ret != 0:
+        raise RuntimeError('Failed to init runtime: {}'.format(ret))
+
+    print('RKNNLite runtime initialized on core {}'.format(core_num))
+
+    while True:
+        input_tensor, done_future = job_queue.get()
+
+        # check for shutdown
+        if input_tensor is None:
+            break
+
+        outputs = rknn.inference(inputs=[input_tensor])
+        done_future.set_result(outputs)
+
+
+class RKNNPlugin(PredictPlugin):
+    labels = LABELS
     rknn: RKNNLite
+    model_path: str
 
-    def __init__(self, model_path: str) -> None:
-        self.model_path = model_path
-        self.init_rknn()
+    def __init__(self, nativeId=None):
+        super().__init__(nativeId)
 
-    def init_rknn(self) -> None:
+        if not os.path.exists(lib_path):
+            print('Downloading librknnrt.so from {}'.format(lib_download))
+            urllib.request.urlretrieve(lib_download, lib_path)
+
+        self.model_path = self.downloadFile(model_download, os.path.basename(model_download))
+
+    def init_rknn(self, core_mask: int) -> None:
         self.rknn = RKNNLite(verbose=rknn_verbose)
         ret = self.rknn.load_rknn(self.model_path)
         if ret != 0:
             raise RuntimeError('Failed to load model: {}'.format(ret))
 
-        ret = self.rknn.init_runtime()
+        ret = self.rknn.init_runtime(core_mask=core_mask)
         if ret != 0:
             raise RuntimeError('Failed to init runtime: {}'.format(ret))
-
-    def inference(self, input_tensor: list) -> list:
-        start = time.time()
-        input_tensor = np.array(input_tensor).astype(np.int8)
-        print(f'input_tensor: {time.time() - start}')
-        start = time.time()
-        result = self.rknn.inference(inputs=[input_tensor])
-        print(f'inference: {time.time() - start}')
-        start = time.time()
-        for i in range(len(result)):
-            print(result[i].size)
-            result[i] = result[i].tolist()
-        print(f'to list: {time.time() - start}')
-        return result
-
-
-class RKNNDetector(PredictPlugin):
-    labels = LABELS
-    model_path: str
-    inference: RKNNInference
-
-    def __init__(self, inference: RKNNInference = None) -> None:
-        super().__init__()
-        asyncio.get_event_loop().create_task(self.async_init(inference))
-
-    async def async_init(self, inference: RKNNInference) -> None:
-        self.inference = await scrypted_sdk.sdk.connectRPCObject(inference)
 
     def get_input_details(self) -> Tuple[int]:
         return (IMG_SIZE[0], IMG_SIZE[1], 3)
@@ -96,12 +98,9 @@ class RKNNDetector(PredictPlugin):
         return IMG_SIZE
 
     async def detect_once(self, input: Image, settings: Any, src_size, cvss) -> Coroutine[Any, Any, Any]:
-        input_tensor = np.expand_dims(np.asarray(input), axis=0).tolist()
-        start = time.time()
-        outputs = await self.inference.inference(input_tensor)
-        print(f'inference: {time.time() - start}')
-        for i in range(len(outputs)):
-            outputs[i] = np.array(outputs[i]).astype(np.float32)
+        input_tensor = np.expand_dims(np.asarray(input), axis=0)
+
+        outputs = self.rknn.inference(inputs=[input_tensor])
         boxes, classes, scores = post_process(outputs)
 
         predictions: List[Prediction] = []
@@ -116,35 +115,29 @@ class RKNNDetector(PredictPlugin):
         return self.create_detection_result(predictions, src_size, cvss)
 
 
-class RKNNPlugin(PredictPlugin):
-    model_path: str
+class RKNNPluginProxy(ScryptedDeviceBase, ObjectDetection):
     executors: asyncio.Queue
-    num_forks: int = 8
-    inference: RKNNInference
 
     def __init__(self, nativeId=None) -> None:
         super().__init__(nativeId)
         ensure_compatibility()
 
-        if not os.path.exists(lib_path):
-            print('Downloading librknnrt.so from {}'.format(lib_download))
-            urllib.request.urlretrieve(lib_download, lib_path)
-
-        self.model_path = self.downloadFile(model_download, os.path.basename(model_download))
-
         self.executors = asyncio.Queue()
         asyncio.get_event_loop().create_task(self.async_init())
 
     async def async_init(self) -> None:
-        f = await scrypted_sdk.fork().result
-        self.inference = await f.get_inference(self.model_path)
+        npu_0 = await scrypted_sdk.fork().result
+        await npu_0.init_rknn(RKNNLite.NPU_CORE_0)
+        npu_1 = await scrypted_sdk.fork().result
+        await npu_1.init_rknn(RKNNLite.NPU_CORE_1)
+        npu_2 = await scrypted_sdk.fork().result
+        await npu_2.init_rknn(RKNNLite.NPU_CORE_2)
 
-        for _ in range(self.num_forks):
-            f = await scrypted_sdk.fork().result
-            self.executors.put_nowait(await f.get_detector(self.inference))
+        self.executors.put_nowait(npu_0)
+        self.executors.put_nowait(npu_1)
+        self.executors.put_nowait(npu_2)
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
-        start = time.time()
         executor = await self.executors.get()
         try:
             return await executor.detectObjects(mediaObject, session)
@@ -153,7 +146,6 @@ class RKNNPlugin(PredictPlugin):
             print('Requesting restart...')
             await scrypted_sdk.deviceManager.requestRestart()
         finally:
-            print(f'Elapsed: {time.time() - start}')
             self.executors.put_nowait(executor)
         pass
 
@@ -178,15 +170,3 @@ class RKNNPlugin(PredictPlugin):
             await scrypted_sdk.deviceManager.requestRestart()
         finally:
             self.executors.put_nowait(executor)
-
-
-class RKNNFork:
-    def get_inference(self, model_path: str) -> RKNNInference:
-        return RKNNInference(model_path)
-
-    def get_detector(self, inference: RKNNInference) -> RKNNDetector:
-        return RKNNDetector(inference)
-
-
-async def fork() -> RKNNFork:
-    return RKNNFork()
