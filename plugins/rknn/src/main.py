@@ -1,7 +1,6 @@
-from rknn import RKNNPlugin, RKNNPluginProxy
+from rknn import RKNNPlugin, fork as rknn_fork
 
-def create_scrypted_plugin() -> RKNNPluginProxy:
-    return RKNNPluginProxy()
-
-async def fork() -> RKNNPlugin:
+def create_scrypted_plugin() -> RKNNPlugin:
     return RKNNPlugin()
+
+fork = rknn_fork

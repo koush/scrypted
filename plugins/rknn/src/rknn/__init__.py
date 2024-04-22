@@ -1,1 +1,1 @@
-from .plugin import RKNNPlugin, RKNNPluginProxy
+from .plugin import RKNNDetector, RKNNPlugin, fork
