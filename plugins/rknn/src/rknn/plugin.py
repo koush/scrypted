@@ -53,8 +53,12 @@ class RKNNPlugin(PredictPlugin):
         self.rknn_runtimes = {}
 
         if not os.path.exists(lib_path):
-            print('Downloading librknnrt.so from {}'.format(lib_download))
-            urllib.request.urlretrieve(lib_download, lib_path)
+            installation = os.environ.get('SCRYPTED_INSTALL_ENVIRONMENT')
+            if installation in ('docker', 'lxc'):
+                print('Downloading librknnrt.so from {}'.format(lib_download))
+                urllib.request.urlretrieve(lib_download, lib_path)
+            else:
+                raise RuntimeError('librknnrt.so not found. Please download it from {} and place it at {}'.format(lib_download, lib_path))
 
         model_path = self.downloadFile(model_download, os.path.basename(model_download))
 
