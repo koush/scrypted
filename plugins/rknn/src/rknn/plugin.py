@@ -1,10 +1,6 @@
 import asyncio
-from concurrent.futures import Future
-from multiprocessing import shared_memory
 import os
 import platform
-import queue
-import threading
 from typing import Any, Coroutine, List, Tuple
 import urllib.request
 
@@ -19,7 +15,7 @@ import scrypted_sdk
 from scrypted_sdk import MediaObject, ObjectDetectionSession, ObjectDetectionGeneratorSession, ObjectDetectionGeneratorResult, ObjectDetectionModel, ObjectsDetected, VideoFrame
 
 # for Rockchip-optimized models, the postprocessing is slightly different from the original models
-from .optimized.yolo import post_process, IMG_SIZE, LABELS, create_shmem, INPUT_SHAPE, OUTPUT_SHAPES
+from .optimized.yolo import post_process, IMG_SIZE, LABELS
 
 import time
 
@@ -48,97 +44,50 @@ def ensure_compatibility():
         raise
 
 
-class SHMem:
-    def __init__(self, input_name, output_names):
-        self.input_name = input_name
-        self.output_names = output_names
-
-    async def get_input_name(self) -> str:
-        return self.input_name
-
-    async def get_output_names(self) -> List[str]:
-        return self.output_names
-
-
 class RKNNInference:
     model_path: str
-    q: queue.Queue
-    shmem_cache: dict
+    rknn: RKNNLite
 
     def __init__(self, model_path: str) -> None:
         self.model_path = model_path
-        self.q = queue.Queue()
-        self.shmem_cache = {}
+        self.init_rknn()
 
-        def thread_main(core_mask):
-            rknn = RKNNLite(verbose=rknn_verbose)
-            ret = rknn.load_rknn(self.model_path)
-            if ret != 0:
-                raise RuntimeError('Failed to load model: {}'.format(ret))
+    def init_rknn(self) -> None:
+        self.rknn = RKNNLite(verbose=rknn_verbose)
+        ret = self.rknn.load_rknn(self.model_path)
+        if ret != 0:
+            raise RuntimeError('Failed to load model: {}'.format(ret))
 
-            ret = rknn.init_runtime(core_mask=core_mask)
-            if ret != 0:
-                raise RuntimeError('Failed to init runtime: {}'.format(ret))
+        ret = self.rknn.init_runtime()
+        if ret != 0:
+            raise RuntimeError('Failed to init runtime: {}'.format(ret))
 
-            while True:
-                input_tensor, done_future = self.q.get()
-                result = rknn.inference(inputs=[input_tensor])
-                done_future.set_result(result)
-
-        threading.Thread(target=thread_main, args=(RKNNLite.NPU_CORE_0,)).start()
-        threading.Thread(target=thread_main, args=(RKNNLite.NPU_CORE_1,)).start()
-        threading.Thread(target=thread_main, args=(RKNNLite.NPU_CORE_2,)).start()
-
-    async def inference(self, shmem: SHMem) -> None:
-        try:
-            #start = time.time()
-            input_name = await shmem.get_input_name()
-            output_names = await shmem.get_output_names()
-
-            if self.shmem_cache.get(input_name) is None:
-                input_shmem = shared_memory.SharedMemory(name=input_name)
-                self.shmem_cache[input_name] = input_shmem
-            else:
-                input_shmem = self.shmem_cache[input_name]
-            input_tensor = np.ndarray(INPUT_SHAPE, dtype=np.int8, buffer=input_shmem.buf)
-            #print(f'input_tensor: {time.time() - start}')
-            #start = time.time()
-            done_future = Future()
-            self.q.put((input_tensor, done_future))
-            result = await asyncio.wrap_future(done_future)
-            #print(f'inference: {time.time() - start}')
-            #start = time.time()
-            for i in range(len(result)):
-                if self.shmem_cache.get(output_names[i]) is None:
-                    output_shmem = shared_memory.SharedMemory(name=output_names[i])
-                    self.shmem_cache[output_names[i]] = output_shmem
-                else:
-                    output_shmem = self.shmem_cache[output_names[i]]
-                output_tensor = np.ndarray(OUTPUT_SHAPES[i], dtype=np.float32, buffer=output_shmem.buf)
-                output_tensor[:] = result[i]
-            #print(f'to list: {time.time() - start}')
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            raise
+    def inference(self, input_tensor: list) -> list:
+        start = time.time()
+        input_tensor = np.array(input_tensor).astype(np.int8)
+        print(f'input_tensor: {time.time() - start}')
+        start = time.time()
+        result = self.rknn.inference(inputs=[input_tensor])
+        print(f'inference: {time.time() - start}')
+        start = time.time()
+        for i in range(len(result)):
+            print(result[i].size)
+            result[i] = result[i].tolist()
+        print(f'to list: {time.time() - start}')
+        return result
 
 
 class RKNNDetector(PredictPlugin):
     labels = LABELS
     model_path: str
     inference: RKNNInference
-    shmem: SHMem
 
-    def __init__(self, inference: RKNNInference) -> None:
+    def __init__(self, inference: RKNNInference = None) -> None:
         super().__init__()
         asyncio.get_event_loop().create_task(self.async_init(inference))
 
     async def async_init(self, inference: RKNNInference) -> None:
         self.inference = await scrypted_sdk.sdk.connectRPCObject(inference)
-        i_shmem, o_shmems = create_shmem()
-        self.shmem = SHMem(i_shmem, o_shmems)
-        self.input_shmem = shared_memory.SharedMemory(name=i_shmem)
-        self.output_shmems = [shared_memory.SharedMemory(name=o_shmem) for o_shmem in o_shmems]
 
     def get_input_details(self) -> Tuple[int]:
         return (IMG_SIZE[0], IMG_SIZE[1], 3)
@@ -147,19 +96,12 @@ class RKNNDetector(PredictPlugin):
         return IMG_SIZE
 
     async def detect_once(self, input: Image, settings: Any, src_size, cvss) -> Coroutine[Any, Any, Any]:
+        input_tensor = np.expand_dims(np.asarray(input), axis=0).tolist()
         start = time.time()
-        input_np: np.ndarray = np.expand_dims(np.asarray(input), axis=0)
-        input_tensor = np.ndarray(INPUT_SHAPE, dtype=np.int8, buffer=self.input_shmem.buf)
-        input_tensor[:] = input_np
-        #print(f'input copy: {time.time() - start}')
-
-        #start = time.time()
-        await self.inference.inference(self.shmem)
-        #print(f'inference: {time.time() - start}')
-
-        outputs = []
-        for i in range(len(self.output_shmems)):
-            outputs.append(np.ndarray(OUTPUT_SHAPES[i], dtype=np.float32, buffer=self.output_shmems[i].buf))
+        outputs = await self.inference.inference(input_tensor)
+        print(f'inference: {time.time() - start}')
+        for i in range(len(outputs)):
+            outputs[i] = np.array(outputs[i]).astype(np.float32)
         boxes, classes, scores = post_process(outputs)
 
         predictions: List[Prediction] = []
@@ -202,7 +144,7 @@ class RKNNPlugin(PredictPlugin):
             self.executors.put_nowait(await f.get_detector(self.inference))
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
-        #start = time.time()
+        start = time.time()
         executor = await self.executors.get()
         try:
             return await executor.detectObjects(mediaObject, session)
@@ -211,7 +153,7 @@ class RKNNPlugin(PredictPlugin):
             print('Requesting restart...')
             await scrypted_sdk.deviceManager.requestRestart()
         finally:
-            #print(f'Elapsed: {time.time() - start}')
+            print(f'Elapsed: {time.time() - start}')
             self.executors.put_nowait(executor)
         pass
 

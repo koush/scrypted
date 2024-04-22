@@ -1,7 +1,5 @@
 # adapted from https://github.com/airockchip/rknn_model_zoo/blob/eaa94d6f57ca553d493bf3bd7399a070452d2774/examples/yolov6/python/yolov6.py
 
-from multiprocessing import shared_memory
-
 import numpy as np
 
 from common.softmax import softmax
@@ -157,30 +155,3 @@ def post_process(input_data):
     scores = np.concatenate(nscores)
 
     return boxes, classes, scores
-
-INPUT_SHAPE = (1, 640, 640, 3)
-
-OUTPUT_SHAPES = [
-    (1, 4, 80, 80),
-    (1, 80, 80, 80),
-    (1, 1, 80, 80),
-    (1, 4, 40, 40),
-    (1, 80, 40, 40),
-    (1, 1, 40, 40),
-    (1, 4, 20, 20),
-    (1, 80, 20, 20),
-    (1, 1, 20, 20)
-]
-
-# returns a tuple of input and output shared memory names
-def create_shmem():
-    # reference tensors
-    input_tensor = np.zeros(INPUT_SHAPE, dtype=np.int8)
-    outputs = [
-        np.zeros(shape, dtype=np.float32) for shape in OUTPUT_SHAPES
-    ]
-
-    input_tensor_shm = shared_memory.SharedMemory(create=True, size=input_tensor.nbytes)
-    output_tensors_shm = [shared_memory.SharedMemory(create=True, size=output.nbytes) for output in outputs]
-
-    return input_tensor_shm.name, [output.name for output in output_tensors_shm]
