@@ -14,6 +14,11 @@ from scrypted_sdk import Setting, SettingValue
 
 from common import yolo
 from coreml.recognition import CoreMLRecognition
+
+try:
+    from coreml.text_recognition import CoreMLTextRecognition
+except:
+    CoreMLTextRecognition = None
 from predict import Prediction, PredictPlugin
 from predict.rectangle import Rectangle
 
@@ -131,25 +136,43 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
 
     async def prepareRecognitionModels(self):
         try:
+            devices = [
+                {
+                    "nativeId": "recognition",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                    ],
+                    "name": "CoreML Recognition",
+                },
+            ]
+
+            if CoreMLTextRecognition:
+                devices.append(
+                    {
+                        "nativeId": "textrecognition",
+                        "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                        "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                        ],
+                        "name": "CoreML Text Recognition",
+                    },
+                )
+
             await scrypted_sdk.deviceManager.onDevicesChanged(
                 {
-                    "devices": [
-                        {
-                            "nativeId": "recognition",
-                            "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
-                            "interfaces": [
-                                scrypted_sdk.ScryptedInterface.ObjectDetection.value,
-                            ],
-                            "name": "CoreML Recognition",
-                        }
-                    ]
+                    "devices": devices,
                 }
             )
         except:
             pass
 
     async def getDevice(self, nativeId: str) -> Any:
-        return CoreMLRecognition(nativeId)
+        if nativeId == "recognition":
+            return CoreMLRecognition(nativeId)
+        if nativeId == "textrecognition":
+            return CoreMLTextRecognition(nativeId)
+        raise Exception("unknown device")
 
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"
@@ -174,7 +197,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
 
     def get_input_size(self) -> Tuple[float, float]:
         return (self.inputwidth, self.inputheight)
-    
+
     async def detect_batch(self, inputs: List[Any]) -> List[Any]:
         out_dicts = await asyncio.get_event_loop().run_in_executor(
             predictExecutor, lambda: self.model.predict(inputs)
