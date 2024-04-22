@@ -42,37 +42,15 @@ def ensure_compatibility():
         raise
 
 
-def thread_executor_main(model_path, core_num, core_mask, job_queue: queue.Queue):
-    rknn = RKNNLite(verbose=rknn_verbose)
-    ret = rknn.load_rknn(model_path)
-    if ret != 0:
-        raise RuntimeError('Failed to load model: {}'.format(ret))
-
-    ret = rknn.init_runtime(core_mask=core_mask)
-    if ret != 0:
-        raise RuntimeError('Failed to init runtime: {}'.format(ret))
-
-    print('RKNNLite runtime initialized on core {}'.format(core_num))
-
-    while True:
-        input_tensor, done_future = job_queue.get()
-
-        # check for shutdown
-        if input_tensor is None:
-            break
-
-        outputs = rknn.inference(inputs=[input_tensor])
-        done_future.set_result(outputs)
-
-
 class RKNNPlugin(PredictPlugin):
     labels = {i: CLASSES[i] for i in range(len(CLASSES))}
-    jobs: queue.Queue
-    executors: List[threading.Thread]
+    rknn_runtimes: dict
 
     def __init__(self, nativeId=None):
         super().__init__(nativeId)
         ensure_compatibility()
+
+        self.rknn_runtimes = {}
 
         if not os.path.exists(lib_path):
             print('Downloading librknnrt.so from {}'.format(lib_download))
@@ -80,15 +58,21 @@ class RKNNPlugin(PredictPlugin):
 
         model_path = self.downloadFile(model_download, os.path.basename(model_download))
 
-        self.jobs = queue.Queue()
+        def executor_initializer():
+            thread_name = threading.current_thread().name
+            rknn = RKNNLite(verbose=rknn_verbose)
+            ret = rknn.load_rknn(model_path)
+            if ret != 0:
+                raise RuntimeError('Failed to load model: {}'.format(ret))
 
-        self.executors = [
-            threading.Thread(target=thread_executor_main, args=(model_path, 0, RKNNLite.NPU_CORE_0, self.jobs)),
-            threading.Thread(target=thread_executor_main, args=(model_path, 1, RKNNLite.NPU_CORE_1, self.jobs)),
-            threading.Thread(target=thread_executor_main, args=(model_path, 2, RKNNLite.NPU_CORE_2, self.jobs)),
-        ]
-        for executor in self.executors:
-            executor.start()
+            ret = rknn.init_runtime()
+            if ret != 0:
+                raise RuntimeError('Failed to init runtime: {}'.format(ret))
+
+            self.rknn_runtimes[thread_name] = rknn
+            print('RKNNLite runtime initialized on thread {}'.format(thread_name))
+
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3, initializer=executor_initializer)
 
     def get_input_details(self) -> Tuple[int]:
         return (IMG_SIZE[0], IMG_SIZE[1], 3)
@@ -97,11 +81,13 @@ class RKNNPlugin(PredictPlugin):
         return IMG_SIZE
 
     async def detect_once(self, input: Image, settings: Any, src_size, cvss) -> Coroutine[Any, Any, Any]:
-        async def predict(input_tensor):
-            done_future = concurrent.futures.Future()
-            self.jobs.put((input_tensor, done_future))
+        def inference(input_tensor):
+            rknn = self.rknn_runtimes[threading.current_thread().name]
+            outputs = rknn.inference(inputs=[input_tensor])
+            return outputs
 
-            fut = asyncio.wrap_future(done_future)
+        async def predict(input_tensor):
+            fut = asyncio.wrap_future(self.executor.submit(inference, input_tensor))
             outputs = await fut
             boxes, classes, scores = post_process(outputs)
 
