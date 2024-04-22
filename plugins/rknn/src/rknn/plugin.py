@@ -65,7 +65,7 @@ class RKNNPlugin(PredictPlugin):
             if ret != 0:
                 raise RuntimeError('Failed to load model: {}'.format(ret))
 
-            ret = rknn.init_runtime(core_mask=RKNNLite.NPU_CORE_ALL)
+            ret = rknn.init_runtime()
             if ret != 0:
                 raise RuntimeError('Failed to init runtime: {}'.format(ret))
 
