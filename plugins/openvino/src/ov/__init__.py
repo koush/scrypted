@@ -18,6 +18,10 @@ from predict import Prediction, PredictPlugin
 from predict.rectangle import Rectangle
 
 from .recognition import OpenVINORecognition
+try:
+    from .text_recognition import OpenVINOTextRecognition
+except:
+    OpenVINOTextRecognition = None
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Predict")
 
@@ -326,22 +330,40 @@ class OpenVINOPlugin(
 
     async def prepareRecognitionModels(self):
         try:
+            devices = [
+                {
+                    "nativeId": "recognition",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                    ],
+                    "name": "OpenVINO Recognition",
+                },
+            ]
+
+            if OpenVINOTextRecognition:
+                devices.append(
+                    {
+                        "nativeId": "textrecognition",
+                        "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                        "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                        ],
+                        "name": "OpenVINO Text Recognition",
+                    },
+                )
+
             await scrypted_sdk.deviceManager.onDevicesChanged(
                 {
-                    "devices": [
-                        {
-                            "nativeId": "recognition",
-                            "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
-                            "interfaces": [
-                                scrypted_sdk.ScryptedInterface.ObjectDetection.value,
-                            ],
-                            "name": "OpenVINO Recognition",
-                        }
-                    ]
+                    "devices": devices,
                 }
             )
         except:
             pass
 
     async def getDevice(self, nativeId: str) -> Any:
-        return OpenVINORecognition(self, nativeId)
+        if nativeId == "recognition":
+            return OpenVINORecognition(self, nativeId)
+        elif nativeId == "textrecognition":
+            return OpenVINOTextRecognition(self, nativeId)
+        raise Exception("unknown device")
