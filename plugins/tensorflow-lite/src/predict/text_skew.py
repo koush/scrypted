@@ -66,13 +66,20 @@ def find_adjacent_groups(boxes: List[BoundingBox]) -> List[dict]:
     for group in groups:
         boxes = group["boxes"]
         sum_angle = 0
+        if len(boxes) -1 :
+            lm = (boxes[0][1] + boxes[0][3]) / 2
+            rm = (boxes[-1][1] + boxes[-1][3]) / 2
+            group['skew_angle'] = math.atan2(rm - lm, boxes[-1][0] - boxes[0][0])
+        else:
+            group['skew_angle'] = 0
+
         for i in range(len(boxes) - 1):
             x1, y1, w1, h1 = boxes[i]
             x2, y2, w2, h2 = boxes[i + 1]
             dx = x2 - x1
             dy = y2 - y1
             sum_angle += math.atan2(dy, dx)
-        group["skew_angle"] = 0 if not len(boxes) - 1 else sum_angle / (len(boxes) - 1)
+        # group["skew_angle"] = 0 if not len(boxes) - 1 else sum_angle / (len(boxes) - 1)
         group["union"] = union_boxes(boxes)
 
     return groups
