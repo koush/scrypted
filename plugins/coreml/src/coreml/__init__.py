@@ -138,7 +138,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
         try:
             devices = [
                 {
-                    "nativeId": "recognition",
+                    "nativeId": "facerecognition",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                     "interfaces": [
                         scrypted_sdk.ScryptedInterface.ObjectDetection.value,

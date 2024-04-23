@@ -332,7 +332,7 @@ class OpenVINOPlugin(
         try:
             devices = [
                 {
-                    "nativeId": "recognition",
+                    "nativeId": "facerecognition",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                     "interfaces": [
                         scrypted_sdk.ScryptedInterface.ObjectDetection.value,
