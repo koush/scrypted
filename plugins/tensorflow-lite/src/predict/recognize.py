@@ -202,8 +202,8 @@ class RecognizeDetection(PredictPlugin):
         for d in ret["detections"]:
             if d["className"] == "face":
                 futures.append(asyncio.ensure_future(self.setEmbedding(d, image)))
-            elif d["className"] == "plate":
-                futures.append(asyncio.ensure_future(self.setLabel(d, image)))
+            # elif d["className"] == "plate":
+            #     futures.append(asyncio.ensure_future(self.setLabel(d, image)))
             # elif d['className'] == 'text':
             #     futures.append(asyncio.ensure_future(self.setLabel(d, image)))
 

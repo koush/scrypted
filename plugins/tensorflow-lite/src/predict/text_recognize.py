@@ -2,19 +2,25 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import traceback
+from asyncio import Future
 from typing import Any, List, Tuple
 
 import numpy as np
 import scrypted_sdk
 from PIL import Image
+from scrypted_sdk import ObjectDetectionResult, ObjectDetectionSession, ObjectsDetected
 
+from common.text import prepare_text_result, process_text_result
 from predict import Prediction, PredictPlugin
 from predict.craft_utils import normalizeMeanVariance
 from predict.rectangle import Rectangle
 
 from .craft_utils import adjustResultCoordinates, getDetBoxes
+from predict.text_skew import find_adjacent_groups
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "TextDetect")
+
 
 class TextRecognition(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -30,7 +36,7 @@ class TextRecognition(PredictPlugin):
         self.minThreshold = 0.1
 
         self.detectModel = self.downloadModel("craft")
-
+        self.textModel = self.downloadModel("vgg_english_g2")
 
     def downloadModel(self, model: str):
         pass
@@ -38,7 +44,12 @@ class TextRecognition(PredictPlugin):
     def predictDetectModel(self, input):
         pass
 
-    async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> scrypted_sdk.ObjectsDetected:
+    def predictTextModel(self, input):
+        pass
+
+    async def detect_once(
+        self, input: Image.Image, settings: Any, src_size, cvss
+    ) -> scrypted_sdk.ObjectsDetected:
         image_tensor = normalizeMeanVariance(np.array(input))
         # reshape to c w h
         image_tensor = image_tensor.transpose([2, 0, 1])
@@ -51,9 +62,9 @@ class TextRecognition(PredictPlugin):
 
         estimate_num_chars = False
         ratio_h = ratio_w = 1
-        text_threshold = .7
-        link_threshold = .7
-        low_text = .4
+        text_threshold = 0.4
+        link_threshold = 0.7
+        low_text = 0.4
         poly = False
 
         boxes_list, polys_list = [], []
@@ -64,7 +75,14 @@ class TextRecognition(PredictPlugin):
 
             # Post-processing
             boxes, polys, mapper = getDetBoxes(
-                score_text, score_link, text_threshold, link_threshold, low_text, poly, estimate_num_chars)
+                score_text,
+                score_link,
+                text_threshold,
+                link_threshold,
+                low_text,
+                poly,
+                estimate_num_chars,
+            )
             if not len(boxes):
                 continue
 
@@ -86,15 +104,59 @@ class TextRecognition(PredictPlugin):
         for boxes in boxes_list:
             for box in boxes:
                 tl, tr, br, bl = box
-                l = tl[0]
-                t = tl[1]
-                r = br[0]
-                b = br[1]
+                l = min(tl[0], bl[0])
+                t = min(tl[1], tr[1])
+                r = max(tr[0], br[0])
+                b = max(bl[1], br[1])
 
                 pred = Prediction(0, 1, Rectangle(l, t, r, b))
                 preds.append(pred)
-            
+
         return self.create_detection_result(preds, src_size, cvss)
+
+    async def run_detection_image(
+        self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession
+    ) -> ObjectsDetected:
+        ret = await super().run_detection_image(image, detection_session)
+
+        detections = ret["detections"]
+
+        futures: List[Future] = []
+
+        boundingBoxes = [d["boundingBox"] for d in detections]
+        text_groups = find_adjacent_groups(boundingBoxes)
+
+        detections = []
+        for group in text_groups:
+            boundingBox = group["union"]
+            d: ObjectDetectionResult = {
+                "boundingBox": boundingBox,
+                "score": 1,
+                "className": "text",
+            }
+            futures.append(asyncio.ensure_future(self.setLabel(d, image, group["skew_angle"])))
+            detections.append(d)
+
+        ret["detections"] = detections
+
+        if len(futures):
+            await asyncio.wait(futures)
+
+        return ret
+
+    async def setLabel(self, d: ObjectDetectionResult, image: scrypted_sdk.Image, skew_angle: float):
+        try:
+
+            image_tensor = await prepare_text_result(d, image, skew_angle)
+            preds = await asyncio.get_event_loop().run_in_executor(
+                predictExecutor,
+                lambda: self.predictTextModel(image_tensor),
+            )
+            d["label"] = process_text_result(preds)
+
+        except Exception as e:
+            traceback.print_exc()
+            pass
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:

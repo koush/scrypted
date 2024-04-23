@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import openvino.runtime as ov
+import numpy as np
 
 from predict.text_recognize import TextRecognition
 
@@ -31,6 +32,15 @@ class OpenVINOTextRecognition(TextRecognition):
         im = ov.Tensor(array=input)
         input_tensor = im
         infer_request.set_input_tensor(input_tensor)
+        infer_request.start_async()
+        infer_request.wait()
+        return infer_request.output_tensors[0].data
+
+    def predictTextModel(self, input):
+        input = input.astype(np.float32)
+        im = ov.Tensor(array=input)
+        infer_request = self.textModel.create_infer_request()
+        infer_request.set_input_tensor(im)
         infer_request.start_async()
         infer_request.wait()
         return infer_request.output_tensors[0].data

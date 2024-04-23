@@ -8,7 +8,17 @@ from common.softmax import softmax
 from common.colors import ensureRGBData
 import math
 
-async def crop_text(d: ObjectDetectionResult, image: scrypted_sdk.Image, width: int, height: int):
+def skew_image(image: Image, skew_angle_rad: float):
+    skew_matrix = [1, 0, 0, skew_angle_rad, 1, 0]
+
+    # Apply the transformation
+    skewed_image = image.transform(
+        image.size, Image.AFFINE, skew_matrix, resample=Image.BICUBIC
+    )
+
+    return skewed_image
+
+async def crop_text(d: ObjectDetectionResult, image: scrypted_sdk.Image):
     l, t, w, h = d["boundingBox"]
     l = math.floor(l)
     t = math.floor(t)
@@ -27,14 +37,30 @@ async def crop_text(d: ObjectDetectionResult, image: scrypted_sdk.Image, width: 
         }
     )
     pilImage = await ensureRGBData(cropped, (w, h), format)
-    resized = pilImage.resize((width, height), resample=Image.LANCZOS).convert("L")
-    pilImage.close()
-    return resized
+    return pilImage
 
-async def prepare_text_result(d: ObjectDetectionResult, image: scrypted_sdk.Image):
+def calculate_y_change(original_height, skew_angle_radians):
+    # Calculate the change in y-position
+    y_change = original_height * math.tan(skew_angle_radians)
+    
+    return y_change
+
+async def prepare_text_result(d: ObjectDetectionResult, image: scrypted_sdk.Image, skew_angle: float):
+    textImage = await crop_text(d, image)
+
+    skew_height_change = calculate_y_change(d["boundingBox"][3], skew_angle)
+    skew_height_change = math.floor(skew_height_change)
+    textImage = skew_image(textImage, skew_angle)
+    # crop skew_height_change from top
+    if skew_height_change > 0:
+        textImage = textImage.crop((0, 0, textImage.width, textImage.height - skew_height_change))
+    elif skew_height_change < 0:
+        textImage = textImage.crop((0, -skew_height_change, textImage.width, textImage.height))
+
     new_height = 64
-    new_width = int(d["boundingBox"][2] * new_height / d["boundingBox"][3])
-    textImage = await crop_text(d, image, new_width, new_height)
+    new_width = int(textImage.width * new_height / textImage.height)
+    textImage = textImage.resize((new_width, new_height), resample=Image.LANCZOS).convert("L")
+
     new_width = 256
     # calculate padding dimensions
     padding = (0, 0, new_width - textImage.width, 0)
@@ -49,7 +75,6 @@ async def prepare_text_result(d: ObjectDetectionResult, image: scrypted_sdk.Imag
 
     # test normalize contrast
     # image_tensor = (image_tensor - np.min(image_tensor)) / (np.max(image_tensor) - np.min(image_tensor))
-
 
     image_tensor = (image_tensor - 0.5) / 0.5
 

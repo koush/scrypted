@@ -37,3 +37,9 @@ class CoreMLTextRecognition(TextRecognition):
         out_dict = model.predict({inputName: input})
         results = list(out_dict.values())[0]
         return results
+
+    def predictTextModel(self, input):
+        model, inputName = self.textModel
+        out_dict = model.predict({inputName: input})
+        preds = out_dict["linear_2"]
+        return preds
