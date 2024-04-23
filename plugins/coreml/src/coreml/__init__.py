@@ -168,7 +168,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
             pass
 
     async def getDevice(self, nativeId: str) -> Any:
-        if nativeId == "recognition":
+        if nativeId == "facerecognition":
             return CoreMLFaceRecognition(nativeId)
         if nativeId == "textrecognition":
             return CoreMLTextRecognition(nativeId)

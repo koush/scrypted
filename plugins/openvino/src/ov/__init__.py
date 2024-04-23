@@ -362,7 +362,7 @@ class OpenVINOPlugin(
             pass
 
     async def getDevice(self, nativeId: str) -> Any:
-        if nativeId == "recognition":
+        if nativeId == "facerecognition":
             return OpenVINOFaceRecognition(self, nativeId)
         elif nativeId == "textrecognition":
             return OpenVINOTextRecognition(self, nativeId)
