@@ -65,21 +65,20 @@ def find_adjacent_groups(boxes: List[BoundingBox]) -> List[dict]:
     # Calculate the skew angle of each group
     for group in groups:
         boxes = group["boxes"]
-        sum_angle = 0
+        group["union"] = union_boxes(boxes)
         if len(boxes) -1 :
             lm = (boxes[0][1] + boxes[0][3]) / 2
             rm = (boxes[-1][1] + boxes[-1][3]) / 2
-            group['skew_angle'] = math.atan2(rm - lm, boxes[-1][0] - boxes[0][0])
+            dx = (boxes[-1][0]) - (boxes[0][0] + boxes[0][2])
+            minx = min([box[0] for box in boxes])
+            maxx = max([box[0] + box[2] for box in boxes])
+            maxh = max([box[3] for box in boxes])
+            pad_height = maxh * 0.05
+            dx = maxx - minx
+            group['skew_angle'] = math.atan2(rm - lm, dx) * 2
+            # pad this box by a few pixels
+            group['union'] = (group['union'][0] - pad_height, group['union'][1] - pad_height, group['union'][2] + pad_height * 2, group['union'][3] + pad_height * 2)
         else:
             group['skew_angle'] = 0
-
-        for i in range(len(boxes) - 1):
-            x1, y1, w1, h1 = boxes[i]
-            x2, y2, w2, h2 = boxes[i + 1]
-            dx = x2 - x1
-            dy = y2 - y1
-            sum_angle += math.atan2(dy, dx)
-        # group["skew_angle"] = 0 if not len(boxes) - 1 else sum_angle / (len(boxes) - 1)
-        group["union"] = union_boxes(boxes)
 
     return groups

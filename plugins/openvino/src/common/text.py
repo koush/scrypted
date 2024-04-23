@@ -20,10 +20,14 @@ def skew_image(image: Image, skew_angle_rad: float):
 
 async def crop_text(d: ObjectDetectionResult, image: scrypted_sdk.Image):
     l, t, w, h = d["boundingBox"]
-    l = math.floor(l)
-    t = math.floor(t)
+    l = max(0, math.floor(l))
+    t = max(0, math.floor(t))
     w = math.floor(w)
     h = math.floor(h)
+    if l + w > image.width:
+        w = image.width - l
+    if t + h > image.height:
+        h = image.height - t
     format = image.format or 'rgb'
     cropped = await image.toBuffer(
         {

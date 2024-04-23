@@ -15,9 +15,9 @@ from common.text import prepare_text_result, process_text_result
 from predict import Prediction, PredictPlugin
 from predict.craft_utils import normalizeMeanVariance
 from predict.rectangle import Rectangle
+from predict.text_skew import find_adjacent_groups
 
 from .craft_utils import adjustResultCoordinates, getDetBoxes
-from predict.text_skew import find_adjacent_groups
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "TextDetect")
 
@@ -62,7 +62,7 @@ class TextRecognition(PredictPlugin):
 
         estimate_num_chars = False
         ratio_h = ratio_w = 1
-        text_threshold = 0.4
+        text_threshold = 0.9
         link_threshold = 0.9
         low_text = 0.4
         poly = False
@@ -124,6 +124,9 @@ class TextRecognition(PredictPlugin):
         futures: List[Future] = []
 
         boundingBoxes = [d["boundingBox"] for d in detections]
+        if not len(boundingBoxes):
+            return ret
+
         text_groups = find_adjacent_groups(boundingBoxes)
 
         detections = []
@@ -134,7 +137,9 @@ class TextRecognition(PredictPlugin):
                 "score": 1,
                 "className": "text",
             }
-            futures.append(asyncio.ensure_future(self.setLabel(d, image, group["skew_angle"])))
+            futures.append(
+                asyncio.ensure_future(self.setLabel(d, image, group["skew_angle"]))
+            )
             detections.append(d)
 
         ret["detections"] = detections
@@ -142,9 +147,14 @@ class TextRecognition(PredictPlugin):
         if len(futures):
             await asyncio.wait(futures)
 
+        # filter empty labels
+        ret["detections"] = [d for d in detections if d.get("label")]
+
         return ret
 
-    async def setLabel(self, d: ObjectDetectionResult, image: scrypted_sdk.Image, skew_angle: float):
+    async def setLabel(
+        self, d: ObjectDetectionResult, image: scrypted_sdk.Image, skew_angle: float
+    ):
         try:
 
             image_tensor = await prepare_text_result(d, image, skew_angle)
