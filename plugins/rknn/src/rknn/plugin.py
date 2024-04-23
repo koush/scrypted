@@ -20,12 +20,12 @@ from .optimized.yolo import post_process, IMG_SIZE, CLASSES
 
 rknn_verbose = False
 lib_download = 'https://github.com/airockchip/rknn-toolkit2/raw/v2.0.0-beta0/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so'
-model_download = 'https://github.com/bjia56/scrypted-rknn/raw/main/models/yolov6n_rk3588_optimized.rknn'
+model_download_tmpl = 'https://github.com/bjia56/scrypted-rknn/raw/main/models/{}_{}_optimized.rknn'
 lib_path = '/usr/lib/librknnrt.so'
 
 
-def ensure_compatibility():
-    err_msg = 'RKNN plugin is only supported on Linux/ARM64 platform with RK3588(S) CPU'
+def ensure_compatibility_and_get_cpu():
+    err_msg = 'RKNN plugin is only supported on Linux/ARM64 platform with a Rockchip CPU'
     if platform.machine() != 'aarch64':
         raise RuntimeError(err_msg)
 
@@ -34,11 +34,18 @@ def ensure_compatibility():
 
     try:
         with open('/proc/device-tree/compatible') as f:
-            if not 'rk3588' in f.read():
+            device_compatible_str = f.read()
+            if 'rk3562' in device_compatible_str:
+                return 'rk3562'
+            elif 'rk3576' in device_compatible_str:
+                return 'rk3576'
+            elif 'rk3588' in device_compatible_str:
+                return 'rk3588'
+            else:
                 raise RuntimeError(err_msg)
     except IOError as e:
         print('Failed to read /proc/device-tree/compatible: {}'.format(e))
-        print('If you are running this on RK3588(S) via Docker, ensure you are launching the container with --privileged option')
+        print('If you are running this via Docker, ensure you are launching the container with --privileged option')
         raise
 
 
@@ -48,7 +55,8 @@ class RKNNPlugin(PredictPlugin):
 
     def __init__(self, nativeId=None):
         super().__init__(nativeId)
-        ensure_compatibility()
+        cpu = ensure_compatibility_and_get_cpu()
+        model = 'yolov6n'
 
         self.rknn_runtimes = {}
 
@@ -60,7 +68,10 @@ class RKNNPlugin(PredictPlugin):
             else:
                 raise RuntimeError('librknnrt.so not found. Please download it from {} and place it at {}'.format(lib_download, lib_path))
 
-        model_path = self.downloadFile(model_download, os.path.basename(model_download))
+        model_download = model_download_tmpl.format(model, cpu)
+        model_file = os.path.basename(model_download)
+        model_path = self.downloadFile(model_download, model_file)
+        print('Using model {}'.format(model_path))
 
         def executor_initializer():
             thread_name = threading.current_thread().name
