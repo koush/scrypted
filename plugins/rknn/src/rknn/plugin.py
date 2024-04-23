@@ -73,6 +73,16 @@ class RKNNPlugin(PredictPlugin):
         model_path = self.downloadFile(model_download, model_file)
         print('Using model {}'.format(model_path))
 
+        test_rknn = RKNNLite(verbose=rknn_verbose)
+        ret = test_rknn.load_rknn(model_path)
+        if ret != 0:
+            raise RuntimeError('Failed to load model: {}'.format(ret))
+
+        ret = test_rknn.init_runtime()
+        if ret != 0:
+            raise RuntimeError('Failed to init runtime: {}'.format(ret))
+        test_rknn.release()
+
         def executor_initializer():
             thread_name = threading.current_thread().name
             rknn = RKNNLite(verbose=rknn_verbose)
