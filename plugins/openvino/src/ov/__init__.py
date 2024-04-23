@@ -17,7 +17,7 @@ import common.yolo as yolo
 from predict import Prediction, PredictPlugin
 from predict.rectangle import Rectangle
 
-from .recognition import OpenVINORecognition
+from .face_recognition import OpenVINOFaceRecognition
 try:
     from .text_recognition import OpenVINOTextRecognition
 except:
@@ -337,7 +337,7 @@ class OpenVINOPlugin(
                     "interfaces": [
                         scrypted_sdk.ScryptedInterface.ObjectDetection.value,
                     ],
-                    "name": "OpenVINO Recognition",
+                    "name": "OpenVINO Face Recognition",
                 },
             ]
 
@@ -363,7 +363,7 @@ class OpenVINOPlugin(
 
     async def getDevice(self, nativeId: str) -> Any:
         if nativeId == "recognition":
-            return OpenVINORecognition(self, nativeId)
+            return OpenVINOFaceRecognition(self, nativeId)
         elif nativeId == "textrecognition":
             return OpenVINOTextRecognition(self, nativeId)
         raise Exception("unknown device")

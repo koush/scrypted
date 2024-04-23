@@ -40,7 +40,7 @@ def cosine_similarity(vector_a, vector_b):
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "Recognize")
 
-class RecognizeDetection(PredictPlugin):
+class FaceRecognizeDetection(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
@@ -154,6 +154,10 @@ class RecognizeDetection(PredictPlugin):
         ret = await super().run_detection_image(image, detection_session)
 
         detections = ret["detections"]
+
+        # filter any non face detections because this is using an old model that includes plates and text
+        detections = [d for d in detections if d["className"] == "face"]
+
         # non max suppression on detections
         for i in range(len(detections)):
             d1 = detections[i]

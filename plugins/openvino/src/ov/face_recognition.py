@@ -5,7 +5,7 @@ import openvino.runtime as ov
 
 import numpy as np
 
-from predict.recognize import RecognizeDetection
+from predict.face_recognize import FaceRecognizeDetection
 
 
 def euclidean_distance(arr1, arr2):
@@ -19,7 +19,7 @@ def cosine_similarity(vector_a, vector_b):
     similarity = dot_product / (norm_a * norm_b)
     return similarity
 
-class OpenVINORecognition(RecognizeDetection):
+class OpenVINOFaceRecognition(FaceRecognizeDetection):
     def __init__(self, plugin, nativeId: str | None = None):
         self.plugin = plugin
 

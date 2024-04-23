@@ -63,7 +63,7 @@ class TextRecognition(PredictPlugin):
         estimate_num_chars = False
         ratio_h = ratio_w = 1
         text_threshold = 0.4
-        link_threshold = 0.7
+        link_threshold = 0.9
         low_text = 0.4
         poly = False
 

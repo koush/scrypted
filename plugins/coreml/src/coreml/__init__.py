@@ -13,7 +13,7 @@ from PIL import Image
 from scrypted_sdk import Setting, SettingValue
 
 from common import yolo
-from coreml.recognition import CoreMLRecognition
+from coreml.face_recognition import CoreMLFaceRecognition
 
 try:
     from coreml.text_recognition import CoreMLTextRecognition
@@ -143,7 +143,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
                     "interfaces": [
                         scrypted_sdk.ScryptedInterface.ObjectDetection.value,
                     ],
-                    "name": "CoreML Recognition",
+                    "name": "CoreML Face Recognition",
                 },
             ]
 
@@ -169,7 +169,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
 
     async def getDevice(self, nativeId: str) -> Any:
         if nativeId == "recognition":
-            return CoreMLRecognition(nativeId)
+            return CoreMLFaceRecognition(nativeId)
         if nativeId == "textrecognition":
             return CoreMLTextRecognition(nativeId)
         raise Exception("unknown device")

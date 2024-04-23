@@ -9,7 +9,7 @@ import numpy as np
 # from Foundation import NSData, NSMakeSize
 
 # import Vision
-from predict.recognize import RecognizeDetection
+from predict.face_recognize import FaceRecognizeDetection
 
 
 def euclidean_distance(arr1, arr2):
@@ -26,7 +26,7 @@ def cosine_similarity(vector_a, vector_b):
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Vision-Predict")
 
-class CoreMLRecognition(RecognizeDetection):
+class CoreMLFaceRecognition(FaceRecognizeDetection):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
