@@ -102,6 +102,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             description: 'Set the approximate region to crop and scale to 16:9 snapshots.',
             type: 'clippath',
         },
+        snapshotStaleness: {
+            title: 'Override Snapshot Staleness',
+            description: 'Value in seconds when a cached image is considered stale',
+            type: 'number'
+        },               
     });
     snapshotDebouncer = createMapPromiseDebouncer<{
         picture: Buffer;
@@ -282,7 +287,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         if (this.currentPictureTime < Date.now() - 1 * 60 * 60 * 1000)
             this.currentPicture = undefined;
 
-        const allowedSnapshotStaleness = eventSnapshot ? 0 : periodicSnapshot ? 20000 : 10000;
+        let snapshotStaleness = this.storage.getItem('snapshotStaleness');
+        const allowedSnapshotStaleness = eventSnapshot ? 0 : snapshotStaleness ? parseInt( snapshotStaleness ) * 1000 : periodicSnapshot ? 20000 : 10000;
 
         let needRefresh = true;
         if (this.currentPicture && this.currentPictureTime > Date.now() - allowedSnapshotStaleness) {
