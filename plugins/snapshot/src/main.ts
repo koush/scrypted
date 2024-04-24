@@ -105,7 +105,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         snapshotStaleness: {
             title: 'Override Snapshot Staleness',
             description: 'Value in seconds when a cached image is considered stale',
-            type: 'number'
+            type: 'number',
+            defaultValue: undefined,
         },               
     });
     snapshotDebouncer = createMapPromiseDebouncer<{
@@ -287,8 +288,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         if (this.currentPictureTime < Date.now() - 1 * 60 * 60 * 1000)
             this.currentPicture = undefined;
 
-        let snapshotStaleness = this.storage.getItem('snapshotStaleness');
-        const allowedSnapshotStaleness = eventSnapshot ? 0 : snapshotStaleness ? parseInt( snapshotStaleness ) * 1000 : periodicSnapshot ? 20000 : 10000;
+        const allowedSnapshotStaleness = eventSnapshot ? 0 : this.storageSettings.values.snapshotStaleness * 1000 || (periodicSnapshot ? 20000 : 10000);
 
         let needRefresh = true;
         if (this.currentPicture && this.currentPictureTime > Date.now() - allowedSnapshotStaleness) {
