@@ -572,12 +572,24 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
         // Call the C300X
         this.remoteRtpDescription = sip.callOrAcceptInvite(
             ( audio ) => {
-            return [
-                // this SDP is used by the intercom and will send the encrypted packets which we don't care about to the loopback on port 65000 of the intercom
-                `m=audio 65000 RTP/SAVP 110`,
-                `a=rtpmap:110 speex/8000`,
-                `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
-            ]
+                let audioSection = [
+                    // this SDP is used by the intercom and will send the encrypted packets which we don't care about to the loopback on port 65000 of the intercom
+                    `m=audio 65000 RTP/SAVP 110`,
+                    `a=rtpmap:110 speex/8000`,
+                    `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
+                ]
+                if( !this.incomingCallRequest ) {
+                    let DEVADDR = this.storage.getItem('DEVADDR');
+                    if( DEVADDR ) {
+                        audioSection.unshift('a=DEVADDR:' + DEVADDR)
+                    } else {
+                        if( sipOptions.to.toLocaleLowerCase().indexOf('c300x') >= 0 || sipOptions.to.toLocaleLowerCase().indexOf('c100x') >= 0 ) {
+                            // Needed for bt_answering_machine (bticino specific), to check for c100X
+                            audioSection.unshift('a=DEVADDR:20')
+                        }                           
+                    }
+                }
+                return audioSection
         }, ( video ) => {
                 return [
                 // this SDP is used by the intercom and will send the encrypted packets which we don't care about to the loopback on port 65000 of the intercom

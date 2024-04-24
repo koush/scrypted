@@ -447,10 +447,6 @@ export class SipManager {
 
       return parseRtpDescription(this.console, incomingCallRequest)
     } else {
-      if( this.sipOptions.to.toLocaleLowerCase().indexOf('c300x') >= 0 ) {
-        // Needed for bt_answering_machine (bticino specific)
-        audio.unshift('a=DEVADDR:20')
-      }
       let inviteResponse = await this.request({
         method: 'INVITE',
         headers: {
