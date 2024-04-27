@@ -1,0 +1,2 @@
+tflite-runtime==2.14.0
+pillow==10.3.0
