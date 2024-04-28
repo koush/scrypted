@@ -55,7 +55,7 @@ def ensure_compatibility_and_get_cpu():
 
 class RKNNPlugin(PredictPlugin):
     labels = {i: CLASSES[i] for i in range(len(CLASSES))}
-    rknn_runtimes: dict
+    rknn_runtimes: queue.SimpleQueue
 
     def __init__(self, nativeId=None):
         super().__init__(nativeId)
@@ -77,31 +77,19 @@ class RKNNPlugin(PredictPlugin):
         model_path = self.downloadFile(model_download, model_file)
         print('Using model {}'.format(model_path))
 
-        test_rknn = RKNNLite(verbose=rknn_verbose)
-        ret = test_rknn.load_rknn(model_path)
-        if ret != 0:
-            raise RuntimeError('Failed to load model: {}'.format(ret))
-
-        ret = test_rknn.init_runtime()
-        if ret != 0:
-            raise RuntimeError('Failed to init runtime: {}'.format(ret))
-        test_rknn.release()
-
-        def executor_initializer():
-            thread_name = threading.current_thread().name
+        self.rknn_runtimes = queue.SimpleQueue()
+        runtime_count = 3
+        for _ in range(runtime_count):
             rknn = RKNNLite(verbose=rknn_verbose)
             ret = rknn.load_rknn(model_path)
             if ret != 0:
                 raise RuntimeError('Failed to load model: {}'.format(ret))
-
             ret = rknn.init_runtime()
             if ret != 0:
                 raise RuntimeError('Failed to init runtime: {}'.format(ret))
+            self.rknn_runtimes.put(rknn)
 
-            self.rknn_runtimes[thread_name] = rknn
-            print('RKNNLite runtime initialized on thread {}'.format(thread_name))
-
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3, initializer=executor_initializer)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=runtime_count)
 
     def get_input_details(self) -> Tuple[int]:
         return (IMG_SIZE[0], IMG_SIZE[1], 3)
@@ -111,9 +99,12 @@ class RKNNPlugin(PredictPlugin):
 
     async def detect_once(self, input: Image, settings: Any, src_size, cvss) -> Coroutine[Any, Any, Any]:
         def inference(input_tensor):
-            rknn = self.rknn_runtimes[threading.current_thread().name]
-            outputs = rknn.inference(inputs=[input_tensor])
-            return outputs
+            rknn = self.rknn_runtimes.get()
+            try:
+                outputs = rknn.inference(inputs=[input_tensor])
+                return outputs
+            finally:
+                self.rknn_runtimes.put(rknn)
 
         async def predict(input_tensor):
             fut = asyncio.wrap_future(self.executor.submit(inference, input_tensor))
