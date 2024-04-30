@@ -34,7 +34,8 @@ $SCRYPTED_HOME_ESCAPED_PATH = $SCRYPTED_HOME.replace('\', '\\')
 npm install --prefix $SCRYPTED_HOME @koush/node-windows --save
 
 $NPX_PATH = (Get-Command npx).Path
-$NPX_PATH_ESCAPED = $NPX_PATH.replace('\', '\\')
+# The path needs double quotes to handle spaces in the directory path
+$NPX_PATH_ESCAPED = `"${$NPX_PATH.replace('\', '\\')}"`
 
 $SERVICE_JS = @"
 const fs = require('fs');
@@ -46,6 +47,8 @@ catch (e) {
 const child_process = require('child_process');
 child_process.spawn('$($NPX_PATH_ESCAPED)', ['-y', 'scrypted', 'serve'], {
     stdio: 'inherit',
+    # allow spawning .cmd https://nodejs.org/en/blog/vulnerability/april-2024-security-releases-2
+    shell: true,
 });
 "@
 
