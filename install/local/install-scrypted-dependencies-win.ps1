@@ -35,7 +35,7 @@ npm install --prefix $SCRYPTED_HOME @koush/node-windows --save
 
 $NPX_PATH = (Get-Command npx).Path
 # The path needs double quotes to handle spaces in the directory path
-$NPX_PATH_ESCAPED = `"${$NPX_PATH.replace('\', '\\')}"`
+$NPX_PATH_ESCAPED = '"${$NPX_PATH.replace('\', '\\')}"'
 
 $SERVICE_JS = @"
 const fs = require('fs');
