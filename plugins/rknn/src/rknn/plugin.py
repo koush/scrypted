@@ -37,6 +37,10 @@ def ensure_compatibility_and_get_cpu():
             device_compatible_str = f.read()
             if 'rk3562' in device_compatible_str:
                 return 'rk3562'
+            elif 'rk3566' in device_compatible_str:
+                return 'rk3566'
+            elif 'rk3568' in device_compatible_str:
+                return 'rk3568'
             elif 'rk3576' in device_compatible_str:
                 return 'rk3576'
             elif 'rk3588' in device_compatible_str:
