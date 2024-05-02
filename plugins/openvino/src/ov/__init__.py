@@ -96,6 +96,22 @@ class OpenVINOPlugin(
         mode = self.storage.getItem("mode")
         if mode == "Default":
             mode = "AUTO"
+
+            dgpus = []
+            # search for NVIDIA dGPU, as that is not preferred by AUTO for some reason?
+            # todo: create separate core per NVIDIA dGPU as inference does not seem to
+            # be distributed to multiple dGPU.
+            for device in self.available_devices:
+                try:
+                    full_device_name = self.core.get_property(device, "FULL_DEVICE_NAME")
+                    if "NVIDIA" in full_device_name and "dGPU" in full_device_name:
+                        dgpus.append(device)
+                except:
+                    pass
+
+            if len(dgpus):
+                mode = f"AUTO:{','.join(dgpus)},CPU"
+
         mode = mode or "AUTO"
         self.mode = mode
 
