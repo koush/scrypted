@@ -40,14 +40,17 @@ services:
             # See volumes section below to use the host daemon.
             # - SCRYPTED_DOCKER_AVAHI=true
 
-            # Uncomment next 3 lines for Nvidia GPU support.
+            # NVIDIA (Part 1 of 3)
             # - NVIDIA_VISIBLE_DEVICES=all
             # - NVIDIA_DRIVER_CAPABILITIES=all
+
+        # NVIDIA (Part 2 of 3)
         # runtime: nvidia
-        # Necessary to communicate with host dbus for avahi-daemon.
-        security_opt:
-            - apparmor:unconfined
+
         volumes:
+            # NVIDIA (Part 3 of 3)
+            # - /etc/OpenCL/vendors/nvidia.icd:/etc/OpenCL/vendors/nvidia.icd
+
             # Scrypted NVR Storage (Part 3 of 3)
 
             # Modify to add the additional volume for Scrypted NVR.
@@ -98,11 +101,13 @@ services:
 
         # logging is noisy and will unnecessarily wear on flash storage.
         # scrypted has per device in memory logging that is preferred.
+        # enable the log file if enhanced debugging is necessary.
         logging:
-            driver: "json-file"
-            options:
-                max-size: "10m"
-                max-file: "10"
+            driver: "none"
+            # driver: "json-file"
+            # options:
+            #     max-size: "10m"
+            #     max-file: "10"
         labels:
             - "com.centurylinklabs.watchtower.scope=scrypted"
 
