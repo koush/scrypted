@@ -72,6 +72,8 @@ export async function installOptionalDependencies(console: Console, packageJson:
         const cp = npmExecFunction(['--prefix', nodePrefix, 'install'], {
             cwd: nodePrefix,
             stdio: 'inherit',
+            // allow spawning .cmd https://nodejs.org/en/blog/vulnerability/april-2024-security-releases-2
+            shell: os.platform() === 'win32' ? true : undefined,
         });
 
         await once(cp, 'exit');
