@@ -1,0 +1,6 @@
+onnxruntime
+
+# pillow-simd is available on x64 linux
+# pillow-simd confirmed not building with arm64 linux or apple silicon
+Pillow>=5.4.1; sys_platform != 'linux' or platform_machine != 'x86_64'
+pillow-simd; sys_platform == 'linux' and platform_machine == 'x86_64'
