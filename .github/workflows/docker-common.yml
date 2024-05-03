@@ -114,8 +114,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           build-args: |
-            NODE_VERSION=${{ matrix.NODE_VERSION }}
-            BASE=ghcr.io/koush/scrypted-common:${{ matrix.BASE }}-${{ matrix.BASE }}-full
+            BASE=ghcr.io/koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-full
           context: install/docker/
           file: install/docker/Dockerfile.nvidia
           platforms: linux/amd64,linux/arm64
