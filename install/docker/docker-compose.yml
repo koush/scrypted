@@ -38,26 +38,19 @@ services:
             # See volumes section below to use the host daemon.
             # - SCRYPTED_DOCKER_AVAHI=true
 
-            # NVIDIA (Part 1 of 3)
+            # NVIDIA (Part 1 of 4)
             # - NVIDIA_VISIBLE_DEVICES=all
             # - NVIDIA_DRIVER_CAPABILITIES=all
 
-        # NVIDIA (Part 2 of 3) - Ensure CUDA versions below match the host system
+        # NVIDIA (Part 2 of 4)
         # runtime: nvidia
-        # pull_policy: build
-        # build:
-        #     context: .
-        #     dockerfile_inline: |
-        #         FROM ghcr.io/koush/scrypted
-        #         RUN apt update -q \
-        #             && apt install wget \
-        #             && wget -qO /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
-        #             && dpkg -i /cuda-keyring.deb \
-        #             && apt update -q \
-        #             && apt install -y cuda-nvcc-12-4 libcublas-12-4 libcudnn8 cuda-libraries-12-4
+
+        # NVIDIA (Part 3 of 4) - Use NVIDIA image, and remove subsequent default image.
+        # image: ghcr.io/koush/scrypted:nvidia
+        image: ghcr.io/koush/scrypted
 
         volumes:
-            # NVIDIA (Part 3 of 3)
+            # NVIDIA (Part 4 of 4)
             # - /etc/OpenCL/vendors/nvidia.icd:/etc/OpenCL/vendors/nvidia.icd
 
             # Scrypted NVR Storage (Part 3 of 3)
@@ -106,7 +99,6 @@ services:
         container_name: scrypted
         restart: unless-stopped
         network_mode: host
-        image: ghcr.io/koush/scrypted
 
         # logging is noisy and will unnecessarily wear on flash storage.
         # scrypted has per device in memory logging that is preferred.
