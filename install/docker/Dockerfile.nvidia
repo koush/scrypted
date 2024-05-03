@@ -1,10 +1,6 @@
-ARG BASE="ghcr.io/koush/scrypted"
+ARG BASE="ghcr.io/koush/scrypted-common:20-jammy-full"
 FROM $BASE
-ARG CUDA_VERSION=12-4
 
-RUN apt update -q \
-     && apt install wget \
-     && wget -qO /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
-     && dpkg -i /cuda-keyring.deb \
-     && apt update -q \
-     && apt install -y cuda-nvcc-$CUDA_VERSION libcublas-$CUDA_VERSION libcudnn8 cuda-libraries-$CUDA_VERSION
+# nvidia cudnn/libcublas etc.
+# for some reason this is not provided by the nvidia container toolkit
+RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-nvidia-graphics.sh | bash
