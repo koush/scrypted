@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.100.1",
+  "version": "0.100.2",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",
@@ -26,11 +26,11 @@
     "semver": "^7.6.0",
     "sharp": "^0.33.3",
     "source-map-support": "^0.5.21",
-    "tar": "^7.0.0",
+    "tar": "^7.0.1",
     "tslib": "^2.6.2",
     "typescript": "^5.4.5",
     "whatwg-mimetype": "^4.0.0",
-    "ws": "^8.16.0"
+    "ws": "^8.17.0"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.5",
