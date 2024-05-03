@@ -116,10 +116,7 @@ jobs:
             BASE=ghcr.io/koush/scrypted:20-jammy-full.s6-v${{ steps.package-version.outputs.NPM_VERSION }}
           context: install/docker/
           file: install/docker/Dockerfile.nvidia
-          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             koush/scrypted:nvidia-v${{ steps.package-version.outputs.NPM_VERSION }}
             ghcr.io/koush/scrypted:nvidia-v${{ steps.package-version.outputs.NPM_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
