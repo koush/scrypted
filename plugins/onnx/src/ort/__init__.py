@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Tuple
 
+import sys
+import platform
 import numpy as np
 import onnxruntime
 import scrypted_sdk
@@ -65,7 +67,18 @@ class ONNXPlugin(
         print(onnxfile)
 
         try:
-            self.compiled_model = onnxruntime.InferenceSession(onnxfile)
+            sess_options = onnxruntime.SessionOptions()
+
+            providers: list[str] = []
+            if sys.platform == 'darwin':
+                providers.append("CoreMLExecutionProvider")
+            
+            if sys.platform == 'linux' and platform.machine() == 'x86_64':
+                providers.append("CUDAExecutionProvider")
+
+            providers.append('CPUExecutionProvider')
+
+            self.compiled_model = onnxruntime.InferenceSession(onnxfile, sess_options=sess_options, providers=providers)
         except:
             import traceback
 

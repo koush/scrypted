@@ -1,4 +1,9 @@
-onnxruntime
+--extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
+# cuda 12
+onnxruntime-gpu; sys_platform == 'linux' and platform_machine == 'x86_64'
+# cpu and coreml execution provider
+onnxruntime; sys_platform != 'linux' or platform_machine != 'x86_64'
+# ort-nightly-gpu==1.17.3.dev20240409002
 
 # pillow-simd is available on x64 linux
 # pillow-simd confirmed not building with arm64 linux or apple silicon
