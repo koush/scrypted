@@ -135,4 +135,7 @@ jobs:
           push: true
           tags: |
             koush/scrypted:nvidia-v${{ steps.package-version.outputs.NPM_VERSION }}
+            ${{ github.event.inputs.tag == 'latest' && 'koush/scrypted:nvidia' || '' }}
+
             ghcr.io/koush/scrypted:nvidia-v${{ steps.package-version.outputs.NPM_VERSION }}
+            ${{ github.event.inputs.tag == 'latest' && 'ghcr.io/koush/scrypted:nvidia' || '' }}
