@@ -42,8 +42,19 @@ services:
             # - NVIDIA_VISIBLE_DEVICES=all
             # - NVIDIA_DRIVER_CAPABILITIES=all
 
-        # NVIDIA (Part 2 of 3)
+        # NVIDIA (Part 2 of 3) - Ensure CUDA versions below match the host system
         # runtime: nvidia
+        # pull_policy: build
+        # build:
+        #     context: .
+        #     dockerfile_inline: |
+        #         FROM ghcr.io/koush/scrypted
+        #         RUN apt update -q \
+        #             && apt install wget \
+        #             && wget -qO /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+        #             && dpkg -i /cuda-keyring.deb \
+        #             && apt update -q \
+        #             && apt install -y cuda-nvcc-12-4 libcublas-12-4 libcudnn8 cuda-libraries-12-4
 
         volumes:
             # NVIDIA (Part 3 of 3)
