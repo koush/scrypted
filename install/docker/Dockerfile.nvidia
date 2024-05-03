@@ -1,14 +1,10 @@
-FROM ghcr.io/koush/scrypted:20-jammy-full.s6
+ARG BASE="ghcr.io/koush/scrypted"
+FROM $BASE
+ARG CUDA_VERSION=12-4
 
-WORKDIR /
-
-# Install miniconda
-ENV CONDA_DIR /opt/conda
-RUN apt update -y && apt -y install wget && wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
-     /bin/bash ~/miniconda.sh -b -p /opt/conda
-# Put conda in path so we can use conda activate
-ENV PATH=$CONDA_DIR/bin:$PATH
-
-RUN conda -y install -c conda-forge cudatoolkit cudnn
-ENV CONDA_PREFIX=/opt/conda
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/
+RUN apt update -q \
+     && apt install wget \
+     && wget -qO /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+     && dpkg -i /cuda-keyring.deb \
+     && apt update -q \
+     && apt install -y cuda-nvcc-$CUDA_VERSION libcublas-$CUDA_VERSION libcudnn8 cuda-libraries-$CUDA_VERSION
