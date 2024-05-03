@@ -80,13 +80,13 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ format('koush/scrypted:{0}-v{1}', matrix.BASE, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
+            ${{ format('koush/scrypted:v{1}-{0}', matrix.BASE[0], github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
             ${{ matrix.BASE[0] == '20-jammy-full' && format('koush/scrypted:{0}', github.event.inputs.tag) || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == '20-jammy-nvidia' && 'koush/scrypted:nvidia' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == '20-jammy-full' && 'koush/scrypted:full' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == '20-jammy-lite' && 'koush/scrypted:lite' || '' }}
 
-            ${{ format('ghcr.io/koush/scrypted:{0}-v{1}', matrix.BASE, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
+            ${{ format('ghcr.io/koush/scrypted:v{1}-{0}', matrix.BASE[0], github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
             ${{ matrix.BASE[0] == '20-jammy-full' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.tag) || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == '20-jammy-nvidia' && 'ghcr.io/koush/scrypted:nvidia' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == '20-jammy-full' && 'ghcr.io/koush/scrypted:full' || '' }}
