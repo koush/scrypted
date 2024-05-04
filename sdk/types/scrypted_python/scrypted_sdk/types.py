@@ -644,7 +644,7 @@ class ObjectDetectionModel(TypedDict):
 
 class ObjectDetectionSession(TypedDict):
 
-    batch: float
+    batch: float  # Denotes that this is the first sample in a batch of samples.
     settings: Any
     sourceId: str
     zones: list[ObjectDetectionZone]

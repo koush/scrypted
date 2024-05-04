@@ -7,12 +7,10 @@ jobs:
   build:
     name: Push Docker image to Docker Hub
     runs-on: self-hosted
+    env:
+      NODE_VERSION: '20'
     strategy:
       matrix:
-        NODE_VERSION: [
-          # "18",
-          "20"
-        ]
         BASE: ["jammy"]
         FLAVOR: ["full", "lite"]
     steps:
@@ -53,15 +51,15 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           build-args: |
-            NODE_VERSION=${{ matrix.NODE_VERSION }}
+            NODE_VERSION=${{ env.NODE_VERSION }}
             BASE=${{ matrix.BASE }}
           context: install/docker/
           file: install/docker/Dockerfile.${{ matrix.FLAVOR }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-${{ matrix.FLAVOR }}
-            ghcr.io/koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-${{ matrix.FLAVOR }}
+            koush/scrypted-common:${{ matrix.BASE }}-${{ matrix.FLAVOR }}
+            ghcr.io/koush/scrypted-common:${{ matrix.BASE }}-${{ matrix.FLAVOR }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -71,10 +69,6 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        NODE_VERSION: [
-          # "18",
-          "20"
-        ]
         BASE: ["jammy"]
     steps:
       - name: Check out the repo
@@ -114,13 +108,13 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           build-args: |
-            BASE=ghcr.io/koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-full
+            BASE=ghcr.io/koush/scrypted-common:${{ matrix.BASE }}-full
           context: install/docker/
           file: install/docker/Dockerfile.nvidia
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-nvidia
-            ghcr.io/koush/scrypted-common:${{ matrix.NODE_VERSION }}-${{ matrix.BASE }}-nvidia
+            koush/scrypted-common:${{ matrix.BASE }}-nvidia
+            ghcr.io/koush/scrypted-common:${{ matrix.BASE }}-nvidia
           cache-from: type=gha
           cache-to: type=gha,mode=max

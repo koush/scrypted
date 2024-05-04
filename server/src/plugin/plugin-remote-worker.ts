@@ -285,6 +285,12 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             // start the stats updater/watchdog after installation has finished, as that may take some time.
             peer.getParam('updateStats').then(updateStats => startStatsUpdater(allMemoryStats, updateStats));
 
+            let pong: (time: number) => Promise<void>;
+            peer.params.ping = async (time: number) => {
+                pong ||= await peer.getParam('pong');
+                await pong(time);
+            };
+
             const main = pluginReader('main.nodejs.js');
             const script = main.toString();
 
