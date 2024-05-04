@@ -754,6 +754,13 @@ class PluginRemote:
         raise Exception(f'unknown service {name}')
 
     async def start_stats_runner(self):
+        pong = None
+        async def ping(time: int):
+            nonlocal pong
+            pong = pong or await self.peer.getParam('pong')
+            await pong(time)
+        self.peer.params['ping'] = ping
+
         update_stats = await self.peer.getParam('updateStats')
         if not update_stats:
             print('host did not provide update_stats')
