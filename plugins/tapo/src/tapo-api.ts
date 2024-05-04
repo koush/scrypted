@@ -128,6 +128,7 @@ export class TapoAPI {
                 'X-If-Encrypt': '0',
                 'X-Session-Id': this.backchannelSessionId,
             });
+            this.stream.write('\r\n');
         });
 
         this.stream.on('close', () => pt.destroy());
@@ -149,6 +150,7 @@ export class TapoAPI {
         writeMessage(this.stream, undefined, Buffer.from(JSON.stringify(request)), {
             'Content-Type': 'application/json',
         });
+        this.stream.write('\r\n');
 
         return deferred.promise;
     }
