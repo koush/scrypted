@@ -1,6 +1,9 @@
 if [ "$(uname -m)" = "x86_64" ]
 then
-    export CUDA_VERSION=12-4
+    # uncomment to require cuda 12, but everything currently targets 11.
+    # stuff that targets 11 will work with 12 though. 
+    # export CUDA_VERSION=12-4
+    export CUDA_VERSION=11-8
     echo "Installing NVIDIA graphics packages."
     apt update -q \
         && apt install wget \
