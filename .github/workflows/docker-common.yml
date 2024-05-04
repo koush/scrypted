@@ -23,6 +23,12 @@ jobs:
       - name: Set up SSH
         uses: MrSquaare/ssh-setup-action@v2
         with:
+          host: ${{ secrets.DOCKER_SSH_HOST_AMD64 }}
+          private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
+
+      - name: Set up SSH
+        uses: MrSquaare/ssh-setup-action@v2
+        with:
           host: ${{ secrets.DOCKER_SSH_HOST_ARM64 }}
           private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
 
@@ -84,6 +90,12 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
+
+      - name: Set up SSH
+        uses: MrSquaare/ssh-setup-action@v2
+        with:
+          host: ${{ secrets.DOCKER_SSH_HOST_AMD64 }}
+          private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
 
       - name: Set up SSH
         uses: MrSquaare/ssh-setup-action@v2
