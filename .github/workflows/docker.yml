@@ -51,6 +51,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
+          platforms: linux/amd64
+          append: |
+            - endpoint: ssh://${{ secrets.DOCKER_SSH_USER }}@${{ secrets.DOCKER_SSH_HOST_AMD64 }}
+              platforms: linux/amd64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
           platforms: linux/arm64
           append: |
             - endpoint: ssh://${{ secrets.DOCKER_SSH_USER }}@${{ secrets.DOCKER_SSH_HOST_ARM64 }}
