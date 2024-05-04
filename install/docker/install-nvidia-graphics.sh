@@ -2,8 +2,8 @@ if [ "$(uname -m)" = "x86_64" ]
 then
     echo "Installing NVIDIA graphics packages."
     apt update -q \
-        && apt install wget \
-        && wget -qO /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+        && apt install -y wget \
+        && wget -qO /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/$(uname -m)/cuda-keyring_1.1-1_all.deb \
         && dpkg -i /cuda-keyring.deb \
         && apt update -q \
         && apt install -y cuda-nvcc-11-8 libcublas-11-8 libcudnn8 cuda-libraries-11-8 \
