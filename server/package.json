@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.100.3",
+  "version": "0.101.5",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",
@@ -26,7 +26,7 @@
     "semver": "^7.6.0",
     "sharp": "^0.33.3",
     "source-map-support": "^0.5.21",
-    "tar": "^7.0.1",
+    "tar": "^7.1.0",
     "tslib": "^2.6.2",
     "typescript": "^5.4.5",
     "whatwg-mimetype": "^4.0.0",
@@ -39,7 +39,7 @@
     "@types/follow-redirects": "^1.14.4",
     "@types/http-auth": "^4.1.4",
     "@types/ip": "^1.1.3",
-    "@types/lodash": "^4.17.0",
+    "@types/lodash": "^4.17.1",
     "@types/node-dijkstra": "^2.5.6",
     "@types/node-forge": "^1.3.11",
     "@types/semver": "^7.5.8",
