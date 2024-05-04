@@ -4,7 +4,6 @@ import { readLine } from '@scrypted/common/src/read-stream';
 import { parseHeaders, readBody, readMessage, writeMessage } from '@scrypted/common/src/rtsp-server';
 import crypto from 'crypto';
 import { Duplex, PassThrough, Writable } from 'stream';
-import { BufferParser, StreamParser } from '../../../server/src/http-fetch-helpers';
 import { digestAuthHeader } from './digest-auth';
 
 export function getTapoAdminPassword(cloudPassword: string, useSHA256: boolean) {
@@ -32,17 +31,17 @@ export class TapoAPI {
             credential: undefined,
             url: url,
             ignoreStatusCode: true,
-        }, {
             method: 'POST',
             headers: {
                 'Content-Type': 'multipart/mixed; boundary=--client-stream-boundary--',
             },
-        }, BufferParser);
+            responseType: 'buffer',
+        });
 
         if (response.statusCode !== 401)
             throw new Error('Expected 401 status code for two way audio init')
 
-        const wwwAuthenticate = response.headers['www-authenticate'];
+        const wwwAuthenticate = response.headers.get('www-authenticate') ?? '';
         const useSHA256 = wwwAuthenticate.includes('encrypt_type="3"');
 
         const password = getTapoAdminPassword(options.cloudPassword, useSHA256);
@@ -52,16 +51,16 @@ export class TapoAPI {
         const response2 = await authHttpFetch({
             credential: undefined,
             url: url,
-        }, {
             method: 'POST',
             headers: {
                 'Authorization': auth,
                 'Content-Type': 'multipart/mixed; boundary=--client-stream-boundary--',
             },
-        }, StreamParser)
+            responseType: 'readable',
+        })
 
         const tapo = new TapoAPI();
-        tapo.keyExchange = response2.headers['key-exchange'] as string;
+        tapo.keyExchange = response2.headers.get('key-exchange') ?? '';
         tapo.stream = response2.body.socket;
         tapo.stream.on('close', () => console.error('stream closed'));
         // this.stream.on('data', data => console.log('data', data));
