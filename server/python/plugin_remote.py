@@ -56,7 +56,7 @@ class DeviceProxy(object):
     def __init__(self, systemManager: SystemManager, id: str):
         self.systemManager = systemManager
         self.id = id
-        self.device: asyncio.Future[rpc.RpcPeer] = None
+        self.device: asyncio.Future[rpc.RpcProxy] = None
 
     def __getattr__(self, name):
         if name == 'id':
@@ -81,7 +81,7 @@ class DeviceProxy(object):
 
     def __apply__(self, method: str, args: list):
         if not self.device:
-            self.device = self.systemManager.api.getDeviceById(self.id)
+            self.device = asyncio.ensure_future(self.systemManager.api.getDeviceById(self.id))
 
         async def apply():
             device = await self.device
@@ -754,6 +754,13 @@ class PluginRemote:
         raise Exception(f'unknown service {name}')
 
     async def start_stats_runner(self):
+        pong = None
+        async def ping(time: int):
+            nonlocal pong
+            pong = pong or await self.peer.getParam('pong')
+            await pong(time)
+        self.peer.params['ping'] = ping
+
         update_stats = await self.peer.getParam('updateStats')
         if not update_stats:
             print('host did not provide update_stats')

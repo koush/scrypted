@@ -182,12 +182,27 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
                 let detections: ObjectDetectionResult[] = [];
 
+                // const event = {
+                //     type: 'smartDetectZone',
+                //     start: 1713211066646,
+                //     score: 80,
+                //     smartDetectTypes: [ 'licensePlate', 'vehicle' ],
+                //     smartDetectEvents: [],
+                //     metadata: { licensePlate: { name: 'ABCDEFG', confidenceLevel: 90 } },
+                //     camera: '64b2e59f0106eb03e4001210',
+                //     partition: null,
+                //     user: null,
+                //     id: '661d86bf03e69c03e408d62a',
+                //     modelKey: 'event'
+                // }
+                  
                 if (payload.type === 'smartDetectZone' || payload.type === 'smartDetectLine') {
                     unifiCamera.resetDetectionTimeout();
 
                     detections = payload.smartDetectTypes.map(type => ({
                         className: type,
                         score: payload.score,
+                        label: (payload as any).metadata?.[type]?.name,
                     }));
                 }
                 else {

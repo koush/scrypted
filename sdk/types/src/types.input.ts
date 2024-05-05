@@ -213,9 +213,14 @@ export interface ColorHsv {
   v?: number;
 }
 
+export interface NotificationAction {
+  action: string;
+  icon?: string;
+  title: string;
+}
+
 export interface NotifierOptions {
   subtitle?: string;
-  actions?: NotificationAction[];
   badge?: string;
   bodyWithSubtitle?: string;
   body?: string;
@@ -229,6 +234,10 @@ export interface NotifierOptions {
   timestamp?: number;
   vibrate?: VibratePattern;
   recordedEvent?: RecordedEvent;
+
+  // removed from typescript dom?
+  actions?: NotificationAction[];
+  image?: string;
 }
 
 /**
@@ -1331,6 +1340,10 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
    */
   className: ObjectDetectionClass;
   /**
+   * Base64 encoded embedding float32 vector.
+   */
+  embedding?: string;
+  /**
    * The label of the object, if it was recognized as a familiar object (person, pet, etc).
    */
   label?: string;
@@ -1395,6 +1408,10 @@ export interface ObjectDetectionGeneratorSession {
   sourceId?: string;
 }
 export interface ObjectDetectionSession extends ObjectDetectionGeneratorSession {
+  /**
+   * Denotes that this is the first sample in a batch of samples.
+   */
+  batch?: number;
 }
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;

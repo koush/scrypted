@@ -1,5 +1,6 @@
 import sdk, { BufferConverter, Image, ImageOptions, MediaObject, MediaObjectOptions, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import type sharp from 'sharp';
+import type { KernelEnum } from "sharp";
 
 let hasLoadedSharp = false;
 let sharpInstance: typeof sharp;
@@ -8,8 +9,6 @@ export function loadSharp() {
         hasLoadedSharp = true;
         try {
             sharpInstance = require('sharp');
-            // not exposed by sharp but it exists.
-            (sharpInstance.kernel as any).linear = 'linear';
             console.log('sharp loaded');
         }
         catch (e) {
@@ -60,11 +59,8 @@ export class VipsImage implements Image {
             });
         }
         if (options?.resize) {
-            let kernel: string;
+            let kernel: keyof KernelEnum;
             switch (options?.resize.filter) {
-                case 'bilinear':
-                    kernel = 'linear';
-                    break;
                 case 'lanczos':
                     kernel = 'lanczos2';
                     break;
@@ -75,12 +71,13 @@ export class VipsImage implements Image {
                     kernel = 'nearest';
                     break;
                 default:
-                    kernel = 'linear';
+                    kernel = 'cubic';
                     break
             }
             transformed.resize(typeof options.resize.width === 'number' ? Math.floor(options.resize.width) : undefined, typeof options.resize.height === 'number' ? Math.floor(options.resize.height) : undefined, {
-                fit: "cover",
-                kernel: kernel as any,
+                // haven't decided if these are the correct defaults.
+                fit: options.resize.width && options.resize.height ? 'fill' : 'cover',
+                kernel: kernel,
             });
         }
 

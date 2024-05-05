@@ -1,6 +1,6 @@
 import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { readLine } from '@scrypted/common/src/read-stream';
-import { parseHeaders, readBody, readMessage } from '@scrypted/common/src/rtsp-server';
+import { parseHeaders, readBody } from '@scrypted/common/src/rtsp-server';
 import contentType from 'content-type';
 import { IncomingMessage } from 'http';
 import { EventEmitter, Readable } from 'stream';
@@ -8,6 +8,7 @@ import { Destroyable } from '../../rtsp/src/rtsp';
 import { getDeviceInfo } from './probe';
 import { Point } from '@scrypted/sdk';
 
+// Human
 // {
 //     "Action" : "Cross",
 //     "Class" : "Normal",
@@ -39,6 +40,66 @@ import { Point } from '@scrypted/sdk';
 //     "Track" : [],
 //     "UTC" : 1711446999,
 //     "UTCMS" : 701
+//  }
+
+// Face
+// {
+//     "CfgRuleId" : 1,
+//     "Class" : "FaceDetection",
+//     "CountInGroup" : 2,
+//     "DetectRegion" : null,
+//     "EventID" : 10360,
+//     "EventSeq" : 6,
+//     "Faces" : [
+//        {
+//           "BoundingBox" : [ 1504, 2336, 1728, 2704 ],
+//           "Center" : [ 1616, 2520 ],
+//           "ObjectID" : 94,
+//           "ObjectType" : "HumanFace",
+//           "RelativeID" : 0
+//        }
+//     ],
+//     "FrameSequence" : 8251212,
+//     "GroupID" : 6,
+//     "Mark" : 0,
+//     "Name" : "FaceDetection",
+//     "Object" : {
+//        "Action" : "Appear",
+//        "BoundingBox" : [ 1504, 2336, 1728, 2704 ],
+//        "Center" : [ 1616, 2520 ],
+//        "Confidence" : 19,
+//        "FrameSequence" : 8251212,
+//        "ObjectID" : 94,
+//        "ObjectType" : "HumanFace",
+//        "RelativeID" : 0,
+//        "SerialUUID" : "",
+//        "Source" : 0.0,
+//        "Speed" : 0,
+//        "SpeedTypeInternal" : 0
+//     },
+//     "Objects" : [
+//        {
+//           "Action" : "Appear",
+//           "BoundingBox" : [ 1504, 2336, 1728, 2704 ],
+//           "Center" : [ 1616, 2520 ],
+//           "Confidence" : 19,
+//           "FrameSequence" : 8251212,
+//           "ObjectID" : 94,
+//           "ObjectType" : "HumanFace",
+//           "RelativeID" : 0,
+//           "SerialUUID" : "",
+//           "Source" : 0.0,
+//           "Speed" : 0,
+//           "SpeedTypeInternal" : 0
+//        }
+//     ],
+//     "PTS" : 43774941350.0,
+//     "Priority" : 0,
+//     "RuleID" : 1,
+//     "RuleId" : 1,
+//     "Source" : -1280470024.0,
+//     "UTC" : 947510337,
+//     "UTCMS" : 0
 //  }
 export interface AmcrestObjectDetails {
     Action: string;
@@ -73,6 +134,7 @@ export interface AmcrestEventData {
 export enum AmcrestEvent {
     MotionStart = "Code=VideoMotion;action=Start",
     MotionStop = "Code=VideoMotion;action=Stop",
+    MotionInfo  = "Code=VideoMotionInfo;action=State",
     AudioStart = "Code=AudioMutation;action=Start",
     AudioStop = "Code=AudioMutation;action=Stop",
     TalkInvite = "Code=_DoTalkAction_;action=Invite",
@@ -86,11 +148,32 @@ export enum AmcrestEvent {
     DahuaTalkHangup = "Code=PassiveHungup;action=Start",
     DahuaCallDeny = "Code=HungupPhone;action=Pulse",
     DahuaTalkPulse = "Code=_CallNoAnswer_;action=Pulse",
+    FaceDetection = "Code=FaceDetection;action=Start",
     SmartMotionHuman = "Code=SmartMotionHuman;action=Start",
     SmartMotionVehicle = "Code=Vehicle;action=Start",
     CrossLineDetection = "Code=CrossLineDetection;action=Start",
     CrossRegionDetection = "Code=CrossRegionDetection;action=Start",
 }
+
+
+async function readAmcrestMessage(client: Readable): Promise<string[]> {
+    let currentHeaders: string[] = [];
+    while (true) {
+        const originalLine = await readLine(client);
+        const line = originalLine.trim();
+        if (!line)
+            return currentHeaders;
+        // dahua bugs out and sends message without a newline separating the body:
+        // Content-Length:39
+        // Code=AudioMutation;action=Start;index=0
+        if (!line.includes(':')) {
+            client.unshift(Buffer.from(originalLine + '\n'));
+            return currentHeaders;
+        }
+        currentHeaders.push(line);
+    }
+}
+
 
 export class AmcrestCameraClient {
     credential: AuthFetchCredentialState;
@@ -192,12 +275,24 @@ export class AmcrestCameraClient {
                     continue;
                 if (ignore === boundaryEnd)
                     continue;
+                // dahua bugs out and sends this.
+                if (ignore === 'HTTP/1.1 200 OK') {
+                    const message = await readAmcrestMessage(stream);
+                    this.console.log('ignoring dahua http message', message);
+                    message.unshift('');
+                    const headers = parseHeaders(message);
+                    const body = await readBody(stream, headers);
+                    if (body)
+                        this.console.log('ignoring dahua http body', body);
+                    continue;
+                }
                 if (ignore !== boundary) {
                     this.console.error('expected boundary but found', ignore);
+                    this.console.error(response.headers);
                     throw new Error('expected boundary');
                 }
 
-                const message = await readMessage(stream);
+                const message = await readAmcrestMessage(stream);
                 events.emit('data', message);
                 message.unshift('');
                 const headers = parseHeaders(message);
@@ -239,6 +334,9 @@ export class AmcrestCameraClient {
                         }
                         else if (event === AmcrestEvent.SmartMotionVehicle) {
                             events.emit('smart', 'car', jsonData);
+                        }
+                        else if (event === AmcrestEvent.FaceDetection) {
+                            events.emit('smart', 'face', jsonData);
                         }
                         else if (event === AmcrestEvent.CrossLineDetection || event === AmcrestEvent.CrossRegionDetection) {
                             const eventData: AmcrestEventData = jsonData;

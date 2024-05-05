@@ -171,7 +171,7 @@ export class StorageSettings<T extends string> implements Settings {
         if (!setting)
             return this.device.storage.getItem(key);
         const readDefaultValue = () => {
-            if (setting.persistedDefaultValue) {
+            if (setting.persistedDefaultValue != null) {
                 this.putSettingInternal(setting, undefined, key, setting.persistedDefaultValue);
                 return setting.persistedDefaultValue;
             }

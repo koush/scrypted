@@ -20,10 +20,10 @@ jobs:
     strategy:
       matrix:
         BASE: [
-          "20-jammy-full",
-          "20-jammy-lite",
+          ["jammy-nvidia", ".s6"],
+          ["jammy-full", ".s6"],
+          ["jammy-lite", ""],
         ]
-        SUPERVISOR: ["", ".s6"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -45,8 +45,22 @@ jobs:
       - name: Set up SSH
         uses: MrSquaare/ssh-setup-action@v2
         with:
+          host: ${{ secrets.DOCKER_SSH_HOST_AMD64 }}
+          private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
+
+      - name: Set up SSH
+        uses: MrSquaare/ssh-setup-action@v2
+        with:
           host: ${{ secrets.DOCKER_SSH_HOST_ARM64 }}
           private-key: ${{ secrets.DOCKER_SSH_PRIVATE_KEY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          platforms: linux/amd64
+          append: |
+            - endpoint: ssh://${{ secrets.DOCKER_SSH_USER }}@${{ secrets.DOCKER_SSH_HOST_AMD64 }}
+              platforms: linux/amd64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -73,23 +87,23 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           build-args: |
-            BASE=${{ matrix.BASE }}
+            BASE=${{ matrix.BASE[0] }}
             SCRYPTED_INSTALL_VERSION=${{ steps.package-version.outputs.NPM_VERSION }}
           context: install/docker/
-          file: install/docker/Dockerfile${{ matrix.SUPERVISOR }}
+          file: install/docker/Dockerfile${{ matrix.BASE[1] }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ format('koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
-            ${{ matrix.BASE == '20-jammy-full' && matrix.SUPERVISOR == '.s6' && format('koush/scrypted:{0}', github.event.inputs.tag) || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-full' && matrix.SUPERVISOR == '' && 'koush/scrypted:full' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-lite' && matrix.SUPERVISOR == '' && 'koush/scrypted:lite' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-lite' && matrix.SUPERVISOR == '.s6' && 'koush/scrypted:lite-s6' || '' }}
+            ${{ format('koush/scrypted:v{1}-{0}', matrix.BASE[0], github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
+            ${{ matrix.BASE[0] == 'jammy-full' && format('koush/scrypted:{0}', github.event.inputs.tag) || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == 'jammy-nvidia' && 'koush/scrypted:nvidia' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == 'jammy-full' && 'koush/scrypted:full' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == 'jammy-lite' && 'koush/scrypted:lite' || '' }}
 
-            ${{ format('ghcr.io/koush/scrypted:{0}{1}-v{2}', matrix.BASE, matrix.SUPERVISOR, github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
-            ${{ matrix.BASE == '20-jammy-full' && matrix.SUPERVISOR == '.s6' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.tag) || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-full' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:full' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-lite' && matrix.SUPERVISOR == '' && 'ghcr.io/koush/scrypted:lite' || '' }}
-            ${{ github.event.inputs.tag == 'latest' && matrix.BASE == '20-jammy-lite' && matrix.SUPERVISOR == '.s6' && 'ghcr.io/koush/scrypted:lite-s6' || '' }}
+            ${{ format('ghcr.io/koush/scrypted:v{1}-{0}', matrix.BASE[0], github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
+            ${{ matrix.BASE[0] == 'jammy-full' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.tag) || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == 'jammy-nvidia' && 'ghcr.io/koush/scrypted:nvidia' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == 'jammy-full' && 'ghcr.io/koush/scrypted:full' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE[0] == 'jammy-lite' && 'ghcr.io/koush/scrypted:lite' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -1,14 +1,6 @@
-FROM ghcr.io/koush/scrypted:20-jammy-full.s6
+ARG BASE="ghcr.io/koush/scrypted-common:20-jammy-full"
+FROM $BASE
 
-WORKDIR /
-
-# Install miniconda
-ENV CONDA_DIR /opt/conda
-RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
-     /bin/bash ~/miniconda.sh -b -p /opt/conda
-# Put conda in path so we can use conda activate
-ENV PATH=$CONDA_DIR/bin:$PATH
-
-RUN conda install -c conda-forge cudatoolkit=11.2.2 cudnn=8.1.0
-ENV CONDA_PREFIX=/opt/conda
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/
+# nvidia cudnn/libcublas etc.
+# for some reason this is not provided by the nvidia container toolkit
+RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-nvidia-graphics.sh | bash

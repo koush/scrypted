@@ -1,0 +1,1 @@
+../../../../sdk/dist/src/storage-settings.d.ts

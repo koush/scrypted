@@ -9,7 +9,7 @@
     // "scrypted.serverRoot": "/home/pi/.scrypted",
 
     // lxc installation
-    "scrypted.debugHost": "scrypted-server",
+    "scrypted.debugHost": "scrypted-test",
     "scrypted.serverRoot": "/root/.scrypted",
 
     // local checkout

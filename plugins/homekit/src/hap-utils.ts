@@ -66,7 +66,7 @@ export function createHAPUsername() {
 }
 
 export function getAddresses() {
-    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
+    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan') || iface.startsWith('net')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
     return addresses;
 }
 
@@ -74,13 +74,17 @@ export function getRandomPort() {
     return Math.round(30000 + Math.random() * 20000);
 }
 
-export function createHAPUsernameStorageSettingsDict(device: { storage: Storage, name?: string }, group: string, subgroup?: string): StorageSettingsDict<'mac' | 'qrCode' | 'pincode' | 'portOverride' | 'resetAccessory'> {
+export function createHAPUsernameStorageSettingsDict(device: { storage: Storage, name?: string }, group: string, subgroup?: string): StorageSettingsDict<'mac' | 'addIdentifyingMaterial' | 'qrCode' | 'pincode' | 'portOverride' | 'resetAccessory'> {
     const alertReload = () => {
         sdk.log.a(`The HomeKit plugin will reload momentarily for the changes to ${device.name} to take effect.`);
         sdk.deviceManager.requestRestart();
     }
 
     return {
+        addIdentifyingMaterial: {
+            hide: true,
+            type: 'boolean',
+        },
         qrCode: {
             group,
             // subgroup,

@@ -406,6 +406,7 @@ class WebRTCTrack implements RTCOutputMediaObjectTrack, RTCInputMediaObjectTrack
 
     constructor(public connectionManagement: WebRTCConnectionManagement, public video: RTCRtpTransceiver, public audio: RTCRtpTransceiver, intercom: Intercom) {
         this.control = new ScryptedSessionControl(intercom, audio);
+        this.connectionManagement.activeTracks.add(this);
     }
 
     async onStop(): Promise<void> {
@@ -623,7 +624,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
 
     async close(): Promise<void> {
         for (const track of this.activeTracks) {
-            track.cleanup(true);
+            track.cleanup(false);
         }
         this.activeTracks.clear();
         this.pc.close();
@@ -662,7 +663,7 @@ export async function createRTCPeerConnectionSink(
     });
 
     track.control.killed.promise.then(() => {
-        track.cleanup(true);
+        track.cleanup(false);
         connection.pc.close();
     });
 

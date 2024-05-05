@@ -319,10 +319,6 @@ export class PluginHost {
             logger.log('e', `${this.pluginName} close`);
             disconnect();
         });
-        this.worker.on('disconnect', () => {
-            logger.log('e', `${this.pluginName} disconnected`);
-            disconnect();
-        });
         this.worker.on('exit', async (code, signal) => {
             logger.log('e', `${this.pluginName} exited ${code} ${signal}`);
             disconnect();
@@ -354,11 +350,38 @@ export class PluginHost {
         // the plugin is expected to send process stats every 10 seconds.
         // this can be used as a check for liveness.
         let lastStats: number;
-        const statsInterval = setInterval(async () => {
+        this.peer.params.updateStats = (stats: any) => {
+            lastStats = Date.now();
+            this.stats = stats;
+        }
+
+        let lastPong: number;
+        this.peer.params.pong = (time: number) => {
+            lastPong = time;
+        };
+        (async () => {
+            try {
+                let pingPromise: Promise<any>
+                while (!this.killed) {
+                    await sleep(30000);
+                    if (this.killed)
+                        return;
+                    pingPromise ||= await this.peer.getParam('ping');
+                    const ping = await pingPromise;
+                    await ping(Date.now());
+                }
+            }
+            catch (e) {
+                logger.log('e', 'plugin ping failed. restarting.');
+                this.api.requestRestart();
+            }
+        })();
+
+        const healthInterval = setInterval(async () => {
             const now = Date.now();
             // plugin may take a while to install, so wait 10 minutes.
             // after that, require 1 minute checkins.
-            if (!lastStats) {
+            if (!lastStats || !lastPong) {
                 if (now - startupTime > 10 * 60 * 1000) {
                     const logger = await this.api.getLogger(undefined);
                     logger.log('e', 'plugin failed to start in a timely manner. restarting.');
@@ -368,15 +391,16 @@ export class PluginHost {
             }
             if (!pluginDebug && (lastStats + 60000 < now)) {
                 const logger = await this.api.getLogger(undefined);
-                logger.log('e', 'plugin is unresponsive. restarting.');
+                logger.log('e', 'plugin is not reporting stats. restarting.');
+                this.api.requestRestart();
+            }
+            if (!pluginDebug && (lastPong + 60000 < now)) {
+                const logger = await this.api.getLogger(undefined);
+                logger.log('e', 'plugin is not responding to ping. restarting.');
                 this.api.requestRestart();
             }
         }, 60000);
-        this.peer.killed.finally(() => clearInterval(statsInterval));
-        this.peer.params.updateStats = (stats: any) => {
-            lastStats = Date.now();
-            this.stats = stats;
-        }
+        this.peer.killed.finally(() => clearInterval(healthInterval));
     }
 
     async createRpcIoPeer(socket: IOServerSocket, accessControls: AccessControls) {

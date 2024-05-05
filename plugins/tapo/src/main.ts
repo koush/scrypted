@@ -1,5 +1,5 @@
 import { SettingsMixinDeviceBase } from '@scrypted/common/src/settings-mixin';
-import sdk, { DeviceProvider, DeviceState, FFmpegInput, Intercom, MediaObject, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { DeviceProvider, FFmpegInput, Intercom, MediaObject, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { MpegTSWriter, StreamTypePCMATapo } from './mpegts-writer';
@@ -97,7 +97,7 @@ class TapoIntercom extends ScryptedDeviceBase implements MixinProvider {
         ]
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any> {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any> {
         return new TapoIntercomMixin({
             mixinProviderNativeId: this.nativeId,
             group: 'Tapo Two Way Audio',

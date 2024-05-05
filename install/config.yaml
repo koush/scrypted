@@ -1,13 +1,12 @@
 # Home Assistant Addon Configuration
 name: Scrypted
-version: "20-jammy-full.s6-v0.95.0"
+version: "20-jammy-full.s6-v0.99.0"
 slug: scrypted
 description: Scrypted is a high performance home video integration and automation platform
 url: "https://github.com/koush/scrypted"
 arch:
   - amd64
   - aarch64
-  - armv7
 init: false
 ingress: true
 ingress_port: 11080

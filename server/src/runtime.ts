@@ -13,7 +13,7 @@ import path from 'path';
 import { ParsedQs } from 'qs';
 import semver from 'semver';
 import { PassThrough } from 'stream';
-import tar from 'tar';
+import { Parser as TarParser } from 'tar';
 import { URL } from "url";
 import WebSocket, { Server as WebSocketServer } from "ws";
 import { computeClusterObjectHash } from './cluster/cluster-hash';
@@ -451,7 +451,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             .finally(() => {
                 if (!ri.sent) {
                     console.warn(pluginId, 'did not send a response before onRequest returned.');
-                    ri.send(`Internal Plugin Error: ${pluginId}` , {
+                    ri.send(`Internal Plugin Error: ${pluginId}`, {
                         code: 500,
                     })
                 }
@@ -543,13 +543,19 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
         console.log('installing package', pkg, version);
 
-        const { body: tarball } = await httpFetch( {
+        const { body: tarball } = await httpFetch({
             url: `${registry.versions[version].dist.tarball}`,
             // force ipv4 in case of busted ipv6.
             family: 4,
         });
         console.log('downloaded tarball', tarball?.length);
-        const parse = new (tar.Parse as any)();
+        try {
+            const pp = new TarParser();
+        }
+        catch (e) {
+            throw new Error(e);
+        }
+        const parse = new TarParser();
         const files: { [name: string]: Buffer } = {};
 
         parse.on('entry', async (entry: any) => {
@@ -595,10 +601,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             return this.installPlugin(plugin);
         })();
 
-        const pt = new PassThrough();
-        pt.write(tarball);
-        pt.push(null);
-        pt.pipe(parse);
+        parse.write(tarball);
+        parse.end();
         return ret;
     }
 
@@ -627,22 +631,29 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     setupPluginHostAutoRestart(pluginHost: PluginHost) {
-        pluginHost.worker.once('exit', () => {
-            if (pluginHost.killed)
+        const logger = this.getDeviceLogger(this.findPluginDevice(pluginHost.pluginId));
+
+        let timeout: NodeJS.Timeout;
+
+        const restart = () => {
+            if (timeout)
                 return;
+
+            const t = 60000;
             pluginHost.kill();
-            const timeout = 60000;
-            console.error(`plugin unexpectedly exited, restarting in ${timeout}ms`, pluginHost.pluginId);
-            setTimeout(async () => {
-                const existing = this.plugins[pluginHost.pluginId];
-                if (existing !== pluginHost) {
-                    console.log('scheduled plugin restart cancelled, plugin was restarted by user', pluginHost.pluginId);
+            logger.log('e', `plugin ${pluginHost.pluginId} unexpectedly exited, restarting in ${t}ms`);
+
+            timeout = setTimeout(async () => {
+                timeout = undefined;
+                const plugin = await this.datastore.tryGet(Plugin, pluginHost.pluginId);
+                if (!plugin) {
+                    logger.log('w', `scheduled plugin restart cancelled, plugin no longer exists ${pluginHost.pluginId}`);
                     return;
                 }
 
-                const plugin = await this.datastore.tryGet(Plugin, pluginHost.pluginId);
-                if (!plugin) {
-                    console.log('scheduled plugin restart cancelled, plugin no longer exists', pluginHost.pluginId);
+                const existing = this.plugins[pluginHost.pluginId];
+                if (existing !== pluginHost) {
+                    logger.log('w', `scheduled plugin restart cancelled, plugin was restarted by user ${pluginHost.pluginId}`);
                     return;
                 }
 
@@ -650,10 +661,16 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     this.runPlugin(plugin);
                 }
                 catch (e) {
-                    console.error('error restarting plugin', plugin._id, e);
+                    logger.log('e', `error restarting plugin ${pluginHost.pluginId}`);
+                    logger.log('e', e.toString());
+                    restart();
                 }
-            }, timeout);
-        });
+            }, t);
+        };
+
+        pluginHost.worker.once('error', restart);
+        pluginHost.worker.once('exit', restart);
+        pluginHost.worker.once('close', restart);
     }
 
     loadPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {

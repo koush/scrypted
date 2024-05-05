@@ -1,4 +1,6 @@
 import sdk, { FFmpegInput, RecordingStreamThumbnailOptions } from '@scrypted/sdk';
+import { Console } from 'console';
+import { PassThrough } from 'stream';
 import url from 'url';
 import type { MIMETypeParameters } from 'whatwg-mimetype';
 import { FFmpegImageFilterOptions, ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
@@ -71,7 +73,7 @@ export function toImageOp(options: RecordingStreamThumbnailOptions) {
     return ret;
 }
 
-export async function processImageOp(input: string | FFmpegInput | Buffer, op: ImageOp, time: number, sourceId: string, debugConsole: Console): Promise<Buffer> {
+export async function processImageOp(input: string | FFmpegInput | Buffer, op: ImageOp, time: number, sourceId: string, debug?: boolean): Promise<Buffer> {
     const { crop, resize } = op;
     const { width, height, fractional } = resize || {};
     const { left, top, right, bottom, fractional: cropFractional } = crop || {};
@@ -120,8 +122,19 @@ export async function processImageOp(input: string | FFmpegInput | Buffer, op: I
         }
     }
 
+    const out = new PassThrough();
+    let console = new Console(out, out);
+    const printConsole = () => {
+        if (!console)
+            return;
+        console = undefined;
+        const data = out.read().toString();
+        const deviceConsole = sdk.deviceManager.getMixinConsole(sourceId);
+        deviceConsole.log(data);
+    }
+
     const ffmpegOpts: FFmpegImageFilterOptions = {
-        console: debugConsole,
+        console,
         ffmpegPath: await sdk.mediaManager.getFFmpegPath(),
         resize: width === undefined && height === undefined
             ? undefined
@@ -143,22 +156,32 @@ export async function processImageOp(input: string | FFmpegInput | Buffer, op: I
         time,
     };
 
-    if (Buffer.isBuffer(input)) {
-        return ffmpegFilterImageBuffer(input, ffmpegOpts);
+    try {
+        if (Buffer.isBuffer(input)) {
+            return await ffmpegFilterImageBuffer(input, ffmpegOpts);
+        }
+
+        const ffmpegInput: FFmpegInput = typeof input !== 'string'
+            ? input
+            : {
+                inputArguments: [
+                    '-i', input,
+                ]
+            };
+
+        const args = [
+            ...ffmpegInput.inputArguments,
+            ...(ffmpegInput.h264EncoderArguments || []),
+        ];
+
+        return await ffmpegFilterImage(args, ffmpegOpts);
     }
-
-    const ffmpegInput: FFmpegInput = typeof input !== 'string'
-        ? input
-        : {
-            inputArguments: [
-                '-i', input,
-            ]
-        };
-
-    const args = [
-        ...ffmpegInput.inputArguments,
-        ...(ffmpegInput.h264EncoderArguments || []),
-    ];
-
-    return ffmpegFilterImage(args, ffmpegOpts);
+    catch (e) {
+        printConsole();
+        throw e;
+    }
+    finally {
+        if (debug)
+            printConsole();
+    }
 }

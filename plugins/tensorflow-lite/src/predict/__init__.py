@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import os
 import re
+import traceback
 import urllib.request
 from typing import Any, List, Tuple
 
@@ -12,69 +12,60 @@ from PIL import Image
 from scrypted_sdk.types import (ObjectDetectionResult, ObjectDetectionSession,
                                 ObjectsDetected, Setting)
 
+import common.colors
 from detect import DetectPlugin
-import traceback
-
-from .rectangle import (Rectangle, combine_rect, from_bounding_box,
-                        intersect_area, intersect_rect, to_bounding_box)
-
-
-# vips is already multithreaded, but needs to be kicked off the python asyncio thread.
-toThreadExecutor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="image")
-
-async def to_thread(f):
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(toThreadExecutor, f)
-
-async def ensureRGBData(data: bytes, size: Tuple[int, int], format: str):
-    if format != 'rgba':
-        return Image.frombuffer('RGB', size, data)
-
-    def convert():
-        rgba = Image.frombuffer('RGBA', size, data)
-        try:
-            return rgba.convert('RGB')
-        finally:
-            rgba.close()
-    return await to_thread(convert)
-
-def parse_label_contents(contents: str):
-    lines = contents.splitlines()
-    ret = {}
-    for row_number, content in enumerate(lines):
-        pair = re.split(r'[:\s]+', content.strip(), maxsplit=1)
-        if len(pair) == 2 and pair[0].strip().isdigit():
-            ret[int(pair[0])] = pair[1].strip()
-        else:
-            ret[row_number] = content.strip()
-    return ret
 
 class Prediction:
-    def __init__(self, id: int, score: float, bbox: Tuple[float, float, float, float]):
+    def __init__(self, id: int, score: float, bbox: Tuple[float, float, float, float], embedding: str = None):
         self.id = id
         self.score = score
         self.bbox = bbox
+        self.embedding = embedding
 
-class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
+class PredictPlugin(DetectPlugin):
     labels: dict
 
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
-        # periodic restart because there seems to be leaks in tflite or coral API.
-        loop = asyncio.get_event_loop()
-        loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+        # periodic restart of main plugin because there seems to be leaks in tflite or coral API.
+        if not nativeId:
+            loop = asyncio.get_event_loop()
+            loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+        
+        self.batch: List[Tuple[Any, asyncio.Future]] = []
+        self.batching = 0
+        self.batch_flush = None
 
     def downloadFile(self, url: str, filename: str):
-        filesPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'files')
-        fullpath = os.path.join(filesPath, filename)
-        if os.path.isfile(fullpath):
+        try:
+            filesPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'files')
+            fullpath = os.path.join(filesPath, filename)
+            if os.path.isfile(fullpath):
+                return fullpath
+            tmp = fullpath + '.tmp'
+            print("Creating directory for", tmp)
+            os.makedirs(os.path.dirname(fullpath), exist_ok=True)
+            print("Downloading", url)
+            response = urllib.request.urlopen(url)
+            if response.getcode() < 200 or response.getcode() >= 300:
+                raise Exception(f"Error downloading")
+            read = 0
+            with open(tmp, "wb") as f:
+                while True:
+                    data = response.read(1024 * 1024)
+                    if not data:
+                        break
+                    read += len(data)
+                    print("Downloaded", read, "bytes")
+                    f.write(data)
+            os.rename(tmp, fullpath)
             return fullpath
-        os.makedirs(os.path.dirname(fullpath), exist_ok=True)
-        tmp = fullpath + '.tmp'
-        urllib.request.urlretrieve(url, tmp)
-        os.rename(tmp, fullpath)
-        return fullpath
+        except:
+            print("Error downloading", url)
+            import traceback
+            traceback.print_exc()
+            raise
 
     def getClasses(self) -> list[str]:
         return list(self.labels.values())
@@ -108,6 +99,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
                 obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
             detection['className'] = className
             detection['score'] = obj.score
+            if hasattr(obj, 'embedding') and obj.embedding is not None:
+                detection['embedding'] = obj.embedding
             detections.append(detection)
 
         if convert_to_src_size:
@@ -137,6 +130,41 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         pass
 
+    async def detect_batch(self, inputs: List[Any]) -> List[Any]:
+        pass
+
+    async def run_batch(self):
+        batch = self.batch
+        self.batch = []
+        self.batching = 0
+
+        if len(batch):
+            inputs = [x[0] for x in batch]
+            try:
+                results = await self.detect_batch(inputs)
+                for i, result in enumerate(results):
+                    batch[i][1].set_result(result)
+            except Exception as e:
+                for i, result in enumerate(results):
+                    batch[i][1].set_exception(e)
+
+    async def flush_batch(self):
+        self.batch_flush = None
+        await self.run_batch()
+
+    async def queue_batch(self, input: Any) -> List[Any]:
+        future = asyncio.Future(loop = asyncio.get_event_loop())
+        self.batch.append((input, future))
+        if self.batching:
+            self.batching = self.batching - 1
+            if self.batching:
+                # if there is any sort of error or backlog, .
+                if not self.batch_flush:
+                    self.batch_flush = self.loop.call_later(.5, lambda: asyncio.ensure_future(self.flush_batch()))
+                return await future
+        await self.run_batch()
+        return await future
+
     async def safe_detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
         try:
             f = self.detect_once(input, settings, src_size, cvss)
@@ -151,26 +179,42 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.BufferConverter):
 
     async def run_detection_image(self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession) -> ObjectsDetected:
         settings = detection_session and detection_session.get('settings')
+        batch = (detection_session and detection_session.get('batch')) or 0
+        self.batching += batch
+
         iw, ih = image.width, image.height
         w, h = self.get_input_size()
 
-        resize = None
-        xs = w / iw
-        ys = h / ih
-        def cvss(point):
-            return point[0] / xs, point[1] / ys
+        if w is None or h is None:
+            resize = None
+            w = image.width
+            h = image.height
+            def cvss(point):
+                return point
+        else:
+            resize = None
+            xs = w / iw
+            ys = h / ih
+            def cvss(point):
+                return point[0] / xs, point[1] / ys
 
-        if iw != w or ih != h:
-            resize = {
-                'width': w,
-                'height': h,
-            }
+            if iw != w or ih != h:
+                resize = {
+                    'width': w,
+                    'height': h,
+                }
 
+        format = image.format or self.get_input_format()
         b = await image.toBuffer({
             'resize': resize,
-            'format': image.format or 'rgb',
+            'format': format,
         })
-        data = await ensureRGBData(b, (w, h), image.format)
+
+        if self.get_input_format() == 'rgb':
+            data = await common.colors.ensureRGBData(b, (w, h), format)
+        elif self.get_input_format() == 'rgba':
+            data = await common.colors.ensureRGBAData(b, (w, h), format)
+
         try:
             ret = await self.safe_detect_once(data, settings, (iw, ih), cvss)
             return ret

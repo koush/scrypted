@@ -162,7 +162,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   getCurrentSettings() {
     const settings = this.model.settings;
     if (!settings)
-      return;
+      return { id : this.id };
 
     const ret: { [key: string]: any } = {};
     for (const setting of settings) {
@@ -183,7 +183,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (this.hasMotionType)
       ret['motionAsObjects'] = true;
 
-    return ret;
+    return {
+      ...ret,
+      id: this.id,
+    };
   }
 
   maybeStartDetection() {
@@ -910,9 +913,10 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
     let objectDetection = systemManager.getDeviceById<ObjectDetection>(this.id);
     const hasMotionType = this.model.classes.includes('motion');
     const group = hasMotionType ? 'Motion Detection' : 'Object Detection';
+    const model = await objectDetection.getDetectionModel({ id: mixinDeviceState.id });
     // const group = objectDetection.name.replace('Plugin', '').trim();
 
-    const ret = new ObjectDetectionMixin(this.plugin, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.model, group, hasMotionType);
+    const ret = new ObjectDetectionMixin(this.plugin, mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, model, group, hasMotionType);
     this.currentMixins.add(ret);
     return ret;
   }

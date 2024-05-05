@@ -67,12 +67,29 @@ async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
         await timeoutPromise(1000, new Promise(resolve => cp.on('exit', resolve)));
         const h264 = Buffer.concat(buffers);
         let offset = 0;
+        let countedZeroes = 0;
         while (offset < h264.length - 6) {
-            if (h264.readInt32BE(offset) !== 1) {
+            const byte = h264[offset];
+            if (byte === 0) {
+                countedZeroes = Math.min(4, countedZeroes + 1);
                 offset++;
                 continue;
             }
-            offset += 4;
+
+            if (countedZeroes < 2) {
+                countedZeroes = 0;
+                offset++
+                continue;
+            }
+
+            countedZeroes = 0;
+            if (byte !== 1) {
+                offset++;
+                continue;
+            }
+
+            offset++;
+
             let naluType = h264.readUInt8(offset) & 0x1f;
             if (naluType === NAL_TYPE_FU_A) {
                 offset++;
@@ -99,7 +116,7 @@ async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
 }
 
 export async function* handleFragmentsRequests(streamId: number, device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
-    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin): AsyncGenerator<RecordingPacket> {
+    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin, isOpen: () => boolean): AsyncGenerator<RecordingPacket> {
 
     // homekitPlugin.storageSettings.values.lastKnownHomeHub = connection.remoteAddress;
 
@@ -177,7 +194,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         }
 
         let audioArgs: string[];
-        if (transcodeRecording || isDefinitelyNotAAC || debugMode.audio) {
+        if (!noAudio && (transcodeRecording || isDefinitelyNotAAC || debugMode.audio)) {
             if (!(transcodeRecording || debugMode.audio))
                 console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
 
@@ -302,6 +319,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         let needSkip = true;
         let ftyp: Buffer[];
         let moov: Buffer[];
+
         for await (const box of generator) {
             const { header, type, data } = box;
             // console.log('motion fragment box', type);
@@ -314,7 +332,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
                 checkMp4 = false;
                 // pending will contain the moof
                 try {
-                    if (!await checkMp4StartsWithKeyFrame(console, Buffer.concat([...ftyp, ...moov, ...pending, header, data]))) {
+                    if (false && !await checkMp4StartsWithKeyFrame(console, Buffer.concat([...ftyp, ...moov, ...pending, header, data]))) {
                         needSkip = false;
                         pending = [];
                         continue;
@@ -343,17 +361,19 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
                     data: fragment,
                     isLast,
                 }
+                if (!isOpen())
+                    return;
                 yield recordingPacket;
                 if (wasLast)
                     break;
             }
         }
-        console.log(`motion recording finished`);
     }
     catch (e) {
         console.log(`motion recording completed ${e}`);
     }
     finally {
+        console.log(`motion recording finished`);
         clearTimeout(videoTimeout);
         cleanupPipes();
         recordingFile?.end();

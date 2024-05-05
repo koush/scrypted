@@ -294,13 +294,15 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
             allProperties.push(...properties);
         }
 
+        let found: ReturnType<typeof publishAutoDiscovery>;
+
         client.on('connect', packet => {
             this.console.log('MQTT client connected, publishing current state.');
             for (const method of allMethods) {
                 client.subscribe(this.pathname + '/' + method);
             }
 
-            publishAutoDiscovery(this.provider.storageSettings.values.mqttId, client, this, this.pathname, 'homeassistant');
+            found = publishAutoDiscovery(this.provider.storageSettings.values.mqttId, client, this, this.pathname, true, 'homeassistant');
             client.subscribe('homeassistant/status');
             this.publishState(client);
         });
@@ -311,14 +313,17 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
 
         client.on('message', async (messageTopic, message) => {
             if (messageTopic === 'homeassistant/status') {
-                publishAutoDiscovery(this.provider.storageSettings.values.mqttId, client, this, this.pathname, 'homeassistant');
+                publishAutoDiscovery(this.provider.storageSettings.values.mqttId, client, this, this.pathname, false, 'homeassistant');
                 this.publishState(client);
                 return;
             }
             const method = messageTopic.substring(this.pathname.length + 1);
             if (!allMethods.includes(method)) {
-                if (!allProperties.includes(method))
-                    this.console.warn('unknown topic', method);
+                if (!allProperties.includes(method)) {
+                    if (!found?.has(method)) {
+                        this.console.warn('unknown topic', method);
+                    }
+                }
                 return;
             }
             try {
@@ -592,7 +597,7 @@ export class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, 
         return isPublishable(type, interfaces) ? [ScryptedInterface.Settings] : undefined;
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState:WritableDeviceState): Promise<any> {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any> {
         return new MqttPublisherMixin(this, {
             mixinDevice,
             mixinDeviceState,

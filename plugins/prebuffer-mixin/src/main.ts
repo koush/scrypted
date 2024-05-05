@@ -1596,10 +1596,11 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     });
 
     // schedule restarts at 2am
-    const midnight = millisUntilMidnight();
-    const twoAM = midnight + 2 * 60 * 60 * 1000;
-    this.log.i(`Rebroadcaster scheduled for restart at 2AM: ${Math.round(twoAM / 1000 / 60)} minutes`)
-    setTimeout(() => deviceManager.requestRestart(), twoAM);
+    // removed as the mp4 containerization leak used way back when is defunct.
+    // const midnight = millisUntilMidnight();
+    // const twoAM = midnight + 2 * 60 * 60 * 1000;
+    // this.log.i(`Rebroadcaster scheduled for restart at 2AM: ${Math.round(twoAM / 1000 / 60)} minutes`)
+    // setTimeout(() => deviceManager.requestRestart(), twoAM);
 
     process.nextTick(() => {
       deviceManager.onDeviceDiscovered({

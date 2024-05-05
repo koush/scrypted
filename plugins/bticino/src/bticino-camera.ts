@@ -17,6 +17,12 @@ import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from
 import { PersistentSipManager } from './persistent-sip-manager';
 import { InviteHandler } from './bticino-inviteHandler';
 import { SipOptions, SipRequest } from '../../sip/src/sip-manager';
+import fs from "fs"
+import url from "url"
+import path from 'path';
+import { default as stream } from 'node:stream'
+import type { ReadableStream } from 'node:stream/web'
+import { finished } from "stream/promises";
 
 import { get } from 'http'
 import { ControllerApi } from './c300x-controller-api';
@@ -25,6 +31,7 @@ import { BticinoMuteSwitch } from './bticino-mute-switch';
 
 const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
+const BTICINO_CLIPS = path.join(process.env.SCRYPTED_PLUGIN_VOLUME, 'bticino-clips');
 
 export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor, DeviceProvider, Intercom, Camera, VideoCamera, Settings, BinarySensor, HttpRequestHandler, VideoClips, Reboot {
 
@@ -147,11 +154,87 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
         });
     }
 
-    getVideoClip(videoId: string): Promise<MediaObject> {
-        let c300x = SipHelper.getIntercomIp(this)
-        const url = `http://${c300x}:8080/voicemail?msg=${videoId}/aswm.avi&raw=true`;
-        return mediaManager.createMediaObjectFromUrl(url);        
+    async getVideoClip(videoId: string): Promise<MediaObject> {
+        const outputfile = await this.fetchAndConvertVoicemailMessage(videoId);
+
+        const fileURLToPath: string = url.pathToFileURL(outputfile).toString()
+        this.console.log(`Creating mediaObject for url: ${fileURLToPath}`)
+        return await mediaManager.createMediaObjectFromUrl(fileURLToPath);
     }
+
+    private async fetchAndConvertVoicemailMessage(videoId: string) {
+        let c300x = SipHelper.getIntercomIp(this)
+
+        const response = await fetch(`http://${c300x}:8080/voicemail?msg=${videoId}/aswm.avi&raw=true`);
+
+        const contentLength: number = Number(response.headers.get("Content-Length"));
+        const lastModified: Date = new Date(response.headers.get("Last-Modified-Time"));
+
+        const avifile = `${BTICINO_CLIPS}/${videoId}.avi`;
+        const outputfile = `${BTICINO_CLIPS}/${videoId}.mp4`;
+
+        if (!fs.existsSync(BTICINO_CLIPS)) {
+            this.console.log(`Creating clips dir at: ${BTICINO_CLIPS}`)
+            fs.mkdirSync(BTICINO_CLIPS);
+        }
+
+        if (fs.existsSync(avifile)) {
+            const stat = fs.statSync(avifile);
+            if (stat.size != contentLength || stat.mtime.getTime() != lastModified.getTime()) {
+                this.console.log(`Size ${stat.size} != ${contentLength} or time ${stat.mtime.getTime} != ${lastModified.getTime}`)
+                try {
+                    fs.rmSync(avifile);
+                } catch (e) { }
+                try {
+                    fs.rmSync(outputfile);
+                } catch (e) { }
+            } else {
+                this.console.log(`Keeping the cached video at ${avifile}`)
+            }
+        }
+
+        if (!fs.existsSync(avifile)) {
+            this.console.log("Starting download.")
+            await finished(stream.Readable.from(response.body as ReadableStream<Uint8Array>).pipe(fs.createWriteStream(avifile)));
+            this.console.log("Download finished.")
+            try {
+                this.console.log(`Setting mtime to ${lastModified}`)
+                fs.utimesSync(avifile, lastModified, lastModified);
+            } catch (e) { }
+        }
+
+        const ffmpegPath = await mediaManager.getFFmpegPath();
+        const ffmpegArgs = [
+            '-hide_banner',
+            '-nostats',
+            '-y',
+            '-i', avifile,
+            outputfile
+        ];
+
+        safePrintFFmpegArguments(console, ffmpegArgs);
+        const cp = child_process.spawn(ffmpegPath, ffmpegArgs, {
+            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+        });
+
+        const p = new Promise((resolveFunc) => {
+            cp.stdout.on("data", (x) => {
+                this.console.log(x.toString());
+            });
+            cp.stderr.on("data", (x) => {
+                this.console.error(x.toString());
+            });
+            cp.on("exit", (code) => {
+                resolveFunc(code);
+            });
+        });
+
+        let returnCode = await p;
+
+        this.console.log(`Converted file returned code: ${returnCode}`);
+        return outputfile;
+    }
+
     getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject> {
         let c300x = SipHelper.getIntercomIp(this)
         const url = `http://${c300x}:8080/voicemail?msg=${thumbnailId}/aswm.jpg&raw=true`;

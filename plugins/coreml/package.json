@@ -34,6 +34,7 @@
       "type": "API",
       "interfaces": [
          "Settings",
+         "DeviceProvider",
          "ObjectDetection",
          "ObjectDetectionPreview"
       ]
@@ -41,5 +42,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.29"
+   "version": "0.1.49"
 }
