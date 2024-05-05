@@ -1,4 +1,4 @@
-import { reservePorts } from '@homebridge/camera-utils';
+import { reservePorts } from './port-utils';
 import { createBindUdp, createBindZero } from '@scrypted/common/src/listen-cluster';
 import dgram from 'dgram';
 import { ReplaySubject, timer } from 'rxjs';

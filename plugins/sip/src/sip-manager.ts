@@ -2,7 +2,7 @@ import { noop, Subject } from 'rxjs'
 import { randomInteger, randomString } from './util'
 import { RtpDescription, RtpOptions, RtpStreamDescription } from './rtp-utils'
 import { decodeSrtpOptions } from '../../ring/src/srtp-utils'
-import { stringify, stringifyUri } from '@slyoldfox/sip'
+import { stringify } from '@slyoldfox/sip'
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import sdp from 'sdp'
 
@@ -181,6 +181,9 @@ export class SipManager {
         // },
         ws: false,
         logger: {
+          error: function(e) {
+            if( sipOptions.debugSip ) console.error(e)
+          },
           recv:  function(m, remote) {
             if( (m.status == '200' || m.method === 'INVITE' ) && m.headers && m.headers.cseq && m.headers.cseq.method === 'INVITE' && m.headers.contact && m.headers.contact[0] ) {
               // ACK for INVITE and BYE must use the registrar contact uri
