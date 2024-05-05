@@ -355,14 +355,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 let rtspServer: RtspServer;
                 let track: string;
                 let playing = false;
-                session.audioReturn.once('message', async buffer => {
+                let initializing = false;
+
+                const initialize = async () => {
                     try {
-                        const decrypted = srtpSession.decrypt(buffer);
-                        const rtp = RtpPacket.deSerialize(decrypted);
-
-                        if (rtp.header.payloadType !== session.startRequest.audio.pt)
-                            return;
-
+                        initializing = true;
                         const { clientPromise, url } = await listenZeroSingleClient();
                         const rtspUrl = url.replace('tcp', 'rtsp');
                         let sdp = createReturnAudioSdp(session.startRequest.audio);
@@ -407,11 +404,14 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     catch (e) {
                         console.error('two way audio failed', e);
                     }
-                });
+                    finally {
+                        initializing = false;
+                    }
+                };
 
                 const srtpSession = new SrtpSession(session.aconfig);
                 session.audioReturn.on('message', buffer => {
-                    if (!playing)
+                    if (initializing)
                         return;
 
                     const decrypted = srtpSession.decrypt(buffer);
@@ -419,6 +419,9 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                     if (rtp.header.payloadType !== session.startRequest.audio.pt)
                         return;
+
+                    if (!playing)
+                        return initialize();
 
                     rtspServer.sendTrack(track, decrypted, false);
                 });
