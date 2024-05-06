@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/sip",
-   "version": "0.0.9",
+   "version": "0.0.10",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -32,17 +32,16 @@
       ]
    },
    "dependencies": {
-      "@homebridge/camera-utils": "^2.0.4",
       "@slyoldfox/sip": "^0.0.6-1",
+      "pick-port": "^1.0.0",
+      "rxjs": "^7.8.1",
       "sdp": "^3.0.3",
-      "stun": "^2.1.0",
-      "uuid": "^8.3.2"
+      "stun": "^2.1.0"
    },
    "devDependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "@types/node": "^16.9.6",
-      "@types/uuid": "^8.3.4",
       "cross-env": "^7.0.3"
    }
 }

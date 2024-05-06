@@ -1,22 +1,22 @@
-import { closeQuiet, createBindUdp, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { createBindUdp, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { sleep } from '@scrypted/common/src/sleep';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
-import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, MotionSensor, PictureOptions, Reboot, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamUrl, MotionSensor, PictureOptions, Reboot, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
 import { SipCallSession } from '../../sip/src/sip-call-session';
 import { RtpDescription, getPayloadType, getSequenceNumber, isRtpMessagePayloadType, isStunMessage } from '../../sip/src/rtp-utils';
 import { VoicemailHandler } from './bticino-voicemailHandler';
 import { CompositeSipMessageHandler } from '../../sip/src/compositeSipMessageHandler';
 import { SipHelper } from './sip-helper';
 import child_process, { ChildProcess } from 'child_process';
-import dgram from 'dgram';
 import { BticinoStorageSettings } from './storage-settings';
 import { BticinoSipPlugin } from './main';
 import { BticinoSipLock } from './bticino-lock';
-import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
+import { safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { PersistentSipManager } from './persistent-sip-manager';
 import { InviteHandler } from './bticino-inviteHandler';
 import { SipOptions, SipRequest } from '../../sip/src/sip-manager';
+import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import fs from "fs"
 import url from "url"
 import path from 'path';
@@ -37,8 +37,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
 
     private session: SipCallSession
     private remoteRtpDescription: Promise<RtpDescription>
-    private audioOutForwarder: dgram.Socket
-    private audioOutProcess: ChildProcess
+    private forwarder
     private refreshTimeout: NodeJS.Timeout
     public requestHandlers: CompositeSipMessageHandler = new CompositeSipMessageHandler()
     public incomingCallRequest : SipRequest
@@ -276,21 +275,27 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
     }    
 
     async takePicture(option?: PictureOptions): Promise<MediaObject> {
-        const thumbnailCacheTime : number = parseInt( this.storage?.getItem('thumbnailCacheTime') ) * 1000 || 300000 
-        const now = new Date().getTime()
-        if( !this.lastImageRefresh || this.lastImageRefresh + thumbnailCacheTime < now ) {
-            // get a proxy object to make sure we pass prebuffer when already watching a stream
-            let cam : VideoCamera = sdk.systemManager.getDeviceById<VideoCamera>(this.id)
-            let vs : MediaObject = await cam.getVideoStream()
-            let buf : Buffer = await mediaManager.convertMediaObjectToBuffer(vs, 'image/jpeg');
-            this.cachedImage = buf
-            this.lastImageRefresh = new Date().getTime()
-            this.console.log(`Camera picture updated and cached: ${this.lastImageRefresh} + cache time: ${thumbnailCacheTime} < ${now}`)
-
+        let rebroadcastEnabled = this.interfaces?.includes( "mixin:@scrypted/prebuffer-mixin")
+        if( rebroadcastEnabled ) {
+            const thumbnailCacheTime : number = parseInt( this.storage?.getItem('thumbnailCacheTime') ) * 1000 || 300000 
+            const now = new Date().getTime()
+            if( !this.lastImageRefresh || this.lastImageRefresh + thumbnailCacheTime < now ) {
+                // get a proxy object to make sure we pass prebuffer when already watching a stream
+                let cam : VideoCamera = sdk.systemManager.getDeviceById<VideoCamera>(this.id)
+                let vs : MediaObject = await cam.getVideoStream()
+                let buf : Buffer = await mediaManager.convertMediaObjectToBuffer(vs, 'image/jpeg');
+                this.cachedImage = buf
+                this.lastImageRefresh = new Date().getTime()
+                this.console.log(`Camera picture updated and cached: ${this.lastImageRefresh} + cache time: ${thumbnailCacheTime} < ${now}`)
+    
+            } else {
+                this.console.log(`Not refreshing camera picture: ${this.lastImageRefresh} + cache time: ${thumbnailCacheTime} < ${now}`)
+            }
+            
+            return mediaManager.createMediaObject(this.cachedImage, 'image/jpeg')
         } else {
-            this.console.log(`Not refreshing camera picture: ${this.lastImageRefresh} + cache time: ${thumbnailCacheTime} < ${now}`)
+            throw new Error("To enable snapshots, enable rebroadcast plugin or set a Snapshot URL in the Snapshot plugin to an external image.");
         }
-        return mediaManager.createMediaObject(this.cachedImage, 'image/jpeg')
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
@@ -317,52 +322,31 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
             this.session = await this.callIntercom( cleanup )
         }
             
-
         this.stopIntercom();
 
-        const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
-
-        const audioOutForwarder = await createBindZero()
-        this.audioOutForwarder = audioOutForwarder.server
+        const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
         let address = (await this.remoteRtpDescription).address
-        audioOutForwarder.server.on('message', message => {
-            if( this.session )
-                this.session.audioSplitter.send(message, 40004, address)
-            return null
-        });
-
-        const args = ffmpegInput.inputArguments.slice();
-        args.push(
-            '-vn', '-dn', '-sn',
-            '-acodec', 'speex',
-            '-flags', '+global_header',
-            '-ac', '1',
-            '-ar', '8k',
-            '-f', 'rtp',
-            //'-srtp_out_suite', 'AES_CM_128_HMAC_SHA1_80',
-            //'-srtp_out_params', encodeSrtpOptions(this.decodedSrtpOptions),
-            `rtp://127.0.0.1:${audioOutForwarder.port}?pkt_size=188`,
-        );
-
-        this.console.log("===========================================")
-        safePrintFFmpegArguments( this.console, args )
-        this.console.log("===========================================")
-
-        const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
-        ffmpegLogInitialOutput(this.console, cp)
-        this.audioOutProcess = cp;
-        cp.on('exit', () => this.console.log('two way audio ended'));
-        this.session.onCallEnded.subscribe(() => {
-            closeQuiet(audioOutForwarder.server);
-            safeKillFFmpeg(cp)
+        this.forwarder = await startRtpForwarderProcess(this.console, ffmpegInput, {
+            audio: {
+                codecCopy: 'speex',
+                encoderArguments: [
+                    '-vn', '-sn', '-dn',
+                    '-acodec', 'speex',
+                    '-flags', '+global_header',
+                    '-ac', '1',
+                    '-ar', '8k',
+                    '-f', 'rtp',
+                ],
+                onRtp: rtp => {
+                        this.session?.audioSplitter?.send(rtp, 40004, address)
+                }
+            }
         });
     }
 
     async stopIntercom(): Promise<void> {
-        closeQuiet(this.audioOutForwarder)
-        this.audioOutProcess?.kill('SIGKILL')
-        this.audioOutProcess = undefined
-        this.audioOutForwarder = undefined
+        this.forwarder?.kill()
+        this.forwarder = undefined
     }
 
     resetStreamTimeout() {
@@ -572,12 +556,24 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
         // Call the C300X
         this.remoteRtpDescription = sip.callOrAcceptInvite(
             ( audio ) => {
-            return [
-                // this SDP is used by the intercom and will send the encrypted packets which we don't care about to the loopback on port 65000 of the intercom
-                `m=audio 65000 RTP/SAVP 110`,
-                `a=rtpmap:110 speex/8000`,
-                `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
-            ]
+                let audioSection = [
+                    // this SDP is used by the intercom and will send the encrypted packets which we don't care about to the loopback on port 65000 of the intercom
+                    `m=audio 65000 RTP/SAVP 110`,
+                    `a=rtpmap:110 speex/8000`,
+                    `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${this.keyAndSalt}`,
+                ]
+                if( !this.incomingCallRequest ) {
+                    let DEVADDR = this.storage.getItem('DEVADDR');
+                    if( DEVADDR ) {
+                        audioSection.unshift('a=DEVADDR:' + DEVADDR)
+                    } else {
+                        if( sipOptions.to.toLocaleLowerCase().indexOf('c300x') >= 0 || sipOptions.to.toLocaleLowerCase().indexOf('c100x') >= 0 ) {
+                            // Needed for bt_answering_machine (bticino specific), to check for c100X
+                            audioSection.unshift('a=DEVADDR:20')
+                        }                           
+                    }
+                }
+                return audioSection
         }, ( video ) => {
                 return [
                 // this SDP is used by the intercom and will send the encrypted packets which we don't care about to the loopback on port 65000 of the intercom

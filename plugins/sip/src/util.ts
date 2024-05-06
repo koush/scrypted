@@ -1,13 +1,7 @@
-import { v4 as generateRandomUuid, v5 as generateUuidFromNamespace } from 'uuid'
-
-const uuidNamespace = 'e53ffdc0-e91d-4ce1-bec2-df939d94739d'
+const crypto = require('crypto');
 
 export function generateUuid(seed?: string) {
-  if (seed) {
-    return generateUuidFromNamespace(seed, uuidNamespace)
-  }
-
-  return generateRandomUuid()
+  return crypto.randomUUID();
 }
 
 export function randomInteger() {
