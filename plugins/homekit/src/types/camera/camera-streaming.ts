@@ -354,15 +354,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             if (twoWayAudio) {
                 let rtspServer: RtspServer;
                 let track: string;
-                let playing = false;
-                session.audioReturn.once('message', async buffer => {
+                let twoWayAudioState: 'stopped' | 'starting' | 'started' = 'stopped';
+
+                const start = async () => {
                     try {
-                        const decrypted = srtpSession.decrypt(buffer);
-                        const rtp = RtpPacket.deSerialize(decrypted);
-
-                        if (rtp.header.payloadType !== session.startRequest.audio.pt)
-                            return;
-
+                        twoWayAudioState = 'starting';
                         const { clientPromise, url } = await listenZeroSingleClient();
                         const rtspUrl = url.replace('tcp', 'rtsp');
                         let sdp = createReturnAudioSdp(session.startRequest.audio);
@@ -393,7 +389,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                             device.stopIntercom();
                             client.destroy();
                             rtspServer = undefined;
-                            playing = false;
+                            twoWayAudioState = 'stopped';
                         }
                         // stop the intercom if the client dies for any reason.
                         // allow the streaming session to continue however.
@@ -402,16 +398,17 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                         rtspServer = new RtspServer(client, sdp);
                         await rtspServer.handlePlayback();
-                        playing = true;
+                        twoWayAudioState = 'started';
                     }
                     catch (e) {
                         console.error('two way audio failed', e);
+                        twoWayAudioState = 'stopped';
                     }
-                });
+                };
 
                 const srtpSession = new SrtpSession(session.aconfig);
                 session.audioReturn.on('message', buffer => {
-                    if (!playing)
+                    if (twoWayAudioState === 'starting')
                         return;
 
                     const decrypted = srtpSession.decrypt(buffer);
@@ -419,6 +416,9 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                     if (rtp.header.payloadType !== session.startRequest.audio.pt)
                         return;
+
+                    if (twoWayAudioState !== 'started')
+                        return start();
 
                     rtspServer.sendTrack(track, decrypted, false);
                 });
