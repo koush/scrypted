@@ -1,23 +1,23 @@
 from __future__ import annotations
 
+import ast
 import asyncio
+import concurrent.futures
+import json
+import platform
+import sys
+import threading
 from typing import Any, Tuple
 
-import sys
-import platform
 import numpy as np
 import onnxruntime
 import scrypted_sdk
 from PIL import Image
-import ast
 from scrypted_sdk.other import SettingValue
 from scrypted_sdk.types import Setting
-import concurrent.futures
 
 import common.yolo as yolo
 from predict import PredictPlugin
-
-predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "ONNX-Predict")
 
 availableModels = [
     "Default",
@@ -66,34 +66,62 @@ class ONNXPlugin(
 
         print(onnxfile)
 
+        deviceIds = self.storage.getItem("deviceIds") or '["0"]'
+        deviceIds = json.loads(deviceIds)
+        if not len(deviceIds):
+            deviceIds = ["0"]
+
+        compiled_models = []
+        self.compiled_models = {}
+
         try:
-            sess_options = onnxruntime.SessionOptions()
+            for deviceId in deviceIds:
+                sess_options = onnxruntime.SessionOptions()
 
-            providers: list[str] = []
-            if sys.platform == 'darwin':
-                providers.append("CoreMLExecutionProvider")
-            
-            if 'linux' in sys.platform and platform.machine() == 'x86_64':
-                providers.append("CUDAExecutionProvider")
+                providers: list[str] = []
+                if sys.platform == 'darwin':
+                    providers.append("CoreMLExecutionProvider")
 
-            providers.append('CPUExecutionProvider')
+                if 'linux' in sys.platform and platform.machine() == 'x86_64':
+                    deviceId = int(deviceId)
+                    providers.append(("CUDAExecutionProvider", { "device_id": deviceId }))
 
-            self.compiled_model = onnxruntime.InferenceSession(onnxfile, sess_options=sess_options, providers=providers)
+                providers.append('CPUExecutionProvider')
+
+                compiled_model = onnxruntime.InferenceSession(onnxfile, sess_options=sess_options, providers=providers)
+                compiled_models.append(compiled_model)
+
+                input = compiled_model.get_inputs()[0]
+                self.model_dim = input.shape[2]
+                self.input_name = input.name
+                self.labels = parse_labels(compiled_model.get_modelmeta().custom_metadata_map['names'])
+
         except:
             import traceback
 
             traceback.print_exc()
             print("Reverting all settings.")
             self.storage.removeItem("model")
+            self.storage.removeItem("deviceIds")
             self.requestRestart()
 
-        input = self.compiled_model.get_inputs()[0]
-        self.model_dim = input.shape[2]
-        self.input_name = input.name
-        self.labels = parse_labels(self.compiled_model.get_modelmeta().custom_metadata_map['names'])
+        def executor_initializer():
+            thread_name = threading.current_thread().name
+            interpreter = compiled_models.pop()
+            self.compiled_models[thread_name] = interpreter
+            print('Runtime initialized on thread {}'.format(thread_name))
+
+        self.executor = concurrent.futures.ThreadPoolExecutor(
+            initializer=executor_initializer,
+            max_workers=len(compiled_models),
+            thread_name_prefix="onnx",
+        )
 
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"
+        deviceIds = self.storage.getItem("deviceIds") or '["0"]'
+        deviceIds = json.loads(deviceIds)
+
         return [
             {
                 "key": "model",
@@ -102,9 +130,20 @@ class ONNXPlugin(
                 "choices": availableModels,
                 "value": model,
             },
+            {
+                "key": "deviceIds",
+                "title": "Device IDs",
+                "description": "Optional: Assign multiple CUDA Device IDs to use for detection.",
+                "choices": deviceIds,
+                "combobox": True,
+                "multiple": True,
+                "value": deviceIds,
+            },
         ]
 
     async def putSetting(self, key: str, value: SettingValue):
+        if (key == 'deviceIds'):
+            value = json.dumps(value)
         self.storage.setItem(key, value)
         await self.onDeviceEvent(scrypted_sdk.ScryptedInterface.Settings.value, None)
         self.requestRestart()
@@ -118,7 +157,8 @@ class ONNXPlugin(
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         def predict(input_tensor):
-            output_tensors = self.compiled_model.run(None, { self.input_name: input_tensor })
+            compiled_model = self.compiled_models[threading.current_thread().name]
+            output_tensors = compiled_model.run(None, { self.input_name: input_tensor })
             objs = yolo.parse_yolov9(output_tensors[0][0])
             return objs
 
@@ -131,7 +171,7 @@ class ONNXPlugin(
 
         try:
             objs = await asyncio.get_event_loop().run_in_executor(
-                predictExecutor, lambda: predict(input_tensor)
+                self.executor, lambda: predict(input_tensor)
             )
 
         except:
