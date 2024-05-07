@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 
 from PIL import Image
 from pycoral.adapters import detect
@@ -121,7 +122,8 @@ class TensorFlowLitePlugin(
             labels_contents = open(labelsFile, "r").read()
             self.labels = parse_label_contents(labels_contents)
 
-        self.interpreters = queue.Queue()
+        self.interpreters = {}
+        available_interpreters = []
         self.interpreter_count = 0
 
         def downloadModel():
@@ -145,7 +147,7 @@ class TensorFlowLitePlugin(
                             "shape"
                         ]
                         self.input_details = int(width), int(height), int(channels)
-                        self.interpreters.put(interpreter)
+                        available_interpreters.append(interpreter)
                         self.interpreter_count = self.interpreter_count + 1
                         print("added tpu %s" % (edge_tpu))
                     except Exception as e:
@@ -165,12 +167,20 @@ class TensorFlowLitePlugin(
             interpreter.allocate_tensors()
             _, height, width, channels = interpreter.get_input_details()[0]["shape"]
             self.input_details = int(width), int(height), int(channels)
-            self.interpreters.put(interpreter)
+            available_interpreters.append(interpreter)
             self.interpreter_count = self.interpreter_count + 1
 
         print(modelFile, labelsFile)
 
+        def executor_initializer():
+            thread_name = threading.current_thread().name
+            interpreter = available_interpreters.pop()
+            self.interpreters[thread_name] = interpreter
+            print('Interpreter initialized on thread {}'.format(thread_name))
+
+
         self.executor = concurrent.futures.ThreadPoolExecutor(
+            initializer=executor_initializer,
             max_workers=self.interpreter_count,
             thread_name_prefix="tflite",
         )
@@ -208,53 +218,50 @@ class TensorFlowLitePlugin(
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         def predict():
-            interpreter = self.interpreters.get()
-            try:
-                if self.yolo:
-                    tensor_index = input_details(interpreter, "index")
+            interpreter = self.interpreters[threading.current_thread().name]
+            if self.yolo:
+                tensor_index = input_details(interpreter, "index")
 
-                    im = np.stack([input])
-                    i = interpreter.get_input_details()[0]
-                    if i["dtype"] == np.int8:
-                        scale, zero_point = i["quantization"]
-                        if scale == 0.003986024297773838 and zero_point == -128:
-                            # fast path for quantization 1/255 = 0.003986024297773838
-                            im = im.view(np.int8)
-                            im -= 128
-                        else:
-                            im = im.astype(np.float32) / (255.0 * scale)
-                            im = (im + zero_point).astype(np.int8)  # de-scale
+                im = np.stack([input])
+                i = interpreter.get_input_details()[0]
+                if i["dtype"] == np.int8:
+                    scale, zero_point = i["quantization"]
+                    if scale == 0.003986024297773838 and zero_point == -128:
+                        # fast path for quantization 1/255 = 0.003986024297773838
+                        im = im.view(np.int8)
+                        im -= 128
                     else:
-                        # this code path is unused.
-                        im = im.astype(np.float32) / 255.0
-                    interpreter.set_tensor(tensor_index, im)
-                    interpreter.invoke()
-                    output_details = interpreter.get_output_details()
-                    output = output_details[0]
-                    x = interpreter.get_tensor(output["index"])
-                    input_scale = self.get_input_details()[0]
-                    if x.dtype == np.int8:
-                        scale, zero_point = output["quantization"]
-                        threshold = yolo.defaultThreshold / scale + zero_point
-                        combined_scale = scale * input_scale
-                        objs = yolo.parse_yolov9(
-                            x[0],
-                            threshold,
-                            scale=lambda v: (v - zero_point) * combined_scale,
-                            confidence_scale=lambda v: (v - zero_point) * scale,
-                        )
-                    else:
-                        # this code path is unused.
-                        objs = yolo.parse_yolov9(x[0], scale=lambda v: v * input_scale)
+                        im = im.astype(np.float32) / (255.0 * scale)
+                        im = (im + zero_point).astype(np.int8)  # de-scale
                 else:
-                    tflite_common.set_input(interpreter, input)
-                    interpreter.invoke()
-                    objs = detect.get_objects(
-                        interpreter, score_threshold=0.2, image_scale=(1, 1)
+                    # this code path is unused.
+                    im = im.astype(np.float32) / 255.0
+                interpreter.set_tensor(tensor_index, im)
+                interpreter.invoke()
+                output_details = interpreter.get_output_details()
+                output = output_details[0]
+                x = interpreter.get_tensor(output["index"])
+                input_scale = self.get_input_details()[0]
+                if x.dtype == np.int8:
+                    scale, zero_point = output["quantization"]
+                    threshold = yolo.defaultThreshold / scale + zero_point
+                    combined_scale = scale * input_scale
+                    objs = yolo.parse_yolov9(
+                        x[0],
+                        threshold,
+                        scale=lambda v: (v - zero_point) * combined_scale,
+                        confidence_scale=lambda v: (v - zero_point) * scale,
                     )
-                return objs
-            finally:
-                self.interpreters.put(interpreter)
+                else:
+                    # this code path is unused.
+                    objs = yolo.parse_yolov9(x[0], scale=lambda v: v * input_scale)
+            else:
+                tflite_common.set_input(interpreter, input)
+                interpreter.invoke()
+                objs = detect.get_objects(
+                    interpreter, score_threshold=0.2, image_scale=(1, 1)
+                )
+            return objs
 
         objs = await asyncio.get_event_loop().run_in_executor(self.executor, predict)
 
