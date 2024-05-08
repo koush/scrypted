@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
 import re
+import traceback
 from typing import Any, Tuple
 
 import numpy as np
@@ -11,19 +13,20 @@ import scrypted_sdk
 from PIL import Image
 from scrypted_sdk.other import SettingValue
 from scrypted_sdk.types import Setting
-import concurrent.futures
 
 import common.yolo as yolo
 from predict import Prediction, PredictPlugin
 from predict.rectangle import Rectangle
 
 from .face_recognition import OpenVINOFaceRecognition
+
 try:
     from .text_recognition import OpenVINOTextRecognition
 except:
     OpenVINOTextRecognition = None
 
 predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Predict")
+prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
 
 availableModels = [
     "Default",
@@ -314,30 +317,34 @@ class OpenVINOPlugin(
 
             return objs
 
-        # the input_tensor can be created with the shared_memory=True parameter,
-        # but that seems to cause issues on some platforms.
-        if self.scrypted_yolo:
-            im = np.stack([input])
-            im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
-            im = im.astype(np.float32) / 255.0
-            im = np.ascontiguousarray(im)  # contiguous
-            im = ov.Tensor(array=im)
-            input_tensor = im
-        elif self.yolo:
-            input_tensor = ov.Tensor(
-                array=np.expand_dims(np.array(input), axis=0).astype(np.float32)
-            )
-        else:
-            input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0))
+
+        def prepare(): 
+            # the input_tensor can be created with the shared_memory=True parameter,
+            # but that seems to cause issues on some platforms.
+            if self.scrypted_yolo:
+                im = np.array(input)
+                im = np.expand_dims(input, axis=0)
+                im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+                im = im.astype(np.float32) / 255.0
+                im = np.ascontiguousarray(im)  # contiguous
+                input_tensor = ov.Tensor(array=im)
+            elif self.yolo:
+                input_tensor = ov.Tensor(
+                    array=np.expand_dims(np.array(input), axis=0).astype(np.float32)
+                )
+            else:
+                input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0))
+            return input_tensor
 
         try:
+            input_tensor = await asyncio.get_event_loop().run_in_executor(
+                prepareExecutor, lambda: prepare()
+            )
             objs = await asyncio.get_event_loop().run_in_executor(
                 predictExecutor, lambda: predict(input_tensor)
             )
 
         except:
-            import traceback
-
             traceback.print_exc()
             raise
 

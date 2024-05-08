@@ -7,6 +7,7 @@ import json
 import platform
 import sys
 import threading
+import traceback
 from typing import Any, Tuple
 
 import numpy as np
@@ -30,7 +31,6 @@ availableModels = [
     "scrypted_yolov8n_320",
     "scrypted_yolov8n",
 ]
-
 
 def parse_labels(names):
     j = ast.literal_eval(names)
@@ -117,6 +117,11 @@ class ONNXPlugin(
             thread_name_prefix="onnx",
         )
 
+        self.prepareExecutor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=len(compiled_models),
+            thread_name_prefix="onnx-prepare",
+        )
+
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"
         deviceIds = self.storage.getItem("deviceIds") or '["0"]'
@@ -156,26 +161,29 @@ class ONNXPlugin(
         return [self.model_dim, self.model_dim]
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
+        def prepare(): 
+            im = np.array(input)
+            im = np.expand_dims(input, axis=0)
+            im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+            im = im.astype(np.float32) / 255.0
+            im = np.ascontiguousarray(im)  # contiguous
+            return im
+
         def predict(input_tensor):
             compiled_model = self.compiled_models[threading.current_thread().name]
             output_tensors = compiled_model.run(None, { self.input_name: input_tensor })
             objs = yolo.parse_yolov9(output_tensors[0][0])
             return objs
 
-        im = np.array(input)
-        im = np.stack([input])
-        im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
-        im = im.astype(np.float32) / 255.0
-        im = np.ascontiguousarray(im)  # contiguous
-        input_tensor = im
-
         try:
+            input_tensor = await asyncio.get_event_loop().run_in_executor(
+                self.prepareExecutor, lambda: prepare()
+            )
             objs = await asyncio.get_event_loop().run_in_executor(
                 self.executor, lambda: predict(input_tensor)
             )
 
         except:
-            import traceback
 
             traceback.print_exc()
             raise
