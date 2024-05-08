@@ -24,8 +24,6 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
                 width: request.width,
                 height: request.height,
             },
-            // wait up to 2 seconds for the snapshot image, fallback to cached image
-            timeout: 2000,
         })
         return await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
     }

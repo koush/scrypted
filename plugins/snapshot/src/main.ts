@@ -271,10 +271,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 
     async takePictureRaw(options?: RequestPictureOptions): Promise<Buffer> {
-        let rawPicturePromise: Promise<{
-            picture: Buffer;
-            pictureTime: number;
-        }>;
         const eventSnapshot = options?.reason === 'event';
         const periodicSnapshot = options?.reason === 'periodic';
 
@@ -282,50 +278,61 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         if (this.currentPictureTime < Date.now() - 1 * 60 * 60 * 1000)
             this.currentPicture = undefined;
 
-        const allowedSnapshotStaleness = eventSnapshot ? 0 : periodicSnapshot ? 20000 : 10000;
-
-        let needRefresh = true;
-        if (this.currentPicture && this.currentPictureTime > Date.now() - allowedSnapshotStaleness) {
-            this.debugConsole?.log('Using cached snapshot for', options?.reason);
-            rawPicturePromise = Promise.resolve({
-                picture: this.currentPicture,
-                pictureTime: this.currentPictureTime,
-            });
-            needRefresh = this.currentPictureTime < Date.now() - allowedSnapshotStaleness / 2;
-        }
-
-        if (needRefresh) {
-            const debounced = this.snapshotDebouncer({
-                id: options?.id,
-                reason: options?.reason,
-            }, eventSnapshot ? 0 : 10000, async () => {
-                const snapshotTimer = Date.now();
-                let picture = await this.takePictureInternal();
-                picture = await this.cropAndScale(picture);
-                this.clearCachedPictures();
-                const pictureTime = Date.now();
-                this.currentPicture = picture;
-                this.currentPictureTime = pictureTime;
-                this.lastAvailablePicture = picture;
-                this.debugConsole?.debug(`Periodic snapshot took ${(this.currentPictureTime - snapshotTimer) / 1000} seconds to retrieve.`)
-                return {
-                    picture,
-                    pictureTime,
-                };
-            });
-            debounced.catch(() => { });
-
-            rawPicturePromise ||= debounced;
-        }
+        // always grab/debounce a snapshot
+        // event snapshot are special and should immediately expire.
+        // other snapshots may be debounced for 4s.
+        const debounced = this.snapshotDebouncer({
+            id: options?.id,
+            type: 'source',
+            event: options?.reason === 'event',
+        }, eventSnapshot ? 0 : 4000, async () => {
+            const snapshotTimer = Date.now();
+            let picture = await this.takePictureInternal();
+            picture = await this.cropAndScale(picture);
+            this.clearCachedPictures();
+            const pictureTime = Date.now();
+            this.currentPicture = picture;
+            this.currentPictureTime = pictureTime;
+            this.lastAvailablePicture = picture;
+            this.debugConsole?.debug(`Periodic snapshot took ${(this.currentPictureTime - snapshotTimer) / 1000} seconds to retrieve.`)
+            return {
+                picture,
+                pictureTime,
+            };
+        });
+        debounced.catch(() => { });
 
         // prevent this from expiring
         let availablePicture = this.currentPicture;
         let availablePictureTime = this.currentPictureTime;
 
-        let rawPicture: Awaited<typeof rawPicturePromise>;
+        let rawPicture: Awaited<typeof debounced>;
         try {
-            const pictureTimeout = options?.timeout || (periodicSnapshot && availablePicture ? 1000 : 10000) || 10000;
-            rawPicture = await timeoutPromise(pictureTimeout, rawPicturePromise);
+            let pictureTimeout = options?.timeout;
+            if (!pictureTimeout) {
+                // determine a fetch timeout based on the reason and staleness
+                const allowedSnapshotStaleness = eventSnapshot ? 0 : periodicSnapshot ? 20000 : 10000;
+                if (!availablePicture) {
+                    // none available so wait a while
+                    pictureTimeout = 10000;
+                }
+                else {
+                    if (availablePictureTime > Date.now() - 3000) {
+                        // very recent, don't wait for too long
+                        pictureTimeout = 1000;
+                    }
+                    else if (availablePictureTime > Date.now() - allowedSnapshotStaleness) {
+                        // fairly recent so give it little time to get a fresh one
+                        // idr interval is typically 4000 for reference
+                        pictureTimeout = 3000;
+                    }
+                    else {
+                        // stale so wait a while
+                        pictureTimeout = 10000;
+                    }
+                }
+            }
+            rawPicture = await timeoutPromise(pictureTimeout, debounced);
         }
         catch (e) {
             // a best effort was made to get a recent snapshot from cache or from a camera request,
@@ -336,7 +343,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             if (eventSnapshot)
                 throw e;
 
-            availablePicture = this.currentPicture || availablePicture;
+            if (this.currentPicture) {
+                // use the current picture if it is still available as it may be newer.
+                availablePicture = this.currentPicture;
+                availablePictureTime = this.currentPictureTime;
+            }
 
             if (!availablePicture)
                 return this.createErrorImage(e);
@@ -358,8 +369,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
         try {
             const key = {
+                type: 'resize',
                 pictureTime: rawPicture.pictureTime,
-                reason: options?.reason,
                 needSoftwareResize: true,
                 picture: options.picture,
             };
