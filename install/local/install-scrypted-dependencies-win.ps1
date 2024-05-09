@@ -11,7 +11,7 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/in
 choco upgrade -y nodejs-lts --version=20.11.1
 
 # Install VC Redist, which is necessary for portable python
-choco install vcredist140
+choco install -y vcredist140
 
 # TODO: remove python install, and use portable python
 # Install Python
