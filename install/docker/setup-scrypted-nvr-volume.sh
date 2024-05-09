@@ -72,6 +72,7 @@ function removescryptedfstab() {
     grep -v "scrypted-nvr" /etc/fstab > /tmp/fstab && cp /tmp/fstab /etc/fstab
     # ensure newline
     sed -i -e '$a\' /etc/fstab
+    systemctl daemon-reload
 }
 
 BLOCK_DEVICE="/dev/$1"
@@ -119,6 +120,7 @@ then
     mkdir -p /mnt/scrypted-nvr
     echo "PARTLABEL=scrypted-nvr     /mnt/scrypted-nvr    ext4   defaults,nofail 0 0" >> /etc/fstab
     mount -a
+    systemctl daemon-reload
     set +e
 
     DIR="/mnt/scrypted-nvr"
