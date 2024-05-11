@@ -156,7 +156,12 @@ class OpenVINOPlugin(
             f"https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.bin",
             f"{model_version}/{model}/{precision}/{ovmodel}.bin",
         )
-        if self.scrypted_model:
+        if self.scrypted_yolo_nas:
+            labelsFile = self.downloadFile(
+                "https://raw.githubusercontent.com/koush/openvino-models/main/scrypted_nas_labels.txt",
+                "scrypted_nas_labels.txt",
+            )
+        elif self.scrypted_model:
             labelsFile = self.downloadFile(
                 "https://raw.githubusercontent.com/koush/openvino-models/main/scrypted_labels.txt",
                 "scrypted_labels.txt",

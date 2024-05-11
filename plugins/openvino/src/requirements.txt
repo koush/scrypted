@@ -1,4 +1,4 @@
-openvino==2024.0.0
+openvino==2024.1.0
 
 # pillow-simd is available on x64 linux
 # pillow-simd confirmed not building with arm64 linux or apple silicon
