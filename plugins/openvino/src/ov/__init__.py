@@ -30,6 +30,7 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
 
 availableModels = [
     "Default",
+    "scrypted_yolo_nas_s_320",
     "scrypted_yolov6n_320",
     "scrypted_yolov6n",
     "scrypted_yolov6s_320",
@@ -137,6 +138,7 @@ class OpenVINOPlugin(
                 self.storage.setItem("model", "Default")
             model = "scrypted_yolov8n_320"
         self.yolo = "yolo" in model
+        self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
         self.sigmoid = model == "yolo-v4-tiny-tf"
@@ -265,7 +267,10 @@ class OpenVINOPlugin(
             objs = []
 
             if self.scrypted_yolo:
-                objs = yolo.parse_yolov9(output_tensors[0][0])
+                if self.scrypted_yolo_nas:
+                    objs = yolo.parse_yolo_nas([output_tensors[1], output_tensors[0]])
+                else:
+                    objs = yolo.parse_yolov9(output_tensors[0][0])
                 return objs
 
             if self.yolo:

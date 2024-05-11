@@ -22,6 +22,7 @@ from predict import PredictPlugin
 
 availableModels = [
     "Default",
+    "scrypted_yolo_nas_s_320",
     "scrypted_yolov6n_320",
     "scrypted_yolov6n",
     "scrypted_yolov6s_320",
@@ -51,12 +52,13 @@ class ONNXPlugin(
                 self.storage.setItem("model", "Default")
             model = "scrypted_yolov8n_320"
         self.yolo = "yolo" in model
+        self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
 
         print(f"model {model}")
 
-        onnxmodel = "best" if self.scrypted_model else model
+        onnxmodel = model if self.scrypted_yolo_nas else "best" if self.scrypted_model else model
 
         model_version = "v2"
         onnxfile = self.downloadFile(
@@ -172,7 +174,10 @@ class ONNXPlugin(
         def predict(input_tensor):
             compiled_model = self.compiled_models[threading.current_thread().name]
             output_tensors = compiled_model.run(None, { self.input_name: input_tensor })
-            objs = yolo.parse_yolov9(output_tensors[0][0])
+            if self.scrypted_yolo_nas:
+                objs = yolo.parse_yolo_nas([output_tensors[1], output_tensors[0]])
+            else:
+                objs = yolo.parse_yolov9(output_tensors[0][0])
             return objs
 
         try:

@@ -6,7 +6,6 @@ import concurrent.futures
 import os
 import re
 from typing import Any, List, Tuple
-import numpy as np
 
 import coremltools as ct
 import scrypted_sdk
