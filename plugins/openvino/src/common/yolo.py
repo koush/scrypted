@@ -6,6 +6,20 @@ from predict.rectangle import Rectangle
 
 defaultThreshold = .2
 
+def parse_yolo_nas(predictions):
+    objs = []
+    for pred_scores, pred_bboxes in zip(*predictions):
+        i, j = np.nonzero(pred_scores > .5)
+        pred_bboxes = pred_bboxes[i]
+        pred_cls_conf = pred_scores[i, j]
+        pred_cls_label = j[:]
+        for box, conf, label in zip(pred_bboxes, pred_cls_conf, pred_cls_label):
+            obj = Prediction(
+                int(label), conf.astype(float), Rectangle(box[0].astype(float), box[1].astype(float), box[2].astype(float), box[3].astype(float))
+            )
+            objs.append(obj)
+    return objs
+
 def parse_yolov9(results, threshold = defaultThreshold, scale = None, confidence_scale  = None):
     objs = []
     keep = np.argwhere(results[4:] > threshold)

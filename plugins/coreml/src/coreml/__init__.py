@@ -6,6 +6,7 @@ import concurrent.futures
 import os
 import re
 from typing import Any, List, Tuple
+import numpy as np
 
 import coremltools as ct
 import scrypted_sdk
@@ -26,6 +27,7 @@ predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "CoreML-Predict")
 
 availableModels = [
     "Default",
+    "scrypted_yolo_nas_s_320",
     "scrypted_yolov9c_320",
     "scrypted_yolov9c",
     "scrypted_yolov6n_320",
@@ -77,6 +79,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
                 self.storage.setItem("model", "Default")
             model = "scrypted_yolov9c_320"
         self.yolo = "yolo" in model
+        self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
         model_version = "v7"
@@ -211,7 +214,12 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
         if self.yolo:
             out_dict = await self.queue_batch({self.input_name: input})
 
-            if self.scrypted_yolo:
+            if self.scrypted_yolo_nas:
+                predictions  = list(out_dict.values())
+                objs = yolo.parse_yolo_nas(predictions)
+                ret = self.create_detection_result(objs, src_size, cvss)
+                return ret
+            elif self.scrypted_yolo:
                 results = list(out_dict.values())[0][0]
                 objs = yolo.parse_yolov9(results)
                 ret = self.create_detection_result(objs, src_size, cvss)
