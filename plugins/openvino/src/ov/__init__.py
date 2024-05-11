@@ -125,10 +125,10 @@ class OpenVINOPlugin(
             if using_mode == "AUTO":
                 if "GPU" in available_devices:
                     using_mode = "GPU"
-            if using_mode == "GPU":
-                precision = "FP16"
-            else:
-                precision = "FP32"
+
+            # FP16 is smaller and the default export. no tangible performance difference.
+            # https://docs.openvino.ai/2023.3/openvino_docs_OV_Converter_UG_Conversion_Options.html
+            precision = "FP16"
 
         self.precision = precision
 
