@@ -85,6 +85,7 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
 
     const nodeHeaders: Record<string, string[]> = {};
     for (let [k, v] of headers) {
+        // Normalize header names to capitalized kebab-case (`content-type` => `Content-Type`)
         if (options.normalizeHeaders) k = k.replace(/((?:^|-)\w)/g, v => v.toUpperCase());
         if (nodeHeaders[k]) {
             nodeHeaders[k].push(v);
