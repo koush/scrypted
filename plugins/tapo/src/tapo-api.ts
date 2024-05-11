@@ -36,6 +36,7 @@ export class TapoAPI {
                 'Content-Type': 'multipart/mixed; boundary=--client-stream-boundary--',
             },
             responseType: 'buffer',
+            normalizeHeaders: true,
         });
 
         if (response.statusCode !== 401)
@@ -57,6 +58,7 @@ export class TapoAPI {
                 'Content-Type': 'multipart/mixed; boundary=--client-stream-boundary--',
             },
             responseType: 'readable',
+            normalizeHeaders: true,
         })
 
         const tapo = new TapoAPI();

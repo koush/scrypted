@@ -11,6 +11,7 @@ export interface HttpFetchOptionsBase<B> {
     ignoreStatusCode?: boolean;
     body?: B | string | ArrayBufferView | any;
     withCredentials?: boolean;
+    normalizeHeaders?: boolean;
 }
 
 export interface HttpFetchJsonOptions<B> extends HttpFetchOptionsBase<B> {

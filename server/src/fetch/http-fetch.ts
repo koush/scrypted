@@ -84,7 +84,8 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
     }
 
     const nodeHeaders: Record<string, string[]> = {};
-    for (const [k, v] of headers) {
+    for (let [k, v] of headers) {
+        if (options.normalizeHeaders) k = k.replace(/((?:^|-)\w)/g, v => v.toUpperCase());
         if (nodeHeaders[k]) {
             nodeHeaders[k].push(v);
         }
