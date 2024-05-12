@@ -43,7 +43,7 @@ async function runCommandEatError(command: string, ...args: string[]) {
 
 export async function runServer(installDir: string) {
     console.log('Starting scrypted main...');
-    await runCommand('npm', '--prefix', '"'+installDir+'"', 'exec', 'scrypted-serve');
+    await runCommand('npm', '--prefix', installDir, 'exec', 'scrypted-serve');
 }
 
 async function startServer(installDir: string) {
@@ -98,7 +98,7 @@ export async function installServe(installVersion: string, ignoreError?: boolean
         version: process.version,
     }));
 
-    const args = ['--prefix', '"'+installDir+'"', 'install', '--production', `@scrypted/server@${installVersion}`]
+    const args = ['--prefix', installDir, 'install', '--production', `@scrypted/server@${installVersion}`]
     if (ignoreError)
         await runCommandEatError('npm', ...args);
     else
@@ -137,7 +137,7 @@ export async function serveMain(installVersion?: string) {
 
         if (fs.existsSync(UPDATE_FILE)) {
             console.log('Update requested. Installing.');
-            await runCommandEatError('npm', '--prefix', '"'+installDir+'"', 'install', '--production', '@scrypted/server@latest').catch(e => {
+            await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest').catch(e => {
                 console.error('Update failed', e);
             });
             console.log('Exiting.');
