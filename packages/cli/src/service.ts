@@ -14,8 +14,12 @@ const EXIT_FILE = '.exit';
 const UPDATE_FILE = '.update';
 
 async function runCommand(command: string, ...args: string[]) {
-    if (os.platform() === 'win32')
+    if (os.platform() === 'win32') {
         command += '.cmd';
+        // wrap each argument in a quote to handle spaces in paths
+        // https://github.com/nodejs/node/issues/38490#issuecomment-927330248
+        args = args.map(arg => '"' + arg + '"');
+    }
     console.log('running', command, ...args);
     const cp = child_process.spawn(command, args, {
         stdio: 'inherit',
