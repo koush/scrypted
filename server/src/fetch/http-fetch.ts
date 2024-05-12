@@ -1,9 +1,9 @@
 import type events from 'events';
-import type stream from 'stream';
 import type followRedirects from 'follow-redirects';
 import type { IncomingMessage } from 'http';
+import type stream from 'stream';
 import type { Readable } from 'stream';
-import { HttpFetchBufferOptions, HttpFetchJsonOptions, HttpFetchOptions, HttpFetchReadableOptions, HttpFetchResponse, HttpFetchResponseType, HttpFetchTextOptions, checkStatus, createStringOrBufferBody, getFetchMethod, setDefaultHttpFetchAccept } from '.';
+import { HttpFetchBufferOptions, HttpFetchJsonOptions, HttpFetchOptions, HttpFetchReadableOptions, HttpFetchResponse, HttpFetchResponseType, HttpFetchTextOptions, checkStatus, createHeadersArray, createStringOrBufferBody, getFetchMethod, setDefaultHttpFetchAccept } from '.';
 export type { HttpFetchBufferOptions, HttpFetchJsonOptions, HttpFetchOptions, HttpFetchReadableOptions, HttpFetchResponse, HttpFetchResponseType, HttpFetchTextOptions, checkStatus, setDefaultHttpFetchAccept } from '.';
 
 async function readMessageBuffer(response: IncomingMessage) {
@@ -64,7 +64,7 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
     : T extends HttpFetchReadableOptions<Readable> ? IncomingMessage
     : T extends HttpFetchJsonOptions<Readable> ? any : Buffer
 >> {
-    const headers = new Headers(options.headers);
+    const headers = createHeadersArray(options.headers);
     setDefaultHttpFetchAccept(headers, options.responseType);
 
     const { once } = require('events') as typeof events;
@@ -83,16 +83,6 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
         body = newBody;
     }
 
-    const nodeHeaders: Record<string, string[]> = {};
-    for (const [k, v] of headers) {
-        if (nodeHeaders[k]) {
-            nodeHeaders[k].push(v);
-        }
-        else {
-            nodeHeaders[k] = [v];
-        }
-    }
-
     let controller: AbortController;
     let timeout: NodeJS.Timeout;
     if (options.timeout) {
@@ -104,6 +94,16 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
 
     const signal = controller?.signal || options.signal;
     signal?.addEventListener('abort', () => request.destroy(new Error('abort')));
+
+    const nodeHeaders: Record<string, string[]> = {};
+    for (const [k, v] of headers) {
+        if (nodeHeaders[k]) {
+            nodeHeaders[k].push(v);
+        }
+        else {
+            nodeHeaders[k] = [v];
+        }
+    }
 
     const request = proto.request(url, {
         method: getFetchMethod(options),

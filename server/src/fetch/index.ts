@@ -1,4 +1,3 @@
-
 export type HttpFetchResponseType = 'json' | 'text' | 'buffer' | 'readable';
 export interface HttpFetchOptionsBase<B> {
     url: string | URL;
@@ -73,15 +72,64 @@ export function getHttpFetchAccept(responseType: HttpFetchResponseType) {
     return;
 }
 
-export function setDefaultHttpFetchAccept(headers: Headers, responseType: HttpFetchResponseType) {
-    if (headers.has('Accept'))
+export function hasHeader(headers: [string, string][], key: string) {
+    key = key.toLowerCase();
+    return headers.find(([k]) => k.toLowerCase() === key);
+}
+
+export function removeHeader(headers: [string, string][], key: string) {
+    key = key.toLowerCase();
+    const filteredHeaders = headers.filter(([headerKey, _]) => headerKey.toLowerCase() !== key);
+    headers.length = 0;
+    filteredHeaders.forEach(header => headers.push(header));
+}
+
+export function setHeader(headers: [string, string][], key: string, value: string) {
+    removeHeader(headers, key);
+    headers.push([key, value]);
+}
+
+export function setDefaultHttpFetchAccept(headers: [string, string][], responseType: HttpFetchResponseType) {
+    if (hasHeader(headers, 'Accept'))
         return;
     const accept = getHttpFetchAccept(responseType);
     if (accept)
-        headers.set('Accept', accept);
+        setHeader(headers, 'Accept', accept);
 }
 
-export function createStringOrBufferBody(headers: Headers, body: any) {
+export function createHeadersArray(headers: HeadersInit): [string, string][] {
+    const headersArray: [string, string][] = [];
+    if (!headers)
+        return headersArray;
+    if (headers instanceof Headers) {
+        for (const [k, v] of headers.entries()) {
+            headersArray.push([k, v]);
+        }
+        return headersArray;
+    }
+
+    if (headers instanceof Array) {
+        for (const [k, v] of headers) {
+            headersArray.push([k, v]);
+        }
+        return headersArray;
+    }
+
+    for (const k of Object.keys(headers)) {
+        const v = headers[k];
+        headersArray.push([k, v]);
+    }
+
+    return headersArray;
+}
+
+/**
+ *
+ * @param headers
+ * @param body
+ * @returns Returns the body and Content-Type header that was set.
+ */
+export function createStringOrBufferBody(headers: [string, string][], body: any) {
     let contentType: string;
     if (typeof body === 'object') {
         body = JSON.stringify(body);
@@ -91,9 +139,8 @@ export function createStringOrBufferBody(headers: Headers, body: any) {
         contentType = 'text/plain';
     }
 
-    if (!headers.has('Content-Type'))
-        headers.set('Content-Type', contentType);
-
+    if (!hasHeader(headers, 'Content-Type'))
+        setHeader(headers, 'Content-Type', contentType);
     return body;
 }
 
@@ -116,7 +163,7 @@ export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T)
     : T extends HttpFetchReadableOptions<BodyInit> ? Response
     : T extends HttpFetchJsonOptions<BodyInit> ? any : Buffer
 >> {
-    const headers = new Headers(options.headers);
+    const headers = createHeadersArray(options.headers);
     setDefaultHttpFetchAccept(headers, options.responseType);
 
     let { body } = options;

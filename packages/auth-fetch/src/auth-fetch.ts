@@ -1,4 +1,4 @@
-import { HttpFetchOptions, HttpFetchResponseType, checkStatus, fetcher, getFetchMethod, setDefaultHttpFetchAccept } from '../../../server/src/fetch';
+import { HttpFetchOptions, HttpFetchResponseType, checkStatus, createHeadersArray, fetcher, getFetchMethod, hasHeader, setDefaultHttpFetchAccept, setHeader } from '../../../server/src/fetch';
 
 export interface AuthFetchCredentialState {
     username: string;
@@ -74,15 +74,15 @@ export function createAuthFetch<B, M>(
 ) {
     const authHttpFetch = async <T extends HttpFetchOptions<B>>(options: T & AuthFetchOptions): ReturnType<typeof h<T>> => {
         const method = getFetchMethod(options);
-        const headers = new Headers(options.headers);
+        const headers = createHeadersArray(options.headers);
         options.headers = headers;
         setDefaultHttpFetchAccept(headers, options.responseType);
 
         const initialHeader = await getAuth(options, options.url, method);
         // try to provide an authorization if a session exists, but don't override Authorization if provided already.
         // 401 will trigger a proper auth.
-        if (initialHeader && !headers.has('Authorization'))
-            headers.set('Authorization', initialHeader);
+        if (initialHeader && !hasHeader(headers, 'Authorization'))
+            setHeader(headers, 'Authorization', initialHeader);
 
         const initialResponse = await h({
             ...options,
@@ -126,7 +126,7 @@ export function createAuthFetch<B, M>(
 
         const header = await getAuth(options, options.url, method);
         if (header)
-            headers.set('Authorization', header);
+            setHeader(headers, 'Authorization', header);
 
         return h(options);
     }
