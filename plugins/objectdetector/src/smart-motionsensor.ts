@@ -144,10 +144,10 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
 
     trigger() {
         this.resetTrigger();
+        this.motionDetected = true;
         const duration: number = this.storageSettings.values.detectionTimeout;
         if (!duration)
             return;
-        this.motionDetected = true;
         this.timeout = setTimeout(() => {
             this.motionDetected = false;
         }, duration * 1000);
