@@ -154,7 +154,6 @@ class TextRecognition(PredictPlugin):
         self, d: ObjectDetectionResult, image: scrypted_sdk.Image, skew_angle: float
     ):
         try:
-
             image_tensor = await prepare_text_result(d, image, skew_angle)
             preds = await self.predictTextModel(image_tensor)
             d["label"] = process_text_result(preds)

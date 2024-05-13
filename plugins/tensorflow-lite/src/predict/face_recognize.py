@@ -9,8 +9,6 @@ import numpy as np
 import scrypted_sdk
 from PIL import Image
 from scrypted_sdk import (
-    Setting,
-    SettingValue,
     ObjectDetectionSession,
     ObjectsDetected,
     ObjectDetectionResult,
@@ -51,14 +49,6 @@ class FaceRecognizeDetection(PredictPlugin):
 
     def downloadModel(self, model: str):
         pass
-
-    async def getSettings(self) -> list[Setting]:
-        pass
-
-    async def putSetting(self, key: str, value: SettingValue):
-        self.storage.setItem(key, value)
-        await self.onDeviceEvent(scrypted_sdk.ScryptedInterface.Settings.value, None)
-        await scrypted_sdk.deviceManager.requestRestart()
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
