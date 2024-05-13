@@ -20,6 +20,13 @@ from scrypted_sdk.types import Setting
 import common.yolo as yolo
 from predict import PredictPlugin
 
+from .face_recognition import ONNXFaceRecognition
+
+try:
+    from .text_recognition import ONNXTextRecognition
+except:
+    ONNXTextRecognition = None
+
 availableModels = [
     "Default",
     "scrypted_yolo_nas_s_320",
@@ -72,6 +79,7 @@ class ONNXPlugin(
         deviceIds = json.loads(deviceIds)
         if not len(deviceIds):
             deviceIds = ["0"]
+        self.deviceIds = deviceIds
 
         compiled_models = []
         self.compiled_models = {}
@@ -123,6 +131,52 @@ class ONNXPlugin(
             max_workers=len(compiled_models),
             thread_name_prefix="onnx-prepare",
         )
+
+        self.faceDevice = None
+        self.textDevice = None
+        asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
+
+    async def prepareRecognitionModels(self):
+        try:
+            devices = [
+                {
+                    "nativeId": "facerecognition",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                    ],
+                    "name": "ONNX Face Recognition",
+                },
+            ]
+
+            if ONNXTextRecognition:
+                devices.append(
+                    {
+                        "nativeId": "textrecognition",
+                        "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                        "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                        ],
+                        "name": "ONNX Text Recognition",
+                    },
+                )
+
+            await scrypted_sdk.deviceManager.onDevicesChanged(
+                {
+                    "devices": devices,
+                }
+            )
+        except:
+            pass
+
+    async def getDevice(self, nativeId: str) -> Any:
+        if nativeId == "facerecognition":
+            self.faceDevice = self.faceDevice or ONNXFaceRecognition(self, nativeId)
+            return self.faceDevice
+        elif nativeId == "textrecognition":
+            self.textDevice = self.textDevice or ONNXTextRecognition(self, nativeId)
+            return self.textDevice
+        raise Exception("unknown device")
 
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"

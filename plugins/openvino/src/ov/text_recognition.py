@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import openvino.runtime as ov
 import numpy as np
+import openvino.runtime as ov
+from ov import async_infer
 
 from predict.text_recognize import TextRecognition
 
@@ -27,20 +28,18 @@ class OpenVINOTextRecognition(TextRecognition):
         print(xmlFile, binFile)
         return self.plugin.core.compile_model(xmlFile, self.plugin.mode)
 
-    def predictDetectModel(self, input):
+    async def predictDetectModel(self, input: np.ndarray):
         infer_request = self.detectModel.create_infer_request()
         im = ov.Tensor(array=input)
         input_tensor = im
         infer_request.set_input_tensor(input_tensor)
-        infer_request.start_async()
-        infer_request.wait()
+        await async_infer.start_async(infer_request)
         return infer_request.output_tensors[0].data
 
-    def predictTextModel(self, input):
+    async def predictTextModel(self, input: np.ndarray):
         input = input.astype(np.float32)
         im = ov.Tensor(array=input)
         infer_request = self.textModel.create_infer_request()
         infer_request.set_input_tensor(im)
-        infer_request.start_async()
-        infer_request.wait()
+        await async_infer.start_async(infer_request)
         return infer_request.output_tensors[0].data

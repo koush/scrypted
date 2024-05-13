@@ -3,6 +3,7 @@ from __future__ import annotations
 import concurrent.futures
 import os
 
+import asyncio
 import coremltools as ct
 import numpy as np
 # import Quartz
@@ -10,6 +11,7 @@ import numpy as np
 
 # import Vision
 from predict.face_recognize import FaceRecognizeDetection
+from PIL import Image
 
 
 def euclidean_distance(arr1, arr2):
@@ -29,6 +31,8 @@ predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Vision-Predict")
 class CoreMLFaceRecognition(FaceRecognizeDetection):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
+        self.detectExecutor = concurrent.futures.ThreadPoolExecutor(1, "detect-face")
+        self.recogExecutor = concurrent.futures.ThreadPoolExecutor(1, "recog-face")
 
     def downloadModel(self, model: str):
         model_version = "v7"
@@ -51,23 +55,29 @@ class CoreMLFaceRecognition(FaceRecognizeDetection):
         inputName = model.get_spec().description.input[0].name
         return model, inputName
     
-    def predictDetectModel(self, input):
-        model, inputName = self.detectModel
-        out_dict = model.predict({inputName: input})
-        results = list(out_dict.values())[0][0]
+    async def predictDetectModel(self, input: Image.Image):
+        def predict():
+            model, inputName = self.detectModel
+            out_dict = model.predict({inputName: input})
+            results = list(out_dict.values())[0][0]
+            return results
+
+        results = await asyncio.get_event_loop().run_in_executor(
+            self.detectExecutor, lambda: predict()
+        )
         return results
 
-    def predictFaceModel(self, input):
-        model, inputName = self.faceModel
-        out_dict = model.predict({inputName: input})
-        return out_dict["var_2167"][0]
+    async def predictFaceModel(self, input: np.ndarray):
+        def predict():
+            model, inputName = self.faceModel
+            out_dict = model.predict({inputName: input})
+            results = out_dict["var_2167"][0]
+            return results
+        results = await asyncio.get_event_loop().run_in_executor(
+            self.recogExecutor, lambda: predict()
+        )
+        return results
     
-    def predictTextModel(self, input):
-        model, inputName = self.textModel
-        out_dict = model.predict({inputName: input})
-        preds = out_dict["linear_2"]
-        return preds
-
     # def predictVision(self, input: Image.Image) -> asyncio.Future[list[Prediction]]:
     #     buffer = input.tobytes()
     #     myData = NSData.alloc().initWithBytes_length_(buffer, len(buffer))

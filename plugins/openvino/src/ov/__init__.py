@@ -204,6 +204,8 @@ class OpenVINOPlugin(
         labels_contents = open(labelsFile, "r").read()
         self.labels = parse_label_contents(labels_contents)
 
+        self.faceDevice = None
+        self.textDevice = None
         asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
 
     async def getSettings(self) -> list[Setting]:
@@ -396,7 +398,9 @@ class OpenVINOPlugin(
 
     async def getDevice(self, nativeId: str) -> Any:
         if nativeId == "facerecognition":
-            return OpenVINOFaceRecognition(self, nativeId)
+            self.faceDevice = self.faceDevice or OpenVINOFaceRecognition(self, nativeId)
+            return self.faceDevice
         elif nativeId == "textrecognition":
-            return OpenVINOTextRecognition(self, nativeId)
+            self.textDevice = self.textDevice or OpenVINOTextRecognition(self, nativeId)
+            return self.textDevice
         raise Exception("unknown device")

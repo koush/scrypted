@@ -41,10 +41,10 @@ class TextRecognition(PredictPlugin):
     def downloadModel(self, model: str):
         pass
 
-    def predictDetectModel(self, input):
+    async def predictDetectModel(self, input: np.ndarray):
         pass
 
-    def predictTextModel(self, input):
+    async def predictTextModel(self, input: np.ndarray):
         pass
 
     async def detect_once(
@@ -56,9 +56,7 @@ class TextRecognition(PredictPlugin):
         # add extra dimension to tensor
         image_tensor = np.expand_dims(image_tensor, axis=0)
 
-        y = await asyncio.get_event_loop().run_in_executor(
-            predictExecutor, lambda: self.predictDetectModel(image_tensor)
-        )
+        y = await self.predictDetectModel(image_tensor)
 
         estimate_num_chars = False
         ratio_h = ratio_w = 1
@@ -158,10 +156,7 @@ class TextRecognition(PredictPlugin):
         try:
 
             image_tensor = await prepare_text_result(d, image, skew_angle)
-            preds = await asyncio.get_event_loop().run_in_executor(
-                predictExecutor,
-                lambda: self.predictTextModel(image_tensor),
-            )
+            preds = await self.predictTextModel(image_tensor)
             d["label"] = process_text_result(preds)
 
         except Exception as e:

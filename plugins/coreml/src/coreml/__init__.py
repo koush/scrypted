@@ -134,6 +134,8 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.2
 
+        self.faceDevice = None
+        self.textDevice = None
         asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
 
     async def prepareRecognitionModels(self):
@@ -171,9 +173,11 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
 
     async def getDevice(self, nativeId: str) -> Any:
         if nativeId == "facerecognition":
-            return CoreMLFaceRecognition(nativeId)
+            self.faceDevice = self.faceDevice or CoreMLFaceRecognition(nativeId)
+            return self.faceDevice
         if nativeId == "textrecognition":
-            return CoreMLTextRecognition(nativeId)
+            self.textDevice = self.textDevice or CoreMLTextRecognition(nativeId)
+            return self.textDevice
         raise Exception("unknown device")
 
     async def getSettings(self) -> list[Setting]:

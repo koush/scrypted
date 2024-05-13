@@ -3,14 +3,10 @@ from __future__ import annotations
 import asyncio
 from asyncio import Future
 import base64
-import concurrent.futures
-import os
 from typing import Any, Tuple, List
 
 import numpy as np
-# import Quartz
 import scrypted_sdk
-# from Foundation import NSData, NSMakeSize
 from PIL import Image
 from scrypted_sdk import (
     Setting,
@@ -21,10 +17,8 @@ from scrypted_sdk import (
 )
 import traceback
 
-# import Vision
 from predict import PredictPlugin
 from common import yolo
-from common.text import prepare_text_result, process_text_result
 
 def euclidean_distance(arr1, arr2):
     return np.linalg.norm(arr1 - arr2)
@@ -36,9 +30,6 @@ def cosine_similarity(vector_a, vector_b):
     norm_b = np.linalg.norm(vector_b)
     similarity = dot_product / (norm_a * norm_b)
     return similarity
-
-
-predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "Recognize")
 
 class FaceRecognizeDetection(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -56,7 +47,6 @@ class FaceRecognizeDetection(PredictPlugin):
         self.minThreshold = 0.7
 
         self.detectModel = self.downloadModel("scrypted_yolov9c_flt")
-        self.textModel = self.downloadModel("vgg_english_g2")
         self.faceModel = self.downloadModel("inception_resnet_v1")
 
     def downloadModel(self, model: str):
@@ -81,9 +71,7 @@ class FaceRecognizeDetection(PredictPlugin):
         return "rgb"
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        results = await asyncio.get_event_loop().run_in_executor(
-            predictExecutor, lambda: self.predictDetectModel(input)
-        )
+        results = await self.predictDetectModel(input)
         objs = yolo.parse_yolov9(results)
         ret = self.create_detection_result(objs, src_size, cvss)
         return ret
@@ -112,10 +100,7 @@ class FaceRecognizeDetection(PredictPlugin):
             processed_tensor = (image_tensor - 127.5) / 128.0
             processed_tensor = np.expand_dims(processed_tensor, axis=0)
 
-            output = await asyncio.get_event_loop().run_in_executor(
-                predictExecutor,
-                lambda: self.predictFaceModel(processed_tensor)
-            )
+            output = await self.predictFaceModel(processed_tensor)
 
             b = output.tobytes()
             embedding = base64.b64encode(b).decode("utf-8")
@@ -125,28 +110,11 @@ class FaceRecognizeDetection(PredictPlugin):
             traceback.print_exc()
             pass
     
-    def predictTextModel(self, input):
+    async def predictDetectModel(self, input: Image.Image):
         pass
 
-    def predictDetectModel(self, input):
+    async def predictFaceModel(self, input: np.ndarray):
         pass
-
-    def predictFaceModel(self, input):
-        pass
-
-    async def setLabel(self, d: ObjectDetectionResult, image: scrypted_sdk.Image):
-        try:
-
-            image_tensor = await prepare_text_result(d, image)
-            preds = await asyncio.get_event_loop().run_in_executor(
-                predictExecutor,
-                lambda: self.predictTextModel(image_tensor),
-            )
-            d['label'] = process_text_result(preds)
-
-        except Exception as e:
-            traceback.print_exc()
-            pass
 
     async def run_detection_image(
         self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession
@@ -206,10 +174,6 @@ class FaceRecognizeDetection(PredictPlugin):
         for d in ret["detections"]:
             if d["className"] == "face":
                 futures.append(asyncio.ensure_future(self.setEmbedding(d, image)))
-            # elif d["className"] == "plate":
-            #     futures.append(asyncio.ensure_future(self.setLabel(d, image)))
-            # elif d['className'] == 'text':
-            #     futures.append(asyncio.ensure_future(self.setLabel(d, image)))
 
         if len(futures):
             await asyncio.wait(futures)

@@ -33,6 +33,7 @@
       "runtime": "python",
       "type": "API",
       "interfaces": [
+         "DeviceProvider",
          "Settings",
          "ObjectDetection",
          "ObjectDetectionPreview"
@@ -41,5 +42,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.87"
+   "version": "0.1.88"
 }
