@@ -26,7 +26,7 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
         },
         detectionTimeout: {
             title: 'Object Detection Timeout',
-            description: 'Duration in seconds the sensor will report motion, before resetting.',
+            description: 'Duration in seconds the sensor will report motion, before resetting. Setting this to 0 will reset the sensor when motion stops.',
             type: 'number',
             defaultValue: 60,
         },
@@ -73,7 +73,8 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
         },
     });
 
-    listener: EventListenerRegister;
+    detectionListener: EventListenerRegister;
+    motionListener: EventListenerRegister;
     timeout: NodeJS.Timeout;
     lastPicture: Promise<MediaObject>;
 
@@ -144,6 +145,8 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
     trigger() {
         this.resetTrigger();
         const duration: number = this.storageSettings.values.detectionTimeout;
+        if (!duration)
+            return;
         this.motionDetected = true;
         this.timeout = setTimeout(() => {
             this.motionDetected = false;
@@ -152,12 +155,14 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
 
     rebind() {
         this.motionDetected = false;
-        this.listener?.removeListener();
-        this.listener = undefined;
+        this.detectionListener?.removeListener();
+        this.detectionListener = undefined;
+        this.motionListener?.removeListener();
+        this.motionListener = undefined;
         this.resetTrigger();
 
 
-        const objectDetector: ObjectDetector & ScryptedDevice = this.storageSettings.values.objectDetector;
+        const objectDetector: ObjectDetector & MotionSensor & ScryptedDevice = this.storageSettings.values.objectDetector;
         if (!objectDetector)
             return;
 
@@ -167,7 +172,19 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
 
         const console = sdk.deviceManager.getMixinConsole(objectDetector.id, this.nativeId);
 
-        this.listener = objectDetector.listen(ScryptedInterface.ObjectDetector, (source, details, data) => {
+        this.motionListener = objectDetector.listen({
+            event: ScryptedInterface.MotionSensor,
+            watch: true,
+        }, (source, details, data) => {
+            const duration: number = this.storageSettings.values.detectionTimeout;
+            if (duration)
+                return;
+
+            if (!objectDetector.motionDetected)
+                this.motionDetected = false;
+        });
+
+        this.detectionListener = objectDetector.listen(ScryptedInterface.ObjectDetector, (source, details, data) => {
             const detected: ObjectsDetected = data;
 
             if (this.storageSettings.values.requireDetectionThumbnail && !detected.detectionId)

@@ -1159,7 +1159,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
   async releaseDevice(id: string, nativeId: string): Promise<void> {
     if (nativeId?.startsWith(SMART_MOTIONSENSOR_PREFIX)) {
       const smart = this.devices.get(nativeId) as SmartMotionSensor;
-      smart?.listener?.removeListener();
+      smart?.detectionListener?.removeListener();
     }
   }
 
