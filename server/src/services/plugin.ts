@@ -1,11 +1,11 @@
 import { ScryptedInterfaceProperty, ScryptedNativeId } from "@scrypted/types";
 import semver from 'semver';
 import { Plugin } from '../db-types';
+import { httpFetch } from "../fetch/http-fetch";
 import { hasMixinCycle } from "../mixin/mixin-cycle";
 import { ScryptedRuntime } from "../runtime";
 import { sleep } from "../sleep";
 import { getState } from "../state";
-import { httpFetch } from "../fetch/http-fetch";
 
 
 export async function getNpmPackageInfo(pkg: string) {
@@ -114,12 +114,23 @@ export class PluginComponent {
         }
         return {
             pid: host?.worker?.pid,
+            clientsCount: host?.io?.clientsCount,
             stats: host?.stats,
             rpcObjects,
             packageJson,
             pendingResults,
             pendingResultCounts: pendingResultMethods,
             id: this.scrypted.findPluginDevice(pluginId)._id,
+        }
+    }
+
+    async disconnectClients(pluginId: string) {
+        const host = this.scrypted.plugins[pluginId];
+        if (!host)
+            return;
+        const { clients } = host.io as any;
+        for (const client of Object.values(clients)) {
+            (client as any).close()
         }
     }
 
