@@ -17,10 +17,16 @@ function parseValue(value: string | null | undefined, setting: StorageSetting, r
         return readDefaultValue() || false;
     }
     if (type === 'number') {
-        return parseFloat(value) || readDefaultValue() || 0;
+        const n = parseFloat(value);
+        if (!isNaN(n))
+            return n;
+        return readDefaultValue() || 0;
     }
     if (type === 'integer') {
-        return parseInt(value) || readDefaultValue() || 0;
+        const n = parseInt(value);
+        if (!isNaN(n))
+            return n;
+        return readDefaultValue() || 0;
     }
     if (type === 'array') {
         if (!value)
