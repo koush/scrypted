@@ -110,6 +110,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
                     PYTHONPATH,
                 }, gstEnv, process.env, env),
             });
+            this.setupWorker();
 
             this.worker.stdout.pipe(this.stdout);
             this.worker.stderr.pipe(this.stderr);
@@ -124,7 +125,6 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             setup();
             this.peerin = this.worker.stdio[3] as Writable;
             this.peerout = this.worker.stdio[4] as Readable;
-            this.setupWorker();
             return;
         }
 
@@ -135,7 +135,6 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             setup();
             this.peerin = this.worker.stdio[3] as Writable;
             this.peerout = this.worker.stdio[4] as Readable;
-            this.setupWorker();
             return;
         }
 
