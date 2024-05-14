@@ -2,7 +2,7 @@ import path from 'path'
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
-import { ParserOptions, ParserSession, handleRebroadcasterClient, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
+import { ParserOptions, ParserSession, handleRebroadcasterClient, startParserSession } from './ffmpeg-rebroadcast';
 import { ListenZeroSingleClientTimeoutError, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
 import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack, createRtspParser, findH264NaluType, getNaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
@@ -41,13 +41,6 @@ interface PrebufferStreamChunk extends StreamChunk {
   time?: number;
 }
 
-type Prebuffers<T extends string> = {
-  [key in T]: PrebufferStreamChunk[];
-}
-
-type PrebufferParsers = 'rtsp';
-const PrebufferParserValues: PrebufferParsers[] = ['rtsp'];
-
 function hasOddities(h264Info: H264Info) {
   const h264Oddities = h264Info.fuab
     || h264Info.mtap16
@@ -60,13 +53,13 @@ function hasOddities(h264Info: H264Info) {
   return h264Oddities;
 }
 
+type PrebufferParsers = 'rtsp';
+
 class PrebufferSession {
 
   parserSessionPromise: Promise<ParserSession<PrebufferParsers>>;
   parserSession: ParserSession<PrebufferParsers>;
-  prebuffers: Prebuffers<PrebufferParsers> = {
-    rtsp: [],
-  };
+  rtspPrebuffer: PrebufferStreamChunk[] = []
   parsers: { [container: string]: StreamParser };
   sdp: Promise<string>;
   usingScryptedParser = false;
@@ -148,10 +141,10 @@ class PrebufferSession {
 
   getDetectedIdrInterval() {
     const durations: number[] = [];
-    if (this.prebuffers.rtsp.length) {
+    if (this.rtspPrebuffer.length) {
       let last: number;
 
-      for (const chunk of this.prebuffers.rtsp) {
+      for (const chunk of this.rtspPrebuffer) {
         if (findH264NaluType(chunk, H264_NAL_TYPE_IDR)) {
           if (last)
             durations.push(chunk.time - last);
@@ -176,9 +169,7 @@ class PrebufferSession {
   }
 
   clearPrebuffers() {
-    for (const prebuffer of PrebufferParserValues) {
-      this.prebuffers[prebuffer] = [];
-    }
+    this.rtspPrebuffer = [];
   }
 
   release() {
@@ -251,7 +242,7 @@ class PrebufferSession {
 
     let total = 0;
     let start = 0;
-    for (const prebuffer of this.prebuffers.rtsp) {
+    for (const prebuffer of this.rtspPrebuffer) {
       start = start || prebuffer.time;
       for (const chunk of prebuffer.chunks) {
         total += chunk.byteLength;
@@ -685,11 +676,10 @@ class PrebufferSession {
       session.killed.finally(() => clearTimeout(refreshTimeout));
     }
 
-    for (const container of PrebufferParserValues) {
       let shifts = 0;
-      let prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
+      let prebufferContainer: PrebufferStreamChunk[] = this.rtspPrebuffer;
 
-      session.on(container, (chunk: PrebufferStreamChunk) => {
+      session.on('rtsp', (chunk: PrebufferStreamChunk) => {
         const now = Date.now();
 
         chunk.time = now;
@@ -702,11 +692,10 @@ class PrebufferSession {
 
         if (shifts > 100000) {
           prebufferContainer = prebufferContainer.slice();
-          this.prebuffers[container] = prebufferContainer;
+          this.rtspPrebuffer = prebufferContainer;
           shifts = 0;
         }
       });
-    }
 
     session.start();
     return session;
@@ -783,13 +772,12 @@ class PrebufferSession {
   async handleRebroadcasterClient(options: {
     findSyncFrame: boolean,
     isActiveClient: boolean,
-    container: PrebufferParsers,
     session: ParserSession<PrebufferParsers>,
     socketPromise: Promise<Duplex>,
     requestedPrebuffer: number,
     filter?: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk,
   }) {
-    const { isActiveClient, container, session, socketPromise, requestedPrebuffer } = options;
+    const { isActiveClient, session, socketPromise, requestedPrebuffer } = options;
     this.console.log('sending prebuffer', requestedPrebuffer);
 
     let socket: Duplex;
@@ -839,15 +827,15 @@ class PrebufferSession {
         }
 
         const cleanup = () => {
-          session.removeListener(container, safeWriteData);
+          session.removeListener('rtsp', safeWriteData);
           session.removeListener('killed', cleanup);
           connection.destroy();
         }
 
-        session.on(container, safeWriteData);
+        session.on('rtsp', safeWriteData);
         session.once('killed', cleanup);
 
-        const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
+        const prebufferContainer: PrebufferStreamChunk[] = this.rtspPrebuffer;
         // if the requested container or the source container is not rtsp, use an exact seek.
         // this works better when the requested container is mp4, and rtsp is the source.
         // if starting on a sync frame, ffmpeg will skip the first segment while initializing
@@ -857,7 +845,7 @@ class PrebufferSession {
         // mpeg-ts as a container (would need to write a muxer)
         // specifying the buffer before the sync frame with probesize.
         // If h264 oddities are detected, assume ffmpeg will be used.
-        if (container !== 'rtsp' || !options.findSyncFrame || this.getLastH264Oddities()) {
+        if (!options.findSyncFrame || this.getLastH264Oddities()) {
           for (const chunk of prebufferContainer) {
             if (chunk.time < now - requestedPrebuffer)
               continue;
@@ -866,7 +854,7 @@ class PrebufferSession {
           }
         }
         else {
-          const parser = this.parsers[container];
+          const parser = this.parsers['rtsp'];
           const filtered = prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer);
           let availablePrebuffers = parser.findSyncFrame(filtered);
           if (!availablePrebuffers) {
@@ -1010,8 +998,6 @@ class PrebufferSession {
       urls = await getUrlLocalAdresses(this.console, url);
     }
 
-    const container = 'rtsp';
-
     mediaStreamOptions.sdp = sdp;
 
     const isActiveClient = options?.refresh !== false;
@@ -1019,7 +1005,6 @@ class PrebufferSession {
     this.handleRebroadcasterClient({
       findSyncFrame,
       isActiveClient,
-      container,
       requestedPrebuffer,
       socketPromise,
       session,
@@ -1045,7 +1030,7 @@ class PrebufferSession {
 
     const now = Date.now();
     let available = 0;
-    const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
+    const prebufferContainer: PrebufferStreamChunk[] = this.rtspPrebuffer;
     for (const prebuffer of prebufferContainer) {
       if (prebuffer.time < now - requestedPrebuffer)
         continue;
@@ -1066,11 +1051,11 @@ class PrebufferSession {
     const ffmpegInput: FFmpegInput = {
       url,
       urls,
-      container,
+      container: 'rtsp',
       inputArguments: [
         ...inputArguments,
-        ...(this.parsers[container].inputArguments || []),
-        '-f', this.parsers[container].container,
+        ...(this.parsers['rtsp'].inputArguments || []),
+        '-f', this.parsers['rtsp'].container,
         '-i', url,
       ],
       mediaStreamOptions,
@@ -1165,7 +1150,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         prebufferSession.handleRebroadcasterClient({
           findSyncFrame: true,
           isActiveClient: true,
-          container: 'rtsp',
           session,
           socketPromise: Promise.resolve(client),
           requestedPrebuffer,

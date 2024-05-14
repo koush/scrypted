@@ -3,13 +3,13 @@ import child_process, { ChildProcess, StdioOptions } from 'child_process';
 import { EventEmitter } from 'events';
 import { Server } from 'net';
 import { Duplex } from 'stream';
-import { cloneDeep } from './clone-deep';
-import { Deferred } from "./deferred";
-import { listenZeroSingleClient } from './listen-cluster';
-import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from './media-helpers';
-import { createRtspParser } from "./rtsp-server";
-import { parseSdp } from "./sdp-utils";
-import { StreamChunk, StreamParser } from './stream-parser';
+import { cloneDeep } from '@scrypted/common/src/clone-deep';
+import { Deferred } from "@scrypted/common/src/deferred";
+import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
+import { createRtspParser } from "@scrypted/common/src/rtsp-server";
+import { parseSdp } from "@scrypted/common/src/sdp-utils";
+import { StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 
 const { mediaManager } = sdk;
 
