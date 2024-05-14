@@ -134,7 +134,7 @@ export interface AmcrestEventData {
 export enum AmcrestEvent {
     MotionStart = "Code=VideoMotion;action=Start",
     MotionStop = "Code=VideoMotion;action=Stop",
-    MotionInfo  = "Code=VideoMotionInfo;action=State",
+    MotionInfo = "Code=VideoMotionInfo;action=State",
     AudioStart = "Code=AudioMutation;action=Start",
     AudioStop = "Code=AudioMutation;action=Stop",
     TalkInvite = "Code=_DoTalkAction_;action=Invite",
@@ -263,6 +263,8 @@ export class AmcrestCameraClient {
         // make content type parsable as content disposition filename
         const cd = contentType.parse(ct);
         let { boundary } = cd.parameters;
+        // amcrest may send "--myboundary" or "-- myboundary" (with a space)
+        const altBoundary = `-- ${boundary}`;
         boundary = `--${boundary}`;
         const boundaryEnd = `${boundary}--`;
 
@@ -286,7 +288,7 @@ export class AmcrestCameraClient {
                         this.console.log('ignoring dahua http body', body);
                     continue;
                 }
-                if (ignore !== boundary) {
+                if (ignore !== boundary && ignore !== altBoundary) {
                     this.console.error('expected boundary but found', ignore);
                     this.console.error(response.headers);
                     throw new Error('expected boundary');
