@@ -1,12 +1,12 @@
-import { ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
-import { closeQuiet, createBindZero } from "@scrypted/common/src/listen-cluster";
-import { findH264NaluType, H264_NAL_TYPE_SPS, parseSemicolonDelimited, RtspClient, RtspClientUdpSetupOptions, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
+import { closeQuiet } from "@scrypted/common/src/listen-cluster";
+import { H264_NAL_TYPE_SPS, RTSP_FRAME_MAGIC, RtspClient, RtspClientUdpSetupOptions, findH264NaluType, parseSemicolonDelimited } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
 import dgram from 'dgram';
 import { parse as spsParse } from "h264-sps-parser";
 import { EventEmitter } from "stream";
+import { ParserSession, setupActivityTimer } from "./ffmpeg-rebroadcast";
 import { negotiateMediaStream } from "./rfc4571";
 import { getSpsResolution } from "./sps-resolution";
 
@@ -95,13 +95,15 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                 const setup: RtspClientUdpSetupOptions = {
                     path: control,
                     type: 'udp',
-                    onRtp: (header, data) => {
-                        const prefix = Buffer.alloc(4);
-                        prefix.writeUInt8(RTSP_FRAME_MAGIC, 0);
-                        prefix.writeUInt8(rtspChannel, 1);
-                        prefix.writeUInt16BE(data.length, 2);
+                    onRtp: (...headerBuffers) => {
                         const chunk: StreamChunk = {
-                            chunks: [prefix, data],
+                            chunks: headerBuffers.map(headerBuffer => headerBuffer[1]).map(data => {
+                                const prefix = Buffer.alloc(4);
+                                prefix.writeUInt8(RTSP_FRAME_MAGIC, 0);
+                                prefix.writeUInt8(rtspChannel, 1);
+                                prefix.writeUInt16BE(data.length, 2);
+                                return [prefix, data];
+                            }).flat(),
                             type: codec,
                         };
                         events.emit('rtsp', chunk);
@@ -129,9 +131,9 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                     path: control,
                     type: 'tcp',
                     port: channel,
-                    onRtp: (header, data) => {
+                    onRtp: (...headerBuffers) => {
                         const chunk: StreamChunk = {
-                            chunks: [header, data],
+                            chunks: headerBuffers.flat(),
                             type: codec,
                         };
                         events.emit('rtsp', chunk);
