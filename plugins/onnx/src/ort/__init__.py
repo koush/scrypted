@@ -200,6 +200,12 @@ class ONNXPlugin(
                 "multiple": True,
                 "value": deviceIds,
             },
+            {
+                "key": "execution_device",
+                "title": "Execution Device",
+                "readonly": True,
+                "value": onnxruntime.get_device(),
+            }
         ]
 
     async def putSetting(self, key: str, value: SettingValue):
