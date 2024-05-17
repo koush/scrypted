@@ -9,6 +9,7 @@ import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
 import type { Runtime } from './scrypted-server-main';
+import { ensureCompatibility } from './compatibility';
 
 export function isChildProcess() {
     return process.argv[2] === 'child' || process.argv[2] === 'child-thread'
@@ -17,6 +18,8 @@ export function isChildProcess() {
 function start(mainFilename: string, options?: {
     onRuntimeCreated?: (runtime: Runtime) => Promise<void>,
 }) {
+    ensureCompatibility();
+
     if (!global.gc) {
         v8.setFlagsFromString('--expose_gc')
         global.gc = vm.runInNewContext("gc");
