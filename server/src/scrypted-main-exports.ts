@@ -1,5 +1,6 @@
 import dns from 'dns';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 import process from 'process';
 import semver from 'semver';
@@ -17,6 +18,13 @@ export function isChildProcess() {
 function start(mainFilename: string, options?: {
     onRuntimeCreated?: (runtime: Runtime) => Promise<void>,
 }) {
+    // Allow including a custom file path for platforms that require
+    // compatibility hacks. For example, Android may need to patch
+    // os functions.
+    if (process.env.SCRYPTED_COMPATIBILITY_FILE && fs.existsSync(process.env.SCRYPTED_COMPATIBILITY_FILE)) {
+        require(process.env.SCRYPTED_COMPATIBILITY_FILE);
+    }
+
     if (!global.gc) {
         v8.setFlagsFromString('--expose_gc')
         global.gc = vm.runInNewContext("gc");
