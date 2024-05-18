@@ -29,14 +29,7 @@ function nodeIpAddress(family: number): string[] {
         ...costlyNetworks,
     ];
 
-    let interfaces: any;
-    try {
-        interfaces = os.networkInterfaces();
-    } catch {
-        // bjia56: When running in secured environments like UserLAnd in Android, os.networkInterfaces()
-        // is unable to get addresses and throws an error. Therefore, assume we can't find any addresses.
-        return [];
-    }
+    const interfaces = os.networkInterfaces();
 
     const all = Object.keys(interfaces)
         .map((nic) => {
