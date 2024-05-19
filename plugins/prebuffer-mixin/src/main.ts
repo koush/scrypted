@@ -1,8 +1,6 @@
-import path from 'path'
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
-import { ParserOptions, ParserSession, handleRebroadcasterClient, startParserSession } from './ffmpeg-rebroadcast';
 import { ListenZeroSingleClientTimeoutError, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
 import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack, createRtspParser, findH264NaluType, getNaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
@@ -10,14 +8,16 @@ import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
 import { StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, ChargeState, DeviceProvider, DeviceState, EventListenerRegister, FFmpegInput, H264Info, MediaObject, MediaStreamDestination, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, VideoCameraConfiguration, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { BufferConverter, ChargeState, DeviceProvider, EventListenerRegister, FFmpegInput, H264Info, MediaObject, MediaStreamDestination, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, VideoCameraConfiguration, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { once } from 'events';
 import net, { AddressInfo } from 'net';
+import path from 'path';
 import semver from 'semver';
 import { Duplex } from 'stream';
 import { Worker } from 'worker_threads';
+import { ParserOptions, ParserSession, startParserSession } from './ffmpeg-rebroadcast';
 import { FileRtspServer } from './file-rtsp-server';
 import { getUrlLocalAdresses } from './local-addresses';
 import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
@@ -784,6 +784,12 @@ class PrebufferSession {
 
     try {
       socket = await socketPromise;
+
+      if (!session.isActive) {
+        // session may be killed while waiting for socket.
+        socket.destroy();
+        throw new Error('session terminated before socket connected');
+      }
     }
     catch (e) {
       // in case the client never connects, do an inactivity check.
@@ -808,70 +814,81 @@ class PrebufferSession {
       this.inactivityCheck(session, isActiveClient);
     });
 
-    handleRebroadcasterClient(socket, {
-      // console: this.console,
-      connect: (connection) => {
-        const now = Date.now();
-
-        const safeWriteData = (chunk: StreamChunk, prebuffer?: boolean) => {
-          if (options.filter) {
-            chunk = options.filter(chunk, prebuffer);
-            if (!chunk)
-              return;
-          }
-          const buffered = connection.writeData(chunk);
-          if (buffered > 100000000) {
-            this.console.log('more than 100MB has been buffered, did downstream die? killing connection.', this.streamName);
-            cleanup();
-          }
-        }
-
-        const cleanup = () => {
-          session.removeListener('rtsp', safeWriteData);
-          session.removeListener('killed', cleanup);
-          connection.destroy();
-        }
-
-        session.on('rtsp', safeWriteData);
-        session.once('killed', cleanup);
-
-        const prebufferContainer: PrebufferStreamChunk[] = this.rtspPrebuffer;
-        // if the requested container or the source container is not rtsp, use an exact seek.
-        // this works better when the requested container is mp4, and rtsp is the source.
-        // if starting on a sync frame, ffmpeg will skip the first segment while initializing
-        // on live sources like rtsp. the buffer before the sync frame stream will be enough
-        // for ffmpeg to analyze and start up in time for the sync frame.
-        // may be worth considering playing with a few other things to avoid this:
-        // mpeg-ts as a container (would need to write a muxer)
-        // specifying the buffer before the sync frame with probesize.
-        // If h264 oddities are detected, assume ffmpeg will be used.
-        if (!options.findSyncFrame || this.getLastH264Oddities()) {
-          for (const chunk of prebufferContainer) {
-            if (chunk.time < now - requestedPrebuffer)
-              continue;
-
-            safeWriteData(chunk, true);
-          }
-        }
-        else {
-          const parser = this.parsers['rtsp'];
-          const filtered = prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer);
-          let availablePrebuffers = parser.findSyncFrame(filtered);
-          if (!availablePrebuffers) {
-            this.console.warn('Unable to find sync frame in rtsp prebuffer.');
-            availablePrebuffers = [];
-          }
-          else {
-            this.console.log('Found sync frame in rtsp prebuffer.');
-          }
-          for (const prebuffer of availablePrebuffers) {
-            safeWriteData(prebuffer, true);
-          }
-        }
-
-        return cleanup;
+    let writeData = (data: StreamChunk): number => {
+      if (data.startStream) {
+        socket.write(data.startStream)
       }
-    })
+
+      const writeDataWithoutStartStream = (data: StreamChunk) => {
+        for (const chunk of data.chunks) {
+          socket.write(chunk);
+        }
+
+        return socket.writableLength;
+      };
+
+      writeData = writeDataWithoutStartStream;
+      return writeDataWithoutStartStream(data);
+    }
+
+    const safeWriteData = (chunk: StreamChunk, prebuffer?: boolean) => {
+      if (options.filter) {
+        chunk = options.filter(chunk, prebuffer);
+        if (!chunk)
+          return;
+      }
+      const buffered = writeData(chunk);
+      if (buffered > 100000000) {
+        this.console.log('more than 100MB has been buffered, did downstream die? killing connection.', this.streamName);
+        cleanup();
+      }
+    }
+
+    const cleanup = () => {
+      socket.destroy();
+      session.removeListener('rtsp', safeWriteData);
+      session.removeListener('killed', cleanup);
+    };
+
+    session.on('rtsp', safeWriteData);
+    session.once('killed', cleanup);
+
+    socket.once('close', () => {
+      cleanup();
+    });
+
+    // socket.on('error', e => this.console.log('client stream ended'));
+
+
+    const now = Date.now();
+    const prebufferContainer: PrebufferStreamChunk[] = this.rtspPrebuffer;
+    // if starting on a sync frame, ffmpeg will skip the first segment while initializing
+    // on live sources like rtsp. the buffer before the sync frame stream will be enough
+    // for ffmpeg to analyze and start up in time for the sync frame.
+    // If h264 oddities are detected, assume ffmpeg will be used.
+    if (!options.findSyncFrame || this.getLastH264Oddities()) {
+      for (const chunk of prebufferContainer) {
+        if (chunk.time < now - requestedPrebuffer)
+          continue;
+
+        safeWriteData(chunk, true);
+      }
+    }
+    else {
+      const parser = this.parsers['rtsp'];
+      const filtered = prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer);
+      let availablePrebuffers = parser.findSyncFrame(filtered);
+      if (!availablePrebuffers) {
+        this.console.warn('Unable to find sync frame in rtsp prebuffer.');
+        availablePrebuffers = [];
+      }
+      else {
+        this.console.log('Found sync frame in rtsp prebuffer.');
+      }
+      for (const prebuffer of availablePrebuffers) {
+        safeWriteData(prebuffer, true);
+      }
+    }
   }
 
   async getVideoStream(findSyncFrame: boolean, options?: RequestMediaStreamOptions) {

@@ -1,8 +1,3 @@
-import sdk, { FFmpegInput, RequestMediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
-import child_process, { ChildProcess, StdioOptions } from 'child_process';
-import { EventEmitter } from 'events';
-import { Server } from 'net';
-import { Duplex } from 'stream';
 import { cloneDeep } from '@scrypted/common/src/clone-deep';
 import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
@@ -10,6 +5,9 @@ import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from
 import { createRtspParser } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
+import sdk, { FFmpegInput, RequestMediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
+import child_process, { ChildProcess, StdioOptions } from 'child_process';
+import { EventEmitter } from 'events';
 
 const { mediaManager } = sdk;
 
@@ -338,65 +336,4 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
             return this;
         }
     };
-}
-
-export interface Rebroadcaster {
-    server: Server;
-    port: number;
-    url: string;
-    clients: number;
-}
-
-export interface RebroadcastSessionCleanup {
-    (): void;
-}
-
-export interface RebroadcasterConnection {
-    writeData: (data: StreamChunk) => number;
-    destroy: () => void;
-}
-
-export interface RebroadcasterOptions {
-    connect?: (connection: RebroadcasterConnection) => RebroadcastSessionCleanup | undefined;
-    console?: Console;
-    idle?: {
-        timeout: number,
-        callback: () => void,
-    },
-}
-
-export function handleRebroadcasterClient(socket: Duplex, options?: RebroadcasterOptions) {
-    const firstWriteData = (data: StreamChunk) => {
-        if (data.startStream) {
-            socket.write(data.startStream)
-        }
-        connection.writeData = writeData;
-        return writeData(data);
-    }
-    const writeData = (data: StreamChunk) => {
-        for (const chunk of data.chunks) {
-            socket.write(chunk);
-        }
-
-        return socket.writableLength;
-    };
-
-    const destroy = () => {
-        const cb = cleanupCallback;
-        cleanupCallback = undefined;
-        socket.destroy();
-        cb?.();
-    }
-
-    const connection: RebroadcasterConnection = {
-        writeData: firstWriteData,
-        destroy,
-    };
-
-    let cleanupCallback = options?.connect(connection);
-
-    socket.once('close', () => {
-        destroy();
-    });
-    socket.on('error', e => options?.console?.log('client stream ended'));
 }

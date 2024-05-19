@@ -72,7 +72,7 @@ async function setupRtspClient(console: Console, rtspClient: RtspClient, channel
                     }
                 },
             });
-            console.log('rtsp/udp', section.codec, result);
+            // console.log('rtsp/udp', section.codec, result);
             return false;
         }
     }
@@ -90,7 +90,7 @@ async function setupRtspClient(console: Console, rtspClient: RtspClient, channel
             }
         },
     });
-    console.log('rtsp/tcp', section.codec);
+    // console.log('rtsp/tcp', section.codec);
     return true;
 }
 
