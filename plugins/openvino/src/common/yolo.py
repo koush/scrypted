@@ -21,7 +21,7 @@ def parse_yolo_nas(predictions):
     return objs
 
 def parse_yolov9(results, threshold = defaultThreshold, scale = None, confidence_scale  = None):
-    objs = []
+    objs: list[Prediction] = []
     keep = np.argwhere(results[4:] > threshold)
     for indices in keep:
         class_id = indices[0]
