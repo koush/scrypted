@@ -166,10 +166,12 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             case MDNSAdvertiser.CIAO:
                 break;
             default:
-                if (fs.existsSync('/var/run/avahi-daemon/'))
-                    advertiser = MDNSAdvertiser.AVAHI;
-                else
-                    advertiser = MDNSAdvertiser.CIAO;
+                advertiser = MDNSAdvertiser.CIAO;
+                // this avahi detection doesn't work sometimes? fails silently.
+                // if (fs.existsSync('/var/run/avahi-daemon/'))
+                //     advertiser = MDNSAdvertiser.AVAHI;
+                // else
+                //     advertiser = MDNSAdvertiser.CIAO;
                 break;
         }
         return advertiser;
@@ -267,8 +269,6 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     },
                         undefined, 'Pairing'));
                     storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
-                    // TODO: change this value after this current default has been persisted to existing clients.
-                    // changing it now will cause existing accessories be renamed.
                     storageSettings.settings.addIdentifyingMaterial.persistedDefaultValue = false;
 
                     const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
