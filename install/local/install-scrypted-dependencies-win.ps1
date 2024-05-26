@@ -26,7 +26,12 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";"
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install --upgrade pip
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install debugpy typing_extensions typing opencv-python
 
-npx -y scrypted@latest install-server
+$SCRYPTED_INSTALL_VERSION=[System.Environment]::GetEnvironmentVariable("SCRYPTED_INSTALL_VERSION","User")
+if ($SCRYPTED_INSTALL_VERSION -eq $null) {
+  npx -y scrypted@latest install-server
+} else {
+  npx -y scrypted@latest install-server $SCRYPTED_INSTALL_VERSION 
+}
 
 $USER_HOME_ESCAPED = $env:USERPROFILE.replace('\', '\\')
 $SCRYPTED_HOME = $env:USERPROFILE + '\.scrypted'

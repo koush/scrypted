@@ -121,7 +121,7 @@ then
 fi
 
 echo "Installing Scrypted..."
-RUN $NPX_PATH -y scrypted@latest install-server
+RUN $NPX_PATH -y scrypted@latest install-server $SCRYPTED_INSTALL_VERSION
 
 cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
 <?xml version="1.0" encoding="UTF-8"?>
