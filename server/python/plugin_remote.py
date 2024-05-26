@@ -557,6 +557,7 @@ class PluginRemote:
             python_version = 'python%s' % str(
                 sys.version_info[0])+"."+str(sys.version_info[1])
             print('python version:', python_version)
+            print('interpreter:', sys.executable)
 
             python_versioned_directory = '%s-%s-%s' % (
                 python_version, platform.system(), platform.machine())
