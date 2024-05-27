@@ -323,7 +323,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         for await (const box of generator) {
             if (!isOpen())
                 return;
-
+            
             const { header, type, data } = box;
             // console.log('motion fragment box', type);
 
@@ -355,6 +355,8 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
                     needSkip = false;
                     continue;
                 }
+                if (!isOpen())
+                    return;
                 const fragment = Buffer.concat(pending);
                 saveFragment(i, fragment);
                 pending = [];
