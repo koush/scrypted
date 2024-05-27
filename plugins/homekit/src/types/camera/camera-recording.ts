@@ -321,6 +321,9 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         let moov: Buffer[];
 
         for await (const box of generator) {
+            if (!isOpen())
+                return;
+
             const { header, type, data } = box;
             // console.log('motion fragment box', type);
 
@@ -361,8 +364,6 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
                     data: fragment,
                     isLast,
                 }
-                if (!isOpen())
-                    return;
                 yield recordingPacket;
                 if (wasLast)
                     break;
