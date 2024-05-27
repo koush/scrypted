@@ -117,7 +117,7 @@ addSupportedType({
                 },
                 closeRecordingStream(streamId, reason) {
                     const r = openRecordingStreams.get(streamId);
-                    r?.throw(new Error(reason?.toString()));
+                    console.log(`motion recording closed ${reason > 0 ? `(error code: ${reason})` : ''}`);
                     openRecordingStreams.delete(streamId);
                 },
                 updateRecordingActive(active) {
