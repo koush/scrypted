@@ -371,7 +371,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         }
     }
     catch (e) {
-        console.log(`motion recording completed ${e}`);
+        console.log(`motion recording error ${e}`);
     }
     finally {
         console.log(`motion recording finished`);
