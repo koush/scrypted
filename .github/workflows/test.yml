@@ -15,10 +15,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, macos-14, macos-14-large, windows-latest]
+        runner: [ubuntu-latest, macos-14, macos-13, windows-latest]
     
     steps:
       - name: Install scrypted server
-        uses: scryptedapp/setup-scrypted@v0
+        uses: scryptedapp/setup-scrypted@v0.0.2
         with:
           branch: ${{ github.sha }}
