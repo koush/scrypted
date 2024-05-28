@@ -25,8 +25,9 @@ jobs:
         id: parse_server
         shell: bash
         run: |
-          VERSION=$(cat ./server/package.json | jq -r '.version')
+          VERSION=$(cat ./server/package-lock.json | jq -r '.version')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Will test @scrypted/server@$VERSION"
 
       - name: Install scrypted server
         uses: scryptedapp/setup-scrypted@v0.0.2
