@@ -9,52 +9,16 @@ on:
   workflow_dispatch:
   
 jobs:
-  test_linux_local:
-    name: Test Linux local installation
-    runs-on: ubuntu-latest
+  test_local:
+    name: Test local installation on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-14, macos-14-large, windows-latest]
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        
-      - name: Run install script
-        run: |
-          cat ./install/local/install-scrypted-dependencies-linux.sh | sudo SERVICE_USER=$USER bash
-          
-      - name: Test server is running
-        run: |
-          systemctl status scrypted.service
-          curl -k --retry 20 --retry-all-errors --retry-max-time 600 https://localhost:10443/
-          
-  test_mac_local:
-    name: Test Mac local installation
-    runs-on: macos-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        
-      - name: Run install script
-        run: |
-          mkdir -p ~/.scrypted
-          bash ./install/local/install-scrypted-dependencies-mac.sh
-          
-      - name: Test server is running
-        run: |
-          curl -k --retry 20 --retry-all-errors --retry-max-time 600 https://localhost:10443/
-          
-  test_windows_local:
-    name: Test Windows local installation
-    runs-on: windows-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        
-      - name: Run install script
-        run: |
-          .\install\local\install-scrypted-dependencies-win.ps1
-          
-      - name: Test server is running
-        run: |
-          curl -k --retry 20 --retry-all-errors --retry-max-time 600 https://localhost:10443/
+      - name: Install scrypted server
+        uses: scryptedapp/setup-scrypted@v0
+        with:
+          branch: ${{ github.sha }}
