@@ -399,7 +399,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
                     codec: 'pcm_ulaw'
                 },
                 source: 'cloud',
-                tool: 'scrypted'
+                tool: 'ffmpeg'
             }
         ];
     }
