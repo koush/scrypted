@@ -18,7 +18,18 @@ jobs:
         runner: [ubuntu-latest, macos-14, macos-13, windows-latest]
     
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Parse latest server release
+        id: parse_server
+        shell: bash
+        run: |
+          VERSION=$(cat ./server/package.json | jq -r '.version')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Install scrypted server
         uses: scryptedapp/setup-scrypted@v0.0.2
         with:
           branch: ${{ github.sha }}
+          version: ${{ steps.parse_server.outputs.version }}
