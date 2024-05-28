@@ -16,7 +16,8 @@
    "keywords": [
       "scrypted",
       "plugin",
-      "tuya"
+      "tuya",
+      "camera"
    ],
    "scrypted": {
       "name": "Tuya Plugin",
@@ -44,7 +45,8 @@
       "@types/crypto-js": "^4.1.1",
       "@types/node": "^16.6.1",
       "@types/uuid": "^8.3.4",
-      "@types/ws": "^8.5.3"
+      "@types/ws": "^8.5.3",
+      "scrypted": "file:../../"
    },
    "version": "0.0.8"
 }
