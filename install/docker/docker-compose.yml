@@ -35,7 +35,7 @@ services:
             # Avahi can be used for network discovery by passing in the host daemon
             # or running the daemon inside the container. Choose one or the other.
             # Uncomment next line to run avahi-daemon inside the container.
-            # See volumes section below to use the host daemon.
+            # See volumes and security_opt section below to use the host daemon.
             # - SCRYPTED_DOCKER_AVAHI=true
 
             # NVIDIA (Part 1 of 4)
@@ -71,11 +71,16 @@ services:
             # Ensure Avahi is running on the host machine:
             # It can be installed with: sudo apt-get install avahi-daemon
             # This is not compatible with running avahi inside the container (see above).
+            # Also, uncomment the lines under security_opt
             # - /var/run/dbus:/var/run/dbus
             # - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
 
             # Default volume for the Scrypted database. Typically should not be changed.
             - ~/.scrypted/volume:/server/volume
+        # Uncomment the following lines to use Avahi daemon from the host
+        # Without this, AppArmor will block the container's attempt to talk to Avahi via dbus
+        # security_opt:
+        #     - apparmor:unconfined
         devices: [
             # uncomment the common systems devices to pass
             # them through to docker.
