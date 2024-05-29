@@ -1348,6 +1348,10 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
    */
   label?: string;
   /**
+   * The score of the label.
+   */
+  labelScore?: number;
+  /**
    * A base64 encoded Float32Array that represents the vector descriptor of the detection.
    * Can be used to compute euclidian distance to determine similarity. 
    */
