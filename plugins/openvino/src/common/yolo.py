@@ -6,6 +6,38 @@ from predict.rectangle import Rectangle
 
 defaultThreshold = .2
 
+def parse_yolov10(results, threshold = defaultThreshold, scale = None, confidence_scale  = None):
+    objs: list[Prediction] = []
+    keep = np.argwhere(results[4:] > threshold)
+    for indices in keep:
+        class_id = indices[0]
+        index = indices[1]
+        confidence = results[class_id + 4, index].astype(float)
+        l = results[0][index].astype(float)
+        t = results[1][index].astype(float)
+        r = results[2][index].astype(float)
+        b = results[3][index].astype(float)
+        if scale:
+            l = scale(l)
+            t = scale(t)
+            r = scale(r)
+            b = scale(b)
+        if confidence_scale:
+            confidence = confidence_scale(confidence)
+        obj = Prediction(
+            int(class_id),
+            confidence,
+            Rectangle(
+                l,
+                t,
+                r,
+                b,
+            ),
+        )
+        objs.append(obj)
+
+    return objs
+
 def parse_yolo_nas(predictions):
     objs = []
     for pred_scores, pred_bboxes in zip(*predictions):
