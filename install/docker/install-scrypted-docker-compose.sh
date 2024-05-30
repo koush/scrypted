@@ -61,6 +61,8 @@ then
     sudo apt-get -y install avahi-daemon
     sed -i 's/'#' - \/var\/run\/dbus/- \/var\/run\/dbus/g' $DOCKER_COMPOSE_YML
     sed -i 's/'#' - \/var\/run\/avahi-daemon/- \/var\/run\/avahi-daemon/g' $DOCKER_COMPOSE_YML
+    sed -i 's/'#' security_opt:/security_opt:/g' $DOCKER_COMPOSE_YML
+    sed -i 's/'#'     - apparmor:unconfined/    - apparmor:unconfined/g' $DOCKER_COMPOSE_YML
 fi
 
 echo "Setting permissions on $SCRYPTED_HOME"

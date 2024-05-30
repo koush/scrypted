@@ -97,7 +97,7 @@ echo "docker compose rm -rf"
 sudo -u $SERVICE_USER docker rm -f /scrypted /scrypted-watchtower 2> /dev/null
 
 echo "Installing Scrypted..."
-RUN sudo -u $SERVICE_USER npx -y scrypted@latest install-server
+RUN sudo -u $SERVICE_USER npx -y scrypted@latest install-server $SCRYPTED_INSTALL_VERSION
 
 cat > /etc/systemd/system/scrypted.service <<EOT
 
