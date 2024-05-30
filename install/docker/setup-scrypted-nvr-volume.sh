@@ -96,7 +96,17 @@ then
     set +e
 
     sync
-    mkfs -F -t ext4 "$BLOCK_DEVICE"1
+    PARTITION_DEVICE="$BLOCK_DEVICE"1
+    if [ ! -e "$PARTITION_DEVICE" ]
+    then
+        PARTITION_DEVICE="$BLOCK_DEVICE"p1
+        if [ ! -e "$PARTITION_DEVICE" ]
+        then
+            echo "Unable to determine block device partition from block device: $BLOCK_DEVICE"
+            exit 1
+        fi
+    fi
+    mkfs -F -t ext4 "$PARTITION_DEVICE"
     sync
 
     # parse/evaluate blkid line as env vars
