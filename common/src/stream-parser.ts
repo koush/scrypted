@@ -108,9 +108,8 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
 
-                const { chunks } = streamChunk;
-                for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-                    const chunk = chunks[chunkIndex];
+                for (let chunkIndex = 0; chunkIndex < streamChunk.chunks.length; chunkIndex++) {
+                    const chunk = streamChunk.chunks[chunkIndex];
 
                     let offset = 0;
                     while (offset + 188 < chunk.length) {

@@ -676,26 +676,26 @@ class PrebufferSession {
       session.killed.finally(() => clearTimeout(refreshTimeout));
     }
 
-    let shifts = 0;
-    let prebufferContainer: PrebufferStreamChunk[] = this.rtspPrebuffer;
+      let shifts = 0;
+      let prebufferContainer: PrebufferStreamChunk[] = this.rtspPrebuffer;
 
-    session.on('rtsp', (chunk: PrebufferStreamChunk) => {
-      const now = Date.now();
+      session.on('rtsp', (chunk: PrebufferStreamChunk) => {
+        const now = Date.now();
 
-      chunk.time = now;
-      prebufferContainer.push(chunk);
+        chunk.time = now;
+        prebufferContainer.push(chunk);
 
-      while (prebufferContainer.length && prebufferContainer[0].time < now - prebufferDurationMs) {
-        prebufferContainer.shift();
-        shifts++;
-      }
+        while (prebufferContainer.length && prebufferContainer[0].time < now - prebufferDurationMs) {
+          prebufferContainer.shift();
+          shifts++;
+        }
 
-      if (shifts > 100000) {
-        prebufferContainer = prebufferContainer.slice();
-        this.rtspPrebuffer = prebufferContainer;
-        shifts = 0;
-      }
-    });
+        if (shifts > 100000) {
+          prebufferContainer = prebufferContainer.slice();
+          this.rtspPrebuffer = prebufferContainer;
+          shifts = 0;
+        }
+      });
 
     session.start();
     return session;
@@ -946,22 +946,15 @@ class PrebufferSession {
       if (!interleavePassthrough) {
         if (channel == undefined) {
           const udp = serverPortMap.get(chunk.type);
-          if (udp) {
-            const { chunks } = chunk;
-            for (let i = 1; i < chunks.length; i += 2) {
-              const c = chunks[i];
-              server.sendTrack(udp.control, c, chunk.type.startsWith('rtcp-'));
-            }
-          }
+          if (udp)
+            server.sendTrack(udp.control, chunk.chunks[1], chunk.type.startsWith('rtcp-'));
           return;
         }
 
         const chunks = chunk.chunks.slice();
-        for (let i = 0; i < chunks.length; i += 2) {
-          const header = Buffer.from(chunks[0]);
-          header.writeUInt8(channel, 1);
-          chunks[i] = header;
-        }
+        const header = Buffer.from(chunks[0]);
+        header.writeUInt8(channel, 1);
+        chunks[0] = header;
         chunk = {
           startStream: chunk.startStream,
           chunks,
@@ -972,12 +965,7 @@ class PrebufferSession {
       }
 
       if (server.writeStream) {
-        const { chunks } = chunk;
-        for (let i = 0; i < chunks.length; i += 2) {
-          const header = chunks[i];
-          const rtp = chunks[i + 1];
-          server.writeRtpPayload(header, rtp);
-        }
+        server.writeRtpPayload(chunk.chunks[0], chunk.chunks[1]);
         return;
       }
 
@@ -1184,13 +1172,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
           requestedPrebuffer,
           filter: (chunk, prebuffer) => {
             const track = map.get(chunk.type);
-            if (track) {
-              const { chunks } = chunk;
-              for (let i = 1; i < chunks.length; i += 2) {
-                const c = chunks[i];
-                server.sendTrack(track, c, false);
-              }
-            }
+            if (track)
+              server.sendTrack(track, chunk.chunks[1], false);
             return undefined;
           }
         });

@@ -92,13 +92,7 @@ export const H264_NAL_TYPE_MTAP32 = 27;
 export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h264')
         return;
-    const { chunks } = streamChunk;
-    for (let i = 1; i < chunks.length; i += 2) {
-        const chunk = chunks[i];
-        const r = findH264NaluTypeInNalu(chunk.subarray(12), naluType);
-        if (r)
-            return r;
-    }
+    return findH264NaluTypeInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), naluType);
 }
 
 export function findH264NaluTypeInNalu(nalu: Buffer, naluType: number) {
@@ -130,15 +124,7 @@ export function findH264NaluTypeInNalu(nalu: Buffer, naluType: number) {
 export function getNaluTypes(streamChunk: StreamChunk) {
     if (streamChunk.type !== 'h264')
         return new Set<number>();
-    const sets: Set<number>[] = [];
-    const { chunks } = streamChunk;
-    for (let i = 1; i < chunks.length; i += 2) {
-        const chunk = chunks[i];
-        const r = getNaluTypesInNalu(chunk.subarray(12));
-        sets.push(r);
-    }
-
-    return new Set(sets.map(s => [...s]).flat());
+    return getNaluTypesInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12))
 }
 
 export function getNaluFragmentInformation(nalu: Buffer) {
@@ -315,7 +301,7 @@ const quote = (str: string): string => `"${str.replace(/"/g, '\\"')}"`;
 export interface RtspClientSetupOptions {
     type: 'tcp' | 'udp';
     path?: string;
-    onRtp: (...headerBuffers: [Buffer, Buffer][]) => void;
+    onRtp: (rtspHeader: Buffer, rtp: Buffer) => void;
 }
 
 export interface RtspClientTcpSetupOptions extends RtspClientSetupOptions {
@@ -426,7 +412,7 @@ export class RtspClient extends RtspBase {
         const data = await readLength(this.client, length);
 
         const options = this.setupOptions.get(channel);
-        options?.onRtp?.([header, data]);
+        options?.onRtp?.(header, data);
     }
 
     async readDataPayload() {
@@ -438,25 +424,31 @@ export class RtspClient extends RtspBase {
         return new Error('RTSP Client received invalid frame magic. This may be a bug in your camera firmware. If this error persists, switch your RTSP Parser to FFmpeg or Scrypted (UDP): ' + header.toString());
     }
 
+    async readLoopLegacy() {
+        try {
+            while (true) {
+                if (this.needKeepAlive) {
+                    this.needKeepAlive = false;
+                    if (this.hasGetParameter)
+                        await this.getParameter();
+                    else
+                        await this.options();
+                }
+                await this.readDataPayload();
+            }
+        }
+        catch (e) {
+            this.client.destroy(e);
+            throw e;
+        }
+    }
+
     async readLoop() {
         const deferred = new Deferred<void>();
 
-        let headerBuffers: [Buffer, Buffer][] = [];
         let header: Buffer;
         let channel: number;
         let length: number;
-
-        const flush = (newChannel?: number) => {
-            const c = channel;
-            channel = newChannel;
-            const channelChange = newChannel !== c;
-            if (!channelChange || !headerBuffers.length)
-                return;
-            const hb = headerBuffers;
-            headerBuffers = [];
-            const options = this.setupOptions.get(c);
-            options?.onRtp?.(...hb);
-        }
 
         const read = async () => {
             if (this.needKeepAlive) {
@@ -473,18 +465,13 @@ export class RtspClient extends RtspBase {
                     if (!header) {
                         header = this.client.read(4);
 
-                        if (!header) {
-                            // flush if waiting for a header.
-                            flush();
+                        if (!header)
                             return;
-                        }
 
                         // validate header once.
                         if (header[0] !== RTSP_FRAME_MAGIC) {
                             if (header.toString() !== 'RTSP')
                                 throw this.createBadHeader(header);
-
-                            flush();
 
                             this.client.unshift(header);
                             header = undefined;
@@ -502,23 +489,18 @@ export class RtspClient extends RtspBase {
                             continue;
                         }
 
-                        const newChannel = header.readUInt8(1);
-                        flush(newChannel);
+                        channel = header.readUInt8(1);
                         length = header.readUInt16BE(2);
                     }
 
-                    const currentChannel = channel;
                     const data = this.client.read(length);
-                    if (!data) {
-                        // flush if waiting for data, but restore the channel.
-                        flush();
-                        channel = currentChannel;
+                    if (!data)
                         return;
-                    }
 
                     const h = header;
                     header = undefined;
-                    headerBuffers.push([h, data]);
+                    const options = this.setupOptions.get(channel);
+                    options?.onRtp?.(h, data);
                 }
             }
             catch (e) {
@@ -692,7 +674,7 @@ export class RtspClient extends RtspBase {
                 this.client.on('close', () => closeQuiet(udp.server));
             }
             port = options.dgram.address().port;
-            options.dgram.on('message', data => options.onRtp([undefined, data]));
+            options.dgram.on('message', data => options.onRtp(undefined, data));
         }
         headers = Object.assign({
             Transport: `RTP/AVP${protocol};unicast;${client}=${port}-${port + 1}`,
