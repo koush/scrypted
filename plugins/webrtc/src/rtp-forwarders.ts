@@ -66,11 +66,7 @@ async function setupRtspClient(console: Console, rtspClient: RtspClient, channel
             const result = await rtspClient.setup({
                 type: 'udp',
                 path: section.control,
-                onRtp: (headerBuffers) => {
-                    for (let i = 1; i < headerBuffers.length; i += 2) {
-                        deliver(headerBuffers[i]);
-                    }
-                },
+                onRtp: (rtspHeader, rtp) => deliver(rtp),
             });
             // console.log('rtsp/udp', section.codec, result);
             return false;
@@ -84,11 +80,7 @@ async function setupRtspClient(console: Console, rtspClient: RtspClient, channel
         type: 'tcp',
         port: channel,
         path: section.control,
-        onRtp: (headerBuffers) => {
-            for (let i = 1; i < headerBuffers.length; i += 2) {
-                deliver(headerBuffers[i]);
-            }
-        },
+        onRtp: (rtspHeader, rtp) => deliver(rtp),
     });
     // console.log('rtsp/tcp', section.codec);
     return true;

@@ -95,17 +95,15 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                 const setup: RtspClientUdpSetupOptions = {
                     path: control,
                     type: 'udp',
-                    onRtp: (headerBuffers) => {
-                        for (let i = 0; i < headerBuffers.length; i += 2) {
-                            const data = headerBuffers[i + 1];
-                            const prefix = Buffer.alloc(4);
-                            prefix.writeUInt8(RTSP_FRAME_MAGIC, 0);
-                            prefix.writeUInt8(rtspChannel, 1);
-                            prefix.writeUInt16BE(data.length, 2);
-                            headerBuffers[i] = prefix;
-                        }
+                    onRtp: (...headerBuffers) => {
                         const chunk: StreamChunk = {
-                            chunks: headerBuffers,
+                            chunks: headerBuffers.map(headerBuffer => headerBuffer[1]).map(data => {
+                                const prefix = Buffer.alloc(4);
+                                prefix.writeUInt8(RTSP_FRAME_MAGIC, 0);
+                                prefix.writeUInt8(rtspChannel, 1);
+                                prefix.writeUInt16BE(data.length, 2);
+                                return [prefix, data];
+                            }).flat(),
                             type: codec,
                         };
                         events.emit('rtsp', chunk);
@@ -133,9 +131,9 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                     path: control,
                     type: 'tcp',
                     port: channel,
-                    onRtp: (headerBuffers) => {
+                    onRtp: (...headerBuffers) => {
                         const chunk: StreamChunk = {
-                            chunks: headerBuffers,
+                            chunks: headerBuffers.flat(),
                             type: codec,
                         };
                         events.emit('rtsp', chunk);

@@ -315,7 +315,7 @@ const quote = (str: string): string => `"${str.replace(/"/g, '\\"')}"`;
 export interface RtspClientSetupOptions {
     type: 'tcp' | 'udp';
     path?: string;
-    onRtp: (headerBuffers: Buffer[]) => void;
+    onRtp: (...headerBuffers: [Buffer, Buffer][]) => void;
 }
 
 export interface RtspClientTcpSetupOptions extends RtspClientSetupOptions {
@@ -441,7 +441,7 @@ export class RtspClient extends RtspBase {
     async readLoop() {
         const deferred = new Deferred<void>();
 
-        let headerBuffers: Buffer[] = [];
+        let headerBuffers: [Buffer, Buffer][] = [];
         let header: Buffer;
         let channel: number;
         let length: number;
@@ -449,12 +449,13 @@ export class RtspClient extends RtspBase {
         const flush = (newChannel?: number) => {
             const c = channel;
             channel = newChannel;
-            if (!headerBuffers.length || newChannel === c)
+            const channelChange = newChannel !== c;
+            if (!channelChange || !headerBuffers.length)
                 return;
             const hb = headerBuffers;
             headerBuffers = [];
             const options = this.setupOptions.get(c);
-            options?.onRtp?.(hb);
+            options?.onRtp?.(...hb);
         }
 
         const read = async () => {
@@ -480,10 +481,10 @@ export class RtspClient extends RtspBase {
 
                         // validate header once.
                         if (header[0] !== RTSP_FRAME_MAGIC) {
-                            flush();
-
                             if (header.toString() !== 'RTSP')
                                 throw this.createBadHeader(header);
+
+                            flush();
 
                             this.client.unshift(header);
                             header = undefined;
@@ -506,10 +507,10 @@ export class RtspClient extends RtspBase {
                         length = header.readUInt16BE(2);
                     }
 
+                    const currentChannel = channel;
                     const data = this.client.read(length);
                     if (!data) {
                         // flush if waiting for data, but restore the channel.
-                        const currentChannel = channel;
                         flush();
                         channel = currentChannel;
                         return;
@@ -517,7 +518,7 @@ export class RtspClient extends RtspBase {
 
                     const h = header;
                     header = undefined;
-                    headerBuffers.push(h, data);
+                    headerBuffers.push([h, data]);
                 }
             }
             catch (e) {
