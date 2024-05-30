@@ -71,6 +71,13 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             type: 'number',
             defaultValue: 2,
         },
+        labelScore: {
+            group: 'Recognition',
+            title: 'Label Score',
+            description: 'The minimum score required for a label to trigger the motion sensor.',
+            type: 'number',
+            defaultValue: 0,
+        }
     });
 
     detectionListener: EventListenerRegister;
@@ -190,7 +197,7 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             if (this.storageSettings.values.requireDetectionThumbnail && !detected.detectionId)
                 return false;
 
-            const { labels, labelDistance } = this.storageSettings.values;
+            const { labels, labelDistance, labelScore } = this.storageSettings.values;
 
             const match = detected.detections?.find(d => {
                 if (this.storageSettings.values.requireScryptedNvrDetections && !d.boundingBox)
@@ -225,13 +232,24 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
                     return false;
 
                 for (const label of labels) {
-                    if (label === d.label)
-                        return true;
+                    if (label === d.label) {
+                        if (!labelScore || d.labelScore >= labelScore)
+                            return true;
+                        this.console.log('Label score too low.', label, d.label, d.labelScore);
+                        continue;
+                    }
+
                     if (!labelDistance)
                         continue;
-                    if (levenshteinDistance(label, d.label) <= labelDistance)
+
+                    if (levenshteinDistance(label, d.label) > labelDistance) {
+                        this.console.log('Label does not match.', label, d.label, d.labelScore);
+                        continue;
+                    }
+
+                    if (!labelScore || d.labelScore >= labelScore)
                         return true;
-                    this.console.log('Label does not match.', label, d.label);
+                    this.console.log('Label score too low.', label, d.label, d.labelScore);
                 }
 
                 return false;
