@@ -2,8 +2,8 @@ import asyncio
 import concurrent.futures
 import os
 import platform
-import queue
 import threading
+import traceback
 from typing import Any, Coroutine, List, Tuple
 import urllib.request
 
@@ -14,8 +14,13 @@ from rknnlite.api import RKNNLite
 from predict import PredictPlugin, Prediction
 from predict.rectangle import Rectangle
 
+import scrypted_sdk
+from scrypted_sdk import DeviceProvider, ScryptedDeviceType, ScryptedInterface
+
 # for Rockchip-optimized models, the postprocessing is slightly different from the original models
 from .optimized.yolo import post_process, IMG_SIZE, CLASSES
+
+from .text_recognition import TEXT_RECOGNITION_NATIVE_ID, TextRecognition
 
 
 rknn_verbose = False
@@ -53,13 +58,16 @@ def ensure_compatibility_and_get_cpu():
         raise
 
 
-class RKNNPlugin(PredictPlugin):
+class RKNNPlugin(PredictPlugin, DeviceProvider):
     labels = {i: CLASSES[i] for i in range(len(CLASSES))}
     rknn_runtimes: dict
+    executor: concurrent.futures.ThreadPoolExecutor
+    text_recognition: TextRecognition = None
+    cpu: str
 
     def __init__(self, nativeId=None):
         super().__init__(nativeId)
-        cpu = ensure_compatibility_and_get_cpu()
+        self.cpu = ensure_compatibility_and_get_cpu()
         model = 'yolov6n'
 
         self.rknn_runtimes = {}
@@ -72,7 +80,7 @@ class RKNNPlugin(PredictPlugin):
             else:
                 raise RuntimeError('librknnrt.so not found. Please download it from {} and place it at {}'.format(lib_download, lib_path))
 
-        model_download = model_download_tmpl.format(model, cpu)
+        model_download = model_download_tmpl.format(model, self.cpu)
         model_file = os.path.basename(model_download)
         model_path = self.downloadFile(model_download, model_file)
         print('Using model {}'.format(model_path))
@@ -101,7 +109,33 @@ class RKNNPlugin(PredictPlugin):
             self.rknn_runtimes[thread_name] = rknn
             print('RKNNLite runtime initialized on thread {}'.format(thread_name))
 
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3, initializer=executor_initializer)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3, thread_name_prefix=type(self).__name__, initializer=executor_initializer)
+
+        asyncio.create_task(self.discoverRecognitionModels())
+
+    async def discoverRecognitionModels(self) -> None:
+        devices = [
+            {
+                "nativeId": TEXT_RECOGNITION_NATIVE_ID,
+                "name": "Rockchip NPU Text Recognition",
+                "type": ScryptedDeviceType.API.value,
+                "interfaces": [
+                    ScryptedInterface.ObjectDetection.value,
+                ],
+            }
+        ]
+        await scrypted_sdk.deviceManager.onDevicesChanged({
+            "devices": devices,
+        })
+
+    async def getDevice(self, nativeId: str) -> TextRecognition:
+        try:
+            if nativeId == TEXT_RECOGNITION_NATIVE_ID:
+                self.text_recognition = self.text_recognition or TextRecognition(nativeId, self.cpu)
+                return self.text_recognition
+        except:
+            traceback.print_exc()
+            raise
 
     def get_input_details(self) -> Tuple[int]:
         return (IMG_SIZE[0], IMG_SIZE[1], 3)
