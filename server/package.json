@@ -1,11 +1,10 @@
 {
   "name": "@scrypted/server",
-  "version": "0.107.0",
+  "version": "0.108.0",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",
     "@scrypted/ffmpeg-static": "^6.1.0-build1",
-    "@scrypted/node-pty": "^1.0.11",
     "@scrypted/types": "^0.3.30",
     "adm-zip": "^0.5.12",
     "body-parser": "^1.20.2",
@@ -47,6 +46,9 @@
     "@types/source-map-support": "^0.5.10",
     "@types/whatwg-mimetype": "^3.0.2",
     "@types/ws": "^8.5.10"
+  },
+  "optionalDependencies": {
+    "@scrypted/node-pty": "^1.0.11"
   },
   "bin": {
     "scrypted-serve": "bin/scrypted-serve"
