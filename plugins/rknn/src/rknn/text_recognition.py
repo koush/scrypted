@@ -70,7 +70,7 @@ RKNN_REC_POSTPROCESS_CONFIG = {
     }
 }
 
-rknn_verbose = True
+rknn_verbose = False
 model_download_tmpl = 'https://github.com/bjia56/scrypted-rknn/raw/main/models/{}_{}.rknn'
 chardict_link = 'https://github.com/bjia56/scrypted-rknn/raw/main/models/ppocr_keys_v1.txt'
 
