@@ -30,17 +30,13 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
 
 availableModels = [
     "Default",
+    "scrypted_yolov10m_320",
     "scrypted_yolov10n_320",
-    "scrypted_yolov10n",
     "scrypted_yolo_nas_s_320",
     "scrypted_yolov6n_320",
-    "scrypted_yolov6n",
     "scrypted_yolov6s_320",
-    "scrypted_yolov6s",
     "scrypted_yolov9c_320",
-    "scrypted_yolov9c",
     "scrypted_yolov8n_320",
-    "scrypted_yolov8n",
     "ssd_mobilenet_v1_coco",
     "ssdlite_mobilenet_v2",
     "yolo-v3-tiny-tf",
