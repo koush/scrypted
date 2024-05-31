@@ -4,6 +4,10 @@
     // "scrypted.debugHost": "koushik-ubuntu",
     // "scrypted.serverRoot": "/server",
 
+    // proxmox installation
+    // "scrypted.debugHost": "scrypted-server",
+    // "scrypted.serverRoot": "/root/.scrypted",
+
     // pi local installation
     // "scrypted.debugHost": "192.168.2.119",
     // "scrypted.serverRoot": "/home/pi/.scrypted",

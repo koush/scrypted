@@ -1,9 +1,10 @@
 import sdk, { Camera, EventListenerRegister, MediaObject, MotionSensor, ObjectDetector, ObjectsDetected, Readme, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings } from "@scrypted/sdk";
 import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
-import type { ObjectDetectionPlugin } from "./main";
 import { levenshteinDistance } from "./edit-distance";
+import type { ObjectDetectionPlugin } from "./main";
 
 export const SMART_MOTIONSENSOR_PREFIX = 'smart-motionsensor-';
+export const SMART_OCCUPANCYSENSOR_PREFIX = 'smart-occupancysensor-';
 
 export function createObjectDetectorStorageSetting(): StorageSetting {
     return {
@@ -235,7 +236,7 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
                     if (label === d.label) {
                         if (!labelScore || d.labelScore >= labelScore)
                             return true;
-                        this.console.log('Label score too low.', label, d.label, d.labelScore);
+                        this.console.log('Label score too low.', d.labelScore);
                         continue;
                     }
 
@@ -249,7 +250,7 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
 
                     if (!labelScore || d.labelScore >= labelScore)
                         return true;
-                    this.console.log('Label score too low.', label, d.label, d.labelScore);
+                    this.console.log('Label score too low.', d.labelScore);
                 }
 
                 return false;
