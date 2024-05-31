@@ -22,7 +22,7 @@ import rec_utils.operators
 import rec_utils.rec_postprocess
 
 
-TEXT_RECOGNITION_NATIVE_ID = "rknntextrecognition"
+TEXT_RECOGNITION_NATIVE_ID = "textrecognition"
 DET_IMG_SIZE = (480, 480)
 
 RKNN_DET_PREPROCESS_CONFIG = [
