@@ -160,7 +160,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 const unifiCamera = this.cameras.get(payload.camera);
 
                 if (!unifiCamera) {
-                    this.console.log('unknown device event, sync needed?', payload.camera);
+                    this.console.log('unknown device event, sync needed?', payload);
                     return;
                 }
 
