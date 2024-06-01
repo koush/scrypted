@@ -12,7 +12,6 @@ import net from 'net';
 import path from 'path';
 import { ParsedQs } from 'qs';
 import semver from 'semver';
-import { PassThrough } from 'stream';
 import { Parser as TarParser } from 'tar';
 import { URL } from "url";
 import WebSocket, { Server as WebSocketServer } from "ws";
@@ -33,6 +32,7 @@ import { PluginHost } from './plugin/plugin-host';
 import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
+import { CustomRuntimeWorker } from './plugin/runtime/custom-worker';
 import { NodeForkWorker } from './plugin/runtime/node-fork-worker';
 import { PythonRuntimeWorker } from './plugin/runtime/python-worker';
 import { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
@@ -46,7 +46,6 @@ import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
-import { CustomRuntimeWorker } from './plugin/runtime/custom-worker';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -675,14 +674,14 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
     loadPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
         const pluginId = plugin._id;
-        this.killPlugin(pluginId);
-
-        const pluginDevices = this.findPluginDevices(pluginId);
-        for (const pluginDevice of pluginDevices) {
-            this.invalidatePluginDevice(pluginDevice._id);
-        }
-
         try {
+            this.killPlugin(pluginId);
+
+            const pluginDevices = this.findPluginDevices(pluginId);
+            for (const pluginDevice of pluginDevices) {
+                this.invalidatePluginDevice(pluginDevice._id);
+            }
+
             const pluginHost = new PluginHost(this, plugin, pluginDebug);
             this.setupPluginHostAutoRestart(pluginHost);
             this.plugins[pluginId] = pluginHost;
