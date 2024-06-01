@@ -13,7 +13,7 @@ export async function listenZero(server: net.Server, hostname?: string) {
     return (server.address() as net.AddressInfo).port;
 }
 
-export async function listenZeroSingleClient(hostname?: string, options?: net.ServerOpts) {
+export async function listenZeroSingleClient(hostname?: string, options?: net.ServerOpts, listenTimeout = 30000) {
     const server = new net.Server(options);
     const port = await listenZero(server, hostname);
 
@@ -22,7 +22,7 @@ export async function listenZeroSingleClient(hostname?: string, options?: net.Se
         const timeout = setTimeout(() => {
             server.close();
             reject(new ListenZeroSingleClientTimeoutError());
-        }, 30000);
+        }, listenTimeout);
         cancel = () => {
             clearTimeout(timeout);
             server.close();
