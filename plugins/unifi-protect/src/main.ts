@@ -157,7 +157,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 const payload = updatePacket.payload as ProtectNvrUpdatePayloadEventAdd;
                 if (!payload.camera)
                     return;
-                const unifiCamera = this.cameras.get(payload.camera);
+                const nativeId = this.findId(payload.camera);
+                const unifiCamera = this.cameras.get(nativeId);
 
                 if (!unifiCamera) {
                     this.console.log('unknown device event, sync needed?', payload);
