@@ -161,10 +161,10 @@ export default {
         let t = ``;
         let toffset = 0;
         if (detection.score && detection.className !== 'motion') {
-          t += `<tspan x='${x}' dy='${toffset}em'>${Math.round(detection.score * 100) / 100}</tspan>`
+          t += `<tspan x='${x}' dy='${toffset}em'>${Math.round((detection.labelScore || detection.score) * 100) / 100}</tspan>`
           toffset -= 1.2;
         }
-        const tname = detection.className + (detection.id ? `: ${detection.id}` : '')
+        const tname = (detection.label || detection.className) + (detection.id ? `: ${detection.id}` : '')
         t += `<tspan x='${x}' dy='${toffset}em'>${tname}</tspan>`
 
         const fs = 20;
