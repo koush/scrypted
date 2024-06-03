@@ -62,7 +62,7 @@ export type fetcher<B, M> = <T extends HttpFetchOptions<B>>(options: T) => Promi
 >>;
 
 
-export function getHttpFetchAccept(responseType: HttpFetchResponseType) {
+export function getHttpFetchAccept(responseType: HttpFetchResponseType | undefined) {
     switch (responseType) {
         case 'json':
             return 'application/json';
@@ -89,7 +89,7 @@ export function setHeader(headers: [string, string][], key: string, value: strin
     headers.push([key, value]);
 }
 
-export function setDefaultHttpFetchAccept(headers: [string, string][], responseType: HttpFetchResponseType) {
+export function setDefaultHttpFetchAccept(headers: [string, string][], responseType: HttpFetchResponseType | undefined) {
     if (hasHeader(headers, 'Accept'))
         return;
     const accept = getHttpFetchAccept(responseType);
@@ -97,7 +97,7 @@ export function setDefaultHttpFetchAccept(headers: [string, string][], responseT
         setHeader(headers, 'Accept', accept);
 }
 
-export function createHeadersArray(headers: HeadersInit): [string, string][] {
+export function createHeadersArray(headers: HeadersInit | undefined): [string, string][] {
     const headersArray: [string, string][] = [];
     if (!headers)
         return headersArray;
@@ -144,7 +144,7 @@ export function createStringOrBufferBody(headers: [string, string][], body: any)
     return body;
 }
 
-export async function domFetchParseIncomingMessage(response: Response, responseType: HttpFetchResponseType) {
+export async function domFetchParseIncomingMessage(response: Response, responseType: HttpFetchResponseType | undefined) {
     switch (responseType) {
         case 'json':
             return response.json();
@@ -152,8 +152,10 @@ export async function domFetchParseIncomingMessage(response: Response, responseT
             return response.text();
         case 'readable':
             return response;
+        case 'buffer':
+        case undefined:
+            return new Uint8Array(await response.arrayBuffer());
     }
-    return new Uint8Array(await response.arrayBuffer());
 }
 
 export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T): Promise<HttpFetchResponse<

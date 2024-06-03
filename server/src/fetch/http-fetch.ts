@@ -41,7 +41,7 @@ const StreamParser: FetchParser<IncomingMessage> = {
     }
 }
 
-export function getHttpFetchParser(responseType: HttpFetchResponseType) {
+export function getHttpFetchParser(responseType: HttpFetchResponseType | undefined) {
     switch (responseType) {
         case 'json':
             return JSONParser;
@@ -49,11 +49,13 @@ export function getHttpFetchParser(responseType: HttpFetchResponseType) {
             return TextParser;
         case 'readable':
             return StreamParser;
+        case 'buffer':
+        case undefined:
+            return BufferParser;
     }
-    return BufferParser;
 }
 
-export function httpFetchParseIncomingMessage(readable: IncomingMessage, responseType: HttpFetchResponseType) {
+export function httpFetchParseIncomingMessage(readable: IncomingMessage, responseType: HttpFetchResponseType | undefined) {
     return getHttpFetchParser(responseType).parse(readable);
 }
 
