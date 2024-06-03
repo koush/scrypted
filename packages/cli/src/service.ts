@@ -90,7 +90,13 @@ export async function installServe(installVersion: string, ignoreError?: boolean
     const installJson = path.join(installDir, 'install.json');
     try {
         const { version } = JSON.parse(fs.readFileSync(installJson).toString());
-        if (semver.parse(process.version).major !== semver.parse(version).major)
+        const processSemver = semver.parse(process.version);
+        if (!processSemver)
+            throw new Error('error parsing process version');
+        const installSemver = semver.parse(version);
+        if (!installSemver)
+            throw new Error('error parsing install.json version');
+        if (processSemver.major !== installSemver.major)
             throw new Error('mismatch');
     }
     catch (e) {
@@ -111,16 +117,32 @@ export async function installServe(installVersion: string, ignoreError?: boolean
 }
 
 export async function serveMain(installVersion?: string) {
-    let install = !!installVersion;
+    const options = ((): { install: true; version: string } | { install: false } => {
+        if (installVersion) {
+            console.log(`Installing @scrypted/server@${installVersion}`);
+            return {
+                install: true, 
+                version: installVersion
+            };
+        }
+
+        if (!fs.existsSync('node_modules/@scrypted/server')) {
+            console.log('Package @scrypted/server not found. Installing.');
+            return {
+                install: true,
+                version: 'latest',
+            };
+        }
+
+        return {
+            install: false,
+        }
+    })();
 
     const { installDir, volume } = cwdInstallDir();
-    if (!fs.existsSync('node_modules/@scrypted/server')) {
-        install = true;
-        installVersion ||= 'latest';
-        console.log('Package @scrypted/server not found. Installing.');
-    }
-    if (install) {
-        await installServe(installVersion, true);
+
+    if (options.install) {
+        await installServe(options.version, true);
     }
 
     // todo: remove at some point after core lxc updater rolls out.
