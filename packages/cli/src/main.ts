@@ -164,7 +164,7 @@ async function main() {
                 ffmpegInput.inputArguments = ffmpegInput.inputArguments.map(i => i === ffmpegInput.url && ffmpegInput.urls ? ffmpegInput.urls?.[0] : i);
             }
         }
-        const args = [...ffmpegInput.inputArguments ?? ''];
+        const args = ffmpegInput.inputArguments ? [...ffmpegInput.inputArguments] : [];
         if (ffmpegInput.h264FilterArguments)
             args.push(...ffmpegInput.h264FilterArguments);
         console.log('ffplay', ...args);
