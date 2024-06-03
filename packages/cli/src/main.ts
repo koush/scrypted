@@ -160,11 +160,11 @@ async function main() {
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await pendingResult, ScryptedMimeTypes.FFmpegInput);
         if (ffmpegInput.url && ffmpegInput.urls?.[0]) {
             const url = new URL(ffmpegInput.url);
-            if (url.hostname === '127.0.0.1' && ffmpegInput.urls?.[0]) {
-                ffmpegInput.inputArguments = ffmpegInput.inputArguments.map(i => i === ffmpegInput.url ? ffmpegInput.urls?.[0] : i);
+            if (url.hostname === '127.0.0.1' && ffmpegInput.urls?.[0] && ffmpegInput.inputArguments) {
+                ffmpegInput.inputArguments = ffmpegInput.inputArguments.map(i => i === ffmpegInput.url && ffmpegInput.urls ? ffmpegInput.urls?.[0] : i);
             }
         }
-        const args = [...ffmpegInput.inputArguments];
+        const args = [...ffmpegInput.inputArguments ?? ''];
         if (ffmpegInput.h264FilterArguments)
             args.push(...ffmpegInput.h264FilterArguments);
         console.log('ffplay', ...args);
