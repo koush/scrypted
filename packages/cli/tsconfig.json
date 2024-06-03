@@ -9,6 +9,7 @@
       "inlineSources": true,
       "declaration": true,
       "moduleResolution": "Node16",
+      "strict": true
   },
   "include": [
       "src/**/*"
