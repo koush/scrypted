@@ -68,8 +68,10 @@ export function getHttpFetchAccept(responseType: HttpFetchResponseType | undefin
             return 'application/json';
         case 'text':
             return 'text/plain';
+        case 'buffer':
+        case 'readable':
+            return null;
     }
-    return;
 }
 
 export function hasHeader(headers: [string, string][], key: string) {
