@@ -23,7 +23,7 @@ class ONNXFaceRecognition(FaceRecognizeDetection):
         onnxmodel = "best" if "scrypted" in model else model
         model_version = "v1"
         onnxfile = self.downloadFile(
-            f"https://raw.githubusercontent.com/koush/onnx-models/main/{model}/{onnxmodel}.onnx",
+            f"https://github.com/koush/onnx-models/raw/main/{model}/{onnxmodel}.onnx",
             f"{model_version}/{model}/{onnxmodel}.onnx",
         )
         print(onnxfile)

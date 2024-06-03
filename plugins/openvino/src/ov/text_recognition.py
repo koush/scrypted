@@ -25,11 +25,11 @@ class OpenVINOTextRecognition(TextRecognition):
         precision = self.plugin.precision
         model_version = "v5"
         xmlFile = self.downloadFile(
-            f"https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.xml",
+            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
             f"{model_version}/{model}/{precision}/{ovmodel}.xml",
         )
         binFile = self.downloadFile(
-            f"https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.bin",
+            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.bin",
             f"{model_version}/{model}/{precision}/{ovmodel}.bin",
         )
         print(xmlFile, binFile)

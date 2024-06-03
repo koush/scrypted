@@ -31,6 +31,7 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
 availableModels = [
     "Default",
     "scrypted_yolov10m_320",
+    "scrypted_yolov10s_320",
     "scrypted_yolov10n_320",
     "scrypted_yolo_nas_s_320",
     "scrypted_yolov6n_320",
@@ -134,7 +135,7 @@ class OpenVINOPlugin(
         if model == "Default" or model not in availableModels:
             if model != "Default":
                 self.storage.setItem("model", "Default")
-            model = "scrypted_yolov8n_320"
+            model = "scrypted_yolov10n_320"
         self.yolo = "yolo" in model
         self.scrypted_yolov10 = "scrypted_yolov10" in model
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
@@ -148,31 +149,31 @@ class OpenVINOPlugin(
 
         model_version = "v5"
         xmlFile = self.downloadFile(
-            f"https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.xml",
+            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
             f"{model_version}/{model}/{precision}/{ovmodel}.xml",
         )
         binFile = self.downloadFile(
-            f"https://raw.githubusercontent.com/koush/openvino-models/main/{model}/{precision}/{ovmodel}.bin",
+            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.bin",
             f"{model_version}/{model}/{precision}/{ovmodel}.bin",
         )
         if self.scrypted_yolo_nas:
             labelsFile = self.downloadFile(
-                "https://raw.githubusercontent.com/koush/openvino-models/main/scrypted_nas_labels.txt",
+                "https://github.com/koush/openvino-models/raw/main/scrypted_nas_labels.txt",
                 "scrypted_nas_labels.txt",
             )
         elif self.scrypted_model:
             labelsFile = self.downloadFile(
-                "https://raw.githubusercontent.com/koush/openvino-models/main/scrypted_labels.txt",
+                "https://github.com/koush/openvino-models/raw/main/scrypted_labels.txt",
                 "scrypted_labels.txt",
             )
         elif self.yolo:
             labelsFile = self.downloadFile(
-                "https://raw.githubusercontent.com/koush/openvino-models/main/coco_80cl.txt",
+                "https://github.com/koush/openvino-models/raw/main/coco_80cl.txt",
                 "coco_80cl.txt",
             )
         else:
             labelsFile = self.downloadFile(
-                "https://raw.githubusercontent.com/koush/openvino-models/main/coco_labels.txt",
+                "https://github.com/koush/openvino-models/raw/main/coco_labels.txt",
                 "coco_labels.txt",
             )
 

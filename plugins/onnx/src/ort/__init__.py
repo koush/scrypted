@@ -55,7 +55,7 @@ class ONNXPlugin(
         if model == "Default" or model not in availableModels:
             if model != "Default":
                 self.storage.setItem("model", "Default")
-            model = "scrypted_yolov8n_320"
+            model = "scrypted_yolov10m_320"
         self.yolo = "yolo" in model
         self.scrypted_yolov10 = "scrypted_yolov10" in model
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
@@ -68,7 +68,7 @@ class ONNXPlugin(
 
         model_version = "v2"
         onnxfile = self.downloadFile(
-            f"https://raw.githubusercontent.com/koush/onnx-models/main/{model}/{onnxmodel}.onnx",
+            f"https://github.com/koush/onnx-models/raw/main/{model}/{onnxmodel}.onnx",
             f"{model_version}/{model}/{onnxmodel}.onnx",
         )
 
