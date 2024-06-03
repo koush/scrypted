@@ -38,6 +38,7 @@ def getDetBoxes_core(textmap, linkmap, text_threshold, link_threshold, low_text,
     nLabels, labels, stats, centroids = cv2.connectedComponentsWithStats(text_score_comb.astype(np.uint8), connectivity=4)
 
     det = []
+    scores = []
     mapper = []
     for k in range(1,nLabels):
         # size filtering
@@ -45,7 +46,8 @@ def getDetBoxes_core(textmap, linkmap, text_threshold, link_threshold, low_text,
         if size < 10: continue
 
         # thresholding
-        if np.max(textmap[labels==k]) < text_threshold: continue
+        score = np.max(textmap[labels==k])
+        if score < text_threshold: continue
 
         # make segmentation map
         segmap = np.zeros(textmap.shape, dtype=np.uint8)
@@ -89,8 +91,9 @@ def getDetBoxes_core(textmap, linkmap, text_threshold, link_threshold, low_text,
         box = np.array(box)
 
         det.append(box)
+        scores.append(score)
 
-    return det, labels, mapper
+    return det, labels, mapper, scores
 
 def getPoly_core(boxes, labels, mapper, linkmap):
     # configs
@@ -241,14 +244,14 @@ def getPoly_core(boxes, labels, mapper, linkmap):
 def getDetBoxes(textmap, linkmap, text_threshold, link_threshold, low_text, poly=False, estimate_num_chars=False):
     if poly and estimate_num_chars:
         raise Exception("Estimating the number of characters not currently supported with poly.")
-    boxes, labels, mapper = getDetBoxes_core(textmap, linkmap, text_threshold, link_threshold, low_text, estimate_num_chars)
+    boxes, labels, mapper, scores = getDetBoxes_core(textmap, linkmap, text_threshold, link_threshold, low_text, estimate_num_chars)
 
     if poly:
         polys = getPoly_core(boxes, labels, mapper, linkmap)
     else:
         polys = [None] * len(boxes)
 
-    return boxes, polys, mapper
+    return boxes, polys, mapper, scores
 
 def adjustResultCoordinates(polys, ratio_w, ratio_h, ratio_net = 2):
     if len(polys) > 0:

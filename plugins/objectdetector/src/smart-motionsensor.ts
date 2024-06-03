@@ -1,9 +1,10 @@
 import sdk, { Camera, EventListenerRegister, MediaObject, MotionSensor, ObjectDetector, ObjectsDetected, Readme, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, Settings } from "@scrypted/sdk";
 import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
-import type { ObjectDetectionPlugin } from "./main";
 import { levenshteinDistance } from "./edit-distance";
+import type { ObjectDetectionPlugin } from "./main";
 
 export const SMART_MOTIONSENSOR_PREFIX = 'smart-motionsensor-';
+export const SMART_OCCUPANCYSENSOR_PREFIX = 'smart-occupancysensor-';
 
 export function createObjectDetectorStorageSetting(): StorageSetting {
     return {
@@ -71,6 +72,13 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             type: 'number',
             defaultValue: 2,
         },
+        labelScore: {
+            group: 'Recognition',
+            title: 'Label Score',
+            description: 'The minimum score required for a label to trigger the motion sensor.',
+            type: 'number',
+            defaultValue: 0,
+        }
     });
 
     detectionListener: EventListenerRegister;
@@ -190,7 +198,7 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
             if (this.storageSettings.values.requireDetectionThumbnail && !detected.detectionId)
                 return false;
 
-            const { labels, labelDistance } = this.storageSettings.values;
+            const { labels, labelDistance, labelScore } = this.storageSettings.values;
 
             const match = detected.detections?.find(d => {
                 if (this.storageSettings.values.requireScryptedNvrDetections && !d.boundingBox)
@@ -225,13 +233,24 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
                     return false;
 
                 for (const label of labels) {
-                    if (label === d.label)
-                        return true;
+                    if (label === d.label) {
+                        if (!labelScore || d.labelScore >= labelScore)
+                            return true;
+                        this.console.log('Label score too low.', d.labelScore);
+                        continue;
+                    }
+
                     if (!labelDistance)
                         continue;
-                    if (levenshteinDistance(label, d.label) <= labelDistance)
+
+                    if (levenshteinDistance(label, d.label) > labelDistance) {
+                        this.console.log('Label does not match.', label, d.label, d.labelScore);
+                        continue;
+                    }
+
+                    if (!labelScore || d.labelScore >= labelScore)
                         return true;
-                    this.console.log('Label does not match.', label, d.label);
+                    this.console.log('Label score too low.', d.labelScore);
                 }
 
                 return false;

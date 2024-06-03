@@ -30,15 +30,13 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
 
 availableModels = [
     "Default",
+    "scrypted_yolov10m_320",
+    "scrypted_yolov10n_320",
     "scrypted_yolo_nas_s_320",
     "scrypted_yolov6n_320",
-    "scrypted_yolov6n",
     "scrypted_yolov6s_320",
-    "scrypted_yolov6s",
     "scrypted_yolov9c_320",
-    "scrypted_yolov9c",
     "scrypted_yolov8n_320",
-    "scrypted_yolov8n",
     "ssd_mobilenet_v1_coco",
     "ssdlite_mobilenet_v2",
     "yolo-v3-tiny-tf",
@@ -138,6 +136,7 @@ class OpenVINOPlugin(
                 self.storage.setItem("model", "Default")
             model = "scrypted_yolov8n_320"
         self.yolo = "yolo" in model
+        self.scrypted_yolov10 = "scrypted_yolov10" in model
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
@@ -274,11 +273,11 @@ class OpenVINOPlugin(
             objs = []
 
             if self.scrypted_yolo:
+                if self.scrypted_yolov10:
+                    return yolo.parse_yolov10(output_tensors[0][0])
                 if self.scrypted_yolo_nas:
-                    objs = yolo.parse_yolo_nas([output_tensors[1], output_tensors[0]])
-                else:
-                    objs = yolo.parse_yolov9(output_tensors[0][0])
-                return objs
+                    return yolo.parse_yolo_nas([output_tensors[1], output_tensors[0]])
+                return yolo.parse_yolov9(output_tensors[0][0])
 
             if self.yolo:
                 # index 2 will always either be 13 or 26

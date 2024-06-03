@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import asyncio
+
 import numpy as np
 import openvino.runtime as ov
-from ov import async_infer
 
+from ov import async_infer
 from predict.text_recognize import TextRecognition
+
+textDetectPrepare, textDetectPredict = async_infer.create_executors("TextDetect")
+textRecognizePrepare, textRecognizePredict = async_infer.create_executors(
+    "TextRecognize"
+)
 
 
 class OpenVINOTextRecognition(TextRecognition):
@@ -29,17 +36,30 @@ class OpenVINOTextRecognition(TextRecognition):
         return self.plugin.core.compile_model(xmlFile, self.plugin.mode)
 
     async def predictDetectModel(self, input: np.ndarray):
-        infer_request = self.detectModel.create_infer_request()
-        im = ov.Tensor(array=input)
-        input_tensor = im
-        infer_request.set_input_tensor(input_tensor)
-        await async_infer.start_async(infer_request)
-        return infer_request.output_tensors[0].data
+        def predict():
+            infer_request = self.detectModel.create_infer_request()
+            im = ov.Tensor(array=input)
+            input_tensor = im
+            infer_request.set_input_tensor(input_tensor)
+            output_tensors = infer_request.infer()
+            ret = output_tensors[0]
+            return ret
+
+        ret = await asyncio.get_event_loop().run_in_executor(
+            textDetectPredict, lambda: predict()
+        )
+        return ret
 
     async def predictTextModel(self, input: np.ndarray):
-        input = input.astype(np.float32)
-        im = ov.Tensor(array=input)
-        infer_request = self.textModel.create_infer_request()
-        infer_request.set_input_tensor(im)
-        await async_infer.start_async(infer_request)
-        return infer_request.output_tensors[0].data
+        def predict():
+            im = ov.Tensor(array=input.astype(np.float32))
+            infer_request = self.textModel.create_infer_request()
+            infer_request.set_input_tensor(im)
+            output_tensors = infer_request.infer()
+            ret = output_tensors[0]
+            return ret
+
+        ret = await asyncio.get_event_loop().run_in_executor(
+            textDetectPredict, lambda: predict()
+        )
+        return ret

@@ -311,6 +311,7 @@ class ObjectDetectionResult(TypedDict):
     history: ObjectDetectionHistory
     id: str  # The id of the tracked object.
     label: str  # The label of the object, if it was recognized as a familiar object (person, pet, etc).
+    labelScore: float  # The score of the label.
     landmarks: list[Point]  # The detection landmarks, like key points in a face landmarks.
     movement: Union[ObjectDetectionHistory, Any]  # Movement history will track the first/last time this object was moving.
     resources: VideoResource

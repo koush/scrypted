@@ -1,12 +1,11 @@
 {
   "name": "@scrypted/server",
-  "version": "0.106.0",
+  "version": "0.110.0",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",
     "@scrypted/ffmpeg-static": "^6.1.0-build1",
-    "@scrypted/node-pty": "^1.0.10",
-    "@scrypted/types": "^0.3.28",
+    "@scrypted/types": "^0.3.30",
     "adm-zip": "^0.5.12",
     "body-parser": "^1.20.2",
     "cookie-parser": "^1.4.6",
@@ -22,12 +21,12 @@
     "node-dijkstra": "^2.5.0",
     "node-forge": "^1.3.1",
     "node-gyp": "^10.1.0",
-    "py": "npm:@bjia56/portable-python@^0.1.31",
+    "py": "npm:@bjia56/portable-python@^0.1.47",
     "router": "^1.3.8",
     "semver": "^7.6.2",
-    "sharp": "^0.33.3",
+    "sharp": "^0.33.4",
     "source-map-support": "^0.5.21",
-    "tar": "^7.1.0",
+    "tar": "^7.2.0",
     "tslib": "^2.6.2",
     "typescript": "^5.4.5",
     "whatwg-mimetype": "^4.0.0",
@@ -40,13 +39,16 @@
     "@types/follow-redirects": "^1.14.4",
     "@types/http-auth": "^4.1.4",
     "@types/ip": "^1.1.3",
-    "@types/lodash": "^4.17.1",
+    "@types/lodash": "^4.17.4",
     "@types/node-dijkstra": "^2.5.6",
     "@types/node-forge": "^1.3.11",
     "@types/semver": "^7.5.8",
     "@types/source-map-support": "^0.5.10",
     "@types/whatwg-mimetype": "^3.0.2",
     "@types/ws": "^8.5.10"
+  },
+  "optionalDependencies": {
+    "@scrypted/node-pty": "^1.0.12"
   },
   "bin": {
     "scrypted-serve": "bin/scrypted-serve"

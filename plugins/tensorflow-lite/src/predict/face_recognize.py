@@ -1,40 +1,27 @@
 from __future__ import annotations
 
 import asyncio
-from asyncio import Future
 import base64
-from typing import Any, Tuple, List
+import traceback
+from asyncio import Future
+from typing import Any, List, Tuple
 
 import numpy as np
 import scrypted_sdk
 from PIL import Image
-from scrypted_sdk import (
-    ObjectDetectionSession,
-    ObjectsDetected,
-    ObjectDetectionResult,
-)
-import traceback
+from scrypted_sdk import (ObjectDetectionResult, ObjectDetectionSession,
+                          ObjectsDetected)
 
-from predict import PredictPlugin
 from common import yolo
+from predict import PredictPlugin
 
-def euclidean_distance(arr1, arr2):
-    return np.linalg.norm(arr1 - arr2)
-
-
-def cosine_similarity(vector_a, vector_b):
-    dot_product = np.dot(vector_a, vector_b)
-    norm_a = np.linalg.norm(vector_a)
-    norm_b = np.linalg.norm(vector_b)
-    similarity = dot_product / (norm_a * norm_b)
-    return similarity
 
 class FaceRecognizeDetection(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
-        self.inputheight = 640
-        self.inputwidth = 640
+        self.inputheight = 320
+        self.inputwidth = 320
 
         self.labels = {
             0: "face",
@@ -44,7 +31,7 @@ class FaceRecognizeDetection(PredictPlugin):
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.7
 
-        self.detectModel = self.downloadModel("scrypted_yolov9c_flt")
+        self.detectModel = self.downloadModel("scrypted_yolov8n_flt_320")
         self.faceModel = self.downloadModel("inception_resnet_v1")
 
     def downloadModel(self, model: str):
@@ -99,11 +86,11 @@ class FaceRecognizeDetection(PredictPlugin):
 
             traceback.print_exc()
             pass
-    
+
     async def predictDetectModel(self, input: Image.Image):
         pass
 
-    async def predictFaceModel(self, input: np.ndarray):
+    async def predictFaceModel(self, prepareTensor):
         pass
 
     async def run_detection_image(
@@ -168,23 +155,4 @@ class FaceRecognizeDetection(PredictPlugin):
         if len(futures):
             await asyncio.wait(futures)
 
-        last = None
-        for d in ret['detections']:
-            if d["className"] != "face":
-                continue
-            check = d.get("embedding")
-            if check is None:
-                continue
-            # decode base64 string check
-            embedding = base64.b64decode(check)
-            embedding = np.frombuffer(embedding, dtype=np.float32)
-            if last is None:
-                last = embedding
-                continue
-            # convert to numpy float32 arrays
-            similarity = cosine_similarity(last, embedding)
-            print('similarity', similarity)
-            last = embedding
-
         return ret
-

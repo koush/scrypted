@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-import openvino.runtime as ov
-from ov import async_infer
-from PIL import Image
+import asyncio
 
 import numpy as np
+import openvino.runtime as ov
+from PIL import Image
 
+from ov import async_infer
 from predict.face_recognize import FaceRecognizeDetection
+
+faceDetectPrepare, faceDetectPredict = async_infer.create_executors("FaceDetect")
+faceRecognizePrepare, faceRecognizePredict = async_infer.create_executors(
+    "FaceRecognize"
+)
+
 
 class OpenVINOFaceRecognition(FaceRecognizeDetection):
     def __init__(self, plugin, nativeId: str | None = None):
@@ -30,19 +37,34 @@ class OpenVINOFaceRecognition(FaceRecognizeDetection):
         return self.plugin.core.compile_model(xmlFile, self.plugin.mode)
 
     async def predictDetectModel(self, input: Image.Image):
-        infer_request = self.detectModel.create_infer_request()
-        im = np.expand_dims(input, axis=0)
-        im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
-        im = im.astype(np.float32) / 255.0
-        im = np.ascontiguousarray(im)  # contiguous
-        im = ov.Tensor(array=im)
-        infer_request.set_input_tensor(im)
-        await async_infer.start_async(infer_request)
-        return infer_request.output_tensors[0].data[0]
+        def predict():
+            im = np.expand_dims(input, axis=0)
+            im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+            im = im.astype(np.float32) / 255.0
+            im = np.ascontiguousarray(im)  # contiguous
+
+            infer_request = self.detectModel.create_infer_request()
+            tensor = ov.Tensor(array=im)
+            infer_request.set_input_tensor(tensor)
+            output_tensors = infer_request.infer()
+            ret = output_tensors[0][0]
+            return ret
+
+        ret = await asyncio.get_event_loop().run_in_executor(
+            faceDetectPredict, lambda: predict()
+        )
+        return ret
 
     async def predictFaceModel(self, input: np.ndarray):
-        im = ov.Tensor(array=input)
-        infer_request = self.faceModel.create_infer_request()
-        infer_request.set_input_tensor(im)
-        await async_infer.start_async(infer_request)
-        return infer_request.output_tensors[0].data[0]
+        def predict():
+            im = ov.Tensor(array=input)
+            infer_request = self.faceModel.create_infer_request()
+            infer_request.set_input_tensor(im)
+            output_tensors = infer_request.infer()
+            ret = output_tensors[0]
+            return ret
+
+        ret = await asyncio.get_event_loop().run_in_executor(
+            faceRecognizePredict, lambda: predict()
+        )
+        return ret

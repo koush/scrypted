@@ -29,15 +29,13 @@ except:
 
 availableModels = [
     "Default",
+    "scrypted_yolov10m_320",
+    "scrypted_yolov10n_320",
     "scrypted_yolo_nas_s_320",
     "scrypted_yolov6n_320",
-    "scrypted_yolov6n",
     "scrypted_yolov6s_320",
-    "scrypted_yolov6s",
     "scrypted_yolov9c_320",
-    "scrypted_yolov9c",
     "scrypted_yolov8n_320",
-    "scrypted_yolov8n",
 ]
 
 def parse_labels(names):
@@ -59,6 +57,7 @@ class ONNXPlugin(
                 self.storage.setItem("model", "Default")
             model = "scrypted_yolov8n_320"
         self.yolo = "yolo" in model
+        self.scrypted_yolov10 = "scrypted_yolov10" in model
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
@@ -200,6 +199,12 @@ class ONNXPlugin(
                 "multiple": True,
                 "value": deviceIds,
             },
+            {
+                "key": "execution_device",
+                "title": "Execution Device",
+                "readonly": True,
+                "value": onnxruntime.get_device(),
+            }
         ]
 
     async def putSetting(self, key: str, value: SettingValue):
@@ -228,11 +233,11 @@ class ONNXPlugin(
         def predict(input_tensor):
             compiled_model = self.compiled_models[threading.current_thread().name]
             output_tensors = compiled_model.run(None, { self.input_name: input_tensor })
+            if self.scrypted_yolov10:
+                return yolo.parse_yolov10(output_tensors[0][0])
             if self.scrypted_yolo_nas:
-                objs = yolo.parse_yolo_nas([output_tensors[1], output_tensors[0]])
-            else:
-                objs = yolo.parse_yolov9(output_tensors[0][0])
-            return objs
+                return yolo.parse_yolo_nas([output_tensors[1], output_tensors[0]])
+            return yolo.parse_yolov9(output_tensors[0][0])
 
         try:
             input_tensor = await asyncio.get_event_loop().run_in_executor(

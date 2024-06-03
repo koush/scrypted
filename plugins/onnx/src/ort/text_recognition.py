@@ -62,12 +62,12 @@ class ONNXTextRecognition(TextRecognition):
         executor = concurrent.futures.ThreadPoolExecutor(
             initializer=executor_initializer,
             max_workers=len(compiled_models_array),
-            thread_name_prefix="face",
+            thread_name_prefix="text",
         )
 
         prepareExecutor = concurrent.futures.ThreadPoolExecutor(
             max_workers=len(compiled_models_array),
-            thread_name_prefix="face-prepare",
+            thread_name_prefix="text-prepare",
         )
 
         return compiled_models, input_name, prepareExecutor, executor

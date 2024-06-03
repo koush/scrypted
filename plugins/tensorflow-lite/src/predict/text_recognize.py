@@ -65,14 +65,14 @@ class TextRecognition(PredictPlugin):
         low_text = 0.4
         poly = False
 
-        boxes_list, polys_list = [], []
+        boxes_list, polys_list, scores_list = [], [], []
         for out in y:
             # make score and link map
             score_text = out[:, :, 0]
             score_link = out[:, :, 1]
 
             # Post-processing
-            boxes, polys, mapper = getDetBoxes(
+            boxes, polys, mapper, scores = getDetBoxes(
                 score_text,
                 score_link,
                 text_threshold,
@@ -96,18 +96,19 @@ class TextRecognition(PredictPlugin):
                 if polys[k] is None:
                     polys[k] = boxes[k]
             boxes_list.append(boxes)
+            scores_list.append(scores)
             polys_list.append(polys)
 
         preds: List[Prediction] = []
-        for boxes in boxes_list:
-            for box in boxes:
+        for boxes, scores in zip(boxes_list, scores_list):
+            for box, score in zip(boxes, scores):
                 tl, tr, br, bl = box
                 l = min(tl[0], bl[0])
                 t = min(tl[1], tr[1])
                 r = max(tr[0], br[0])
                 b = max(bl[1], br[1])
 
-                pred = Prediction(0, 1, Rectangle(l, t, r, b))
+                pred = Prediction(0, float(score), Rectangle(l, t, r, b))
                 preds.append(pred)
 
         return self.create_detection_result(preds, src_size, cvss)
@@ -121,18 +122,19 @@ class TextRecognition(PredictPlugin):
 
         futures: List[Future] = []
 
-        boundingBoxes = [d["boundingBox"] for d in detections]
+        boundingBoxes, scores = [d["boundingBox"] for d in detections], [d["score"] for d in detections]
         if not len(boundingBoxes):
             return ret
 
-        text_groups = find_adjacent_groups(boundingBoxes)
+        text_groups = find_adjacent_groups(boundingBoxes, scores)
 
         detections = []
         for group in text_groups:
             boundingBox = group["union"]
+            score = group["score"]
             d: ObjectDetectionResult = {
                 "boundingBox": boundingBox,
-                "score": 1,
+                "score": score,
                 "className": "text",
             }
             futures.append(

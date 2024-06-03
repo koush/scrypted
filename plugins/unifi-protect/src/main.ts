@@ -157,10 +157,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 const payload = updatePacket.payload as ProtectNvrUpdatePayloadEventAdd;
                 if (!payload.camera)
                     return;
-                const unifiCamera = this.cameras.get(payload.camera);
+                const nativeId = this.getNativeId({ id: payload.camera }, false);
+                const unifiCamera = this.cameras.get(nativeId);
 
                 if (!unifiCamera) {
-                    this.console.log('unknown device event, sync needed?', payload.camera);
+                    this.console.log('unknown device event, sync needed?', payload);
                     return;
                 }
 
@@ -195,7 +196,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 //     id: '661d86bf03e69c03e408d62a',
                 //     modelKey: 'event'
                 // }
-                  
+
                 if (payload.type === 'smartDetectZone' || payload.type === 'smartDetectLine') {
                     unifiCamera.resetDetectionTimeout();
 
@@ -602,7 +603,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         return this.storageSettings.values.idMaps.nativeId?.[nativeId] || nativeId;
     }
 
-    getNativeId(device: any, update: boolean) {
+    getNativeId(device: { id?: string, mac?: string; anonymousDeviceId?: string }, update: boolean) {
         const { id, mac, anonymousDeviceId } = device;
         const idMaps = this.storageSettings.values.idMaps;
 

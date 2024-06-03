@@ -26,15 +26,13 @@ predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "CoreML-Predict")
 
 availableModels = [
     "Default",
+    "scrypted_yolov10m_320",
+    "scrypted_yolov10n_320",
     "scrypted_yolo_nas_s_320",
     "scrypted_yolov9c_320",
-    "scrypted_yolov9c",
     "scrypted_yolov6n_320",
-    "scrypted_yolov6n",
     "scrypted_yolov6s_320",
-    "scrypted_yolov6s",
     "scrypted_yolov8n_320",
-    "scrypted_yolov8n",
     "ssdlite_mobilenet_v2",
     "yolov4-tiny",
 ]
@@ -78,6 +76,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
                 self.storage.setItem("model", "Default")
             model = "scrypted_yolov9c_320"
         self.yolo = "yolo" in model
+        self.scrypted_yolov10n = "scrypted_yolov10" in model
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
@@ -217,12 +216,19 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
         if self.yolo:
             out_dict = await self.queue_batch({self.input_name: input})
 
+            if self.scrypted_yolov10n:
+                results = list(out_dict.values())[0][0]
+                objs = yolo.parse_yolov10(results)
+                ret = self.create_detection_result(objs, src_size, cvss)
+                return ret
+
             if self.scrypted_yolo_nas:
                 predictions  = list(out_dict.values())
                 objs = yolo.parse_yolo_nas(predictions)
                 ret = self.create_detection_result(objs, src_size, cvss)
                 return ret
-            elif self.scrypted_yolo:
+
+            if self.scrypted_yolo:
                 results = list(out_dict.values())[0][0]
                 objs = yolo.parse_yolov9(results)
                 ret = self.create_detection_result(objs, src_size, cvss)

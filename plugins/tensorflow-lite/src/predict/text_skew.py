@@ -43,30 +43,31 @@ def are_boxes_adjacent(box1: BoundingBox, box2: BoundingBox):
         return False
 
 
-def find_adjacent_groups(boxes: List[BoundingBox]) -> List[dict]:
+def find_adjacent_groups(boxes: List[BoundingBox], scores: List[float]) -> List[dict]:
     groups = []
 
     # sort boxes left to right
     boxes = sorted(boxes, key=lambda box: box[0])
 
-    for box in boxes:
+    for index, box in enumerate(boxes):
         added_to_group = False
         for group in groups:
             for other_box in group["boxes"]:
                 if are_boxes_adjacent(box, other_box):
                     group["boxes"].append(box)
+                    group["scores"].append(scores[index])
                     added_to_group = True
                     break
             if added_to_group:
                 break
         if not added_to_group:
-            groups.append({"boxes": [box], "skew_angle": 0})
+            groups.append({"boxes": [box], "scores": [scores[index]], "skew_angle": 0})
 
     # Calculate the skew angle of each group
     for group in groups:
         boxes = group["boxes"]
         group["union"] = union_boxes(boxes)
-        if len(boxes) -1 :
+        if len(boxes) - 1:
             lm = (boxes[0][1] + boxes[0][3]) / 2
             rm = (boxes[-1][1] + boxes[-1][3]) / 2
             dx = (boxes[-1][0]) - (boxes[0][0] + boxes[0][2])
@@ -78,7 +79,10 @@ def find_adjacent_groups(boxes: List[BoundingBox]) -> List[dict]:
             group['skew_angle'] = math.atan2(rm - lm, dx) * 2
             # pad this box by a few pixels
             group['union'] = (group['union'][0] - pad_height, group['union'][1] - pad_height, group['union'][2] + pad_height * 2, group['union'][3] + pad_height * 2)
+            # average the scores
+            group['score'] = sum(group['scores']) / len(group['scores'])
         else:
             group['skew_angle'] = 0
+            group['score'] = group['scores'][0]
 
     return groups
