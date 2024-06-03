@@ -29,6 +29,7 @@ availableModels = [
     "scrypted_yolov10m_320",
     "scrypted_yolov10n_320",
     "scrypted_yolo_nas_s_320",
+    "scrypted_yolov9e_320",
     "scrypted_yolov9c_320",
     "scrypted_yolov6n_320",
     "scrypted_yolov6s_320",
