@@ -70,7 +70,7 @@ async function getAuth(options: AuthFetchOptions, url: string | URL, method: str
 
 export function createAuthFetch<B, M>(
     h: fetcher<B, M>,
-    parser: (body: M, responseType: HttpFetchResponseType) => Promise<any>
+    parser: (body: M, responseType: HttpFetchResponseType | undefined) => Promise<any>
 ) {
     const authHttpFetch = async <T extends HttpFetchOptions<B>>(options: T & AuthFetchOptions): ReturnType<typeof h<T>> => {
         const method = getFetchMethod(options);
@@ -99,7 +99,7 @@ export function createAuthFetch<B, M>(
             };
         }
 
-        let authenticateHeaders: string | string[] = initialResponse.headers.get('www-authenticate');
+        let authenticateHeaders: string | string[] | null = initialResponse.headers.get('www-authenticate');
         if (!authenticateHeaders)
             throw new Error('Did not find WWW-Authenticate header.');
 
