@@ -28,7 +28,7 @@ import { getMixins, hasMixinCycle } from './mixin/mixin-cycle';
 import { AccessControls } from './plugin/acl';
 import { PluginDebug } from './plugin/plugin-debug';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
-import { PluginHost } from './plugin/plugin-host';
+import { PluginHost, UnsupportedRuntimeError } from './plugin/plugin-host';
 import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
@@ -629,8 +629,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         return this.runPlugin(plugin, pluginDebug);
     }
 
-    setupPluginHostAutoRestart(pluginHost: PluginHost) {
-        const logger = this.getDeviceLogger(this.findPluginDevice(pluginHost.pluginId));
+    setupPluginHostAutoRestart(pluginId: string, pluginHost?: PluginHost) {
+        const logger = this.getDeviceLogger(this.findPluginDevice(pluginId));
 
         let timeout: NodeJS.Timeout;
 
@@ -639,20 +639,20 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 return;
 
             const t = 60000;
-            pluginHost.kill();
-            logger.log('e', `plugin ${pluginHost.pluginId} unexpectedly exited, restarting in ${t}ms`);
+            pluginHost?.kill();
+            logger.log('e', `plugin ${pluginId} unexpectedly exited, restarting in ${t}ms`);
 
             timeout = setTimeout(async () => {
                 timeout = undefined;
-                const plugin = await this.datastore.tryGet(Plugin, pluginHost.pluginId);
+                const plugin = await this.datastore.tryGet(Plugin, pluginId);
                 if (!plugin) {
-                    logger.log('w', `scheduled plugin restart cancelled, plugin no longer exists ${pluginHost.pluginId}`);
+                    logger.log('w', `scheduled plugin restart cancelled, plugin no longer exists ${pluginId}`);
                     return;
                 }
 
-                const existing = this.plugins[pluginHost.pluginId];
-                if (existing && existing !== pluginHost && !existing.killed) {
-                    logger.log('w', `scheduled plugin restart cancelled, plugin was restarted by user ${pluginHost.pluginId}`);
+                const existing = this.plugins[pluginId];
+                if (existing && pluginHost && existing !== pluginHost && !existing.killed) {
+                    logger.log('w', `scheduled plugin restart cancelled, plugin was restarted by user ${pluginId}`);
                     return;
                 }
 
@@ -660,16 +660,21 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     this.runPlugin(plugin);
                 }
                 catch (e) {
-                    logger.log('e', `error restarting plugin ${pluginHost.pluginId}`);
+                    logger.log('e', `error restarting plugin ${pluginId}`);
                     logger.log('e', e.toString());
                     restart();
                 }
             }, t);
         };
-
-        pluginHost.worker.once('error', restart);
-        pluginHost.worker.once('exit', restart);
-        pluginHost.worker.once('close', restart);
+        1
+        if (pluginHost) {
+            pluginHost.worker.once('error', restart);
+            pluginHost.worker.once('exit', restart);
+            pluginHost.worker.once('close', restart);
+        }
+        else {
+            restart();
+        }
     }
 
     loadPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
@@ -683,15 +688,22 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             }
 
             const pluginHost = new PluginHost(this, plugin, pluginDebug);
-            this.setupPluginHostAutoRestart(pluginHost);
             this.plugins[pluginId] = pluginHost;
+            this.setupPluginHostAutoRestart(pluginId, pluginHost);
 
             return pluginHost;
         }
         catch (e) {
             const logger = this.getDeviceLogger(this.findPluginDevice(pluginId));
-            logger.log('e', 'error loading plugin');
+            if (e instanceof UnsupportedRuntimeError) {
+                logger.log('e', 'error loading plugin (not retrying)');
+                logger.log('e', e.toString());
+                throw e;
+            }
+
+            logger.log('e', 'error loading plugin (retrying...)');
             logger.log('e', e.toString());
+            this.setupPluginHostAutoRestart(pluginId);
             throw e;
         }
     }

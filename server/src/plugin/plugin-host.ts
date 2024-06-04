@@ -28,6 +28,12 @@ import { RuntimeWorker } from './runtime/runtime-worker';
 
 const serverVersion = require('../../package.json').version;
 
+export class UnsupportedRuntimeError extends Error {
+    constructor(runtime: string) {
+        super(`Unsupported runtime: ${runtime}`);
+    }
+}
+
 export class PluginHost {
     worker: RuntimeWorker;
     peer: RpcPeer;
@@ -281,7 +287,7 @@ export class PluginHost {
 
         const workerHost = this.scrypted.pluginHosts.get(runtime);
         if (!workerHost)
-            throw new Error(`Unsupported Scrypted runtime: ${this.packageJson.scrypted.runtime}`);
+            throw new UnsupportedRuntimeError(this.packageJson.scrypted.runtime);
 
         this.worker = workerHost(this.scrypted.mainFilename, this.pluginId, {
             packageJson: this.packageJson,
