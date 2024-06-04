@@ -152,10 +152,8 @@ export async function domFetchParseIncomingMessage(response: Response, responseT
             return response.text();
         case 'readable':
             return response;
-        case 'buffer':
-        case undefined:
-            return new Uint8Array(await response.arrayBuffer());
     }
+    return new Uint8Array(await response.arrayBuffer());
 }
 
 export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T): Promise<HttpFetchResponse<

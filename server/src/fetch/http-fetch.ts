@@ -49,10 +49,8 @@ export function getHttpFetchParser(responseType: HttpFetchResponseType | undefin
             return TextParser;
         case 'readable':
             return StreamParser;
-        case 'buffer':
-        case undefined:
-            return BufferParser;
     }
+    return BufferParser;
 }
 
 export function httpFetchParseIncomingMessage(readable: IncomingMessage, responseType: HttpFetchResponseType | undefined) {
