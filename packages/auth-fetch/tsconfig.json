@@ -9,6 +9,7 @@
         "inlineSources": true,
         "declaration": true,
         "resolveJsonModule": true,
+        "strict": true
     },
     "include": [
         "src/**/*"
