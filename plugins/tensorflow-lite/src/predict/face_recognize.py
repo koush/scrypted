@@ -25,13 +25,11 @@ class FaceRecognizeDetection(PredictPlugin):
 
         self.labels = {
             0: "face",
-            1: "plate",
-            2: "text",
         }
         self.loop = asyncio.get_event_loop()
-        self.minThreshold = 0.7
+        self.minThreshold = 0.2
 
-        self.detectModel = self.downloadModel("scrypted_yolov10m_face")
+        self.detectModel = self.downloadModel("scrypted_yolov10n_face")
         self.faceModel = self.downloadModel("inception_resnet_v1")
 
     def downloadModel(self, model: str):
