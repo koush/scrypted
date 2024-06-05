@@ -62,7 +62,7 @@ class TextRecognition(PredictPlugin):
         ratio_h = ratio_w = 1
         text_threshold = 0.7
         link_threshold = 0.9
-        low_text = 0.4
+        low_text = 0.5
         poly = False
 
         boxes_list, polys_list, scores_list = [], [], []
@@ -138,7 +138,7 @@ class TextRecognition(PredictPlugin):
                 "className": "text",
             }
             futures.append(
-                asyncio.ensure_future(self.setLabel(d, image, group["skew_angle"]))
+                asyncio.ensure_future(self.setLabel(d, image, group["skew_angle"], group['deskew_height']))
             )
             detections.append(d)
 
@@ -153,10 +153,10 @@ class TextRecognition(PredictPlugin):
         return ret
 
     async def setLabel(
-        self, d: ObjectDetectionResult, image: scrypted_sdk.Image, skew_angle: float
+        self, d: ObjectDetectionResult, image: scrypted_sdk.Image, skew_angle: float, deskew_height: float
     ):
         try:
-            image_tensor = await prepare_text_result(d, image, skew_angle)
+            image_tensor = await prepare_text_result(d, image, skew_angle, deskew_height)
             preds = await self.predictTextModel(image_tensor)
             d["label"] = process_text_result(preds)
 

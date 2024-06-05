@@ -49,7 +49,7 @@ def calculate_y_change(original_height, skew_angle_radians):
     
     return y_change
 
-async def prepare_text_result(d: ObjectDetectionResult, image: scrypted_sdk.Image, skew_angle: float):
+async def prepare_text_result(d: ObjectDetectionResult, image: scrypted_sdk.Image, skew_angle: float, deskew_height: float):
     textImage = await crop_text(d, image)
 
     skew_height_change = calculate_y_change(d["boundingBox"][3], skew_angle)
@@ -57,19 +57,29 @@ async def prepare_text_result(d: ObjectDetectionResult, image: scrypted_sdk.Imag
     textImage = skew_image(textImage, skew_angle)
     # crop skew_height_change from top
     if skew_height_change > 0:
-        textImage = textImage.crop((0, 0, textImage.width, textImage.height - skew_height_change))
+        textImage = textImage.crop((0, 0, textImage.width, deskew_height))
     elif skew_height_change < 0:
-        textImage = textImage.crop((0, -skew_height_change, textImage.width, textImage.height))
+        textImage = textImage.crop((0, textImage.height - deskew_height, textImage.width, textImage.height))
 
-    new_height = 64
+    target_height = 64
+    height_padding = 3
+    new_height = target_height - height_padding * 2
     new_width = int(textImage.width * new_height / textImage.height)
     textImage = textImage.resize((new_width, new_height), resample=Image.LANCZOS).convert("L")
 
     new_width = 256
+    # average the top pixels
+    edge_color = textImage.getpixel((0, textImage.height // 2))
+    # average the bottom pixels
+    edge_color += textImage.getpixel((textImage.width - 1, textImage.height // 2))
+    # average the right pixels
+    edge_color += textImage.getpixel((textImage.width // 2, 0))
+    # average the left pixels
+    edge_color += textImage.getpixel((textImage.width // 2, textImage.height - 1))
+    edge_color = edge_color // 4
+
     # calculate padding dimensions
-    padding = (0, 0, new_width - textImage.width, 0)
-    # todo: clamp entire edge rather than just center
-    edge_color = textImage.getpixel((textImage.width - 1, textImage.height // 2))
+    padding = (0, height_padding, new_width - textImage.width, height_padding)
     # pad image
     textImage = ImageOps.expand(textImage, padding, fill=edge_color)
     # pil to numpy

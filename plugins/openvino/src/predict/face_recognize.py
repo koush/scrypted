@@ -15,6 +15,12 @@ from scrypted_sdk import (ObjectDetectionResult, ObjectDetectionSession,
 from common import yolo
 from predict import PredictPlugin
 
+def cosine_similarity(vector_a, vector_b):
+    dot_product = np.dot(vector_a, vector_b)
+    norm_a = np.linalg.norm(vector_a)
+    norm_b = np.linalg.norm(vector_b)
+    similarity = dot_product / (norm_a * norm_b)
+    return similarity
 
 class FaceRecognizeDetection(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -152,5 +158,23 @@ class FaceRecognizeDetection(PredictPlugin):
 
         if len(futures):
             await asyncio.wait(futures)
+
+        # last = None
+        # for d in ret['detections']:
+        #     if d["className"] != "face":
+        #         continue
+        #     check = d.get("embedding")
+        #     if check is None:
+        #         continue
+        #     # decode base64 string check
+        #     embedding = base64.b64decode(check)
+        #     embedding = np.frombuffer(embedding, dtype=np.float32)
+        #     if last is None:
+        #         last = embedding
+        #         continue
+        #     # convert to numpy float32 arrays
+        #     similarity = cosine_similarity(last, embedding)
+        #     print('similarity', similarity)
+        #     last = embedding
 
         return ret
