@@ -20,8 +20,8 @@ class FaceRecognizeDetection(PredictPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
-        self.inputheight = 640
-        self.inputwidth = 640
+        self.inputheight = 320
+        self.inputwidth = 320
 
         self.labels = {
             0: "face",
@@ -29,7 +29,7 @@ class FaceRecognizeDetection(PredictPlugin):
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.2
 
-        self.detectModel = self.downloadModel("scrypted_yolov10n_face")
+        self.detectModel = self.downloadModel("scrypted_yolov10n_face_320")
         self.faceModel = self.downloadModel("inception_resnet_v1")
 
     def downloadModel(self, model: str):

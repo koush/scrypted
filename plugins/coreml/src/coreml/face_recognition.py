@@ -71,7 +71,7 @@ class CoreMLFaceRecognition(FaceRecognizeDetection):
         def predict():
             model, inputName = self.faceModel
             out_dict = model.predict({inputName: input})
-            results = out_dict["var_2167"][0]
+            results = list(out_dict.values())[0][0]
             return results
         results = await asyncio.get_event_loop().run_in_executor(
             self.recogExecutor, lambda: predict()
