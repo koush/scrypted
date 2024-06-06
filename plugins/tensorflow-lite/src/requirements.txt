@@ -1,8 +1,4 @@
 --extra-index-url https://google-coral.github.io/py-repo/
 pycoral~=2.0
 tflite-runtime==2.5.0.post1
-
-# pillow-simd is available on x64 linux
-# pillow-simd confirmed not building with arm64 linux or apple silicon
-Pillow>=5.4.1; 'linux' not in sys_platform or platform_machine != 'x86_64'
-pillow-simd; 'linux' in sys_platform and platform_machine == 'x86_64'
+Pillow==10.3.0

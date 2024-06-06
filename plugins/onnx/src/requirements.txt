@@ -7,7 +7,4 @@ onnxruntime; 'linux' not in sys_platform or platform_machine != 'x86_64'
 # nightly?
 # ort-nightly-gpu==1.17.3.dev20240409002
 
-# pillow-simd is available on x64 linux
-# pillow-simd confirmed not building with arm64 linux or apple silicon
-Pillow>=5.4.1; 'linux' not in sys_platform or platform_machine != 'x86_64'
-pillow-simd; 'linux' in sys_platform and platform_machine == 'x86_64'
+Pillow==10.3.0

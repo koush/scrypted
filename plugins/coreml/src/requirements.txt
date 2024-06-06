@@ -1,2 +1,2 @@
 coremltools==7.1
-Pillow>=5.4.1
+Pillow==10.3.0
