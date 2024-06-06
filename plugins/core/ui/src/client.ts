@@ -26,6 +26,7 @@ export function loginScrypted(username: string, password: string, change_passwor
         username,
         password,
         change_password,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 }
 
