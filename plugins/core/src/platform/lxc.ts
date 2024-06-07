@@ -54,7 +54,13 @@ export async function checkLxcDependencies() {
                 r(stdout + '\n' + stderr);
         }));
 
-        if (output.includes('Version: 23')) {
+        if (
+            // apt
+            output.includes('Version: 23')
+            // was installed via script at some point
+            || output.includes('Version: 24.13.29138.7')
+            // current script version: 24.17.29377.6
+            ) {
             const cp = child_process.spawn('sh', ['-c', 'curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-graphics.sh | bash']);
             const [exitCode] = await once(cp, 'exit');
             if (exitCode !== 0)
