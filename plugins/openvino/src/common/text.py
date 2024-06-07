@@ -67,7 +67,7 @@ async def prepare_text_result(d: ObjectDetectionResult, image: scrypted_sdk.Imag
     new_width = int(textImage.width * new_height / textImage.height)
     textImage = textImage.resize((new_width, new_height), resample=Image.LANCZOS).convert("L")
 
-    new_width = 256
+    new_width = 384
     # average the top pixels
     edge_color = textImage.getpixel((0, textImage.height // 2))
     # average the bottom pixels

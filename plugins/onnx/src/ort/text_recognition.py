@@ -21,7 +21,7 @@ class ONNXTextRecognition(TextRecognition):
 
     def downloadModel(self, model: str):
         onnxmodel = model
-        model_version = "v3"
+        model_version = "v4"
         onnxfile = self.downloadFile(
             f"https://github.com/koush/onnx-models/raw/main/{model}/{onnxmodel}.onnx",
             f"{model_version}/{model}/{onnxmodel}.onnx",

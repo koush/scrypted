@@ -20,7 +20,7 @@ class CoreMLTextRecognition(TextRecognition):
         self.recogExecutor = concurrent.futures.ThreadPoolExecutor(1, "recog-text")
 
     def downloadModel(self, model: str):
-        model_version = "v7"
+        model_version = "v8"
         mlmodel = "model"
 
         files = [

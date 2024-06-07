@@ -23,7 +23,7 @@ class OpenVINOTextRecognition(TextRecognition):
     def downloadModel(self, model: str):
         ovmodel = "best"
         precision = self.plugin.precision
-        model_version = "v5"
+        model_version = "v6"
         xmlFile = self.downloadFile(
             f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
             f"{model_version}/{model}/{precision}/{ovmodel}.xml",
