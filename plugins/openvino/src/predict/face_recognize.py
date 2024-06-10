@@ -33,7 +33,7 @@ class FaceRecognizeDetection(PredictPlugin):
             0: "face",
         }
         self.loop = asyncio.get_event_loop()
-        self.minThreshold = 0.2
+        self.minThreshold = 0.5
 
         self.detectModel = self.downloadModel("scrypted_yolov10n_face_320")
         self.faceModel = self.downloadModel("inception_resnet_v1")
