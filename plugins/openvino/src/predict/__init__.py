@@ -145,8 +145,8 @@ class PredictPlugin(DetectPlugin):
                 for i, result in enumerate(results):
                     batch[i][1].set_result(result)
             except Exception as e:
-                for i, result in enumerate(results):
-                    batch[i][1].set_exception(e)
+                for input in batch:
+                    input[1].set_exception(e)
 
     async def flush_batch(self):
         self.batch_flush = None
