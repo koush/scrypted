@@ -41,12 +41,19 @@ pct restore $VMID $SCRYPTED_TAR_ZST $@
 if [ "$?" != "0" ]
 then
     echo ""
-    echo "pct restore failed"
+    echo "The Scrypted container installation failed (pct restore error)."
     echo ""
-    echo "This may be caused by the server's 'local' storage not supporting containers."
-    echo "Try running this script again with a different storage device (local-lvm, local-zfs). For example:"
+    echo "This may be because the server's 'local' storage device is not being a valid"
+    echo "location for containers."
+    echo "Try running this script again with a different storage device like"
+    echo "'local-lvm' or 'local-zfs'."
+    echo ""
+    echo "#############################################################################"
+    echo "Paste the following command into this shell to install to local-lvm instead:"
     echo ""
     echo "bash $0 --storage local-lvm"
+    echo "#############################################################################"
+    echo ""
     echo ""
     exit 1
 fi
