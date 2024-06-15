@@ -122,7 +122,7 @@ export class ReolinkCameraClient {
             responseType: 'json',
         });
         return {
-            value: response.body?.[0]?.value as AIState,
+            value: (response.body?.[0]?.value || response.body?.value) as AIState,
             data: response.body,
         };
     }
