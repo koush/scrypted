@@ -91,7 +91,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
         }
 
         try {
-            const ai: AIState = this.storageSettings.values.hasObjectDetector[0]?.value;
+            const ai: AIState = this.storageSettings.values.hasObjectDetector?.value;
             const classes: string[] = [];
 
             for (const key of Object.keys(ai)) {
@@ -203,6 +203,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, Reboot, Intercom,
 
                     if (!classes.length)
                         return;
+
+                    this.storageSettings.values.hasObjectDetector = ai;
 
                     hasSucceeded = true;
                     const od: ObjectsDetected = {
