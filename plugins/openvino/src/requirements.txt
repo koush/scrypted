@@ -1,2 +1,4 @@
+# must ensure numpy is pinned to prevent dependencies with an unpinned numpy from pulling numpy>=2.0.
+numpy==1.26.4
 openvino==2024.1.0
 Pillow==10.3.0

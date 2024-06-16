@@ -1,4 +1,6 @@
 --extra-index-url https://google-coral.github.io/py-repo/
+# must ensure numpy is pinned to prevent dependencies with an unpinned numpy from pulling numpy>=2.0.
+numpy==1.26.4
 pycoral~=2.0
 tflite-runtime==2.5.0.post1
 Pillow==10.3.0

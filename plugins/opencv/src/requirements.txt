@@ -1,13 +1,5 @@
-# plugin
-numpy>=1.16.2
-
+# must ensure numpy is pinned to prevent dependencies with an unpinned numpy from pulling numpy>=2.0.
+numpy==1.26.4
 imutils>=0.5.0
-
-# locked to version because 4.8.0.76 is broken.
-# todo: check newer versions.
-opencv-python==4.8.0.74
-
-# pillow-simd is available on x64 linux
-# pillow-simd confirmed not building with arm64 linux or apple silicon
-Pillow>=5.4.1; 'linux' not in sys_platform or platform_machine != 'x86_64'
-pillow-simd; 'linux' in sys_platform and platform_machine == 'x86_64'
+opencv-python==4.10.0.82
+Pillow==10.3.0
