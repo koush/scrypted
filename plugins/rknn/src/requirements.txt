@@ -1,4 +1,5 @@
 https://github.com/airockchip/rknn-toolkit2/raw/v2.0.0-beta0/rknn-toolkit-lite2/packages/rknn_toolkit_lite2-2.0.0b0-cp310-cp310-linux_aarch64.whl
+numpy<2.0.0
 pillow==10.3.0
 six==1.16.0
 shapely== 2.0.4
