@@ -89,10 +89,23 @@ export const H264_NAL_TYPE_FU_B = 29;
 export const H264_NAL_TYPE_MTAP16 = 26;
 export const H264_NAL_TYPE_MTAP32 = 27;
 
+export const H265_NAL_TYPE_AGG = 48;
+export const H265_NAL_TYPE_VPS = 32;
+export const H265_NAL_TYPE_SPS = 33;
+export const H265_NAL_TYPE_PPS = 34;
+export const H265_NAL_TYPE_IDR_N = 19;
+export const H265_NAL_TYPE_IDR_W = 20;
+
 export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h264')
         return;
     return findH264NaluTypeInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), naluType);
+}
+
+export function findH265NaluType(streamChunk: StreamChunk, naluType: number) {
+    if (streamChunk.type !== 'h265')
+        return;
+    return findH265NaluTypeInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), naluType);
 }
 
 export function findH264NaluTypeInNalu(nalu: Buffer, naluType: number) {
@@ -114,6 +127,25 @@ export function findH264NaluTypeInNalu(nalu: Buffer, naluType: number) {
 
         if (fuaType === naluType && isFuStart)
             return nalu.subarray(1);
+    }
+    else if (checkNaluType === naluType) {
+        return nalu;
+    }
+    return;
+}
+
+export function findH265NaluTypeInNalu(nalu: Buffer, naluType: number) {
+    const checkNaluType = (nalu[0] & 0b01111110) >> 1;
+    if (checkNaluType === H265_NAL_TYPE_AGG) {
+        let pos = 1;
+        while (pos < nalu.length) {
+            const naluLength = nalu.readUInt16BE(pos);
+            pos += 2;
+            const stapaType = nalu[pos] & 0x1f;
+            if (stapaType === naluType)
+                return nalu.subarray(pos, pos + naluLength);
+            pos += naluLength;
+        }
     }
     else if (checkNaluType === naluType) {
         return nalu;
@@ -195,12 +227,20 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
         findSyncFrame(streamChunks: StreamChunk[]) {
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
-                if (streamChunk.type !== 'h264') {
-                    continue;
+                if (streamChunk.type === 'h264') {
+                    if (findH264NaluType(streamChunk, H264_NAL_TYPE_SPS) || findH264NaluType(streamChunk, H264_NAL_TYPE_IDR)) {
+                        return streamChunks.slice(prebufferIndex);
+                    }
                 }
-
-                if (findH264NaluType(streamChunk, H264_NAL_TYPE_SPS) || findH264NaluType(streamChunk, H264_NAL_TYPE_IDR)) {
-                    return streamChunks.slice(prebufferIndex);
+                else if (streamChunk.type === 'h265') {
+                    if (findH265NaluType(streamChunk, H265_NAL_TYPE_VPS)
+                        || findH265NaluType(streamChunk, H265_NAL_TYPE_SPS)
+                        || findH265NaluType(streamChunk, H265_NAL_TYPE_PPS)
+                        || findH265NaluType(streamChunk, H265_NAL_TYPE_IDR_N)
+                        || findH265NaluType(streamChunk, H265_NAL_TYPE_IDR_W)
+                    ) {
+                        return streamChunks.slice(prebufferIndex);
+                    }
                 }
             }
 
