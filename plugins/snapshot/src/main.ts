@@ -746,6 +746,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             });
         }
         catch (e) {
+            this.debugConsole?.error('snapshot http request failed', e);
             response.send('', {
                 code: 500,
             });
