@@ -6,7 +6,7 @@ import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect"
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { createZygote } from '@scrypted/common/src/zygote';
-import sdk, { BufferConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { BufferConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import ip from 'ip';
@@ -19,7 +19,7 @@ import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
 import { MediaStreamTrack, PeerConfig, RTCPeerConnection, defaultPeerConfig } from './werift';
 import { WeriftSignalingSession } from './werift-signaling-session';
-import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
+import { RTCPeerConnectionPipe, createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -154,15 +154,29 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
             return this.mixinDevice.getVideoStream(options);
         }
 
-        const { intercom, mediaObject, pcClose } = await createRTCPeerConnectionSource({
-            console: this.console,
+        const result = zygote();
+        this.plugin.activeConnections++;
+        result.worker.on('exit', () => {
+            this.plugin.activeConnections--;
+        });
+
+        const fork = await result.result;
+
+        const { getIntercom, mediaObject, pcClose } = await fork.createRTCPeerConnectionSource({
+            __json_copy_serialize_children: true,
+            nativeId: this.nativeId,
+            mixinId: this.id,
             mediaStreamOptions: this.createVideoStreamOptions(),
-            channel: this.mixinDevice,
+            startRTCSignalingSession: (session) => this.mixinDevice.startRTCSignalingSession(session),
             maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
         });
 
-        this.webrtcIntercom = intercom;
-        pcClose.finally(() => this.webrtcIntercom = undefined);
+        this.webrtcIntercom = getIntercom();
+        const pcc = pcClose();
+        pcc.finally(() => {
+            this.webrtcIntercom = undefined;
+            result.worker.terminate();
+        });
 
         return mediaObject;
     }
@@ -594,6 +608,23 @@ function handleCleanupConnection(cleanup: Deferred<string>, connection: WebRTCCo
 
 export async function fork() {
     return {
+        async createRTCPeerConnectionSource(options: {
+            __json_copy_serialize_children: true,
+            mixinId: string,
+            nativeId: ScryptedNativeId,
+            mediaStreamOptions: ResponseMediaStreamOptions,
+            startRTCSignalingSession: (session: RTCSignalingSession) => Promise<RTCSessionControl | undefined>,
+            maximumCompatibilityMode: boolean,
+        }): Promise<RTCPeerConnectionPipe> {
+            return createRTCPeerConnectionSource({
+                nativeId: this.nativeId,
+                mixinId: options.mixinId,
+                mediaStreamOptions: options.mediaStreamOptions,
+                startRTCSignalingSession: (session) => options.startRTCSignalingSession(session),
+                maximumCompatibilityMode: options.maximumCompatibilityMode,
+            });
+        },
+
         async createConnection(message: any,
             port: number,
             clientSession: RTCSignalingSession,

@@ -2,7 +2,7 @@ import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { getNaluTypesInNalu, RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
-import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes, ScryptedNativeId } from "@scrypted/sdk";
 import { FullIntraRequest } from "../../../external/werift/packages/rtp/src/rtcp/psfb/fullIntraRequest";
 import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { startRtpForwarderProcess } from "./rtp-forwarders";
@@ -13,9 +13,10 @@ import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive, logIsLoc
 const { mediaManager } = sdk;
 
 export interface RTCPeerConnectionPipe {
+    __json_copy_serialize_children: true,
     mediaObject: MediaObject;
-    intercom: Promise<Intercom>;
-    pcClose: Promise<unknown>;
+    getIntercom(): Promise<Intercom>;
+    pcClose(): Promise<unknown>;
 }
 
 function ignoreDeferred(...d: Deferred<any>[]) {
@@ -27,12 +28,14 @@ function ignorePromise(...p: Promise<any>[]) {
 }
 
 export async function createRTCPeerConnectionSource(options: {
-    console: Console,
+    mixinId: string,
+    nativeId: ScryptedNativeId,
     mediaStreamOptions: ResponseMediaStreamOptions,
-    channel: RTCSignalingChannel,
+    startRTCSignalingSession: (session: RTCSignalingSession) => Promise<RTCSessionControl | undefined>,
     maximumCompatibilityMode: boolean,
 }): Promise<RTCPeerConnectionPipe> {
-    const { mediaStreamOptions, channel, console, maximumCompatibilityMode } = options;
+    const { mediaStreamOptions, startRTCSignalingSession, mixinId, nativeId, maximumCompatibilityMode } = options;
+    const console = mixinId ? sdk.deviceManager.getMixinConsole(mixinId, nativeId) : sdk.deviceManager.getDeviceConsole(nativeId);
 
     const { clientPromise, port } = await listenZeroSingleClient();
 
@@ -45,9 +48,9 @@ export async function createRTCPeerConnectionSource(options: {
 
     const cleanup = () => {
         console.log('webrtc/rtsp cleaning up');
-        clientPromise.then(client => client.destroy()).catch(() => {});
-        sessionControl.promise.then(sc => sc.endSession()).catch(() => {});
-        peerConnection.promise.then(pc => pc.close()).catch(() => {});
+        clientPromise.then(client => client.destroy()).catch(() => { });
+        sessionControl.promise.then(sc => sc.endSession()).catch(() => { });
+        peerConnection.promise.then(pc => pc.close()).catch(() => { });
         ignorePromise(intercom.promise.then(intercom => intercom.stopIntercom()));
     };
 
@@ -73,6 +76,8 @@ export async function createRTCPeerConnectionSource(options: {
                 },
                 iceServers: getWeriftIceServers(setup.configuration),
             });
+
+            waitClosed(ret).then(() => cleanup());
 
             logConnectionState(console, ret);
             peerConnection.resolve(ret);
@@ -101,6 +106,8 @@ export async function createRTCPeerConnectionSource(options: {
             let gotVideo = false;
 
             const pc = await peerConnection.promise;
+            const timeout = setTimeout(() => cleanup(), 2 * 60 * 1000);
+            waitClosed(pc).then(() => clearTimeout(timeout));
 
             const setupAudioTranscevier = (transciever: RTCRtpTransceiver) => {
                 audioTransceiver = transciever;
@@ -135,6 +142,7 @@ export async function createRTCPeerConnectionSource(options: {
                     track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
 
                     track.onReceiveRtp.once(() => {
+                        clearTimeout(timeout);
                         let firSequenceNumber = 0;
                         const pictureLossInterval = setInterval(() => {
                             // i think this is necessary for older clients like ring
@@ -266,7 +274,7 @@ export async function createRTCPeerConnectionSource(options: {
         }
 
         const session = new SignalingSession();
-        const sc = await channel.startRTCSignalingSession(session);
+        const sc = await startRTCSignalingSession(session);
         sessionControl.resolve(sc);
         console.log('waiting for peer connection');
         const pc = await peerConnection.promise;
@@ -351,9 +359,10 @@ export async function createRTCPeerConnectionSource(options: {
     };
 
     return {
+        __json_copy_serialize_children: true,
         mediaObject: await mediaManager.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl),
-        intercom: intercom.promise,
-        pcClose,
+        getIntercom: () => intercom.promise,
+        pcClose: () => pcClose,
     };
 }
 

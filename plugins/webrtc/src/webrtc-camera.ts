@@ -29,15 +29,17 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
         const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC');
 
-        const { mediaObject, intercom } = await createRTCPeerConnectionSource({
-            console: this.console,
+        // todo: sdk.fork
+        const { mediaObject, getIntercom } = await createRTCPeerConnectionSource({
+            mixinId: undefined,
+            nativeId: this.nativeId,
             mediaStreamOptions,
-            channel: this,
+            startRTCSignalingSession: session => this.startRTCSignalingSession(session),
             maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
         });
 
         this.intercom?.then(intercom => intercom.stopIntercom());
-        this.intercom = intercom;
+        this.intercom = getIntercom();
 
         return mediaObject;
     }
