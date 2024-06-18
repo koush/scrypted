@@ -161,7 +161,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 const unifiCamera = this.cameras.get(nativeId);
 
                 if (!unifiCamera) {
-                    this.console.log('unknown device event, sync needed?', payload);
+                    this.console.log('unknown device event, sync needed?', payload, nativeId);
                     return;
                 }
 
@@ -608,7 +608,10 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         const idMaps = this.storageSettings.values.idMaps;
 
         // try to find an existing nativeId given the mac and anonymous device id
-        const found = (mac && idMaps.mac[mac]) || (anonymousDeviceId && idMaps.anonymousDeviceId[anonymousDeviceId]);
+        const found = (mac && idMaps.mac[mac])
+            || (anonymousDeviceId && idMaps.anonymousDeviceId[anonymousDeviceId])
+            || (id && idMaps.id[id])
+            ;
 
         // use the found id if one exists (device got provisioned a new id), otherwise use the id provided by the device.
         const nativeId = found || id;
