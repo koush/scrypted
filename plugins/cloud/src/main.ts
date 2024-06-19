@@ -1058,12 +1058,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 });
 
                 await once(this.cloudflared.child, 'exit').catch(() => { });
-                // the successfully started cloudflared process may exit at some point, loop ad allow it to restart.
+                // the successfully started cloudflared process may exit at some point, loop and allow it to restart.
+                this.console.error('cloudflared exited');
             }
             catch (e) {
                 // this error may be reached if the cloudflared backoff fails.
                 this.console.error('cloudflared error', e);
-                throw e;
             }
             finally {
                 this.cloudflared = undefined;
