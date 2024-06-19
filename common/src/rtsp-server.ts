@@ -134,14 +134,18 @@ export function findH264NaluTypeInNalu(nalu: Buffer, naluType: number) {
     return;
 }
 
+function parseH265NaluType(nalu: number) {
+    return (nalu & 0b01111110) >> 1;
+}
+
 export function findH265NaluTypeInNalu(nalu: Buffer, naluType: number) {
-    const checkNaluType = (nalu[0] & 0b01111110) >> 1;
+    const checkNaluType = parseH265NaluType(nalu[0]);
     if (checkNaluType === H265_NAL_TYPE_AGG) {
         let pos = 1;
         while (pos < nalu.length) {
             const naluLength = nalu.readUInt16BE(pos);
             pos += 2;
-            const stapaType = nalu[pos] & 0x1f;
+            const stapaType = parseH265NaluType(nalu[pos]);
             if (stapaType === naluType)
                 return nalu.subarray(pos, pos + naluLength);
             pos += naluLength;
@@ -198,6 +202,27 @@ export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false, fuaReq
         }
         else {
             ret.add(fuaType);
+        }
+    }
+    else {
+        ret.add(naluType);
+    }
+
+    return ret;
+}
+
+export function getNaluTypesInH265Nalu(nalu: Buffer, fuaRequireStart = false, fuaRequireEnd = false) {
+    const ret = new Set<number>();
+    const naluType = parseH265NaluType(nalu[0]);
+    if (naluType === H265_NAL_TYPE_AGG) {
+        ret.add(H265_NAL_TYPE_AGG);
+        let pos = 1;
+        while (pos < nalu.length) {
+            const naluLength = nalu.readUInt16BE(pos);
+            pos += 2;
+            const stapaType = parseH265NaluType(nalu[pos]);
+            ret.add(stapaType);
+            pos += naluLength;
         }
     }
     else {
@@ -580,6 +605,7 @@ export class RtspClient extends RtspBase {
             throw new Error('no WWW-Authenticate found');
 
         const { BASIC } = await import('http-auth-utils');
+        // @ts-ignore
         const { parseHTTPHeadersQuotedKeyValueSet } = await import('http-auth-utils/dist/utils');
 
         if (this.wwwAuthenticate.includes('Basic')) {
