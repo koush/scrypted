@@ -283,7 +283,8 @@ export async function createRTCPeerConnectionSource(options: {
 
         let destroyProcess: () => void;
 
-        const ic: Intercom = {
+        const ic: Intercom & { __json_copy_serialize_children: true } = {
+            __json_copy_serialize_children: true,
             async startIntercom(media: MediaObject) {
                 if (!isPeerConnectionAlive(pc))
                     throw new Error('peer connection is closed');
