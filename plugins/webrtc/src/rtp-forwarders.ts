@@ -100,7 +100,6 @@ async function createTrackForwarders(console: Console, killDeferred: Deferred<vo
         if (track.ssrc)
             outputArguments.push('-ssrc', track.ssrc.toString());
 
-        attachTrackDgram(track, server);
     }
 }
 
@@ -405,6 +404,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         ];
 
         if (useRtp) {
+            attachTrackDgram(video, video.bind.server);
+            attachTrackDgram(audio, audio.bind.server);
+
             args.push(
                 '-sdp_file', 'pipe:4',
             );
