@@ -2,6 +2,7 @@ import { cloneDeep } from '@scrypted/common/src/clone-deep';
 import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
+import { createActivityTimeout } from '@scrypted/common/src/activity-timeout';
 import { createRtspParser } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
@@ -100,42 +101,14 @@ export async function parseAudioCodec(cp: ChildProcess) {
 export function setupActivityTimer(container: string, kill: (error?: Error) => void, events: {
     once(event: 'killed', callback: () => void): void,
 }, timeout: number) {
-    let dataTimeout: NodeJS.Timeout;
-
-    function dataKill() {
+    const ret = createActivityTimeout(timeout, () => {
         const str = 'timeout waiting for data, killing parser session';
         console.error(str, container);
         kill(new Error(str));
-    }
-
-    let lastTime = Date.now();
-    function resetActivityTimer() {
-        lastTime = Date.now();
-    }
-
-    function clearActivityTimer() {
-        clearInterval(dataTimeout);
-    }
-
-    if (timeout) {
-        dataTimeout = setInterval(() => {
-            if (Date.now() > lastTime + timeout) {
-                clearInterval(dataTimeout);
-                dataTimeout = undefined;
-                dataKill();
-            }
-        }, timeout);
-    }
-
-    events.once('killed', () => clearInterval(dataTimeout));
-
-    resetActivityTimer();
-    return {
-        resetActivityTimer,
-        clearActivityTimer,
-    }
+    });
+    events.once('killed', () => ret.clearActivityTimer());
+    return ret;
 }
-
 
 export async function startParserSession<T extends string>(ffmpegInput: FFmpegInput, options: ParserOptions<T>): Promise<ParserSession<T>> {
     const { console } = options;
