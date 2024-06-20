@@ -404,8 +404,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         ];
 
         if (useRtp) {
-            attachTrackDgram(video, video.bind.server);
-            if (audio)
+            if (video?.bind?.server)
+                attachTrackDgram(video, video.bind.server);
+            if (audio?.bind?.server)
                 attachTrackDgram(audio, audio.bind.server);
 
             args.push(
@@ -436,7 +437,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                 const { videoSection, audioSection } = reportTranscodedSections(rtspServer.sdp);
                 await rtspServer.handleSetup();
 
-                attachTrackDgram(video, rtspServer.setupTracks[videoSection?.control]?.rtp);
+                if (video)
+                    attachTrackDgram(video, rtspServer.setupTracks[videoSection?.control]?.rtp);
                 if (audio)
                     attachTrackDgram(audio, rtspServer.setupTracks[audioSection?.control]?.rtp);
 
