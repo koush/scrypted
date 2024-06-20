@@ -531,8 +531,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             throw new Error('@scrypted/cloud is not logged in.');
         const q = qsstringify({
             scope: local.pathname,
+            serverId: this.storageSettings.values.serverId,
             ttl,
-        })
+        });
         const scope = await httpFetch({
             url: `https://${this.getHostname()}/_punch/scope?${q}`,
             headers: {
