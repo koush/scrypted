@@ -951,13 +951,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async startCloudflared() {
-        if (!this.storageSettings.values.cloudflareEnabled) {
-            this.console.log('cloudflared is disabled.');
-            return;
-        }
-
         while (true) {
             try {
+                if (!this.storageSettings.values.cloudflareEnabled) {
+                    this.console.log('cloudflared is disabled.');
+                    return;
+                }
+
                 this.console.log('starting cloudflared');
                 this.cloudflared = await backOff(async () => {
                     const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
@@ -1057,12 +1057,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     maxDelay: 300000,
                 });
 
-                await once(this.cloudflared.child, 'exit');
-                throw new Error('cloudflared exited.');
+                await once(this.cloudflared.child, 'exit').catch(() => { });
+                // the successfully started cloudflared process may exit at some point, loop and allow it to restart.
+                this.console.error('cloudflared exited');
             }
             catch (e) {
+                // this error may be reached if the cloudflared backoff fails.
                 this.console.error('cloudflared error', e);
-                throw e;
             }
             finally {
                 this.cloudflared = undefined;
