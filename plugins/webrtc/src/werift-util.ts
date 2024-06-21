@@ -53,9 +53,11 @@ function isPrivate(address: string) {
 export function isLocalIceTransport(pc: RTCPeerConnection) {
     let isLocalNetwork = true;
     let destinationId: string;
+    let type: string;
     for (const ice of pc.iceTransports) {
-        const { remoteAddr, localCandidate } = (ice.connection as any).nominated;
+        const { remoteAddr, localCandidate, remoteCandidate } = (ice.connection as any).nominated;
         const [address, port] = remoteAddr;
+        type = remoteCandidate.type;
         if (!destinationId)
             destinationId = address;
 
@@ -72,6 +74,7 @@ export function isLocalIceTransport(pc: RTCPeerConnection) {
     const ipv4 = ip.isV4Format(destinationId);
     return {
         ipv4,
+        type,
         isLocalNetwork,
         destinationId,
     };

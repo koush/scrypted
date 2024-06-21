@@ -78,7 +78,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
                 timeStart: Date.now(),
                 videoTransceiver: undefined,
                 audioTransceiver,
-                isLocalNetwork: undefined, destinationId: undefined, ipv4: undefined,
+                isLocalNetwork: undefined, destinationId: undefined, ipv4: undefined, type: undefined,
                 requestMediaStream: async () => media,
                 maximumCompatibilityMode: false,
                 clientOptions: undefined,

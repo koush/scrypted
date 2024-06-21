@@ -42,14 +42,14 @@ const fullResolutionAllowList = [
 
 export async function createTrackForwarder(options: {
     timeStart: number,
-    isLocalNetwork: boolean, destinationId: string, ipv4: boolean,
+    isLocalNetwork: boolean, destinationId: string, ipv4: boolean, type: string,
     requestMediaStream: RequestMediaStream,
     videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver,
     maximumCompatibilityMode: boolean, clientOptions: RTCSignalingOptions,
 }) {
     const {
         timeStart,
-        isLocalNetwork, destinationId,
+        isLocalNetwork, destinationId, type,
         requestMediaStream,
         videoTransceiver, audioTransceiver,
         maximumCompatibilityMode,
@@ -279,7 +279,17 @@ export async function createTrackForwarder(options: {
     // better knowledge of network capabilities, and also mirrors
     // from my cursory research into ipv6, the MTU is no lesser than ipv4, in fact
     // the min mtu is larger.
-    const videoPacketSize = 1378;
+    // 2024/06/20: webrtc MTU is typically 1200 as seen in chrome:
+    // https://groups.google.com/g/discuss-webrtc/c/gH5ysR3SoZI
+    // https://bloggeek.me/webrtcglossary/mtu-size/
+    // apparently this is due to guaranteeing reliability for weird networks.
+    // most of these networks can be correctly configured with an increased MTU (wireguard, tailscale),
+    // but others can not, like iCloud Private Relay.
+    // iCloud Private Relay ends up coming through TURN, as do many other restrictive networks.
+    // so when a turn (aka relay) server is used, a smaller MTU must be used. Otherwise optimistically use
+    // the normal/larger default.
+    // After a bit of fiddling with iCloud Private Relay, 1246 was arrived at as the optimal value.
+    const videoPacketSize = type === 'relay' ? 1246 : 1378;
     let h264Repacketizer: H264Repacketizer;
     let spsPps: ReturnType<typeof getSpsPps>;
 
