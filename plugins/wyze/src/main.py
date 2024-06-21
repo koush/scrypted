@@ -28,7 +28,7 @@ from scrypted_sdk.types import (DeviceProvider, PanTiltZoom,
 import wyzecam
 import wyzecam.api_models
 from wyzecam import tutk_protocol
-from wyzecam.api import RateLimitError, post_v2_device
+from wyzecam.api import RateLimitError, post_device
 from wyzecam.tutk.tutk import FRAME_SIZE_2K, FRAME_SIZE_360P, FRAME_SIZE_1080P
 
 os.environ["TUTK_PROJECT_ROOT"] = os.path.join(
@@ -269,8 +269,18 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 p.stdin.write_eof()
             except:
                 pass
-            loop.call_later(5, lambda: p.terminate())
-            loop.call_later(10, lambda: p.kill())
+            def terminate():
+                try:
+                    p.terminate()
+                except:
+                    pass
+            def kill():
+                try:
+                    p.kill()
+                except:
+                    pass
+            loop.call_later(5, terminate)
+            loop.call_later(10, kill)
 
         try:
             forked, gen = self.forkAndStream(substream)
@@ -307,16 +317,20 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         forked, gen = self.forkAndStream(substream)
         try:
             async for audio, data, codec, sampleRate in gen:
-                if not audio and not sps and len(data):
-                    nals = data.split(b"\x00\x00\x00\x01")
-                    sps = nals[1]
-                    pps = nals[2]
+                if not audio and (not sps or not pps) and len(data):
+                    nalus = data.split(b"\x00\x00\x00\x01")[1:]
+                    for nalu in nalus:
+                        naluType = nalu[0] & 0x1f
+                        if naluType == 7:
+                            sps = nalu
+                        elif naluType == 8:
+                            pps = nalu
 
                 if audio and not self.getMuted():
                     audioCodec = codec
                     audioSampleRate = sampleRate
 
-                if sps and (audioCodec or self.getMuted()):
+                if sps and pps and (audioCodec or self.getMuted()):
                     return (audioCodec, audioSampleRate, sps, pps)
         finally:
             forked.worker.terminate()
@@ -546,7 +560,7 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
         }
 
         try:
-            resp = post_v2_device(self.authInfo, "get_event_list", params)
+            resp = post_device(self.authInfo, "get_event_list", params)
             return time.time(), resp["event_list"]
         except RateLimitError as ex:
             self.print(f"[EVENTS] RateLimitError: {ex}, cooling down.")
@@ -745,6 +759,14 @@ class WyzeFork:
 
                 asyncio.ensure_future(ptzRunner(), loop=loop)
 
+                def ignore(self, *args, **kwargs):
+                    pass
+                def ignoreTrue(self, *args, **kwargs):
+                    return True
+                sess._audio_frame_slow = ignore
+                sess._video_frame_slow = ignore
+                sess._received_first_frame = ignoreTrue
+
                 if not muted:
 
                     def runAudio():
@@ -752,6 +774,7 @@ class WyzeFork:
                         try:
                             rate = sess.get_audio_sample_rate()
                             codec: str = None
+
                             for frame, frame_info in sess.recv_audio_data():
                                 if closed:
                                     return
@@ -764,11 +787,13 @@ class WyzeFork:
                                     loop=loop,
                                 )
                         except Exception as e:
+                            # print_exception(print, e)
                             asyncio.run_coroutine_threadsafe(
                                 aq.put((True, None, None, None, format_exception(e))),
                                 loop=loop,
                             )
                         finally:
+                            # print('done audio')
                             asyncio.run_coroutine_threadsafe(
                                 aq.put((True, None, None, None, None)), loop=loop
                             )
@@ -785,18 +810,20 @@ class WyzeFork:
                     videoParm = sess.camera.camera_info.get("videoParm")
                     fps = int((videoParm and videoParm.get("fps", 20)) or 20)
 
-                    for frame in sess.recv_bridge_frame(fps=fps):
+                    for frame in sess.recv_bridge_data():
                         if closed:
                             return
                         asyncio.run_coroutine_threadsafe(
                             aq.put((False, frame, None, None, None)), loop=loop
                         )
                 except Exception as e:
+                    # print_exception(print, e)
                     asyncio.run_coroutine_threadsafe(
                         aq.put((False, None, None, None, format_exception(e))),
                         loop=loop,
                     )
                 finally:
+                    # print('done video')
                     asyncio.run_coroutine_threadsafe(
                         aq.put((False, None, None, None, None)), loop=loop
                     )

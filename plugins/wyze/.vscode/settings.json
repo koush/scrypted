@@ -9,7 +9,7 @@
     // "scrypted.serverRoot": "/home/pi/.scrypted",
 
     // local checkout
-    "scrypted.debugHost": "192.168.2.109",
+    "scrypted.debugHost": "127.0.0.1",
     "scrypted.serverRoot": "/server",
 
     "scrypted.pythonRemoteRoot": "${config:scrypted.serverRoot}/volume/plugin.zip",
