@@ -134,7 +134,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
             const xml = await xml2js.parseStringPromise(data);
 
 
-            const [channelId] = xml.EventNotificationAlert.channelID;
+            const [channelId] = xml.EventNotificationAlert.channelID || xml.EventNotificationAlert.dynChannelID;
             if (!await checkCameraNumber(channelId)) {
                 this.console.warn('chann fail')
                 return;
