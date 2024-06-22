@@ -189,7 +189,9 @@ export class HikvisionCameraAPI {
                             continue;
                         if (ignore === boundaryEnd)
                             continue;
-                        if (ignore !== boundary) {
+                        if (ignore !== boundary
+                            // older hikvision nvr send a boundary in the headers, but then use a totally different constant boundary value
+                            && ignore != "--boundary") {
                             this.console.error('expected boundary but found', ignore);
                             throw new Error('expected boundary');
                         }
