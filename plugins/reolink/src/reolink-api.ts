@@ -59,6 +59,10 @@ export type AIState = {
     channel: number;
 };
 
+export type SirenResponse = {
+    rspCode: number;
+}
+
 export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
 
@@ -123,6 +127,23 @@ export class ReolinkCameraClient {
         });
         return {
             value: (response.body?.[0]?.value || response.body?.value) as AIState,
+            data: response.body,
+        };
+    }
+
+    async getAbility() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'GetAbility');
+        params.set('channel', this.channelId.toString());
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.request({
+            url,
+            responseType: 'json',
+        });
+        return {
+            value: response.body?.[0]?.value || response.body?.value,
             data: response.body,
         };
     }
@@ -246,5 +267,52 @@ export class ReolinkCameraClient {
         if (op) {
             await this.ptzOp(op);
         }
+    }
+
+    async setSiren(on: boolean, duration?: number) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'AudioAlarmPlay');
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const createReadable = (data: any) => {
+            const pt = new PassThrough();
+            pt.write(Buffer.from(JSON.stringify(data)));
+            pt.end();
+            return pt;
+        }
+
+        let alarmMode;
+        if (duration) {
+            alarmMode = {
+                alarm_mode: 'times',
+                times: duration
+            };
+        }
+        else {
+            alarmMode = {
+                alarm_mode: 'manul',
+                manual_switch: on? 1 : 0
+            };
+        }
+
+        const response = await this.request({
+            url,
+            method: 'POST',
+            responseType: 'json',
+        }, createReadable([
+            {
+                cmd: "AudioAlarmPlay",
+                action: 0,
+                param: {
+                    channel: this.channelId,
+                    ...alarmMode
+                }
+            },
+        ]));
+        return {
+            value: (response.body?.[0]?.value || response.body?.value) as SirenResponse,
+            data: response.body,
+        };
     }
 }
