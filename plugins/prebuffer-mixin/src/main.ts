@@ -1,10 +1,12 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
+import { parse as spsParse } from "h264-sps-parser";
+
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { ListenZeroSingleClientTimeoutError, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack, createRtspParser, findH264NaluType, getNaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
-import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
+import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_SPS, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack, createRtspParser, findH264NaluType, getNaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
+import { addTrackControls, getSpsPps, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
 import { StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
@@ -25,6 +27,7 @@ import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { createStreamSettings } from './stream-settings';
 import { TRANSCODE_MIXIN_PROVIDER_NATIVE_ID, TranscodeMixinProvider, getTranscodeMixinProviderId } from './transcode-settings';
+import { getSpsResolution } from './sps-resolution';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -235,6 +238,51 @@ class PrebufferSession {
     }
   }
 
+  async parseCodecs(skipResolution?: boolean) {
+    const sdp = await this.parserSession.sdp;
+    const parsedSdp = parseSdp(sdp);
+    const videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
+    const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
+
+    const inputAudioCodec = audioSection?.codec;
+    const inputVideoCodec = videoSection.codec;
+    let inputVideoResolution: ReturnType<typeof getSpsResolution>;
+
+    if (!skipResolution) {
+      // scan the prebuffer for sps
+      for (const chunk of this.rtspPrebuffer) {
+        try {
+          const sps = findH264NaluType(chunk, H264_NAL_TYPE_SPS);
+          if (sps) {
+            const parsedSps = spsParse(sps);
+            inputVideoResolution = getSpsResolution(parsedSps);
+          }
+        }
+        catch (e) {
+        }
+      }
+
+      if (!inputVideoResolution) {
+        const spspps = getSpsPps(videoSection);
+        const { sps } = spspps;
+        if (sps) {
+          try {
+            const parsedSps = spsParse(sps);
+            inputVideoResolution = getSpsResolution(parsedSps);
+          }
+          catch (e) {
+          }
+        }
+      }
+    }
+
+    return {
+      inputVideoCodec,
+      inputAudioCodec,
+      inputVideoResolution,
+    }
+  }
+
   async getMixinSettings(): Promise<Setting[]> {
     const settings: Setting[] = [];
 
@@ -338,8 +386,9 @@ class PrebufferSession {
     };
 
     if (session) {
-      const resolution = session.inputVideoResolution?.width && session.inputVideoResolution?.height
-        ? `${session.inputVideoResolution?.width}x${session.inputVideoResolution?.height}`
+      const codecInfo = await this.parseCodecs();
+      const resolution = codecInfo.inputVideoResolution?.width && codecInfo.inputVideoResolution?.height
+        ? `${codecInfo.inputVideoResolution?.width}x${codecInfo.inputVideoResolution?.height}`
         : 'unknown';
 
       const idrInterval = this.getDetectedIdrInterval();
@@ -359,7 +408,7 @@ class PrebufferSession {
           subgroup,
           title: 'Detected Video/Audio Codecs',
           readonly: true,
-          value: (session?.inputVideoCodec?.toString() || 'unknown') + '/' + (session?.inputAudioCodec?.toString() || 'unknown'),
+          value: (codecInfo?.inputVideoCodec?.toString() || 'unknown') + '/' + (codecInfo?.inputAudioCodec?.toString() || 'unknown'),
           description: 'Configuring your camera to H264 video, and audio to Opus or PCM-mulaw (G.711ulaw) is recommended.'
         },
         {
@@ -470,7 +519,7 @@ class PrebufferSession {
       session = startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, {
         timeout: 10000,
       });
-      this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
+      this.sdp = session.sdp;
     }
     else {
       const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
@@ -501,7 +550,7 @@ class PrebufferSession {
           audioSoftMuted,
           rtspRequestTimeout: 10000,
         });
-        this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
+        this.sdp = session.sdp;
       }
       else {
         let acodec: string[];
@@ -615,37 +664,38 @@ class PrebufferSession {
     }
 
     await session.sdp;
-
-    // complain to the user about the codec if necessary. upstream may send a audio
-    // stream but report none exists (to request muting).
-    if (!audioSoftMuted && advertisedAudioCodec && session.inputAudioCodec !== undefined
-      && session.inputAudioCodec !== advertisedAudioCodec) {
-      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, detectedAudioCodec);
-    }
-
-    const advertisedVideoCodec = mso?.video?.codec;
-    if (advertisedVideoCodec && session.inputVideoCodec !== undefined
-      && session.inputVideoCodec !== advertisedVideoCodec) {
-      this.console.warn('Video codec plugin reported vs detected mismatch', advertisedVideoCodec, session.inputVideoCodec);
-    }
-
-    if (!session.inputAudioCodec) {
-      this.console.log('No audio stream detected.');
-    }
-
-    // set/update the detected codec, set it to null if no audio was found.
-    this.storage.setItem(this.lastDetectedAudioCodecKey, session.inputAudioCodec || 'null');
-
-    if (session.inputVideoCodec !== 'h264') {
-      this.console.error(`Video codec is not h264. If there are errors, try changing your camera's encoder output.`);
-    }
-
     this.parserSession = session;
     session.killed.finally(() => {
       if (this.parserSession === session)
         this.parserSession = undefined;
     });
     session.killed.finally(() => clearTimeout(this.inactivityTimeout));
+
+    const codecInfo = await this.parseCodecs();
+
+    // complain to the user about the codec if necessary. upstream may send a audio
+    // stream but report none exists (to request muting).
+    if (!audioSoftMuted && advertisedAudioCodec && codecInfo.inputAudioCodec !== undefined
+      && codecInfo.inputAudioCodec !== advertisedAudioCodec) {
+      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, detectedAudioCodec);
+    }
+
+    const advertisedVideoCodec = mso?.video?.codec;
+    if (advertisedVideoCodec && codecInfo.inputVideoCodec !== undefined
+      && codecInfo.inputVideoCodec !== advertisedVideoCodec) {
+      this.console.warn('Video codec plugin reported vs detected mismatch', advertisedVideoCodec, codecInfo.inputVideoCodec);
+    }
+
+    if (!codecInfo.inputAudioCodec) {
+      this.console.log('No audio stream detected.');
+    }
+
+    // set/update the detected codec, set it to null if no audio was found.
+    this.storage.setItem(this.lastDetectedAudioCodecKey, codecInfo.inputAudioCodec || 'null');
+
+    if (codecInfo.inputVideoCodec !== 'h264') {
+      this.console.error(`Video codec is not h264. If there are errors, try changing your camera's encoder output.`);
+    }
 
     // settings ui refresh
     deviceManager.onMixinEvent(this.mixin.id, this.mixin, ScryptedInterface.Settings, undefined);
@@ -676,26 +726,26 @@ class PrebufferSession {
       session.killed.finally(() => clearTimeout(refreshTimeout));
     }
 
-      let shifts = 0;
-      let prebufferContainer: PrebufferStreamChunk[] = this.rtspPrebuffer;
+    let shifts = 0;
+    let prebufferContainer: PrebufferStreamChunk[] = this.rtspPrebuffer;
 
-      session.on('rtsp', (chunk: PrebufferStreamChunk) => {
-        const now = Date.now();
+    session.on('rtsp', (chunk: PrebufferStreamChunk) => {
+      const now = Date.now();
 
-        chunk.time = now;
-        prebufferContainer.push(chunk);
+      chunk.time = now;
+      prebufferContainer.push(chunk);
 
-        while (prebufferContainer.length && prebufferContainer[0].time < now - prebufferDurationMs) {
-          prebufferContainer.shift();
-          shifts++;
-        }
+      while (prebufferContainer.length && prebufferContainer[0].time < now - prebufferDurationMs) {
+        prebufferContainer.shift();
+        shifts++;
+      }
 
-        if (shifts > 100000) {
-          prebufferContainer = prebufferContainer.slice();
-          this.rtspPrebuffer = prebufferContainer;
-          shifts = 0;
-        }
-      });
+      if (shifts > 100000) {
+        prebufferContainer = prebufferContainer.slice();
+        this.rtspPrebuffer = prebufferContainer;
+        shifts = 0;
+      }
+    });
 
     session.start();
     return session;
@@ -913,7 +963,8 @@ class PrebufferSession {
       requestedPrebuffer = Math.min(defaultPrebuffer, this.getDetectedIdrInterval() || defaultPrebuffer);;
     }
 
-    const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
+    const codecInfo = await this.parseCodecs(true);
+    const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options, codecInfo.inputVideoCodec, codecInfo.inputAudioCodec);
     let sdp = await this.sdp;
     if (!mediaStreamOptions.video?.h264Info && this.usingScryptedParser) {
       mediaStreamOptions.video ||= {};
@@ -1039,10 +1090,10 @@ class PrebufferSession {
       mediaStreamOptions.audio.sampleRate ||= audioSection.rtpmap.clock;
     }
 
-    if (session.inputVideoResolution?.width && session.inputVideoResolution?.height) {
+    if (codecInfo.inputVideoResolution?.width && codecInfo.inputVideoResolution?.height) {
       // this may be an audio only request.
       if (mediaStreamOptions.video)
-        Object.assign(mediaStreamOptions.video, session.inputVideoResolution);
+        Object.assign(mediaStreamOptions.video, codecInfo.inputVideoResolution);
     }
 
     const now = Date.now();

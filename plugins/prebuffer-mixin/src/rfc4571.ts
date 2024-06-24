@@ -191,19 +191,14 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
 
     return {
         start,
-        sdp: Promise.resolve([Buffer.from(sdp)]),
-        inputAudioCodec,
-        inputVideoCodec,
-        get inputVideoResolution() {
-            return inputVideoResolution;
-        },
+        sdp: Promise.resolve(sdp),
         get isActive() { return isActive },
         kill(error?: Error) {
             kill(error);
         },
         killed,
         resetActivityTimer,
-        negotiateMediaStream: (requestMediaStream) => {
+        negotiateMediaStream: (requestMediaStream,inputVideoCodec, inputAudioCodec) => {
             return negotiateMediaStream(sdp, mediaStreamOptions, inputVideoCodec, inputAudioCodec, requestMediaStream);
         },
         emit(container: 'rtsp', chunk: StreamChunk) {

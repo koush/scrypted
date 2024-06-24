@@ -14,15 +14,9 @@ const { mediaManager } = sdk;
 
 export interface ParserSession<T extends string> {
     parserSpecific?: any;
-    sdp: Promise<Buffer[]>;
+    sdp: Promise<string>;
     resetActivityTimer?: () => void,
-    negotiateMediaStream(requestMediaStream: RequestMediaStreamOptions): ResponseMediaStreamOptions;
-    inputAudioCodec?: string;
-    inputVideoCodec?: string;
-    inputVideoResolution?: {
-        width: number,
-        height: number,
-    },
+    negotiateMediaStream(requestMediaStream: RequestMediaStreamOptions, inputVideoCodec: string, inputAudioCodec: string): ResponseMediaStreamOptions;
     start(): void;
     kill(error?: Error): void;
     killed: Promise<void>;
@@ -118,10 +112,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     // need this to prevent kill from throwing due to uncaught Error during cleanup
     events.on('error', e => console.error('rebroadcast error', e));
 
-    let inputAudioCodec: string;
-    let inputVideoCodec: string;
-    let inputVideoResolution: string[];
-
     let sessionKilled: any;
     const killed = new Promise<void>(resolve => {
         sessionKilled = resolve;
@@ -171,7 +161,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
                 try {
                     ensureActive(() => socket.destroy());
 
-                    for await (const chunk of parser.parse(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
+                    for await (const chunk of parser.parse(socket, undefined, undefined)) {
                         events.emit(container, chunk);
                         resetActivityTimer();
                     }
@@ -218,7 +208,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
             try {
                 const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
 
-                for await (const chunk of parser.parse(pipe as any, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
+                for await (const chunk of parser.parse(pipe as any, undefined, undefined)) {
                     await deferredStart.promise;
                     events.emit(container, chunk);
                     resetActivityTimer();
@@ -232,17 +222,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     };
 
     const rtsp = (options.parsers as any).rtsp as ReturnType<typeof createRtspParser>;
-    rtsp.sdp.then(sdp => {
-        const parsed = parseSdp(sdp);
-        const audio = parsed.msections.find(msection => msection.type === 'audio');
-        const video = parsed.msections.find(msection => msection.type === 'video');
-        inputVideoCodec = video?.codec;
-        inputAudioCodec = audio?.codec;
-    });
-
-    const sdp = new Deferred<Buffer[]>();
-    rtsp.sdp.then(r => sdp.resolve([Buffer.from(r)]));
-    killed.then(() => sdp.reject(new Error("ffmpeg killed before sdp could be parsed")));
 
     start();
 
@@ -250,25 +229,13 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         start() {
             deferredStart.resolve();
         },
-        sdp: sdp.promise,
-        get inputAudioCodec() {
-            return inputAudioCodec;
-        },
-        get inputVideoCodec() {
-            return inputVideoCodec;
-        },
-        get inputVideoResolution() {
-            return {
-                width: parseInt(inputVideoResolution?.[2]),
-                height: parseInt(inputVideoResolution?.[3]),
-            }
-        },
+        sdp: rtsp.sdp,
         get isActive() { return isActive },
         kill(error?: Error) {
             kill(error);
         },
         killed,
-        negotiateMediaStream: () => {
+        negotiateMediaStream: (requestMediaStream: RequestMediaStreamOptions, inputVideoCodec, inputAudioCodec) => {
             const ret: ResponseMediaStreamOptions = cloneDeep(ffmpegInput.mediaStreamOptions) || {
                 id: undefined,
                 name: undefined,
