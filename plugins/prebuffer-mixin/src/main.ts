@@ -1,11 +1,9 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
-import { parse as spsParse } from "h264-sps-parser";
-
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { ListenZeroSingleClientTimeoutError, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_SPS, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack, createRtspParser, findH264NaluType, getNaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
+import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_SPS, H264_NAL_TYPE_STAP_B, H265_NAL_TYPE_SPS, RtspServer, RtspTrack, createRtspParser, findH264NaluType, findH265NaluType, getNaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, getSpsPps, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
@@ -14,6 +12,7 @@ import sdk, { BufferConverter, ChargeState, DeviceProvider, EventListenerRegiste
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { once } from 'events';
+import { parse as h264SpsParse } from "h264-sps-parser";
 import net, { AddressInfo } from 'net';
 import path from 'path';
 import semver from 'semver';
@@ -25,9 +24,9 @@ import { getUrlLocalAdresses } from './local-addresses';
 import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
+import { getSpsResolution } from './sps-resolution';
 import { createStreamSettings } from './stream-settings';
 import { TRANSCODE_MIXIN_PROVIDER_NATIVE_ID, TranscodeMixinProvider, getTranscodeMixinProviderId } from './transcode-settings';
-import { getSpsResolution } from './sps-resolution';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -252,10 +251,13 @@ class PrebufferSession {
       // scan the prebuffer for sps
       for (const chunk of this.rtspPrebuffer) {
         try {
-          const sps = findH264NaluType(chunk, H264_NAL_TYPE_SPS);
+          let sps = findH264NaluType(chunk, H264_NAL_TYPE_SPS);
           if (sps) {
-            const parsedSps = spsParse(sps);
+            const parsedSps = h264SpsParse(sps);
             inputVideoResolution = getSpsResolution(parsedSps);
+          }
+          else if (!sps) {
+            // sps = findH265NaluType(chunk, H265_NAL_TYPE_SPS);
           }
         }
         catch (e) {
@@ -263,15 +265,19 @@ class PrebufferSession {
       }
 
       if (!inputVideoResolution) {
-        const spspps = getSpsPps(videoSection);
-        const { sps } = spspps;
-        if (sps) {
-          try {
-            const parsedSps = spsParse(sps);
-            inputVideoResolution = getSpsResolution(parsedSps);
+        try {
+          const spspps = getSpsPps(videoSection);
+          let { sps } = spspps;
+          if (sps) {
+            if (videoSection.codec === 'h264') {
+              const parsedSps = h264SpsParse(sps);
+              inputVideoResolution = getSpsResolution(parsedSps);
+            }
+            else if (videoSection.codec === 'h265') {
+            }
           }
-          catch (e) {
-          }
+        }
+        catch (e) {
         }
       }
     }
@@ -320,10 +326,10 @@ class PrebufferSession {
           combobox: true,
         },
         {
-          title: 'FFmpeg Output Arguments Prefix',
+          title: 'FFmpeg Output Prefix',
           group,
           subgroup,
-          description: 'Optional/Advanced: Additional output arguments to pass to the ffmpeg command. These will be placed before the input arguments.',
+          description: 'Optional/Advanced: Additional output arguments to pass to the ffmpeg command. These will be placed before the output.',
           key: this.ffmpegOutputArgumentsKey,
           value: this.storage.getItem(this.ffmpegOutputArgumentsKey),
           choices: [
