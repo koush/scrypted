@@ -7,8 +7,8 @@ import type { HomeKitPlugin } from "../main";
 addSupportedType({
     type: ScryptedDeviceType.WindowCovering,
     probe(device: DummyDevice): boolean {
-        return (device.interfaces.includes(ScryptedInterface.Entry) || device.interfaces.includes(ScryptedInterface.Brightness))
-            && device.interfaces.includes(ScryptedInterface.EntrySensor);
+        return (device.interfaces.includes(ScryptedInterface.Entry) && device.interfaces.includes(ScryptedInterface.EntrySensor))
+            || device.interfaces.includes(ScryptedInterface.Brightness);
     },
     getAccessory: async (device: ScryptedDevice & Entry & EntrySensor & Brightness, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
@@ -61,7 +61,7 @@ addSupportedType({
                     callback();
                     targetPosition = value as number;
                     device.setBrightness(targetPosition);
-            });
+                });
         }
 
         return accessory;
