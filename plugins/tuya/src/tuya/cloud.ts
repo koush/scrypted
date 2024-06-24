@@ -14,7 +14,7 @@ import { randomBytes } from "crypto";
 interface Session {
   accessToken: string;
   refreshToken: string;
-  tokenExpiresAt: Date;
+  expiration: Date;
   uid: string;
 }
 
@@ -47,13 +47,13 @@ export class TuyaCloud {
 
   public async login(): Promise<boolean> {
     await this.refreshAccessTokenIfNeeded();
-    return this.isLoggedIn();
+    return this.isSessionValid;
   }
 
-  public isLoggedIn(): boolean {
+  get isSessionValid(): boolean {
     return (
       this.session !== undefined &&
-      this.session.tokenExpiresAt.getTime() > Date.now()
+      this.session.expiration.getTime() > Date.now()
     );
   }
 
@@ -276,7 +276,7 @@ export class TuyaCloud {
   }
 
   private async refreshAccessTokenIfNeeded() {
-    if (this.isLoggedIn()) {
+    if (this.isSessionValid) {
       return;
     }
 
@@ -324,7 +324,7 @@ export class TuyaCloud {
       this.session = {
         accessToken: response.result.access_token,
         refreshToken: response.result.refresh_token,
-        tokenExpiresAt: newExpiration,
+        expiration: newExpiration,
         uid: response.result.uid,
       };
     }

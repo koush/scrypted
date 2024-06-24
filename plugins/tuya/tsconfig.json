@@ -3,7 +3,7 @@
         "module": "CommonJS",
         "target": "ES2021",
         "resolveJsonModule": true,
-        "moduleResolution": "Node16",
+        "moduleResolution": "Node10",
         "esModuleInterop": true,
         "sourceMap": true
     },

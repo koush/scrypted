@@ -20,9 +20,10 @@ import sdk, {
   RTCSignalingSendIceCandidate,
   RTCSignalingChannel,
   RTCSessionControl,
+  ScryptedNativeId,
 } from "@scrypted/sdk";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
-import { TuyaController } from "./main";
+import { TuyaPlugin } from "./plugin";
 import {
   MQTTConfig,
   TuyaDeviceConfig,
@@ -64,7 +65,7 @@ export class TuyaCameraLight
     const lightSwitchStatus = TuyaDevice.getLightSwitchStatus(camera);
 
     if (camera.online && lightSwitchStatus) {
-      await this.camera.controller.cloud?.updateDevice(camera, [
+      await this.camera.controller.manager.cloud?.updateDevice(camera, [
         {
           code: lightSwitchStatus.code,
           value: on,
@@ -136,6 +137,7 @@ class TuyaRTCSignalingSesion implements RTCSignalingSession {
     this.sessionId = randomUUID();
   }
 
+  __proxy_props: { options: RTCSignalingOptions; };
   options: RTCSignalingOptions;
 
   async createLocalDescription(
@@ -284,13 +286,13 @@ export class TuyaCamera
   private motionTimeout?: NodeJS.Timeout;
   private binaryTimeout: NodeJS.Timeout;
 
-  constructor(public controller: TuyaController, nativeId: string) {
+  constructor(public controller: TuyaPlugin, nativeId: string) {
     super(nativeId);
   }
 
   // Camera Light Device Provider.
 
-  getDevice(nativeId: string) {
+  async getDevice(nativeId: ScryptedNativeId): Promise<TuyaCameraLight> {
     // Find created devices
     if (this.cameraLightSwitch?.id === nativeId) {
       return this.cameraLightSwitch;
@@ -306,6 +308,10 @@ export class TuyaCamera
       "This Camera Device Provider has not been implemented of type: " +
         nativeId.split("-")[1]
     );
+  }
+
+  async releaseDevice(id: string, nativeId: ScryptedNativeId): Promise<void> {
+    throw new Error("Method not implemented.");
   }
 
   // OnOff Status Indicator
@@ -328,7 +334,7 @@ export class TuyaCamera
     const statusIndicator = TuyaDevice.getStatusIndicator(camera);
 
     if (statusIndicator) {
-      await this.controller.cloud?.updateDevice(camera, [
+      await this.controller.manager.cloud?.updateDevice(camera, [
         {
           code: statusIndicator.code,
           value: on,
@@ -359,7 +365,7 @@ export class TuyaCamera
       throw new Error(`Failed to stream ${this.name}: Camera is offline.`);
     }
 
-    const rtsps = await this.controller.cloud?.getRTSPS(camera);
+    const rtsps = await this.controller.manager.cloud?.getRTSPS(camera);
 
     if (!rtsps) {
       this.logger.e(
@@ -396,7 +402,7 @@ export class TuyaCamera
     }
 
     const deviceWebRTConfigResponse =
-      await this.controller.cloud?.getDeviceWebRTConfig(camera);
+      await this.controller.manager.cloud?.getDeviceWebRTConfig(camera);
 
     if (!deviceWebRTConfigResponse?.success) {
       this.logger.e(
@@ -409,7 +415,7 @@ export class TuyaCamera
 
     const deviceWebRTConfig = deviceWebRTConfigResponse.result;
 
-    let mqResponse = await this.controller.cloud?.getWebRTCMQConfig(
+    let mqResponse = await this.controller.manager.cloud?.getWebRTCMQConfig(
       deviceWebRTConfig
     );
     if (!mqResponse?.success) {
@@ -524,7 +530,7 @@ export class TuyaCamera
   }
 
   findCamera() {
-    return this.controller.cloud?.cameras?.find(
+    return this.controller.manager.cloud?.cameras?.find(
       (device) => device.id === this.nativeId
     );
   }
@@ -570,7 +576,7 @@ export class TuyaCamera
     // Only set light switch on cameras that have a light switch.
 
     if (TuyaDevice.hasLightSwitch(camera)) {
-      this.getDevice(this.nativeLightSwitchId)?.updateState(camera);
+      // this.getDevice(this.nativeLightSwitchId)?.updateState(camera);
     }
   }
 
