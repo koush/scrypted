@@ -15,7 +15,7 @@ addSupportedType({
 
         const service = accessory.addService(Service.WindowCovering, device.name);
 
-        if (device.interfaces.includes(ScryptedInterface.Brightness)) {
+        if (device.interfaces.includes(ScryptedInterface.Entry)) {
             bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.CurrentPosition,
                 () => !!device.entryOpen ? 100 : 0);
 
