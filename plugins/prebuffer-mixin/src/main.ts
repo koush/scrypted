@@ -519,7 +519,6 @@ class PrebufferSession {
       session = startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, {
         timeout: 10000,
       });
-      this.sdp = session.sdp;
     }
     else {
       const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
@@ -550,7 +549,6 @@ class PrebufferSession {
           audioSoftMuted,
           rtspRequestTimeout: 10000,
         });
-        this.sdp = session.sdp;
       }
       else {
         let acodec: string[];
@@ -598,12 +596,17 @@ class PrebufferSession {
           // the rtsp parser should always stream copy unless audio is soft muted.
           acodec,
         });
-        this.sdp = rtspParser.sdp;
         rbo.parsers.rtsp = rtspParser;
 
         session = await startParserSession(ffmpegInput, rbo);
       }
     }
+
+    this.sdp = session.sdp;
+    session.on('error', e => {
+      if (!e.message?.startsWith('killed:'))
+        console.error('rebroadcast error', e)
+    });
 
     if (this.usingScryptedParser && !isRfc4571) {
       // watch the stream for 10 seconds to see if an weird nalu is encountered.
@@ -775,7 +778,7 @@ class PrebufferSession {
         return;
       }
       this.console.log(this.streamName, 'terminating rebroadcast due to inactivity');
-      session.kill(new Error('stream inactivity'));
+      session.kill(new Error('killed: stream inactivity'));
     }, 10000);
   }
 
@@ -791,7 +794,7 @@ class PrebufferSession {
         if (!this.activeClients && this.parserSessionPromise) {
           this.console.log(this.streamName, 'terminating rebroadcast due to low battery or not charging')
           const session = await this.parserSessionPromise;
-          session.kill(new Error('low battery or not charging'));
+          session.kill(new Error('killed: low battery or not charging'));
         }
       } else {
         this.ensurePrebufferSession();

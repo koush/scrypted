@@ -24,7 +24,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
-    events.on('error', e => console.error('rebroadcast error', e));
+    events.on('error', () => {});
 
     let servers: dgram.Socket[] = [];
     const rtspClient = new RtspClient(url);

@@ -69,7 +69,7 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
-    events.on('error', e => console.error('rebroadcast error', e));
+    events.on('error', () => {});
 
     const parsedSdp = parseSdp(sdp);
     const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');

@@ -24,6 +24,7 @@ export interface ParserSession<T extends string> {
 
     emit(container: T, chunk: StreamChunk): this;
     on(container: T, callback: (chunk: StreamChunk) => void): this;
+    on(error: 'error', callback: (e: Error) => void): this;
     removeListener(event: T | 'killed', callback: any): this;
     once(event: T | 'killed', listener: (...args: any[]) => void): this;
 }
@@ -110,7 +111,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
-    events.on('error', e => console.error('rebroadcast error', e));
+    events.on('error', () => {});
 
     let sessionKilled: any;
     const killed = new Promise<void>(resolve => {
