@@ -31,6 +31,8 @@ availableModels = [
     "scrypted_yolo_nas_s_320",
     "scrypted_yolov9e_320",
     "scrypted_yolov9c_320",
+    "scrypted_yolov9s_320",
+    "scrypted_yolov9t_320",
     "scrypted_yolov6n_320",
     "scrypted_yolov6s_320",
     "scrypted_yolov8n_320",
@@ -81,7 +83,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
-        model_version = "v7"
+        model_version = "v8"
         mlmodel = "model" if self.scrypted_yolo else model
 
         print(f"model: {model}")

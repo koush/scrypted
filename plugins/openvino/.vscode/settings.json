@@ -5,16 +5,16 @@
     // "scrypted.serverRoot": "/server",
 
     // proxmox installation
-    // "scrypted.debugHost": "scrypted-server",
-    // "scrypted.serverRoot": "/root/.scrypted",
+    "scrypted.debugHost": "scrypted-server",
+    "scrypted.serverRoot": "/root/.scrypted",
 
     // pi local installation
     // "scrypted.debugHost": "192.168.2.119",
     // "scrypted.serverRoot": "/home/pi/.scrypted",
 
     // local checkout
-    "scrypted.debugHost": "127.0.0.1",
-    "scrypted.serverRoot": "/Users/koush/.scrypted",
+    // "scrypted.debugHost": "127.0.0.1",
+    // "scrypted.serverRoot": "/Users/koush/.scrypted",
     // "scrypted.debugHost": "koushik-winvm",
     // "scrypted.serverRoot": "C:\\Users\\koush\\.scrypted",
 
