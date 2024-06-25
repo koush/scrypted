@@ -170,7 +170,8 @@ export class StorageSettings<T extends string> implements Settings {
                 this.device.storage.setItem(key, value?.toString());
         }
         setting?.onPut?.(oldValue, value);
-        this.device.onDeviceEvent(ScryptedInterface.Settings, undefined);
+        if (!setting?.hide)
+            this.device.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
     getItemInternal(key: T, setting: StorageSetting, rawDevice?: boolean): any {
