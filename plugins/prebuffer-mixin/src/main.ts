@@ -1765,45 +1765,16 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState) {
     this.setHasEnabledMixin(mixinDeviceState.id);
 
-    // 8-11-2022
-    // old scrypted had a bug where mixin device state was not exposing properties like id correctly
-    // across rpc boundaries.
-    let fork = false;
-    try {
-      const info = await systemManager.getComponent('info');
-      const version = await info.getVersion();
-      fork = semver.gte(version, '0.2.5');
-    }
-    catch (e) {
-    }
-
     const { id } = mixinDeviceState;
-
-    if (fork && sdk.fork && typeof mixinDeviceState.id === 'string') {
-      const forked = sdk.fork<RebroadcastPluginFork>();
-      const { worker } = forked;
-
-      try {
-        const result = await forked.result;
-        const mixin = await result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
-        this.currentMixins.set(mixin, {
-          worker,
-          id,
-        });
-        return mixin;
-      }
-      catch (e) {
-        throw e;
-      }
-    }
-    else {
-      const ret = await newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
-      this.currentMixins.set(ret, {
-        worker: undefined,
-        id,
-      });
-      return ret;
-    }
+    const forked = sdk.fork<RebroadcastPluginFork>();
+    const { worker } = forked;
+    const result = await forked.result;
+    const mixin = await result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
+    this.currentMixins.set(mixin, {
+      worker,
+      id,
+    });
+    return mixin;
   }
 
   async releaseMixin(id: string, mixinDevice: PrebufferMixin) {
