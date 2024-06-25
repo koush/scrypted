@@ -108,21 +108,25 @@ export function findH265NaluType(streamChunk: StreamChunk, naluType: number) {
     return findH265NaluTypeInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), naluType);
 }
 
+export function parseH264NaluType(firstNaluByte: number) {
+    return firstNaluByte & 0x1f;
+}
+
 export function findH264NaluTypeInNalu(nalu: Buffer, naluType: number) {
-    const checkNaluType = nalu[0] & 0x1f;
+    const checkNaluType = parseH264NaluType(nalu[0]);
     if (checkNaluType === H264_NAL_TYPE_STAP_A) {
         let pos = 1;
         while (pos < nalu.length) {
             const naluLength = nalu.readUInt16BE(pos);
             pos += 2;
-            const stapaType = nalu[pos] & 0x1f;
+            const stapaType = parseH264NaluType(nalu[pos]);
             if (stapaType === naluType)
                 return nalu.subarray(pos, pos + naluLength);
             pos += naluLength;
         }
     }
     else if (checkNaluType === H264_NAL_TYPE_FU_A) {
-        const fuaType = nalu[1] & 0x1f;
+        const fuaType = parseH264NaluType(nalu[1]);
         const isFuStart = !!(nalu[1] & 0x80);
 
         if (fuaType === naluType && isFuStart)
@@ -134,8 +138,8 @@ export function findH264NaluTypeInNalu(nalu: Buffer, naluType: number) {
     return;
 }
 
-function parseH265NaluType(nalu: number) {
-    return (nalu & 0b01111110) >> 1;
+function parseH265NaluType(firstNaluByte: number) {
+    return (firstNaluByte & 0b01111110) >> 1;
 }
 
 export function findH265NaluTypeInNalu(nalu: Buffer, naluType: number) {
@@ -163,33 +167,23 @@ export function getNaluTypes(streamChunk: StreamChunk) {
     return getNaluTypesInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12))
 }
 
-export function getNaluFragmentInformation(nalu: Buffer) {
-    const naluType = nalu[0] & 0x1f;
-    const fua = naluType === H264_NAL_TYPE_FU_A;
-    return {
-        fua,
-        fuaStart: fua && !!(nalu[1] & 0x80),
-        fuaEnd: fua && !!(nalu[1] & 0x40),
-    }
-}
-
 export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false, fuaRequireEnd = false) {
     const ret = new Set<number>();
-    const naluType = nalu[0] & 0x1f;
+    const naluType = parseH264NaluType(nalu[0]);
     if (naluType === H264_NAL_TYPE_STAP_A) {
         ret.add(H264_NAL_TYPE_STAP_A);
         let pos = 1;
         while (pos < nalu.length) {
             const naluLength = nalu.readUInt16BE(pos);
             pos += 2;
-            const stapaType = nalu[pos] & 0x1f;
+            const stapaType = parseH264NaluType(nalu[pos]);
             ret.add(stapaType);
             pos += naluLength;
         }
     }
     else if (naluType === H264_NAL_TYPE_FU_A) {
         ret.add(H264_NAL_TYPE_FU_A);
-        const fuaType = nalu[1] & 0x1f;
+        const fuaType = parseH264NaluType(nalu[1]);
         if (fuaRequireStart) {
             const isFuStart = !!(nalu[1] & 0x80);
             if (isFuStart)
@@ -209,6 +203,12 @@ export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false, fuaReq
     }
 
     return ret;
+}
+
+export function getH265NaluTypes(streamChunk: StreamChunk) {
+    if (streamChunk.type !== 'h265')
+        return new Set<number>();
+    return getNaluTypesInH265Nalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12))
 }
 
 export function getNaluTypesInH265Nalu(nalu: Buffer, fuaRequireStart = false, fuaRequireEnd = false) {
@@ -253,16 +253,19 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
                 if (streamChunk.type === 'h264') {
-                    if (findH264NaluType(streamChunk, H264_NAL_TYPE_SPS) || findH264NaluType(streamChunk, H264_NAL_TYPE_IDR)) {
+                    const naluTypes = getNaluTypes(streamChunk);
+                    if (naluTypes.has(H264_NAL_TYPE_SPS) || naluTypes.has(H264_NAL_TYPE_IDR)) {
                         return streamChunks.slice(prebufferIndex);
                     }
                 }
                 else if (streamChunk.type === 'h265') {
-                    if (findH265NaluType(streamChunk, H265_NAL_TYPE_VPS)
-                        || findH265NaluType(streamChunk, H265_NAL_TYPE_SPS)
-                        || findH265NaluType(streamChunk, H265_NAL_TYPE_PPS)
-                        || findH265NaluType(streamChunk, H265_NAL_TYPE_IDR_N)
-                        || findH265NaluType(streamChunk, H265_NAL_TYPE_IDR_W)
+                    const naluTypes = getH265NaluTypes(streamChunk);
+
+                    if (naluTypes.has(H265_NAL_TYPE_VPS)
+                        || naluTypes.has(H265_NAL_TYPE_SPS)
+                        || naluTypes.has(H265_NAL_TYPE_PPS)
+                        || naluTypes.has(H265_NAL_TYPE_IDR_N)
+                        || naluTypes.has(H265_NAL_TYPE_IDR_W)
                     ) {
                         return streamChunks.slice(prebufferIndex);
                     }
