@@ -110,8 +110,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
         this.updateDeviceInfo();
         this.updateDevice();
-
         this.updatePtzCaps();
+        this.updateAbilities();
     }
 
     updatePtzCaps() {
@@ -121,6 +121,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             tilt: ptz?.includes('Tilt'),
             zoom: ptz?.includes('Zoom'),
         }
+    }
+
+    async updateAbilities() {
+        const api = this.getClient();
+        const abilities = await api.getAbility();
+        this.console.log('getAbility', JSON.stringify(abilities));
     }
 
     supportsOnvifDetections() {
@@ -468,15 +474,18 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
         ];
 
+        if (deviceInfo?.model?.replace(' ', '').includes('Duo2') || deviceInfo?.model?.replace(' ', '').includes('Duo3')) {
+            // these models don't have rtmp main stream or any ext streams... need to filter those out.
+        }
+
         if (deviceInfo?.model == "Reolink TrackMix PoE") {
             streams.push({
                 name: '',
                 id: 'autotrack.bcs',
                 container: 'rtmp',
                 video: { width: 896, height: 512 },
-                url: ''
-
-            })
+                url: '',
+            });
         }
 
         for (const stream of streams) {
@@ -606,14 +615,18 @@ class ReolinkProvider extends RtspProvider {
         const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
         let info: DeviceInformation = {};
 
+        const skipValidate = settings.skipValidate?.toString() === 'true';
         const username = settings.username?.toString();
         const password = settings.password?.toString();
+        // verify password only has alphanumeric characters because reolink can't handle
+        // url escaping.
+        if (!skipValidate && !/^[a-zA-Z0-9]+$/.test(password))
+            throw new Error('Change the password this Reolink device to be alphanumeric characters only. See https://docs.scrypted.app/camera-preparation.html#authentication-setup for more information.');
         let doorbell: boolean = false;
         let name: string = 'Reolink Camera';
         let deviceInfo: DevInfo;
         let ai;
         let abilities;
-        const skipValidate = settings.skipValidate?.toString() === 'true';
         const rtspChannel = parseInt(settings.rtspChannel?.toString()) || 0;
         if (!skipValidate) {
             const api = new ReolinkCameraClient(httpAddress, username, password, rtspChannel, this.console);
