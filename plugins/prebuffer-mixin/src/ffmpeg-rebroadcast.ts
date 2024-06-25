@@ -118,11 +118,15 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         sessionKilled = resolve;
     });
 
+    const sdpDeferred = new Deferred<string>();
     function kill(error?: Error) {
+        error ||= new Error('killed');
         if (isActive) {
             events.emit('killed');
-            events.emit('error', error || new Error('killed'));
+            events.emit('error', error);
         }
+        if (!sdpDeferred.finished)
+            sdpDeferred.reject(error);
         isActive = false;
         sessionKilled();
         safeKillFFmpeg(cp);
@@ -223,6 +227,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     };
 
     const rtsp = (options.parsers as any).rtsp as ReturnType<typeof createRtspParser>;
+    rtsp.sdp.then(sdp => sdpDeferred.resolve(sdp));
 
     start();
 
@@ -230,7 +235,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         start() {
             deferredStart.resolve();
         },
-        sdp: rtsp.sdp,
+        sdp: sdpDeferred.promise,
         get isActive() { return isActive },
         kill(error?: Error) {
             kill(error);
