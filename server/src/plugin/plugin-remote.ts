@@ -462,7 +462,7 @@ export interface PluginRemoteAttachOptions {
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
     onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, getZip: () => Promise<Buffer>, zipOptions: PluginRemoteLoadZipOptions) => Promise<any>;
-    onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<void>;
+    onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<PluginAPI>;
 }
 
 export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
@@ -496,7 +496,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             }
         });
 
-        await options?.onGetRemote?.(api, pluginId);
+        api = await options?.onGetRemote?.(api, pluginId) || api;
 
         const systemManager = new SystemManagerImpl();
         const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole, getMixinConsole);

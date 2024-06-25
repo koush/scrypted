@@ -55,6 +55,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
     let postInstallSourceMapSupport: (scrypted: ScryptedStatic) => void;
 
+    const forks = new Set<PluginRemote>();
+
     attachPluginRemote(peer, {
         createMediaManager: async (sm, dm) => {
             systemManager = sm;
@@ -62,8 +64,21 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             return new MediaManagerImpl(systemManager, dm);
         },
         onGetRemote: async (_api, _pluginId) => {
-            api = _api;
+            class PluginForkableAPI extends PluginAPIProxy {
+                [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (_api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];
+
+                setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
+                    const id = deviceManager.nativeIds.get(nativeId).id;
+                    for (const r of forks) {
+                        r.setNativeId(nativeId, id, storage);
+                    }
+                    return super.setStorage(nativeId, storage);
+                }
+            }
+
+            api = new PluginForkableAPI(_api);
             peer.selfName = pluginId;
+            return api;
         },
         getPluginConsole,
         getDeviceConsole,
@@ -298,7 +313,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 process.send(options, socket);
             }
 
-            const forks = new Set<PluginRemote>();
+            const pluginRemoteAPI: PluginRemote = scrypted.pluginRemoteAPI;
 
             scrypted.fork = () => {
                 const ntw = new NodeThreadWorker(mainFilename, pluginId, {
@@ -322,7 +337,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                         setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
                             const id = deviceManager.nativeIds.get(nativeId).id;
-                            (scrypted.pluginRemoteAPI as PluginRemote).setNativeId(nativeId, id, storage);
+                            pluginRemoteAPI.setNativeId(nativeId, id, storage);
                             for (const r of forks) {
                                 if (r === remote)
                                     continue;
