@@ -130,17 +130,17 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     supportsOnvifDetections() {
-      const onvif: string[] = [
-          // wifi
-          'CX410W',
-          'Reolink Video Doorbell WiFi',
+        const onvif: string[] = [
+            // wifi
+            'CX410W',
+            'Reolink Video Doorbell WiFi',
 
-          // poe
-          'CX410',
-          'CX810',
-          'Reolink Video Doorbell PoE',
-      ];
-      return onvif.includes(this.storageSettings.values.deviceInfo?.model);
+            // poe
+            'CX410',
+            'CX810',
+            'Reolink Video Doorbell PoE',
+        ];
+        return onvif.includes(this.storageSettings.values.deviceInfo?.model);
     }
 
     async getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject> {
@@ -241,7 +241,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     createOnvifClient() {
-        return connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, this.storageSettings.values.doorbell? this.storage.getItem('onvifDoorbellEvent') : undefined);
+        return connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, this.storageSettings.values.doorbell ? this.storage.getItem('onvifDoorbellEvent') : undefined);
     }
 
     async listenEvents() {
@@ -251,6 +251,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // reolink ai might not trigger motion if objects are detected, weird.
         const startAI = async (ret: Destroyable, triggerMotion: () => void) => {
             let hasSucceeded = false;
+            let hasSet = false;
             while (!killed) {
                 try {
                     const ai = await client.getAiState();
@@ -269,7 +270,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                     if (!classes.length)
                         return;
 
-                    this.storageSettings.values.hasObjectDetector = ai;
+
+                    if (!hasSet) {
+                        hasSet = true;
+                        this.storageSettings.values.hasObjectDetector = ai;
+                    }
 
                     hasSucceeded = true;
                     const od: ObjectsDetected = {
