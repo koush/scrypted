@@ -32,10 +32,13 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 
 ### HomeKit Discovery and Pairing Issues
 
-* Ensure all your Home hubs are online and updated. Power cycling them is recommended in case one is stuck.
+* Ensure all your Apple TV and Home Pods are online and updated. Power cycling them is recommended in case one is stuck.
+* Ensure your Apple TV and Home Pods are on the same subnet as the Scrypted server.
 * Ensure LAN/WLAN multicast is enabled on your router.
 * Ensure the iOS device you are using for pairing is on the same network (pairing will fail on cellular).
 * Ensure the Docker installation (if applicable) is using host networking. This configuration is the default if the official Scrypted Docker compose install script was used.
+* Try switching the mDNS advertiser used in the HomeKit plugin settings.
+* Try disabling IGMP Snooping on your router.
 
 ### HomeKit Live Streaming Timeout (Recordings may be working)
 
