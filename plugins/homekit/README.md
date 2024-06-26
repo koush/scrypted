@@ -37,8 +37,8 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 * Ensure LAN/WLAN multicast is enabled on your router.
 * Ensure the iOS device you are using for pairing is on the same network (pairing will fail on cellular).
 * Ensure the Docker installation (if applicable) is using host networking. This configuration is the default if the official Scrypted Docker compose install script was used.
-* Try using Bonjour or Avahi as the mDNS advertiser in the HomeKit plugin settings.
-* Try disabling IGMP Snooping is disabled on your router.
+* Try switching the mDNS advertiser used in the HomeKit plugin settings.
+* Try disabling IGMP Snooping on your router.
 
 ### HomeKit Live Streaming Timeout (Recordings may be working)
 
