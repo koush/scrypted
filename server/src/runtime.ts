@@ -463,6 +463,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             delete this.plugins[pluginId];
             existing.kill();
         }
+        this.invalidatePluginMixins(pluginId);
     }
 
     // should this be async?
@@ -481,6 +482,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             return;
         proxyPair.handler.rebuildMixinTable();
         return proxyPair;
+    }
+
+    invalidatePluginMixins(pluginId: string) {
+        const deviceIds = new Set<string>(Object.values(this.pluginDevices).filter(d => d.pluginId === pluginId).map(d => d._id));
+        this.invalidateMixins(deviceIds);
     }
 
     invalidateMixins(ids: Set<string>) {

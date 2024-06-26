@@ -80,8 +80,7 @@ export class PluginHost {
         }
         this.ws = {};
 
-        const deviceIds = new Set<string>(Object.values(this.scrypted.pluginDevices).filter(d => d.pluginId === this.pluginId).map(d => d._id));
-        this.scrypted.invalidateMixins(deviceIds);
+        this.scrypted.invalidatePluginMixins(this.pluginId);
 
         this.consoleServer.then(server => server.destroy());
     }
