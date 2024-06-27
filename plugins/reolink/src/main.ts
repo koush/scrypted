@@ -51,7 +51,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
     storageSettings = new StorageSettings(this, {
         doorbell: {
-            hide: true,
             title: 'Doorbell',
             description: 'This camera is a Reolink Doorbell.',
             type: 'boolean',
@@ -670,7 +669,7 @@ class ReolinkProvider extends RtspProvider {
         device.info = info;
         device.putSetting('username', username);
         device.putSetting('password', password);
-        device.putSetting('doorbell', doorbell.toString())
+        device.storageSettings.values.doorbell = doorbell;
         device.storageSettings.values.deviceInfo = deviceInfo;
         device.storageSettings.values.abilities = abilities;
         device.storageSettings.values.hasObjectDetector = ai;
