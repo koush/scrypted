@@ -413,6 +413,23 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         return ret;
     }
 
+    addRtspCredentials(rtspUrl: string) {
+        const url = new URL(rtspUrl);
+        if (url.protocol !== 'rtmp:') {
+            url.username = this.storage.getItem('username');
+            url.password = this.storage.getItem('password') || '';
+        } else {
+            const params = url.searchParams;
+            params.set('token', this.client.token);
+        }
+        return url.toString();
+    }
+
+    async createVideoStream(vso: UrlMediaStreamOptions): Promise<MediaObject> {
+        await this.client.login();
+        return super.createVideoStream(vso);
+    }
+
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         this.videoStreamOptions ||= this.getConstructedVideoStreamOptionsInternal().catch(e => {
             this.constructedVideoStreamOptions = undefined;
@@ -500,8 +517,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 const params = streamUrl.searchParams;
                 params.set("channel", this.getRtspChannel().toString())
                 params.set("stream", '0')
-                params.set("user", this.getUsername())
-                params.set("password", this.getPassword())
                 stream.url = streamUrl.toString();
                 stream.name = `RTMP ${stream.id}`;
             } else if (stream.container === 'rtsp') {
@@ -623,10 +638,6 @@ class ReolinkProvider extends RtspProvider {
         const skipValidate = settings.skipValidate?.toString() === 'true';
         const username = settings.username?.toString();
         const password = settings.password?.toString();
-        // verify password only has alphanumeric characters because reolink can't handle
-        // url escaping.
-        if (!skipValidate && !/^[a-zA-Z0-9]+$/.test(password))
-            throw new Error('Change the password this Reolink device to be alphanumeric characters only. See https://docs.scrypted.app/camera-preparation.html#authentication-setup for more information.');
         let doorbell: boolean = false;
         let name: string = 'Reolink Camera';
         let deviceInfo: DevInfo;
