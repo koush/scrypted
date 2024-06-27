@@ -109,9 +109,14 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         super(nativeId, provider);
 
         this.updateDeviceInfo();
-        this.updateDevice();
-        this.updatePtzCaps();
-        this.updateAbilities();
+        (async () => {
+            this.updatePtzCaps();
+            const api = this.getClient();
+            const deviceInfo = await api.getDeviceInfo();
+            this.storageSettings.values.deviceInfo = deviceInfo;
+            await this.updateAbilities();
+            await this.updateDevice();
+        })();
     }
 
     updatePtzCaps() {
@@ -126,6 +131,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     async updateAbilities() {
         const api = this.getClient();
         const abilities = await api.getAbility();
+        this.storageSettings.values.abilities = abilities;
         this.console.log('getAbility', JSON.stringify(abilities));
     }
 
@@ -304,7 +310,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
         }
 
-        const useOnvifDetections: boolean = (this.storageSettings.values.useOnvifDetections === 'Default' && this.supportsOnvifDetections()) || this.storageSettings.values.useOnvifDetections === 'Enabled';
+        const useOnvifDetections: boolean = (this.storageSettings.values.useOnvifDetections === 'Default'
+            && (this.supportsOnvifDetections() || this.storageSettings.values.doorbell))
+            || this.storageSettings.values.useOnvifDetections === 'Enabled';
         if (useOnvifDetections) {
             const ret = await listenEvents(this, await this.createOnvifClient(), this.storageSettings.values.motionTimeout * 1000);
             ret.on('onvifEvent', (eventTopic: string, dataValue: any) => {
