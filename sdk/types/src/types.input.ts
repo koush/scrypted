@@ -628,6 +628,7 @@ export interface MediaStreamFeedback {
     width: number;
     height: number;
   }): Promise<void>;
+  setMTUCallback(currentMTU: number, callback: (mtu: number) => void): Promise<void>;
 }
 
 /**
