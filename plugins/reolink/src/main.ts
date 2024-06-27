@@ -1,5 +1,5 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Device, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Device, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, ScryptedNativeId } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -115,6 +115,15 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             this.storageSettings.values.deviceInfo = deviceInfo;
             await this.updateAbilities();
             await this.updateDevice();
+            if (this.hasSiren()) {
+                this.reportSirenDevice();
+            }
+            else {
+                sdk.deviceManager.onDevicesChanged({
+                    providerNativeId: this.nativeId,
+                    devices: []
+                });
+            }
         })();
     }
 
@@ -193,6 +202,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         return this.onvifIntercom.stopIntercom();
     }
 
+    hasSiren() {
+        return this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm?.ver
+            && this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm?.ver !== 0;
+    }
+
     async updateDevice() {
         const interfaces = this.provider.getInterfaces();
         let type = ScryptedDeviceType.Camera;
@@ -211,9 +225,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (this.storageSettings.values.hasObjectDetector) {
             interfaces.push(ScryptedInterface.ObjectDetector);
         }
-        if (this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm?.ver && this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm?.ver !== 0) {
+        if (this.hasSiren())
             interfaces.push(ScryptedInterface.DeviceProvider);
-        }
+
         await this.provider.updateDevice(this.nativeId, name, interfaces, type);
     }
 
@@ -250,6 +264,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     async listenEvents() {
+        return new EventEmitter() as any;
         let killed = false;
         const client = this.getClient();
 
@@ -573,10 +588,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         return `${this.getIPAddress()}:${this.storage.getItem('rtmpPort') || 1935}`;
     }
 
-    createSiren() {
+    reportSirenDevice() {
         const sirenNativeId = `${this.nativeId}-siren`;
-        this.siren = new ReolinkCameraSiren(this, sirenNativeId);
-
         const sirenDevice: Device = {
             providerNativeId: this.nativeId,
             name: 'Reolink Siren',
@@ -590,6 +603,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             ],
             type: ScryptedDeviceType.Siren,
         };
+
         sdk.deviceManager.onDevicesChanged({
             providerNativeId: this.nativeId,
             devices: [sirenDevice]
@@ -600,9 +614,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
     async getDevice(nativeId: string): Promise<any> {
         if (nativeId.endsWith('-siren')) {
+            this.siren ||= new ReolinkCameraSiren(this, nativeId);
             return this.siren;
         }
-        throw new Error(`${nativeId} is unknown`);
     }
 
     async releaseDevice(id: string, nativeId: string) {
@@ -678,11 +692,6 @@ class ReolinkProvider extends RtspProvider {
         device.setHttpPortOverride(settings.httpPort?.toString());
         device.updateDeviceInfo();
 
-        if (abilities?.Ability?.supportAudioAlarm?.ver !== 0) {
-            const sirenNativeId = device.createSiren();
-            this.devices.set(sirenNativeId, device.siren);
-        }
-
         return nativeId;
     }
 
@@ -725,13 +734,6 @@ class ReolinkProvider extends RtspProvider {
     }
 
     createCamera(nativeId: string) {
-        if (nativeId.endsWith('-siren')) {
-            const camera = this.devices.get(nativeId.replace(/-siren/, '')) as ReolinkCamera;
-            if (!camera.siren) {
-                camera.siren = new ReolinkCameraSiren(camera, nativeId);
-            }
-            return camera.siren;
-        }
         return new ReolinkCamera(nativeId, this);
     }
 }

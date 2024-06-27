@@ -130,11 +130,6 @@ export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> e
 
     constructor(nativeId?: string) {
         super(nativeId);
-
-        for (const camId of deviceManager.getNativeIds()) {
-            if (camId)
-                this.getDevice(camId);
-        }
     }
 
     async createDevice(settings: DeviceCreatorSettings, nativeId?: ScryptedNativeId): Promise<string> {
