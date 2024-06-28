@@ -4,6 +4,7 @@ import https, { RequestOptions } from 'https';
 import { PassThrough, Readable } from 'stream';
 import { HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/fetch/http-fetch';
 
+import { getMotionState, reolinkHttpsAgent } from './probe';
 import { PanTiltZoomCommand } from "@scrypted/sdk";
 import { sleep } from "@scrypted/common/src/sleep";
 
@@ -64,8 +65,6 @@ export type SirenResponse = {
 
 export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
-    token: string;
-    tokenLease: number = Date.now();
 
     constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console) {
         this.credential = {
@@ -74,9 +73,11 @@ export class ReolinkCameraClient {
         };
     }
 
-    private async request(options: HttpFetchOptions<Readable>, body?: Readable) {
+    async request(urlOrOptions: string | URL | HttpFetchOptions<Readable>, body?: Readable) {
         const response = await authHttpFetch({
-            ...options,
+            ...typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions : {
+                url: urlOrOptions,
+            },
             rejectUnauthorized: false,
             credential: this.credential,
             body,
@@ -84,61 +85,14 @@ export class ReolinkCameraClient {
         return response;
     }
 
-    async login() {
-        if (this.tokenLease > Date.now()) {
-            return;
-        }
-
-        this.console.log(`token expired at ${this.tokenLease}, renewing...`);
-
-        const url = new URL(`http://${this.host}/api.cgi`);
-        const params = url.searchParams;
-        params.set('cmd', 'Login');
-
-        const createReadable = (data: any) => {
-            const pt = new PassThrough();
-            pt.write(Buffer.from(JSON.stringify(data)));
-            pt.end();
-            return pt;
-        }
-
-        const response = await this.request({
-            url,
-            method: 'POST',
-            responseType: 'json',
-        }, createReadable([
-            {
-                cmd: 'Login',
-                action: 0,
-                param: {
-                    User: {
-                        userName: this.username,
-                        password: this.password
-                    }
-                }
-            },
-        ]));
-        this.token = response.body?.[0]?.value?.Token?.name || response.body?.value?.Token?.name;
-        if (!this.token) {
-            throw new Error('unable to login');
-        }
-        this.tokenLease = Date.now() + 1000 * (response.body?.[0]?.value?.Token.leaseTime || response.body?.value?.Token.leaseTime);
-    }
-
-    async requestWithLogin(options: HttpFetchOptions<Readable>, body?: Readable) {
-        await this.login();
-        const url = options.url as URL;
-        const params = url.searchParams;
-        params.set('token', this.token);
-        return this.request(options, body);
-    }
-
     async reboot() {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'Reboot');
-        const response = await this.requestWithLogin({
-            url,
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.request({
+            url: url.toString(),
             responseType: 'json',
         });
         return {
@@ -157,18 +111,7 @@ export class ReolinkCameraClient {
     //     }
     //  ]
     async getMotionState() {
-        const url = new URL(`http://${this.host}/api.cgi`);
-        const params = url.searchParams;
-        params.set('cmd', 'GetMdState');
-        params.set('channel', this.channelId.toString());
-        const response = await this.requestWithLogin({
-            url,
-            responseType: 'json',
-        });
-        return {
-            value: !!response.body?.[0]?.value?.state,
-            data: response.body,
-        };
+        return getMotionState(this.credential, this.username, this.password, this.host, this.channelId);
     }
 
     async getAiState() {
@@ -176,7 +119,9 @@ export class ReolinkCameraClient {
         const params = url.searchParams;
         params.set('cmd', 'GetAiState');
         params.set('channel', this.channelId.toString());
-        const response = await this.requestWithLogin({
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.request({
             url,
             responseType: 'json',
         });
@@ -191,7 +136,9 @@ export class ReolinkCameraClient {
         const params = url.searchParams;
         params.set('cmd', 'GetAbility');
         params.set('channel', this.channelId.toString());
-        const response = await this.requestWithLogin({
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.request({
             url,
             responseType: 'json',
         });
@@ -207,8 +154,10 @@ export class ReolinkCameraClient {
         params.set('cmd', 'Snap');
         params.set('channel', this.channelId.toString());
         params.set('rs', Date.now().toString());
+        params.set('user', this.username);
+        params.set('password', this.password);
 
-        const response = await this.requestWithLogin({
+        const response = await this.request({
             url,
             timeout,
         });
@@ -222,7 +171,9 @@ export class ReolinkCameraClient {
         params.set('cmd', 'GetEnc');
         // is channel used on this call?
         params.set('channel', this.channelId.toString());
-        const response = await this.requestWithLogin({
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.request({
             url,
             responseType: 'json',
         });
@@ -234,7 +185,9 @@ export class ReolinkCameraClient {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'GetDevInfo');
-        const response = await this.requestWithLogin({
+        params.set('user', this.username);
+        params.set('password', this.password);
+        const response = await this.request({
             url,
             responseType: 'json',
         });
@@ -242,10 +195,12 @@ export class ReolinkCameraClient {
         return response.body?.[0]?.value?.DevInfo;
     }
 
-    private async ptzOp(op: string) {
+    async ptzOp(op: string) {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'PtzCtrl');
+        params.set('user', this.username);
+        params.set('password', this.password);
 
         const createReadable = (data: any) => {
             const pt = new PassThrough();
@@ -254,7 +209,7 @@ export class ReolinkCameraClient {
             return pt;
         }
 
-        const c1 = this.requestWithLogin({
+        const c1 = this.request({
             url,
             method: 'POST',
             responseType: 'text',
@@ -272,7 +227,7 @@ export class ReolinkCameraClient {
 
         await sleep(500);
 
-        const c2 = this.requestWithLogin({
+        const c2 = this.request({
             url,
             method: 'POST',
         }, createReadable([
@@ -318,6 +273,8 @@ export class ReolinkCameraClient {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'AudioAlarmPlay');
+        params.set('user', this.username);
+        params.set('password', this.password);
         const createReadable = (data: any) => {
             const pt = new PassThrough();
             pt.write(Buffer.from(JSON.stringify(data)));
@@ -339,7 +296,7 @@ export class ReolinkCameraClient {
             };
         }
 
-        const response = await this.requestWithLogin({
+        const response = await this.request({
             url,
             method: 'POST',
             responseType: 'json',
