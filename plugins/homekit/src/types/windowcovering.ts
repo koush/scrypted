@@ -21,7 +21,7 @@ addSupportedType({
 
             let targetPosition = !!device.entryOpen ? 100 : 0;
             bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.TargetPosition,
-                () => targetPosition);
+                () => !!device.entryOpen ? 100 : 0);
 
             const props = {
                 minValue: 0,
@@ -48,7 +48,7 @@ addSupportedType({
 
             let targetPosition = device.brightness || 0;
             bindCharacteristic(device, ScryptedInterface.Brightness, service, Characteristic.TargetPosition,
-                () => targetPosition);
+                () => device.brightness || 0);
 
             const props = {
                 minValue: 0,
