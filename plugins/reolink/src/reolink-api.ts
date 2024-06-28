@@ -1,12 +1,10 @@
-import { AuthFetchCredentialState, AuthFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
-import { EventEmitter } from 'events';
-import https, { RequestOptions } from 'https';
+import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { PassThrough, Readable } from 'stream';
-import { HttpFetchOptions, HttpFetchResponseType } from '../../../server/src/fetch/http-fetch';
+import { HttpFetchOptions } from '../../../server/src/fetch/http-fetch';
 
-import { PanTiltZoomCommand } from "@scrypted/sdk";
 import { sleep } from "@scrypted/common/src/sleep";
-import { getLoginToken } from './probe';
+import { PanTiltZoomCommand } from "@scrypted/sdk";
+import { DevInfo, getLoginParameters } from './probe';
 
 export interface Enc {
     audio: number;
@@ -26,28 +24,6 @@ export interface Stream {
     width: number;
 }
 
-export interface DevInfo {
-    B485: number;
-    IOInputNum: number;
-    IOOutputNum: number;
-    audioNum: number;
-    buildDay: string;
-    cfgVer: string;
-    channelNum: number;
-    detail: string;
-    diskNum: number;
-    exactType: string;
-    firmVer: string;
-    frameworkVer: number;
-    hardVer: string;
-    model: string;
-    name: string;
-    pakSuffix: string;
-    serial: string;
-    type: string;
-    wifi: number;
-}
-
 export interface AIDetectionState {
     alarm_state: number;
     support: number;
@@ -65,8 +41,8 @@ export type SirenResponse = {
 
 export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
-    token: string;
-    tokenLease: number = Date.now();
+    parameters: Record<string, string>;
+    tokenLease: number;
 
     constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console) {
         this.credential = {
@@ -92,16 +68,18 @@ export class ReolinkCameraClient {
 
         this.console.log(`token expired at ${this.tokenLease}, renewing...`);
 
-        const { token, body } = await getLoginToken(this.host, this.username, this.password);
-        this.token = token;
-        this.tokenLease = Date.now() + 1000 * (body?.[0]?.value?.Token.leaseTime || body?.value?.Token.leaseTime);
+        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password);
+        this.parameters = parameters
+        this.tokenLease = Date.now() + 1000 * leaseTimeSeconds;
     }
 
     async requestWithLogin(options: HttpFetchOptions<Readable>, body?: Readable) {
         await this.login();
         const url = options.url as URL;
         const params = url.searchParams;
-        params.set('token', this.token);
+        for (const [k, v] of Object.entries(this.parameters)) {
+            params.set(k, v);
+        }
         return this.request(options, body);
     }
 
@@ -167,6 +145,11 @@ export class ReolinkCameraClient {
             url,
             responseType: 'json',
         });
+        const error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to getAbility', error);
+            throw new Error('error during call to getAbility');
+        }
         return {
             value: response.body?.[0]?.value || response.body?.value,
             data: response.body,
@@ -210,7 +193,11 @@ export class ReolinkCameraClient {
             url,
             responseType: 'json',
         });
-
+        const error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to getDeviceInfo', error);
+            throw new Error('error during call to getDeviceInfo');
+        }
         return response.body?.[0]?.value?.DevInfo;
     }
 

@@ -1,12 +1,13 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Device, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, ScryptedNativeId } from "@scrypted/sdk";
+import sdk, { Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { OnvifCameraAPI, OnvifEvent, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
-import { AIState, DevInfo, Enc, ReolinkCameraClient } from './reolink-api';
+import { DevInfo } from './probe';
+import { AIState, Enc, ReolinkCameraClient } from './reolink-api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     intervalId: NodeJS.Timeout;
@@ -444,7 +445,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             url.password = this.storage.getItem('password') || '';
         } else {
             const params = url.searchParams;
-            params.set('token', this.client.token);
+            for (const [k, v] of Object.entries(this.client.parameters)) {
+                params.set(k, v);
+            }
         }
         return url.toString();
     }
