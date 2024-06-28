@@ -520,8 +520,15 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
         ];
 
-        if (deviceInfo?.model?.replace(' ', '').includes('Duo2') || deviceInfo?.model?.replace(' ', '').includes('Duo3')) {
-            // these models don't have rtmp main stream or any ext streams... need to filter those out.
+        // this property seems to be:
+        // 1: rtmp main, sub ext + rtsp main + sub
+        // 2: rtmp sub + rtsp main + sub
+        // 4k cams seem to be 2.
+        // unsure if there are other values
+        const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[0].live?.ver;
+        if (live === 2) {
+            // remove the rtmp main and ext
+            streams.splice(0, 2);
         }
 
         if (deviceInfo?.model == "Reolink TrackMix PoE") {
