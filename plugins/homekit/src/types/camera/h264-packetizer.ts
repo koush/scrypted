@@ -84,7 +84,12 @@ export class H264Repacketizer {
     stapa: RtpPacket;
     fuaMin: number;
 
-    constructor(public console: Console, public maxPacketSize: number, public codecInfo?: H264CodecInfo, public jitterBuffer = new JitterBuffer(console, 4)) {
+    constructor(public console: Console, private maxPacketSize: number, public codecInfo?: H264CodecInfo, public jitterBuffer = new JitterBuffer(console, 4)) {
+        this.setMaxPacketSize(maxPacketSize);
+    }
+
+    setMaxPacketSize(maxPacketSize: number) {
+        this.maxPacketSize = maxPacketSize;
         // 12 is the rtp/srtp header size.
         this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;
         this.fuaMin = Math.round(maxPacketSize * .8);

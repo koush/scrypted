@@ -304,7 +304,14 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
             let mediaStreamFeedback: MediaStreamFeedback;
             try {
+                // homekit mtu is unusable. webrtc uses 1200 due to weird cell networks, vpns, etc.
+                // this is the only reliable option without dynamic detection of the mtu.
+                session.startRequest.video.mtu = 1200;
+
                 mediaStreamFeedback = await sdk.mediaManager.convertMediaObject(mediaObject, ScryptedMimeTypes.MediaStreamFeedback);
+
+                // unset the MTU as it will be handled by the upstream adaptive bitrate.
+                session.startRequest.video.mtu = undefined;
             }
             catch (e) {
             }

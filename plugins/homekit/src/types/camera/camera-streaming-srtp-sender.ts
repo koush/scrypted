@@ -60,9 +60,11 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         opusPacketizer = new OpusRepacketizer(audioOptions.framesPerPacket);
     }
     else {
-        // adjust packet size for the rtp packet header (12).
-        const adjustedMtu = videoOptions.maxPacketSize - 12;
-        h264Packetizer = new H264Repacketizer(console, adjustedMtu, videoOptions);
+        if (videoOptions.maxPacketSize) {
+            // adjust packet size for the rtp packet header (12).
+            const adjustedMtu = videoOptions.maxPacketSize - 12;
+            h264Packetizer = new H264Repacketizer(console, adjustedMtu, videoOptions);
+        }
         sender.setSendBufferSize(1024 * 1024);
     }
 
@@ -142,6 +144,11 @@ export function createCameraStreamSender(console: Console, config: Config, sende
                 rtp.header.timestamp = (firstTimestamp + packetCount * 160 * audioIntervalScale) % 0xFFFFFFFF;
                 sendPacket(rtp);
             }
+            return;
+        }
+
+        if (!h264Packetizer) {
+            sendPacket(rtp);
             return;
         }
 

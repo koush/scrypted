@@ -216,6 +216,9 @@ export async function createTrackForwarder(options: {
         }
     }
 
+    if (mediaStreamFeedback)
+        needPacketization = false;
+
     let opusRepacketizer: OpusRepacketizer;
     let lastPacketTs: number = 0;
     const audioRtpTrack: RtpTrack = {
@@ -289,7 +292,11 @@ export async function createTrackForwarder(options: {
     // so when a turn (aka relay) server is used, a smaller MTU must be used. Otherwise optimistically use
     // the normal/larger default.
     // After a bit of fiddling with iCloud Private Relay, 1246 was arrived at as the optimal value.
-    const videoPacketSize = type === 'relay' ? 1246 : 1378;
+    // 2024/06/28: Setting to 1200 due to FirstNet.
+    // After further user testing, FirstNet MTU seems be around 1200, though advertised at 1342.
+    // So using Chrome's 1200 seems best, though crappy.
+    // https://iotdevices.att.com/att-iot/FirstNetMTU.aspx
+    const videoPacketSize = 1200;
     let h264Repacketizer: H264Repacketizer;
     let spsPps: ReturnType<typeof getSpsPps>;
 
