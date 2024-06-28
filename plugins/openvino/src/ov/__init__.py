@@ -120,17 +120,8 @@ class OpenVINOPlugin(
         mode = mode or "AUTO"
         self.mode = mode
 
-        precision = self.storage.getItem("precision") or "Default"
-        if precision == "Default":
-            using_mode = mode
-            if using_mode == "AUTO":
-                if "GPU" in available_devices:
-                    using_mode = "GPU"
-
-            # FP16 is smaller and the default export. no tangible performance difference.
-            # https://docs.openvino.ai/2023.3/openvino_docs_OV_Converter_UG_Conversion_Options.html
-            precision = "FP16"
-
+        # todo remove this, don't need to export two models anymore.
+        precision = "FP16"
         self.precision = precision
 
         model = self.storage.getItem("model") or "Default"
