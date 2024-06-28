@@ -1,25 +1,41 @@
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import https from 'https';
+import { httpFetch } from '../../../server/src/fetch/http-fetch';
 
 export const reolinkHttpsAgent = new https.Agent({
     rejectUnauthorized: false,
 });
 
-export async function getMotionState(credential: AuthFetchCredentialState, username: string, password: string, address: string, channelId: number) {
-    const url = new URL(`http://${address}/api.cgi`);
+
+export async function getLoginToken(host: string, username: string, password: string) {
+    const url = new URL(`http://${host}/api.cgi`);
     const params = url.searchParams;
-    params.set('cmd', 'GetMdState');
-    params.set('channel', channelId.toString());
-    params.set('user', username);
-    params.set('password', password);
-    const response = await authHttpFetch({
-        credential,
-        url: url.toString(),
-        rejectUnauthorized: false,
+    params.set('cmd', 'Login');
+
+    const response = await httpFetch({
+        url,
+        method: 'POST',
         responseType: 'json',
+        rejectUnauthorized: false,
+        body: [
+            {
+                cmd: 'Login',
+                action: 0,
+                param: {
+                    User: {
+                        userName: username,
+                        password: password
+                    }
+                }
+            },
+        ],
     });
+
+    const token = response.body?.[0]?.value?.Token?.name || response.body?.value?.Token?.name;
+    if (!token) 
+        throw new Error('unable to login');
     return {
-        value: !!response.body?.[0]?.value?.state,
-        data: response.body,
-    };
+        token,
+        body: response.body,
+    }
 }
