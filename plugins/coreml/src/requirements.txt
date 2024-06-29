@@ -1,4 +1,5 @@
 # must ensure numpy is pinned to prevent dependencies with an unpinned numpy from pulling numpy>=2.0.
 numpy==1.26.4
-coremltools==7.1
+coremltools==7.2
 Pillow==10.3.0
+opencv-python==4.10.0.84

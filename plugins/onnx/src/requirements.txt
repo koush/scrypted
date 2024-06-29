@@ -11,3 +11,4 @@ onnxruntime; 'linux' not in sys_platform or platform_machine != 'x86_64'
 # ort-nightly-gpu==1.17.3.dev20240409002
 
 Pillow==10.3.0
+opencv-python==4.10.0.84
