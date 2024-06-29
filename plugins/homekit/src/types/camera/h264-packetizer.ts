@@ -217,11 +217,10 @@ export class H264Repacketizer {
             payload.push(packed, nalu);
         }
 
-        // is this possible?
-        if (counter === 0) {
-            this.console.warn('stap a packet is too large. this may be a bug.');
+        // when a stapa packet has a p frame inside it, it may exceed the max packet size.
+        // it needs to be returned as is to be turned into a fua packet.
+        if (counter === 0)
             return datas.shift();
-        }
 
         // a single nalu stapa is unnecessary, return the nalu itself.
         // this can happen when trying to packetize multiple nalus into a stapa
@@ -238,7 +237,13 @@ export class H264Repacketizer {
     packetizeStapA(datas: Buffer[]) {
         const ret: Buffer[] = [];
         while (datas.length) {
-            ret.push(this.packetizeOneStapA(datas));
+            const nalu = this.packetizeOneStapA(datas);
+            if (nalu.length < this.maxPacketSize) {
+                ret.push(nalu);
+                continue;
+            }
+            const fuas = this.packetizeFuA(nalu);
+            ret.push(...fuas);
         }
         return ret;
     }
@@ -527,8 +532,6 @@ export class H264Repacketizer {
                 this.stapa = packet;
 
             const stapa = this.packetizeStapA(depacketized);
-            if (stapa.length !== 1)
-                this.console.warn('Expected single stapa packet. Please report this to @koush on Discord.')
             this.createRtpPackets(packet, stapa, ret);
         }
         else if (nalType >= 1 && nalType < 24) {
