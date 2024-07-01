@@ -6,6 +6,7 @@ import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
+import { HikvisionCameraStreamSetup, HikvisionAPI } from "./hikvision-api-interfaces"
 import { HikvisionCameraAPI, HikvisionCameraEvent, detectionMap } from "./hikvision-camera-api";
 
 const { mediaManager } = sdk;
@@ -16,12 +17,13 @@ function channelToCameraNumber(channel: string) {
     return channel.substring(0, channel.length - 2);
 }
 
-class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, ObjectDetector {
+export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, ObjectDetector {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
-    client: HikvisionCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
     hasSmartDetection: boolean;
+
+    client: HikvisionAPI;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
@@ -221,7 +223,7 @@ class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboo
         }
     }
 
-    createClient() {
+    createClient(): HikvisionAPI {
         return new HikvisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
     }
 
