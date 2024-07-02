@@ -9,8 +9,12 @@ import { ensurePluginVolume } from "./plugin-volume";
 
 export function defaultNpmExec(args: string[], options: child_process.SpawnOptions) {
     let npm = 'npm';
-    if (os.platform() === 'win32')
+    if (os.platform() === 'win32') {
         npm += '.cmd';
+        // wrap each argument in a quote to handle spaces in paths
+        // https://github.com/nodejs/node/issues/38490#issuecomment-927330248
+        args = args.map(arg => '"' + arg + '"');
+    }
     const cp = child_process.spawn(npm, args, options);
     return cp;
 }
