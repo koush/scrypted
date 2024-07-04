@@ -353,6 +353,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         model: camera.type,
                         firmware: camera.firmwareVersion,
                         version: camera.hardwareRevision,
+                        ip: camera.host,
                         serialNumber: camera.id,
                         mac: camera.mac,
                         managementUrl,
@@ -399,6 +400,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     info: {
                         manufacturer: 'Ubiquiti',
                         model: sensor.type,
+                        ip: sensor.host,
                         firmware: sensor.firmwareVersion,
                         version: sensor.hardwareRevision,
                         serialNumber: sensor.id,
@@ -426,6 +428,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     info: {
                         manufacturer: 'Ubiquiti',
                         model: light.type,
+                        ip: light.host,
                         firmware: light.firmwareVersion,
                         version: light.hardwareRevision,
                         serialNumber: light.id,
@@ -450,6 +453,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     info: {
                         manufacturer: 'Ubiquiti',
                         model: lock.type,
+                        ip: lock.host,
                         firmware: lock.firmwareVersion,
                         version: lock.hardwareRevision.toString(),
                         serialNumber: lock.id,
