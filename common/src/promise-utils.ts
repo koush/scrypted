@@ -1,5 +1,3 @@
-export { sleep } from '@scrypted/server/src/sleep';
-
 export interface RefreshPromise<T> {
     promise: Promise<T>;
     cacheDuration: number;
