@@ -246,6 +246,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             return;
         const info = this.info || {};
         info.ip = ip;
+        info.serialNumber = this.storageSettings.values.deviceInfo?.serial;
+        info.firmware = this.storageSettings.values.deviceInfo?.firmVer;
+        info.version = this.storageSettings.values.deviceInfo?.hardVer;
+        info.model = this.storageSettings.values.deviceInfo?.model;
         info.manufacturer = 'Reolink';
         info.managementUrl = `http://${ip}`;
         this.info = info;
