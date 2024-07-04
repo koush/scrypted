@@ -636,8 +636,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             name: 'Reolink Siren',
             nativeId: sirenNativeId,
             info: {
-                manufacturer: 'Reolink',
-                serialNumber: this.nativeId,
+                ...this.info,
             },
             interfaces: [
                 ScryptedInterface.OnOff
