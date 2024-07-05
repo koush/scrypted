@@ -10,7 +10,7 @@ export function createDuplexRpcPeer(selfName: string, peerName: string, readable
             serializer.sendMessage(message, reject, serializationContext);
         }
         catch (e) {
-            reject?.(e);
+            reject?.(e as Error);
             readable.destroy();
         }
     });
@@ -165,7 +165,7 @@ export function createRpcDuplexSerializer(writable: {
                     serializer.onMessageFinish(message);
                 }
                 catch (e) {
-                    serializer.kill('message parse failure ' + e.message);
+                    serializer.kill('message parse failure ' + (e as Error).message);
                 }
             }
             else {

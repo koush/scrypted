@@ -38,7 +38,7 @@ export class DataChannelDebouncer {
             this.timeout = undefined;
         }
         catch (e) {
-            this.kill(e);
+            this.kill(e as Error);
         }
     }
 }

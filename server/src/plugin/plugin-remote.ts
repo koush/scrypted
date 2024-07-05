@@ -179,7 +179,6 @@ class DeviceStateProxyHandler implements ProxyHandler<any> {
 
     set?(target: any, p: PropertyKey, value: any, receiver: any) {
         checkProperty(p.toString(), value);
-        const now = Date.now();
         this.deviceManager.systemManager.state[this.id][p as string] = {
             value,
         };
@@ -446,7 +445,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
         return remote;
     }
     catch (e) {
-        throw new RPCResultError(peer, 'error while retrieving PluginRemote', e);
+        throw new RPCResultError(peer, 'error while retrieving PluginRemote', e as Error);
     }
 }
 

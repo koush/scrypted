@@ -94,7 +94,7 @@ export function createAsyncQueue<T>() {
                     }
                     catch (e) {
                         // the yield above may raise an error, and the queue should be ended.
-                        end(e);
+                        end(e as Error);
                         if (e instanceof EndError)
                             return;
                         throw e;

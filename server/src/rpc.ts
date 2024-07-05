@@ -723,7 +723,7 @@ export class RpcPeer {
                     }
                     catch (e) {
                         // console.error('failure', rpcApply.method, e);
-                        this.createErrorResult(result, e);
+                        this.createErrorResult(result, e as Error);
                     }
 
                     this.send(result, undefined, serializationContext);
@@ -785,7 +785,7 @@ export class RpcPeer {
                     }
                     catch (e) {
                         // console.error('failure', rpcApply.method, e);
-                        this.createErrorResult(result, e);
+                        this.createErrorResult(result, e as Error);
                     }
 
                     if (!rpcApply.oneway)

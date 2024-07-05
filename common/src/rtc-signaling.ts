@@ -41,15 +41,15 @@ export function isPeerConnectionClosed(pc: RTCPeerConnection) {
         || pc.iceConnectionState === 'closed';
 }
 
-function silence() {
-    let ctx = new AudioContext(), oscillator = ctx.createOscillator();
-    const dest = ctx.createMediaStreamDestination();
-    oscillator.connect(dest);
-    oscillator.start();
-    const ret = dest.stream.getAudioTracks()[0];
-    ret.enabled = false;
-    return ret;
-}
+// function silence() {
+//     let ctx = new AudioContext(), oscillator = ctx.createOscillator();
+//     const dest = ctx.createMediaStreamDestination();
+//     oscillator.connect(dest);
+//     oscillator.start();
+//     const ret = dest.stream.getAudioTracks()[0];
+//     ret.enabled = false;
+//     return ret;
+// }
 
 function createOptions() {
     const options: RTCSignalingOptions = {

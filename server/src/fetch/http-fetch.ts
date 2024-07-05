@@ -150,31 +150,3 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
     }
 }
 
-function ensureType<T>(v: T) {
-}
-
-async function test() {
-    const a = await httpFetch({
-        url: 'http://example.com',
-    });
-
-    ensureType<Buffer>(a.body);
-
-    const b = await httpFetch({
-        url: 'http://example.com',
-        responseType: 'json',
-    });
-    ensureType<any>(b.body);
-
-    const c = await httpFetch({
-        url: 'http://example.com',
-        responseType: 'readable',
-    });
-    ensureType<IncomingMessage>(c.body);
-
-    const d = await httpFetch({
-        url: 'http://example.com',
-        responseType: 'buffer',
-    });
-    ensureType<Buffer>(d.body);
-}

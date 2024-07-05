@@ -523,7 +523,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     serializer.sendMessage(message, reject, serializationContext);
                 }
                 catch (e) {
-                    reject?.(e);
+                    reject?.(e as Error);
                 }
             });
 
@@ -537,9 +537,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             });
             serializer.setupRpcPeer(upgradingPeer);
 
-            const readyClose = new Promise<RpcPeer>((resolve, reject) => {
-                check.on('close', () => reject(new Error('closed')))
-            })
+            // is this an issue?
+            // const readyClose = new Promise<RpcPeer>((resolve, reject) => {
+            //     check.on('close', () => reject(new Error('closed')))
+            // })
 
             upgradingPeer.params['session'] = session;
 
@@ -570,7 +571,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     dcSerializer.sendMessage(message, reject, serializationContext);
                 }
                 catch (e) {
-                    reject?.(e);
+                    reject?.(e as Error);
                     pc.close();
                 }
             });
@@ -671,7 +672,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     serializer.sendMessage(message, reject, serializationContext);
                 }
                 catch (e) {
-                    reject?.(e);
+                    reject?.(e as Error);
                 }
             });
             socket.on('message', data => {
@@ -786,7 +787,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                                 serializer.sendMessage(message, reject, serializationContext);
                             }
                             catch (e) {
-                                reject?.(e);
+                                reject?.(e as Error);
                             }
                         });
                         serializer.setupRpcPeer(clusterPeer);

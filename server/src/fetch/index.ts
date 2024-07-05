@@ -210,32 +210,3 @@ export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T)
         clearTimeout(timeout);
     }
 }
-
-function ensureType<T>(v: T) {
-}
-
-async function test() {
-    const a = await domFetch({
-        url: 'http://example.com',
-    });
-
-    ensureType<Buffer>(a.body);
-
-    const b = await domFetch({
-        url: 'http://example.com',
-        responseType: 'json',
-    });
-    ensureType<any>(b.body);
-
-    const c = await domFetch({
-        url: 'http://example.com',
-        responseType: 'readable',
-    });
-    ensureType<Response>(c.body);
-
-    const d = await domFetch({
-        url: 'http://example.com',
-        responseType: 'buffer',
-    });
-    ensureType<Buffer>(d.body);
-}
