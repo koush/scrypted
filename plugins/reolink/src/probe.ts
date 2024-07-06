@@ -60,38 +60,51 @@ export async function getLoginParameters(host: string, username: string, passwor
     catch (e) {
     }
 
-    const url = new URL(`http://${host}/api.cgi`);
-    const params = url.searchParams;
-    params.set('cmd', 'Login');
-
-    const response = await httpFetch({
-        url,
-        method: 'POST',
-        responseType: 'json',
-        rejectUnauthorized: false,
-        body: [
-            {
-                cmd: 'Login',
-                action: 0,
-                param: {
-                    User: {
-                        userName: username,
-                        password: password
+    try {
+        const url = new URL(`http://${host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'Login');
+    
+        const response = await httpFetch({
+            url,
+            method: 'POST',
+            responseType: 'json',
+            rejectUnauthorized: false,
+            body: [
+                {
+                    cmd: 'Login',
+                    action: 0,
+                    param: {
+                        User: {
+                            userName: username,
+                            password: password
+                        }
                     }
-                }
+                },
+            ],
+        });
+    
+        const token = response.body?.[0]?.value?.Token?.name || response.body?.value?.Token?.name;
+        if (!token)
+            throw new Error('unable to login');
+        const { body } = response;
+        const leaseTimeSeconds: number = body?.[0]?.value?.Token.leaseTime || body?.value?.Token.leaseTime;
+        return {
+            parameters: {
+                token,
             },
-        ],
-    });
-
-    const token = response.body?.[0]?.value?.Token?.name || response.body?.value?.Token?.name;
-    if (!token)
-        throw new Error('unable to login');
-    const { body } = response;
-    const leaseTimeSeconds: number = body?.[0]?.value?.Token.leaseTime || body?.value?.Token.leaseTime;
-    return {
-        parameters: {
-            token,
-        },
-        leaseTimeSeconds,
+            leaseTimeSeconds,
+        }
+    }
+    catch (e) {
+        // if the token exchange fails, fall back to basic auth
+        // TODO: maybe detect error type?
+        return {
+            parameters: {
+                user: username,
+                password,
+            },
+            leaseTimeSeconds: 60,
+        }
     }
 }
