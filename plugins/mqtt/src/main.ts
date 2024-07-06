@@ -391,7 +391,8 @@ export class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, 
     }
 
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {
-        const { name, template } = settings;
+        let { name, template } = settings;
+        name = name || 'New MQTT Device';
         if (!template || template === MQTT_AUTODISCOVERY)
             return this.newAutoDiscovery(name.toString());
 
