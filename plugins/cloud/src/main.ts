@@ -888,10 +888,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.proxy.on('proxyRes', (res, req) => {
             res.headers['X-Scrypted-Cloud'] = req.headers['x-scrypted-cloud'];
             res.headers['X-Scrypted-Direct-Address'] = req.headers['x-scrypted-direct-address'];
-            let domain: string;
-            if (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
+            let domain = this.cloudflareTunnel;
+            if (!domain && this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
                 domain = `https://${this.storageSettings.values.hostname}`;
-            domain ||= this.cloudflareTunnel;
             res.headers['X-Scrypted-Cloud-Address'] = domain;
             res.headers['Access-Control-Expose-Headers'] = 'X-Scrypted-Cloud, X-Scrypted-Direct-Address, X-Scrypted-Cloud-Address';
         });
