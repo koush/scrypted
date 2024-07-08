@@ -982,6 +982,7 @@ class ColorSettingTemperature:
 class DeviceCreator:
     """A DeviceProvider that allows the user to create a device."""
 
+    createdDevice: str  # Type of device that will be created by this DeviceCreator. For example: Example Corp Camera or ACME Light Switch.
     async def createDevice(self, settings: DeviceCreatorSettings) -> str:
         pass
 
@@ -1756,6 +1757,7 @@ class ScryptedInterfaceProperty(str, Enum):
     ptzCapabilities = "ptzCapabilities"
     lockState = "lockState"
     entryOpen = "entryOpen"
+    createdDevice = "createdDevice"
     batteryLevel = "batteryLevel"
     chargeState = "chargeState"
     online = "online"
@@ -2150,6 +2152,14 @@ class DeviceState:
     @entryOpen.setter
     def entryOpen(self, value: bool | Any):
         self.setScryptedProperty("entryOpen", value)
+
+    @property
+    def createdDevice(self) -> str:
+        return self.getScryptedProperty("createdDevice")
+
+    @createdDevice.setter
+    def createdDevice(self, value: str):
+        self.setScryptedProperty("createdDevice", value)
 
     @property
     def batteryLevel(self) -> float:
@@ -2717,7 +2727,9 @@ ScryptedInterfaceDescriptors = {
       "createDevice",
       "getCreateDeviceSettings"
     ],
-    "properties": []
+    "properties": [
+      "createdDevice"
+    ]
   },
   "Battery": {
     "name": "Battery",

@@ -1013,6 +1013,51 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
   cpuTimer = new CpuTimer();
   cpuUsage = 0;
 
+  constructor(nativeId?: ScryptedNativeId) {
+    super(nativeId, 'v5');
+
+    this.createdDeviceName = 'Smart Motion Sensor';
+
+    process.nextTick(() => {
+      sdk.deviceManager.onDeviceDiscovered({
+        name: 'FFmpeg Frame Generator',
+        type: ScryptedDeviceType.Builtin,
+        interfaces: [
+          ScryptedInterface.VideoFrameGenerator,
+        ],
+        nativeId: 'ffmpeg',
+      })
+    });
+
+    setInterval(() => {
+      this.cpuUsage = this.cpuTimer.sample();
+      // this.console.log('cpu usage', Math.round(this.cpuUsage * 100));
+
+      const runningDetections = this.runningObjectDetections;
+
+      let allowStart = 2;
+      // always allow 2 cameras to push past cpu throttling
+      if (runningDetections.length > 2) {
+        const cpuPerDetector = this.cpuUsage / runningDetections.length;
+        allowStart = Math.ceil(1 / cpuPerDetector) - runningDetections.length;
+        if (allowStart <= 0)
+          return;
+      }
+
+      const idleDetectors = [...this.currentMixins.values()]
+        .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
+        .filter(c => !c.detectorRunning);
+
+      for (const notRunning of idleDetectors) {
+        if (notRunning.maybeStartDetection()) {
+          allowStart--;
+          if (allowStart <= 0)
+            return;
+        }
+      }
+    }, 10000)
+  }
+
   pruneOldStatistics() {
     const now = Date.now();
     for (const [k, v] of this.objectDetectionStatistics.entries()) {
@@ -1099,49 +1144,6 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
 
     this.statsSnapshotDetections = 0;
     this.statsSnapshotTime = now;
-  }
-
-  constructor(nativeId?: ScryptedNativeId) {
-    super(nativeId, 'v5');
-
-    process.nextTick(() => {
-      sdk.deviceManager.onDeviceDiscovered({
-        name: 'FFmpeg Frame Generator',
-        type: ScryptedDeviceType.Builtin,
-        interfaces: [
-          ScryptedInterface.VideoFrameGenerator,
-        ],
-        nativeId: 'ffmpeg',
-      })
-    });
-
-    setInterval(() => {
-      this.cpuUsage = this.cpuTimer.sample();
-      // this.console.log('cpu usage', Math.round(this.cpuUsage * 100));
-
-      const runningDetections = this.runningObjectDetections;
-
-      let allowStart = 2;
-      // always allow 2 cameras to push past cpu throttling
-      if (runningDetections.length > 2) {
-        const cpuPerDetector = this.cpuUsage / runningDetections.length;
-        allowStart = Math.ceil(1 / cpuPerDetector) - runningDetections.length;
-        if (allowStart <= 0)
-          return;
-      }
-
-      const idleDetectors = [...this.currentMixins.values()]
-        .map(d => [...d.currentMixins.values()].filter(dd => !dd.hasMotionType)).flat()
-        .filter(c => !c.detectorRunning);
-
-      for (const notRunning of idleDetectors) {
-        if (notRunning.maybeStartDetection()) {
-          allowStart--;
-          if (allowStart <= 0)
-            return;
-        }
-      }
-    }, 10000)
   }
 
   async getDevice(nativeId: string): Promise<any> {

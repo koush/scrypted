@@ -1037,6 +1037,11 @@ export interface DeviceCreator {
    * Return the id of the created device.
    */
   createDevice(settings: DeviceCreatorSettings): Promise<string>;
+  /**
+   * Type of device that will be created by this DeviceCreator.
+   * For example: Example Corp Camera or ACME Light Switch.
+   */
+  createdDevice?: string;
 }
 export interface DiscoveredDevice {
   name: string;
