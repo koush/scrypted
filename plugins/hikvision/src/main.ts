@@ -593,6 +593,10 @@ class HikvisionProvider extends RtspProvider {
         super();
     }
 
+    getScryptedDeviceCreator(): string {
+        return 'Hikvision Camera';
+    }
+
     getAdditionalInterfaces() {
         return [
             ScryptedInterface.Reboot,

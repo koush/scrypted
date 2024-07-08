@@ -1,3 +1,7 @@
 import { RtspProvider } from "./rtsp";
 
-export default new RtspProvider();
+export default class RTSPCameraProvider extends RtspProvider {
+    getScryptedDeviceCreator(): string {
+        return 'RTSP Camera';
+    }
+}

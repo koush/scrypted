@@ -1,5 +1,5 @@
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import { DeviceState, EventListenerRegister, MixinProvider, MotionSensor, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from "@scrypted/sdk";
+import { EventListenerRegister, MixinProvider, MotionSensor, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 
 export const ReplaceMotionSensorNativeId = 'replaceMotionSensor';
@@ -63,7 +63,7 @@ export class ReplaceMotionSensor extends ScryptedDeviceBase implements MixinProv
         ];
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any> {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any> {
         return new ReplaceMotionSensorMixin({
             group: 'Custom Motion Sensor',
             groupKey: 'replaceMotionSensor',

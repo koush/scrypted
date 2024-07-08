@@ -1016,7 +1016,9 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
   constructor(nativeId?: ScryptedNativeId) {
     super(nativeId, 'v5');
 
-    this.createdDevice = 'Smart Motion Sensor';
+    this.systemDevice = {
+      deviceCreator: 'Smart Motion Sensor',
+    };
 
     process.nextTick(() => {
       sdk.deviceManager.onDeviceDiscovered({

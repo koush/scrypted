@@ -362,6 +362,10 @@ export class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, 
     constructor(nativeId?: string) {
         super(nativeId);
 
+        this.systemDevice = {
+            deviceCreator: 'MQTT Device',
+        };
+
         this.maybeEnableBroker();
 
         for (const deviceId of deviceManager.getNativeIds()) {

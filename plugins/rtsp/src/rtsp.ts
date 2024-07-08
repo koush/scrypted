@@ -375,7 +375,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
     }
 }
 
-export class RtspProvider extends CameraProviderBase<UrlMediaStreamOptions> {
+export abstract class RtspProvider extends CameraProviderBase<UrlMediaStreamOptions> {
     createCamera(nativeId: string): RtspCamera {
         return new RtspCamera(nativeId, this);
     }

@@ -466,6 +466,10 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         })
     }
 
+    getScryptedDeviceCreator(): string {
+        return 'ONVIF Camera';
+    }
+
     async getDevice(nativeId: string) {
         if (nativeId === 'ptz')
             return new OnvifPTZMixinProvider('ptz');

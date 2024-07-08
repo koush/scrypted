@@ -1,5 +1,5 @@
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import { BinarySensor, DeviceState, EventListenerRegister, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from "@scrypted/sdk";
+import { BinarySensor, EventListenerRegister, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 
 export const ReplaceBinarySensorNativeId = 'replaceBinarySensor';
@@ -63,7 +63,7 @@ export class ReplaceBinarySensor extends ScryptedDeviceBase implements MixinProv
         ];
     }
 
-    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any> {
+    async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: WritableDeviceState): Promise<any> {
         return new ReplaceBinarySensorMixin({
             group: 'Custom Doorbell Button',
             groupKey: 'replaceBinarySensor',

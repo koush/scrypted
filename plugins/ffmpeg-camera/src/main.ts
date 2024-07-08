@@ -130,6 +130,10 @@ class FFmpegProvider extends CameraProviderBase<UrlMediaStreamOptions> {
     createCamera(nativeId: string): FFmpegCamera {
         return new FFmpegCamera(nativeId, this);
     }
+
+    getScryptedDeviceCreator(): string {
+        return 'FFmpeg Camera';
+    }
 }
 
 export default new FFmpegProvider();

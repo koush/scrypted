@@ -703,6 +703,9 @@ class AmcrestProvider extends RtspProvider {
         ];
     }
 
+    getScryptedDeviceCreator(): string {
+        return 'Amcrest Camera';
+    }
 
     async createDevice(settings: DeviceCreatorSettings, nativeId?: string): Promise<string> {
         const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;

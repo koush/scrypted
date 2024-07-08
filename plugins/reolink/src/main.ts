@@ -667,6 +667,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 }
 
 class ReolinkProvider extends RtspProvider {
+    getScryptedDeviceCreator(): string {
+        return 'Reolink Camera';
+    }
+
     getAdditionalInterfaces() {
         return [
             ScryptedInterface.Reboot,

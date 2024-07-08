@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/ffmpeg-camera",
-   "version": "0.0.22",
+   "version": "0.0.23",
    "description": "FFmpeg Camera Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -27,6 +27,8 @@
       "name": "FFmpeg Camera Plugin",
       "type": "DeviceProvider",
       "interfaces": [
+         "ScryptedSystemDevice",
+         "ScryptedDeviceCreator",
          "DeviceProvider",
          "DeviceCreator"
       ],

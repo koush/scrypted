@@ -84,6 +84,10 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
     constructor(nativeId?: string) {
         super(nativeId);
 
+        this.systemDevice = {
+            deviceCreator: 'Dummy Switch',
+        };
+
         for (const camId of deviceManager.getNativeIds()) {
             if (camId)
                 this.getDevice(camId);
