@@ -1,1 +1,2 @@
-export { sleep } from "@scrypted/server/src/sleep";
+import { sleep } from "@scrypted/server/src/sleep";
+export { sleep };
