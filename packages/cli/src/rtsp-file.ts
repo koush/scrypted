@@ -16,8 +16,13 @@ export async function convertRtspToMp4(rtspFile: string, sessionFile?: string) {
 
     const sessionDir = path.dirname(path.dirname(rtspFile));
     let sdp: string;
-    const sessionJson = path.join(sessionDir, 'session.json');
-    const sessionSdp = path.join(sessionDir, 'session.sdp');
+    let sessionJson = path.join(sessionDir, 'session.json');
+    if (!fs.existsSync(sessionJson) && sessionFile)
+        sessionJson = sessionFile.endsWith('.json') && sessionFile;
+
+    let sessionSdp = path.join(sessionDir, 'session.sdp');
+    if (!fs.existsSync(sessionSdp) && sessionFile)
+        sessionSdp = sessionFile.endsWith('.sdp') && sessionFile;
 
     if (fs.existsSync(sessionJson))  {
         sdp = JSON.parse(fs.readFileSync(sessionJson).toString()).sdp;
@@ -26,6 +31,8 @@ export async function convertRtspToMp4(rtspFile: string, sessionFile?: string) {
         sdp = fs.readFileSync(sessionSdp).toString();
     }
     else {
+        console.error('Could not find session sdp. Ensure the rtsp directory structure is intact or specify the path to the session file.');
+        console.error();
         printRtspUsage();
         process.exit(1);
     }
