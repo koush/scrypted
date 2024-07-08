@@ -506,7 +506,7 @@ export class RtspClient extends RtspBase {
             }
         }
         catch (e) {
-            this.client.destroy(e);
+            this.client.destroy(e as Error);
             throw e;
         }
     }
@@ -572,7 +572,7 @@ export class RtspClient extends RtspBase {
                 }
             }
             catch (e) {
-                deferred.reject(e);
+                deferred.reject(e as Error);
                 this.client.destroy();
             }
         };

@@ -9,8 +9,10 @@
       "inlineSources": true,
       "declaration": true,
       "moduleResolution": "Node16",
-      "strict": true
-  },
+      "strict": true,
+      "strictPropertyInitialization": false,
+      "strictNullChecks": false,
+    },
   "include": [
       "src/**/*"
   ],

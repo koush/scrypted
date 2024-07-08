@@ -79,4 +79,4 @@ export async function bind(server: dgram.Socket, port: number) {
     }
 }
 
-export { ListenZeroSingleClientTimeoutError, listenZero, listenZeroSingleClient } from "@scrypted/server/src/listen-zero";
+export { ListenZeroSingleClientTimeoutError, listenZero, listenZeroSingleClient } from "../../server/src/listen-zero";
