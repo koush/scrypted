@@ -10,6 +10,10 @@ export class AggregateCore extends ScryptedDeviceBase implements DeviceProvider,
     constructor() {
         super(AggregateCoreNativeId);
 
+        this.systemDevice = {
+            deviceCreator: 'Device Group',
+        };
+
         for (const nativeId of deviceManager.getNativeIds()) {
             if (nativeId?.startsWith('aggregate:')) {
                 const aggregate = createAggregateDevice(nativeId);

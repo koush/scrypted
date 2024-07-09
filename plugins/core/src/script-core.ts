@@ -18,6 +18,10 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
 
     constructor() {
         super(ScriptCoreNativeId);
+
+        this.systemDevice = {
+            deviceCreator: 'Script',
+        };
     }
 
     async getCreateDeviceSettings(): Promise<Setting[]> {

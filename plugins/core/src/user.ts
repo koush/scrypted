@@ -108,6 +108,10 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
     constructor() {
         super(UsersNativeId);
 
+        this.systemDevice = {
+            deviceCreator: 'Scrypted User',
+        };
+
         this.syncUsers();
     }
 

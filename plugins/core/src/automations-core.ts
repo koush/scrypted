@@ -12,6 +12,10 @@ export class AutomationCore extends ScryptedDeviceBase implements DeviceProvider
     constructor() {
         super(AutomationCoreNativeId);
 
+        this.systemDevice = {
+            deviceCreator: 'Automation',
+        };
+
         for (const nativeId of deviceManager.getNativeIds()) {
             if (nativeId?.startsWith('automation:')) {
                 const automation = new Automation(nativeId);
@@ -19,7 +23,6 @@ export class AutomationCore extends ScryptedDeviceBase implements DeviceProvider
                 this.reportAutomation(nativeId, automation.providedName);
             }
         }
-
 
         (async () => {
             const updatePluginsNativeId = 'automation:update-plugins'
