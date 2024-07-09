@@ -66,6 +66,10 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
     constructor() {
         super();
 
+        this.systemDevice = {
+            settings: "General",
+        }
+
         checkLxcDependencies();
 
         this.indexHtml = readFileAsString('dist/index.html');
