@@ -1,6 +1,6 @@
 import { closeQuiet, createBindZero, listenZero } from '@scrypted/common/src/listen-cluster';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import sdk, { BinarySensor, Camera, Device, DeviceProvider, DeviceCreator, DeviceCreatorSettings, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, DeviceProvider, DeviceCreator, DeviceCreatorSettings, FFmpegInput, Intercom, MediaObject, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import dgram from 'dgram';
@@ -430,7 +430,9 @@ export class SipCamProvider extends ScryptedDeviceBase implements DeviceProvider
 
     constructor(nativeId?: string) {
         super(nativeId);
-
+        this.systemDevice = {
+            deviceCreator: 'SIP Camera',
+        };
         for (const camId of deviceManager.getNativeIds()) {
             if (camId)
                 this.getDevice(camId);

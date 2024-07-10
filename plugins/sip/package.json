@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/sip",
-   "version": "0.0.10",
+   "version": "0.0.11",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -23,6 +23,8 @@
       "name": "SIP Plugin",
       "type": "DeviceProvider",
       "interfaces": [
+         "ScryptedSystemDevice",
+         "ScryptedDeviceCreator",
          "DeviceProvider",
          "DeviceCreator"
       ],
@@ -32,6 +34,8 @@
       ]
    },
    "dependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
       "@slyoldfox/sip": "^0.0.6-1",
       "pick-port": "^1.0.0",
       "rxjs": "^7.8.1",
@@ -39,9 +43,7 @@
       "stun": "^2.1.0"
    },
    "devDependencies": {
-      "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk",
-      "@types/node": "^16.9.6",
+      "@types/node": "^20.11.30",
       "cross-env": "^7.0.3"
    }
 }
