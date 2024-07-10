@@ -5,6 +5,7 @@ import fs from 'fs';
 import type { TranspileOptions } from "typescript";
 import vm from "vm";
 import { ScriptDevice } from "./monaco/script-device";
+import type * as monacoEditor from 'monaco-editor';
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -134,7 +135,7 @@ export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
 
     const libs = Object.assign(getTypeDefs(), extraLibs);
 
-    function monacoEvalDefaultsFunction(monaco: any, safeLibs: any, libs: any) {
+    function monacoEvalDefaultsFunction(monaco: typeof monacoEditor, safeLibs: any, libs: any) {
         monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(
             Object.assign(
                 {},
