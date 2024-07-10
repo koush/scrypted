@@ -29,6 +29,7 @@ from plugin_pip import install_with_pip, need_requirements, remove_pip_dirs
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 EventDetails,
+                                                ScryptedInterface,
                                                 ScryptedInterfaceMethods,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
@@ -139,6 +140,19 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
             state = self.systemState.get(check, None)
             if not state:
                 continue
+            checkInterfaces = state.get('interfaces', None)
+            if not checkInterfaces:
+                continue
+            interfaces = checkInterfaces.get('value', [])
+            if ScryptedInterface.ScryptedPlugin.value in interfaces:
+                checkPluginId = state.get('pluginId', None)
+                if not checkPluginId:
+                    continue
+                pluginId = checkPluginId.get('value', None)
+                if not pluginId:
+                    continue
+                if pluginId == name:
+                    return self.getDeviceById(check)
             checkName = state.get('name', None)
             if not checkName:
                 continue
