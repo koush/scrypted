@@ -9,6 +9,13 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
 
     devices = new Map<string, BticinoSipCamera>()
 
+    constructor() {
+        super();
+        this.systemDevice = {
+            deviceCreator: 'Bticino Doorbell',
+        };
+    }
+
     async getCreateDeviceSettings(): Promise<Setting[]> {
         return [
             {
@@ -76,17 +83,18 @@ export class BticinoSipPlugin extends ScryptedDeviceBase implements DeviceProvid
                 name: name + ' Muted',
                 type: ScryptedDeviceType.Switch,
                 interfaces: [ScryptedInterface.OnOff, ScryptedInterface.HttpRequestHandler],
-            }                
+            }
+            const devices = setupData["model"] === 'c100x' ? [lockDevice, muteSwitchDevice] : [lockDevice, aswmSwitchDevice, muteSwitchDevice]
     
             await deviceManager.onDevicesChanged({
                 providerNativeId: nativeId,
-                devices: [lockDevice, aswmSwitchDevice, muteSwitchDevice],
+                devices: devices
             })
     
             let sipCamera : BticinoSipCamera = await this.getDevice(nativeId)
             
             sipCamera.putSetting("sipfrom", "scrypted-" + sipCamera.id + "@127.0.0.1")
-            sipCamera.putSetting("sipto", "c300x@" + setupData["ipAddress"] )
+            sipCamera.putSetting("sipto", setupData["model"] + "@" + setupData["ipAddress"] )
             sipCamera.putSetting("sipdomain", setupData["domain"])
             sipCamera.putSetting("sipdebug", true )
             

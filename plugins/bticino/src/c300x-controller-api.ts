@@ -51,6 +51,9 @@ export class ControllerApi {
             res.on("end", () => {
                 try {
                     let parsedBody = JSON.parse( body )
+                    if( !parsedBody["model"] ) {
+                        reject( new Error("Cannot determine model, update your c300x-controller.") )
+                    }
                     if( parsedBody["errors"].length > 0 ) {
                         reject( new Error( parsedBody["errors"][0] ) )
                     } else {
