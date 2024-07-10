@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/sip",
-   "version": "0.0.10",
+   "version": "0.0.11",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
