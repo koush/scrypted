@@ -1,4 +1,4 @@
-import sdk, {  MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceBase } from "@scrypted/sdk/settings-mixin";
 import fs from 'fs';
@@ -6,6 +6,7 @@ import type { TranspileOptions } from "typescript";
 import vm from "vm";
 import { ScriptDevice } from "./monaco/script-device";
 import type * as monacoEditor from 'monaco-editor';
+import { createMonacoEvalDefaultsWithLibs, ScryptedLibs, StandardLibs } from "./monaco-libs";
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -29,22 +30,18 @@ export function readFileAsString(f: string) {
     return fs.readFileSync(f).toString();;
 }
 
-function getTypeDefs() {
-    const settingsMixinDefs = readFileAsString('@types/sdk/settings-mixin.d.ts');
-    const storageSettingsDefs = readFileAsString('@types/sdk/storage-settings.d.ts');
-    const scryptedTypesDefs = readFileAsString('@types/sdk/types.d.ts');
-    const scryptedIndexDefs = readFileAsString('@types/sdk/index.d.ts');
+function getScryptedLibs(): ScryptedLibs {
     return {
-        settingsMixinDefs,
-        storageSettingsDefs,
-        scryptedIndexDefs,
-        scryptedTypesDefs,
-    };
+        "@types/sdk/index.d.ts": readFileAsString('@types/sdk/index.d.ts'),
+        "@types/sdk/settings-mixin.d.ts": readFileAsString('@types/sdk/settings-mixin.d.ts'),
+        "@types/sdk/storage-settings.d.ts": readFileAsString('@types/sdk/storage-settings.d.ts'),
+        "@types/sdk/types.d.ts": readFileAsString('@types/sdk/types.d.ts'),
+    }
 }
 
 export async function scryptedEval(device: ScryptedDeviceBase, script: string, extraLibs: { [lib: string]: string }, params: { [name: string]: any }) {
     const libs = Object.assign({
-        types: getTypeDefs().scryptedTypesDefs,
+        types: getScryptedLibs()['@types/sdk/types.d.ts'],
     }, extraLibs);
     const allScripts = Object.values(libs).join('\n').toString() + script;
     let compiled: string;
@@ -118,102 +115,18 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
 }
 
 export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
-    const safeLibs: any = {};
+    const standardlibs: StandardLibs = {
+        "@types/node/globals.d.ts": readFileAsString('@types/node/globals.d.ts'),
+        "@types/node/buffer.d.ts": readFileAsString('@types/node/buffer.d.ts'),
+        "@types/node/process.d.ts": readFileAsString('@types/node/process.d.ts'),
+        "@types/node/events.d.ts": readFileAsString('@types/node/events.d.ts'),
+        "@types/node/stream.d.ts": readFileAsString('@types/node/stream.d.ts'),
+        "@types/node/fs.d.ts": readFileAsString('@types/node/fs.d.ts'),
+        "@types/node/net.d.ts": readFileAsString('@types/node/net.d.ts'),
+        "@types/node/child_process.d.ts": readFileAsString('@types/node/child_process.d.ts'),
+    };
 
-    for (const safeLib of [
-        '@types/node/globals.d.ts',
-        '@types/node/buffer.d.ts',
-        '@types/node/process.d.ts',
-        '@types/node/events.d.ts',
-        '@types/node/stream.d.ts',
-        '@types/node/fs.d.ts',
-        '@types/node/net.d.ts',
-        '@types/node/child_process.d.ts',
-    ]) {
-        safeLibs[`node_modules/${safeLib}`] = readFileAsString(safeLib)
-    }
-
-    const libs = Object.assign(getTypeDefs(), extraLibs);
-
-    function monacoEvalDefaultsFunction(monaco: typeof monacoEditor, safeLibs: any, libs: any) {
-        monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(
-            Object.assign(
-                {},
-                monaco.languages.typescript.typescriptDefaults.getDiagnosticsOptions(),
-                {
-                    diagnosticCodesToIgnore: [1108, 1375, 1378],
-                }
-            )
-        );
-
-        monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
-            Object.assign(
-                {},
-                monaco.languages.typescript.typescriptDefaults.getCompilerOptions(),
-                {
-                    moduleResolution:
-                        monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-                }
-            )
-        );
-
-        const catLibs = Object.values(libs).join('\n');
-        const catlibsNoExport = Object.keys(libs).filter(lib => lib !== 'sdk')
-            .map(lib => libs[lib]).map(lib =>
-                lib.toString().replace(/export /g, '').replace(/import.*?/g, ''))
-            .join('\n');
-        monaco.languages.typescript.typescriptDefaults.addExtraLib(`
-        ${catLibs}
-
-        declare global {
-            ${catlibsNoExport}
-
-            const log: Logger;
-
-            const deviceManager: DeviceManager;
-            const endpointManager: EndpointManager;
-            const mediaManager: MediaManager;
-            const systemManager: SystemManager;
-            const mqtt: MqttClient;
-            const device: ScryptedDeviceBase & { pathname : string };
-        }
-        `,
-
-            "node_modules/@types/scrypted__sdk/types/index.d.ts"
-        );
-
-        monaco.languages.typescript.typescriptDefaults.addExtraLib(
-            libs['settingsMixin'],
-            "node_modules/@types/scrypted__sdk/settings-mixin.d.ts"
-        );
-
-        monaco.languages.typescript.typescriptDefaults.addExtraLib(
-            libs['storageSettings'],
-            "node_modules/@types/scrypted__sdk/storage-settings.d.ts"
-        );
-
-        monaco.languages.typescript.typescriptDefaults.addExtraLib(
-            libs['sdk'],
-            "node_modules/@types/scrypted__sdk/index.d.ts"
-        );
-
-        for (const lib of Object.keys(safeLibs)) {
-            monaco.languages.typescript.typescriptDefaults.addExtraLib(
-                safeLibs[lib],
-                lib,
-            );
-        }
-    }
-
-    return `(function() {
-    const safeLibs = ${JSON.stringify(safeLibs)};
-    const libs = ${JSON.stringify(libs)};
-
-    return (monaco) => {
-        (${monacoEvalDefaultsFunction})(monaco, safeLibs, libs);
-    }
-    })();
-    `;
+    return createMonacoEvalDefaultsWithLibs(standardlibs, getScryptedLibs(), extraLibs);
 }
 
 export interface ScriptDeviceImpl extends ScriptDevice {
