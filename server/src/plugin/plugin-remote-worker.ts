@@ -9,6 +9,7 @@ import { computeClusterObjectHash } from '../cluster/cluster-hash';
 import { ClusterObject, ConnectRPCObject } from '../cluster/connect-rpc-object';
 import { listenZero } from '../listen-zero';
 import { RpcMessage, RpcPeer } from '../rpc';
+import { evalLocal } from '../rpc-peer-eval';
 import { createDuplexRpcPeer } from '../rpc-serializer';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
@@ -376,7 +377,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             try {
                 const filename = zipOptions?.debug ? '/plugin/main.nodejs.js' : `/${pluginId}/main.nodejs.js`;
-                peer.evalLocal(script, filename, params);
+                evalLocal(peer, script, filename, params);
 
                 if (zipOptions?.fork) {
                     // pluginConsole?.log('plugin forked');

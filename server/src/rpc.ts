@@ -1,6 +1,3 @@
-import type { CompileFunctionOptions } from 'vm';
-type CompileFunction = (code: string, params?: ReadonlyArray<string>, options?: CompileFunctionOptions) => Function;
-
 export function startPeriodicGarbageCollection() {
     if (!global.gc) {
         console.warn('rpc peer garbage collection not available: global.gc is not exposed.');
@@ -253,12 +250,6 @@ export class RPCResultError extends Error {
     }
 }
 
-function compileFunction(code: string, params?: ReadonlyArray<string>, options?: CompileFunctionOptions): any {
-    params = params || [];
-    const f = `(function(${params.join(',')}) {;${code};})`;
-    return eval(f);
-}
-
 declare class WeakRef<T> {
     target: T;
     constructor(target: any);
@@ -497,23 +488,6 @@ export class RpcPeer {
 
             this.send(paramMessage, reject);
         });
-    }
-
-    evalLocal<T>(script: string, filename?: string, coercedParams?: { [name: string]: any }): T {
-        const params = Object.assign({}, this.params, coercedParams);
-        let compile: CompileFunction;
-        try {
-            // prevent bundlers from trying to include non-existent vm module.
-            compile = module[`require`]('vm').compileFunction;
-        }
-        catch (e) {
-            compile = compileFunction;
-        }
-        const f = compile(script, Object.keys(params), {
-            filename,
-        });
-        const value = f(...Object.values(params));
-        return value;
     }
 
     /**
