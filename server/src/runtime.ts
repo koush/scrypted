@@ -275,10 +275,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             return;
         }
 
+        const reqany = req as any;
         if ((req as any).upgradeHead)
-            this.connectRPCObjectIO.handleUpgrade(req, res.socket, (req as any).upgradeHead)
+            this.connectRPCObjectIO.handleUpgrade(reqany, res.socket, reqany)
         else
-            this.connectRPCObjectIO.handleRequest(req, res);
+            this.connectRPCObjectIO.handleRequest(reqany, res);
     }
 
     async getEndpointPluginData(req: Request, endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<HttpPluginData> {
@@ -422,15 +423,18 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             return;
         }
 
-        (req as any).scrypted = {
+        const reqany = req as any;
+
+        reqany.scrypted = {
             endpointRequest,
             pluginDevice,
             accessControls,
         };
+
         if ((req as any).upgradeHead)
-            pluginHost.io.handleUpgrade(req, res.socket, (req as any).upgradeHead)
+            pluginHost.io.handleUpgrade(reqany, res.socket, reqany.upgradeHead)
         else
-            pluginHost.io.handleRequest(req, res);
+            pluginHost.io.handleRequest(reqany, res);
     }
 
     handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
