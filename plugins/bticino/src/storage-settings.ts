@@ -49,11 +49,23 @@ export class BticinoStorageSettings {
                 description: 'Enable SIP debugging',
                 placeholder: 'true or false',
             },     
+            DEVADDR: {
+                title: 'Device address (DEVADDR)',
+                type: 'string',
+                description: 'Only specify if this is different than 20. For c100x this is a UUID, see: tcpdump -i lo port 5060',
+                defaultValue: '20',
+                placeholder: '20',
+            },               
             notifyVoicemail: {
                 title: 'Notify on new voicemail messages',
                 type: 'boolean',
                 description: 'Enable voicemail alerts',
                 placeholder: 'true or false',
+                onGet: async () => {
+                    return {
+                        hide: this.storageSettings.values.sipto.indexOf('c100x') == 0,
+                    }
+                }
             },   
             doorbellWebhookUrl: {
                 title: 'Doorbell Sensor Webhook',

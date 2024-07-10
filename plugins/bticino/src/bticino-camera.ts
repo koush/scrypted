@@ -29,7 +29,6 @@ import { ControllerApi } from './c300x-controller-api';
 import { BticinoAswmSwitch } from './bticino-aswm-switch';
 import { BticinoMuteSwitch } from './bticino-mute-switch';
 
-const STREAM_TIMEOUT = 65000;
 const { mediaManager } = sdk;
 const BTICINO_CLIPS = path.join(process.env.SCRYPTED_PLUGIN_VOLUME, 'bticino-clips');
 
@@ -42,7 +41,6 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
     public requestHandlers: CompositeSipMessageHandler = new CompositeSipMessageHandler()
     public incomingCallRequest : SipRequest
     private settingsStorage: BticinoStorageSettings = new BticinoStorageSettings( this )
-    private voicemailHandler : VoicemailHandler = new VoicemailHandler(this)
     private inviteHandler : InviteHandler = new InviteHandler(this)
     private controllerApi : ControllerApi = new ControllerApi(this)
     private muteSwitch : BticinoMuteSwitch
@@ -60,7 +58,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
 
     constructor(nativeId: string, public provider: BticinoSipPlugin) {
         super(nativeId)
-        this.requestHandlers.add( this.voicemailHandler ).add( this.inviteHandler )
+        this.requestHandlers.add( this.inviteHandler )
         this.persistentSipManager = new PersistentSipManager( this );
         (async() => {
             this.doorbellWebhookUrl = await this.doorbellWebhookEndpoint()
@@ -349,19 +347,13 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
         this.forwarder = undefined
     }
 
-    resetStreamTimeout() {
-        this.log.d('starting/refreshing stream')
-        clearTimeout(this.refreshTimeout)
-        this.refreshTimeout = setTimeout(() => this.stopSession(), STREAM_TIMEOUT)
-    }
-
     hasActiveCall() {
         return this.session;
     }
 
     stopSession() {
         if (this.session) {
-            this.log.d('ending sip session')
+            this.console.log('ending sip session')
             this.session.stop()
             this.session = undefined
         }
@@ -406,7 +398,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
                     if (this.session === sip)
                         this.session = undefined
                     try {
-                        this.log.d('cleanup(): stopping sip session.')
+                        this.console.log('cleanup(): stopping sip session.')
                         sip?.stop()
                         this.currentMediaObject = undefined
                     }
@@ -617,7 +609,7 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
 
     async getDevice(nativeId: string) : Promise<any> {
         if( nativeId && nativeId.endsWith('-aswm-switch')) {
-            this.aswmSwitch = new BticinoAswmSwitch(this, this.voicemailHandler)
+            this.aswmSwitch = new BticinoAswmSwitch(this)
             return this.aswmSwitch
         } else if( nativeId && nativeId.endsWith('-mute-switch') ) {
             this.muteSwitch = new BticinoMuteSwitch(this)
@@ -633,7 +625,6 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
             this.muteSwitch.cancelTimer()
         } else {
             this.stopIntercom()
-            this.voicemailHandler.cancelTimer()
             this.persistentSipManager.cancelTimer()        
             this.controllerApi.cancelTimer()
         }

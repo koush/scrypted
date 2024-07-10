@@ -4,9 +4,12 @@ import { VoicemailHandler } from "./bticino-voicemailHandler";
 
 export class BticinoAswmSwitch extends ScryptedDeviceBase implements OnOff, HttpRequestHandler {
     private timeout : NodeJS.Timeout
+    private voicemailHandler : VoicemailHandler
 
-    constructor(private camera: BticinoSipCamera, private voicemailHandler : VoicemailHandler) {
+    constructor(private camera: BticinoSipCamera) {
         super( camera.nativeId + "-aswm-switch")
+        this.voicemailHandler = new VoicemailHandler(camera)
+        camera.requestHandlers.add(this.voicemailHandler)
         this.timeout = setTimeout( () => this.syncStatus() , 5000 )
     }
 
@@ -29,6 +32,7 @@ export class BticinoAswmSwitch extends ScryptedDeviceBase implements OnOff, Http
         if( this.timeout ) {
             clearTimeout(this.timeout)
         }
+        this.voicemailHandler?.cancelTimer()
     }
 
     public async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
