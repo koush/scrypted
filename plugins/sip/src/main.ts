@@ -430,7 +430,9 @@ export class SipCamProvider extends ScryptedDeviceBase implements DeviceProvider
 
     constructor(nativeId?: string) {
         super(nativeId);
-
+        this.systemDevice = {
+            deviceCreator: 'SIP Camera',
+        };
         for (const camId of deviceManager.getNativeIds()) {
             if (camId)
                 this.getDevice(camId);
