@@ -1,0 +1,53 @@
+{
+   "name": "@vityevato/hikvision-doorbell",
+   "version": "0.0.4",
+   "description": "Hikvision Doorbell Plugin for Scrypted",
+   "author": "Roman Sokolov",
+   "license": "Apache",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "hikvision",
+      "camera",
+      "doorbell"
+   ],
+   "scrypted": {
+      "name": "Hikvision Doorbell Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider",
+         "DeviceCreator"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "@scrypted/server": "file:../../server",
+      "@types/xml2js": "^0.4.11",
+      "http-auth-client": "^0.4.1",
+      "ip": "^1.1.8",
+      "lodash": "^4.17.21",
+      "xml2js": "^0.6.0",
+      "sip": "git+https://github.com/kirm/sip.js.git"
+   },
+   "devDependencies": {
+      "@types/ip": "^1.1.3",
+      "@types/node": "^18.15.11"
+   }
+}
