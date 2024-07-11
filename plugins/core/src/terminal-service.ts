@@ -114,7 +114,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
      *   Resize: { "dim": { "cols": number, "rows": number } }
      *   EOF: { "eof": true }
      */
-    async connectStream(input: AsyncGenerator<Buffer | string, void>): Promise<AsyncGenerator<Buffer, void>> {
+    async connectStream(input: AsyncGenerator<Buffer | string, void>, options?: any): Promise<AsyncGenerator<Buffer, void>> {
         let cp: InteractiveTerminal | NoninteractiveTerminal = null;
         const queue = createAsyncQueue<Buffer>();
 
@@ -171,6 +171,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                         } else if (parsed.eof) {
                             cp?.sendEOF();
                         } else if ("interactive" in parsed && !cp) {
+                            const cmd = parsed.cmd || options?.cmd;
                             if (parsed.interactive) {
                                 let spawn: typeof ptySpawn;
                                 try {
@@ -182,7 +183,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                                     catch (e) {
                                         spawn = require('@scrypted/node-pty').spawn as typeof ptySpawn;
                                     }
-                                    cp = new InteractiveTerminal(parsed.cmd, spawn);
+                                    cp = new InteractiveTerminal(cmd, spawn);
                                 }
                                 catch (e) {
                                     this.console.error('Error starting pty', e);
@@ -190,7 +191,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                                     return;
                                 }
                             } else {
-                                cp = new NoninteractiveTerminal(parsed.cmd);
+                                cp = new NoninteractiveTerminal(cmd);
                             }
                             registerChildListeners();
                         }
