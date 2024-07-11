@@ -26,6 +26,8 @@
       "name": "HomeKit",
       "type": "DeviceProvider",
       "interfaces": [
+         "ScryptedSystemDevice",
+         "ScryptedSettings",
          "MixinProvider",
          "Settings",
          "DeviceProvider"
