@@ -277,7 +277,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
         const reqany = req as any;
         if ((req as any).upgradeHead)
-            this.connectRPCObjectIO.handleUpgrade(reqany, res.socket, reqany)
+            this.connectRPCObjectIO.handleUpgrade(reqany, res.socket, reqany.upgradeHead)
         else
             this.connectRPCObjectIO.handleRequest(reqany, res);
     }
