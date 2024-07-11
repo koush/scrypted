@@ -182,6 +182,7 @@ class ScryptedInterface(str, Enum):
     Settings = "Settings"
     StartStop = "StartStop"
     StreamService = "StreamService"
+    TTY = "TTY"
     TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
     Thermometer = "Thermometer"
@@ -1465,6 +1466,12 @@ class StreamService:
     async def connectStream(self, input: Any = None, options: Any = None) -> Any:
         pass
 
+
+class TTY:
+    """TTY connection offered by a remote device that can be connected to by an interactive terminal interface.  Implementors should also implement StreamService to handle the actual data transfer."""
+
+
+    pass
 
 class TamperSensor:
 
@@ -3124,6 +3131,11 @@ ScryptedInterfaceDescriptors = {
     "methods": [
       "connectStream"
     ],
+    "properties": []
+  },
+  "TTY": {
+    "name": "TTY",
+    "methods": [],
     "properties": []
   },
   "ScryptedSystemDevice": {
