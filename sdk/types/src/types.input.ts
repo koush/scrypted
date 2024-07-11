@@ -1381,7 +1381,7 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
   labelScore?: number;
   /**
    * A base64 encoded Float32Array that represents the vector descriptor of the detection.
-   * Can be used to compute euclidian distance to determine similarity. 
+   * Can be used to compute euclidian distance to determine similarity.
    */
   descriptor?: string;
   /**
@@ -1526,6 +1526,15 @@ export interface VideoFrameGenerator {
  */
 export interface StreamService {
   connectStream(input?: AsyncGenerator<any, void>, options?: any): Promise<AsyncGenerator<any, void>>;
+}
+/**
+ * TTY connection offered by a remote device that can be connected to
+ * by an interactive terminal interface.
+ *
+ * Implementors should also implement StreamService to handle
+ * the actual data transfer.
+ */
+export interface TTY {
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -2129,6 +2138,7 @@ export enum ScryptedInterface {
   ScryptedUser = "ScryptedUser",
   VideoFrameGenerator = 'VideoFrameGenerator',
   StreamService = 'StreamService',
+  TTY = 'TTY',
 
   ScryptedSystemDevice = "ScryptedSystemDevice",
   ScryptedDeviceCreator = "ScryptedDeviceCreator",
