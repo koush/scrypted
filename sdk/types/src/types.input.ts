@@ -2015,7 +2015,7 @@ export interface Setting {
   subgroup?: string;
   description?: string;
   placeholder?: string;
-  type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath' | 'interface' | 'qrcode' | 'textarea' | 'date' | 'time' | 'datetime' | 'day' | 'script';
+  type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath' | 'interface' | 'html' | 'textarea' | 'date' | 'time' | 'datetime' | 'day' | 'script';
   /**
    * The range of allowed numbers, if any, when the type is 'number'.
    */
