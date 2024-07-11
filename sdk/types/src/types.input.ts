@@ -2005,7 +2005,7 @@ export enum MediaPlayerState {
   Paused = "Paused",
   Buffering = "Buffering",
 }
-export type SettingValue = undefined | null | string | number | boolean | string[] | number[];
+export type SettingValue = undefined | null | string | number | boolean | string[] | number[] | ClipPath;
 export type Point = [number, number];
 export type ClipPath = Point[];
 export interface Setting {
