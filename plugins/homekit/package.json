@@ -38,7 +38,8 @@
       "check-disk-space": "^3.4.0",
       "hap-nodejs": "^0.11.2",
       "lodash": "^4.17.21",
-      "mkdirp": "^3.0.1"
+      "mkdirp": "^3.0.1",
+      "qrcode-svg": "^1.1.0"
    },
    "devDependencies": {
       "@scrypted/common": "file:../../common",
@@ -46,6 +47,7 @@
       "@types/debug": "^4.1.12",
       "@types/lodash": "^4.17.0",
       "@types/node": "^20.11.28",
+      "@types/qrcode-svg": "^1.1.4",
       "@types/url-parse": "^1.4.11"
    }
 }

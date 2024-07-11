@@ -16,6 +16,7 @@ import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { reorderDevicesByProvider } from './util';
 import { VideoClipsMixinProvider } from './video-clips-provider';
+import QRCode from 'qrcode-svg';
 
 const hapStorage: Storage = {
     get length() {
@@ -283,7 +284,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                             await this.publishAccessory(accessory, storageSettings.values.mac, storageSettings.values.pincode, standaloneCategory, storageSettings.values.portOverride, storageSettings.values.addIdentifyingMaterial);
                             if (!hasPublished) {
                                 hasPublished = true;
-                                storageSettings.values.qrCode = accessory.setupURI();
+                                storageSettings.values.qrCode = new QRCode(accessory.setupURI()).svg();
                                 logConnections(mixinConsole, accessory, this.seenConnections);
                             }
                         }
@@ -364,7 +365,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         };
 
         this.bridge.publish(publishInfo, true).then(() => {
-            this.storageSettings.values.qrCode = this.bridge.setupURI();
+            this.storageSettings.values.qrCode = new QRCode(this.bridge.setupURI()).svg();
             logConnections(this.console, this.bridge, this.seenConnections);
         });
 
