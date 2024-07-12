@@ -69,6 +69,16 @@ The recommended codec settings for cameras in HomeKit can be viewed in the [Home
 
 The latest troubleshooting guide for all known streaming or recording issues can be viewed in the [HomeKit plugin](#/device/${id}).`;
 
+        if (this.storageSettings.values.standalone) {
+            readme += `
+
+## HomeKit Pairing
+
+${this.storageSettings.values.pincode}
+${this.storageSettings.values.qrCode}
+            `
+        }
+
         return readme;
     }
 
