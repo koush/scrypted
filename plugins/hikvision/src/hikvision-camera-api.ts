@@ -1,3 +1,4 @@
+import { HikvisionCameraStreamSetup, HikvisionAPI } from "./hikvision-api-interfaces"
 import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { readLine } from '@scrypted/common/src/read-stream';
 import { parseHeaders, readBody, readMessage } from '@scrypted/common/src/rtsp-server';
@@ -33,13 +34,7 @@ export enum HikvisionCameraEvent {
     FieldDetection = "<eventType>fielddetection</eventType>",
 }
 
-
-export interface HikvisionCameraStreamSetup {
-    videoCodecType: string;
-    audioCodecType: string;
-}
-
-export class HikvisionCameraAPI {
+export class HikvisionCameraAPI implements HikvisionAPI {
     credential: AuthFetchCredentialState;
     deviceModel: Promise<string>;
     listenerPromise: Promise<Destroyable>;

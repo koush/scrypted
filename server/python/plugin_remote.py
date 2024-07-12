@@ -404,7 +404,7 @@ class PluginRemote:
 
         def computeClusterObjectHash(o: ClusterObject) -> str:
             m = hashlib.sha256()
-            m.update(bytes(f"{o['id']}{o['port']}{o.get('sourcePort', '')}{o['proxyId']}{clusterSecret}", 'utf8'))
+            m.update(bytes(f"{o['id']}{o['port']}{o.get('sourcePort') or ''}{o['proxyId']}{clusterSecret}", 'utf8'))
             return base64.b64encode(m.digest()).decode('utf-8')
 
         def onProxySerialization(value: Any, proxyId: str, sourcePeerPort: int = None):
