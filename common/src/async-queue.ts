@@ -155,6 +155,23 @@ export function createAsyncQueue<T>() {
     }
 }
 
+export function createAsyncQueueFromGenerator<T>(generator: AsyncGenerator<T>) {
+    const q = createAsyncQueue<T>();
+    (async() => {
+        try {
+            for await (const i of generator) {
+                q.submit(i);
+            }
+        }
+        catch (e) {
+            q.end(e as Error);
+        }
+        q.end();
+    })();
+
+    return q;
+}
+
 // async function testSlowEnqueue() {
 //     const asyncQueue = createAsyncQueue<number>();
 
