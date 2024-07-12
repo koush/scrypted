@@ -79,6 +79,11 @@ fs.writeFileSync(path.join(__dirname, '../gen/index.ts'), contents);
 const discoveredTypes = new Set<string>();
 discoveredTypes.add('EventDetails');
 
+// When computing method signatures, we push the generic parameter types
+// into this set. We can then convert them to Any.
+// Pop the types off when we're done.
+const parameterTypes = new Set<string>();
+
 function toPythonType(type: any): string {
     if (type.type === 'array')
         return `list[${toPythonType(type.elementType)}]`;
@@ -88,7 +93,11 @@ function toPythonType(type: any): string {
         return `tuple[${type.elements.map((et: any) => toPythonType(et)).join(', ')}]`;
     if (type.type === 'union')
         return type.types.map((type: any) => toPythonType(type)).join(' | ')
+    if (type.name === 'AsyncGenerator')
+        return `AsyncGenerator[${toPythonType(type.typeArguments[0])}, None]`;
     type = type.typeArguments?.[0]?.name || type.name || type;
+    if (parameterTypes.has(type))
+        return 'Any';
     switch (type) {
         case 'boolean':
             return 'bool';
@@ -133,9 +142,22 @@ function toPythonMethodDeclaration(method: any) {
 }
 
 function selfSignature(method: any) {
+    for (const typeParameter of method.signatures[0].typeParameter || []) {
+        parameterTypes.add(typeParameter.name);
+    }
     const params = (method.signatures[0].parameters || []).map((p: any) => toPythonParameter(p));
+    parameterTypes.clear();
     params.unshift('self');
     return params.join(', ');
+}
+
+function selfReturnType(method: any) {
+    for (const typeParameter of method.signatures[0].typeParameter || []) {
+        parameterTypes.add(typeParameter.name);
+    }
+    const retType = toPythonReturnType(method.signatures[0].type);
+    parameterTypes.clear();
+    return retType
 }
 
 const enums = schema.children?.filter((child: any) => child.kindString === 'Enumeration') ?? [];
@@ -210,7 +232,7 @@ ${toDocstring(td)}
 `
     }
     for (const method of methods) {
-        python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${toPythonReturnType(method.signatures[0].type)}:
+        python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${selfReturnType(method)}:
         ${toDocstring(method, true)}
 
 `
@@ -229,7 +251,7 @@ for (const td of interfaces) {
 
 let pythonEnums = ''
 for (const e of enums) {
-    if (e.children) {    
+    if (e.children) {
         pythonEnums += `
 class ${e.name}(str, Enum):
 ${toDocstring(e)}
@@ -331,7 +353,7 @@ try:
     from typing import TypedDict
 except:
     from typing_extensions import TypedDict
-from typing import Union, Any
+from typing import Union, Any, AsyncGenerator
 
 from .other import *
 
