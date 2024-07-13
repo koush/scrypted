@@ -378,7 +378,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
             const canMixin = await this.canMixin(eventSource.type, eventSource.interfaces);
             const includes = eventSource?.mixins?.includes(this.id);
-            const has = accessoryIds.has(eventSource?.id);
+            const has = accessoryIds.has(eventSource?.id) || this.mergedDevices.has(eventSource?.id);
             if (has && !canMixin) {
                 this.console.log('restart event', eventSource?.id, eventDetails.property, eventData);
                 this.log.a(`${eventSource.name} can no longer be synced. HomeKit plugin will reload momentarily.`);
