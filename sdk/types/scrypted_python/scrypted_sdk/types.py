@@ -4,7 +4,7 @@ try:
     from typing import TypedDict
 except:
     from typing_extensions import TypedDict
-from typing import Union, Any
+from typing import Union, Any, AsyncGenerator
 
 from .other import *
 
@@ -1202,7 +1202,7 @@ class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         pass
 
-    async def generateObjectDetections(self, videoFrames: MediaObject | VideoFrame, session: ObjectDetectionGeneratorSession) -> ObjectDetectionGeneratorResult:
+    async def generateObjectDetections(self, videoFrames: MediaObject | AsyncGenerator[VideoFrame, None], session: ObjectDetectionGeneratorSession) -> AsyncGenerator[ObjectDetectionGeneratorResult, None]:
         pass
 
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
@@ -1463,7 +1463,7 @@ class StartStop:
 class StreamService:
     """Generic bidirectional stream connection."""
 
-    async def connectStream(self, input: Any = None, options: Any = None) -> Any:
+    async def connectStream(self, input: AsyncGenerator[Any, None] = None, options: Any = None) -> AsyncGenerator[Any, None]:
         pass
 
 
@@ -1543,7 +1543,7 @@ class VideoClips:
 
 class VideoFrameGenerator:
 
-    async def generateVideoFrames(self, mediaObject: MediaObject, options: VideoFrameGeneratorOptions = None) -> VideoFrame:
+    async def generateVideoFrames(self, mediaObject: MediaObject, options: VideoFrameGeneratorOptions = None) -> AsyncGenerator[VideoFrame, None]:
         pass
 
 
