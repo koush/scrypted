@@ -1,12 +1,11 @@
 import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes } from "@scrypted/sdk";
-import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceBase } from "@scrypted/sdk/settings-mixin";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import fs from 'fs';
 import type { TranspileOptions } from "typescript";
 import vm from "vm";
-import { ScriptDevice } from "./monaco/script-device";
-import type * as monacoEditor from 'monaco-editor';
 import { createMonacoEvalDefaultsWithLibs, ScryptedLibs, StandardLibs } from "./monaco-libs";
+import { ScriptDevice } from "./monaco/script-device";
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
