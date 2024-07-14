@@ -302,6 +302,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                             killDeferred.promise.finally(() => r.destroy());
                             await r.handlePlayback();
                             rtspServer = r;
+                        })
+                        .catch(e => {
+                            if (!killDeferred.finished)
+                                killDeferred.reject(e);
                         });
 
                         audio.ffmpegDestination = '127.0.0.1';
@@ -467,6 +471,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         }
                     }
                 }
+            })
+            .catch(e => {
+                if (!killDeferred.finished)
+                    killDeferred.reject(e);
             });
         }
 
