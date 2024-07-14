@@ -1524,8 +1524,8 @@ export interface VideoFrameGenerator {
 /**
  * Generic bidirectional stream connection.
  */
-export interface StreamService {
-  connectStream<Input, Output=Input>(input?: AsyncGenerator<Input, void>, options?: any): Promise<AsyncGenerator<Output, void>>;
+export interface StreamService<Input, Output=Input> {
+  connectStream(input?: AsyncGenerator<Input, void>, options?: any): Promise<AsyncGenerator<Output, void>>;
 }
 /**
  * TTY connection offered by a remote device that can be connected to
