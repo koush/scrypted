@@ -1,4 +1,5 @@
-import sdk, { ScryptedInterface } from '@scrypted/sdk';
+import sdk, { OnOff, ScryptedDeviceBase, ScryptedInterface } from '@scrypted/sdk';
+import test from 'node:test';
 
 const { systemManager } = sdk;
 
@@ -39,4 +40,18 @@ export function reorderDevicesByProvider(deviceIds: string[]): string[] {
     });
 
     return flattenDeviceTree(providerDeviceIdMap, null);
+}
+
+class TestDeviceBase {
+
+}
+
+function hideProps<T>():  new()=> T {
+    return TestDeviceBase as any;
+}
+
+class Poop extends hideProps<TestDeviceBase & OnOff>() {
+    constructor() {
+        super();
+    }
 }

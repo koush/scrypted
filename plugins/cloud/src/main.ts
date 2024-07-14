@@ -1013,8 +1013,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     const deferred = new Deferred<string>();
                     const cloudflareTunnel = cloudflared.tunnel(args);
 
-                    const processData = (data: string) => {
-                        const string: string = data.toString();
+                    const processData = (string: string) => {
                         this.console.error(string);
 
                         const lines = string.split('\n');
