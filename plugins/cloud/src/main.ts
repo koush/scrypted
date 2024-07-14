@@ -1012,14 +1012,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
                     const deferred = new Deferred<string>();
                     const cloudflareTunnel = cloudflared.tunnel(args);
-                    cloudflareTunnel.child.stdout.on('data', data => this.console.log(data.toString()));
-                    cloudflareTunnel.child.stderr.on('data', data => {
+
+                    const processData = (data: string) => {
                         const string: string = data.toString();
                         this.console.error(string);
 
                         const lines = string.split('\n');
                         for (const line of lines) {
-                            if (line.includes('Register tunnel error') && deferred.finished ) {
+                            if (line.includes('Unregistered tunnel connection') && deferred.finished) {
                                 this.console.warn('Cloudflare registration failed after tunnel started. The old tunnel may be invalid. Terminating.');
                                 cloudflareTunnel.child.kill();
                             }
@@ -1044,7 +1044,19 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                                 }
                             }
                         }
+                    };
+
+                    cloudflareTunnel.child.stdout.on('data', data => {
+                        const d = data.toString();
+                        this.console.log(d);
+                        processData(d);
                     });
+                    cloudflareTunnel.child.stderr.on('data', data => {
+                        const d = data.toString();
+                        this.console.error(d);
+                        processData(d);
+                    });
+
                     cloudflareTunnel.child.on('exit', () => deferred.resolve(undefined));
                     try {
                         this.cloudflareTunnel = await Promise.any([deferred.promise, cloudflareTunnel.url]);
