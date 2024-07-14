@@ -822,6 +822,7 @@ class Setting(TypedDict):
     description: str
     deviceFilter: str
     group: str
+    immediate: bool  # Flat that the UI should immediately apply this setting.
     key: str
     multiple: bool
     placeholder: str

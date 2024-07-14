@@ -2034,6 +2034,10 @@ export interface Setting {
   combobox?: boolean;
   deviceFilter?: string;
   multiple?: boolean;
+  /**
+   * Flat that the UI should immediately apply this setting.
+   */
+  immediate?: boolean;
   value?: SettingValue;
 }
 
