@@ -101,7 +101,7 @@ class NoninteractiveTerminal {
 
 export class TerminalService extends ScryptedDeviceBase implements StreamService<Buffer | string, Buffer> {
     constructor(nativeId?: ScryptedNativeId) {
-        super(TerminalServiceNativeId);
+        super(nativeId);
     }
 
     /*
