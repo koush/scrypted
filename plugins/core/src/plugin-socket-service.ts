@@ -6,7 +6,7 @@ import net from 'net';
 export const ReplServiceNativeId = 'replservice';
 export const ConsoleServiceNativeId = 'consoleservice';
 
-export class PluginSocketService extends ScryptedDeviceBase implements StreamService {
+export class PluginSocketService extends ScryptedDeviceBase implements StreamService<Buffer|string, Buffer> {
     constructor(nativeId: ScryptedNativeId, public serviceName: string) {
         super(nativeId);
     }

@@ -5,6 +5,7 @@ import { Scheduler } from "./builtins/scheduler";
 import { Listen } from "./builtins/listen";
 import { scryptedEval } from "./scrypted-eval";
 import { AutomationShellScript } from "./builtins/shellscript";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 const { systemManager } = sdk;
 
 interface Abort {
@@ -14,43 +15,38 @@ interface Abort {
 export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
     registers: EventListenerRegister[] = [];
     pendings = new Map<string, Abort>();
+    storageSettings = new StorageSettings(this, {
+        denoiseEvents: {
+            title: 'Denoise Events',
+            description: 'Denoising events will suppress events where the same event data is sent multiple times in a row. For example, if a sensor sent multiple door open events, only the first event will trigger this automation. The automation will fire again once the door sends a close event.',
+            type: 'boolean',
+        },
+        runToCompletion: {
+            title: 'Run Automations to Completion',
+            description: 'By default, automations that are executing will reset if triggered by a new event. Check this box to require an automation to run to completion before it can be triggered again. This setting can be used in conjunction with a timer to prevent an automation from running too often.',
+            type: 'boolean',
+        },
+        staticEvents: {
+            title: 'Reset Automation on All Events',
+            description: 'By default, running Automation timers will be reset if the same device fires the event again. Check this box to reset Automation timers on all of the configured events.',
+            type: 'boolean',
+        }
+    });
 
     constructor(nativeId: string) {
         super(nativeId);
 
+        if (this.on === undefined)
+            this.on = true;
         this.bind();
-
-        this.on = this.storage.getItem('enabled') !== 'false';
     }
 
     async getSettings(): Promise<Setting[]> {
-        return [
-            {
-                key: 'denoiseEvents',
-                value: this.storage.getItem('denoiseEvents') === 'true',
-                title: 'Denoise Events',
-                description: 'Denoising events will suppress events where the same event data is sent multiple times in a row. For example, if a sensor sent multiple door open events, only the first event will trigger this automation. The automation will fire again once the door sends a close event.',
-                type: 'boolean',
-            },
-            {
-                key: 'runToCompletion',
-                value: this.storage.getItem('runToCompletion') === 'true',
-                title: 'Run Automations to Completion',
-                description: 'By default, automations that are executing will reset if triggered by a new event. Check this box to require an automation to run to completion before it can be triggered again. This setting can be used in conjunction with a timer to prevent an automation from running too often.',
-                type: 'boolean',
-            },
-            {
-                key: 'staticEvents',
-                value: this.storage.getItem('staticEvents') === 'true',
-                title: 'Reset Automation on All Events',
-                description: 'By default, running Automation timers will be reset if the same device fires the event again. Check this box to reset Automation timers on all of the configured events.',
-                type: 'boolean',
-            },
-        ]
+        return this.storageSettings.getSettings();
     }
 
     async putSetting(key: string, value: SettingValue): Promise<void> {
-        this.storage.setItem(key, value.toString());
+        await this.storageSettings.putSetting(key, value);
         this.bind();
     }
 
@@ -59,13 +55,11 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
     }
 
     async turnOff() {
-        this.storage.setItem('enabled', 'false');
         this.on = false;
         this.bind();
     }
 
     async turnOn() {
-        this.storage.removeItem('enabled');
         this.on = true;
         this.bind();
     }
