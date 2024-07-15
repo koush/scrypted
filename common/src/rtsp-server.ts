@@ -572,7 +572,8 @@ export class RtspClient extends RtspBase {
                 }
             }
             catch (e) {
-                deferred.reject(e as Error);
+                if (!deferred.finished)
+                    deferred.reject(e as Error);
                 this.client.destroy();
             }
         };
