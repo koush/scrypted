@@ -303,10 +303,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                             await r.handlePlayback();
                             rtspServer = r;
                         })
-                        .catch(e => {
-                            if (!killDeferred.finished)
-                                killDeferred.reject(e);
-                        });
+                            .catch(e => {
+                                if (!killDeferred.finished)
+                                    killDeferred.reject(e);
+                            });
 
                         audio.ffmpegDestination = '127.0.0.1';
                         audio.srtp = undefined;
@@ -472,10 +472,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                     }
                 }
             })
-            .catch(e => {
-                if (!killDeferred.finished)
-                    killDeferred.reject(e);
-            });
+                .catch(e => {
+                    if (!killDeferred.finished)
+                        killDeferred.reject(e);
+                });
         }
 
         safePrintFFmpegArguments(console, args);
@@ -507,9 +507,14 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         sdpDeferred.resolve(rtspSdp);
     }
 
-    if (!rtspClientHooked) {
-        process.nextTick(() => {
-            rtspClient?.readLoop().catch(() => { }).finally(() => killDeferred.resolve(undefined));
+    if (!rtspClientHooked && rtspClient) {
+        process.nextTick(async () => {
+            try {
+                await rtspClient.readLoop();
+            }
+            catch (e) {
+            }
+            killDeferred.resolve(undefined);
         });
     }
 
