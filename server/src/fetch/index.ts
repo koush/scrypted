@@ -7,7 +7,10 @@ export interface HttpFetchOptionsBase<B> {
     signal?: AbortSignal,
     timeout?: number;
     rejectUnauthorized?: boolean;
-    ignoreStatusCode?: boolean;
+    /**
+     * Checks the status code. Defaults to true.
+     */
+    checkStatusCode?: boolean | ((statusCode: number) => boolean);
     body?: B | string | ArrayBufferView | any;
     withCredentials?: boolean;
 }
@@ -40,6 +43,7 @@ export function fetchStatusCodeOk(statusCode: number) {
 export function checkStatus(statusCode: number) {
     if (!fetchStatusCodeOk(statusCode))
         throw new Error(`http response statusCode ${statusCode}`);
+    return true;
 }
 
 export function getFetchMethod(options: HttpFetchOptions<any>) {
@@ -190,9 +194,11 @@ export async function domFetch<T extends HttpFetchOptions<BodyInit>>(options: T)
             body,
         });
 
-        if (!options?.ignoreStatusCode) {
+        if (options?.checkStatusCode === undefined || options?.checkStatusCode) {
             try {
-                checkStatus(response.status);
+                const checker = typeof options?.checkStatusCode === 'function' ? options.checkStatusCode : checkStatus;
+                if (!checker(response.status))
+                    throw new Error(`http response statusCode ${response.status}`);
             }
             catch (e) {
                 response.arrayBuffer().catch(() => { });

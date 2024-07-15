@@ -30,7 +30,7 @@ export class TapoAPI {
         const response = await authHttpFetch({
             credential: undefined,
             url: url,
-            ignoreStatusCode: true,
+            checkStatusCode: false,
             method: 'POST',
             headers: {
                 'Content-Type': 'multipart/mixed; boundary=--client-stream-boundary--',

@@ -91,20 +91,26 @@ export function createAuthFetch<B, M>(
         const initialResponse = await h({
             ...options,
             signal: controller.signal,
-            ignoreStatusCode: true,
+            // need to intercept the status code to check for 401.
+            // all other status codes will be handled according to the initial request options.
+            checkStatusCode(statusCode) {
+                // can handle a 401 if an credential is provided.
+                // however, not providing a credential is also valid, and should
+                // fall through to the normal response handling which may be interested
+                // in the 401 response.
+                if (statusCode === 401 && options.credential)
+                    return true;
+                if (options?.checkStatusCode === undefined || options?.checkStatusCode) {
+                    const checker = typeof options?.checkStatusCode === 'function' ? options.checkStatusCode : checkStatus;
+                    return checker(statusCode);
+                }
+                return true;
+            },
             responseType: 'readable',
         });
 
-        if (initialResponse.statusCode !== 401 || !options.credential) {
-            if (!options?.ignoreStatusCode) {
-                try {
-                    checkStatus(initialResponse.statusCode);
-                }
-                catch (e) {
-                    controller.abort('Invalid status code');
-                    throw e;
-                }
-            }
+        // if it's not a 401, just return the response.
+        if (initialResponse.statusCode !== 401) {
             return {
                 ...initialResponse,
                 body: await parser(initialResponse.body, options.responseType),

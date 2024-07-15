@@ -5,7 +5,7 @@ export async function getDeviceInfo(credential: AuthFetchCredentialState, addres
     const response = await authHttpFetch({
         credential,
         url: `http://${address}/ISAPI/System/deviceInfo`,
-        ignoreStatusCode: true,
+        checkStatusCode: false,
         responseType: 'text',
         rejectUnauthorized: false,
     });

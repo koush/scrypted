@@ -122,9 +122,12 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
     try {
         const [response] = await once(request, 'response') as [IncomingMessage];
 
-        if (!options?.ignoreStatusCode) {
+
+        if (options?.checkStatusCode === undefined || options?.checkStatusCode) {
             try {
-                checkStatus(response.statusCode);
+                const checker = typeof options?.checkStatusCode === 'function' ? options.checkStatusCode : checkStatus;
+                if (!checker(response.statusCode))
+                    throw new Error(`http response statusCode ${response.statusCode}`);
             }
             catch (e) {
                 readMessageBuffer(response).catch(() => { });
