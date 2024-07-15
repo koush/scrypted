@@ -1,8 +1,16 @@
 export class Deferred<T> {
     finished = false;
-    resolve!: (value: T|PromiseLike<T>) => this;
+    resolve!: (value: T) => this;
     reject!: (error: Error) => this;
-    promise: Promise<T> = new Promise((resolve, reject) => {
+    async resolvePromise(p: Promise<T>) {
+        try {
+            this.resolve(await p);
+        }
+        catch (e) {
+            this.reject(e);
+        }
+    }
+    promise = new Promise<T>((resolve, reject) => {
         this.resolve = v => {
             this.finished = true;
             resolve(v);
