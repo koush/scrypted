@@ -89,11 +89,11 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
         controller = new AbortController();
         timeout = setTimeout(() => controller.abort(), options.timeout);
 
-        options.signal?.addEventListener('abort', () => controller.abort('abort'));
+        options.signal?.addEventListener('abort', () => controller.abort(options.signal?.reason));
     }
 
     const signal = controller?.signal || options.signal;
-    signal?.addEventListener('abort', () => request.destroy(new Error('abort')));
+    signal?.addEventListener('abort', () => request.destroy(new Error(options.signal?.reason || 'abort')));
 
     const nodeHeaders: Record<string, string[]> = {};
     for (const [k, v] of headers) {

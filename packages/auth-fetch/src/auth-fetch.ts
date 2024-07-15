@@ -84,15 +84,27 @@ export function createAuthFetch<B, M>(
         if (initialHeader && !hasHeader(headers, 'Authorization'))
             setHeader(headers, 'Authorization', initialHeader);
 
+
+        const controller = new AbortController();
+        options.signal?.addEventListener('abort', () => controller.abort(options.signal?.reason));
+
         const initialResponse = await h({
             ...options,
+            signal: controller.signal,
             ignoreStatusCode: true,
             responseType: 'readable',
         });
 
         if (initialResponse.statusCode !== 401 || !options.credential) {
-            if (!options?.ignoreStatusCode)
-                checkStatus(initialResponse.statusCode);
+            if (!options?.ignoreStatusCode) {
+                try {
+                    checkStatus(initialResponse.statusCode);
+                }
+                catch (e) {
+                    controller.abort('Invalid status code');
+                    throw e;
+                }
+            }
             return {
                 ...initialResponse,
                 body: await parser(initialResponse.body, options.responseType),
