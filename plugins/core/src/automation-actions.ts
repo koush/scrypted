@@ -45,21 +45,21 @@ addAction(ScryptedInterface.Program, {},
     });
 
 addAction(ScryptedInterface.Notifier, {
-    title: {
+    notificationTitle: {
         title: 'Title',
         type: 'string',
     },
-    body: {
+    notificationBody: {
         title: 'Body',
         type: 'string',
     },
-    image: {
+    notificationMediaUrl: {
         title: 'Image',
         type: 'interface',
         deviceFilter: `deviceInterface === '${ScryptedInterface.VideoCamera}' || deviceInterface === '${ScryptedInterface.Camera}'`,
     },
 }, async function invoke(device: ScryptedDevice & Notifier, storageSettings) {
-    return device.sendNotification(storageSettings.title as string, {
-        body: storageSettings.body as string,
+    return device.sendNotification(storageSettings.notificationTitle as string, {
+        body: storageSettings.notificationBody as string,
     });
 });

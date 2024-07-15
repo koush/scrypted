@@ -131,17 +131,49 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
         this.log.i('automation is waiting for event trigger.')
 
         try {
-            const createTypeStorageSettings = (i: string, value: string) => {
+            const createTriggerTypeStorageSettings = (i: string, value: string) => {
                 const index = parseInt(i);
                 return new StorageSettings(this, {
-                    [`type-${index}`]: {
+                    [`trigger-type-${index}`]: {
+                        title: 'Trigger Type',
+                        choices: [
+                            'Scheduler',
+                            'Device Event',
+                            'Remove Trigger',
+                        ],
+                        immediate: true,
+                        mapGet: () => {
+                            return value;
+                        },
+                        mapPut: (ov: string, value: string) => {
+                            switch (value) {
+                                case 'Device Event':
+                                    this.data.triggers[index].id = '';
+                                    break;
+                                case 'Scheduler':
+                                    this.data.triggers[index].id = 'scheduler';
+                                    break;
+                                case 'Remove Trigger':
+                                    this.data.triggers.splice(index, 1);
+                                    break;
+                            }
+                            this.storageSettings.values.data = this.data;
+                        },
+                    }
+                });
+            };
+
+            const createActionTypeStorageSettings = (i: string, value: string) => {
+                const index = parseInt(i);
+                return new StorageSettings(this, {
+                    [`action-type-${index}`]: {
                         title: 'Action Type',
                         choices: [
                             'Script',
                             'Shell Script',
                             'Wait',
                             'Update Plugins',
-                            'Control Device',
+                            'Device Action',
                             'Remove Action',
                         ],
                         immediate: true,
@@ -162,7 +194,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                                 case 'Update Plugins':
                                     this.data.actions[index].id = 'update-plugins';
                                     break;
-                                case 'Control Device':
+                                case 'Device Action':
                                     this.data.actions[index].id = '';
                                     break;
                                 case 'Remove Action':
@@ -178,15 +210,92 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
             this.actionSettings = [];
             this.triggerSettings = []
 
+            for (const [index, trigger] of Object.entries(this.data.triggers)) {
+                const stepTriggers: typeof this.triggerSettings = [];
+                const parts = trigger.id.split('#');
+                const [id,] = parts;
+                if (id === 'scheduler') {
+                    stepTriggers.push(createTriggerTypeStorageSettings(index, 'Scheduler'));
+
+                    // stepTriggers.push(new StorageSettings(this, {
+                    //     [`trigger-day-${index}`]: {
+                    //         title: 'Day',
+                    //         type: 'day',
+                    //         mapGet() {
+                    //             return trigger.model.day;
+                    //         },
+                    //         mapPut: (ov: any, value: any) => {
+                    //             trigger.model.day = value;
+                    //             this.storageSettings.values.data = this.data;
+                    //         },
+                    //     }
+                    // }));
+
+                    // stepTriggers.push(new StorageSettings(this, {
+                    //     [`trigger-time-${index}`]: {
+                    //         title: 'Time',
+                    //         type: 'time',
+                    //         mapGet() {
+                    //             return trigger.model.time;
+                    //         },
+                    //         mapPut: (ov: any, value: any) => {
+                    //             trigger.model.time = value;
+                    //             this.storageSettings.values.data = this.data;
+                    //         },
+                    //     }
+                    // }));
+                }
+                else {
+                    stepTriggers.push(createTriggerTypeStorageSettings(index, 'Device Event'));
+
+                    stepTriggers.push(new StorageSettings(this, {
+                        [`trigger-${index}`]: {
+                            title: 'Device Event',
+                            description: 'The event to trigger the automation.',
+                            type: 'interface',
+                            mapGet() {
+                                return trigger.id;
+                            },
+                            mapPut: (ov: any, value: any) => {
+                                trigger.id = value;
+                                this.storageSettings.values.data = this.data;
+                            },
+                        }
+                    }));
+                }
+
+                stepTriggers.push(new StorageSettings(this, {
+                    [`trigger-condition-${index}`]: {
+                        title: 'Trigger Condition (optional)',
+                        description: 'A JavaScript condition to evaluate before running the automation. If the condition is false, the automation will not run. The eventData variable contains the event payload.',
+                        placeholder: 'MotionSensor example: eventData === true',
+                        mapGet() {
+                            return trigger.condition;
+                        },
+                        mapPut: (ov: any, value: any) => {
+                            trigger.condition = value;
+                            this.storageSettings.values.data = this.data;
+                        },
+                    }
+                }));
+
+                for (const ts of stepTriggers) {
+                    for (const s of Object.values(ts.settings)) {
+                        s.subgroup = `Trigger ${parseInt(index) + 1}`
+                    }
+                }
+                this.triggerSettings.push(...stepTriggers);
+            }
+
             for (const [index, action] of Object.entries(this.data.actions)) {
-                const stepActions : typeof this.actionSettings = [];
+                const stepActions: typeof this.actionSettings = [];
                 const parts = action.id.split('#');
                 const [id, iface] = parts;
                 if (id === 'scriptable') {
-                    stepActions.push(createTypeStorageSettings(index, 'Script'));
+                    stepActions.push(createActionTypeStorageSettings(index, 'Script'));
 
                     stepActions.push(new StorageSettings(this, {
-                        [index]: {
+                        [`action-${index}`]: {
                             title: 'Script',
                             description: 'The script to run when the automation is triggered.',
                             type: 'script',
@@ -201,12 +310,12 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                     }));
                 }
                 else if (id === 'shell-scriptable') {
-                    stepActions.push(createTypeStorageSettings(index, 'Shell Script'));
+                    stepActions.push(createActionTypeStorageSettings(index, 'Shell Script'));
 
                     stepActions.push(new StorageSettings(this, {
-                        [index]: {
-                            title: 'Script',
-                            description: 'The script to run when the automation is triggered.',
+                        [`action-${index}`]: {
+                            title: 'Shell Script',
+                            description: 'The shell script to run when the automation is triggered.',
                             type: 'textarea',
                             mapGet() {
                                 return action.model['script.sh'];
@@ -219,10 +328,10 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                     }));
                 }
                 else if (id === 'timer') {
-                    stepActions.push(createTypeStorageSettings(index, 'Wait'));
+                    stepActions.push(createActionTypeStorageSettings(index, 'Wait'));
 
                     stepActions.push(new StorageSettings(this, {
-                        [index]: {
+                        [`action-${index}`]: {
                             title: 'Seconds',
                             description: 'The number of seconds to wait before running the next action.',
                             type: 'number',
@@ -237,15 +346,15 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                     }));
                 }
                 else if (id === 'update-plugins') {
-                    stepActions.push(createTypeStorageSettings(index, 'Update Plugins'));
+                    stepActions.push(createActionTypeStorageSettings(index, 'Update Plugins'));
                 }
                 else {
-                    
+
                     const validInterfaces = [...automationActions.keys()];
                     const deviceFilter = `${JSON.stringify(validInterfaces)}.includes(deviceInterface)`;
-                    stepActions.push(createTypeStorageSettings(index, 'Control Device'));
+                    stepActions.push(createActionTypeStorageSettings(index, 'Device Action'));
                     stepActions.push(new StorageSettings(this, {
-                        [index]: {
+                        [`action-${index}`]: {
                             title: 'Device',
                             description: 'The device to control when the automation is triggered.',
                             type: 'interface',
@@ -271,6 +380,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                             const a = actionSettings[k];
                             a.mapPut = (ov: any, value: any) => {
                                 action.model[k] = value;
+                                this.storageSettings.values.data = this.data;
                             };
                             a.mapGet = () => {
                                 return action.model[k];
@@ -291,6 +401,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
 
             this.triggerSettings.push(new StorageSettings(this, {
                 addTrigger: {
+                    subgroup: `Trigger ${this.data.triggers.length + 1}`,
                     title: 'Add Trigger',
                     description: 'Add a new trigger to the automation.',
                     type: 'button',

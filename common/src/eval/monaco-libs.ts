@@ -67,6 +67,10 @@ export function createMonacoEvalDefaultsWithLibs(standardLibs: StandardLibs, scr
             const systemManager: SystemManager;
             const mqtt: MqttClient;
             const device: ScryptedDeviceBase & { pathname : string };
+
+            const eventSource: ScryptedDevice;
+            const eventDetails: EventDetails;
+            const eventData: any;
         }
         `,
 
