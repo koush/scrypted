@@ -556,7 +556,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         try {
             endpointManager.setAccessControlAllowOrigin({
                 origins: [
-                    `http://${SCRYPTED_SERVER}`,
+                    'https://manage.scrypted.app',
                     `https://${SCRYPTED_SERVER}`,
                     ...this.storageSettings.values.additionalCorsOrigins,
                 ],
