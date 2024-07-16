@@ -570,6 +570,7 @@ class HumiditySettingStatus(TypedDict):
 
 class LauncherApplicationInfo(TypedDict):
 
+    cloudHref: str
     description: str
     href: str
     icon: str  # Supports: mdi-icon, fa-icon, urls.
