@@ -217,33 +217,63 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                 if (id === 'scheduler') {
                     stepTriggers.push(createTriggerTypeStorageSettings(index, 'Scheduler'));
 
-                    // stepTriggers.push(new StorageSettings(this, {
-                    //     [`trigger-day-${index}`]: {
-                    //         title: 'Day',
-                    //         type: 'day',
-                    //         mapGet() {
-                    //             return trigger.model.day;
-                    //         },
-                    //         mapPut: (ov: any, value: any) => {
-                    //             trigger.model.day = value;
-                    //             this.storageSettings.values.data = this.data;
-                    //         },
-                    //     }
-                    // }));
+                    stepTriggers.push(new StorageSettings(this, {
+                        [`trigger-day-${index}`]: {
+                            title: 'Day',
+                            type: 'day',
+                            multiple: true,
+                            mapGet() {
 
-                    // stepTriggers.push(new StorageSettings(this, {
-                    //     [`trigger-time-${index}`]: {
-                    //         title: 'Time',
-                    //         type: 'time',
-                    //         mapGet() {
-                    //             return trigger.model.time;
-                    //         },
-                    //         mapPut: (ov: any, value: any) => {
-                    //             trigger.model.time = value;
-                    //             this.storageSettings.values.data = this.data;
-                    //         },
-                    //     }
-                    // }));
+                                const days: number[] = [];
+                                if (trigger?.model.sunday)
+                                    days.push(0);
+                                if (trigger?.model.monday)
+                                    days.push(1);
+                                if (trigger?.model.tuesday)
+                                    days.push(2);
+                                if (trigger?.model.wednesday)
+                                    days.push(3);
+                                if (trigger?.model.thursday)
+                                    days.push(4);
+                                if (trigger?.model.friday)
+                                    days.push(5);
+                                if (trigger?.model.saturday)
+                                    days.push(6);
+
+                                return days;
+                            },
+                            mapPut: (ov: any, value: any) => {
+                                trigger.model.sunday = value.includes(0);
+                                trigger.model.monday = value.includes(1);
+                                trigger.model.tuesday = value.includes(2);
+                                trigger.model.wednesday = value.includes(3);
+                                trigger.model.thursday = value.includes(4);
+                                trigger.model.friday = value.includes(5);
+                                trigger.model.saturday = value.includes(6);
+
+                                this.storageSettings.values.data = this.data;
+                            },
+                        }
+                    }));
+
+                    stepTriggers.push(new StorageSettings(this, {
+                        [`trigger-time-${index}`]: {
+                            title: 'Time',
+                            type: 'time',
+                            mapGet() {
+                                const date = new Date();
+                                date.setHours(trigger.model.hour);
+                                date.setMinutes(trigger.model.minute);
+                                return date.getTime();
+                            },
+                            mapPut: (ov: any, value: any) => {
+                                const date = new Date(value);
+                                trigger.model.hour = date.getHours();
+                                trigger.model.minute = date.getMinutes();
+                                this.storageSettings.values.data = this.data;
+                            },
+                        }
+                    }));
                 }
                 else {
                     stepTriggers.push(createTriggerTypeStorageSettings(index, 'Device Event'));
@@ -470,7 +500,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                         }
 
                         const parts = action.id.split('#');
-                        const id = parts[0];
+                        const [id, iface] = parts;
 
                         if (id === 'scriptable') {
                             const script = new AutomationJavascript(this, eventSource, eventDetails, eventData);
@@ -490,10 +520,13 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                         else {
                             const device = systemManager.getDeviceById(id);
                             if (!device)
-                                throw new Error(`unknown action ${action.id}`);
+                                throw new Error(`unknown device ${id}`);
 
-                            const { rpc } = action.model;
-                            device[rpc.method](...rpc.parameters || []);
+                            const runner = automationActions.get(iface as ScryptedInterface);
+                            if (!runner)
+                                throw new Error(`unknown action ${iface}`);
+
+                            runner.invoke(device, action.model);
                         }
                     }
                 }
@@ -517,16 +550,15 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                     listen = device;
                 }
                 else {
-                    let device: any;
+                    let scheduler: Scheduler;
                     if (id === 'scheduler') {
-                        device = new Scheduler();
+                        scheduler = new Scheduler();
                     }
                     else {
                         throw new Error(`unknown action ${trigger.id}`);
                     }
 
-                    const { rpc } = trigger.model;
-                    listen = device[rpc.method](...rpc.parameters || []);
+                    listen = scheduler.schedule(trigger.model);
                 }
 
                 register = listen.listen({

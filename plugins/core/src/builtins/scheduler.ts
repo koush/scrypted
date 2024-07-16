@@ -2,16 +2,15 @@ import { ScryptedDevice, EventListenerOptions, ScryptedDeviceBase } from "@scryp
 import { Listen } from "./listen";
 
 export interface Schedule {
-    clockType: "AM" | "PM" | "24HourClock" | "BeforeSunrise" | "BeforeSunset" | "AfterSunrise" | "AfterSunset";
-    friday: boolean;
     hour: number;
     minute: number;
-    monday: boolean
-    saturday: boolean
     sunday: boolean
-    thursday: boolean;
+    monday: boolean
     tuesday: boolean
     wednesday: boolean
+    thursday: boolean;
+    friday: boolean;
+    saturday: boolean
 }
 
 export class Scheduler {
