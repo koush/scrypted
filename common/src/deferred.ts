@@ -7,7 +7,7 @@ export class Deferred<T> {
             this.resolve(await p);
         }
         catch (e) {
-            this.reject(e);
+            this.reject(e as Error);
         }
     }
     promise = new Promise<T>((resolve, reject) => {

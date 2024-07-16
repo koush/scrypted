@@ -22,6 +22,7 @@ addAction(ScryptedInterface.OnOff, {
     on: {
         title: 'Turn On/Off',
         type: 'boolean',
+        immediate: true,
     }
 }, async function invoke(device: ScryptedDevice & OnOff, storageSettings) {
     return storageSettings.on ? device.turnOn() : device.turnOff();
