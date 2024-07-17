@@ -17,6 +17,7 @@ import path from 'path';
 import { Duplex } from 'stream';
 import tls from 'tls';
 import { readLine } from '../../../common/src/read-stream';
+import { sleep } from '../../../common/src/sleep';
 import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
 import { PushManager } from './push';
@@ -219,7 +220,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     upnpInterval: NodeJS.Timeout;
     upnpClient = upnp.createClient();
     upnpStatus = 'Starting';
-    securePort: number;
     randomBytes = crypto.randomBytes(16).toString('base64');
     reverseConnections = new Set<Duplex>();
 
@@ -405,7 +405,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         if (this.storageSettings.values.forwardingMode === 'Custom Domain' || this.cloudflareTunnelHost)
             upnpPort = 443;
 
-        this.console.log(`Scrypted Cloud mapped https://${ip}:${upnpPort} to https://127.0.0.1:${this.securePort}`);
+        this.console.log(`Scrypted Cloud routing to https://${ip}:${upnpPort}`);
 
         // the ip is not sent, but should be checked to see if it changed.
         if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort || ip !== this.storageSettings.values.lastPersistedIp) {
@@ -491,7 +491,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             },
             private: {
                 host: localAddress,
-                port: this.securePort,
+                port: this.storageSettings.values.securePort,
             },
             ttl: 1800,
         }, async err => {
@@ -868,16 +868,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         await once(this.server, 'listening');
         const port = (this.server.address() as any).port;
 
-        this.secureServer = https.createServer({
-            key: this.storageSettings.values.certificate.serviceKey,
-            cert: this.storageSettings.values.certificate.certificate,
-        }, handler);
-        this.secureServer.on('upgrade', wsHandler)
-        // this is the direct connection port
-        this.secureServer.listen(this.storageSettings.values.securePort, '0.0.0.0');
-        await once(this.secureServer, 'listening');
-        this.storageSettings.values.securePort = this.securePort = (this.secureServer.address() as any).port;
-
         const agent = new http.Agent({ maxSockets: Number.MAX_VALUE, keepAlive: true });
         this.proxy = HttpProxy.createProxy({
             agent,
@@ -951,10 +941,30 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
         });
 
-        this.startCloudflared();
+        this.startCloudflared(port);
+
+        while (true) {
+            try {
+                this.secureServer = https.createServer({
+                    key: this.storageSettings.values.certificate.serviceKey,
+                    cert: this.storageSettings.values.certificate.certificate,
+                }, handler);
+                this.secureServer.on('upgrade', wsHandler)
+                // this is the direct connection port
+                this.secureServer.listen(this.storageSettings.values.securePort, '0.0.0.0');
+                await once(this.secureServer, 'listening');
+                this.storageSettings.values.securePort = (this.secureServer.address() as any).port;
+                break;
+
+            }
+            catch (e) {
+                this.console.log('error starting secure server. retrying.', e);
+                await sleep(60000);
+            }
+        }
     }
 
-    async startCloudflared() {
+    async startCloudflared(quickTunnelPort: number) {
         while (true) {
             try {
                 if (!this.storageSettings.values.cloudflareEnabled) {
@@ -999,15 +1009,17 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     }
                     process.chdir(cloudflareD);
 
-                    const secureUrl = `https://127.0.0.1:${this.securePort}`;
+                    let tunnelUrl: string
+
                     const args: any = {};
                     if (this.storageSettings.values.cloudflaredTunnelToken) {
+                        tunnelUrl = `https://127.0.0.1:${this.storageSettings.values.securePort}`;
                         args['run'] = null;
                         args['--token'] = this.storageSettings.values.cloudflaredTunnelToken;
                     }
                     else {
-                        args['--no-tls-verify'] = null;
-                        args['--url'] = secureUrl;
+                        tunnelUrl = `http://127.0.0.1:${quickTunnelPort}`;
+                        args['--url'] = tunnelUrl;
                     }
 
                     const deferred = new Deferred<string>();
@@ -1067,7 +1079,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                         this.console.error('cloudflared error', e);
                         throw e;
                     }
-                    this.console.log(`cloudflare url mapped ${this.cloudflareTunnel} to ${secureUrl}`);
+                    this.console.log(`cloudflare url mapped ${this.cloudflareTunnel} to ${tunnelUrl}`);
                     return cloudflareTunnel;
                 }, {
                     startingDelay: 60000,
