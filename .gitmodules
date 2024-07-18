@@ -14,9 +14,6 @@
 [submodule "external/werift"]
 	path = external/werift
 	url = ../../koush/werift-webrtc
-[submodule "plugins/zwave/file-stream-rotator"]
-	path = plugins/zwave/file-stream-rotator
-	url = ../../koush/file-stream-rotator.git
 [submodule "sdk/developer.scrypted.app"]
 	path = sdk/developer.scrypted.app
 	url = ../../koush/developer.scrypted.app
