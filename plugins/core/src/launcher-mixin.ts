@@ -1,5 +1,5 @@
 import { DeviceState, MixinProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
-import { typeToIcon } from "../ui/src/components/helpers";
+import { typeToIcon } from "../../../../manage.scrypted.app/src/device-icons";
 
 export class LauncherMixin extends ScryptedDeviceBase implements MixinProvider, Readme {
     async getReadmeMarkdown(): Promise<string> {
