@@ -1,9 +1,6 @@
 [submodule "plugins/unifi-protect/src/unifi-protect"]
 	path = external/unifi-protect
 	url = ../../koush/unifi-protect.git
-[submodule "plugins/myq/src/myq"]
-	path = plugins/myq/src/myq
-	url = ../../koush/myq.git
 [submodule "external/ring-client-api"]
 	path = external/ring-client-api
 	url = ../../koush/ring

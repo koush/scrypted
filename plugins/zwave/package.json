@@ -38,8 +38,8 @@
    },
    "devDependencies": {
       "@types/node": "^18.15.11"
-   },
+   }, 
    "optionalDependencies": {
-      "zwave-js": "^12.12.4"
+      "zwave-js": "^12.13.0"
    }
 }
