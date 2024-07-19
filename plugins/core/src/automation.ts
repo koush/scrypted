@@ -59,6 +59,9 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
     constructor(nativeId: string) {
         super(nativeId);
 
+        this.data.actions ||= [];
+        this.data.triggers ||= [];
+
         if (this.on === undefined)
             this.on = true;
         this.bind();
@@ -317,7 +320,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                 this.triggerSettings.push(...stepTriggers);
             }
 
-            for (const [index, action] of Object.entries(this.data.actions)) {
+            for (const [index, action] of Object.entries(this.data.actions || [])) {
                 const stepActions: typeof this.actionSettings = [];
                 const parts = action.id.split('#');
                 const [id, iface] = parts;
