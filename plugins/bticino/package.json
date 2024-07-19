@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/bticino",
-   "version": "0.0.17",
+   "version": "0.0.18",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -20,7 +20,7 @@
       "sip"
    ],
    "scrypted": {
-      "name": "BTicino SIP Plugin",
+      "name": "BTicino Intercom Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "ScryptedSystemDevice",
