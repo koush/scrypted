@@ -1,4 +1,4 @@
-# BTicino C300X Plugin for Scrypted
+# BTicino Intercom Plugin for Scrypted
 
 The C300X Plugin for Scrypted allows viewing your C300X intercom with incoming video/audio.
 
