@@ -54,18 +54,18 @@ export async function read16BELengthLoop(readable: Readable, options: {
   readable.on('readable', read);
 
   await once(readable, 'end');
-  throw new Error('stream ended');
+  throw new StreamEndError('read16BELengthLoop');
 }
 
 export class StreamEndError extends Error {
-  constructor() {
-    super('stream ended');
+  constructor(where: string) {
+    super(`stream ended: ${where}`);
   }
 }
 
 export async function readLength(readable: Readable, length: number): Promise<Buffer> {
   if (readable.readableEnded || readable.destroyed)
-    throw new StreamEndError();
+    throw new StreamEndError('readLength start');
 
   if (!length) {
     return Buffer.alloc(0);
@@ -88,12 +88,12 @@ export async function readLength(readable: Readable, length: number): Promise<Bu
       }
 
       if (readable.readableEnded || readable.destroyed)
-        reject(new Error("stream ended during read"));
+        reject(new StreamEndError('readLength readable'));
     };
 
     const e = () => {
       cleanup();
-      reject(new StreamEndError())
+      reject(new StreamEndError('readLength end'));
     };
 
     const cleanup = () => {
