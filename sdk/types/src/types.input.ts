@@ -1703,6 +1703,10 @@ export interface FFmpegInput extends MediaContainer {
   h264EncoderArguments?: string[];
   videoDecoderArguments?: string[];
   h264FilterArguments?: string[];
+  /**
+   * Environment variables to set when launching FFmpeg.
+   */
+  env?: { [key: string]: string };
 }
 export interface DeviceInformation {
   model?: string;
