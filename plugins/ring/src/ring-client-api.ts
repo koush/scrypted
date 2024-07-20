@@ -9,6 +9,6 @@ export { BasicPeerConnection } from '@koush/ring-client-api/packages/ring-client
 export { SimpleWebRtcSession } from '@koush/ring-client-api/packages/ring-client-api/streaming/simple-webrtc-session';
 export { StreamingSession } from '@koush/ring-client-api/packages/ring-client-api/streaming/streaming-session';
 export { generateUuid } from '@koush/ring-client-api/packages/ring-client-api/util';
-export { RingDeviceType, RingDeviceData, RingDeviceCategory } from '@koush/ring-client-api/packages/ring-client-api/ring-types';
+export { RingDeviceType, RingDeviceData, RingDeviceCategory, VideoSearchResult } from '@koush/ring-client-api/packages/ring-client-api/ring-types';
 export { RingDevice } from '@koush/ring-client-api/packages/ring-client-api/ring-device';
 export * as rxjs from '@koush/ring-client-api/node_modules/rxjs';

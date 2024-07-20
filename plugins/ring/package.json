@@ -22,6 +22,7 @@
       "name": "Ring Plugin",
       "type": "DeviceProvider",
       "interfaces": [
+         "HttpRequestHandler",
          "DeviceProvider",
          "Settings"
       ],
@@ -44,5 +45,5 @@
       "got": "11.8.6",
       "socket.io-client": "^2.5.0"
    },
-   "version": "0.0.138"
+   "version": "0.0.139"
 }

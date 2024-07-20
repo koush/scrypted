@@ -10,7 +10,7 @@ import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/package
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { BasicPeerConnection, CameraData, clientApi, isStunMessage, RingBaseApi, RingCamera, RtpDescription, rxjs, SimpleWebRtcSession, SipSession, StreamingSession } from './ring-client-api';
+import { VideoSearchResult, BasicPeerConnection, CameraData, clientApi, isStunMessage, RingBaseApi, RingCamera, RtpDescription, rxjs, SimpleWebRtcSession, SipSession, StreamingSession } from './ring-client-api';
 import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
 
 const STREAM_TIMEOUT = 120000;
@@ -87,7 +87,7 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
     currentMediaMimeType: string;
     refreshTimeout: NodeJS.Timeout;
     picturePromise: RefreshPromise<Buffer>;
-    videoClips = new Map<string, VideoClip>();
+    videoClips = new Map<string, VideoSearchResult>();
 
     constructor(public api: RingBaseApi, nativeId: string, camera: RingCamera) {
         super(nativeId);
@@ -726,6 +726,8 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
             dateTo: options.endTime,
         });
 
+        const ep = await sdk.endpointManager.getLocalEndpoint();
+
         return response.video_search.map((result) => {
             const videoClip =  {
                 id: result.ding_id,
@@ -736,14 +738,14 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
                 thumbnailId: result.ding_id,
                 resources: {
                     thumbnail: {
-                        href: result.thumbnail_url
+                        href: new URL(`thumbnail/${this.id}/${result.ding_id}`, ep).pathname,
                     },
                     video: {
                         href: result.hq_url
                     }
                 }
             }
-            this.videoClips.set(result.ding_id, videoClip)
+            this.videoClips.set(result.ding_id, result)
             return videoClip;
         });
     }
@@ -752,7 +754,7 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
         if (!this.videoClips.has(videoId)) {
             throw new Error('Failed to get video clip.');
         }
-        return mediaManager.createMediaObjectFromUrl(this.videoClips.get(videoId).resources.video.href);
+        return mediaManager.createMediaObjectFromUrl(this.videoClips.get(videoId).untranscoded_url);
     }
 
     async getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject> {
@@ -762,7 +764,7 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
         const ffmpegInput: FFmpegInput = {
             inputArguments: [
                 '-f', 'h264',
-                '-i', this.videoClips.get(thumbnailId).resources.thumbnail.href,
+                '-i', this.videoClips.get(thumbnailId).thumbnail_url,
             ]
         };
         const input = await mediaManager.createFFmpegMediaObject(ffmpegInput);
