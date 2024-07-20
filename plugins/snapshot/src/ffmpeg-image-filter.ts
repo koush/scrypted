@@ -7,6 +7,14 @@ import { once } from 'events';
 import { Writable } from 'stream';
 import { Pipe2Jpeg } from './pipe2jpeg';
 
+const defaultFfmpegImageArgs = [
+    '-hide_banner',
+    '-hwaccel', 'none',
+    '-err_detect', 'aggressive',
+    '-fflags', 'discardcorrupt',
+    '-y',
+];
+
 export interface FFmpegImageFilterOptions {
     console?: Console,
     blur?: boolean;
@@ -99,8 +107,8 @@ export function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpegImageF
         'pipe:3',
     ];
     const args: string[] = [
-        '-hide_banner',
-        '-y',
+        ...defaultFfmpegImageArgs,
+
         ...inputArguments,
 
         ...outputArguments,
@@ -140,10 +148,8 @@ export function ffmpegFilterImage(inputArguments: string[], options: FFmpegImage
     }
 
     const args: string[] = [
-        '-hide_banner',
-        '-err_detect', 'aggressive',
-        '-fflags', 'discardcorrupt',
-        '-y',
+        ...defaultFfmpegImageArgs,
+
         ...inputArguments,
 
         ...outputArguments,
