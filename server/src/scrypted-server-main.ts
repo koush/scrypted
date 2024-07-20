@@ -161,6 +161,16 @@ async function start(mainFilename: string, options?: {
         callback(sha === user.passwordHash || password === user.token);
     });
 
+    // the default http-auth will returns a WWW-Authenticate header if login fails.
+    // this causes the Safari to prompt for login.
+    // https://github.com/gevorg/http-auth/blob/4158fa75f58de70fd44aa68876a8674725e0556e/src/auth/base.js#L81
+    // override the ask function to return a bare 401 instead.
+    // @ts-expect-error
+    basicAuth.ask = (res) => {
+        res.statusCode = 401;
+        res.end();
+    };
+
     const httpsServerOptions = process.env.SCRYPTED_HTTPS_OPTIONS_FILE
         ? JSON.parse(fs.readFileSync(process.env.SCRYPTED_HTTPS_OPTIONS_FILE).toString())
         : {};
