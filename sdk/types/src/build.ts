@@ -142,22 +142,9 @@ function toPythonMethodDeclaration(method: any) {
 }
 
 function selfSignature(method: any) {
-    for (const typeParameter of method.signatures[0].typeParameter || []) {
-        parameterTypes.add(typeParameter.name);
-    }
     const params = (method.signatures[0].parameters || []).map((p: any) => toPythonParameter(p));
-    parameterTypes.clear();
     params.unshift('self');
     return params.join(', ');
-}
-
-function selfReturnType(method: any) {
-    for (const typeParameter of method.signatures[0].typeParameter || []) {
-        parameterTypes.add(typeParameter.name);
-    }
-    const retType = toPythonReturnType(method.signatures[0].type);
-    parameterTypes.clear();
-    return retType
 }
 
 const enums = schema.children?.filter((child: any) => child.kindString === 'Enumeration') ?? [];
@@ -223,6 +210,10 @@ function addNonDictionaryType(td: any) {
 class ${td.name}:
 ${toDocstring(td)}
 `;
+    // cache type parameters so underlying generators can map them to Any
+    for (const typeParameter of td.typeParameters || []) {
+        parameterTypes.add(typeParameter.name);
+    }
 
     const children = td.children || [];
     const properties = children.filter((child: any) => child.kindString === 'Property');
@@ -232,7 +223,7 @@ ${toDocstring(td)}
 `
     }
     for (const method of methods) {
-        python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${selfReturnType(method)}:
+        python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${toPythonReturnType(method.signatures[0].type)}:
         ${toDocstring(method, true)}
 
 `
@@ -241,6 +232,9 @@ ${toDocstring(td)}
         python += `
     pass
 `
+
+    // reset for the next type
+    parameterTypes.clear();
 }
 
 for (const td of interfaces) {

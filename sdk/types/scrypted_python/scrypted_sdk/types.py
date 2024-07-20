@@ -518,6 +518,7 @@ class FFmpegInput(TypedDict):
 
     container: str
     destinationVideoBitrate: float
+    env: Any  # Environment variables to set when launching FFmpeg.
     h264EncoderArguments: list[str]
     h264FilterArguments: list[str]
     inputArguments: list[str]
@@ -1465,7 +1466,7 @@ class StartStop:
 class StreamService:
     """Generic bidirectional stream connection."""
 
-    async def connectStream(self, input: AsyncGenerator[Input, None] = None, options: Any = None) -> AsyncGenerator[Output, None]:
+    async def connectStream(self, input: AsyncGenerator[Any, None] = None, options: Any = None) -> AsyncGenerator[Any, None]:
         pass
 
 
