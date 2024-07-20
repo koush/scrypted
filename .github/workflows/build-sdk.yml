@@ -7,7 +7,7 @@ on:
   pull_request:
     paths: ["sdk/**"]
   workflow_dispatch:
-  
+
 jobs:
   build:
     name: Build
@@ -15,11 +15,11 @@ jobs:
     defaults:
       run:
         working-directory: ./sdk
-    
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.4.1
       - run: npm ci
       - run: npm run build
