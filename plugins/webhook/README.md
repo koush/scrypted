@@ -1,15 +1,7 @@
-# @scrypted/webhook
+# Webhook Plugin for Scrypted
 
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
+The WebHook plugin creates http urls that can be used to:
+* Retrieve state from devices.
+* Retrieve images from cameras.
+* Control devices.
 
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
-
-## Visual Studio Code configuration
-
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
