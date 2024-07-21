@@ -136,6 +136,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
 
     async putRtspUrls(urls: string[]) {
         this.storage.setItem('urls', JSON.stringify(urls.filter(url => !!url)));
+        this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
     async putSettingBase(key: string, value: SettingValue) {
