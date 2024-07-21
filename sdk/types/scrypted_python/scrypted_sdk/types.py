@@ -519,6 +519,7 @@ class FFmpegInput(TypedDict):
     container: str
     destinationVideoBitrate: float
     env: Any  # Environment variables to set when launching FFmpeg.
+    ffmpegPath: str  # Path to a custom FFmpeg binary.
     h264EncoderArguments: list[str]
     h264FilterArguments: list[str]
     inputArguments: list[str]

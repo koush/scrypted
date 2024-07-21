@@ -190,7 +190,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     // start ffmpeg process with child process pipes
     args.unshift('-hide_banner');
     safePrintFFmpegArguments(console, args);
-    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
+    const cp = child_process.spawn(ffmpegInput.ffmpegPath || await mediaManager.getFFmpegPath(), args, {
         stdio,
         env,
     });
