@@ -134,10 +134,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
 
 
     const args = ffmpegInput.inputArguments.slice();
-    const env = {
-        ...process.env,
-        ...ffmpegInput.env,
-    }
+    const env = ffmpegInput.env ? { ...process.env, ...ffmpegInput.env } : undefined;
 
     const ensureActive = (killed: () => void) => {
         if (!isActive) {
