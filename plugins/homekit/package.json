@@ -38,7 +38,7 @@
    "dependencies": {
       "@koush/werift-src": "file:../../external/werift",
       "check-disk-space": "^3.4.0",
-      "hap-nodejs": "^0.11.2",
+      "hap-nodejs": "^1.0.0",
       "lodash": "^4.17.21",
       "mkdirp": "^3.0.1",
       "qrcode-svg": "^1.1.0"
@@ -47,9 +47,9 @@
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "@types/debug": "^4.1.12",
-      "@types/lodash": "^4.17.0",
-      "@types/node": "^20.11.28",
-      "@types/qrcode-svg": "^1.1.4",
+      "@types/lodash": "^4.17.7",
+      "@types/node": "^20.14.11",
+      "@types/qrcode-svg": "^1.1.5",
       "@types/url-parse": "^1.4.11"
    }
 }
