@@ -1407,6 +1407,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         log.a(`${this.name} is a cloud camera. Prebuffering maintains a persistent stream and will not be enabled by default. You must enable the Prebuffer stream manually.`)
       }
     }
+    if (this.storage.getItem('warnedSynthetic') !== 'true') {
+      const synthetic = msos?.find(mso => mso.source === 'synthetic');
+      if (synthetic) {
+        this.storage.setItem('warnedSynthetic', 'true');
+        log.a(`${this.name} is a synthetic stream requiring substantial transcoding overhead. Prebuffering maintains a persistent stream and will not be enabled by default. You must enable the Prebuffer stream manually.`)
+      }
+    }
 
     if (!enabledIds.length)
       this.online = true;

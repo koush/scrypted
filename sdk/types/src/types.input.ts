@@ -477,7 +477,7 @@ export interface AudioStreamOptions {
   sampleRate?: number;
 }
 
-export type MediaStreamSource = "local" | "cloud";
+export type MediaStreamSource = "local" | "cloud" | "synthetic";
 export type MediaStreamTool = 'ffmpeg' | 'scrypted' | 'gstreamer';
 
 /**
