@@ -1707,6 +1707,10 @@ export interface FFmpegInput extends MediaContainer {
    * Environment variables to set when launching FFmpeg.
    */
   env?: { [key: string]: string };
+  /**
+   * Path to a custom FFmpeg binary.
+   */
+  ffmpegPath?: string;
 }
 export interface DeviceInformation {
   model?: string;
