@@ -31,6 +31,8 @@ export class AutomationCore extends ScryptedDeviceBase implements DeviceProvider
                 await this.reportAutomation(updatePluginsNativeId, 'Autoupdate Plugins');
                 updatePlugins = new Automation(updatePluginsNativeId);
                 updatePlugins.storage.setItem('data', JSON.stringify(updatePluginsData));
+                updatePlugins.data = updatePlugins.storageSettings.values.data;
+                updatePlugins.bind();
                 this.automations.set(updatePluginsNativeId, updatePlugins);
             }
         })();
