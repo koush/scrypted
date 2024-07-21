@@ -591,8 +591,8 @@ class PrebufferSession {
         //   ffmpegInput.inputArguments.unshift('-use_wallclock_as_timestamps', '1');
 
         // extraOutputArguments must contain full codec information
-        if (ffmpegInput.h264EncoderArguments) {
-          vcodec = ffmpegInput.h264EncoderArguments;
+        if (ffmpegInput.h264EncoderArguments?.length) {
+          vcodec = [...ffmpegInput.h264EncoderArguments];
         }
         if (extraOutputArguments) {
           vcodec = [...extraOutputArguments.split(' ').filter(d => !!d)];
