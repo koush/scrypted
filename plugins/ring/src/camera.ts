@@ -25,9 +25,9 @@ class RingWebSocketRTCSessionControl implements RTCSessionControl {
             this.streamingSession.setCameraSpeaker(options.audio);
     }
 
-    async getRefreshAt() {}
+    async getRefreshAt() { }
 
-    async extendSession() {}
+    async extendSession() { }
 
     async endSession() {
         this.streamingSession.stop();
@@ -35,13 +35,13 @@ class RingWebSocketRTCSessionControl implements RTCSessionControl {
 }
 
 class RingBrowserRTCSessionControl implements RTCSessionControl {
-    constructor(public ringCamera: RingCameraDevice, public simpleSession: SimpleWebRtcSession) {}
+    constructor(public ringCamera: RingCameraDevice, public simpleSession: SimpleWebRtcSession) { }
 
-    async setPlayback(options: { audio: boolean; video: boolean; }) {}
+    async setPlayback(options: { audio: boolean; video: boolean; }) { }
 
-    async getRefreshAt() {}
+    async getRefreshAt() { }
 
-    async extendSession() {}
+    async extendSession() { }
 
     async endSession() {
         await this.simpleSession.end();
@@ -70,7 +70,7 @@ class RingCameraSiren extends ScryptedDeviceBase implements OnOff {
     async turnOff(): Promise<void> {
         await this.device.camera.setSiren(false);
     }
-    
+
     async turnOn(): Promise<void> {
         await this.device.camera.setSiren(true);
     }
@@ -189,7 +189,7 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
         return new RingCameraLight(this);
     }
 
-    async releaseDevice(id: string, nativeId: string): Promise<void> {}
+    async releaseDevice(id: string, nativeId: string): Promise<void> { }
 
     async startIntercom(media: MediaObject): Promise<void> {
         if (!this.session)
@@ -297,7 +297,7 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
                     try {
                         this.console.log('stopping ring sip session.');
                         sip.stop();
-                    } catch (e) {}
+                    } catch (e) { }
                     rtsp?.destroy();
                 }
 
@@ -665,7 +665,7 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
                     return realDevice.getVideoStream(prebuffered);
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
 
         let buffer: Buffer;
 
@@ -722,14 +722,14 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
 
     async getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
         const response = await this.camera.videoSearch({
-            dateFrom: options.startTime, 
+            dateFrom: options.startTime,
             dateTo: options.endTime,
         });
 
         const ep = await sdk.endpointManager.getLocalEndpoint();
 
         return response.video_search.map((result) => {
-            const videoClip =  {
+            const videoClip = {
                 id: result.ding_id,
                 startTime: result.created_at,
                 duration: Math.round(result.duration * 1000),
@@ -763,7 +763,8 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
         }
         const ffmpegInput: FFmpegInput = {
             inputArguments: [
-                '-f', 'h264',
+                // it may be h264 or h265.
+                // '-f', 'h264',
                 '-i', this.videoClips.get(thumbnailId).thumbnail_url,
             ]
         };
@@ -771,7 +772,7 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
         const jpeg = await mediaManager.convertMediaObjectToBuffer(input, 'image/jpeg');
         return await mediaManager.createMediaObject(jpeg, 'image/jpeg');
     }
-    
+
     async removeVideoClips(...videoClipIds: string[]): Promise<void> {
         throw new Error('Removing video clips not supported.');
     }

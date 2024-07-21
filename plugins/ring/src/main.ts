@@ -119,12 +119,13 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings,
             const [, , id, ding_id] = normalizedUrl.split('/');
             const locationId = sdk.systemManager.getDeviceById(id).providerId;
             const locationNativeId = sdk.systemManager.getDeviceById(locationId).nativeId;
-            const location =  this.devices.get(locationNativeId);
+            const location = this.devices.get(locationNativeId);
             const camera = location.devices.get(sdk.systemManager.getDeviceById(id).nativeId) as RingCameraDevice;
             const clip = camera.videoClips.get(ding_id);
             const mo = await sdk.mediaManager.createFFmpegMediaObject({
                 inputArguments: [
-                    '-f', 'h264',
+                    // it may be h264 or h265.
+                    // '-f', 'h264',
                     '-i', clip.thumbnail_url,
                 ]
             });
