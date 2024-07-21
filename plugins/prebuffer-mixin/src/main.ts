@@ -590,6 +590,9 @@ class PrebufferSession {
         // if (!userInputArguments && (ffmpegInput.container === 'rtmp' || ffmpegInput.url?.startsWith('rtmp:')))
         //   ffmpegInput.inputArguments.unshift('-use_wallclock_as_timestamps', '1');
 
+        if (ffmpegInput.h264EncoderArguments?.length) {
+          vcodec = [...ffmpegInput.h264EncoderArguments];
+        }
         // extraOutputArguments must contain full codec information
         if (extraOutputArguments) {
           vcodec = [...extraOutputArguments.split(' ').filter(d => !!d)];
