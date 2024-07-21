@@ -134,6 +134,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
 
 
     const args = ffmpegInput.inputArguments.slice();
+    const env = ffmpegInput.env || process.env;
 
     const ensureActive = (killed: () => void) => {
         if (!isActive) {
@@ -191,6 +192,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     safePrintFFmpegArguments(console, args);
     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
         stdio,
+        env,
     });
     ffmpegLogInitialOutput(console, cp, undefined, options?.storage);
     cp.on('exit', () => kill(new Error('ffmpeg exited')));
