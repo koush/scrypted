@@ -144,7 +144,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         const local = getMediaStream(storageSettings.keys.defaultStream, msos);
         const remoteRecording = getMediaStream(storageSettings.keys.remoteRecordingStream, msos);
 
-        if (!local?.stream || local.stream.source === 'cloud')
+        if (!local?.stream || local.stream.source === 'cloud' || local.stream.source === 'synthetic')
             return [];
 
         if (local.stream.id === remoteRecording.stream.id)
