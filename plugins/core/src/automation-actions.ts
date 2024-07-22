@@ -1,4 +1,4 @@
-import { Brightness, Notifier, OnOff, Program, ScryptedDevice, ScryptedInterface } from "@scrypted/sdk";
+import { Brightness, Lock, LockState, Notifier, OnOff, Program, ScryptedDevice, ScryptedInterface, StartStop } from "@scrypted/sdk";
 import { StorageSettingsDict } from "@scrypted/sdk/storage-settings";
 
 interface InvokeStorage<T extends string> {
@@ -21,11 +21,35 @@ function addAction<T extends string>(
 addAction(ScryptedInterface.OnOff, {
     on: {
         title: 'Turn On/Off',
+        description: 'Enable to turn on the device. Disable to turn off the device.',
         type: 'boolean',
         immediate: true,
     }
 }, async function invoke(device: ScryptedDevice & OnOff, storageSettings) {
     return storageSettings.on ? device.turnOn() : device.turnOff();
+});
+
+addAction(ScryptedInterface.StartStop, {
+    running: {
+        title: 'Start/Stop',
+        description: 'Enable to start the device. Disable to stop the device.',
+        type: 'boolean',
+        immediate: true,
+    }
+}, async function invoke(device: ScryptedDevice & StartStop, storageSettings) {
+    device.running
+    return storageSettings.running ? device.start() : device.stop();
+});
+
+addAction(ScryptedInterface.Lock, {
+    lockState: {
+        title: 'Lock/Unlock',
+        choices: [LockState.Locked, LockState.Unlocked],
+        defaultValue: LockState.Locked,
+        immediate: true,
+    }
+}, async function invoke(device: ScryptedDevice & Lock, storageSettings) {
+    return storageSettings.lockState === LockState.Unlocked ? device.unlock() : device.lock();
 });
 
 addAction(ScryptedInterface.Brightness, {
