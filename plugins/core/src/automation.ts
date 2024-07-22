@@ -405,9 +405,11 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
 
                     let actionSettings = automationActions.get(iface as ScryptedInterface)?.settings;
                     if (actionSettings) {
-                        actionSettings = {
-                            ...actionSettings,
-                        };
+                        const cloned = JSON.parse(JSON.stringify(actionSettings));
+                        actionSettings = {};
+                        for (const k of Object.keys(cloned)) {
+                            actionSettings[`action-${index}-${k}`] = cloned[k];
+                        }
 
                         for (const k in actionSettings) {
                             const a = actionSettings[k];

@@ -150,7 +150,7 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
                 description: 'The components of other devices to combine into this device group.',
                 type: 'interface',
                 multiple: true,
-                deviceFilter: `id !== ${this.id} && interface !== ${ScryptedInterface.Settings}`,
+                deviceFilter: `id !== '${this.id}' && deviceInterface !== '${ScryptedInterface.Settings}'`,
             }
         })
 
