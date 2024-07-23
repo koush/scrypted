@@ -45,7 +45,7 @@ export function createMonacoEvalDefaultsWithLibs(standardLibs: StandardLibs, scr
 
         const libs: any = {
             ...scryptedLibs,
-            extraLibs,
+            ...extraLibs,
         };
 
         const catLibs = Object.values(libs).join('\n');
@@ -65,8 +65,6 @@ export function createMonacoEvalDefaultsWithLibs(standardLibs: StandardLibs, scr
             const endpointManager: EndpointManager;
             const mediaManager: MediaManager;
             const systemManager: SystemManager;
-            const mqtt: MqttClient;
-            const device: ScryptedDeviceBase & { pathname : string };
 
             const eventSource: ScryptedDevice;
             const eventDetails: EventDetails;
