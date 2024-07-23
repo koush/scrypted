@@ -407,12 +407,11 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                     if (actionSettings) {
                         const cloned = JSON.parse(JSON.stringify(actionSettings));
                         actionSettings = {};
-                        for (const k of Object.keys(cloned)) {
-                            actionSettings[`action-${index}-${k}`] = cloned[k];
-                        }
 
-                        for (const k in actionSettings) {
-                            const a = actionSettings[k];
+                        for (const k of Object.keys(cloned)) {
+                            const a = cloned[k];
+                            actionSettings[`action-${index}-${k}`] = a;
+
                             a.mapPut = (ov: any, value: any) => {
                                 action.model[k] = value;
                                 this.storageSettings.values.data = this.data;
@@ -531,7 +530,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
                             if (!runner)
                                 throw new Error(`unknown action ${iface}`);
 
-                            runner.invoke(device, action.model);
+                            runner.invoke(device, action.model).catch(e => this.console.error('automation aciton failed', action.model, e));
                         }
                     }
                 }
