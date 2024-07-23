@@ -1,9 +1,9 @@
 import { Deferred } from '@scrypted/common/src/deferred';
-import { authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { readLine } from '@scrypted/common/src/read-stream';
 import { parseHeaders, readBody, readMessage, writeMessage } from '@scrypted/common/src/rtsp-server';
 import crypto from 'crypto';
 import { Duplex, PassThrough, Writable } from 'stream';
+import { httpFetch } from '../../../server/src/fetch/http-fetch';
 import { digestAuthHeader } from './digest-auth';
 
 export function getTapoAdminPassword(cloudPassword: string, useSHA256: boolean) {
@@ -27,8 +27,7 @@ export class TapoAPI {
         const url = `http://${options.address}/stream`;
 
         // will fail with auth required.
-        const response = await authHttpFetch({
-            credential: undefined,
+        const response = await httpFetch({
             url: url,
             checkStatusCode: false,
             method: 'POST',
@@ -48,8 +47,7 @@ export class TapoAPI {
 
         const auth = digestAuthHeader('POST', '/stream', wwwAuthenticate, 'admin', password, 0) + ', algorithm=MD5';
 
-        const response2 = await authHttpFetch({
-            credential: undefined,
+        const response2 = await httpFetch({
             url: url,
             method: 'POST',
             headers: {
