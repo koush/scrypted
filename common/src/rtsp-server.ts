@@ -1124,7 +1124,7 @@ export class RtspServer {
 }
 
 export async function listenSingleRtspClient<T extends RtspServer>(options?: {
-    hostname?: string,
+    hostname: string,
     pathToken?: string,
     createServer?(duplex: Duplex): T,
 }) {
