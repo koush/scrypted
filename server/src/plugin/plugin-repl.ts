@@ -75,5 +75,5 @@ export async function createREPLServer(scrypted: ScryptedStatic, params: any, pl
         socket.on('error', cleanup);
         socket.on('end', cleanup);
     });
-    return listenZero(server);
+    return listenZero(server, '127.0.0.1');
 }
