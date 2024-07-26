@@ -10,34 +10,41 @@ import { DevInfo } from './probe';
 import { AIState, Enc, ReolinkCameraClient } from './reolink-api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
-    intervalId: NodeJS.Timeout;
+    sirenTimeout: NodeJS.Timeout;
 
     constructor(public camera: ReolinkCamera, nativeId: string) {
         super(nativeId);
     }
 
     async turnOff() {
+        this.on = false;
         await this.setSiren(false);
     }
 
     async turnOn() {
+        this.on = true;
         await this.setSiren(true);
     }
 
     private async setSiren(on: boolean) {
+        const api = this.camera.getClient();
+
         // doorbell doesn't seem to support alarm_mode = 'manul', so let's pump the API every second and run the siren in timed mode.
         if (this.camera.storageSettings.values.doorbell) {
             if (!on) {
-                clearInterval(this.intervalId);
+                clearInterval(this.sirenTimeout);
+                await api.setSiren(false);
                 return;
             }
-            this.intervalId = setInterval(async () => {
-                const api = this.camera.getClient();
-                await api.setSiren(on, 1);
-            }, 1000);
+
+            // siren lasts around 4 seconds.
+            this.sirenTimeout = setTimeout(async () => {
+                await this.turnOff();
+            }, 4000);
+
+            await api.setSiren(true, 1);
             return;
         }
-        const api = this.camera.getClient();
         await api.setSiren(on);
     }
 }
