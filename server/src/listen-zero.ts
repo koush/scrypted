@@ -7,13 +7,13 @@ export class ListenZeroSingleClientTimeoutError extends Error {
     }
 }
 
-export async function listenZero(server: net.Server, hostname?: string) {
+export async function listenZero(server: net.Server, hostname: string) {
     server.listen(0, hostname);
     await once(server, 'listening');
     return (server.address() as net.AddressInfo).port;
 }
 
-export async function listenZeroSingleClient(hostname?: string, options?: net.ServerOpts, listenTimeout = 30000) {
+export async function listenZeroSingleClient(hostname: string, options?: net.ServerOpts, listenTimeout = 30000) {
     const server = new net.Server(options);
     const port = await listenZero(server, hostname);
 

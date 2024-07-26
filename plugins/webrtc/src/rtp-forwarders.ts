@@ -293,7 +293,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                             }
                         });
 
-                        const audioClient = await listenZeroSingleClient();
+                        const audioClient = await listenZeroSingleClient('127.0.0.1');
                         let audioPipe: Writable;
                         killDeferred.promise.finally(() => audioClient.clientPromise.then(client => client.destroy()));
                         let rtspServer: RtspServer;
@@ -421,7 +421,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             // seems better to use udp for audio timing/chop.
             const useUdp = rtspMode === 'udp';
 
-            const serverPort = await listenZeroSingleClient();
+            const serverPort = await listenZeroSingleClient('127.0.0.1');
 
             args.push(
                 '-rtsp_transport',
