@@ -270,11 +270,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                 process.on('uncaughtException', e => {
                     getPluginConsole().error('uncaughtException', e);
-                    scrypted.log.e('uncaughtException ' + e?.toString());
+                    scrypted.log.e('uncaughtException ' + (e.stack || e?.toString()));
                 });
                 process.on('unhandledRejection', e => {
                     getPluginConsole().error('unhandledRejection', e);
-                    scrypted.log.e('unhandledRejection ' + e?.toString());
+                    scrypted.log.e('unhandledRejection ' + ((e as Error).stack || e?.toString()));
                 });
 
                 installSourceMapSupport({
