@@ -55,7 +55,7 @@ addSupportedType({
         .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
             callback();
             device.setAirPurifierState({
-                speed: value,
+                speed: value as number,
             })
         })
         

@@ -190,7 +190,6 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             defaultIncluded = {};
         }
 
-        const plugins = await systemManager.getComponent('plugins');
         const accessoryIds = new Set<string>();
         const deviceIds = Object.keys(systemManager.getSystemState());
 
@@ -223,10 +222,14 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     // don't sync this by default, as it's solely for automations
                     if (device.type === ScryptedDeviceType.Notifier)
                         continue;
+                    // don't sync this because automations may randomly turn the siren on
+                    // since it is exposed as a switch. there's no native siren type.
+                    if (device.type === ScryptedDeviceType.Siren)
+                        continue;
                     if (defaultIncluded[device.id] === includeToken)
                         continue;
                     mixins.push(this.id);
-                    await plugins.setMixins(device.id, mixins);
+                    await device.setMixins(mixins);
                     defaultIncluded[device.id] = includeToken;
                 }
             }
@@ -270,7 +273,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     },
                         undefined, 'Pairing'));
                     storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
-                    storageSettings.settings.addIdentifyingMaterial.persistedDefaultValue = false;
+                    storageSettings.settings.addIdentifyingMaterial.persistedDefaultValue = true;
 
                     const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
 

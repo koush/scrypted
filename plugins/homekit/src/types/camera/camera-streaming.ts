@@ -366,7 +366,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 const start = async () => {
                     try {
                         twoWayAudioState = 'starting';
-                        const { clientPromise, url } = await listenZeroSingleClient();
+                        const { clientPromise, url } = await listenZeroSingleClient('127.0.0.1');
                         const rtspUrl = url.replace('tcp', 'rtsp');
                         let sdp = createReturnAudioSdp(session.startRequest.audio);
                         sdp = addTrackControls(sdp);
