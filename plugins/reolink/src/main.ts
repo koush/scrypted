@@ -14,6 +14,7 @@ class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
 
     constructor(public camera: ReolinkCamera, nativeId: string) {
         super(nativeId);
+        this.on = false;
     }
 
     async turnOff() {
