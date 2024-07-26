@@ -29,7 +29,7 @@ class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     private async setSiren(on: boolean) {
         const api = this.camera.getClient();
 
-        // doorbell doesn't seem to support alarm_mode = 'manul', so let's pump the API every second and run the siren in timed mode.
+        // doorbell doesn't seem to support alarm_mode = 'manul'
         if (this.camera.storageSettings.values.doorbell) {
             if (!on) {
                 clearInterval(this.sirenTimeout);
