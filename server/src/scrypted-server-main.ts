@@ -229,6 +229,12 @@ async function start(mainFilename: string, options?: {
     }
 
     app.use(async (req, res, next) => {
+        // /web/component requires basic auth admin access.
+        if (req.url.startsWith('/web/component/')) {
+            next();
+            return;
+        }
+
         // the remote address may be ipv6 prefixed so use a fuzzy match.
         // eg ::ffff:192.168.2.124
         if (process.env.SCRYPTED_ADMIN_USERNAME

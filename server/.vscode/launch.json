@@ -28,7 +28,7 @@
             ],
             "env": {
                 "SCRYPTED_CAN_RESTART": "true",
-                // "SCRYPTED_DEFAULT_AUTHENTICATION": "demo"
+                // "SCRYPTED_DEFAULT_AUTHENTICATION": "demo",
                 // force usage of system python because brew python is 3.11
                 // which has no wheels for coreml tools or tflite-runtime
                 "SCRYPTED_PYTHON_PATH": "/opt/homebrew/bin/python3.11",
