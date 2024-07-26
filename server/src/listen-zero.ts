@@ -8,7 +8,7 @@ export class ListenZeroSingleClientTimeoutError extends Error {
 }
 
 export async function listenZero(server: net.Server, hostname: string) {
-    server.listen(0, hostname);
+    server.listen(0, hostname || '127.0.0.1');
     await once(server, 'listening');
     return (server.address() as net.AddressInfo).port;
 }
