@@ -515,7 +515,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                 return;
             }
 
-            const client = await listenZeroSingleClient();
+            const client = await listenZeroSingleClient('127.0.0.1');
             cleanup.promise.finally(() => {
                 client.cancel();
                 client.clientPromise.then(cp => cp.destroy()).catch(() => { });

@@ -1,5 +1,5 @@
-import { RpcPeer } from "@scrypted/server/src/rpc";
-import { createRpcSerializer } from "@scrypted/server/src/rpc-serializer";
+import { RpcPeer } from "../../server/src/rpc";
+import { createRpcSerializer } from "../../server/src/rpc-serializer";
 import type { RTCSignalingSession } from "@scrypted/sdk";
 
 export async function createBrowserSignalingSession(ws: WebSocket, localName: string, remoteName: string) {

@@ -37,7 +37,7 @@ export async function createRTCPeerConnectionSource(options: {
     const { mediaStreamOptions, startRTCSignalingSession, mixinId, nativeId, maximumCompatibilityMode } = options;
     const console = mixinId ? sdk.deviceManager.getMixinConsole(mixinId, nativeId) : sdk.deviceManager.getDeviceConsole(nativeId);
 
-    const { clientPromise, port } = await listenZeroSingleClient();
+    const { clientPromise, port } = await listenZeroSingleClient('127.0.0.1');
 
     const timeStart = Date.now();
 

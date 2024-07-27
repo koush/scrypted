@@ -46,7 +46,7 @@ export class ScryptedSessionControl implements RTCSessionControl {
 
         this.rtspServer?.client.destroy();
 
-        const rtspTcpServer = await listenZeroSingleClient();
+        const rtspTcpServer = await listenZeroSingleClient('127.0.0.1');
 
         const url = rtspTcpServer.url.replace('tcp:', 'rtsp:');
         const ffmpegInput: FFmpegInput = {
