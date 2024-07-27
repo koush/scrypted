@@ -13,6 +13,12 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
             defaultValue: true,
             type: 'boolean',
         },
+        admin: {
+            title: 'Administrator',
+            mapGet: () => '<div style="font-size: .8rem; margin-bottom: 16px; margin-left: 8px;">This user has administrator access.</div>',
+            type: 'html',
+            hide: true,
+        },
         interfaces: {
             title: 'Interfaces',
             description: 'The interfaces this user can access. Admin users can access all interfaces on all devices. Scrypted NVR users should use NVR Permissions to grant access to the NVR and associated cameras.',
@@ -20,16 +26,28 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
             multiple: true,
             defaultValue: [],
         },
-    })
+    });
 
-    async getScryptedUserAccessControl(): Promise<ScryptedUserAccessControl> {
+    _admin: boolean;
+    async getAdmin() {
+        if (this._admin !== undefined)
+            return this._admin;
         const usersService = await sdk.systemManager.getComponent('users');
         const users: DBUser[] = await usersService.getAllUsers();
         const user = users.find(user => user.username === this.username);
         if (!user)
             throw new Error("user not found");
+        this._admin = !!user.admin;
+        if (this._admin) {
+            this.storageSettings.settings.defaultAccess.hide = true;
+            this.storageSettings.settings.interfaces.hide = true;
+            this.storageSettings.settings.admin.hide = false;
+        }
+        return this._admin;
+    }
 
-        if (user.admin)
+    async getScryptedUserAccessControl(): Promise<ScryptedUserAccessControl> {
+        if (await this.getAdmin())
             return;
 
         const self = sdk.deviceManager.getDeviceState(this.nativeId);
@@ -63,6 +81,8 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
     }
 
     async getSettings(): Promise<Setting[]> {
+        await this.getAdmin();
+
         return [
             {
                 key: 'username',

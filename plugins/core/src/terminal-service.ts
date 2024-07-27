@@ -1,5 +1,5 @@
 import { ScryptedDeviceBase, ScryptedNativeId, StreamService } from "@scrypted/sdk";
-import type { IPty, spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
+import type { IPty, spawn as ptySpawn } from 'node-pty';
 import { createAsyncQueue } from '@scrypted/common/src/async-queue'
 import { ChildProcess, spawn as childSpawn } from "child_process";
 
