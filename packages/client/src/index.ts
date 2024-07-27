@@ -57,9 +57,9 @@ export type ScryptedClientConnectionType = 'http' | 'webrtc' | 'http-direct';
 export interface ScryptedClientStatic extends ScryptedStatic {
     userId?: string;
     username?: string;
+    admin: boolean;
     disconnect(): void;
     onClose?: Function;
-    version: string;
     rtcConnectionManagement?: RTCConnectionManagement;
     browserSignalingSession?: BrowserSignalingSession;
     address?: string;
@@ -714,16 +714,16 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             });
         }
 
-        const [version, rtcConnectionManagement] = await Promise.all([
+        const [admin, rtcConnectionManagement] = await Promise.all([
             (async () => {
-                let version = 'unknown';
                 try {
+                    // info is 
                     const info = await systemManager.getComponent('info');
-                    version = await info.getVersion();
+                    return !!info;
                 }
                 catch (e) {
                 }
-                return version;
+                return false;
             })(),
             (async () => {
                 let rtcConnectionManagement: RTCConnectionManagement;
@@ -740,7 +740,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         ]);
 
         console.log('api initialized', Date.now() - start);
-        console.log('api queried, version:', version);
 
         const userDevice = Object.keys(systemManager.getSystemState())
             .map(id => systemManager.getDeviceById(id))
@@ -852,7 +851,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             pluginRemoteAPI: undefined,
             address,
             connectionType,
-            version,
+            admin,
             systemManager,
             deviceManager,
             endpointManager,
