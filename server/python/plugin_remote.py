@@ -274,6 +274,13 @@ class DeviceState(scrypted_python.scrypted_sdk.types.DeviceState):
         self.systemManager.api.setState(self.nativeId, property, value)
 
 
+class WritableDeviceState(scrypted_python.scrypted_sdk.types.WritableDeviceState):
+
+    def __init__(self, id, setState) -> None:
+        self.id = id
+        self.setState = setState
+
+
 class DeviceStorage(Storage):
     id: str
     nativeId: str
@@ -757,7 +764,7 @@ class PluginRemote:
         pass
 
     async def createDeviceState(self, id, setState):
-        pass
+        return WritableDeviceState(id, setState)
 
     async def getServicePort(self, name):
         if name == "repl":
