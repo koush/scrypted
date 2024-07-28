@@ -1,12 +1,12 @@
 
 {
     // docker installation
-    // "scrypted.debugHost": "koushik-ubuntu",
-    // "scrypted.serverRoot": "/server",
+    "scrypted.debugHost": "scrypted-demo",
+    "scrypted.serverRoot": "/server",
 
     // proxmox installation
-    "scrypted.debugHost": "scrypted-server",
-    "scrypted.serverRoot": "/root/.scrypted",
+    // "scrypted.debugHost": "scrypted-server",
+    // "scrypted.serverRoot": "/root/.scrypted",
 
     // pi local installation
     // "scrypted.debugHost": "192.168.2.119",

@@ -98,21 +98,30 @@ class OpenVINOPlugin(
         self.available_devices = available_devices
         print("available devices: %s" % available_devices)
 
+        nvidia = False
+        iris_xe = False
+        arc = False
+
+        dgpus = []
+        # search for NVIDIA dGPU, as that is not preferred by AUTO for some reason?
+        # todo: create separate core per NVIDIA dGPU as inference does not seem to
+        # be distributed to multiple dGPU.
+        for device in self.available_devices:
+            try:
+                full_device_name = self.core.get_property(device, "FULL_DEVICE_NAME")
+                if "Iris" in full_device_name and "Xe" in full_device_name:
+                    iris_xe = True
+                if "Arc" in full_device_name:
+                    arc = True
+                if "NVIDIA" in full_device_name and "dGPU" in full_device_name:
+                    dgpus.append(device)
+                    nvidia = True
+            except:
+                pass
+
         mode = self.storage.getItem("mode")
         if mode == "Default":
             mode = "AUTO"
-
-            dgpus = []
-            # search for NVIDIA dGPU, as that is not preferred by AUTO for some reason?
-            # todo: create separate core per NVIDIA dGPU as inference does not seem to
-            # be distributed to multiple dGPU.
-            for device in self.available_devices:
-                try:
-                    full_device_name = self.core.get_property(device, "FULL_DEVICE_NAME")
-                    if "NVIDIA" in full_device_name and "dGPU" in full_device_name:
-                        dgpus.append(device)
-                except:
-                    pass
 
             if len(dgpus):
                 mode = f"AUTO:{','.join(dgpus)},CPU"
@@ -128,7 +137,12 @@ class OpenVINOPlugin(
         if model == "Default" or model not in availableModels:
             if model != "Default":
                 self.storage.setItem("model", "Default")
-            model = "scrypted_yolov9t_320"
+            if arc or nvidia:
+                model = "scrypted_yolov9c_320"
+            elif iris_xe:
+                model = "scrypted_yolov9s_320"
+            else:
+                model = "scrypted_yolov9t_320"
         self.yolo = "yolo" in model
         self.scrypted_yolov10 = "scrypted_yolov10" in model
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
@@ -232,17 +246,6 @@ class OpenVINOPlugin(
                 ],
                 "value": mode,
                 "combobox": True,
-            },
-            {
-                "key": "precision",
-                "title": "Precision",
-                "description": "The model floating point precision. FP16 is recommended for GPU. FP32 is recommended for CPU.",
-                "choices": [
-                    "Default",
-                    "FP16",
-                    "FP32",
-                ],
-                "value": precision,
             },
         ]
 
