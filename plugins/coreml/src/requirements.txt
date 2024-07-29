@@ -4,5 +4,5 @@ coremltools==7.2
 Pillow==10.3.0
 
 # opencv-python requires macos 12 after version 4.10.
+# seems to be problematic and requires a build though, so skip it.
 opencv-python==4.10.0.84; platform_machine != 'x86_64'
-opencv-python==4.9.0.80; platform_machine == 'x86_64'
