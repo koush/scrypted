@@ -152,7 +152,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         const parser: StreamParser = options.parsers[container as T];
 
         if (parser.tcpProtocol) {
-            const tcp = await listenZeroSingleClient();
+            const tcp = await listenZeroSingleClient('127.0.0.1');
             const url = new URL(parser.tcpProtocol);
             url.port = tcp.port.toString();
             args.push(

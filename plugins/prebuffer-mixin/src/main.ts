@@ -1719,7 +1719,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     const u = new URL(url);
     if (!u.protocol.startsWith('tcp'))
       throw new Error('rfc4751 url must be tcp');
-    const { clientPromise, url: clientUrl } = await listenZeroSingleClient();
+    const { clientPromise, url: clientUrl } = await listenZeroSingleClient('127.0.0.1');
     const ffmpeg: FFmpegInput = {
       url: clientUrl,
       inputArguments: [
