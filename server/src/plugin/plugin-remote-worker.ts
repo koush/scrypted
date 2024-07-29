@@ -100,6 +100,12 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const properties = RpcPeer.prepareProxyProperties(value) || {};
                 let clusterEntry: ClusterObject = properties.__cluster;
 
+                // if the cluster entry already exists, check if it belongs to this node.
+                // if it belongs to this node, the entry must also be for this peer.
+                // relying on the liveness/gc of a different peer may cause race conditions.
+                if (clusterEntry && clusterPort === clusterEntry.port && sourcePeerPort !== clusterEntry.sourcePort)
+                    clusterEntry = undefined;
+
                 // set the cluster identity if it does not exist.
                 if (!clusterEntry) {
                     clusterEntry = {
@@ -112,11 +118,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     clusterEntry.sha256 = computeClusterObjectHash(clusterEntry, clusterSecret);
                     properties.__cluster = clusterEntry;
                 }
-                // always reassign the id and source.
-                // if this is already a p2p object, and is passed to a different peer,
-                // a future p2p object must be routed to the correct p2p peer to find the object.
-                // clusterEntry.proxyId = proxyId;
-                // clusterEntry.source = source;
+
                 return properties;
             }
             peer.onProxySerialization = onProxySerialization;

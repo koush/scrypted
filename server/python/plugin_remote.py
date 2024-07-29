@@ -417,6 +417,10 @@ class PluginRemote:
         def onProxySerialization(value: Any, proxyId: str, sourcePeerPort: int = None):
             properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
             clusterEntry = properties.get('__cluster', None)
+
+            if clusterEntry and clusterPort == clusterEntry['port'] and sourcePeerPort != clusterEntry.get('sourcePort', None):
+                clusterEntry = None
+
             if not properties.get('__cluster', None):
                 clusterEntry: ClusterObject = {
                     'id': clusterId,
