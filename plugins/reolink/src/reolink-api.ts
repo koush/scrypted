@@ -201,7 +201,7 @@ export class ReolinkCameraClient {
         return response.body?.[0]?.value?.DevInfo;
     }
 
-    private async ptzOp(op: string) {
+    private async ptzOp(op: string, speed: number) {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'PtzCtrl');
@@ -223,7 +223,7 @@ export class ReolinkCameraClient {
                 param: {
                     channel: this.channelId,
                     op,
-                    speed: 10,
+                    speed,
                     timeout: 1,
                 }
             },
@@ -260,7 +260,7 @@ export class ReolinkCameraClient {
             op += 'Up';
 
         if (op) {
-            await this.ptzOp(op);
+            await this.ptzOp(op, (command.speed?.pan || command.speed?.tilt || 1) * 10);
         }
 
         if (command.zoom < 0)
@@ -269,7 +269,7 @@ export class ReolinkCameraClient {
             op = 'ZoomInc';
 
         if (op) {
-            await this.ptzOp(op);
+            await this.ptzOp(op, (command.speed?.zoom || 1) * 10);
         }
     }
 
