@@ -358,8 +358,14 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                     const remote = await setupPluginRemote(threadPeer, forkApi, pluginId, { serverVersion }, () => systemManager.getSystemState());
                     forks.add(remote);
-                    ntw.worker.on('exit', () => {
+                    ntw.on('exit', () => {
                         threadPeer.kill('worker exited');
+                        forkApi.removeListeners();
+                        forks.delete(remote);
+                        allMemoryStats.delete(ntw);
+                    });
+                    ntw.on('error', e => {
+                        threadPeer.kill('worker error ' + e);
                         forkApi.removeListeners();
                         forks.delete(remote);
                         allMemoryStats.delete(ntw);
