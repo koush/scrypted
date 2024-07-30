@@ -260,7 +260,7 @@ export class ReolinkCameraClient {
             op += 'Up';
 
         if (op) {
-            await this.ptzOp(op, (command.speed?.pan || command.speed?.tilt || 1) * 10);
+            await this.ptzOp(op, Math.round((command.speed?.pan || command.speed?.tilt || 1) * 10));
         }
 
         if (command.zoom < 0)
@@ -269,7 +269,7 @@ export class ReolinkCameraClient {
             op = 'ZoomInc';
 
         if (op) {
-            await this.ptzOp(op, (command.speed?.zoom || 1) * 10);
+            await this.ptzOp(op, Math.round((command.speed?.zoom || 1) * 10));
         }
     }
 
