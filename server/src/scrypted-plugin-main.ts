@@ -25,6 +25,14 @@ function start(mainFilename: string) {
             peer.transportSafeArgumentTypes.add(Buffer.name);
             peer.transportSafeArgumentTypes.add(Uint8Array.name);
             port.on('message', message => peer.handleMessage(v8.deserialize(message)));
+            port.on('messageerror', e => {
+                console.error('message error', e);
+                process.exit(1);
+            });
+            port.on('close', () => {
+                console.error('port closed');
+                process.exit(1);
+            });
         });
     }
     else {
