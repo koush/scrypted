@@ -414,9 +414,10 @@ class PluginRemote:
             m.update(bytes(f"{o['id']}{o['port']}{o.get('sourcePort') or ''}{o['proxyId']}{clusterSecret}", 'utf8'))
             return base64.b64encode(m.digest()).decode('utf-8')
 
-        def onProxySerialization(value: Any, proxyId: str, sourcePeerPort: int = None):
+        def onProxySerialization(value: Any, sourcePeerPort: int = None):
             properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
             clusterEntry = properties.get('__cluster', None)
+            proxyId: str = (clusterEntry and clusterEntry.get('proxyId', None)) or rpc.RpcPeer.generateId()
 
             if clusterEntry and clusterPort == clusterEntry['port'] and sourcePeerPort != clusterEntry.get('sourcePort', None):
                 clusterEntry = None
@@ -431,7 +432,7 @@ class PluginRemote:
                 clusterEntry['sha256'] = computeClusterObjectHash(clusterEntry)
                 properties['__cluster'] = clusterEntry
 
-            return properties
+            return proxyId, properties
 
         self.peer.onProxySerialization = onProxySerialization
 
@@ -448,8 +449,8 @@ class PluginRemote:
             rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
             peer: rpc.RpcPeer
             peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
-            peer.onProxySerialization = lambda value, proxyId: onProxySerialization(
-                value, proxyId, clusterPeerPort)
+            peer.onProxySerialization = lambda value: onProxySerialization(
+                value, clusterPeerPort)
             future: asyncio.Future[rpc.RpcPeer] = asyncio.Future()
             future.set_result(peer)
             clusterPeers[clusterPeerPort] = future
@@ -483,9 +484,8 @@ class PluginRemote:
                     rpcTransport = rpc_reader.RpcStreamTransport(
                         reader, writer)
                     clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(self.loop, rpcTransport)
-                    clusterPeer.tags['localPort'] = clusterPeerPort
-                    clusterPeer.onProxySerialization = lambda value, proxyId: onProxySerialization(
-                        value, proxyId, clusterPeerPort)
+                    clusterPeer.onProxySerialization = lambda value: onProxySerialization(
+                        value, clusterPeerPort)
 
                     async def run_loop():
                         try:
@@ -519,8 +519,11 @@ class PluginRemote:
 
             try:
                 clusterPeer = await clusterPeerPromise
-                if clusterPeer.tags.get('localPort') == sourcePort:
-                    return value
+                weakref = clusterPeer.remoteWeakProxies.get(proxyId, None)
+                existing = weakref() if weakref else None
+                if existing:
+                    return existing
+
                 peerConnectRPCObject = clusterPeer.tags.get('connectRPCObject')
                 if not peerConnectRPCObject:
                     peerConnectRPCObject = await clusterPeer.getParam('connectRPCObject')
