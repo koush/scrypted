@@ -12,17 +12,20 @@ function start(mainFilename: string) {
     module.paths.push(getPluginNodePath(pluginId));
 
     if (process.argv[2] === 'child-thread') {
-        const peer = startPluginRemote(mainFilename, process.argv[3], (message, reject) => {
-            try {
-                worker_threads.parentPort.postMessage(v8.serialize(message));
-            }
-            catch (e) {
-                reject?.(e);
-            }
+        worker_threads.parentPort.once('message', message => {
+            const { port } = message as { port: worker_threads.MessagePort };
+            const peer = startPluginRemote(mainFilename, pluginId, (message, reject) => {
+                try {
+                    port.postMessage(v8.serialize(message));
+                }
+                catch (e) {
+                    reject?.(e);
+                }
+            });
+            peer.transportSafeArgumentTypes.add(Buffer.name);
+            peer.transportSafeArgumentTypes.add(Uint8Array.name);
+            port.on('message', message => peer.handleMessage(v8.deserialize(message)));
         });
-        peer.transportSafeArgumentTypes.add(Buffer.name);
-        peer.transportSafeArgumentTypes.add(Uint8Array.name);
-        worker_threads.parentPort.on('message', message => peer.handleMessage(v8.deserialize(message)));
     }
     else {
         const peer = startPluginRemote(mainFilename, process.argv[3], (message, reject, serializationContext) => process.send(message, serializationContext?.sendHandle, {
