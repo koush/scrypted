@@ -6,7 +6,6 @@ import * as cloudflared from 'cloudflared';
 import crypto from 'crypto';
 import { once } from 'events';
 import { backOff } from "exponential-backoff";
-import fs, { mkdirSync, renameSync, rmSync } from 'fs';
 import http from 'http';
 import HttpProxy from 'http-proxy';
 import https from 'https';
@@ -20,8 +19,11 @@ import { readLine } from '../../../common/src/read-stream';
 import { sleep } from '../../../common/src/sleep';
 import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
+import { installCloudflared } from "./cloudflared-install";
 import { PushManager } from './push';
 import { qsparse, qsstringify } from "./qs";
+import { createLocallyManagedTunnel, runLocallyManagedTunnel } from "./cloudflared-local-managed";
+import { ChildProcess } from "child_process";
 
 // import { registerDuckDns } from "./greenlock";
 
@@ -52,7 +54,10 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
 
 class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider, HttpRequestHandler {
     cloudflareTunnel: string;
-    cloudflared: Awaited<ReturnType<typeof cloudflared.tunnel>>;
+    cloudflared: {
+        url: Promise<string>;
+        child: ChildProcess;
+    };
     manager = new PushManager(DEFAULT_SENDER_ID);
     server: http.Server;
     secureServer: https.Server;
@@ -171,6 +176,22 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             onPut: () => {
                 this.cloudflared?.child.kill();
             },
+            // this has been deprecated in favor of locally managed tunnels.
+            hide: true,
+        },
+        cloudflaredTunnelCredentials: {
+            group: 'Cloudflare',
+            json: true,
+            hide: true,
+        },
+        cloudflaredTunnelCustomDomain: {
+            group: 'Cloudflare',
+            title: 'Cloudflare Tunnel Custom Domain',
+            placeholder: 'scrypted.example.com',
+            description: 'Optional: Host a custom domain with Cloudflare. After setting the domain, complete the Cloudflare browser login link shown in Scrypted Cloud Plugin Console.',
+            onPut: (_, nv) => {
+                this.doCloudflaredLogin(nv);
+            },
         },
         cloudflaredTunnelUrl: {
             group: 'Cloudflare',
@@ -222,6 +243,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     upnpStatus = 'Starting';
     randomBytes = crypto.randomBytes(16).toString('base64');
     reverseConnections = new Set<Duplex>();
+    cloudflaredLoginController?: AbortController;
 
     get cloudflareTunnelHost() {
         if (!this.cloudflareTunnel)
@@ -260,8 +282,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         this.storageSettings.settings.securePort.onGet = async () => {
             return {
-                group: this.storageSettings.values.forwardingMode === 'Disabled' ? 'Cloudflare' : undefined,
-                title: this.storageSettings.values.forwardingMode === 'Disabled' ? 'Cloudflare Port' : 'Forward Port',
+                hide: this.storageSettings.values.forwardingMode === 'Disabled',
             }
         };
 
@@ -285,7 +306,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         //     }
         // };
 
-        this.storageSettings.settings.cloudflaredTunnelToken.onGet =
+        this.storageSettings.settings.cloudflaredTunnelCustomDomain.onGet =
             this.storageSettings.settings.cloudflaredTunnelUrl.onGet = async () => {
                 return {
                     hide: !this.storageSettings.values.cloudflareEnabled,
@@ -714,6 +735,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     getSSLHostname() {
         const validDomain = (this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
             || (this.storageSettings.values.cloudflaredTunnelToken && this.cloudflareTunnelHost)
+            || (this.storageSettings.values.cloudflaredTunnelCredentials && this.cloudflareTunnelHost)
             || (this.storageSettings.values.duckDnsCertValid && this.storageSettings.values.duckDnsHostname && this.storageSettings.values.upnpPort && `${this.storageSettings.values.duckDnsHostname}:${this.storageSettings.values.upnpPort}`);
         return validDomain;
     }
@@ -867,6 +889,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.server.listen(0, '127.0.0.1');
         await once(this.server, 'listening');
         const port = (this.server.address() as any).port;
+        this.console.log('scrypted cloud server listening on', port);
 
         const agent = new http.Agent({ maxSockets: Number.MAX_VALUE, keepAlive: true });
         this.proxy = HttpProxy.createProxy({
@@ -974,39 +997,21 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
                 this.console.log('starting cloudflared');
                 this.cloudflared = await backOff(async () => {
-                    const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
-                    const version = 2;
-                    const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `v${version}`, `${process.platform}-${process.arch}`);
-                    const bin = path.join(cloudflareD, cloudflared.bin);
+                    const { cloudflareD, bin } = await installCloudflared();
 
-                    if (!fs.existsSync(bin)) {
-                        for (let i = 0; i <= version; i++) {
-                            const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `v${version}`);
-                            rmSync(cloudflareD, {
-                                force: true,
-                                recursive: true,
-                            });
-                        }
-                        if (process.platform === 'darwin' && process.arch === 'arm64') {
-                            const bin = path.join(cloudflareD, cloudflared.bin);
-                            mkdirSync(path.dirname(bin), {
-                                recursive: true,
-                            });
-                            const tmp = `${bin}.tmp`;
+                    if (this.storageSettings.values.cloudflaredTunnelCredentials && this.storageSettings.values.cloudflaredTunnelCustomDomain) {
+                        const tunnelUrl = `http://127.0.0.1:${quickTunnelPort}`;
+                        const url = this.cloudflareTunnel = `https://${this.storageSettings.values.cloudflaredTunnelCustomDomain}`;
+                        this.console.log(`cloudflare url mapped ${this.cloudflareTunnel} to ${tunnelUrl}`);
 
-                            const stream = await httpFetch({
-                                url: 'https://github.com/scryptedapp/cloudflared/releases/download/2023.8.2/cloudflared-darwin-arm64',
-                                responseType: 'readable',
-                            });
-                            const write = stream.body.pipe(fs.createWriteStream(tmp));
-                            await once(write, 'close');
-                            renameSync(tmp, bin);
-                            fs.chmodSync(bin, 0o0755)
-                        }
-                        else {
-                            await cloudflared.install(bin);
+                        const ret = await runLocallyManagedTunnel(this.storageSettings.values.cloudflaredTunnelCredentials, tunnelUrl, cloudflareD, bin);
+                        return {
+                            child: ret,
+                            url: Promise.resolve(url),
                         }
                     }
+
+                    // npm cloudflared package kinda sucks.
                     process.chdir(cloudflareD);
 
                     let tunnelUrl: string
@@ -1203,6 +1208,28 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
+    async doCloudflaredLogin(domain: string) {
+        if (!domain) {
+            this.cloudflared?.child.kill();
+            return;
+        }
+
+        this.log.a('Visit the URL printed in the Scrypted Cloud plugin console to log into Cloudflare.');
+        try {
+            this.cloudflaredLoginController?.abort();
+            this.cloudflaredLoginController = new AbortController();
+            const { bin } = await installCloudflared();
+            const jsonContents = await createLocallyManagedTunnel(domain, bin, this.cloudflaredLoginController.signal);
+            this.storageSettings.values.cloudflaredTunnelCredentials = jsonContents;
+            this.storageSettings.values.cloudflaredTunnelToken = undefined;
+            this.cloudflared?.child.kill();
+        }
+        catch (e) {
+            this.storageSettings.values.cloudflaredTunnelCustomDomain = undefined;
+            this.console.error('cloudflared login error', e);
+            this.log.a('Cloudflare login error. See console logs.');
+        }
+    }
 }
 
 export default ScryptedCloud;

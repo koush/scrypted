@@ -5,6 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Test Cloudflared",
+            "type": "node",
+            "request": "launch",
+            "args": [
+                "${workspaceFolder}/test/test-cloudflared.ts"
+            ],
+            "runtimeArgs": [
+                "-r",
+                "ts-node/register"
+            ],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
             "name": "Scrypted Debugger",
             "address": "${config:scrypted.debugHost}",
             "port": 10081,
