@@ -8,13 +8,20 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
     worker: worker_threads.Worker;
     port: worker_threads.MessagePort;
 
-    constructor(mainFilename: string, public pluginId: string, options: RuntimeWorkerOptions) {
+    constructor(mainFilename: string, public pluginId: string, options: RuntimeWorkerOptions, workerOptions?: worker_threads.WorkerOptions) {
         super();
         const { env } = options;
 
+        const message = new worker_threads.MessageChannel();
+        const { port1, port2 } = message;
         this.worker = new worker_threads.Worker(mainFilename, {
             argv: ['child-thread', this.pluginId],
             env: Object.assign({}, process.env, env),
+            workerData: {
+                port: port1,
+            },
+            transferList: [port1],
+            ...workerOptions,
         });
 
         this.worker.on('exit', () => {
@@ -27,8 +34,6 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
             this.emit('error', e);
         });
 
-        const message = new worker_threads.MessageChannel();
-        const { port1, port2 } = message;
         this.port = port2;
         this.port.on('messageerror', e => {
             this.emit('error', e);
@@ -36,10 +41,6 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
         this.port.on('close', () => {
             this.emit('error', new Error('port closed'));
         });
-
-        this.worker.postMessage({
-            port: port1,
-        }, [port1]);
     }
 
     get pid() {

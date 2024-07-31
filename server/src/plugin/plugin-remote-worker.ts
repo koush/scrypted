@@ -93,6 +93,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             throw new Error(`unknown service ${name}`);
         },
         async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, getZip: () => Promise<Buffer>, zipOptions: PluginRemoteLoadZipOptions) {
+            const mainFile = zipOptions?.main || 'main';
+            const mainNodejs = `${mainFile}.nodejs.js`;
+            const pluginMainNodeJs = `/plugin/${mainNodejs}`;
+            const pluginIdMainNodeJs = `/${pluginId}/${mainNodejs}`;
+
             const { clusterId, clusterSecret, zipHash } = zipOptions;
             const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, getZip);
 
@@ -266,7 +271,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             // params.window = window;
             params.exports = exports;
 
-            const entry = pluginReader('main.nodejs.js.map')
+            const entry = pluginReader(`${mainNodejs}.map`)
             const map = entry?.toString();
 
             // plugins may install their own sourcemap support during startup, so
@@ -287,11 +292,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 installSourceMapSupport({
                     environment: 'node',
                     retrieveSourceMap(source) {
-                        if (source === '/plugin/main.nodejs.js' || source === `/${pluginId}/main.nodejs.js`) {
+                        if (source === pluginMainNodeJs || source === pluginIdMainNodeJs) {
                             if (!map)
                                 return null;
                             return {
-                                url: '/plugin/main.nodejs.js',
+                                url: pluginMainNodeJs,
                                 map,
                             }
                         }
@@ -314,7 +319,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 await pong(time);
             };
 
-            const main = pluginReader('main.nodejs.js');
+            const main = pluginReader(mainNodejs);
             const script = main.toString();
 
             scrypted.connect = (socket, options) => {
@@ -323,7 +328,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             const pluginRemoteAPI: PluginRemote = scrypted.pluginRemoteAPI;
 
-            scrypted.fork = () => {
+            scrypted.fork = (options) => {
                 const ntw = new NodeThreadWorker(mainFilename, pluginId, {
                     packageJson,
                     env: process.env,
@@ -331,6 +336,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     zipFile,
                     unzippedPath,
                     zipHash,
+                }, {
+                    name: options?.name,
                 });
 
                 const result = (async () => {
@@ -389,7 +396,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             }
 
             try {
-                const filename = zipOptions?.debug ? '/plugin/main.nodejs.js' : `/${pluginId}/main.nodejs.js`;
+                const filename = zipOptions?.debug ? pluginMainNodeJs : pluginIdMainNodeJs;
                 evalLocal(peer, script, filename, params);
 
                 if (zipOptions?.fork) {

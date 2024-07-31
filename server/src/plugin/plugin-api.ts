@@ -161,6 +161,7 @@ export interface PluginRemoteLoadZipOptions {
     debug?: boolean;
     zipHash: string;
     fork?: boolean;
+    main?: string;
 
     clusterId: string;
     clusterSecret: string;

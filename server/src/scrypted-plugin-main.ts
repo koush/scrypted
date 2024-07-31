@@ -12,27 +12,25 @@ function start(mainFilename: string) {
     module.paths.push(getPluginNodePath(pluginId));
 
     if (process.argv[2] === 'child-thread') {
-        worker_threads.parentPort.once('message', message => {
-            const { port } = message as { port: worker_threads.MessagePort };
-            const peer = startPluginRemote(mainFilename, pluginId, (message, reject) => {
-                try {
-                    port.postMessage(v8.serialize(message));
-                }
-                catch (e) {
-                    reject?.(e);
-                }
-            });
-            peer.transportSafeArgumentTypes.add(Buffer.name);
-            peer.transportSafeArgumentTypes.add(Uint8Array.name);
-            port.on('message', message => peer.handleMessage(v8.deserialize(message)));
-            port.on('messageerror', e => {
-                console.error('message error', e);
-                process.exit(1);
-            });
-            port.on('close', () => {
-                console.error('port closed');
-                process.exit(1);
-            });
+        const { port } = worker_threads.workerData as { port: worker_threads.MessagePort };
+        const peer = startPluginRemote(mainFilename, pluginId, (message, reject) => {
+            try {
+                port.postMessage(v8.serialize(message));
+            }
+            catch (e) {
+                reject?.(e);
+            }
+        });
+        peer.transportSafeArgumentTypes.add(Buffer.name);
+        peer.transportSafeArgumentTypes.add(Uint8Array.name);
+        port.on('message', message => peer.handleMessage(v8.deserialize(message)));
+        port.on('messageerror', e => {
+            console.error('message error', e);
+            process.exit(1);
+        });
+        port.on('close', () => {
+            console.error('port closed');
+            process.exit(1);
         });
     }
     else {

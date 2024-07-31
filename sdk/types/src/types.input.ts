@@ -2416,6 +2416,11 @@ export interface ConnectOptions extends APIOptions {
   pluginId: string;
 }
 
+export interface ForkOptions {
+  name?: string;
+  filename?: string;
+}
+
 export interface ScryptedStatic {
   /**
    * @deprecated
@@ -2436,7 +2441,7 @@ export interface ScryptedStatic {
    * Start a new instance of the plugin, returning an instance of the new process
    * and the result of the fork method.
    */
-  fork<T>(): PluginFork<T>;
+  fork<T>(options?: ForkOptions): PluginFork<T>;
   /**
    * Initiate the Scrypted RPC wire protocol on a socket.
    * @param socket

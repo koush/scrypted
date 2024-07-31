@@ -5,12 +5,14 @@ import os from 'os';
 
 export type Zygote<T> = () => PluginFork<T>;
 
-export function createZygote<T>(): Zygote<T> {
+export function createZygote<T>(name: string): Zygote<T> {
     let zygote = sdk.fork<T>();
     function* next() {
         while (true) {
             const cur = zygote;
-            zygote = sdk.fork<T>();
+            zygote = sdk.fork<T>({
+                name,
+            });
             yield cur;
         }
     }
