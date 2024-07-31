@@ -8,10 +8,10 @@ import { RpcMessage } from "./rpc";
 
 function start(mainFilename: string) {
     const pluginId = process.argv[3];
-    console.log('starting plugin', pluginId);
     module.paths.push(getPluginNodePath(pluginId));
 
     if (process.argv[2] === 'child-thread') {
+        console.log('starting thread', pluginId);
         const { port } = worker_threads.workerData as { port: worker_threads.MessagePort };
         const peer = startPluginRemote(mainFilename, pluginId, (message, reject) => {
             try {
@@ -34,6 +34,7 @@ function start(mainFilename: string) {
         });
     }
     else {
+        console.log('starting plugin', pluginId);
         const peer = startPluginRemote(mainFilename, process.argv[3], (message, reject, serializationContext) => process.send(message, serializationContext?.sendHandle, {
             swallowErrors: !reject,
         }, e => {
