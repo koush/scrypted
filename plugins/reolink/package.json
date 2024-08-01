@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/reolink",
-   "version": "0.0.90",
+   "version": "0.0.91",
    "description": "Reolink Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -42,7 +42,7 @@
       "onvif": "file:../onvif/onvif"
    },
    "devDependencies": {
-      "@types/node": "^18.16.18",
+      "@types/node": "^22.0.2",
       "@scrypted/sdk": "file:../../sdk"
    }
 }
