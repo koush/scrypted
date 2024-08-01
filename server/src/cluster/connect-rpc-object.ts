@@ -1,8 +1,9 @@
 export interface ClusterObject {
     id: string;
+    address: string;
     port: number;
     proxyId: string;
-    sourcePort: number;
+    sourceKey: string;
     sha256: string;
 }
 
