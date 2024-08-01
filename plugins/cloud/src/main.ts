@@ -1018,6 +1018,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
                     const args: any = {};
                     if (this.storageSettings.values.cloudflaredTunnelToken) {
+                        this.log.a('Cloudflare tunnel tokens are no longer supported. Please use the new Cloudflare Tunnel Custom Domain option.');
                         tunnelUrl = `https://127.0.0.1:${this.storageSettings.values.securePort}`;
                         args['run'] = null;
                         args['--token'] = this.storageSettings.values.cloudflaredTunnelToken;
