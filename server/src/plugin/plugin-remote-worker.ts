@@ -410,6 +410,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                     const forkOptions = Object.assign({}, zipOptions);
                     forkOptions.fork = true;
+                    forkOptions.main = options.filename;
                     return remote.loadZip(packageJson, getZip, forkOptions)
                 })();
 
