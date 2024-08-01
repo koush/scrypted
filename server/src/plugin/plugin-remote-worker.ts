@@ -157,6 +157,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const clusterPeerAddress = client.remoteAddress;
                 const clusterPeerPort = client.remotePort;
                 const clusterPeerKey = getClusterPeerKey(clusterPeerAddress, clusterPeerPort);
+                // the listening peer sourceKey (client address/port) is used by the OTHER peer (the client)
+                // to determine if it is already connected to THIS peer (the server).
                 clusterPeer.onProxySerialization = (value) => onProxySerialization(value, clusterPeerKey);
                 clusterPeers.set(clusterPeerKey, Promise.resolve(clusterPeer));
                 startPluginRemoteOptions?.onClusterPeer?.(clusterPeer);
@@ -194,7 +196,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     try {
                         await once(socket, 'connect');
 
-                        // the sourceKey is used by peers to determine if they're already connected.
+                        // this connecting peer sourceKey (server address/port) is used by the OTHER peer (the server)
+                        // to determine if it is already connected to THIS peer (the client).
                         const { address: sourceAddress, port: sourcePort } = (socket.address() as net.AddressInfo);
                         if (sourceAddress !== SCRYPTED_CLUSTER_ADDRESS && sourceAddress !== '127.0.0.1')
                             console.warn("source address mismatch", sourceAddress);
