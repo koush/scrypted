@@ -9,14 +9,11 @@ catch (e) {
 const path = require('path');
 const process = require('process');
 const fs = require('fs');
-const spawn = require('child_process').spawn;
 const cwd = process.cwd();
 const AdmZip = require('adm-zip');
 const os = require('os');
 const rimraf = require('rimraf');
 const webpack = require('webpack');
-const esbuild = require('esbuild');
-const ncp = require('ncp');
 const tmp = require('tmp');
 
 if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
@@ -44,61 +41,7 @@ if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
         zip.addLocalFolder(zipfs, 'fs');
     zip.writeZip(path.join(out, 'plugin.zip'));
 }
-else if (false) {
-    const packageJson = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json').toString()));
-    const optionalDependencies = Object.keys(packageJson.optionalDependencies || {});
-
-    let out;
-    if (process.env.NODE_ENV == 'production')
-        out = path.resolve(cwd, 'dist');
-    else
-        out = path.resolve(cwd, 'out');
-
-    let outfile = path.join(out, 'main.nodejs.js');
-
-    esbuild.build({
-        entryPoints: ['src/main.ts'],
-        bundle: true,
-        outfile,
-        platform: 'node',
-        format: 'cjs',
-        // loader: { '.json': 'file' },
-        external: [
-            ...Object.keys(optionalDependencies),
-        ],
-        sourcemap: true,
-    })
-        .then(() => {
-            const zip = new AdmZip();
-
-            const readme = path.join(cwd, 'README.md');
-            if (fs.existsSync(readme)) {
-                zip.addLocalFile(readme);
-            }
-
-            zip.addLocalFile(outfile);
-            zip.addLocalFile(outfile + '.map');
-
-            const zipfs = path.join(cwd, 'fs');
-            if (fs.existsSync(zipfs))
-                zip.addLocalFolder(zipfs, 'fs');
-            zip.writeZip(path.join(out, 'plugin.zip'));
-        })
-        .catch(e => process.nextTick(() => {
-            console.error(e);
-            throw new Error(e);
-        }));
-}
 else {
-    var entry;
-    for (var search of ['src/main.js', 'src/main.ts']) {
-        var resolved = path.resolve(cwd, search);
-        if (fs.existsSync(resolved)) {
-            entry = resolved;
-            break;
-        }
-    }
-
     const packageJson = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json').toString()));
     const optionalDependencies = Object.keys(packageJson.optionalDependencies || {});
 
@@ -106,40 +49,51 @@ else {
         process.env.SCRYPTED_WEBPACK_BABEL = 'true';
     }
 
-    const runtimes = [
-        // {
-        //     config: 'webpack.duktape.config.js',
-        //     output: 'main.js',
-        // },
-        // {
-        //     config: 'webpack.quickjs.config.js',
-        //     output: 'main.quickjs.js',
-        // },
-        {
-            config: 'webpack.nodejs.config.js',
-            output: 'main.nodejs.js',
-        },
-    ];
+    const defaultMainNodeJs = 'main.nodejs.js';
+    const entries = [];
+    if (packageJson.exports) {
+        for (const [key, value] of Object.entries(packageJson.exports)) {
+            entries.push({
+                filename: key,
+                output: value,
+            });
+        }
+    }
+    else {
+        for (const search of ['src/main.js', 'src/main.ts']) {
+            const resolved = path.resolve(cwd, search);
+            if (fs.existsSync(resolved)) {
+                entries.push({
+                    filename: search,
+                    output: defaultMainNodeJs,
+                });
+                break;
+            }
+        }
+    }
 
-    var out;
+    const nodeWebpackConfig = 'webpack.nodejs.config.js';
+
+    let out;
     if (process.env.NODE_ENV == 'production')
         out = path.resolve(cwd, 'dist');
     else
         out = path.resolve(cwd, 'out');
 
-    if (!entry) {
+    if (!entries?.length) {
         console.warn('unable to locate src/main.js or src/main.ts');
         console.warn('if a custom webpack config is used, will fall back to an entry configured there');
+        entries.push(undefined);
     }
 
-    var webpackCmd = path.resolve(cwd, 'node_modules/.bin/webpack-cli');
+    let webpackCmd = path.resolve(cwd, 'node_modules/.bin/webpack-cli');
     if (!fs.existsSync(webpackCmd)) {
         webpackCmd = path.resolve(cwd, 'node_modules/@scrypted/sdk/node_modules/.bin/webpack-cli')
     }
     if (os.platform().startsWith('win')) {
         webpackCmd += '.cmd';
     }
-    var zip = new AdmZip();
+    const zip = new AdmZip();
 
     const readme = path.join(cwd, 'README.md');
     if (fs.existsSync(readme)) {
@@ -162,11 +116,11 @@ else {
         if (out)
             rimraf.sync(out);
 
-        for (const runtime of runtimes) {
+        for (let entry of entries) {
             await new Promise((resolve, reject) => {
-                var webpackConfig;
-                var customWebpackConfig = path.resolve(cwd, runtime.config);
-                const defaultWebpackConfig = path.resolve(__dirname, '..', runtime.config);
+                let webpackConfig;
+                const customWebpackConfig = path.resolve(cwd, nodeWebpackConfig);
+                const defaultWebpackConfig = path.resolve(__dirname, '..', nodeWebpackConfig);
                 if (fs.existsSync(customWebpackConfig)) {
                     webpackConfig = customWebpackConfig;
                 }
@@ -177,28 +131,28 @@ else {
                 process.env.SCRYPTED_DEFAULT_WEBPACK_CONFIG = defaultWebpackConfig;
 
                 const config = require(webpackConfig);
-                if (entry) {
-                    // a standard entrypoint was found
-                    config.entry = {
-                        main: entry,
-                    };
-                } else {
-                    // try to use an entrypoint specified in the webpack config
-                    if (!config?.entry?.main) {
-                        console.error("webpack config does not supply an entry file");
-                        return 1;
-                    }
-                    var resolved = path.resolve(cwd, config.entry.main);
-                    if (fs.existsSync(resolved)) {
-                        config.entry.main = resolved
-                    } else {
-                        console.error("entry file specified in webpack config does not exist");
-                        return 1;
-                    }
-                }
-                config.output.path = out;
-                config.output.filename = runtime.output;
+                entry ||= {
+                    filename: config?.entry?.main,
+                    output: defaultMainNodeJs,
+                };
 
+                if (!entry?.filename) {
+                    console.error("no main.ts or main.js was found, and webpack config does not supply an entry file.");
+                    console.error(entry?.filename);
+                    return 1;
+                }
+
+                const main = path.resolve(cwd, entry.filename);
+                if (!fs.existsSync(main)) {
+                    console.error("entry file specified in webpack config does not exist");
+                    return 1;
+                }
+
+                config.entry = {
+                    main,
+                };
+                config.output.path = out;
+                config.output.filename = entry?.output || defaultMainNodeJs;
 
                 for (const opt of optionalDependencies) {
                     const t = tmp.tmpNameSync({
@@ -238,7 +192,7 @@ else {
             });
         }
 
-        var zipfs = path.join(cwd, 'fs');
+        const zipfs = path.join(cwd, 'fs');
         if (fs.existsSync(zipfs))
             zip.addLocalFolder(zipfs, 'fs');
         zip.writeZip(path.join(out, 'plugin.zip'));
