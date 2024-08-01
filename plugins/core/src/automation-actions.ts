@@ -1,5 +1,6 @@
-import { Brightness, Lock, LockState, Notifier, OnOff, Program, ScryptedDevice, ScryptedInterface, StartStop } from "@scrypted/sdk";
+import { Brightness, Camera, Lock, LockState, Notifier, OnOff, Program, ScryptedDevice, ScryptedInterface, StartStop, VideoCamera } from "@scrypted/sdk";
 import { StorageSettingsDict } from "@scrypted/sdk/storage-settings";
+import sdk from '@scrypted/sdk';
 
 interface InvokeStorage<T extends string> {
     settings: StorageSettingsDict<T>;
@@ -81,7 +82,23 @@ addAction(ScryptedInterface.Notifier, {
         deviceFilter: `deviceInterface === '${ScryptedInterface.VideoCamera}' || deviceInterface === '${ScryptedInterface.Camera}'`,
     },
 }, async function invoke(device: ScryptedDevice & Notifier, storageSettings) {
+    let { notificationMediaUrl } = storageSettings;
+    if (notificationMediaUrl && !notificationMediaUrl?.includes('://')) {
+        const [id,iface] = notificationMediaUrl.split('#');
+        if (iface === ScryptedInterface.Camera) {
+            const mediaDevice = sdk.systemManager.getDeviceById<Camera>(id);
+            notificationMediaUrl = await mediaDevice.takePicture({
+                reason: 'event',
+            });
+        }
+        else {
+            const mediaDevice = sdk.systemManager.getDeviceById<VideoCamera>(id);
+            notificationMediaUrl = mediaDevice.getVideoStream();
+        }
+
+    }
+
     return device.sendNotification(storageSettings.notificationTitle as string, {
         body: storageSettings.notificationBody as string,
-    });
+    }, notificationMediaUrl);
 });
