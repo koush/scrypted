@@ -1,5 +1,4 @@
 import sdk, { PluginFork } from '@scrypted/sdk';
-import worker_threads from 'worker_threads';
 import { createAsyncQueue } from './async-queue';
 import os from 'os';
 
