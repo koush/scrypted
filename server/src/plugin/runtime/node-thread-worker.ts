@@ -1,6 +1,6 @@
 import v8 from 'v8';
 import worker_threads from "worker_threads";
-import { EventEmitter } from "ws";
+import { EventEmitter } from "events";
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 
