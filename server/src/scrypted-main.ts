@@ -1,3 +1,6 @@
 import start from './scrypted-main-exports';
 
-start(__filename);
+if (process.versions.deno)
+    start(process.env.SCRYPTED_MAIN_FILENAME);
+else
+    start(__filename);

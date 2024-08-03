@@ -46,6 +46,7 @@ import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
+import { DenoWorker } from './plugin/runtime/deno-worker';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -102,6 +103,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         this.pluginHosts.set('custom', (_, pluginId, options, runtime) => new CustomRuntimeWorker(pluginId, options, runtime));
         this.pluginHosts.set('python', (_, pluginId, options) => new PythonRuntimeWorker(pluginId, options));
         this.pluginHosts.set('node', (mainFilename, pluginId, options) => new NodeForkWorker(mainFilename, pluginId, options));
+        this.pluginHosts.set('deno', (mainFilename, pluginId, options) => new DenoWorker(mainFilename, pluginId, options));
 
         app.disable('x-powered-by');
 
