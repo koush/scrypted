@@ -1,10 +1,10 @@
 export function startPeriodicGarbageCollection() {
-    if (!global.gc) {
+    if (!globalThis.gc) {
         console.warn('rpc peer garbage collection not available: global.gc is not exposed.');
     }
-    let g: typeof global;
+    let g: typeof globalThis;
     try {
-        g = global;
+        g = globalThis;
     }
     catch (e) {
     }
