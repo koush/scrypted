@@ -185,6 +185,7 @@ class ScryptedInterface(str, Enum):
     TTY = "TTY"
     TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
+    TerminalSettings = "TerminalSettings"
     Thermometer = "Thermometer"
     UltravioletSensor = "UltravioletSensor"
     VOCSensor = "VOCSensor"
@@ -1489,6 +1490,13 @@ class TemperatureSetting:
         pass
 
 
+class TerminalSettings:
+    """TerminalSettings allows TerminalService to query plugins for modifications to the (non-)interactive terminal environment."""
+
+    def getPaths(self) -> list[str]:
+        pass
+
+
 class Thermometer:
 
     temperature: float  # Get the ambient temperature in Celsius.
@@ -1928,6 +1936,7 @@ class ScryptedInterfaceMethods(str, Enum):
     getScryptedUserAccessControl = "getScryptedUserAccessControl"
     generateVideoFrames = "generateVideoFrames"
     connectStream = "connectStream"
+    getPaths = "getPaths"
 
 class DeviceState:
 
@@ -3140,6 +3149,13 @@ ScryptedInterfaceDescriptors = {
   "TTY": {
     "name": "TTY",
     "methods": [],
+    "properties": []
+  },
+  "TerminalSettings": {
+    "name": "TerminalSettings",
+    "methods": [
+      "getPaths"
+    ],
     "properties": []
   },
   "ScryptedSystemDevice": {
