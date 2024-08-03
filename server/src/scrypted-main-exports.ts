@@ -25,9 +25,9 @@ function start(mainFilename: string, options?: {
         require(process.env.SCRYPTED_COMPATIBILITY_FILE);
     }
 
-    if (!global.gc) {
+    if (!globalThis.gc && !process.versions.deno) {
         v8.setFlagsFromString('--expose_gc')
-        global.gc = vm.runInNewContext("gc");
+        globalThis.gc = vm.runInNewContext("gc");
     }
 
     if (!semver.gte(process.version, '16.0.0')) {
