@@ -1,11 +1,9 @@
-import { RuntimeWorkerOptions as RuntimeWorkerOptions } from "./runtime-worker";
 import child_process from 'child_process';
-import path from 'path';
-import { RpcMessage, RpcPeer } from "../../rpc";
-import { ChildProcessWorker } from "./child-process-worker";
-import { getPluginNodePath } from "../plugin-npm-dependencies";
-import { SidebandSocketSerializer } from "../socket-serializer";
 import net from "net";
+import { RpcMessage, RpcPeer } from "../../rpc";
+import { SidebandSocketSerializer } from "../socket-serializer";
+import { ChildProcessWorker } from "./child-process-worker";
+import { RuntimeWorkerOptions } from "./runtime-worker";
 
 export class NodeForkWorker extends ChildProcessWorker {
 
