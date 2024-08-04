@@ -8,7 +8,8 @@ function compileFunction(code: string, params?: ReadonlyArray<string>, options?:
     params = params || [];
     if (options?.filename)
         code = `${code}\n//# sourceURL=${options.filename}\n`;
-    return new Function(...params, code);
+    const f = `(function(${params.join(',')}) {;${code}\n;})`;
+    return eval(f);
 }
 
 export function evalLocal<T>(peer: RpcPeer, script: string, filename?: string, coercedParams?: { [name: string]: any }): T {
