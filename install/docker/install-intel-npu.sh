@@ -26,7 +26,7 @@ then
     exit 0
 fi
 
-dpkg --purge --force-remove-reinstreq intel-driver-compiler-npu intel-level-zero-npu
+dpkg --purge --force-remove-reinstreq intel-driver-compiler-npu intel-fw-npu intel-level-zero-npu
 
 # no errors beyond this point
 set -e
