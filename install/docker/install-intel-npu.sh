@@ -7,16 +7,13 @@ fi
 UBUNTU_22_04=$(lsb_release -r | grep "22.04")
 UBUNTU_24_04=$(lsb_release -r | grep "24.04")
 
-# check bookworm and bullseye if UBUNTU vars are not set.
-# this will cover proxmox.
 if [ -z "$UBUNTU_22_04" ]
 then
-    UBUNTU_22_04=$(cat /etc/os-release | grep bullseye)
-fi
-
-if [ -z "$UBUNTU_24_04" ]
-then
-    UBUNTU_24_04=$(cat /etc/os-release | grep bookworm)
+    # proxmox is compatible with ubuntu 22.04, check for  /etc/pve directory
+    if [ -d "/etc/pve" ]
+    then
+        UBUNTU_22_04=true
+    fi
 fi
 
 # needs either ubuntu 22.0.4 or 24.04
