@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/types",
-  "version": "0.3.44",
+  "version": "0.3.45",
   "description": "",
   "main": "dist/index.js",
   "author": "",
@@ -10,9 +10,10 @@
     "build": "tsc --project src && rimraf dist gen && typedoc && ts-node ./src/build.ts && tsc"
   },
   "devDependencies": {
-    "@types/node": "^18.19.15",
-    "rimraf": "^3.0.2",
-    "ts-node": "^10.9.1"
+    "@types/node": "^22.1.0",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
   },
   "types": "dist/index.d.ts"
 }

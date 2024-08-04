@@ -3,7 +3,7 @@ import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 import path from 'path';
 import fs from "fs";
 import packageJson from "../package.json"
-import { DeclarationReflection, ProjectReflection, SomeType } from 'typedoc';
+import { DeclarationReflection, ProjectReflection, ReflectionKind, SomeType } from 'typedoc';
 
 const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../gen/schema.json')).toString()) as ProjectReflection;
 const typesVersion = packageJson.version;
@@ -24,15 +24,15 @@ function toTypescriptType(type: any): string {
 for (const name of Object.values(ScryptedInterface)) {
     const td = schema.children?.find((child) => child.name === name);
     const children = td?.children || [];
-    const properties = children.filter((child) => child.kindString === 'Property').map((child) => child.name);
-    const methods = children.filter((child) => child.kindString === 'Method').map((child) => child.name);
+    const properties = children.filter((child) => child.kind === ReflectionKind.Property).map((child) => child.name);
+    const methods = children.filter((child) => child.kind === ReflectionKind.Method).map((child) => child.name);
     ScryptedInterfaceDescriptors[name] = {
         name,
         methods,
         properties,
     };
 
-    for (const p of children.filter((child) => child.kindString === 'Property')) {
+    for (const p of children.filter((child) => child.kind === ReflectionKind.Property)) {
         allProperties[p.name] = p;
     }
 }

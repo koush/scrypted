@@ -7,5 +7,8 @@
         "resolveJsonModule": true,
         "noEmit": true,
         "strict": true
-    }
+    },
+    "exclude": [
+        "../node_modules/**/*"
+    ]
 }
