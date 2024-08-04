@@ -18,7 +18,7 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
     }
 
     get pid() {
-        return this.worker.pid;
+        return this.worker?.pid;
     }
 
     get stdout() {

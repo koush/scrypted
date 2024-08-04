@@ -33,10 +33,6 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
     _stderr = new PassThrough();
     pythonInstallationComplete = true;
 
-    get pid() {
-        return this.worker?.pid || -1;
-    }
-
     get stdout() {
         return this._stdout;
     }

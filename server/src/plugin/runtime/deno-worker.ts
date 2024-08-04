@@ -80,8 +80,4 @@ export class DenoWorker extends ChildProcessWorker {
             reject?.(e);
         }
     }
-
-    get pid() {
-        return this.worker?.pid;
-    }
 }
