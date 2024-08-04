@@ -7,8 +7,7 @@
 # install script.
 ################################################################
 ARG BASE="jammy"
-ARG REPO="ubuntu"
-FROM ${REPO}:${BASE} as header
+FROM ubuntu:${BASE} as header
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -72,8 +71,9 @@ RUN python3 -m pip install debugpy typing_extensions psutil
 ################################################################
 FROM header as base
 
-# intel opencl gpu for openvino
+# intel opencl gpu and npu for openvino
 RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-graphics.sh | bash
+RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-npu.sh | bash
 
 # python 3.9 from ppa.
 # 3.9 is the version with prebuilt support for tensorflow lite
