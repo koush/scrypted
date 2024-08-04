@@ -7,9 +7,12 @@ export interface CompileFunctionOptions {
 function compileFunction(): any {
     // this is a hacky way of preventing the closure from capturing the code variable which may be a large blob.
     try {
-        // "new Function" can't be used because it injects newlines per parameter.
-        // this causes source mapping to get misaligned.
-        return eval((globalThis as any).compileFunctionShim);
+        // "new Function" can't be used directly because it injects newlines per parameter,
+        // which causes source mapping to get misaligned.
+        // However, using eval inside a function works, because there are no parameters,
+        // and the "new Function" addresses the closure capture issue.
+        const f = new Function('return eval(globalThis.compileFunctionShim)');
+        return f();
     }
     finally {
         delete (globalThis as any).compileFunctionShim;
