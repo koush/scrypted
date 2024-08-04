@@ -2,10 +2,10 @@ import stringifyObject from 'stringify-object';
 import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 import path from 'path';
 import fs from "fs";
-import packageJson from "../package.json"
 import { DeclarationReflection, ProjectReflection, ReflectionKind, SomeType } from 'typedoc';
 
 const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../gen/schema.json')).toString()) as ProjectReflection;
+const packageJson = require('../package.json');
 const typesVersion = packageJson.version;
 const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = {};
 
@@ -42,11 +42,11 @@ const methods = Object.values(ScryptedInterfaceDescriptors).map(d => d.methods).
 
 const deviceStateContents = `
 export interface DeviceState {
-${Object.entries(allProperties).map(([property, {type, flags}]) => `  ${property}${flags.isOptional ? '?' : ''}: ${toTypescriptType(type)}`).join('\n')};
+${Object.entries(allProperties).map(([property, { type, flags }]) => `  ${property}${flags.isOptional ? '?' : ''}: ${toTypescriptType(type)}`).join('\n')};
 }
 
 export class DeviceBase implements DeviceState {
-${Object.entries(allProperties).map(([property, {type, flags}]) => `  ${property}${flags.isOptional ? '?' : '!'}: ${toTypescriptType(type)}`).join('\n')};
+${Object.entries(allProperties).map(([property, { type, flags }]) => `  ${property}${flags.isOptional ? '?' : '!'}: ${toTypescriptType(type)}`).join('\n')};
 }
 `;
 
@@ -147,7 +147,7 @@ function selfSignature(method: any) {
     return params.join(', ');
 }
 
-const enums = schema.children?.filter((child: any) => child.kindString === 'Enumeration') ?? [];
+const enums = schema.children?.filter((child) => child.kind === ReflectionKind.Enum) ?? [];
 const interfaces = schema.children?.filter((child: any) => Object.values(ScryptedInterface).includes(child.name)) ?? [];
 let python = '';
 
@@ -182,7 +182,7 @@ function toDocstring(td: any, includePass: boolean = false) {
     for (const comment of comments) {
         text += `    ${comment.text.replaceAll('\n', ' ')}\n\n`;
     }
-    text = text.slice(0,text.length - 2)
+    text = text.slice(0, text.length - 2)
     text += `    """\n${suffix}`;
     return text
 
@@ -200,11 +200,11 @@ function toComment(td: any) {
     for (const comment of comments) {
         text += `${comment.text.replaceAll('\n', ' ')} `;
     }
-    return text.slice(0,text.length - 1)
+    return text.slice(0, text.length - 1)
 
 }
 
-function addNonDictionaryType(td: any) {
+function addNonDictionaryType(td: DeclarationReflection) {
     seen.add(td.name);
     python += `
 class ${td.name}:
@@ -216,14 +216,14 @@ ${toDocstring(td)}
     }
 
     const children = td.children || [];
-    const properties = children.filter((child: any) => child.kindString === 'Property');
-    const methods = children.filter((child: any) => child.kindString === 'Method');
+    const properties = children.filter((child) => child.kind === ReflectionKind.Property);
+    const methods = children.filter((child) => child.kind === ReflectionKind.Method);
     for (const property of properties) {
         python += `    ${property.name}: ${toPythonType(property.type)}${toComment(property)}
 `
     }
     for (const method of methods) {
-        python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${toPythonReturnType(method.signatures[0].type)}:
+        python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${toPythonReturnType(method.signatures![0].type)}:
         ${toDocstring(method, true)}
 
 `
@@ -250,9 +250,9 @@ for (const e of enums) {
 class ${e.name}(str, Enum):
 ${toDocstring(e)}
 `
-    for (const val of e.children) {
-        if (val.type && 'value' in val.type)
-            pythonEnums += `    ${val.name} = "${val.type.value}"
+        for (const val of e.children) {
+            if (val.type && 'value' in val.type)
+                pythonEnums += `    ${val.name} = "${val.type.value}"
 `;
         }
     }
@@ -284,7 +284,7 @@ class DeviceState:
         pass
 
 `
-for (const [val, {type}] of Object.entries(allProperties)) {
+for (const [val, { type }] of Object.entries(allProperties)) {
     if (val === 'nativeId')
         continue;
     python += `
@@ -315,7 +315,7 @@ while (discoveredTypes.size) {
             continue;
         if (td.name === 'EventListener' || td.name === 'SettingValue')
             continue;
-        const isDictionary = !td.children?.find((c: any) => c.kindString === 'Method');
+        const isDictionary = !td.children?.find((c) => c.kind === ReflectionKind.Method);
         if (!isDictionary) {
             addNonDictionaryType(td);
             continue;
@@ -325,7 +325,7 @@ class ${td.name}(TypedDict):
 ${toDocstring(td)}
 `;
 
-        const properties = td.children?.filter((child: any) => child.kindString === 'Property') || [];
+        const properties = td.children?.filter((child) => child.kind === ReflectionKind.Property) || [];
         for (const property of properties) {
             pythonUnknowns += `    ${property.name}: ${toPythonType(property.type)}${toComment(property)}
 `
