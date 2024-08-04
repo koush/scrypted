@@ -62,3 +62,8 @@ dpkg -i *.deb
 cd /tmp && rm -rf /tmp/npu
 
 apt-get -y dist-upgrade
+
+if [ -n "$INTEL_FW_NPU" ]
+then
+    echo "Intel NPU firmware was installed. Reboot the host to complete the installation."
+fi
