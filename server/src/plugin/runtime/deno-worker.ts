@@ -20,7 +20,7 @@ export class DenoWorker extends ChildProcessWorker {
         }
 
         const args = [
-            '--unstable-byonm', '--unstable-bare-node-builtins', '--unstable-sloppy-imports',
+            '--unstable-byonm', '--unstable-bare-node-builtins', '--unstable-sloppy-imports', '--unstable-webgpu',
             'run',
             ...execArgv,
             '--allow-all',
