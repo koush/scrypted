@@ -49,10 +49,6 @@ export class DenoWorker extends ChildProcessWorker {
         this.setupWorker();
     }
 
-    kill(): void {
-
-    }
-
     setupRpcPeer(peer: RpcPeer): void {
         this.worker.on('message', (message, sendHandle) => {
             if ((message as any).type && sendHandle) {
