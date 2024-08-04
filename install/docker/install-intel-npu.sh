@@ -7,10 +7,22 @@ fi
 UBUNTU_22_04=$(lsb_release -r | grep "22.04")
 UBUNTU_24_04=$(lsb_release -r | grep "24.04")
 
+# check bookworm and bullseye if UBUNTU vars are not set.
+# this will cover proxmox.
+if [ -z "$UBUNTU_22_04" ]
+then
+    UBUNTU_22_04=$(cat /etc/os-release | grep bullseye)
+fi
+
+if [ -z "$UBUNTU_24_04" ]
+then
+    UBUNTU_24_04=$(cat /etc/os-release | grep bookworm)
+fi
+
 # needs either ubuntu 22.0.4 or 24.04
 if [ -z "$UBUNTU_22_04" ] && [ -z "$UBUNTU_24_04" ]
 then
-    echo "Intel NPU will not be installed. Ubuntu version could not be detected."
+    echo "Intel NPU will not be installed. Ubuntu version could not be detected when checking lsb-release and /etc/os-release."
     exit 0
 fi
 
