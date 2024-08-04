@@ -39,8 +39,8 @@
     "raw-loader": "^4.0.2",
     "rimraf": "^3.0.2",
     "tmp": "^0.2.1",
-    "ts-loader": "^9.4.2",
-    "typescript": "^4.9.4",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.5.4",
     "webpack": "^5.75.0",
     "webpack-bundle-analyzer": "^4.5.0"
   },
@@ -49,7 +49,7 @@
     "@types/stringify-object": "^4.0.0",
     "stringify-object": "^3.3.0",
     "ts-node": "^10.4.0",
-    "typedoc": "^0.23.21"
+    "typedoc": "^0.26.5"
   },
   "types": "dist/src/index.d.ts"
 }
