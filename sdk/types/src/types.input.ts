@@ -1537,6 +1537,15 @@ export interface StreamService<Input, Output=Input> {
 export interface TTY {
 }
 /**
+ * TTYSettings allows TTY backends to query plugins for modifications
+ * to the (non-)interactive terminal environment.
+ */
+export interface TTYSettings {
+  getTTYSettings(): Promise<{
+    paths?: string[];
+  }>;
+}
+/**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
  */
 export interface Logger {
@@ -2152,6 +2161,7 @@ export enum ScryptedInterface {
   VideoFrameGenerator = 'VideoFrameGenerator',
   StreamService = 'StreamService',
   TTY = 'TTY',
+  TTYSettings = 'TTYSettings',
 
   ScryptedSystemDevice = "ScryptedSystemDevice",
   ScryptedDeviceCreator = "ScryptedDeviceCreator",
