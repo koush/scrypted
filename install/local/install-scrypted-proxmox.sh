@@ -34,6 +34,7 @@ then
     echo ""
     echo "bash $0 --force"
     echo ""
+    exit 1
 fi
 
 pct restore $VMID $SCRYPTED_TAR_ZST $@
