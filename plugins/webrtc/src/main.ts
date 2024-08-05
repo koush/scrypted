@@ -20,6 +20,7 @@ import { WebRTCCamera } from "./webrtc-camera";
 import { MediaStreamTrack, PeerConfig, RTCPeerConnection, defaultPeerConfig } from './werift';
 import { WeriftSignalingSession } from './werift-signaling-session';
 import { RTCPeerConnectionPipe, createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
+import worker_threads from 'worker_threads';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -29,7 +30,7 @@ defaultPeerConfig.headerExtensions = {
     audio: [],
 };
 
-const zygote = createZygote<ReturnType<typeof fork>>();
+const zygote = worker_threads.isMainThread ? createZygote<ReturnType<typeof fork>>() : undefined;
 
 class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
     storageSettings = new StorageSettings(this, {});
