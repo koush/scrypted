@@ -183,9 +183,9 @@ class ScryptedInterface(str, Enum):
     StartStop = "StartStop"
     StreamService = "StreamService"
     TTY = "TTY"
+    TTYSettings = "TTYSettings"
     TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
-    TerminalSettings = "TerminalSettings"
     Thermometer = "Thermometer"
     UltravioletSensor = "UltravioletSensor"
     VOCSensor = "VOCSensor"
@@ -1478,6 +1478,13 @@ class TTY:
 
     pass
 
+class TTYSettings:
+    """TTYSettings allows TTY backends to query plugins for modifications to the (non-)interactive terminal environment."""
+
+    async def getTTYSettings(self) -> Any:
+        pass
+
+
 class TamperSensor:
 
     tampered: TamperState
@@ -1487,13 +1494,6 @@ class TemperatureSetting:
 
     temperatureSetting: TemperatureSettingStatus
     async def setTemperature(self, command: TemperatureCommand) -> None:
-        pass
-
-
-class TerminalSettings:
-    """TerminalSettings allows TerminalService to query plugins for modifications to the (non-)interactive terminal environment."""
-
-    def getPaths(self) -> list[str]:
         pass
 
 
@@ -1936,7 +1936,7 @@ class ScryptedInterfaceMethods(str, Enum):
     getScryptedUserAccessControl = "getScryptedUserAccessControl"
     generateVideoFrames = "generateVideoFrames"
     connectStream = "connectStream"
-    getPaths = "getPaths"
+    getTTYSettings = "getTTYSettings"
 
 class DeviceState:
 
@@ -3151,10 +3151,10 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": []
   },
-  "TerminalSettings": {
-    "name": "TerminalSettings",
+  "TTYSettings": {
+    "name": "TTYSettings",
     "methods": [
-      "getPaths"
+      "getTTYSettings"
     ],
     "properties": []
   },
