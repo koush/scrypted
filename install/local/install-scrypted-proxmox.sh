@@ -17,6 +17,12 @@ then
     VMID=10443
 fi
 
+if [ -n "$SCRYPTED_RESTORE" ]
+then
+    RESTORE_VMID=$VMID
+    $VMID="10444 --force"
+fi
+
 echo "Downloading scrypted container backup."
 if [ ! -f "$SCRYPTED_TAR_ZST" ]
 then
@@ -73,6 +79,20 @@ then
     echo "onboot: 1" >> $CONF
 else
     echo "$CONF not found? Start on boot must be enabled manually."    
+fi
+
+if [ -n "$RESTORE_VMID" ]
+then
+    echo "Preparing rootfs reset..."
+    pct set 10444 --delete mp0
+    pct set 10444 --delete unused0
+    pct move-volume $RESTORE_VMID mp0 --target-vmid 10444 --target-volume mp0
+    rm *.tar
+    vzdump $RESTORE_VMID --dumpdir /tmp
+    echo "Moving data volume to backup..."
+    pct restore 10444 *.tar $@
+
+    # todo: back to VMID...
 fi
 
 echo "Adding udev rule: /etc/udev/rules.d/65-scrypted.rules"
