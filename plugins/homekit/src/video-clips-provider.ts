@@ -3,7 +3,7 @@ import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import checkDiskSpace from 'check-disk-space';
 import { getSavePath, getVideoClip, getVideoClips, getVideoClipThumbnail, nukeClips, parseHksvId, pruneClips, removeVideoClip } from "./types/camera/camera-recording-files";
 
-const DAYS_TO_KEEP = 10;
+const DAYS_TO_KEEP = 3;
 const PRUNE_AGE = DAYS_TO_KEEP * 24 * 60 * 60 * 1000;
 const { systemManager } = sdk;
 
@@ -74,9 +74,9 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Setti
         const diskSpace = await checkDiskSpace(savePath);
         let pruneAge = PRUNE_AGE;
         if (diskSpace.free < 10_000_000_000) {
-            pruneAge = 1 * 24 * 60 * 60 * 1000;
+            pruneAge = 1 * 60 * 60 * 1000;
             this.console.warn(`Low Disk space: ${savePath}`);
-            this.console.warn("Pruning videos older than 1 day to recover space.");
+            this.console.warn("Pruning videos older than 1 hour to recover space.");
         }
 
         pruneClips(pruneAge, this.console);
