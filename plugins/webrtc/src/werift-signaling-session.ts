@@ -39,9 +39,9 @@ export class WeriftSignalingSession implements RTCSignalingSession {
 
         let ret: RTCSessionDescriptionInit;
         if (type === 'offer') {
-            const offer = await this.pc.createOffer();
+            let offer = await this.pc.createOffer();
             if (!sendIceCandidate)
-                await this.pc.setLocalDescription(offer);
+                offer = (await this.pc.setLocalDescription(offer)).toJSON();
             else
                 this.pc.setLocalDescription(offer);
             ret = createRawResponse(offer);
@@ -49,9 +49,9 @@ export class WeriftSignalingSession implements RTCSignalingSession {
         else {
             if (!sendIceCandidate)
                 await this.remoteDescription;
-            const answer = await this.pc.createAnswer();
+            let answer = await this.pc.createAnswer();
             if (!sendIceCandidate)
-                await this.pc.setLocalDescription(answer);
+                answer = (await this.pc.setLocalDescription(answer)).toJSON();
             else
                 this.pc.setLocalDescription(answer);
             ret = createRawResponse(answer);
