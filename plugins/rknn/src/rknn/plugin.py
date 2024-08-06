@@ -68,7 +68,7 @@ class RKNNPlugin(PredictPlugin, DeviceProvider):
     def __init__(self, nativeId=None):
         super().__init__(nativeId)
         self.cpu = ensure_compatibility_and_get_cpu()
-        model = 'yolov6n'
+        self.modelName = 'yolov6n'
 
         self.rknn_runtimes = {}
 
@@ -80,7 +80,7 @@ class RKNNPlugin(PredictPlugin, DeviceProvider):
             else:
                 raise RuntimeError('librknnrt.so not found. Please download it from {} and place it at {}'.format(lib_download, lib_path))
 
-        model_download = model_download_tmpl.format(model, self.cpu)
+        model_download = model_download_tmpl.format(self.modelName, self.cpu)
         model_file = os.path.basename(model_download)
         model_path = self.downloadFile(model_download, model_file)
         print('Using model {}'.format(model_path))
