@@ -116,7 +116,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         if (process.env.SCRYPTED_PORTABLE_PYTHON && !pluginPythonVersion)
             pluginPythonVersion = packagedPythonVersion;
 
-        let portablePythonOptions = options.packageJson.scrypted.pythonOptions?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonOptions?.default || {};
+        let portablePythonOptions = options.packageJson.scrypted.pythonVersion?.options?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonVersion?.options?.default || {};
 
         // if the plugin requests a specific python, then install it via portable python
         if (!pluginPythonVersion) {
