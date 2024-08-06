@@ -20,7 +20,8 @@ fi
 if [ -n "$SCRYPTED_RESTORE" ]
 then
     RESTORE_VMID=$VMID
-    $VMID="10444 --force"
+    VMID=10444
+    pct destroy $VMID 2> > /dev/null
 fi
 
 echo "Downloading scrypted container backup."
@@ -81,18 +82,25 @@ else
     echo "$CONF not found? Start on boot must be enabled manually."    
 fi
 
-if [ -n "$RESTORE_VMID" ]
+if [ -n "$SCRYPTED_RESTORE" ]
 then
-    echo "Preparing rootfs reset..."
-    pct set 10444 --delete mp0
-    pct set 10444 --delete unused0
-    pct move-volume $RESTORE_VMID mp0 --target-vmid 10444 --target-volume mp0
-    rm *.tar
-    vzdump $RESTORE_VMID --dumpdir /tmp
-    echo "Moving data volume to backup..."
-    pct restore 10444 *.tar $@
+    readyn "Running this script will reset Scrypted to a factory state while preserving existing data. IT IS RECOMMENDED TO CREATE A BACKUP FIRST. Are you sure you want to continue?"
+    if [ "$yn" != "y" ]
+    then
+        exit 1
+    fi
 
-    # todo: back to VMID...
+    echo "Preparing rootfs reset..."
+    # this copies the 
+    pct set 10444 --delete mp0 && pct set 10444 --delete unused0 && pct move-volume $RESTORE_VMID mp0 --target-vmid 10444 --target-volume mp0
+
+    rm *.tar
+    vzdump 10444 --dumpdir /tmp
+    VMID=$RESTORE_VMID
+    echo "Moving data volume to backup..."
+    pct restore $VMID *.tar $@
+
+    pct destroy 10444
 fi
 
 echo "Adding udev rule: /etc/udev/rules.d/65-scrypted.rules"
