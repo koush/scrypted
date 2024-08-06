@@ -100,6 +100,7 @@ class TensorFlowLitePlugin(
             self.yolo = "yolo" in model
             self.yolov9 = "yolov9" in model
             self.scrypted_model = "scrypted" in model
+            self.modelName = model
 
             print(f"model: {model}")
 

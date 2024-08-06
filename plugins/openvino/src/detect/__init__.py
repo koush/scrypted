@@ -14,6 +14,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
         self.loop = asyncio.get_event_loop()
+        self.modelName = self.pluginId
 
     def getClasses(self) -> list[str]:
         pass
@@ -32,7 +33,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
     async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         d: ObjectDetectionModel = {
-            'name': self.pluginId,
+            'name': self.modelName,
             'classes': self.getClasses(),
             'triggerClasses': self.getTriggerClasses(),
             'inputSize': self.get_input_details(),

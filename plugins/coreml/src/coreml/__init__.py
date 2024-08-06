@@ -85,6 +85,7 @@ class CoreMLPlugin(PredictPlugin, scrypted_sdk.Settings, scrypted_sdk.DeviceProv
         self.scrypted_model = "scrypted" in model
         model_version = "v8"
         mlmodel = "model" if self.scrypted_yolo else model
+        self.modelName = model
 
         print(f"model: {model}")
 

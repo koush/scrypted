@@ -63,6 +63,7 @@ class ONNXPlugin(
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
+        self.modelName = model
 
         print(f"model {model}")
 

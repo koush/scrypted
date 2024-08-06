@@ -149,6 +149,7 @@ class OpenVINOPlugin(
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
         self.sigmoid = model == "yolo-v4-tiny-tf"
+        self.modelName = model
 
         print(f"model/mode/precision: {model}/{mode}/{precision}")
 
