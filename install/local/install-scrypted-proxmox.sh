@@ -21,7 +21,7 @@ if [ -n "$SCRYPTED_RESTORE" ]
 then
     RESTORE_VMID=$VMID
     VMID=10444
-    pct destroy $VMID 2> > /dev/null
+    pct destroy $VMID 2>&1 > /dev/null
 fi
 
 echo "Downloading scrypted container backup."
