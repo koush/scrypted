@@ -1,0 +1,1 @@
+const nodeptyprebuiltmultiarch = __non_webpack_require__('node-pty-prebuilt-multiarch'); module.exports = nodeptyprebuiltmultiarch;

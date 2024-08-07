@@ -1,0 +1,22 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.nodeModules = exports.jsonRegex = exports.jsJsxMap = exports.jsJsx = exports.tsTsxJsJsxRegex = exports.dtsTsTsxJsJsxRegex = exports.dtsTsTsxRegex = exports.dtsDtsxOrDtsDtsxMapRegex = exports.declarationRegex = exports.tsTsxRegex = exports.tsxRegex = exports.extensionRegex = exports.LineFeedCode = exports.CarriageReturnLineFeedCode = exports.LineFeed = exports.CarriageReturnLineFeed = exports.EOL = void 0;
+const os = require("os");
+exports.EOL = os.EOL;
+exports.CarriageReturnLineFeed = '\r\n';
+exports.LineFeed = '\n';
+exports.CarriageReturnLineFeedCode = 0;
+exports.LineFeedCode = 1;
+exports.extensionRegex = /\.[^.]+$/;
+exports.tsxRegex = /\.tsx$/i;
+exports.tsTsxRegex = /\.([cm]?ts|tsx)$/i;
+exports.declarationRegex = /\.d\.([cm]?ts|tsx)$/i;
+exports.dtsDtsxOrDtsDtsxMapRegex = /\.d\.([cm]?ts|tsx)(\.map)?$/i;
+exports.dtsTsTsxRegex = /(\.d)?\.([cm]?ts|tsx)$/i;
+exports.dtsTsTsxJsJsxRegex = /((\.d)?\.([cm]?[tj]s|[tj]sx))$/i;
+exports.tsTsxJsJsxRegex = /\.([cm]?[tj]s|[tj]sx)$/i;
+exports.jsJsx = /\.([cm]?js|jsx)$/i;
+exports.jsJsxMap = /\.([cm]?js|jsx)\.map$/i;
+exports.jsonRegex = /\.json$/i;
+exports.nodeModules = /node_modules/i;
+//# sourceMappingURL=constants.js.map

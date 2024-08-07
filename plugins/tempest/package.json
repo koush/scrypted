@@ -1,0 +1,45 @@
+{
+    "name": "@scrypted/tempest",
+    "version": "0.0.1",
+    "description": "Tempest Weather Station for Scrypted",
+    "author": "Your Name",
+    "license": "Apache-2.0",
+    "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+    },
+    "keywords": [
+      "scrypted",
+      "plugin",
+      "tempest",
+      "weather"
+    ],
+    "scrypted": {
+      "name": "Tempest Weather Station",
+      "type": "DeviceProvider",
+      "interfaces": [
+        "DeviceProvider",
+        "Settings",
+        "Thermometer",
+        "HumiditySensor",
+        "BinarySensor",
+        "Battery"
+      ]
+    },
+    "dependencies": {
+      "axios": "^0.21.1"
+    },
+    "devDependencies": {
+      "@scrypted/sdk": "^0.2.84",
+      "@types/node": "^16.9.6"
+    }
+  }
