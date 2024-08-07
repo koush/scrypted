@@ -1,1 +1,0 @@
-const memfs = __non_webpack_require__('memfs'); module.exports = memfs;

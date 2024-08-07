@@ -1,1 +1,0 @@
-const nodeforge = __non_webpack_require__('node-forge'); module.exports = nodeforge;
