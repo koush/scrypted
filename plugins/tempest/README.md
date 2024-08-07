@@ -13,7 +13,7 @@ This plugin is in a very early, pre-beta state. It's published for developers wh
 
 ## Setup
 1. Install the plugin in your Scrypted instance
-2. Configure with your Tempest API token and station ID
+2. Configure with your Tempest access token and station ID
 
 ## Contributing
 Contributions are welcome! Feel free to fork and submit pull requests to enhance automation capabilities.
