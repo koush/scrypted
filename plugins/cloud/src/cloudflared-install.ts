@@ -6,7 +6,7 @@ import { httpFetch } from '../../../server/src/fetch/http-fetch';
 
 export async function installCloudflared() {
     const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
-    const version = 2;
+    const version = 5;
     const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `v${version}`, `${process.platform}-${process.arch}`);
     const bin = path.join(cloudflareD, cloudflared.bin);
 
@@ -18,25 +18,7 @@ export async function installCloudflared() {
                 recursive: true,
             });
         }
-        if (process.platform === 'darwin' && process.arch === 'arm64') {
-            const bin = path.join(cloudflareD, cloudflared.bin);
-            mkdirSync(path.dirname(bin), {
-                recursive: true,
-            });
-            const tmp = `${bin}.tmp`;
-
-            const stream = await httpFetch({
-                url: 'https://github.com/scryptedapp/cloudflared/releases/download/2023.8.2/cloudflared-darwin-arm64',
-                responseType: 'readable',
-            });
-            const write = stream.body.pipe(fs.createWriteStream(tmp));
-            await once(write, 'close');
-            renameSync(tmp, bin);
-            fs.chmodSync(bin, 0o0755)
-        }
-        else {
-            await cloudflared.install(bin);
-        }
+        await cloudflared.install(bin);
     }
 
     return {
