@@ -382,10 +382,8 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
             
         } catch (error) {
             this.console.error(`Install error: ${error}`); 
-            if (error.code === 'EHOSTUNREACH') { 
-                // if host unreached we rethrows error for restarting of the installation process
-                throw error;
-            }           
+            // we rethrows error for restarting of the installation process
+            throw error;
         }
     }
 
