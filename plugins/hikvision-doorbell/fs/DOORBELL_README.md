@@ -1,4 +1,4 @@
-# Hikvision Doorbell (beta)
+# Hikvision Doorbell
 
 At the moment, plugin was tested with the **DS-KV6113PE1[C]** model `doorbell` with firmware version: **V2.2.65 build 231213**, in the following modes:
 
@@ -30,15 +30,21 @@ The interaction mode is configured using the **SIP Mode** combobox. The plugin s
 
 #### Don't Use SIP
 
-In this mode, a SIP proxy is not used, and the `doorbell` must be connected to `Hik-Connect` or to your `Indoor Station`.
+This mode should be used if you have an **Indoor Station** and a `doorbell` connected to it.
+
+You should also enable the **Hik-Connect** (Platform Access Mode) in the `doorbell` settings so that `this device` receives a call notification. These are the implementation features of the doorbell software, unfortunately.
 
 #### Connect to SIP Proxy
+
+This mode should be used when you have a separate SIP gateway and all your intercom devices work via SIP telephony.
 
 **On this device** you need to configure a connection to your SIP proxy (gateway) in the additional tab, which will appear after saving the selection.
 
 **On `doorbell`** also set up a connection to a SIP proxy (gateway), and also, in the appropriate section of the settings, specify the “phone number” of this device so that a call will also be received here.
 
 #### Emulate SIP Proxy
+
+This mode should be used when you have a `doorbell` but no **Indoor Station**, and you want to connect this `doorbell` to Scrypted server only.
 
 In this mode, the plugin creates a fake SIP proxy that listens for a connection on the specified port (or auto-select a port if not specified). The task of this server is to receive a notification about a call and, in the event of an intercom start (two way audio), simulate picking up the handset so that the `doorbell` switches to conversation mode (stops ringing).
 
