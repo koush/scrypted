@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
-import PushReceiver, { Types } from '@eneris/push-receiver';
+import { PushReceiver } from '@eneris/push-receiver';
 import { Deferred } from '@scrypted/common/src/deferred';
+import type { Types } from '@eneris/push-receiver/dist/client';
 
 export declare interface PushManager {
     on(event: 'message', listener: (data: any) => void): this;
@@ -27,7 +28,12 @@ export class PushManager extends EventEmitter {
 
             const instance = new PushReceiver({
                 ...savedConfig,
-                senderId,
+                firebase: {
+                    messagingSenderId: senderId,
+                    projectId: 'scrypted-app',
+                    apiKey: 'AIzaSyDI0bgFuVPIqKZoNpB-iTOU7ijIeepxOXE',
+                    appId: '1:827888101440:web:6ff9f8ada107e9cc0097a5',
+                } ,
                 heartbeatIntervalMs: 15 * 60 * 1000,
             });
 

@@ -38,7 +38,7 @@
       ]
    },
    "dependencies": {
-      "@eneris/push-receiver": "^3.1.5",
+      "@eneris/push-receiver": "^4.1.6",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "bpmux": "^8.2.1",
@@ -54,5 +54,5 @@
       "@types/node": "^22.1.0",
       "ts-node": "^10.9.2"
    },
-   "version": "0.2.31"
+   "version": "0.2.32"
 }
