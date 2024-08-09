@@ -5,20 +5,12 @@ import { Stream } from "stream";
 import xml2js from 'xml2js';
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI } from "./onvif-api";
-import { autoconfigureCodecs, configureCodecs, getCodecs } from "./onvif-configure";
+import { autoconfigureCodecs, automaticallyConfigureSettings, configureCodecs, getCodecs } from "./onvif-configure";
 import { listenEvents } from "./onvif-events";
 import { OnvifIntercom } from "./onvif-intercom";
 import { OnvifPTZMixinProvider } from "./onvif-ptz";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
-
-const automaticallyConfigureSettings: Setting = {
-    key: 'autoconfigure',
-    title: 'Automatically Configure Settings',
-    description: 'Automatically configure and valdiate the camera codecs and other settings for optimal Scrypted performance. Some settings will require manual configuration via the camera web admin.',
-    type: 'boolean',
-    value: true,
-};
 
 class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, VideoCameraConfiguration, Reboot {
     eventStream: Stream;
@@ -39,9 +31,9 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
     }
 
     async setVideoStreamOptions(options: MediaStreamOptions) {
+        this.rtspMediaStreamOptions = undefined;
         const client = await this.getClient();
         const ret = await configureCodecs(this.console, client, options);
-        this.rtspMediaStreamOptions = undefined;
         return ret;
     }
 
@@ -201,7 +193,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         const ret: Setting[] = [
             ...await super.getOtherSettings(),
             {
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 title: 'Onvif Doorbell',
                 type: 'boolean',
                 description: 'Enable if this device is a doorbell',
@@ -209,7 +201,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
                 value: isDoorbell.toString(),
             },
             {
-                group: 'Advanced',
+                subgroup: 'Advanced',
                 title: 'Onvif Doorbell Event Name',
                 type: 'string',
                 description: 'Onvif event name to trigger the doorbell',
@@ -222,6 +214,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         if (!isDoorbell) {
             ret.push(
                 {
+                    subgroup: 'Advanced',
                     title: 'Two Way Audio',
                     description: 'Enable if this device supports two way audio over ONVIF.',
                     type: 'boolean',
@@ -235,7 +228,6 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
             ...automaticallyConfigureSettings,
         };
         ac.type = 'button';
-        ac.subgroup = 'Advanced';
         ret.push(ac);
 
         return ret;
@@ -263,13 +255,15 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
     async putSetting(key: string, value: any) {
         if (key === automaticallyConfigureSettings.key) {
             autoconfigureCodecs(this.console, await this.getClient())
+                .then(() => {
+                    this.log.a('Successfully configured settings.');
+                })
                 .catch(e => {
                     this.log.a('There was an error automatically configuring settings. More information can be viewed in the console.');
                     this.console.error('error autoconfiguring', e);
                 });
             return;
         }
-
 
         this.client = undefined;
         this.rtspMediaStreamOptions = undefined;

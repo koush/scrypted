@@ -1,6 +1,14 @@
-import { MediaStreamConfiguration, MediaStreamDestination, MediaStreamOptions, VideoStreamConfiguration } from "@scrypted/sdk";
+import { MediaStreamConfiguration, MediaStreamDestination, MediaStreamOptions, Setting, VideoStreamConfiguration } from "@scrypted/sdk";
 import { OnvifCameraAPI } from "./onvif-api";
 import { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
+
+export const automaticallyConfigureSettings: Setting = {
+    key: 'autoconfigure',
+    title: 'Automatically Configure Settings',
+    description: 'Automatically configure and valdiate the camera codecs and other settings for optimal Scrypted performance. Some settings will require manual configuration via the camera web admin.',
+    type: 'boolean',
+    value: true,
+};
 
 export function computeInterval(fps: number, govLength: number) {
     if (!fps || !govLength)
@@ -205,8 +213,6 @@ export async function autoconfigureCodecs(console: Console, client: OnvifCameraA
     else if (used.length === 1) {
         // no nop
     }
-
-    console.log('autoconfigured codecs!');
 }
 
 export async function configureCodecs(console: Console, client: OnvifCameraAPI, options: MediaStreamOptions): Promise<MediaStreamConfiguration> {

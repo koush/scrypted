@@ -1,12 +1,14 @@
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration } from "@scrypted/sdk";
 import crypto from 'crypto';
 import { PassThrough } from "stream";
 import xml2js from 'xml2js';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
+import { connectCameraAPI } from '../../onvif/src/onvif-api';
+import { autoconfigureCodecs, automaticallyConfigureSettings, configureCodecs } from '../../onvif/src/onvif-configure';
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
-import { HikvisionCameraStreamSetup, HikvisionAPI } from "./hikvision-api-interfaces"
+import { HikvisionAPI } from "./hikvision-api-interfaces";
 import { HikvisionCameraAPI, HikvisionCameraEvent, detectionMap } from "./hikvision-camera-api";
 
 const { mediaManager } = sdk;
@@ -17,7 +19,7 @@ function channelToCameraNumber(channel: string) {
     return channel.substring(0, channel.length - 2);
 }
 
-export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, ObjectDetector {
+export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, ObjectDetector, VideoCameraConfiguration {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
@@ -36,6 +38,13 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     async reboot() {
         const client = this.getClient();
         await client.reboot();
+    }
+
+    async setVideoStreamOptions(options: MediaStreamOptions) {
+        this.detectedChannels = undefined;
+        const client = await connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, undefined);
+        const ret = await configureCodecs(this.console, client, options);
+        return ret;
     }
 
     async updateDeviceInfo() {
@@ -403,6 +412,18 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     }
 
     async putSetting(key: string, value: string) {
+        if (key === automaticallyConfigureSettings.key) {
+            autoconfigureCodecs(this.console, await connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, undefined))
+                .then(() => {
+                    this.log.a('Successfully configured settings.');
+                })
+                .catch(e => {
+                    this.log.a('There was an error automatically configuring settings. More information can be viewed in the console.');
+                    this.console.error('error autoconfiguring', e);
+                });
+            return;
+        }
+
         this.client = undefined;
         this.detectedChannels = undefined;
         super.putSetting(key, value);
@@ -434,6 +455,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
         ret.push(
             {
+                subgroup: 'Advanced',
                 title: 'Doorbell',
                 type: 'boolean',
                 description: 'This device is a Hikvision doorbell.',
@@ -441,6 +463,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 key: 'doorbellType',
             },
             {
+                subgroup: 'Advanced',
                 title: 'Two Way Audio',
                 value: twoWayAudio,
                 key: 'twoWayAudio',
@@ -448,6 +471,12 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 choices,
             },
         );
+
+        const ac = {
+            ...automaticallyConfigureSettings,
+        };
+        ac.type = 'button';
+        ret.push(ac);
 
         return ret;
     }
@@ -630,6 +659,12 @@ class HikvisionProvider extends RtspProvider {
 
         const username = settings.username?.toString();
         const password = settings.password?.toString();
+
+        if (settings.autoconfigure) {
+            const client = await connectCameraAPI(httpAddress, username, password, this.console, undefined);
+            await autoconfigureCodecs(this.console, client);
+        }
+
         const skipValidate = settings.skipValidate?.toString() === 'true';
         let twoWayAudio: string;
         if (!skipValidate) {
@@ -696,6 +731,7 @@ class HikvisionProvider extends RtspProvider {
                 description: 'Optional: Override the HTTP Port from the default value of 80',
                 placeholder: '80',
             },
+            automaticallyConfigureSettings,
             {
                 key: 'skipValidate',
                 title: 'Skip Validation',
