@@ -453,10 +453,8 @@ export interface VideoStreamOptions {
   minBitrate?: number;
   maxBitrate?: number;
   fps?: number;
-  /**
-   * Key Frame interval in milliseconds.
-   */
-  idrIntervalMillis?: number;
+  // what the heck is this?
+  quality?: number;
   /**
    * Key Frame interval in frames.
    */
@@ -670,8 +668,153 @@ export interface VideoCamera {
   getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]>;
 }
 
+// {
+//   "qualityRange": {
+//     "min": 0,
+//     "max": 5
+//   },
+//   "H264": {
+//     "resolutionsAvailable": [
+//       {
+//         "width": 1280,
+//         "height": 720
+//       },
+//       {
+//         "width": 1920,
+//         "height": 1080
+//       },
+//       {
+//         "width": 2688,
+//         "height": 1520
+//       },
+//       {
+//         "width": 3072,
+//         "height": 1728
+//       },
+//       {
+//         "width": 3840,
+//         "height": 2160
+//       }
+//     ],
+//     "govLengthRange": {
+//       "min": 1,
+//       "max": 400
+//     },
+//     "frameRateRange": {
+//       "min": 1,
+//       "max": 30
+//     },
+//     "encodingIntervalRange": {
+//       "min": 1,
+//       "max": 1
+//     },
+//     "H264ProfilesSupported": [
+//       "Baseline",
+//       "Main",
+//       "High"
+//     ]
+//   },
+//   "extension": {
+//     "H264": {
+//       "resolutionsAvailable": [
+//         {
+//           "width": 1280,
+//           "height": 720
+//         },
+//         {
+//           "width": 1920,
+//           "height": 1080
+//         },
+//         {
+//           "width": 2688,
+//           "height": 1520
+//         },
+//         {
+//           "width": 3072,
+//           "height": 1728
+//         },
+//         {
+//           "width": 3840,
+//           "height": 2160
+//         }
+//       ],
+//       "govLengthRange": {
+//         "min": 1,
+//         "max": 400
+//       },
+//       "frameRateRange": {
+//         "min": 1,
+//         "max": 30
+//       },
+//       "encodingIntervalRange": {
+//         "min": 1,
+//         "max": 1
+//       },
+//       "H264ProfilesSupported": [
+//         "Baseline",
+//         "Main",
+//         "High"
+//       ],
+//       "bitrateRange": {
+//         "min": 32,
+//         "max": 16384
+//       }
+//     }
+//   }
+// }
+export interface VideoStreamConfiguration extends VideoStreamOptions {
+  resolutions?: [number, number][];
+  fpsRange?: [number, number];
+  keyframeIntervalRange?: [number, number];
+  bitrateRange?: [number, number];
+  qualityRange?: [number, number];
+  profiles?: string[];
+  bitrateControls?: string[];
+  codecs?: string[];
+}
+
+// audio streams seem more restrictive around what can be configured.
+// {
+//   "options": [
+//     {
+//       "encoding": "G711",
+//       "bitrateList": {
+//         "items": 64
+//       },
+//       "sampleRateList": {
+//         "items": 8
+//       }
+//     },
+//     {
+//       "encoding": "G726",
+//       "bitrateList": {
+//         "items": 16
+//       },
+//       "sampleRateList": {
+//         "items": 8
+//       }
+//     }
+//   ]
+// }
+
+export interface AudioStreamEncoding {
+  codec: string;
+  birates: number[];
+  sampleRates: number[];
+}
+
+export interface AudioStreamConfiguration extends AudioStreamOptions {
+  encodings?: AudioStreamEncoding[];
+}
+
+export interface MediaStreamConfiguration {
+  video?: VideoStreamConfiguration;
+  audio?: AudioStreamOptions;
+}
+
+// this is really just a mapping around onvif.
 export interface VideoCameraConfiguration {
-  setVideoStreamOptions(options: MediaStreamOptions): Promise<void>;
+  setVideoStreamOptions(options: MediaStreamOptions): Promise<MediaStreamConfiguration>;
 }
 
 export interface RequestRecordingStreamOptions extends RequestMediaStreamOptions {
