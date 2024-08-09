@@ -30,10 +30,11 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         await client.reboot();
     }
 
-    async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
+    async setVideoStreamOptions(options: MediaStreamOptions) {
         const client = await this.getClient();
-        await configureCodecs(client, options);
+        const ret = await configureCodecs(this.console, client, options);
         this.rtspMediaStreamOptions = undefined;
+        return ret;
     }
 
     async updateDeviceInfo() {

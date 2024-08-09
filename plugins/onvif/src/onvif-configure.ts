@@ -22,24 +22,29 @@ export function computeBitrate(bitrate: number) {
     return bitrate * 1000;
 }
 
-export async function configureCodecs(client: OnvifCameraAPI, options: MediaStreamOptions) {
+export async function configureCodecs(console: Console, client: OnvifCameraAPI, options: MediaStreamOptions) {
     const profiles: any[] = await client.getProfiles();
     const profile = profiles.find(profile => profile.$.token === options.id);
     const configuration = profile.videoEncoderConfiguration;
 
     const videoOptions = options.video;
 
-    switch (videoOptions?.codec) {
-        case 'h264':
-            configuration.encoding = 'H264';
+    if (videoOptions?.codec) {
+        let key: string;
+        switch (videoOptions.codec) {
+            case 'h264':
+                key = 'H264';
+                break;
+            case 'h265':
+                key = 'H265';
+                break;
+        }
+        if (key) {
+            configuration.encoding = key;
 
-            if (videoOptions?.idrIntervalMillis && videoOptions?.fps) {
-                configuration.H264 ||= {};
-                configuration.H264.govLength = Math.floor(videoOptions?.fps * videoOptions?.idrIntervalMillis / 1000);
-            }
             if (videoOptions?.keyframeInterval) {
-                configuration.H264 ||= {};
-                configuration.H264.govLength = videoOptions?.keyframeInterval;
+                configuration[key] ||= {};
+                configuration[key].govLength = videoOptions?.keyframeInterval;
             }
             if (videoOptions?.profile) {
                 let profile: string;
@@ -55,11 +60,11 @@ export async function configureCodecs(client: OnvifCameraAPI, options: MediaStre
                         break;
                 }
                 if (profile) {
-                    configuration.H264 ||= {};
-                    configuration.H264.profile = profile;
+                    configuration[key] ||= {};
+                    configuration[key].profile = profile;
                 }
             }
-            break;
+        }
     }
 
     if (videoOptions?.width && videoOptions?.height) {
@@ -85,14 +90,14 @@ export async function configureCodecs(client: OnvifCameraAPI, options: MediaStre
         configuration.rateControl.encodingInterval = 1;
     }
 
-    return new Promise<void>((r, f) => {
-        client.cam.setVideoEncoderConfiguration(configuration, (e: Error, result: any) => {
-            if (e)
-                return f(e);
-
-            r();
-        })
-    });
+    await client.setVideoEncoderConfiguration(configuration);
+    const configuredCodec = await client.getVideoEncoderConfigurationOptions(profile.$.token, configuration.$.token);
+    const codecs = await getCodecs(console, client);
+    const foundCodec = codecs.find(codec => codec.id === options.id);
+    return {
+        ...foundCodec,
+        ...configuredCodec,
+    }
 }
 
 export async function getCodecs(console: Console, client: OnvifCameraAPI) {
@@ -115,8 +120,7 @@ export async function getCodecs(console: Console, client: OnvifCameraAPI) {
                     width: videoEncoderConfiguration?.resolution?.width,
                     height: videoEncoderConfiguration?.resolution?.height,
                     codec: videoEncoderConfiguration?.encoding?.toLowerCase(),
-                    idrIntervalMillis: computeInterval(videoEncoderConfiguration?.rateControl?.frameRateLimit,
-                        videoEncoderConfiguration?.$.GovLength),
+                    keyframeInterval: videoEncoderConfiguration?.$?.GovLength,
                 },
                 audio: {
                     bitrate: computeBitrate(audioEncoderConfiguration?.bitrate),
