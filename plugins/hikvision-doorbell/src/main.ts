@@ -541,12 +541,11 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
             if (autoinstall) { 
                 try {
                     await this.getClient().setFakeSip (true, ip, port)
+                    this.console.info (`Installed fake SIP settings on doorbell. Address: ${ip}, port: ${port}`);
                 } catch (e) {
                     this.console.error (`Error installing fake SIP settings: ${e}`);
-                    if (e.code === 'EHOSTUNREACH') {
-                        // repeat if unreached
-                        this.installSipSettingsOnDeviceTimeout = setTimeout (() => this.installSipSettingsOnDevice(), UNREACHED_REPEAT_TIMEOUT);
-                    }
+                    // repeat if unreached
+                    this.installSipSettingsOnDeviceTimeout = setTimeout (() => this.installSipSettingsOnDevice(), UNREACHED_REPEAT_TIMEOUT);
                 }
             }
         }
@@ -666,6 +665,10 @@ export class HikvisionDoorbellProvider extends RtspProvider
 
     constructor() {
         super();
+    }
+
+    getScryptedDeviceCreator(): string {
+        return 'Hikvision Doorbell';
     }
 
     override getAdditionalInterfaces() {
