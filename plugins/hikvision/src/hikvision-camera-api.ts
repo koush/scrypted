@@ -7,6 +7,7 @@ import { IncomingMessage } from 'http';
 import { EventEmitter, Readable } from 'stream';
 import { Destroyable } from '../../rtsp/src/rtsp';
 import { getDeviceInfo } from './probe';
+import { sleep } from "@scrypted/common/src/sleep";
 
 export const detectionMap = {
     human: 'person',
@@ -53,7 +54,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             },
             rejectUnauthorized: false,
             credential: this.credential,
-            body,
+            body: typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions?.body : body,
         });
         return response;
     }
@@ -133,6 +134,42 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         });
 
         return response.body;
+    }
+
+    async getVcaResource(channel: string) {
+        const response = await this.request({
+            url: `http://${this.ip}/ISAPI/System/Video/inputs/channels/${getChannel(channel)}/VCAResource`,
+            responseType: 'text',
+        });
+
+        return response.body as string;
+    }
+
+    async putVcaResource(channel: string, resource: 'smart' | 'facesnap' | 'close') {
+        const current = await this.getVcaResource(channel);
+        // no op
+        if (current.includes(resource))
+            return true;
+
+        const xml = '<?xml version="1.0" encoding="UTF-8"?>\r\n' +
+            '<VCAResource version="2.0" xmlns="http://www.hikvision.com/ver20/XMLSchema">\r\n' +
+            `<type>${resource}</type>\r\n` +
+            '</VCAResource>\r\n';
+
+            const response = await this.request({
+                body: xml,
+                method: 'PUT',
+                url: `http://${this.ip}/ISAPI/System/Video/inputs/channels/${getChannel(channel)}/VCAResource`,
+                responseType: 'text',
+                headers: {
+                    'Content-Type': 'application/xml',
+                },
+            });
+
+        // need to reboot after this change.
+        await this.reboot();
+        // return false to indicate that the change will take effect after the reboot.
+        return false;
     }
 
     async listenEvents(): Promise<Destroyable> {
