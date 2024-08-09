@@ -622,6 +622,7 @@ class MediaStatus(TypedDict):
 class MediaStreamConfiguration(TypedDict):
 
     audio: AudioStreamOptions
+    id: str
     video: VideoStreamConfiguration
 
 class MediaStreamOptions(TypedDict):

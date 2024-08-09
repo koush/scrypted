@@ -181,7 +181,6 @@ export class OnvifCameraAPI {
         let fpsRange: [number, number];
         let keyframeIntervalRange: [number, number];
         const profiles: string[] = [];
-        const bitrateControls: string[] = [];
         let bitrateRange: [number, number];
 
         const H264 = options?.extension?.H264 || options?.H264;
@@ -215,6 +214,10 @@ export class OnvifCameraAPI {
 
     async setVideoEncoderConfiguration(configuration: any) {
         return promisify(cb => this.cam.setVideoEncoderConfiguration(configuration, cb));
+    }
+
+    async setAudioEncoderConfiguration(configuration: any) {
+        return promisify(cb => this.cam.setAudioEncoderConfiguration(configuration, cb));
     }
 
     async getProfiles() {

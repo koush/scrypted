@@ -808,6 +808,7 @@ export interface AudioStreamConfiguration extends AudioStreamOptions {
 }
 
 export interface MediaStreamConfiguration {
+  id?: string;
   video?: VideoStreamConfiguration;
   audio?: AudioStreamOptions;
 }

@@ -20,7 +20,9 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
             container: 'rtsp',
             video: {
             },
-            audio: this.isAudioDisabled() ? null : {},
+            audio: {
+
+            },
         };
     }
 

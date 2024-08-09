@@ -1,16 +1,24 @@
-import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import { AddressInfo } from "net";
 import onvif from 'onvif';
 import { Stream } from "stream";
 import xml2js from 'xml2js';
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI } from "./onvif-api";
-import { computeBitrate, computeInterval, configureCodecs, convertAudioCodec, getCodecs } from "./onvif-configure";
+import { autoconfigureCodecs, configureCodecs, getCodecs } from "./onvif-configure";
 import { listenEvents } from "./onvif-events";
 import { OnvifIntercom } from "./onvif-intercom";
 import { OnvifPTZMixinProvider } from "./onvif-ptz";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
+
+const automaticallyConfigureSettings: Setting = {
+    key: 'autoconfigure',
+    title: 'Automatically Configure Settings',
+    description: 'Automatically configure and valdiate the camera codecs and other settings for optimal Scrypted performance. Some settings will require manual configuration via the camera web admin.',
+    type: 'boolean',
+    value: true,
+};
 
 class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, VideoCameraConfiguration, Reboot {
     eventStream: Stream;
@@ -133,12 +141,6 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
                 if (!ret.length)
                     throw new Error('onvif camera had no profiles.');
 
-                if (this.isAudioDisabled()) {
-                    for (const r of ret) {
-                        r.audio = null;
-                    }
-                }
-
                 resolve(ret);
             }
             catch (e) {
@@ -199,6 +201,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         const ret: Setting[] = [
             ...await super.getOtherSettings(),
             {
+                group: 'Advanced',
                 title: 'Onvif Doorbell',
                 type: 'boolean',
                 description: 'Enable if this device is a doorbell',
@@ -206,6 +209,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
                 value: isDoorbell.toString(),
             },
             {
+                group: 'Advanced',
                 title: 'Onvif Doorbell Event Name',
                 type: 'string',
                 description: 'Onvif event name to trigger the doorbell',
@@ -219,12 +223,20 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
             ret.push(
                 {
                     title: 'Two Way Audio',
+                    description: 'Enable if this device supports two way audio over ONVIF.',
                     type: 'boolean',
                     key: 'onvifTwoWay',
                     value: (!!this.providedInterfaces?.includes(ScryptedInterface.Intercom)).toString(),
                 }
             )
         }
+
+        const ac = {
+            ...automaticallyConfigureSettings,
+        };
+        ac.type = 'button';
+        ac.subgroup = 'Advanced';
+        ret.push(ac);
 
         return ret;
     }
@@ -249,6 +261,16 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
     }
 
     async putSetting(key: string, value: any) {
+        if (key === automaticallyConfigureSettings.key) {
+            autoconfigureCodecs(this.console, await this.getClient())
+                .catch(e => {
+                    this.log.a('There was an error automatically configuring settings. More information can be viewed in the console.');
+                    this.console.error('error autoconfiguring', e);
+                });
+            return;
+        }
+
+
         this.client = undefined;
         this.rtspMediaStreamOptions = undefined;
 
@@ -407,6 +429,12 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
         const username = settings.username?.toString();
         const password = settings.password?.toString();
+
+        if (settings.autoconfigure) {
+            const client = await connectCameraAPI(httpAddress, username, password, this.console, undefined);
+            await autoconfigureCodecs(this.console, client);
+        }
+
         const skipValidate = settings.skipValidate?.toString() === 'true';
         let ptzCapabilities: string[];
         if (!skipValidate) {
@@ -497,6 +525,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                 description: 'Optional: Override the HTTP Port from the default value of 80',
                 placeholder: '80',
             },
+            automaticallyConfigureSettings,
             {
                 key: 'skipValidate',
                 title: 'Skip Validation',
@@ -522,6 +551,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                     title: 'Password',
                     type: 'password',
                 },
+                automaticallyConfigureSettings,
             ]
         }));
     }
@@ -533,6 +563,10 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
             throw new Error('device not found');
         adopt.settings.ip = entry.host;
         adopt.settings.httpPort = entry.port;
+        if (adopt.settings.autoconfigure) {
+            const client = await connectCameraAPI(`${entry.host}:${entry.port || 80}`, adopt.settings.username as string, adopt.settings.password as string, this.console, undefined);
+            await autoconfigureCodecs(this.console, client);
+        }
         await this.createDevice(adopt.settings, adopt.nativeId);
         this.discoveredDevices.delete(adopt.nativeId);
         const device = await this.getDevice(adopt.nativeId) as OnvifCamera;

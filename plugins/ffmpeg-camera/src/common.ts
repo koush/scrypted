@@ -27,10 +27,6 @@ export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends S
 
     abstract getRawVideoStreamOptions(): T[];
 
-    isAudioDisabled() {
-        return this.storage.getItem('noAudio') === 'true';
-    }
-
     async getVideoStream(options?: T): Promise<MediaObject> {
         const vsos = await this.getVideoStreamOptions();
         const vso = vsos?.find(s => s.id === options?.id) || this.getDefaultStream(vsos);
@@ -90,13 +86,6 @@ export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends S
             ...await this.getUrlSettings(),
             ...await this.getStreamSettings(),
             ...await this.getOtherSettings(),
-            {
-                key: 'noAudio',
-                title: 'No Audio',
-                description: 'Enable this setting if the camera does not have audio or to mute audio.',
-                type: 'boolean',
-                value: (this.isAudioDisabled()).toString(),
-            },
         ];
 
         for (const s of ret) {
