@@ -4,12 +4,20 @@ import { PassThrough } from "stream";
 import xml2js from 'xml2js';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { connectCameraAPI } from '../../onvif/src/onvif-api';
-import { autoconfigureCodecs, automaticallyConfigureSettings, configureCodecs } from '../../onvif/src/onvif-configure';
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
-import { HikvisionAPI } from "./hikvision-api-interfaces";
+import { HikvisionAPI } from "./hikvision-api-channels";
 import { HikvisionCameraAPI, HikvisionCameraEvent, detectionMap } from "./hikvision-camera-api";
+import { automaticallyConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
+import { autoconfigureSettings } from "./hikvision-autoconfigure";
+
+const rtspChannelSetting: Setting = {
+    key: 'rtspChannel',
+    title: 'Channel Number',
+    description: "Optional: The channel number to use for snapshots. E.g., 101, 201, etc. The camera portion, e.g., 1, 2, etc, will be used to construct the RTSP stream.",
+    placeholder: '101',
+};
 
 const { mediaManager } = sdk;
 
@@ -41,10 +49,10 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     }
 
     async setVideoStreamOptions(options: MediaStreamOptions) {
-        this.detectedChannels = undefined;
-        const client = await connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, undefined);
-        const ret = await configureCodecs(this.console, client, options);
-        return ret;
+        let vsos = await this.getVideoStreamOptions();
+        const index = vsos.findIndex(vso => vso.id === options.id);
+        const client = this.getClient();
+        return client.configureCodecs(this.getCameraNumber() || '1', (index + 1).toString().padStart(2, '0'), options)
     }
 
     async updateDeviceInfo() {
@@ -264,15 +272,14 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     }
 
     async getUrlSettings(): Promise<Setting[]> {
+        const rtspSetting = {
+            ...rtspChannelSetting,
+            subgroup: 'Advanced',
+            value: this.storage.getItem('rtspChannel'),
+        };
+
         return [
-            {
-                subgroup: 'Advanced',
-                key: 'rtspChannel',
-                title: 'Channel Number',
-                description: "Optional: The channel number to use for snapshots. E.g., 101, 201, etc. The camera portion, e.g., 1, 2, etc, will be used to construct the RTSP stream.",
-                placeholder: '101',
-                value: this.storage.getItem('rtspChannel'),
-            },
+            rtspSetting,
             ...await super.getUrlSettings(),
         ]
     }
@@ -316,49 +323,32 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 if (isOld) {
                     this.console.error('Old NVR. Defaulting to two camera configuration');
                     return defaultMap;
-                } else {
+                }
+
+                try {
+                    let channels: MediaStreamOptions[];
                     try {
-                        let xml: string;
-                        try {
-                            const response = await client.request({
-                                url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
-                                responseType: 'text',
-                            });
-                            xml = response.body;
-                            this.storage.setItem('channels', xml);
-                        }
-                        catch (e) {
-                            xml = this.storage.getItem('channels');
-                            if (!xml)
-                                throw e;
-                        }
-                        const parsedXml = await xml2js.parseStringPromise(xml);
-
-                        const ret = new Map<string, MediaStreamOptions>();
-                        for (const streamingChannel of parsedXml.StreamingChannelList.StreamingChannel) {
-                            const [id] = streamingChannel.id;
-                            const width = parseInt(streamingChannel?.Video?.[0]?.videoResolutionWidth?.[0]) || undefined;
-                            const height = parseInt(streamingChannel?.Video?.[0]?.videoResolutionHeight?.[0]) || undefined;
-                            let codec = streamingChannel?.Video?.[0]?.videoCodecType?.[0] as string;
-                            codec = codec?.toLowerCase()?.replaceAll('.', '');
-                            const vso: MediaStreamOptions = {
-                                id,
-                                video: {
-                                    width,
-                                    height,
-                                    codec,
-                                }
-                            }
-                            ret.set(id, vso);
-                        }
-
-                        return ret;
+                        channels = await client.getCodecs(camNumber);
+                        this.storage.setItem('channelsJSON', JSON.stringify(channels));
                     }
                     catch (e) {
-                        this.console.error('error retrieving channel ids', e);
-                        this.detectedChannels = undefined;
-                        return defaultMap;
+                        const raw = this.storage.getItem('channelsJSON');
+                        if (!raw)
+                            throw e;
+                        channels = JSON.parse(raw);
                     }
+                    const ret = new Map<string, MediaStreamOptions>();
+                    for (const streamingChannel of channels) {
+                        const channel = streamingChannel.id;
+                        ret.set(channel, streamingChannel);
+                    }
+
+                    return ret;
+                }
+                catch (e) {
+                    this.console.error('error retrieving channel ids', e);
+                    this.detectedChannels = undefined;
+                    return defaultMap;
                 }
             })();
         }
@@ -413,7 +403,8 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
     async putSetting(key: string, value: string) {
         if (key === automaticallyConfigureSettings.key) {
-            autoconfigureCodecs(this.console, await connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, undefined))
+            const client = this.getClient();
+            autoconfigureSettings(client, this.getCameraNumber() || '1')
                 .then(() => {
                     this.log.a('Successfully configured settings.');
                 })
@@ -660,15 +651,16 @@ class HikvisionProvider extends RtspProvider {
         const username = settings.username?.toString();
         const password = settings.password?.toString();
 
+        const api = new HikvisionCameraAPI(httpAddress, username, password, this.console);
+
         if (settings.autoconfigure) {
-            const client = await connectCameraAPI(httpAddress, username, password, this.console, undefined);
-            await autoconfigureCodecs(this.console, client);
+            const cameraNumber = (settings.rtspChannel as string)?.substring(0, 1) || '1';
+            await autoconfigureSettings(api, cameraNumber);
         }
 
         const skipValidate = settings.skipValidate?.toString() === 'true';
         let twoWayAudio: string;
         if (!skipValidate) {
-            const api = new HikvisionCameraAPI(httpAddress, username, password, this.console);
             try {
                 const deviceInfo = await api.getDeviceInfo();
 
@@ -702,6 +694,8 @@ class HikvisionProvider extends RtspProvider {
         device.putSetting('username', username);
         device.putSetting('password', password);
         device.setIPAddress(settings.ip?.toString());
+        if (settings.rtspChannel)
+            device.putSetting('rtspChannel', settings.rtspChannel as string);
         device.setHttpPortOverride(settings.httpPort?.toString());
         if (twoWayAudio)
             device.putSetting('twoWayAudio', twoWayAudio);
@@ -720,6 +714,7 @@ class HikvisionProvider extends RtspProvider {
                 title: 'Password',
                 type: 'password',
             },
+            rtspChannelSetting,
             {
                 key: 'ip',
                 title: 'IP Address',

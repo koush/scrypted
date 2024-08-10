@@ -149,6 +149,7 @@ export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> e
 
     getInterfaces() {
         return [
+            ScryptedInterface.VideoCameraConfiguration,
             ScryptedInterface.VideoCamera,
             ScryptedInterface.Settings,
             ...this.getAdditionalInterfaces()

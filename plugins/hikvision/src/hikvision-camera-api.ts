@@ -1,13 +1,16 @@
-import { HikvisionCameraStreamSetup, HikvisionAPI } from "./hikvision-api-interfaces"
 import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { readLine } from '@scrypted/common/src/read-stream';
 import { parseHeaders, readBody, readMessage } from '@scrypted/common/src/rtsp-server';
+import { MediaStreamConfiguration, MediaStreamOptions } from "@scrypted/sdk";
 import contentType from 'content-type';
 import { IncomingMessage } from 'http';
 import { EventEmitter, Readable } from 'stream';
+import xml2js from 'xml2js';
 import { Destroyable } from '../../rtsp/src/rtsp';
+import { CapabiltiesResponse } from './hikvision-api-capabilities';
+import { HikvisionAPI, HikvisionCameraStreamSetup } from "./hikvision-api-channels";
+import { ChannelResponse, ChannelsResponse } from './hikvision-xml-types';
 import { getDeviceInfo } from './probe';
-import { sleep } from "@scrypted/common/src/sleep";
 
 export const detectionMap = {
     human: 'person',
@@ -156,15 +159,15 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             `<type>${resource}</type>\r\n` +
             '</VCAResource>\r\n';
 
-            const response = await this.request({
-                body: xml,
-                method: 'PUT',
-                url: `http://${this.ip}/ISAPI/System/Video/inputs/channels/${getChannel(channel)}/VCAResource`,
-                responseType: 'text',
-                headers: {
-                    'Content-Type': 'application/xml',
-                },
-            });
+        const response = await this.request({
+            body: xml,
+            method: 'PUT',
+            url: `http://${this.ip}/ISAPI/System/Video/inputs/channels/${getChannel(channel)}/VCAResource`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+        });
 
         // need to reboot after this change.
         await this.reboot();
@@ -277,5 +280,171 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         }
 
         return this.listenerPromise;
+    }
+
+    async configureCodecs(camNumber: string, channelNumber: string, options: MediaStreamOptions): Promise<MediaStreamConfiguration> {
+        const cameraChannel = `${camNumber}${channelNumber}`;
+        let vsos = await this.getCodecs(camNumber);
+
+        const response = await this.request({
+            url: `http://${this.ip}/ISAPI/Streaming/channels/${cameraChannel}`,
+            responseType: 'text',
+        });
+        const channel: ChannelResponse = await xml2js.parseStringPromise(response.body);
+        const vc = channel.StreamingChannel.Video[0];
+
+        const { video: videoOptions, audio: audioOptions } = options;
+
+        if (videoOptions?.codec) {
+            let videoCodecType: string;
+            switch (videoOptions.codec) {
+                case 'h264':
+                    videoCodecType = 'H.264';
+                    break;
+                case 'h265':
+                    videoCodecType = 'H.265';
+                    break;
+            }
+            if (videoCodecType) {
+                vc.videoCodecType = [videoCodecType];
+                vc.SmartCodec = [{
+                    enabled: ['false'],
+                }];
+                vc.SVC = [{
+                    enabled: ['false'],
+                }];
+            }
+        }
+
+        if (videoOptions?.keyframeInterval)
+            vc.GovLength = [videoOptions.keyframeInterval.toString()];
+
+        if (videoOptions?.profile) {
+            let profile: string;
+            switch (videoOptions.profile) {
+                case 'baseline':
+                    profile = 'Baseline';
+                    break;
+                case 'main':
+                    profile = 'Main';
+                    break;
+                case 'high':
+                    profile = 'High';
+                    break;
+            }
+            if (profile) {
+                vc.H264Profile = [profile];
+                vc.H265Profile = [profile];
+            }
+        }
+
+        if (videoOptions?.width && videoOptions?.height) {
+            vc.videoResolutionWidth = [videoOptions?.width.toString()];
+            vc.videoResolutionHeight = [videoOptions?.height.toString()];
+        }
+
+
+        // can't be set by hikvision. But see if it is settable and doesn't match to direct user.
+        if (videoOptions?.bitrateControl && vc.videoQualityControlType?.[0]) {
+            const constant = videoOptions?.bitrateControl === 'constant';
+            if ((vc.videoQualityControlType[0] === 'CBR' && !constant) || (vc.videoQualityControlType[0] === 'VBR' && constant))
+                throw new Error(options.id + ': The camera video Bitrate Type must be manually set to ' + videoOptions?.bitrateControl + ' in the camera web admin.');
+        }
+
+        if (videoOptions?.bitrateControl) {
+            if (videoOptions?.bitrateControl === 'constant')
+                vc.videoQualityControlType = ['CBR'];
+            else if (videoOptions?.bitrateControl === 'variable')
+                vc.videoQualityControlType = ['VBR'];
+        }
+
+        if (videoOptions?.bitrate) {
+            const br = Math.round(videoOptions?.bitrate / 1000);
+            vc.vbrUpperCap = [br.toString()];
+            vc.constantBitRate = [br.toString()];
+        }
+
+        if (videoOptions?.fps) {
+            // weird calculation here per docs
+            const fps = videoOptions.fps * 100;
+            vc.maxFrameRate = [fps.toString()];
+            // not sure if this is necessary.
+            const gov = parseInt(vc.GovLength[0]);
+            vc.keyFrameInterval = [(gov / videoOptions.fps * 100).toString()];
+        }
+
+        const builder = new xml2js.Builder();
+        const put = builder.buildObject(vc);
+
+        await this.request({
+            method: 'PUT',
+            url: `http://${this.ip}/ISAPI/Streaming/channels/${cameraChannel}`,
+            responseType: 'text',
+            body: put,
+            headers: {
+                'Content-Type': 'application/xml',
+            }
+        });
+
+        const response2 = await this.request({
+            url: `http://${this.ip}/ISAPI/Streaming/channels/${cameraChannel}/capabilities`,
+            responseType: 'text',
+        });
+
+        vsos = await this.getCodecs(camNumber);
+        const vso: MediaStreamConfiguration = vsos.find(vso => vso.id === cameraChannel);
+
+        const capabilities: CapabiltiesResponse = await xml2js.parseStringPromise(response2.body);
+        const v = capabilities.StreamingChannel.Video[0];
+        vso.video.bitrateRange = [parseInt(v.vbrUpperCap[0].$.min) * 1000, parseInt(v.vbrUpperCap[0].$.max) * 1000];
+        const fpsRange = v.maxFrameRate[0].$.opt.split(',').map(fps => parseInt(fps) / 1000);
+        vso.video.fpsRange = [Math.min(...fpsRange), Math.max(...fpsRange)];
+
+        vso.video.bitrateControls = ['constant', 'variable'];
+        vso.video.keyframeIntervalRange = [parseInt(v.GovLength[0].$.min), parseInt(v.GovLength[0].$.max)];
+        const videoResolutionWidths = v.videoResolutionWidth[0].$.opt.split(',').map(w => parseInt(w));
+        const videoResolutionHeights = v.videoResolutionHeight[0].$.opt.split(',').map(h => parseInt(h));
+        vso.video.resolutions = videoResolutionWidths.map((w, i) => ([w, videoResolutionHeights[i]]));
+
+        return vso;
+    }
+
+    async getCodecs(camNumber: string) {
+        const defaultMap = new Map<string, MediaStreamOptions>();
+        defaultMap.set(camNumber + '01', undefined);
+        defaultMap.set(camNumber + '02', undefined);
+
+        try {
+            const response = await this.request({
+                url: `http://${this.ip}/ISAPI/Streaming/channels`,
+                responseType: 'text',
+            });
+            const xml = response.body;
+            const parsedXml: ChannelsResponse = await xml2js.parseStringPromise(xml);
+
+            const vsos: MediaStreamOptions[] = [];
+            for (const streamingChannel of parsedXml.StreamingChannelList.StreamingChannel) {
+                const [id] = streamingChannel.id;
+                const width = parseInt(streamingChannel?.Video?.[0]?.videoResolutionWidth?.[0]) || undefined;
+                const height = parseInt(streamingChannel?.Video?.[0]?.videoResolutionHeight?.[0]) || undefined;
+                let codec = streamingChannel?.Video?.[0]?.videoCodecType?.[0] as string;
+                codec = codec?.toLowerCase()?.replaceAll('.', '');
+                const vso: MediaStreamOptions = {
+                    id,
+                    video: {
+                        width,
+                        height,
+                        codec,
+                    }
+                }
+                vsos.push(vso);
+            }
+
+            return vsos;
+        }
+        catch (e) {
+            this.console.error('error retrieving channel ids', e);
+            return [...defaultMap.values()];
+        }
     }
 }

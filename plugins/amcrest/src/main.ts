@@ -110,11 +110,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.info = deviceInfo;
     }
 
-    async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
+    async setVideoStreamOptions(options: MediaStreamOptions) {
         if (!options.id?.startsWith('channel'))
             throw new Error('invalid id');
         const channel = parseInt(this.getRtspChannel()) || 1;
-        const formatNumber = parseInt(options.id?.substring('channel'.length)) - 1;
+        const formatNumber = Math.max(0, parseInt(options.id?.substring('channel'.length)) - 1);
         const format = options.id === 'channel0' ? 'MainFormat' : 'ExtraFormat';
         const encode = `Encode[${channel - 1}].${format}[${formatNumber}]`;
         const params = new URLSearchParams();
@@ -128,6 +128,15 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         if (options.video?.codec === 'h264') {
             params.set(`${encode}.Video.Compression`, 'H.264');
         }
+        if (options.video?.profile) {
+            let profile = 'Main';
+            if (options.video.profile === 'high')
+                profile = 'High';
+            else if (options.video.profile === 'baseline')
+                profile = 'Baseline';
+            params.set(`${encode}.Video.Profile`, profile);
+
+        }
         if (options.video?.codec === 'h265') {
             params.set(`${encode}.Video.Compression`, 'H.265');
         }
@@ -136,12 +145,12 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
         if (options.video?.fps) {
             params.set(`${encode}.Video.FPS`, options.video.fps.toString());
-            if (options.video?.idrIntervalMillis) {
-                params.set(`${encode}.Video.GOP`, (options.video.fps * options.video?.idrIntervalMillis / 1000).toString());
-            }
+        }
+        if (options.video?.keyframeInterval) {
+            params.set(`${encode}.Video.GOP`, options.video?.keyframeInterval.toString());
         }
         if (options.video?.bitrateControl) {
-            params.set(`${encode}.Video.BitRateControl`, options.video.bitrateControl === 'variable' ? 'VBR' : 'CBR');
+            params.set(`${encode}.Video.BitRateControl`, options.video.bitrateControl === 'constant' ? 'CBR' : 'VBR');
         }
 
         if (![...params.keys()].length)
@@ -152,6 +161,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             responseType: 'text',
         });
         this.console.log('reconfigure result', response.body);
+        return undefined;
     }
 
     getClient() {
@@ -284,6 +294,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         const ret = await super.getOtherSettings();
         ret.push(
             {
+                subgroup: 'Advanced',
                 title: 'Doorbell Type',
                 choices: [
                     'Not a Doorbell',
@@ -354,6 +365,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         ret.push(
             {
+                subgroup: 'Advanced',
                 title: 'Two Way Audio',
                 value: twoWayAudio,
                 key: 'twoWayAudio',

@@ -5,10 +5,11 @@ import { Stream } from "stream";
 import xml2js from 'xml2js';
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI } from "./onvif-api";
-import { autoconfigureCodecs, automaticallyConfigureSettings, configureCodecs, getCodecs } from "./onvif-configure";
+import { autoconfigureSettings, configureCodecs, getCodecs } from "./onvif-configure";
 import { listenEvents } from "./onvif-events";
 import { OnvifIntercom } from "./onvif-intercom";
 import { OnvifPTZMixinProvider } from "./onvif-ptz";
+import { automaticallyConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -254,7 +255,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
 
     async putSetting(key: string, value: any) {
         if (key === automaticallyConfigureSettings.key) {
-            autoconfigureCodecs(this.console, await this.getClient())
+            autoconfigureSettings(this.console, await this.getClient())
                 .then(() => {
                     this.log.a('Successfully configured settings.');
                 })
@@ -426,7 +427,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
         if (settings.autoconfigure) {
             const client = await connectCameraAPI(httpAddress, username, password, this.console, undefined);
-            await autoconfigureCodecs(this.console, client);
+            await autoconfigureSettings(this.console, client);
         }
 
         const skipValidate = settings.skipValidate?.toString() === 'true';
@@ -559,7 +560,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         adopt.settings.httpPort = entry.port;
         if (adopt.settings.autoconfigure) {
             const client = await connectCameraAPI(`${entry.host}:${entry.port || 80}`, adopt.settings.username as string, adopt.settings.password as string, this.console, undefined);
-            await autoconfigureCodecs(this.console, client);
+            await autoconfigureSettings(this.console, client);
         }
         await this.createDevice(adopt.settings, adopt.nativeId);
         this.discoveredDevices.delete(adopt.nativeId);

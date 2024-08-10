@@ -26,10 +26,6 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         };
     }
 
-    getChannelFromMediaStreamOptionsId(id: string) {
-        return id.substring('channel'.length);
-    }
-
     getRawVideoStreamOptions(): UrlMediaStreamOptions[] {
         let urls: string[] = [];
         try {
@@ -234,7 +230,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
 
     async putSetting(key: string, value: SettingValue) {
         this.putSettingBase(key, value);
-        this.listener.then(l => l.emit('error', new Error("new settings")));
+        this.listener?.then(l => l.emit('error', new Error("new settings")));
     }
 
     async takePicture(options?: RequestPictureOptions) {
