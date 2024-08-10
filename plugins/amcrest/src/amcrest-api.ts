@@ -116,6 +116,8 @@ function fromAmcrestVideoCodec(videoCodec: string) {
 }
 
 const amcrestResolutions = {
+    "1080P": [1920, 1080],
+    "720P": [1280, 720],
     "D1": [704, 480],
     "HD1": [352, 480],
     "BCIF": [704, 240],
@@ -134,7 +136,7 @@ function fromAmcrestResolution(resolution: string) {
     const parts = resolution.split('x');
     return [parseInt(parts[0]), parseInt(parts[1])];
 }
-
+  
 export class AmcrestCameraClient {
     credential: AuthFetchCredentialState;
 
@@ -412,8 +414,10 @@ export class AmcrestCameraClient {
 
         const resolutions = findValue(capsResponse.body, caps, 'Video.ResolutionTypes').split(',').map(fromAmcrestResolution);
         const bitrates = findValue(capsResponse.body, caps, 'Video.BitRateOptions').split(',').map(s => parseInt(s) * 1000);
+        const fpsMax = parseInt(findValue(capsResponse.body, caps, 'Video.FPSMax'));
         vso.video.resolutions = resolutions;
         vso.video.bitrateRange = [bitrates[0], bitrates[bitrates.length - 1]];
+        vso.video.fpsRange = [1, fpsMax];
         return vso;
     }
 
