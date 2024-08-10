@@ -329,9 +329,16 @@ async function start(mainFilename: string, options?: {
     // allow basic auth to deploy plugins
     app.all('/web/component/*', (req, res, next) => {
         if (req.protocol === 'https' && req.headers.authorization && req.headers.authorization.toLowerCase()?.indexOf('basic') !== -1) {
-            const basicChecker = basicAuth.check((req) => {
-                res.locals.username = req.user;
-                (req as any).username = req.user;
+            const basicChecker = basicAuth.check(async (req) => {
+                try {
+                    const user = await db.tryGet(ScryptedUser, req.user);
+                    res.locals.username = user._id;
+                    res.locals.username = user.aclId;
+                }
+                catch (e) {
+                    // should be unreachable.
+                    console.warn('basic auth failed unexpectedly', e);
+                }
                 next();
             });
 
