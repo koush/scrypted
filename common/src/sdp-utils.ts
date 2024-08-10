@@ -227,6 +227,10 @@ export function parseRtpMap(mline: ReturnType<typeof parseMLine>, rtpmap: string
             codec = 'pcm_alaw';
             ffmpegEncoder = 'pcm_alaw';
         }
+        else if (mline.payloadTypes?.includes(14)) {
+            codec = 'mp3';
+            ffmpegEncoder = 'mp3';
+        }
         else {
             // ffmpeg seems to omit the rtpmap type for pcm alaw when creating sdp?
             // is this the default?
