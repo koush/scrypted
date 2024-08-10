@@ -7,23 +7,22 @@ export { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 
 const { mediaManager } = sdk;
 
+export function createRtspMediaStreamOptions(url: string, index: number): UrlMediaStreamOptions {
+    return {
+        id: `channel${index}`,
+        name: `Stream ${index + 1}`,
+        url,
+        container: 'rtsp',
+        video: {
+        },
+        audio: {
+
+        },
+    };
+}
 export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
     takePicture(option?: PictureOptions): Promise<MediaObject> {
         throw new Error("The RTSP Camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
-    }
-
-    createRtspMediaStreamOptions(url: string, index: number): UrlMediaStreamOptions {
-        return {
-            id: `channel${index}`,
-            name: `Stream ${index + 1}`,
-            url,
-            container: 'rtsp',
-            video: {
-            },
-            audio: {
-
-            },
-        };
     }
 
     getRawVideoStreamOptions(): UrlMediaStreamOptions[] {
@@ -41,7 +40,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         }
 
         // filter out empty strings.
-        const ret = urls.filter(url => !!url).map((url, index) => this.createRtspMediaStreamOptions(url, index));
+        const ret = urls.filter(url => !!url).map((url, index) => createRtspMediaStreamOptions(url, index));
 
         if (!ret.length)
             return;

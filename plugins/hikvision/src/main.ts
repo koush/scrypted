@@ -1,16 +1,15 @@
+import { automaticallyConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
 import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration } from "@scrypted/sdk";
 import crypto from 'crypto';
 import { PassThrough } from "stream";
 import xml2js from 'xml2js';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { connectCameraAPI } from '../../onvif/src/onvif-api';
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
-import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { createRtspMediaStreamOptions, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionAPI } from "./hikvision-api-channels";
-import { HikvisionCameraAPI, HikvisionCameraEvent, detectionMap } from "./hikvision-camera-api";
-import { automaticallyConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
 import { autoconfigureSettings } from "./hikvision-autoconfigure";
+import { detectionMap, HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 
 const rtspChannelSetting: Setting = {
     key: 'rtspChannel',
@@ -364,7 +363,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         for (const [id, channel] of detectedChannels.entries()) {
             if (cameraNumber && channelToCameraNumber(id) !== cameraNumber)
                 continue;
-            const mso = this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/ISAPI/Streaming/channels/${id}/${params}`, index++);
+            const mso = createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/ISAPI/Streaming/channels/${id}/${params}`, index++);
             Object.assign(mso.video, channel?.video);
             mso.tool = 'scrypted';
             ret.push(mso);
@@ -621,6 +620,7 @@ class HikvisionProvider extends RtspProvider {
 
     getAdditionalInterfaces() {
         return [
+            ScryptedInterface.VideoCameraConfiguration,
             ScryptedInterface.Reboot,
             ScryptedInterface.Camera,
             ScryptedInterface.MotionSensor,
@@ -693,10 +693,10 @@ class HikvisionProvider extends RtspProvider {
         device.info = info;
         device.putSetting('username', username);
         device.putSetting('password', password);
-        device.setIPAddress(settings.ip?.toString());
         if (settings.rtspChannel)
             device.putSetting('rtspChannel', settings.rtspChannel as string);
         device.setHttpPortOverride(settings.httpPort?.toString());
+        device.setIPAddress(settings.ip?.toString());
         if (twoWayAudio)
             device.putSetting('twoWayAudio', twoWayAudio);
         device.updateDeviceInfo();
@@ -714,12 +714,12 @@ class HikvisionProvider extends RtspProvider {
                 title: 'Password',
                 type: 'password',
             },
-            rtspChannelSetting,
             {
                 key: 'ip',
                 title: 'IP Address',
                 placeholder: '192.168.2.222',
             },
+            rtspChannelSetting,
             {
                 key: 'httpPort',
                 title: 'HTTP Port',

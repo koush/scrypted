@@ -4,103 +4,10 @@ import { parseHeaders, readBody } from '@scrypted/common/src/rtsp-server';
 import contentType from 'content-type';
 import { IncomingMessage } from 'http';
 import { EventEmitter, Readable } from 'stream';
-import { Destroyable } from '../../rtsp/src/rtsp';
+import { createRtspMediaStreamOptions, Destroyable, UrlMediaStreamOptions } from '../../rtsp/src/rtsp';
 import { getDeviceInfo } from './probe';
-import { Point } from '@scrypted/sdk';
+import { MediaStreamConfiguration, MediaStreamOptions, Point } from '@scrypted/sdk';
 
-// Human
-// {
-//     "Action" : "Cross",
-//     "Class" : "Normal",
-//     "CountInGroup" : 1,
-//     "DetectRegion" : [
-//        [ 455, 260 ],
-//        [ 3586, 260 ],
-//        [ 3768, 7580 ],
-//        [ 382, 7451 ]
-//     ],
-//     "Direction" : "Enter",
-//     "EventID" : 10181,
-//     "GroupID" : 0,
-//     "Name" : "Rule1",
-//     "Object" : {
-//        "Action" : "Appear",
-//        "BoundingBox" : [ 2856, 1280, 3880, 4880 ],
-//        "Center" : [ 3368, 3080 ],
-//        "Confidence" : 0,
-//        "LowerBodyColor" : [ 0, 0, 0, 0 ],
-//        "MainColor" : [ 0, 0, 0, 0 ],
-//        "ObjectID" : 863,
-//        "ObjectType" : "Human",
-//        "RelativeID" : 0,
-//        "Speed" : 0
-//     },
-//     "PTS" : 43380319830.0,
-//     "RuleID" : 2,
-//     "Track" : [],
-//     "UTC" : 1711446999,
-//     "UTCMS" : 701
-//  }
-
-// Face
-// {
-//     "CfgRuleId" : 1,
-//     "Class" : "FaceDetection",
-//     "CountInGroup" : 2,
-//     "DetectRegion" : null,
-//     "EventID" : 10360,
-//     "EventSeq" : 6,
-//     "Faces" : [
-//        {
-//           "BoundingBox" : [ 1504, 2336, 1728, 2704 ],
-//           "Center" : [ 1616, 2520 ],
-//           "ObjectID" : 94,
-//           "ObjectType" : "HumanFace",
-//           "RelativeID" : 0
-//        }
-//     ],
-//     "FrameSequence" : 8251212,
-//     "GroupID" : 6,
-//     "Mark" : 0,
-//     "Name" : "FaceDetection",
-//     "Object" : {
-//        "Action" : "Appear",
-//        "BoundingBox" : [ 1504, 2336, 1728, 2704 ],
-//        "Center" : [ 1616, 2520 ],
-//        "Confidence" : 19,
-//        "FrameSequence" : 8251212,
-//        "ObjectID" : 94,
-//        "ObjectType" : "HumanFace",
-//        "RelativeID" : 0,
-//        "SerialUUID" : "",
-//        "Source" : 0.0,
-//        "Speed" : 0,
-//        "SpeedTypeInternal" : 0
-//     },
-//     "Objects" : [
-//        {
-//           "Action" : "Appear",
-//           "BoundingBox" : [ 1504, 2336, 1728, 2704 ],
-//           "Center" : [ 1616, 2520 ],
-//           "Confidence" : 19,
-//           "FrameSequence" : 8251212,
-//           "ObjectID" : 94,
-//           "ObjectType" : "HumanFace",
-//           "RelativeID" : 0,
-//           "SerialUUID" : "",
-//           "Source" : 0.0,
-//           "Speed" : 0,
-//           "SpeedTypeInternal" : 0
-//        }
-//     ],
-//     "PTS" : 43774941350.0,
-//     "Priority" : 0,
-//     "RuleID" : 1,
-//     "RuleId" : 1,
-//     "Source" : -1280470024.0,
-//     "UTC" : 947510337,
-//     "UTCMS" : 0
-//  }
 export interface AmcrestObjectDetails {
     Action: string;
     BoundingBox: Point;
@@ -174,6 +81,59 @@ async function readAmcrestMessage(client: Readable): Promise<string[]> {
     }
 }
 
+function findValue(blob: string, prefix: string, key: string) {
+    const lines = blob.split('\n');
+    const value = lines.find(line => line.startsWith(`${prefix}.${key}`));
+    if (!value)
+        return;
+
+    const parts = value.split('=');
+    return parts[1];
+}
+
+function fromAmcrestAudioCodec(audioCodec: string) {
+    audioCodec = audioCodec
+        ?.replace('.', '')?.toLowerCase()?.trim();
+    if (audioCodec?.includes('aac'))
+        audioCodec = 'aac';
+    else if (audioCodec?.includes('g711a'))
+        audioCodec = 'pcm_alaw';
+    else if (audioCodec?.includes('g711u'))
+        audioCodec = 'pcm_mulaw';
+    else if (audioCodec?.includes('g711'))
+        audioCodec = 'pcm';
+    return audioCodec;
+}
+
+function fromAmcrestVideoCodec(videoCodec: string) {
+    videoCodec = videoCodec
+        ?.replace('.', '')?.toLowerCase()?.trim();
+    if (videoCodec?.includes('h264'))
+        videoCodec = 'h264';
+    else if (videoCodec?.includes('h265'))
+        videoCodec = 'h265';
+    return videoCodec;
+}
+
+const amcrestResolutions = {
+    "D1": [704, 480],
+    "HD1": [352, 480],
+    "BCIF": [704, 240],
+    "2CIF": [704, 240],
+    "CIF": [352, 240],
+    "QCIF": [176, 120],
+    "NHD": [640, 360],
+    "VGA": [640, 480],
+    "QVGA": [320, 240]
+};  
+
+function fromAmcrestResolution(resolution: string) {
+    const named = amcrestResolutions[resolution];
+    if (named)
+        return named;
+    const parts = resolution.split('x');
+    return [parseInt(parts[0]), parseInt(parts[1])];
+}
 
 export class AmcrestCameraClient {
     credential: AuthFetchCredentialState;
@@ -371,6 +331,7 @@ export class AmcrestCameraClient {
 
     async unlock(): Promise<boolean> {
         const response = await this.request({
+            // channel 1? this may fail through nvr.
             url: `http://${this.ip}/cgi-bin/accessControl.cgi?action=openDoor&channel=1&UserID=101&Type=Remote`,
             responseType: 'text',
         });
@@ -379,9 +340,138 @@ export class AmcrestCameraClient {
 
     async lock(): Promise<boolean> {
         const response = await this.request({
+            // channel 1? this may fail through nvr.
             url: `http://${this.ip}/cgi-bin/accessControl.cgi?action=closeDoor&channel=1&UserID=101&Type=Remote`,
             responseType: 'text',
         });
         return response.body.includes('OK');
+    }
+
+    async configureCodecs(cameraNumber: number, options: MediaStreamConfiguration) {
+        if (!options.id?.startsWith('channel'))
+            throw new Error('invalid id');
+
+        const capsResponse = await this.request({
+            url: `http://${this.ip}/cgi-bin/encode.cgi?action=getConfigCaps&channel=${cameraNumber}`,
+            responseType: 'text',
+        });
+
+        this.console.log(capsResponse.body);
+
+        const formatNumber = Math.max(0, parseInt(options.id?.substring('channel'.length)) - 1);
+        const format = options.id === 'channel0' ? 'MainFormat' : 'ExtraFormat';
+        const encode = `Encode[${cameraNumber - 1}].${format}[${formatNumber}]`;
+        const params = new URLSearchParams();
+        if (options.video?.bitrate) {
+            let bitrate = options?.video?.bitrate;
+            bitrate = Math.round(bitrate / 1000);
+            params.set(`${encode}.Video.BitRate`, bitrate.toString());
+        }
+        if (options.video?.codec === 'h264') {
+            params.set(`${encode}.Video.Compression`, 'H.264');
+            params.set(`${encode}.VideoEnable`, 'true');
+        }
+        if (options.video?.profile) {
+            let profile = 'Main';
+            if (options.video.profile === 'high')
+                profile = 'High';
+            else if (options.video.profile === 'baseline')
+                profile = 'Baseline';
+            params.set(`${encode}.Video.Profile`, profile);
+
+        }
+        if (options.video?.codec === 'h265') {
+            params.set(`${encode}.Video.Compression`, 'H.265');
+        }
+        if (options.video?.width && options.video?.height) {
+            params.set(`${encode}.Video.resolution`, `${options.video.width}x${options.video.height}`);
+        }
+        if (options.video?.fps) {
+            params.set(`${encode}.Video.FPS`, options.video.fps.toString());
+        }
+        if (options.video?.keyframeInterval) {
+            params.set(`${encode}.Video.GOP`, options.video?.keyframeInterval.toString());
+        }
+        if (options.video?.bitrateControl) {
+            params.set(`${encode}.Video.BitRateControl`, options.video.bitrateControl === 'constant' ? 'CBR' : 'VBR');
+        }
+
+        if ([...params.keys()].length) {
+            const response = await this.request({
+                url: `http://${this.ip}/cgi-bin/configManager.cgi?action=setConfig&${params}`,
+                responseType: 'text',
+            });
+            this.console.log('reconfigure result', response.body);
+        }
+
+        const vsos = await this.getCodecs(cameraNumber);
+        const index = vsos.findIndex(vso => vso.id === options.id);
+        const vso: MediaStreamConfiguration = vsos[index];
+
+        const caps = `caps[${cameraNumber - 1}].${format}[${formatNumber}]`;
+
+        const resolutions = findValue(capsResponse.body, caps, 'Video.ResolutionTypes').split(',').map(fromAmcrestResolution);
+        const bitrates = findValue(capsResponse.body, caps, 'Video.BitRateOptions').split(',').map(s => parseInt(s) * 1000);
+        vso.video.resolutions = resolutions;
+        vso.video.bitrateRange = [bitrates[0], bitrates[bitrates.length - 1]];
+        return vso;
+    }
+
+    async getCodecs(cameraNumber: number): Promise<UrlMediaStreamOptions[]> {
+        const masResponse = await this.request({
+            url: `http://${this.ip}/cgi-bin/magicBox.cgi?action=getProductDefinition&name=MaxExtraStream`,
+            responseType: 'text',
+        })
+        const mas = masResponse.body.split('=')[1].trim();
+
+        // amcrest reports more streams than are acually available in its responses,
+        // so checking the max extra streams prevents usage of invalid streams.
+        const maxExtraStreams = parseInt(mas) || 1;
+        const vsos = [...Array(maxExtraStreams + 1).keys()].map(subtype => createRtspMediaStreamOptions(undefined, subtype));
+
+        const encodeResponse = await this.request({
+            url: `http://${this.ip}/cgi-bin/configManager.cgi?action=getConfig&name=Encode`,
+            responseType: 'text',
+        });
+        this.console.log(encodeResponse.body);
+
+        for (let i = 0; i < vsos.length; i++) {
+            const vso = vsos[i];
+            let encName: string;
+            if (i === 0) {
+                encName = `table.Encode[${cameraNumber - 1}].MainFormat[0]`;
+            }
+            else {
+                encName = `table.Encode[${cameraNumber - 1}].ExtraFormat[${i - 1}]`;
+            }
+
+            const videoCodec = fromAmcrestVideoCodec(findValue(encodeResponse.body, encName, 'Video.Compression'));
+            const audioCodec = fromAmcrestAudioCodec(findValue(encodeResponse.body, encName, 'Audio.Compression'));
+
+            if (vso.audio)
+                vso.audio.codec = audioCodec;
+            vso.video.codec = videoCodec;
+
+            const width = findValue(encodeResponse.body, encName, 'Video.Width');
+            const height = findValue(encodeResponse.body, encName, 'Video.Height');
+            if (width && height) {
+                vso.video.width = parseInt(width);
+                vso.video.height = parseInt(height);
+            }
+
+            const videoEnable = findValue(encodeResponse.body, encName, 'VideoEnable');
+            if (videoEnable?.trim() === 'false') {
+                this.console.warn('Video stream is disabled and should likely be enabled:', encName);
+                continue;
+            }
+
+            const encodeOptions = findValue(encodeResponse.body, encName, 'Video.BitRate');
+            if (!encodeOptions)
+                continue;
+
+            vso.video.bitrate = parseInt(encodeOptions) * 1000;
+        }
+
+        return vsos;
     }
 }
