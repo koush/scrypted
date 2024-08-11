@@ -81,6 +81,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             hide: true,
         },
         ptz: {
+            subgroup: 'Advanced',
             title: 'PTZ Capabilities',
             choices: [
                 'Pan',
@@ -111,10 +112,27 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             ],
             defaultValue: 'Default',
         },
+        useOnvifTwoWayAudio: {
+            subgroup: 'Advanced',
+            title: 'Use ONVIF for Two-Way Audio',
+            type: 'boolean',
+        },
     });
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
+
+        this.storageSettings.settings.useOnvifTwoWayAudio.onGet = async () => {
+            return {
+                hide: !!this.storageSettings.values.doorbell,
+            }
+        };
+
+        this.storageSettings.settings.ptz.onGet = async () => {
+            return {
+                hide: !!this.storageSettings.values.doorbell,
+            }
+        };
 
         this.updateDeviceInfo();
         (async () => {
@@ -226,11 +244,16 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (this.storageSettings.values.doorbell) {
             interfaces.push(
                 ScryptedInterface.BinarySensor,
-                ScryptedInterface.Intercom
             );
             type = ScryptedDeviceType.Doorbell;
             name = 'Reolink Doorbell';
         }
+        if (this.storageSettings.values.doorbell || this.storageSettings.values.useOnvifTwoWayAudio) {
+            interfaces.push(
+                ScryptedInterface.Intercom
+            );
+        }
+
         if (this.storageSettings.values.ptz?.length) {
             interfaces.push(ScryptedInterface.PanTiltZoom);
         }
@@ -640,8 +663,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     async getRtspPortOverrideSettings(): Promise<Setting[]> {
         return [
             ...await super.getRtspPortOverrideSettings(),
-            ...await this.storageSettings.getSettings(),
         ];
+    }
+
+    getOtherSettings(): Promise<Setting[]> {
+        return this.storageSettings.getSettings();
     }
 
     getRtmpAddress() {
