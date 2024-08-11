@@ -16,10 +16,16 @@ const onvifToFfmpegVideoCodecMap = {
 };
 
 const onvifToFfmpegAudioCodecMap = {
-    'mp4a': 'aac',
+    'MP4A-LATM': 'aac',
     'aac': 'aac',
     'PCMU': 'pcm_mulaw',
     'PCMA': 'pcm_alaw',
+};
+
+const ffmpegToOnvifAudioCodecMap = {
+    'aac': 'MP4A-LATM',
+    'pcm_mulaw': 'PCMU',
+    'pcm_alaw': 'PCMA',
 };
 
 export function fromOnvifAudioCodec(codec: string) {
@@ -65,8 +71,12 @@ export async function configureCodecs(console: Console, client: OnvifCameraAPI, 
     client.profiles = undefined;
     const profiles: any[] = await client.getProfiles();
     const profile = profiles.find(profile => profile.$.token === options.id);
+
     const vc = profile.videoEncoderConfiguration;
     const ac = profile.audioEncoderConfiguration;
+
+    const originalVideo = JSON.stringify(vc);
+    const originalAudio = JSON.stringify(ac);
 
     const { video: videoOptions, audio: audioOptions } = options;
 
@@ -132,7 +142,17 @@ export async function configureCodecs(console: Console, client: OnvifCameraAPI, 
         vc.rateControl.encodingInterval = 1;
     }
 
-    await client.setVideoEncoderConfiguration(vc);
+    if (audioOptions?.codec)
+        ac.encoding = toOnvifAudioCodec(audioOptions.codec);
+    if (audioOptions?.bitrate)
+        ac.bitrate = Math.floor(audioOptions?.bitrate / 1000);
+    if (audioOptions?.sampleRate)
+        ac.sampleRate = audioOptions.sampleRate / 1000;
+
+    if (JSON.stringify(vc) !== originalVideo)
+        await client.setVideoEncoderConfiguration(vc);
+    if (JSON.stringify(ac) !== originalAudio)
+        await client.setAudioEncoderConfiguration(ac);
     const configuredVideo = await client.getVideoEncoderConfigurationOptions(profile.$.token, vc.$.token);
     client.profiles = undefined;
     const codecs = await getCodecs(console, client);
