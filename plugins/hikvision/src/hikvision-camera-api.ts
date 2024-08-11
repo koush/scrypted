@@ -386,7 +386,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         }
 
         if (videoOptions?.fps) {
-            // weird calculation here per docs
+            // fps is scaled by 100.
             const fps = videoOptions.fps * 100;
             vc.maxFrameRate = [fps.toString()];
             // not sure if this is necessary.
@@ -421,12 +421,13 @@ export class HikvisionCameraAPI implements HikvisionAPI {
 
         const capabilities: CapabiltiesResponse = await xml2js.parseStringPromise(capsResponse.body);
         const v = capabilities.StreamingChannel.Video[0];
-        const vso: MediaStreamConfiguration= {
+        const vso: MediaStreamConfiguration = {
             id: options.id,
             video: {},
         }
         vso.video.bitrateRange = [parseInt(v.vbrUpperCap[0].$.min) * 1000, parseInt(v.vbrUpperCap[0].$.max) * 1000];
-        const fpsRange = v.maxFrameRate[0].$.opt.split(',').map(fps => parseInt(fps) / 1000);
+        // fps is scaled by 100.
+        const fpsRange = v.maxFrameRate[0].$.opt.split(',').map(fps => parseInt(fps) / 100);
         vso.video.fpsRange = [Math.min(...fpsRange), Math.max(...fpsRange)];
 
         vso.video.bitrateControls = ['constant', 'variable'];
