@@ -1,7 +1,7 @@
-import { automaticallyConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
+import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
@@ -338,7 +338,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         };
         ac.type = 'button';
         ret.push(ac);
-        
+
         return ret;
     }
 
@@ -607,6 +607,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 }
 
 class AmcrestProvider extends RtspProvider {
+    constructor(nativeId?: ScryptedNativeId) {
+        super(nativeId);
+        checkPluginNeedsAutoConfigure(this);
+    }
+
     getAdditionalInterfaces() {
         return [
             ScryptedInterface.Reboot,

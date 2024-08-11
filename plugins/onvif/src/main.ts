@@ -9,7 +9,7 @@ import { autoconfigureSettings, configureCodecs, getCodecs } from "./onvif-confi
 import { listenEvents } from "./onvif-events";
 import { OnvifIntercom } from "./onvif-intercom";
 import { OnvifPTZMixinProvider } from "./onvif-ptz";
-import { automaticallyConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
+import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -298,8 +298,10 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         timeout: NodeJS.Timeout;
     }>();
 
-    constructor(nativeId?: string) {
+
+    constructor(nativeId?: ScryptedNativeId) {
         super(nativeId);
+        checkPluginNeedsAutoConfigure(this, 1);
 
         process.nextTick(() => {
             deviceManager.onDeviceDiscovered({

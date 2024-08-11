@@ -1,5 +1,5 @@
-import { automaticallyConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration } from "@scrypted/sdk";
+import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration } from "@scrypted/sdk";
 import crypto from 'crypto';
 import { PassThrough } from "stream";
 import xml2js from 'xml2js';
@@ -610,8 +610,9 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 class HikvisionProvider extends RtspProvider {
     clients: Map<string, HikvisionCameraAPI>;
 
-    constructor() {
-        super();
+    constructor(nativeId?: ScryptedNativeId) {
+        super(nativeId);
+        checkPluginNeedsAutoConfigure(this);
     }
 
     getScryptedDeviceCreator(): string {

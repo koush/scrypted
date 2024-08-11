@@ -1,4 +1,4 @@
-import { AudioStreamOptions, MediaStreamConfiguration, MediaStreamDestination, MediaStreamOptions, Setting } from "@scrypted/sdk";
+import sdk, { AudioStreamOptions, MediaStreamConfiguration, MediaStreamDestination, MediaStreamOptions, ScryptedDeviceBase, Setting } from "@scrypted/sdk";
 
 export const automaticallyConfigureSettings: Setting = {
     key: 'autoconfigure',
@@ -22,6 +22,16 @@ function getBitrateForResolution(resolution: number) {
     if (resolution >= 640 * 480)
         return MEGABIT / 2;
     return MEGABIT / 4;
+}
+
+export async function checkPluginNeedsAutoConfigure(plugin: ScryptedDeviceBase, extraDevices = 0) {
+    if (plugin.storage.getItem('autoconfigure') === 'true')
+        return;
+
+    plugin.storage.setItem('autoconfigure', 'true');
+    if (sdk.deviceManager.getNativeIds().length <= 1 + extraDevices)
+        return;
+    plugin.log.a(`${plugin.name} now has support for automatic camera configuration for optimal performance. Cameras can be autoconfigured in their respective settings.`);
 }
 
 export async function autoconfigureCodecs(
