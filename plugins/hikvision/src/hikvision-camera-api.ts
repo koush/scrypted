@@ -304,7 +304,6 @@ export class HikvisionCameraAPI implements HikvisionAPI {
 
     async configureCodecs(camNumber: string, channelNumber: string, options: MediaStreamOptions): Promise<MediaStreamConfiguration> {
         const cameraChannel = `${camNumber}${channelNumber}`;
-        let vsos = await this.getCodecs(camNumber);
 
         const response = await this.request({
             url: `http://${this.ip}/ISAPI/Streaming/channels/${cameraChannel}`,
@@ -420,11 +419,12 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         });
         this.console.log(capsResponse.body);
 
-        vsos = await this.getCodecs(camNumber);
-        const vso: MediaStreamConfiguration = vsos.find(vso => vso.id === cameraChannel);
-
         const capabilities: CapabiltiesResponse = await xml2js.parseStringPromise(capsResponse.body);
         const v = capabilities.StreamingChannel.Video[0];
+        const vso: MediaStreamConfiguration= {
+            id: options.id,
+            video: {},
+        }
         vso.video.bitrateRange = [parseInt(v.vbrUpperCap[0].$.min) * 1000, parseInt(v.vbrUpperCap[0].$.max) * 1000];
         const fpsRange = v.maxFrameRate[0].$.opt.split(',').map(fps => parseInt(fps) / 1000);
         vso.video.fpsRange = [Math.min(...fpsRange), Math.max(...fpsRange)];

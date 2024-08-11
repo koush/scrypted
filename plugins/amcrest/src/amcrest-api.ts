@@ -419,15 +419,15 @@ export class AmcrestCameraClient {
             this.console.log('reconfigure result', response.body);
         }
 
-        const vsos = await this.getCodecs(cameraNumber);
-        const index = vsos.findIndex(vso => vso.id === options.id);
-        const vso: MediaStreamConfiguration = vsos[index];
-
         const caps = `caps[${cameraNumber - 1}].${format}[${formatNumber}]`;
 
         const resolutions = findValue(capsResponse.body, caps, 'Video.ResolutionTypes').split(',').map(fromAmcrestResolution);
         const bitrates = findValue(capsResponse.body, caps, 'Video.BitRateOptions').split(',').map(s => parseInt(s) * 1000);
         const fpsMax = parseInt(findValue(capsResponse.body, caps, 'Video.FPSMax'));
+        const vso: MediaStreamConfiguration = {
+            id: options.id,
+            video: {},
+        };
         vso.video.resolutions = resolutions;
         vso.video.bitrateRange = [bitrates[0], bitrates[bitrates.length - 1]];
         vso.video.fpsRange = [1, fpsMax];
