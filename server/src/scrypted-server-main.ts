@@ -333,7 +333,7 @@ async function start(mainFilename: string, options?: {
                 try {
                     const user = await db.tryGet(ScryptedUser, req.user);
                     res.locals.username = user._id;
-                    res.locals.username = user.aclId;
+                    res.locals.aclId = user.aclId;
                 }
                 catch (e) {
                     // should be unreachable.
