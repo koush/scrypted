@@ -702,7 +702,7 @@ class AmcrestProvider extends RtspProvider {
             {
                 key: 'httpPort',
                 title: 'HTTP Port',
-                description: 'Optional: Override the HTTP Port from the default value of 80',
+                description: 'Optional: Override the HTTP Port from the default value of 80.',
                 placeholder: '80',
             },
             automaticallyConfigureSettings,

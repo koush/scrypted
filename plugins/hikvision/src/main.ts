@@ -8,7 +8,7 @@ import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { createRtspMediaStreamOptions, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionAPI } from "./hikvision-api-channels";
-import { autoconfigureSettings } from "./hikvision-autoconfigure";
+import { autoconfigureSettings, hikvisionAutoConfigureSettings } from "./hikvision-autoconfigure";
 import { detectionMap, HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 
 const rtspChannelSetting: Setting = {
@@ -467,6 +467,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         };
         ac.type = 'button';
         ret.push(ac);
+        ret.push(hikvisionAutoConfigureSettings);
 
         return ret;
     }
@@ -724,10 +725,11 @@ class HikvisionProvider extends RtspProvider {
             {
                 key: 'httpPort',
                 title: 'HTTP Port',
-                description: 'Optional: Override the HTTP Port from the default value of 80',
+                description: 'Optional: Override the HTTP Port from the default value of 80.',
                 placeholder: '80',
             },
             automaticallyConfigureSettings,
+            hikvisionAutoConfigureSettings,
             {
                 key: 'skipValidate',
                 title: 'Skip Validation',

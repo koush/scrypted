@@ -9,7 +9,7 @@ import { autoconfigureSettings, configureCodecs, getCodecs } from "./onvif-confi
 import { listenEvents } from "./onvif-events";
 import { OnvifIntercom } from "./onvif-intercom";
 import { OnvifPTZMixinProvider } from "./onvif-ptz";
-import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
+import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure, onvifAutoConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -519,10 +519,11 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
             {
                 key: 'httpPort',
                 title: 'HTTP Port',
-                description: 'Optional: Override the HTTP Port from the default value of 80',
+                description: 'Optional: Override the HTTP Port from the default value of 80.',
                 placeholder: '80',
             },
             automaticallyConfigureSettings,
+            onvifAutoConfigureSettings,
             {
                 key: 'skipValidate',
                 title: 'Skip Validation',
@@ -549,6 +550,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                     type: 'password',
                 },
                 automaticallyConfigureSettings,
+                onvifAutoConfigureSettings,
             ]
         }));
     }
@@ -563,6 +565,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         if (adopt.settings.autoconfigure) {
             const client = await connectCameraAPI(`${entry.host}:${entry.port || 80}`, adopt.settings.username as string, adopt.settings.password as string, this.console, undefined);
             await autoconfigureSettings(this.console, client);
+            adopt.settings.autoconfigure = false;
         }
         await this.createDevice(adopt.settings, adopt.nativeId);
         this.discoveredDevices.delete(adopt.nativeId);

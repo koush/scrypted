@@ -8,6 +8,12 @@ export const automaticallyConfigureSettings: Setting = {
     value: true,
 };
 
+export const onvifAutoConfigureSettings: Setting = {
+    key: 'onvif-autoconfigure',
+    type: 'html',
+    value: 'ONVIF autoconfiguration will configure the camera codecs. <b>The camera motion sensor must still be <a target="_blank" href="https://docs.scrypted.app/camera-preparation.html#motion-sensor-setup">configured manually</a>.</b>',
+};
+
 const MEGABIT = 1024 * 1000;
 
 function getBitrateForResolution(resolution: number) {
@@ -98,7 +104,8 @@ export async function autoconfigureCodecs(
     // get the fps of 20 or highest available
     let fps = Math.min(20, Math.max(...l.video.fpsRange));
 
-    await configureCodecs({
+    const waiting: Promise<MediaStreamConfiguration>[] = [];
+    const confLow = configureCodecs({
         id: l.id,
         video: {
             width: resolution[0],
@@ -113,6 +120,7 @@ export async function autoconfigureCodecs(
         },
         audio: audioOptions,
     });
+    waiting.push(confLow);
 
     if (used.length === 3) {
         // find remote and low
@@ -123,7 +131,7 @@ export async function autoconfigureCodecs(
         const lResolution = findResolutionTarget(l, 640, 360);
 
         fps = Math.min(20, Math.max(...r.video.fpsRange));
-        await configureCodecs({
+        const confRemote = configureCodecs({
             id: r.id,
             video: {
                 width: rResolution[0],
@@ -138,9 +146,10 @@ export async function autoconfigureCodecs(
             },
             audio: audioOptions,
         });
+        waiting.push(confRemote);
 
         fps = Math.min(20, Math.max(...l.video.fpsRange));
-        await configureCodecs({
+        const confLow = configureCodecs({
             id: l.id,
             video: {
                 width: lResolution[0],
@@ -155,6 +164,8 @@ export async function autoconfigureCodecs(
             },
             audio: audioOptions,
         });
+
+        waiting.push(confLow);
     }
     else if (used.length == 2) {
         let target: [number, number];
@@ -165,7 +176,7 @@ export async function autoconfigureCodecs(
 
         const rResolution = findResolutionTarget(used[1], target[0], target[1]);
         const fps = Math.min(20, Math.max(...used[1].video.fpsRange));
-        await configureCodecs({
+        const confRemote = configureCodecs({
             id: used[1].id,
             video: {
                 width: rResolution[0],
@@ -180,8 +191,23 @@ export async function autoconfigureCodecs(
             },
             audio: audioOptions,
         });
+
+        waiting.push(confRemote);
     }
     else if (used.length === 1) {
         // no nop
     }
+
+    const waited = await Promise.allSettled(waiting);
+
+    let errors = '';
+    for (const w of waited) {
+        if (w.status === 'rejected') {
+            console.error(w.reason?.message);
+            errors += w.reason?.message + '\n';
+        }
+    }
+
+    if (errors)
+        throw new Error(errors);
 }

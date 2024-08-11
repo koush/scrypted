@@ -129,13 +129,6 @@ export async function configureCodecs(console: Console, client: OnvifCameraAPI, 
         vc.rateControl.bitrateLimit = Math.floor(videoOptions?.bitrate / 1000);
     }
 
-    // can't be set by onvif. But see if it is settable and doesn't match to direct user.
-    if (videoOptions?.bitrateControl && vc.rateControl?.$?.ConstantBitRate !== undefined) {
-        const constant = videoOptions?.bitrateControl === 'constant';
-        if (vc.rateControl.$.ConstantBitRate !== constant)
-            throw new Error(options.id + ': camera video Bitrate Type must be manually set to ' + videoOptions?.bitrateControl + ' in the camera web admin.');
-    }
-
     if (videoOptions?.fps) {
         vc.rateControl ||= {};
         vc.rateControl.frameRateLimit = videoOptions?.fps;
@@ -163,6 +156,14 @@ export async function configureCodecs(console: Console, client: OnvifCameraAPI, 
             ...configuredVideo,
         }
     };
+
+    // can't be set by onvif. But see if it is settable and doesn't match to direct user.
+    if (videoOptions?.bitrateControl && vc.rateControl?.$?.ConstantBitRate !== undefined) {
+        const constant = videoOptions?.bitrateControl === 'constant';
+        if (vc.rateControl.$.ConstantBitRate !== constant)
+            throw new Error(options.id + ': camera video Bitrate Type must be manually set to ' + videoOptions?.bitrateControl + ' in the camera web admin.');
+    }
+
     return ret;
 }
 
