@@ -355,6 +355,72 @@ export class AmcrestCameraClient {
         return response.body.includes('OK');
     }
 
+
+    async resetMotionDetection(cameraNumber: number) {
+        const params = new URLSearchParams();
+        params.set(`MotionDetect[${cameraNumber - 1}].Enable`, 'true');
+
+        // from amcrest docs:
+        // basically a 22x18 binary grid.
+        // so a full cell block is 4194303.
+
+        // Currently, a region is divided into 18 lines and 22 blocks per line.
+        // A bit describes a block in the line.
+        // Bit = 1: motion in this block is monitored.
+        // Example:
+        // MotionDetect [0].Region [0] = 4194303 (0x3FFFFF): the 22 blocks in
+        // channel 0 line 0 is monitored.
+        // MotionDetect [0].Region [1] =0: the 22 blocks in channel 0 line 1 is
+        // not monitored.
+        // MotionDetect [0].Region [17] = 3: the left two blocks in the last line o
+        // channel 0 is monitored.
+
+        // there are 4 configurable motion windows, will use the first one, index 0.
+        // each window is 18 lines, 22 blocks per line.
+
+        // not sure what this first line is.
+
+        // table.MotionDetect[0].Level=3
+        // table.MotionDetect[0].MotionDetectWindow[0].Id=0
+        // table.MotionDetect[0].MotionDetectWindow[0].Name=Region1
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[0]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[1]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[2]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[3]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[4]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[5]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[6]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[7]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[8]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[9]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[10]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[11]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[12]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[13]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[14]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[15]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[16]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Region[17]=4194303
+        // table.MotionDetect[0].MotionDetectWindow[0].Sensitive=60
+        // table.MotionDetect[0].MotionDetectWindow[0].Threshold=5
+
+        // doesn't seem to be able to be renamed.
+        params.set(`MotionDetect[${cameraNumber - 1}].MotionDetectWindow[0].Name`, 'Scrypted');
+
+        for (let i = 0; i < 18; i++) {
+            params.set(`MotionDetect[${cameraNumber - 1}].MotionDetectWindow[0].Region[${i}]`, '4194303');
+        }
+
+        params.set(`MotionDetect[${cameraNumber - 1}].MotionDetectWindow[0].Sensitive`, '60');
+        params.set(`MotionDetect[${cameraNumber - 1}].MotionDetectWindow[0].Threshold`, '5');
+
+        const response = await this.request({
+            url: `http://${this.ip}/cgi-bin/configManager.cgi?action=setConfig&${params}`,
+            responseType: 'text',
+        });
+        this.console.log('reset motion result', response.body);
+    }
+
     async configureCodecs(cameraNumber: number, options: MediaStreamConfiguration) {
         if (!options.id?.startsWith('channel'))
             throw new Error('invalid id');
