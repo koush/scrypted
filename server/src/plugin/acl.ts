@@ -1,4 +1,4 @@
-import { EventDetails, ScryptedInterface, ScryptedUserAccessControl } from "@scrypted/types";
+import type { EventDetails, ScryptedInterface, ScryptedUserAccessControl } from "@scrypted/types";
 
 /**
  * Scrypted Access Controls allow selective reading of state, subscription to evemts,
