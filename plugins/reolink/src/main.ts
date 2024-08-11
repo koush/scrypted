@@ -535,26 +535,37 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
         ];
 
-        // this property seems to be:
-        // 1 (Doorbell): rtmp main, sub, ext + rtsp main, sub
-        // 2 (Duo 2): rtmp sub + rtsp main.sub
-        // 4k cams seem to be 2.
-        // unsure if there are other values
-        // update: unfortunately this property is unusable on the E1 Pro.
-        // However, the mainEncType property seems like a reliable marker
-        // const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[0].live?.ver;
-        // if (live === 2) {
-        //     // remove the rtmp main and ext
-        //     streams.splice(0, 2);
-        // }
+        // abilityChn->live
+        // 0: not support
+        // 1: support main/extern/sub stream
+        // 2: support main/sub stream
 
+        const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[0].live?.ver;
+        const [rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub] = streams;
+        streams.splice(0, streams.length);
+
+        // abilityChn->mainEncType
+        // 0: main stream enc type is H264
+        // 1: main stream enc type is H265
+
+        // anecdotally, encoders of type h265 do not have a working RTMP main stream.
         const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[0].mainEncType?.ver;
-        // 0 (Doorbell): rtmp main, sub, ext + rtsp main, sub
-        // 1 (Duo 2 + E1 Pro): rtmp sub + rtsp main, sub
-        if (mainEncType === 1) {
-            // remove the rtmp main and ext
-            streams.splice(0, 2);
+
+        if (live === 2) {
+            if (mainEncType === 1) {
+                streams.push(rtmpSub, rtspMain, rtspSub);
+            }
+            else {
+                streams.push(rtmpMain, rtmpSub, rtspMain, rtspSub);
+            }
         }
+        else if (mainEncType === 1) {
+            streams.push(rtmpExt, rtmpSub, rtspMain, rtspSub);
+        }
+        else {
+            streams.push(rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub);
+        }
+
 
         if (deviceInfo?.model == "Reolink TrackMix PoE") {
             streams.push({
