@@ -38,6 +38,26 @@ export enum HikvisionCameraEvent {
     FieldDetection = "<eventType>fielddetection</eventType>",
 }
 
+// convert thees to ffmpeg codecs
+// G.722.1,G.711ulaw,G.711alaw,MP2L2,G.726,PCM,MP3
+function fromHikvisionAudioCodec(codec: string) {
+    if (codec === 'G.711ulaw')
+        return 'pcm_mulaw';
+    if (codec === 'G.711alaw')
+        return 'pcm_alaw';
+    if (codec === 'MP3')
+        return 'mp3';
+}
+
+function toHikvisionAudioCodec(codec: string) {
+    if (codec === 'pcm_mulaw')
+        return 'G.711ulaw';
+    if (codec === 'pcm_alaw')
+        return 'G.711alaw';
+    if (codec === 'mp3')
+        return 'MP3';
+}
+
 export class HikvisionCameraAPI implements HikvisionAPI {
     credential: AuthFetchCredentialState;
     deviceModel: Promise<string>;
@@ -291,7 +311,9 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             responseType: 'text',
         });
         const channel: ChannelResponse = await xml2js.parseStringPromise(response.body);
-        const vc = channel.StreamingChannel.Video[0];
+        const sc = channel.StreamingChannel;
+        const vc = sc.Video[0];
+        const ac = sc.Audio[0];
 
         const { video: videoOptions, audio: audioOptions } = options;
 
@@ -373,10 +395,15 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             vc.keyFrameInterval = [(gov / videoOptions.fps * 100).toString()];
         }
 
-        const builder = new xml2js.Builder();
-        const put = builder.buildObject(vc);
+        if (audioOptions?.codec) {
+            ac.audioCompressionType = [toHikvisionAudioCodec(options.audio.codec)];
+            ac.enabled = ['true'];
+        }
 
-        await this.request({
+        const builder = new xml2js.Builder();
+        const put = builder.buildObject(sc);
+
+        const putChannelsResponse = await this.request({
             method: 'PUT',
             url: `http://${this.ip}/ISAPI/Streaming/channels/${cameraChannel}`,
             responseType: 'text',
@@ -385,16 +412,18 @@ export class HikvisionCameraAPI implements HikvisionAPI {
                 'Content-Type': 'application/xml',
             }
         });
+        this.console.log(putChannelsResponse.body);
 
-        const response2 = await this.request({
+        const capsResponse = await this.request({
             url: `http://${this.ip}/ISAPI/Streaming/channels/${cameraChannel}/capabilities`,
             responseType: 'text',
         });
+        this.console.log(capsResponse.body);
 
         vsos = await this.getCodecs(camNumber);
         const vso: MediaStreamConfiguration = vsos.find(vso => vso.id === cameraChannel);
 
-        const capabilities: CapabiltiesResponse = await xml2js.parseStringPromise(response2.body);
+        const capabilities: CapabiltiesResponse = await xml2js.parseStringPromise(capsResponse.body);
         const v = capabilities.StreamingChannel.Video[0];
         vso.video.bitrateRange = [parseInt(v.vbrUpperCap[0].$.min) * 1000, parseInt(v.vbrUpperCap[0].$.max) * 1000];
         const fpsRange = v.maxFrameRate[0].$.opt.split(',').map(fps => parseInt(fps) / 1000);

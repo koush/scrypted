@@ -30,7 +30,7 @@ export async function autoconfigureCodecs(
     audioOptions?: AudioStreamOptions,
 ) {
     audioOptions ||= {
-        codec: 'pcm_ulaw',
+        codec: 'pcm_mulaw',
         bitrate: 64000,
         sampleRate: 8000,
     };
