@@ -1,4 +1,4 @@
-import { MediaStreamConfiguration, MediaStreamDestination, MediaStreamOptions, Setting } from "@scrypted/sdk";
+import { AudioStreamOptions, MediaStreamConfiguration, MediaStreamDestination, MediaStreamOptions, Setting } from "@scrypted/sdk";
 
 export const automaticallyConfigureSettings: Setting = {
     key: 'autoconfigure',
@@ -24,11 +24,21 @@ function getBitrateForResolution(resolution: number) {
     return MEGABIT / 4;
 }
 
-export async function autoconfigureCodecs(getCodecs: () => Promise<MediaStreamOptions[]>, configureCodecs: (options: MediaStreamOptions) => Promise<MediaStreamConfiguration>) {
+export async function autoconfigureCodecs(
+    getCodecs: () => Promise<MediaStreamOptions[]>,
+    configureCodecs: (options: MediaStreamOptions) => Promise<MediaStreamConfiguration>,
+    audioOptions?: AudioStreamOptions,
+) {
+    audioOptions ||= {
+        codec: 'pcm_ulaw',
+        bitrate: 64000,
+        sampleRate: 8000,
+    };
+
     const codecs = await getCodecs();
     const configurable: MediaStreamConfiguration[] = [];
     for (const codec of codecs) {
-        const config = await configureCodecs( {
+        const config = await configureCodecs({
             id: codec.id,
         });
         configurable.push(config);
@@ -91,6 +101,7 @@ export async function autoconfigureCodecs(getCodecs: () => Promise<MediaStreamOp
             quality: 5,
             profile: 'main',
         },
+        audio: audioOptions,
     });
 
     if (used.length === 3) {
@@ -115,10 +126,11 @@ export async function autoconfigureCodecs(getCodecs: () => Promise<MediaStreamOp
                 quality: 5,
                 profile: 'main',
             },
+            audio: audioOptions,
         });
 
         fps = Math.min(20, Math.max(...l.video.fpsRange));
-        await configureCodecs(  {
+        await configureCodecs({
             id: l.id,
             video: {
                 width: lResolution[0],
@@ -131,6 +143,7 @@ export async function autoconfigureCodecs(getCodecs: () => Promise<MediaStreamOp
                 quality: 5,
                 profile: 'main',
             },
+            audio: audioOptions,
         });
     }
     else if (used.length == 2) {
@@ -155,6 +168,7 @@ export async function autoconfigureCodecs(getCodecs: () => Promise<MediaStreamOp
                 quality: 5,
                 profile: 'main',
             },
+            audio: audioOptions,
         });
     }
     else if (used.length === 1) {

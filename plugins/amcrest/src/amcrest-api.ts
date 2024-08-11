@@ -94,15 +94,21 @@ function findValue(blob: string, prefix: string, key: string) {
 function fromAmcrestAudioCodec(audioCodec: string) {
     audioCodec = audioCodec
         ?.replace('.', '')?.toLowerCase()?.trim();
-    if (audioCodec?.includes('aac'))
-        audioCodec = 'aac';
-    else if (audioCodec?.includes('g711a'))
-        audioCodec = 'pcm_alaw';
-    else if (audioCodec?.includes('g711u'))
-        audioCodec = 'pcm_mulaw';
-    else if (audioCodec?.includes('g711'))
-        audioCodec = 'pcm';
-    return audioCodec;
+    if (audioCodec === 'AAC')
+        return 'aac';
+    if (audioCodec === 'G.711A')
+        return 'pcm_alaw';
+    if (audioCodec === 'G.711Mu')
+        return 'pcm_mulaw';
+}
+
+function toAmcrestAudioCodec(audioCodec: string) {
+    if (audioCodec === 'aac')
+        return 'AAC';
+    if (audioCodec === 'pcm_alaw')
+        return 'G.711A';
+    if (audioCodec === 'pcm_mulaw')
+        return 'G.711Mu';
 }
 
 function fromAmcrestVideoCodec(videoCodec: string) {
@@ -127,7 +133,7 @@ const amcrestResolutions = {
     "NHD": [640, 360],
     "VGA": [640, 480],
     "QVGA": [320, 240]
-};  
+};
 
 function fromAmcrestResolution(resolution: string) {
     const named = amcrestResolutions[resolution];
@@ -136,7 +142,7 @@ function fromAmcrestResolution(resolution: string) {
     const parts = resolution.split('x');
     return [parseInt(parts[0]), parseInt(parts[1])];
 }
-  
+
 export class AmcrestCameraClient {
     credential: AuthFetchCredentialState;
 
@@ -397,6 +403,13 @@ export class AmcrestCameraClient {
         if (options.video?.bitrateControl) {
             params.set(`${encode}.Video.BitRateControl`, options.video.bitrateControl === 'constant' ? 'CBR' : 'VBR');
         }
+
+        if (options.audio?.codec) {
+            params.set(`${encode}.Audio.Compression`, toAmcrestAudioCodec(options.audio.codec));
+            params.set(`${encode}.AudioEnable`, 'true');
+        }
+
+        // nothing else audio related seems configurable.
 
         if ([...params.keys()].length) {
             const response = await this.request({
