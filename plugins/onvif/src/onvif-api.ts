@@ -168,6 +168,11 @@ export class OnvifCameraAPI {
         return ret;
     }
 
+    async canConfigureEncoding() {
+        const ret: any = await promisify(cb => this.cam.getMediaServiceCapabilities(cb));
+        return !!ret.profileCapabilities;
+    }
+
     async getVideoEncoderConfigurationOptions(profileToken: string, configurationToken: string): Promise<VideoStreamConfiguration> {
         const options: any = await promisify(cb => this.cam.getVideoEncoderConfigurationOptions({ profileToken }, cb));
         const codecs: string[] = [];
@@ -183,12 +188,18 @@ export class OnvifCameraAPI {
         const profiles: string[] = [];
         let bitrateRange: [number, number];
 
+        const ensureArray = (value: any): any => {
+            if (!Array.isArray(value))
+                return [value];
+            return value;
+        };
+
         const H264 = options?.extension?.H264 || options?.H264;
         if (H264) {
             if (H264?.H264ProfilesSupported)
-                profiles.push(...H264.H264ProfilesSupported.map(p => p.toLowerCase()));
+                profiles.push(...ensureArray(H264.H264ProfilesSupported).map(p => p.toLowerCase()));
             if (H264?.resolutionsAvailable)
-                resolutions.push(...H264.resolutionsAvailable.map(r => [r.width, r.height]));
+                resolutions.push(...ensureArray(H264.resolutionsAvailable).map(r => [r.width, r.height]));
             if (H264?.frameRateRange?.min || H264?.frameRateRange?.max)
                 fpsRange = [H264.frameRateRange.min, H264.frameRateRange.max];
             if (H264?.govLengthRange?.min || H264?.govLengthRange?.max)

@@ -68,6 +68,9 @@ export async function autoconfigureSettings(console: Console, client: OnvifCamer
 }
 
 export async function configureCodecs(console: Console, client: OnvifCameraAPI, options: MediaStreamOptions): Promise<MediaStreamConfiguration> {
+    if (!await client.canConfigureEncoding())
+        console.warn('This camera may not support encoding configuration. Proceeding anyways.');
+
     client.profiles = undefined;
     const profiles: any[] = await client.getProfiles();
     const profile = profiles.find(profile => profile.$.token === options.id);
