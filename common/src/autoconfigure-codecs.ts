@@ -104,8 +104,18 @@ export async function autoconfigureCodecs(
     // get the fps of 20 or highest available
     let fps = Math.min(20, Math.max(...l.video.fpsRange));
 
-    const waiting: Promise<MediaStreamConfiguration>[] = [];
-    const confLow = configureCodecs({
+    let errors = '';
+
+    const logConfigureCodecs = async (config: MediaStreamConfiguration) => {
+        try {
+            await configureCodecs(config);
+        }
+        catch (e) {
+            errors += e;
+        }
+    }
+
+    await logConfigureCodecs({
         id: l.id,
         video: {
             width: resolution[0],
@@ -120,7 +130,6 @@ export async function autoconfigureCodecs(
         },
         audio: audioOptions,
     });
-    waiting.push(confLow);
 
     if (used.length === 3) {
         // find remote and low
@@ -131,7 +140,7 @@ export async function autoconfigureCodecs(
         const lResolution = findResolutionTarget(l, 640, 360);
 
         fps = Math.min(20, Math.max(...r.video.fpsRange));
-        const confRemote = configureCodecs({
+        await logConfigureCodecs({
             id: r.id,
             video: {
                 width: rResolution[0],
@@ -146,10 +155,9 @@ export async function autoconfigureCodecs(
             },
             audio: audioOptions,
         });
-        waiting.push(confRemote);
 
         fps = Math.min(20, Math.max(...l.video.fpsRange));
-        const confLow = configureCodecs({
+        await logConfigureCodecs({
             id: l.id,
             video: {
                 width: lResolution[0],
@@ -164,8 +172,6 @@ export async function autoconfigureCodecs(
             },
             audio: audioOptions,
         });
-
-        waiting.push(confLow);
     }
     else if (used.length == 2) {
         let target: [number, number];
@@ -191,21 +197,9 @@ export async function autoconfigureCodecs(
             },
             audio: audioOptions,
         });
-
-        waiting.push(confRemote);
     }
     else if (used.length === 1) {
         // no nop
-    }
-
-    const waited = await Promise.allSettled(waiting);
-
-    let errors = '';
-    for (const w of waited) {
-        if (w.status === 'rejected') {
-            console.error(w.reason?.message);
-            errors += w.reason?.message + '\n';
-        }
     }
 
     if (errors)
