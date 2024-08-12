@@ -9,6 +9,11 @@ export const hikvisionAutoConfigureSettings: Setting = {
 };
 
 export async function autoconfigureSettings(client: HikvisionAPI, camNumber: string) {
+    if (!await client.putVcaResource(camNumber + '01', 'close')) {
+        client.reboot();
+        throw new Error('Camera VCA resource was disabled to enable the third stream. Try again after the camera has completed rebooting.');
+    }
+
     return ac(
         () => client.getCodecs(camNumber),
         (options) => {

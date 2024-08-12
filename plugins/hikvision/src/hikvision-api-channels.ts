@@ -19,6 +19,7 @@ export interface HikvisionAPI {
     checkStreamSetup(channel: string, isOld: boolean): Promise<HikvisionCameraStreamSetup>;
     jpegSnapshot(channel: string, timeout: number): Promise<Buffer>;
     listenEvents(): Promise<Destroyable>;
+    putVcaResource(channel: string, resource: 'smart' | 'facesnap' | 'close'): Promise<boolean>;
     getCodecs(camNumber: string): Promise<MediaStreamOptions[]>;
     configureCodecs(camNumber: string, channelNumber: string, options: MediaStreamOptions): Promise<MediaStreamConfiguration>;
 }
