@@ -484,10 +484,20 @@ export class AmcrestCameraClient {
         }
 
         const caps = `caps[${cameraNumber - 1}].${format}[${formatNumber}]`;
+        const singleCaps = `caps.${format}[${formatNumber}]`;
 
-        const resolutions = findValue(capsResponse.body, caps, 'Video.ResolutionTypes').split(',').map(fromAmcrestResolution);
-        const bitrates = findValue(capsResponse.body, caps, 'Video.BitRateOptions').split(',').map(s => parseInt(s) * 1000);
-        const fpsMax = parseInt(findValue(capsResponse.body, caps, 'Video.FPSMax'));
+        const findCaps = (key: string) => {
+            const found = findValue(capsResponse.body, caps, key);
+            if (found)
+                return found;
+            // ad410 doesnt return a camera number if accessed directly
+            if (cameraNumber - 1 === 0)
+                return findValue(capsResponse.body, singleCaps, key);
+        }
+
+        const resolutions = findCaps('Video.ResolutionTypes').split(',').map(fromAmcrestResolution);
+        const bitrates = findCaps('Video.BitRateOptions').split(',').map(s => parseInt(s) * 1000);
+        const fpsMax = parseInt(findCaps('Video.FPSMax'));
         const vso: MediaStreamConfiguration = {
             id: options.id,
             video: {},
