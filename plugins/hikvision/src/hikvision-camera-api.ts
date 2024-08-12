@@ -312,7 +312,8 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         const channel: ChannelResponse = await xml2js.parseStringPromise(response.body);
         const sc = channel.StreamingChannel;
         const vc = sc.Video[0];
-        const ac = sc.Audio[0];
+        // may not be any audio
+        const ac = sc.Audio?.[0];
 
         const { video: videoOptions, audio: audioOptions } = options;
 
@@ -394,7 +395,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             vc.keyFrameInterval = [(gov / videoOptions.fps * 100).toString()];
         }
 
-        if (audioOptions?.codec) {
+        if (audioOptions?.codec && ac) {
             ac.audioCompressionType = [toHikvisionAudioCodec(options.audio.codec)];
             ac.enabled = ['true'];
         }
