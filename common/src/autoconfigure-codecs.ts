@@ -182,7 +182,7 @@ export async function autoconfigureCodecs(
 
         const rResolution = findResolutionTarget(used[1], target[0], target[1]);
         const fps = Math.min(20, Math.max(...used[1].video.fpsRange));
-        const confRemote = configureCodecs({
+        await logConfigureCodecs({
             id: used[1].id,
             video: {
                 width: rResolution[0],
