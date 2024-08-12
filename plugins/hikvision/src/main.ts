@@ -356,7 +356,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
         // due to being able to override the channel number, and NVR providing per channel port access,
         // do not actually use these channel ids, and just use it to determine the number of channels
-        // available for a camera.q
+        // available for a camera.
         const ret = [];
         let index = 0;
         const cameraNumber = this.getCameraNumber();

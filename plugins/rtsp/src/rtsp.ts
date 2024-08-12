@@ -5,8 +5,6 @@ import { CameraBase, CameraProviderBase, UrlMediaStreamOptions } from "../../ffm
 
 export { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 
-const { mediaManager } = sdk;
-
 export function createRtspMediaStreamOptions(url: string, index: number): UrlMediaStreamOptions {
     return {
         id: `channel${index}`,

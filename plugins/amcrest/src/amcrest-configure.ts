@@ -1,6 +1,12 @@
-import { AudioStreamConfiguration } from '@scrypted/sdk';
+import { AudioStreamConfiguration, Setting } from '@scrypted/sdk';
 import { autoconfigureCodecs as ac } from '../../../common/src/autoconfigure-codecs';
 import { AmcrestCameraClient } from "./amcrest-api";
+
+export const amcrestAutoConfigureSettings: Setting = {
+    key: 'amcrest-autoconfigure',
+    type: 'html',
+    value: 'Amcrest autoconfiguration will configure the camera codecs and the motion sensor.',
+};
 
 export async function autoconfigureSettings(client: AmcrestCameraClient, cameraNumber: number) {
     const audioOptions: AudioStreamConfiguration = {

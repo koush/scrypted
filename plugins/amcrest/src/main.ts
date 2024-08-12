@@ -371,32 +371,38 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         const client = this.getClient();
 
-        if (!this.videoStreamOptions) {
-            this.videoStreamOptions = (async () => {
-                let vsos: UrlMediaStreamOptions[];
-                const cameraNumber = parseInt(this.getRtspChannel()) || 1;
-                try {
-                    try {
-                        vsos = await client.getCodecs(cameraNumber);
-                        this.storage.setItem('vsosJSON', JSON.stringify(vsos));
-                    }
-                    catch (e) {
-                        this.console.error('error retrieving stream configurations', e);
-                        vsos = JSON.parse(this.storage.getItem('vsosJSON')) as UrlMediaStreamOptions[];
-                    }
+        if (this.videoStreamOptions)
+            return this.videoStreamOptions;
 
-                    for (const [index, vso] of vsos.entries()) {
-                        vso.url = `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${cameraNumber}&subtype=${index}`;
-                    }
-                    return vsos;
+        this.videoStreamOptions = (async () => {
+            const cameraNumber = parseInt(this.getRtspChannel()) || 1;
+            try {
+                let vsos: UrlMediaStreamOptions[];
+                try {
+                    vsos = await client.getCodecs(cameraNumber);
+                    this.storage.setItem('vsosJSON', JSON.stringify(vsos));
                 }
                 catch (e) {
+                    this.console.error('error retrieving stream configurations', e);
+                    vsos = JSON.parse(this.storage.getItem('vsosJSON')) as UrlMediaStreamOptions[];
                 }
 
-                vsos = [...Array(2).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${cameraNumber}&subtype=${subtype}`, subtype));
+                for (const [index, vso] of vsos.entries()) {
+                    vso.tool = 'scrypted';
+                    vso.url = `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${cameraNumber}&subtype=${index}`;
+                }
                 return vsos;
-            })();
-        }
+            }
+            catch (e) {
+                this.videoStreamOptions = undefined;
+                const vsos = [...Array(2).keys()].map(subtype => {
+                    const ret = createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${cameraNumber}&subtype=${subtype}`, subtype);
+                    ret.tool = 'scrypted';
+                    return ret;
+                });
+                return vsos;
+            }
+        })();
 
         return this.videoStreamOptions;
     }

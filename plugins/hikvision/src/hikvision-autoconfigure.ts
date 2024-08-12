@@ -3,7 +3,7 @@ import { autoconfigureCodecs as ac } from '../../../common/src/autoconfigure-cod
 import { HikvisionAPI } from './hikvision-api-channels';
 
 export const hikvisionAutoConfigureSettings: Setting = {
-    key: 'onvif-autoconfigure',
+    key: 'hikvision-autoconfigure',
     type: 'html',
     value: 'Hikvision autoconfiguration will configure the camera codecs. <b>The camera motion sensor must still be <a target="_blank" href="https://docs.scrypted.app/camera-preparation.html#motion-sensor-setup">configured manually</a>.</b>',
 };

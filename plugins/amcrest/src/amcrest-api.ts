@@ -92,8 +92,7 @@ function findValue(blob: string, prefix: string, key: string) {
 }
 
 function fromAmcrestAudioCodec(audioCodec: string) {
-    audioCodec = audioCodec
-        ?.replace('.', '')?.toLowerCase()?.trim();
+    audioCodec = audioCodec?.trim();
     if (audioCodec === 'AAC')
         return 'aac';
     if (audioCodec === 'G.711A')
@@ -112,11 +111,10 @@ function toAmcrestAudioCodec(audioCodec: string) {
 }
 
 function fromAmcrestVideoCodec(videoCodec: string) {
-    videoCodec = videoCodec
-        ?.replace('.', '')?.toLowerCase()?.trim();
-    if (videoCodec?.includes('h264'))
+    videoCodec = videoCodec?.trim();
+    if (videoCodec === 'H.264')
         videoCodec = 'h264';
-    else if (videoCodec?.includes('h265'))
+    else if (videoCodec === 'H.265')
         videoCodec = 'h265';
     return videoCodec;
 }
@@ -504,7 +502,7 @@ export class AmcrestCameraClient {
         const masResponse = await this.request({
             url: `http://${this.ip}/cgi-bin/magicBox.cgi?action=getProductDefinition&name=MaxExtraStream`,
             responseType: 'text',
-        })
+        });
         const mas = masResponse.body.split('=')[1].trim();
 
         // amcrest reports more streams than are acually available in its responses,
