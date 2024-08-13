@@ -12,6 +12,7 @@ import { autoconfigureSettings, hikvisionAutoConfigureSettings } from "./hikvisi
 import { detectionMap, HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 
 const rtspChannelSetting: Setting = {
+    subgroup: 'Advanced',
     key: 'rtspChannel',
     title: 'Channel Number',
     description: "Optional: The channel number to use for snapshots. E.g., 101, 201, etc. The camera portion, e.g., 1, 2, etc, will be used to construct the RTSP stream.",
@@ -467,7 +468,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         };
         ac.type = 'button';
         ret.push(ac);
-        ret.push(hikvisionAutoConfigureSettings);
+        ret.push({ ...hikvisionAutoConfigureSettings });
 
         return ret;
     }
@@ -723,6 +724,7 @@ class HikvisionProvider extends RtspProvider {
             },
             rtspChannelSetting,
             {
+                subgroup: 'Advanced',
                 key: 'httpPort',
                 title: 'HTTP Port',
                 description: 'Optional: Override the HTTP Port from the default value of 80.',
@@ -731,6 +733,7 @@ class HikvisionProvider extends RtspProvider {
             automaticallyConfigureSettings,
             hikvisionAutoConfigureSettings,
             {
+                subgroup: 'Advanced',
                 key: 'skipValidate',
                 title: 'Skip Validation',
                 description: 'Add the device without verifying the credentials and network settings.',

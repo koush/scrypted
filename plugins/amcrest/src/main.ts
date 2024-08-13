@@ -7,7 +7,7 @@ import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { createRtspMediaStreamOptions, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { AmcrestCameraClient, AmcrestEvent, AmcrestEventData } from "./amcrest-api";
-import { autoconfigureSettings } from "./amcrest-configure";
+import { amcrestAutoConfigureSettings, autoconfigureSettings } from "./amcrest-configure";
 
 const { mediaManager } = sdk;
 
@@ -15,6 +15,7 @@ const AMCREST_DOORBELL_TYPE = 'Amcrest Doorbell';
 const DAHUA_DOORBELL_TYPE = 'Dahua Doorbell';
 
 const rtspChannelSetting: Setting = {
+    subgroup: 'Advanced',
     key: 'rtspChannel',
     title: 'Channel Number Override',
     description: "The channel number to use for snapshots and video. E.g., 1, 2, etc.",
@@ -338,6 +339,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         };
         ac.type = 'button';
         ret.push(ac);
+        ret.push({ ...amcrestAutoConfigureSettings });
 
         return ret;
     }
@@ -349,7 +351,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     async getUrlSettings() {
         const rtspChannel = {
             ...rtspChannelSetting,
-            subgroup: 'Advanced',
             value: this.storage.getItem('rtspChannel'),
         };
         return [
@@ -706,13 +707,16 @@ class AmcrestProvider extends RtspProvider {
             },
             rtspChannelSetting,
             {
+                subgroup: 'Advanced',
                 key: 'httpPort',
                 title: 'HTTP Port',
                 description: 'Optional: Override the HTTP Port from the default value of 80.',
                 placeholder: '80',
             },
             automaticallyConfigureSettings,
+            amcrestAutoConfigureSettings,
             {
+                subgroup: 'Advanced',
                 key: 'skipValidate',
                 title: 'Skip Validation',
                 description: 'Add the device without verifying the credentials and network settings.',

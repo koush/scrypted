@@ -517,14 +517,16 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                 placeholder: '192.168.2.222',
             },
             {
+                subgroup: 'Advanced',
                 key: 'httpPort',
                 title: 'HTTP Port',
                 description: 'Optional: Override the HTTP Port from the default value of 80.',
                 placeholder: '80',
             },
-            automaticallyConfigureSettings,
-            onvifAutoConfigureSettings,
+            { ...automaticallyConfigureSettings },
+            { ...onvifAutoConfigureSettings },
             {
+                subgroup: 'Advanced',
                 key: 'skipValidate',
                 title: 'Skip Validation',
                 description: 'Add the device without verifying the credentials and network settings.',
