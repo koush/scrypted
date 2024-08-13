@@ -7,7 +7,7 @@
     "@scrypted/deno": "^1.45.5",
     "@scrypted/ffmpeg-static": "^6.1.0-build1",
     "@scrypted/node-pty": "^1.0.18",
-    "@scrypted/types": "^0.3.44",
+    "@scrypted/types": "^0.3.48",
     "adm-zip": "^0.5.15",
     "body-parser": "^1.20.2",
     "cookie-parser": "^1.4.6",
