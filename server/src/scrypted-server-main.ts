@@ -229,12 +229,6 @@ async function start(mainFilename: string, options?: {
     }
 
     app.use(async (req, res, next) => {
-        // /web/component requires basic auth admin access.
-        if (req.url.startsWith('/web/component/')) {
-            next();
-            return;
-        }
-
         // the remote address may be ipv6 prefixed so use a fuzzy match.
         // eg ::ffff:192.168.2.124
         if (process.env.SCRYPTED_ADMIN_USERNAME
@@ -326,8 +320,15 @@ async function start(mainFilename: string, options?: {
         next();
     });
 
-    // allow basic auth to deploy plugins
+    // all methods under /web/component require admin auth.
     app.all('/web/component/*', (req, res, next) => {
+        // check if the user is admin authed already, and if not, continue on with basic auth to escalate.
+        // this will cover anonymous access like in demo site.
+        if (res.locals.username && !res.locals.aclId) {
+            next();
+            return;
+        }
+
         if (req.protocol === 'https' && req.headers.authorization && req.headers.authorization.toLowerCase()?.indexOf('basic') !== -1) {
             const basicChecker = basicAuth.check(async (req) => {
                 try {
@@ -347,7 +348,7 @@ async function start(mainFilename: string, options?: {
             return;
         }
         next();
-    })
+    });
 
     // verify all plugin related requests have admin auth
     app.all('/web/component/*', (req, res, next) => {
