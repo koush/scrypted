@@ -1,6 +1,5 @@
 import os from 'os';
 import net from 'net';
-import { add } from 'lodash';
 
 const loopbackList = new net.BlockList();
 loopbackList.addSubnet('127.0.0.0', 8);
