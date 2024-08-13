@@ -94,12 +94,13 @@ class TensorFlowLitePlugin(
             nonlocal model
 
             if defaultModel:
-                if edge_tpus and next(
-                    (obj for obj in edge_tpus if obj["type"] == "usb"), None
-                ):
-                    model = "ssdlite_mobiledet_coco_qat_postprocess"
-                else:
-                    model = "efficientdet_lite0_320_ptq"
+                model = "scrypted_yolov10n_320"
+                # if edge_tpus and next(
+                #     (obj for obj in edge_tpus if obj["type"] == "usb"), None
+                # ):
+                #     model = "ssdlite_mobiledet_coco_qat_postprocess"
+                # else:
+                #     model = "efficientdet_lite0_320_ptq"
             self.yolo = "yolo" in model
             self.yolov9 = "yolov9" in model
             self.scrypted_model = "scrypted" in model
