@@ -15,12 +15,13 @@ import semver from 'semver';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { Plugin, ScryptedUser, Settings } from './db-types';
+import { getUsableNetworkAddresses } from './ip';
 import Level from './level';
 import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { RPCResultError } from './rpc';
 import { ScryptedRuntime } from './runtime';
-import { getHostAddresses, SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
+import { SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { getNpmPackageInfo } from './services/plugin';
 import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
@@ -531,7 +532,7 @@ async function start(mainFilename: string, options?: {
     });
 
     const getAlternateAddresses = async () => {
-        const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true))
+        const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getUsableNetworkAddresses())
             .map(address => {
                 if (net.isIPv6(address) && !net.isIPv4(address))
                     address = `[${address}]`;
@@ -737,7 +738,7 @@ async function start(mainFilename: string, options?: {
     console.log('#######################################################');
     console.log(`Scrypted Volume           : ${volumeDir}`);
     console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
-    for (const address of getHostAddresses(true, true)) {
+    for (const address of getUsableNetworkAddresses()) {
         console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
     }
     console.log(`Version:       : ${await scrypted.info.getVersion()}`);

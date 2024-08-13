@@ -1,30 +1,19 @@
 import { readFileAsString, tsCompile } from '@scrypted/common/src/eval/scrypted-eval';
 import sdk, { DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
-import os from 'os';
 import Router from 'router';
+import { getUsableNetworkAddresses } from '../../../server/src/ip';
 import { AggregateCore, AggregateCoreNativeId } from './aggregate-core';
 import { AutomationCore, AutomationCoreNativeId } from './automations-core';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
+import { checkLxcDependencies } from './platform/lxc';
 import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
-import { checkLxcDependencies } from './platform/lxc';
 
-const { systemManager, deviceManager, endpointManager } = sdk;
-
-export function getAddresses() {
-    const addresses: string[] = [];
-    for (const [iface, nif] of Object.entries(os.networkInterfaces())) {
-        if (iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan') || iface.startsWith('net')) {
-            addresses.push(iface);
-            addresses.push(...nif.map(addr => addr.address));
-        }
-    }
-    return addresses;
-}
+const { deviceManager, endpointManager } = sdk;
 
 interface RoutedHttpRequest extends HttpRequest {
     params: { [key: string]: string };
@@ -50,7 +39,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
             multiple: true,
             async onGet() {
                 return {
-                    choices: getAddresses(),
+                    choices: getUsableNetworkAddresses(),
                 };
             },
             mapGet: () => this.localAddresses,
