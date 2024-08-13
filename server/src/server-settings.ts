@@ -1,12 +1,12 @@
 import os from 'os';
-import * as nodeIp from 'ip';
+import { getUsableNetworkAddresses, isUsableNetworkAddress } from './ip';
 
 export const SCRYPTED_INSECURE_PORT = parseInt(process.env.SCRYPTED_INSECURE_PORT) || 11080;
 export const SCRYPTED_SECURE_PORT = parseInt(process.env.SCRYPTED_SECURE_PORT) || 10443;
 export const SCRYPTED_DEBUG_PORT = parseInt(process.env.SCRYPTED_DEBUG_PORT) || 10081;
 
 export function getIpAddress(): string {
-    return nodeIp.address();
+    return getUsableNetworkAddresses()[0];
 }
 
 function normalizeFamilyNodeV18(family: string|number) {
@@ -44,7 +44,7 @@ function nodeIpAddress(family: number): string[] {
             const addresses = interfaces[nic]!.filter(
                 (details) =>
                     normalizeFamilyNodeV18(details.family) === family
-                    && !nodeIp.isLoopback(details.address)
+                    && isUsableNetworkAddress(details.address)
             );
             return {
                 nic,

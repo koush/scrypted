@@ -7,7 +7,6 @@ import fs from 'fs';
 import http from 'http';
 import httpAuth from 'http-auth';
 import https from 'https';
-import ip, { isV4Format } from 'ip';
 import net from 'net';
 import os from 'os';
 import path from 'path';
@@ -534,7 +533,7 @@ async function start(mainFilename: string, options?: {
     const getAlternateAddresses = async () => {
         const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true))
             .map(address => {
-                if (ip.isV6Format(address) && !isV4Format(address))
+                if (net.isIPv6(address) && !net.isIPv4(address))
                     address = `[${address}]`;
                 return `https://${address}:${SCRYPTED_SECURE_PORT}`
             });

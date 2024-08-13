@@ -1,11 +1,10 @@
+import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
 import Level from '../level';
-import { sleep } from '../sleep';
 import { getPluginsVolume, getScryptedVolume } from '../plugin/plugin-volume';
-import AdmZip from 'adm-zip';
 import { ScryptedRuntime } from '../runtime';
-import { getPluginNodePath } from '../plugin/plugin-npm-dependencies';
+import { sleep } from '../sleep';
 
 export class Backup {
     constructor(public runtime: ScryptedRuntime) {}
