@@ -86,10 +86,12 @@ export async function autoconfigureCodecs(
         let diff = 999999999;
         let ret: [number, number];
 
+        const targetArea = width * height;
         for (const res of config.video.resolutions) {
-            const d = Math.abs(res[0] - width) + Math.abs(res[1] - height);
-            if (d < diff) {
-                diff = d;
+            const actualArea = res[0] * res[1];
+            const diffArea = Math.abs(targetArea - actualArea);            
+            if (diffArea < diff) {
+                diff = diffArea;
                 ret = res;
             }
         }
