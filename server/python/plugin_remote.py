@@ -799,6 +799,8 @@ class PluginRemote:
                 print(str_requirements)
 
             sys.path.insert(0, zipPath)
+            if not debug:
+                sys.path.insert(0, plugin_zip_paths.get("unzipped_path"))
             sys.path.insert(0, pip_target)
 
         self.systemManager = SystemManager(self.api, self.systemState)
