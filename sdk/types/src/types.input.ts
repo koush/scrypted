@@ -1,5 +1,6 @@
-import type { Socket as NodeNetSocket } from 'net';
+import { ChildProcess as NodeChildProcess } from 'child_process';
 import type { Worker as NodeWorker } from 'worker_threads';
+import type { Socket as NodeNetSocket } from 'net';
 
 export type ScryptedNativeId = string | undefined;
 
@@ -2504,9 +2505,15 @@ export interface FFmpegTranscode {
 }
 export type FFmpegTranscodeStream = (options: FFmpegTranscode) => Promise<void>;
 
+export interface ForkWorker {
+  terminate(): void;
+  on(event: 'exit', listener: () => void): void;
+  removeListener(event: 'exit', listener: () => void): void;
+  nativeWorker?: NodeChildProcess | NodeWorker;
+}
 export interface PluginFork<T> {
   result: Promise<T>;
-  worker: NodeWorker;
+  worker: ForkWorker;
 }
 
 export declare interface DeviceState {
@@ -2573,6 +2580,7 @@ export interface ConnectOptions extends APIOptions {
 export interface ForkOptions {
   name?: string;
   filename?: string;
+  runtime?: string;
 }
 
 export interface ScryptedStatic {

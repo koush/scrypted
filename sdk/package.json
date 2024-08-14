@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.3.52",
+  "version": "0.3.54",
   "description": "",
   "main": "dist/src/index.js",
   "exports": {
