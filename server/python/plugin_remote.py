@@ -800,12 +800,7 @@ class PluginRemote:
                 print("requirements.txt (up to date)")
                 print(str_requirements)
 
-
-            # use the zip path first
-            sys.path.insert(0, zipPath)
-            if not debug:
-                # needed for binary extensions
-                sys.path.insert(0, plugin_zip_paths.get("unzipped_path"))
+            sys.path.insert(0, plugin_zip_paths.get("unzipped_path"))
             sys.path.insert(0, pip_target)
 
         self.systemManager = SystemManager(self.api, self.systemState)
@@ -895,6 +890,11 @@ class PluginRemote:
             sdk_init(
                 zip, self, self.systemManager, self.deviceManager, self.mediaManager
             )
+
+        # plugin embedded files are treated as the working directory, chdir to that.
+        fsPath = os.path.join(plugin_zip_paths.get("unzipped_path"), "fs")
+        os.makedirs(fsPath, exist_ok=True)
+        os.chdir(fsPath)
 
         if not forkMain:
             from main import create_scrypted_plugin  # type: ignore

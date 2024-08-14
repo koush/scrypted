@@ -96,10 +96,8 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         const setup = () => {
             const types = require.resolve('@scrypted/types');
             const PYTHONPATH = types.substring(0, types.indexOf('types') + 'types'.length);
-            const fsDir = path.join(options.unzippedPath, 'fs');
-            fs.mkdirSync(fsDir, { recursive: true });
             this.worker = child_process.spawn(pythonPath, args, {
-                cwd: fsDir,
+                cwd: options.unzippedPath,
                 // stdin, stdout, stderr, peer in, peer out
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
                 env: Object.assign({
