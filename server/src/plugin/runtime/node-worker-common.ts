@@ -93,6 +93,10 @@ export function extractZip(pluginVolume: string, h: string, zipBuffer: Buffer) {
     fs.writeFileSync(path.join(zipDirTmp, zipFilename), zipBuffer);
     const admZip = new AdmZip(zipBuffer);
     admZip.extractAllTo(path.join(zipDirTmp, 'unzipped'), true);
+    const fsPath = path.join(zipDirTmp, 'unzipped', 'fs');
+    fs.mkdirSync(fsPath, {
+        recursive: true,
+    });
     fs.renameSync(zipDirTmp, zipDir);
 
     return {

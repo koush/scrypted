@@ -252,10 +252,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             }
             if (worker_threads.isMainThread) {
                 const fsDir = path.join(unzippedPath, 'fs')
-                if (fs.existsSync(fsDir))
-                    process.chdir(fsDir);
-                else
-                    process.chdir(unzippedPath);
+                await fs.promises.mkdir(fsDir, {
+                    recursive: true,
+                });
+                process.chdir(fsDir);
             }
 
             const pluginReader = (name: string) => {
