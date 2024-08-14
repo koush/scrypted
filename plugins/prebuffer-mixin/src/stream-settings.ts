@@ -81,6 +81,12 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
     });
 
     const storageSettings = new StorageSettings(device, {
+        noAudio: {
+            subgroup,
+            title: 'No Audio',
+            description: 'Enable this setting if the camera does not have audio or to mute audio.',
+            type: 'boolean',
+        },
         enabledStreams: {
             subgroup,
             title: 'Prebuffered Streams',

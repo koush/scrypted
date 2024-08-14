@@ -472,6 +472,8 @@ class PrebufferSession {
     let mso: ResponseMediaStreamOptions;
     try {
       mso = (await this.mixinDevice.getVideoStreamOptions()).find(o => o.id === this.streamId);
+      if (this.mixin.streamSettings.storageSettings.values.noAudio)
+        mso.audio = null;
     }
     catch (e) {
     }
