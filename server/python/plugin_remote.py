@@ -800,7 +800,12 @@ class PluginRemote:
                 print("requirements.txt (up to date)")
                 print(str_requirements)
 
-            sys.path.insert(0, plugin_zip_paths.get("unzipped_path"))
+
+            # use the zip path first
+            sys.path.insert(0, zipPath)
+            if not debug:
+                # needed for binary extensions
+                sys.path.insert(0, plugin_zip_paths.get("unzipped_path"))
             sys.path.insert(0, pip_target)
 
         self.systemManager = SystemManager(self.api, self.systemState)
