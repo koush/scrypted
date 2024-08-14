@@ -13,8 +13,8 @@ async function pipInstall(python, pkg) {
         throw new Error('non-zero exit code: ' + exitCode);
 }
 
-module.exports.installScryptedServerRequirements = async function installScryptedServerRequirements(version, dest) {
-    const py = new PortablePython(version || require('./packaged-python').version, dest);
+module.exports.installScryptedServerRequirements = async function installScryptedServerRequirements(version, dest, options) {
+    const py = new PortablePython(version || require('./packaged-python').version, dest, options);
     await py.install();
     let python = py.executablePath;
 
