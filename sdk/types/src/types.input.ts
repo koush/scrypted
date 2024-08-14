@@ -1,4 +1,4 @@
-import { ChildProcess as NodeChildProcess } from 'child_process';
+import type { ChildProcess as NodeChildProcess } from 'child_process';
 import type { Worker as NodeWorker } from 'worker_threads';
 import type { Socket as NodeNetSocket } from 'net';
 
