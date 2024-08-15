@@ -1,35 +1,17 @@
-import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PanTiltZoom, PanTiltZoomCommand, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
 import { AddressInfo } from "net";
 import onvif from 'onvif';
 import { Stream } from "stream";
 import xml2js from 'xml2js';
-import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
+import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { connectCameraAPI, OnvifCameraAPI } from "./onvif-api";
+import { autoconfigureSettings, configureCodecs, getCodecs } from "./onvif-configure";
+import { listenEvents } from "./onvif-events";
 import { OnvifIntercom } from "./onvif-intercom";
 import { OnvifPTZMixinProvider } from "./onvif-ptz";
-import { listenEvents } from "./onvif-events";
+import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure, onvifAutoConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
-
-function computeInterval(fps: number, govLength: number) {
-    if (!fps || !govLength)
-        return;
-    return govLength / fps * 1000;
-}
-
-function computeBitrate(bitrate: number) {
-    if (!bitrate)
-        return;
-    return bitrate * 1000;
-}
-
-function convertAudioCodec(codec: string) {
-    if (codec?.toLowerCase()?.includes('mp4a'))
-        return 'aac';
-    if (codec?.toLowerCase()?.includes('aac'))
-        return 'aac';
-    return codec?.toLowerCase();
-}
 
 class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, VideoCameraConfiguration, Reboot {
     eventStream: Stream;
@@ -49,57 +31,11 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         await client.reboot();
     }
 
-    async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
+    async setVideoStreamOptions(options: MediaStreamOptions) {
+        this.rtspMediaStreamOptions = undefined;
         const client = await this.getClient();
-        const profiles: any[] = await client.getProfiles();
-        const profile = profiles.find(profile => profile.$.token === options.id);
-        const configuration = profile.videoEncoderConfiguration;
-
-        const videoOptions = options.video;
-
-        switch (videoOptions.codec) {
-            case 'h264':
-                configuration.encoding = 'H264';
-
-                if (videoOptions.idrIntervalMillis && videoOptions.fps) {
-                    configuration.H264 ||= {};
-                    configuration.H264.govLength = Math.floor(videoOptions.fps * videoOptions.idrIntervalMillis / 1000);
-                }
-                if (videoOptions.keyframeInterval) {
-                    configuration.H264 ||= {};
-                    configuration.H264.govLength = videoOptions.keyframeInterval;
-                }
-                if (videoOptions.profile) {
-                    configuration.H264 ||= {};
-                    configuration.H264.profile = videoOptions.profile;
-                }
-                break;
-        }
-
-        if (videoOptions.width && videoOptions.height) {
-            configuration.resolution ||= {};
-            configuration.resolution.width = videoOptions.width;
-            configuration.resolution.height = videoOptions.height;
-        }
-
-        if (videoOptions?.bitrate) {
-            configuration.rateControl ||= {};
-            configuration.rateControl.bitrateLimit = Math.floor(videoOptions.bitrate / 1000);
-        }
-        if (videoOptions.fps) {
-            configuration.rateControl ||= {};
-            configuration.rateControl.frameRateLimit = videoOptions.fps;
-            configuration.rateControl.encodingInterval = 1;
-        }
-
-        return new Promise((r, f) => {
-            client.cam.setVideoEncoderConfiguration(configuration, (e: Error, result: any) => {
-                if (e)
-                    return f(e);
-
-                r();
-            })
-        });
+        const ret = await configureCodecs(this.console, client, options);
+        return ret;
     }
 
     async updateDeviceInfo() {
@@ -187,55 +123,25 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
     }
 
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
-        if (!this.rtspMediaStreamOptions) {
-            this.rtspMediaStreamOptions = new Promise(async (resolve) => {
-                try {
-                    const client = await this.getClient();
-                    const profiles: any[] = await client.getProfiles();
-                    const ret: UrlMediaStreamOptions[] = [];
-                    for (const { $, name, videoEncoderConfiguration, audioEncoderConfiguration } of profiles) {
-                        try {
-                            ret.push({
-                                id: $.token,
-                                metadata: {
-                                    videoId: videoEncoderConfiguration?.$?.token,
-                                    audioId: audioEncoderConfiguration?.$?.token,
-                                },
-                                name: name,
-                                container: 'rtsp',
-                                url: await client.getStreamUrl($.token),
-                                video: {
-                                    fps: videoEncoderConfiguration?.rateControl?.frameRateLimit,
-                                    bitrate: computeBitrate(videoEncoderConfiguration?.rateControl?.bitrateLimit),
-                                    width: videoEncoderConfiguration?.resolution?.width,
-                                    height: videoEncoderConfiguration?.resolution?.height,
-                                    codec: videoEncoderConfiguration?.encoding?.toLowerCase(),
-                                    idrIntervalMillis: computeInterval(videoEncoderConfiguration?.rateControl?.frameRateLimit,
-                                        videoEncoderConfiguration?.$.GovLength),
-                                },
-                                audio: this.isAudioDisabled() ? null : {
-                                    bitrate: computeBitrate(audioEncoderConfiguration?.bitrate),
-                                    codec: convertAudioCodec(audioEncoderConfiguration?.encoding),
-                                }
-                            })
-                        }
-                        catch (e) {
-                            this.console.error('error retrieving onvif profile', $.token, e);
-                        }
-                    }
+        if (this.rtspMediaStreamOptions)
+            return this.rtspMediaStreamOptions;
 
-                    if (!ret.length)
-                        throw new Error('onvif camera had no profiles.');
+        this.rtspMediaStreamOptions = new Promise(async (resolve) => {
+            try {
+                const client = await this.getClient();
+                const ret = await getCodecs(this.console, client);
 
-                    resolve(ret);
-                }
-                catch (e) {
-                    this.rtspMediaStreamOptions = undefined;
-                    this.console.error('error retrieving onvif profiles', e);
-                    resolve(undefined);
-                }
-            })
-        }
+                if (!ret.length)
+                    throw new Error('onvif camera had no profiles.');
+
+                resolve(ret);
+            }
+            catch (e) {
+                this.rtspMediaStreamOptions = undefined;
+                this.console.error('error retrieving onvif profiles', e);
+                resolve(undefined);
+            }
+        });
 
         return this.rtspMediaStreamOptions;
     }
@@ -288,6 +194,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         const ret: Setting[] = [
             ...await super.getOtherSettings(),
             {
+                subgroup: 'Advanced',
                 title: 'Onvif Doorbell',
                 type: 'boolean',
                 description: 'Enable if this device is a doorbell',
@@ -295,6 +202,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
                 value: isDoorbell.toString(),
             },
             {
+                subgroup: 'Advanced',
                 title: 'Onvif Doorbell Event Name',
                 type: 'string',
                 description: 'Onvif event name to trigger the doorbell',
@@ -307,13 +215,21 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         if (!isDoorbell) {
             ret.push(
                 {
+                    subgroup: 'Advanced',
                     title: 'Two Way Audio',
+                    description: 'Enable if this device supports two way audio over ONVIF.',
                     type: 'boolean',
                     key: 'onvifTwoWay',
                     value: (!!this.providedInterfaces?.includes(ScryptedInterface.Intercom)).toString(),
                 }
             )
         }
+
+        const ac = {
+            ...automaticallyConfigureSettings,
+        };
+        ac.type = 'button';
+        ret.push(ac);
 
         return ret;
     }
@@ -338,6 +254,18 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
     }
 
     async putSetting(key: string, value: any) {
+        if (key === automaticallyConfigureSettings.key) {
+            autoconfigureSettings(this.console, await this.getClient())
+                .then(() => {
+                    this.log.a('Successfully configured settings.');
+                })
+                .catch(e => {
+                    this.log.a('There was an error automatically configuring settings. More information can be viewed in the console.');
+                    this.console.error('error autoconfiguring', e);
+                });
+            return;
+        }
+
         this.client = undefined;
         this.rtspMediaStreamOptions = undefined;
 
@@ -370,8 +298,10 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         timeout: NodeJS.Timeout;
     }>();
 
-    constructor(nativeId?: string) {
+
+    constructor(nativeId?: ScryptedNativeId) {
         super(nativeId);
+        checkPluginNeedsAutoConfigure(this, 1);
 
         process.nextTick(() => {
             deviceManager.onDeviceDiscovered({
@@ -496,6 +426,12 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
         const username = settings.username?.toString();
         const password = settings.password?.toString();
+
+        if (settings.autoconfigure) {
+            const client = await connectCameraAPI(httpAddress, username, password, this.console, undefined);
+            await autoconfigureSettings(this.console, client);
+        }
+
         const skipValidate = settings.skipValidate?.toString() === 'true';
         let ptzCapabilities: string[];
         if (!skipValidate) {
@@ -581,12 +517,16 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                 placeholder: '192.168.2.222',
             },
             {
+                subgroup: 'Advanced',
                 key: 'httpPort',
                 title: 'HTTP Port',
-                description: 'Optional: Override the HTTP Port from the default value of 80',
+                description: 'Optional: Override the HTTP Port from the default value of 80.',
                 placeholder: '80',
             },
+            { ...automaticallyConfigureSettings },
+            { ...onvifAutoConfigureSettings },
             {
+                subgroup: 'Advanced',
                 key: 'skipValidate',
                 title: 'Skip Validation',
                 description: 'Add the device without verifying the credentials and network settings.',
@@ -611,6 +551,8 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                     title: 'Password',
                     type: 'password',
                 },
+                automaticallyConfigureSettings,
+                onvifAutoConfigureSettings,
             ]
         }));
     }
@@ -622,6 +564,11 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
             throw new Error('device not found');
         adopt.settings.ip = entry.host;
         adopt.settings.httpPort = entry.port;
+        if (adopt.settings.autoconfigure) {
+            const client = await connectCameraAPI(`${entry.host}:${entry.port || 80}`, adopt.settings.username as string, adopt.settings.password as string, this.console, undefined);
+            await autoconfigureSettings(this.console, client);
+            adopt.settings.autoconfigure = false;
+        }
         await this.createDevice(adopt.settings, adopt.nativeId);
         this.discoveredDevices.delete(adopt.nativeId);
         const device = await this.getDevice(adopt.nativeId) as OnvifCamera;

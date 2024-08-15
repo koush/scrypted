@@ -1,19 +1,15 @@
-import sdk, { PluginFork } from '@scrypted/sdk';
+import sdk, { ForkOptions, PluginFork } from '@scrypted/sdk';
 import { createAsyncQueue } from './async-queue';
 import os from 'os';
 
 export type Zygote<T> = () => PluginFork<T>;
 
-export function createZygote<T>(name?: string, filename?: string): Zygote<T> {
-    const opts = {
-        name,
-        filename,
-    };
-    let zygote = sdk.fork<T>(opts);
+export function createZygote<T>(options?: ForkOptions): Zygote<T> {
+    let zygote = sdk.fork<T>(options);
     function* next() {
         while (true) {
             const cur = zygote;
-            zygote = sdk.fork<T>(opts);
+            zygote = sdk.fork<T>(options);
             yield cur;
         }
     }

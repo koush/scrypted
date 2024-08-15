@@ -15,6 +15,10 @@ function createLevelDocument(documentConstructor: any, json: any) {
     return doc;
 }
 
+class Foo {
+
+}
+
 export class WrappedLevel extends Level<string, string | number> {
     curId: number;
 
@@ -30,7 +34,8 @@ export class WrappedLevel extends Level<string, string | number> {
             this.curId = 0;
     }
 
-    async tryGet(documentConstructor: any, _id: any, options?: GetOptions<string, string | number>) {
+
+    async tryGet<T>(documentConstructor: new () => T, _id: any, options?: GetOptions<string, string | number>): Promise<T> {
         try {
             const _documentType = documentConstructor.name;
             const key = `${_documentType}/${_id}`;

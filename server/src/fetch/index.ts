@@ -145,6 +145,11 @@ export function createStringOrBufferBody(headers: [string, string][], body: any)
 
     if (!hasHeader(headers, 'Content-Type'))
         setHeader(headers, 'Content-Type', contentType);
+
+    if (!hasHeader(headers, 'Content-Length')) {
+        body = Buffer.from(body);
+        setHeader(headers, 'Content-Length', body.length.toString());
+    }
     return body;
 }
 

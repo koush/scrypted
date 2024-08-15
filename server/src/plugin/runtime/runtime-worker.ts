@@ -29,6 +29,10 @@ export interface RuntimeWorker {
     once(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
     once(event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
 
+    removeListener(event: 'error', listener: (err: Error) => void): this;
+    removeListener(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
+    removeListener(event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
+
     send(message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any): void;
 
     setupRpcPeer(peer: RpcPeer): void;

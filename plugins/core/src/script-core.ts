@@ -1,4 +1,4 @@
-import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting } from '@scrypted/sdk';
+import sdk, { Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, ForkWorker, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting } from '@scrypted/sdk';
 import { randomBytes } from "crypto";
 import fs from 'fs';
 import path from "path/posix";
@@ -10,7 +10,7 @@ export const ScriptCoreNativeId = 'scriptcore';
 
 interface ScriptWorker {
     script: Script;
-    worker: Worker;
+    worker: ForkWorker;
 }
 
 export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator, Readme {
@@ -91,7 +91,7 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
         }
 
         let script = new Script(nativeId);
-        let worker: Worker;
+        let worker: ForkWorker;
 
         const triggerDeviceDiscover = async (name: string, type: ScryptedDeviceType, interfaces: string[]) => {
             const e = this.scripts.get(nativeId);

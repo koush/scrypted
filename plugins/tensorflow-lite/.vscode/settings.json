@@ -9,12 +9,12 @@
     // "scrypted.serverRoot": "/home/pi/.scrypted",
 
     // lxc installation
-    "scrypted.debugHost": "scrypted-test",
-    "scrypted.serverRoot": "/root/.scrypted",
+    // "scrypted.debugHost": "scrypted-test",
+    // "scrypted.serverRoot": "/root/.scrypted",
 
     // local checkout
-    // "scrypted.debugHost": "127.0.0.1",
-    // "scrypted.serverRoot": "/Users/koush/.scrypted",
+    "scrypted.debugHost": "127.0.0.1",
+    "scrypted.serverRoot": "/Users/koush/.scrypted",
     // "scrypted.debugHost": "koushik-windows",
     // "scrypted.serverRoot": "C:\\Users\\koush\\.scrypted",
 

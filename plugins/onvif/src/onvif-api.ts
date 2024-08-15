@@ -1,6 +1,6 @@
-import { HttpFetchOptions, HttpFetchResponseType, AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { AuthFetchCredentialState, authHttpFetch, HttpFetchOptions } from '@scrypted/common/src/http-auth-fetch';
+import { VideoStreamConfiguration } from '@scrypted/sdk';
 import { EventEmitter } from 'events';
-import https from 'https';
 import { Readable } from 'stream';
 
 const onvif = require('onvif');
@@ -166,6 +166,69 @@ export class OnvifCameraAPI {
             }
         });
         return ret;
+    }
+
+    async canConfigureEncoding() {
+        const ret: any = await promisify(cb => this.cam.getMediaServiceCapabilities(cb));
+        return !!ret.profileCapabilities;
+    }
+
+    async getVideoEncoderConfigurationOptions(profileToken: string, configurationToken: string): Promise<VideoStreamConfiguration> {
+        const options: any = await promisify(cb => this.cam.getVideoEncoderConfigurationOptions({ profileToken }, cb));
+        const codecs: string[] = [];
+        if (options.H264)
+            codecs.push('h264');
+        if (options.H265)
+            codecs.push('h265');
+
+        let qualityRange: [number, number];
+        const resolutions: [number, number][] = [];
+        let fpsRange: [number, number];
+        let keyframeIntervalRange: [number, number];
+        const profiles: string[] = [];
+        let bitrateRange: [number, number];
+
+        const ensureArray = (value: any): any => {
+            if (!Array.isArray(value))
+                return [value];
+            return value;
+        };
+
+        const H264 = options?.extension?.H264 || options?.H264;
+        if (H264) {
+            if (H264?.H264ProfilesSupported)
+                profiles.push(...ensureArray(H264.H264ProfilesSupported).map(p => p.toLowerCase()));
+            if (H264?.resolutionsAvailable)
+                resolutions.push(...ensureArray(H264.resolutionsAvailable).map(r => [r.width, r.height]));
+            if (H264?.frameRateRange?.min || H264?.frameRateRange?.max)
+                fpsRange = [H264.frameRateRange.min, H264.frameRateRange.max];
+            if (H264?.govLengthRange?.min || H264?.govLengthRange?.max)
+                keyframeIntervalRange = [H264.govLengthRange.min, H264.govLengthRange.max];
+            if (H264?.bitrateRange?.min || H264?.bitrateRange?.max)
+                bitrateRange = [H264.bitrateRange.min, H264.bitrateRange.max];
+        }
+        if (options.qualityRange?.min || options?.qualityRange?.max)
+            qualityRange = [options.qualityRange.min, options.qualityRange.max];
+
+        // if (config?.)
+
+        return {
+            codecs,
+            qualityRange,
+            fpsRange,
+            keyframeIntervalRange,
+            resolutions,
+            profiles,
+            bitrateRange,
+        }
+    }
+
+    async setVideoEncoderConfiguration(configuration: any) {
+        return promisify(cb => this.cam.setVideoEncoderConfiguration(configuration, cb));
+    }
+
+    async setAudioEncoderConfiguration(configuration: any) {
+        return promisify(cb => this.cam.setAudioEncoderConfiguration(configuration, cb));
     }
 
     async getProfiles() {

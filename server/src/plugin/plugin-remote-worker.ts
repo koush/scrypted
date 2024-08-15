@@ -1,4 +1,5 @@
-import { ScryptedStatic, SystemManager } from '@scrypted/types';
+import { ForkWorker, ScryptedStatic, SystemManager } from '@scrypted/types';
+import child_process from 'child_process';
 import { once } from 'events';
 import fs from 'fs';
 import net from 'net';
@@ -21,6 +22,9 @@ import { createREPLServer } from './plugin-repl';
 import { getPluginVolume } from './plugin-volume';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
+import { RuntimeWorker } from './runtime/runtime-worker';
+import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
+import { ChildProcessWorker } from './runtime/child-process-worker';
 
 const serverVersion = require('../../package.json').version;
 
@@ -252,10 +256,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             }
             if (worker_threads.isMainThread) {
                 const fsDir = path.join(unzippedPath, 'fs')
-                if (fs.existsSync(fsDir))
-                    process.chdir(fsDir);
-                else
-                    process.chdir(unzippedPath);
+                await fs.promises.mkdir(fsDir, {
+                    recursive: true,
+                });
+                process.chdir(fsDir);
             }
 
             const pluginReader = (name: string) => {
@@ -335,7 +339,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             // process.cpuUsage is for the entire process.
             // process.memoryUsage is per thread.
-            const allMemoryStats = new Map<NodeThreadWorker, NodeJS.MemoryUsage>();
+            const allMemoryStats = new Map<RuntimeWorker, NodeJS.MemoryUsage>();
             // start the stats updater/watchdog after installation has finished, as that may take some time.
             peer.getParam('updateStats').then(updateStats => startStatsUpdater(allMemoryStats, updateStats));
 
@@ -355,23 +359,53 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             const pluginRemoteAPI: PluginRemote = scrypted.pluginRemoteAPI;
 
             scrypted.fork = (options) => {
-                const ntw = new NodeThreadWorker(mainFilename, pluginId, {
-                    packageJson,
-                    env: process.env,
-                    pluginDebug: undefined,
-                    zipFile,
-                    unzippedPath,
-                    zipHash,
-                }, {
-                    name: options?.name,
-                });
+                let runtimeWorker: RuntimeWorker;
+                let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
+                if (options?.runtime) {
+                    const builtins = getBuiltinRuntimeHosts();
+                    const runtime = builtins.get(options.runtime);
+                    if (!runtime)
+                        throw new Error('unknown runtime ' + options.runtime);
+                    runtimeWorker = runtime(mainFilename, pluginId, {
+                        packageJson,
+                        env: process.env,
+                        pluginDebug: undefined,
+                        zipFile,
+                        unzippedPath,
+                        zipHash,
+                    }, undefined);
+
+                    if (runtimeWorker instanceof ChildProcessWorker)
+                        nativeWorker = runtimeWorker.childProcess;
+
+                    nativeWorker.stdout.on('data', (data) => {
+                        console.log(data.toString());
+                    });
+                    nativeWorker.stderr.on('data', (data) => {
+                        console.error(data.toString());
+                    });
+                }
+                else {
+                    const ntw = new NodeThreadWorker(mainFilename, pluginId, {
+                        packageJson,
+                        env: process.env,
+                        pluginDebug: undefined,
+                        zipFile,
+                        unzippedPath,
+                        zipHash,
+                    }, {
+                        name: options?.name,
+                    });
+                    runtimeWorker = ntw;
+                    nativeWorker = ntw.worker;
+                }
 
                 const result = (async () => {
-                    const threadPeer = new RpcPeer('main', 'thread', (message, reject) => ntw.send(message, reject));
+                    const threadPeer = new RpcPeer('main', 'thread', (message, reject) => runtimeWorker.send(message, reject));
                     threadPeer.params.updateStats = (stats: PluginStats) => {
-                        allMemoryStats.set(ntw, stats.memoryUsage);
+                        allMemoryStats.set(runtimeWorker, stats.memoryUsage);
                     }
-                    ntw.setupRpcPeer(threadPeer);
+                    runtimeWorker.setupRpcPeer(threadPeer);
 
                     class PluginForkAPI extends PluginAPIProxy {
                         [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];
@@ -391,17 +425,17 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                     const remote = await setupPluginRemote(threadPeer, forkApi, pluginId, { serverVersion }, () => systemManager.getSystemState());
                     forks.add(remote);
-                    ntw.on('exit', () => {
+                    runtimeWorker.on('exit', () => {
                         threadPeer.kill('worker exited');
                         forkApi.removeListeners();
                         forks.delete(remote);
-                        allMemoryStats.delete(ntw);
+                        allMemoryStats.delete(runtimeWorker);
                     });
-                    ntw.on('error', e => {
+                    runtimeWorker.on('error', e => {
                         threadPeer.kill('worker error ' + e);
                         forkApi.removeListeners();
                         forks.delete(remote);
-                        allMemoryStats.delete(ntw);
+                        allMemoryStats.delete(runtimeWorker);
                     });
 
                     for (const [nativeId, dmd] of deviceManager.nativeIds.entries()) {
@@ -414,12 +448,22 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     return remote.loadZip(packageJson, getZip, forkOptions)
                 })();
 
-                result.catch(() => ntw.kill());
+                result.catch(() => runtimeWorker.kill());
 
+                const worker: ForkWorker = {
+                    on(event: string, listener: (...args: any[]) => void) {
+                        return runtimeWorker.on(event as any, listener);
+                    },
+                    terminate: () => runtimeWorker.kill(),
+                    removeListener(event, listener) {
+                        return runtimeWorker.removeListener(event as any, listener);
+                    },
+                    nativeWorker,
+                };
                 return {
-                    worker: ntw.worker,
+                    worker,
                     result,
-                }
+                };
             }
 
             try {

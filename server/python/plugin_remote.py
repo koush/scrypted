@@ -763,9 +763,11 @@ class PluginRemote:
                 pip_target, "requirements.optional"
             )
 
-            need_pip = True
+            need_pip = False
+            # pip is needed if there's a requiremnts.txt file that has changed.
             if str_requirements:
                 need_pip = need_requirements(requirements_basename, str_requirements)
+            # pip is needed if the base scrypted requirements have changed.
             if not need_pip:
                 need_pip = need_requirements(
                     scrypted_requirements_basename, SCRYPTED_REQUIREMENTS
@@ -798,7 +800,7 @@ class PluginRemote:
                 print("requirements.txt (up to date)")
                 print(str_requirements)
 
-            sys.path.insert(0, zipPath)
+            sys.path.insert(0, plugin_zip_paths.get("unzipped_path"))
             sys.path.insert(0, pip_target)
 
         self.systemManager = SystemManager(self.api, self.systemState)
@@ -888,6 +890,11 @@ class PluginRemote:
             sdk_init(
                 zip, self, self.systemManager, self.deviceManager, self.mediaManager
             )
+
+        # plugin embedded files are treated as the working directory, chdir to that.
+        fsPath = os.path.join(plugin_zip_paths.get("unzipped_path"), "fs")
+        os.makedirs(fsPath, exist_ok=True)
+        os.chdir(fsPath)
 
         if not forkMain:
             from main import create_scrypted_plugin  # type: ignore

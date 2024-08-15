@@ -97,6 +97,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             const types = require.resolve('@scrypted/types');
             const PYTHONPATH = types.substring(0, types.indexOf('types') + 'types'.length);
             this.worker = child_process.spawn(pythonPath, args, {
+                cwd: options.unzippedPath,
                 // stdin, stdout, stderr, peer in, peer out
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
                 env: Object.assign({
@@ -115,6 +116,8 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         let pluginPythonVersion: string = options.packageJson.scrypted.pythonVersion?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonVersion?.default;
         if (process.env.SCRYPTED_PORTABLE_PYTHON && !pluginPythonVersion)
             pluginPythonVersion = packagedPythonVersion;
+
+        let portablePythonOptions = options.packageJson.scrypted.pythonVersion?.options?.[os.platform()]?.[os.arch()] || options.packageJson.scrypted.pythonVersion?.options?.default || {};
 
         // if the plugin requests a specific python, then install it via portable python
         if (!pluginPythonVersion) {
@@ -148,7 +151,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         const pyPath = path.join(getPluginVolume(pluginId), 'py');
         const portableInstallPath = path.join(pyPath, pyVersion);
 
-        const py = new PortablePython(pluginPythonVersion, portableInstallPath);
+        const py = new PortablePython(pluginPythonVersion, portableInstallPath, portablePythonOptions);
         if (fs.existsSync(py.executablePath)) {
             pythonPath = py.executablePath;
             finishSetup();
@@ -158,7 +161,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
                 try {
                     this.pythonInstallationComplete = false;
                     await fs.promises.rm(pyPath, { recursive: true, force: true }).catch(() => { });
-                    pythonPath = await installScryptedServerRequirements(pluginPythonVersion, portableInstallPath);
+                    pythonPath = await installScryptedServerRequirements(pluginPythonVersion, portableInstallPath, portablePythonOptions);
                     finishSetup();
                 }
                 catch (e) {

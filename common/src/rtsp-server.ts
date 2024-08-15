@@ -726,7 +726,10 @@ export class RtspClient extends RtspBase {
             Accept: 'application/sdp',
         });
 
-        this.contentBase = response.headers['content-base'] || response.headers['content-location'];;
+        this.contentBase = response.headers['content-base'] || response.headers['content-location'];
+        // content base may be a relative path? seems odd.
+        if (this.contentBase)
+            this.contentBase = new URL(this.contentBase, this.url).toString();
         return response;
     }
 

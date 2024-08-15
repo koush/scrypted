@@ -1,4 +1,4 @@
-import { NodeThreadWorker } from "./runtime/node-thread-worker";
+import { RuntimeWorker } from "./runtime/runtime-worker";
 
 export interface PluginStats {
     type: 'stats',
@@ -6,30 +6,31 @@ export interface PluginStats {
     memoryUsage: NodeJS.MemoryUsage;
 }
 
-export function startStatsUpdater(allMemoryStats: Map<NodeThreadWorker, NodeJS.MemoryUsage>, updateStats: (stats: PluginStats) => void) {
+export function startStatsUpdater(allMemoryStats: Map<RuntimeWorker, NodeJS.MemoryUsage>, updateStats: (stats: PluginStats) => void) {
     setInterval(() => {
         let cpuUsage: NodeJS.CpuUsage;
         let memoryUsage: NodeJS.MemoryUsage;
-        if (process.cpuUsage) {
+        if (process.cpuUsage)
             cpuUsage = process.cpuUsage();
-            allMemoryStats.set(undefined, process.memoryUsage());
 
-            memoryUsage = {
-                rss: 0,
-                heapTotal: 0,
-                heapUsed: 0,
-                external: 0,
-                arrayBuffers: 0,
-            }
+        allMemoryStats.set(undefined, process.memoryUsage());
 
-            for (const mu of allMemoryStats.values()) {
-                memoryUsage.rss += mu.rss;
-                memoryUsage.heapTotal += mu.heapTotal;
-                memoryUsage.heapUsed += mu.heapUsed;
-                memoryUsage.external += mu.external;
-                memoryUsage.arrayBuffers += mu.arrayBuffers;
-            }
+        memoryUsage = {
+            rss: 0,
+            heapTotal: 0,
+            heapUsed: 0,
+            external: 0,
+            arrayBuffers: 0,
+        }
 
+        for (const mu of allMemoryStats.values()) {
+            if (!mu)
+                continue;
+            memoryUsage.rss += mu.rss;
+            memoryUsage.heapTotal += mu.heapTotal;
+            memoryUsage.heapUsed += mu.heapUsed;
+            memoryUsage.external += mu.external;
+            memoryUsage.arrayBuffers += mu.arrayBuffers;
         }
 
         updateStats({

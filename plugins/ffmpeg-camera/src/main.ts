@@ -124,6 +124,21 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> {
         return mediaManager.createFFmpegMediaObject(ret);
     }
 
+    isAudioDisabled() {
+        return this.storage.getItem('noAudio') === 'true';
+    }
+   
+    async getOtherSettings(): Promise<Setting[]> {
+        return [
+            {
+                key: 'noAudio',
+                title: 'No Audio',
+                description: 'Enable this setting if the camera does not have audio or to mute audio.',
+                type: 'boolean',
+                value: (this.isAudioDisabled()).toString(),
+            },
+        ]
+    }
 }
 
 class FFmpegProvider extends CameraProviderBase<UrlMediaStreamOptions> {

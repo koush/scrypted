@@ -1,14 +1,12 @@
 import { closeQuiet } from "@scrypted/common/src/listen-cluster";
-import { H264_NAL_TYPE_SPS, RTSP_FRAME_MAGIC, RtspClient, RtspClientUdpSetupOptions, findH264NaluType, parseSemicolonDelimited } from "@scrypted/common/src/rtsp-server";
+import { RTSP_FRAME_MAGIC, RtspClient, RtspClientUdpSetupOptions, parseSemicolonDelimited } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
 import dgram from 'dgram';
-import { parse as spsParse } from "h264-sps-parser";
 import { EventEmitter } from "stream";
 import { ParserSession, setupActivityTimer } from "./ffmpeg-rebroadcast";
 import { negotiateMediaStream } from "./rfc4571";
-import { getSpsResolution } from "./sps-resolution";
 
 export type RtspChannelCodecMapping = { [key: number]: string };
 

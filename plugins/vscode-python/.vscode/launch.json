@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Scrypted Debugger",
-            "type": "python",
+            "type": "debugpy",
             "request": "attach",
             "connect": {
                 "host": "${config:scrypted.debugHost}",
@@ -16,12 +16,8 @@
             "preLaunchTask": "scrypted: deploy+debug",
             "pathMappings": [
                 {
-                    "localRoot": "/Volumes/Dev/scrypted/server/python/",
-                    "remoteRoot": "/Volumes/Dev/scrypted/server/python/",
-                },
-                {
                     "localRoot": "${workspaceFolder}/src",
-                    "remoteRoot": "${config:scrypted.pythonRemoteRoot}"
+                    "remoteRoot": "."
                 },
             ]
         }

@@ -1,11 +1,11 @@
+import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
 import Level from '../level';
-import { sleep } from '../sleep';
 import { getPluginsVolume, getScryptedVolume } from '../plugin/plugin-volume';
-import AdmZip from 'adm-zip';
 import { ScryptedRuntime } from '../runtime';
-import { getPluginNodePath } from '../plugin/plugin-npm-dependencies';
+import { sleep } from '../sleep';
+import util from 'util';
 
 export class Backup {
     constructor(public runtime: ScryptedRuntime) {}
@@ -33,7 +33,16 @@ export class Backup {
         });
 
         const zip = new AdmZip();
-        await zip.addLocalFolderPromise(backupDbPath, {});
+        // addLocalFolderPromise broken
+        // https://github.com/cthackers/adm-zip/issues/532
+        await new Promise<void>((resolve, reject) => {
+            zip.addLocalFolderAsync(backupDbPath, (success, error) => {
+                if (error)
+                    reject(error);
+                else
+                    resolve();
+            })
+        });
         return zip.toBufferPromise();
     }
 

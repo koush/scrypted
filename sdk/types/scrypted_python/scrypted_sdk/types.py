@@ -358,11 +358,11 @@ class RequestVideoStreamOptions(TypedDict):
     fps: float
     h264Info: H264Info
     height: float
-    idrIntervalMillis: float  # Key Frame interval in milliseconds.
     keyframeInterval: float  # Key Frame interval in frames.
     maxBitrate: float
     minBitrate: float
     profile: str
+    quality: float
     width: float
 
 class ScryptedDeviceAccessControl(TypedDict):
@@ -378,6 +378,29 @@ class VideoResource(TypedDict):
     thumbnail: Resource
     video: Resource
 
+class VideoStreamConfiguration(TypedDict):
+
+    bitrate: float
+    bitrateControl: Any | Any
+    bitrateControls: list[str]
+    bitrateRange: tuple[float, float]
+    codec: str
+    codecs: list[str]
+    fps: float
+    fpsRange: tuple[float, float]
+    h264Info: H264Info
+    height: float
+    keyframeInterval: float  # Key Frame interval in frames.
+    keyframeIntervalRange: tuple[float, float]
+    maxBitrate: float
+    minBitrate: float
+    profile: str
+    profiles: list[str]
+    quality: float
+    qualityRange: tuple[float, float]
+    resolutions: list[tuple[float, float]]
+    width: float
+
 class VideoStreamOptions(TypedDict):
 
     bitrate: float
@@ -386,11 +409,11 @@ class VideoStreamOptions(TypedDict):
     fps: float
     h264Info: H264Info
     height: float
-    idrIntervalMillis: float  # Key Frame interval in milliseconds.
     keyframeInterval: float  # Key Frame interval in frames.
     maxBitrate: float
     minBitrate: float
     profile: str
+    quality: float
     width: float
 
 class ImageFormat(TypedDict):
@@ -595,6 +618,12 @@ class MediaStatus(TypedDict):
     mediaPlayerState: MediaPlayerState
     metadata: Any
     position: float
+
+class MediaStreamConfiguration(TypedDict):
+
+    audio: AudioStreamOptions
+    id: str
+    video: VideoStreamConfiguration
 
 class MediaStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""
@@ -1525,7 +1554,7 @@ class VideoCamera:
 
 class VideoCameraConfiguration:
 
-    async def setVideoStreamOptions(self, options: MediaStreamOptions) -> None:
+    async def setVideoStreamOptions(self, options: MediaStreamOptions) -> MediaStreamConfiguration:
         pass
 
 

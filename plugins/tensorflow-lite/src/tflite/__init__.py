@@ -35,6 +35,9 @@ availableModels = [
     "ssd_mobilenet_v2_coco_quant_postprocess",
     "tf2_ssd_mobilenet_v2_coco17_ptq",
     "ssdlite_mobiledet_coco_qat_postprocess",
+    "scrypted_yolov10n_320",
+    "scrypted_yolov10s_320",
+    "scrypted_yolov10m_320",
     "scrypted_yolov6n_320",
     "scrypted_yolov6s_320",
     "scrypted_yolov9c_320",
@@ -91,15 +94,17 @@ class TensorFlowLitePlugin(
             nonlocal model
 
             if defaultModel:
-                if edge_tpus and next(
-                    (obj for obj in edge_tpus if obj["type"] == "usb"), None
-                ):
-                    model = "ssdlite_mobiledet_coco_qat_postprocess"
-                else:
-                    model = "efficientdet_lite0_320_ptq"
+                model = "scrypted_yolov10n_320"
+                # if edge_tpus and next(
+                #     (obj for obj in edge_tpus if obj["type"] == "usb"), None
+                # ):
+                #     model = "ssdlite_mobiledet_coco_qat_postprocess"
+                # else:
+                #     model = "efficientdet_lite0_320_ptq"
             self.yolo = "yolo" in model
             self.yolov9 = "yolov9" in model
             self.scrypted_model = "scrypted" in model
+            self.scrypted_yolov10 = "scrypted_yolov10" in model
             self.modelName = model
 
             print(f"model: {model}")
@@ -131,7 +136,7 @@ class TensorFlowLitePlugin(
             tflite_model = "best_full_integer_quant" if self.scrypted_model else model
             return self.downloadFile(
                 f"https://github.com/koush/tflite-models/raw/{branch}/{model}/{tflite_model}{suffix}.tflite",
-                f"{model_version}/{tflite_model}{suffix}.tflite",
+                f"{model_version}/{model}/{tflite_model}{suffix}.tflite",
             )
 
         try:
@@ -247,12 +252,20 @@ class TensorFlowLitePlugin(
                     scale, zero_point = output["quantization"]
                     threshold = yolo.defaultThreshold / scale + zero_point
                     combined_scale = scale * input_scale
-                    objs = yolo.parse_yolov9(
-                        x[0],
-                        threshold,
-                        scale=lambda v: (v - zero_point) * combined_scale,
-                        confidence_scale=lambda v: (v - zero_point) * scale,
-                    )
+                    if self.scrypted_yolov10:
+                        objs = yolo.parse_yolov10(
+                            x[0],
+                            threshold,
+                            scale=lambda v: (v - zero_point) * combined_scale,
+                            confidence_scale=lambda v: (v - zero_point) * scale,
+                        )
+                    else:
+                        objs = yolo.parse_yolov9(
+                            x[0],
+                            threshold,
+                            scale=lambda v: (v - zero_point) * combined_scale,
+                            confidence_scale=lambda v: (v - zero_point) * scale,
+                        )
                 else:
                     # this code path is unused.
                     objs = yolo.parse_yolov9(x[0], scale=lambda v: v * input_scale)

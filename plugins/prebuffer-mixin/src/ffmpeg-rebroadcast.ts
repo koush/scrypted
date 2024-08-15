@@ -229,7 +229,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     };
 
     const rtsp = (options.parsers as any).rtsp as ReturnType<typeof createRtspParser>;
-    rtsp.sdp.then(sdp => sdpDeferred.resolve(sdp));
+    rtsp.sdp.then(sdp => {
+        console?.log('sdp received from ffmpeg', sdp);
+        sdpDeferred.resolve(sdp);
+    });
 
     start();
 

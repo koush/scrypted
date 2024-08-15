@@ -2,7 +2,7 @@ import { sleep } from '@scrypted/common/src/sleep';
 import sdk, { Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
-import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { createRtspMediaStreamOptions, Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { OnvifCameraAPI, OnvifEvent, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
@@ -81,6 +81,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             hide: true,
         },
         ptz: {
+            subgroup: 'Advanced',
             title: 'PTZ Capabilities',
             choices: [
                 'Pan',
@@ -111,10 +112,27 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             ],
             defaultValue: 'Default',
         },
+        useOnvifTwoWayAudio: {
+            subgroup: 'Advanced',
+            title: 'Use ONVIF for Two-Way Audio',
+            type: 'boolean',
+        },
     });
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
+
+        this.storageSettings.settings.useOnvifTwoWayAudio.onGet = async () => {
+            return {
+                hide: !!this.storageSettings.values.doorbell,
+            }
+        };
+
+        this.storageSettings.settings.ptz.onGet = async () => {
+            return {
+                hide: !!this.storageSettings.values.doorbell,
+            }
+        };
 
         this.updateDeviceInfo();
         (async () => {
@@ -226,11 +244,16 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (this.storageSettings.values.doorbell) {
             interfaces.push(
                 ScryptedInterface.BinarySensor,
-                ScryptedInterface.Intercom
             );
             type = ScryptedDeviceType.Doorbell;
             name = 'Reolink Doorbell';
         }
+        if (this.storageSettings.values.doorbell || this.storageSettings.values.useOnvifTwoWayAudio) {
+            interfaces.push(
+                ScryptedInterface.Intercom
+            );
+        }
+
         if (this.storageSettings.values.ptz?.length) {
             interfaces.push(ScryptedInterface.PanTiltZoom);
         }
@@ -445,7 +468,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     createRtspMediaStreamOptions(url: string, index: number) {
-        const ret = super.createRtspMediaStreamOptions(url, index);
+        const ret = createRtspMediaStreamOptions(url, index);
         ret.tool = 'scrypted';
         return ret;
     }
@@ -535,26 +558,37 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
         ];
 
-        // this property seems to be:
-        // 1 (Doorbell): rtmp main, sub, ext + rtsp main, sub
-        // 2 (Duo 2): rtmp sub + rtsp main.sub
-        // 4k cams seem to be 2.
-        // unsure if there are other values
-        // update: unfortunately this property is unusable on the E1 Pro.
-        // However, the mainEncType property seems like a reliable marker
-        // const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[0].live?.ver;
-        // if (live === 2) {
-        //     // remove the rtmp main and ext
-        //     streams.splice(0, 2);
-        // }
+        // abilityChn->live
+        // 0: not support
+        // 1: support main/extern/sub stream
+        // 2: support main/sub stream
 
+        const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[0].live?.ver;
+        const [rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub] = streams;
+        streams.splice(0, streams.length);
+
+        // abilityChn->mainEncType
+        // 0: main stream enc type is H264
+        // 1: main stream enc type is H265
+
+        // anecdotally, encoders of type h265 do not have a working RTMP main stream.
         const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[0].mainEncType?.ver;
-        // 0 (Doorbell): rtmp main, sub, ext + rtsp main, sub
-        // 1 (Duo 2 + E1 Pro): rtmp sub + rtsp main, sub
-        if (mainEncType === 1) {
-            // remove the rtmp main and ext
-            streams.splice(0, 2);
+
+        if (live === 2) {
+            if (mainEncType === 1) {
+                streams.push(rtmpSub, rtspMain, rtspSub);
+            }
+            else {
+                streams.push(rtmpMain, rtmpSub, rtspMain, rtspSub);
+            }
         }
+        else if (mainEncType === 1) {
+            streams.push(rtmpExt, rtmpSub, rtspMain, rtspSub);
+        }
+        else {
+            streams.push(rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub);
+        }
+
 
         if (deviceInfo?.model == "Reolink TrackMix PoE") {
             streams.push({
@@ -629,8 +663,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     async getRtspPortOverrideSettings(): Promise<Setting[]> {
         return [
             ...await super.getRtspPortOverrideSettings(),
-            ...await this.storageSettings.getSettings(),
         ];
+    }
+
+    getOtherSettings(): Promise<Setting[]> {
+        return this.storageSettings.getSettings();
     }
 
     getRtmpAddress() {
@@ -769,7 +806,7 @@ class ReolinkProvider extends RtspProvider {
             {
                 key: 'httpPort',
                 title: 'HTTP Port',
-                description: 'Optional: Override the HTTP Port from the default value of 80',
+                description: 'Optional: Override the HTTP Port from the default value of 80.',
                 placeholder: '80',
             },
             {

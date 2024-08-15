@@ -7,7 +7,6 @@ import fs from 'fs';
 import http from 'http';
 import httpAuth from 'http-auth';
 import https from 'https';
-import ip, { isV4Format } from 'ip';
 import net from 'net';
 import os from 'os';
 import path from 'path';
@@ -16,12 +15,13 @@ import semver from 'semver';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { Plugin, ScryptedUser, Settings } from './db-types';
+import { getUsableNetworkAddresses } from './ip';
 import Level from './level';
 import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { RPCResultError } from './rpc';
 import { ScryptedRuntime } from './runtime';
-import { getHostAddresses, SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
+import { SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { getNpmPackageInfo } from './services/plugin';
 import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
@@ -229,12 +229,6 @@ async function start(mainFilename: string, options?: {
     }
 
     app.use(async (req, res, next) => {
-        // /web/component requires basic auth admin access.
-        if (req.url.startsWith('/web/component/')) {
-            next();
-            return;
-        }
-
         // the remote address may be ipv6 prefixed so use a fuzzy match.
         // eg ::ffff:192.168.2.124
         if (process.env.SCRYPTED_ADMIN_USERNAME
@@ -326,12 +320,26 @@ async function start(mainFilename: string, options?: {
         next();
     });
 
-    // allow basic auth to deploy plugins
+    // all methods under /web/component require admin auth.
     app.all('/web/component/*', (req, res, next) => {
+        // check if the user is admin authed already, and if not, continue on with basic auth to escalate.
+        // this will cover anonymous access like in demo site.
+        if (res.locals.username && !res.locals.aclId) {
+            next();
+            return;
+        }
+
         if (req.protocol === 'https' && req.headers.authorization && req.headers.authorization.toLowerCase()?.indexOf('basic') !== -1) {
-            const basicChecker = basicAuth.check((req) => {
-                res.locals.username = req.user;
-                (req as any).username = req.user;
+            const basicChecker = basicAuth.check(async (req) => {
+                try {
+                    const user = await db.tryGet(ScryptedUser, req.user);
+                    res.locals.username = user._id;
+                    res.locals.aclId = user.aclId;
+                }
+                catch (e) {
+                    // should be unreachable.
+                    console.warn('basic auth failed unexpectedly', e);
+                }
                 next();
             });
 
@@ -340,7 +348,7 @@ async function start(mainFilename: string, options?: {
             return;
         }
         next();
-    })
+    });
 
     // verify all plugin related requests have admin auth
     app.all('/web/component/*', (req, res, next) => {
@@ -524,9 +532,9 @@ async function start(mainFilename: string, options?: {
     });
 
     const getAlternateAddresses = async () => {
-        const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getHostAddresses(true, true))
+        const addresses = ((await scrypted.addressSettings.getLocalAddresses()) || getUsableNetworkAddresses())
             .map(address => {
-                if (ip.isV6Format(address) && !isV4Format(address))
+                if (net.isIPv6(address) && !net.isIPv4(address))
                     address = `[${address}]`;
                 return `https://${address}:${SCRYPTED_SECURE_PORT}`
             });
@@ -730,7 +738,7 @@ async function start(mainFilename: string, options?: {
     console.log('#######################################################');
     console.log(`Scrypted Volume           : ${volumeDir}`);
     console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
-    for (const address of getHostAddresses(true, true)) {
+    for (const address of getUsableNetworkAddresses()) {
         console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
     }
     console.log(`Version:       : ${await scrypted.info.getVersion()}`);
