@@ -34,16 +34,10 @@ export class DenoWorker extends ChildProcessWorker {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
             env: Object.assign({
                 SCRYPTED_MAIN_FILENAME: mainFilename,
+                RUST_BACKTRACE: "full",
             }, process.env, env),
             serialization: 'json',
             // execArgv,
-        });
-
-        this.worker.stderr.on('data', (data) => {
-            console.error(`stderr: ${data}`);
-        });
-        this.worker.stdout.on('data', (data) => {
-            console.log(`stdout: ${data}`);
         });
 
         this.setupWorker();

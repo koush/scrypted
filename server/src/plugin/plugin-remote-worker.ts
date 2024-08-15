@@ -377,6 +377,13 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                     if (runtimeWorker instanceof ChildProcessWorker)
                         nativeWorker = runtimeWorker.childProcess;
+
+                    nativeWorker.stdout.on('data', (data) => {
+                        console.log(data.toString());
+                    });
+                    nativeWorker.stderr.on('data', (data) => {
+                        console.error(data.toString());
+                    });
                 }
                 else {
                     const ntw = new NodeThreadWorker(mainFilename, pluginId, {
