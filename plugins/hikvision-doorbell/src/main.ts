@@ -2,7 +2,7 @@ import { HikvisionCamera } from "../../hikvision/src/main"
 import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, LockState, Readme } from "@scrypted/sdk";
 import { PassThrough } from "stream";
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { RtspProvider, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { createRtspMediaStreamOptions, RtspProvider, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionDoorbellAPI, HikvisionDoorbellEvent } from "./doorbell-api";
 import { SipManager, SipRegistration } from "./sip-manager";
@@ -254,7 +254,7 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
                     return defaultMap;
                 } else {
                     try {
-                        return await this.getClient().getVideoChannels();
+                        return await this.getClient().getVideoChannels (camNumber);
                     }
                     catch (e) {
                         this.console.error('error retrieving channel ids', e);
@@ -269,14 +269,14 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
 
         // due to being able to override the channel number, and NVR providing per channel port access,
         // do not actually use these channel ids, and just use it to determine the number of channels
-        // available for a camera.q
+        // available for a camera.
         const ret = [];
         let index = 0;
         const cameraNumber = this.getCameraNumber();
         for (const [id, channel] of detectedChannels.entries()) {
             if (cameraNumber && channelToCameraNumber(id) !== cameraNumber)
                 continue;
-            const mso = this.createRtspMediaStreamOptions(this.getClient().rtspUrlFor(this.getRtspAddress(), id, params), index++);
+            const mso = createRtspMediaStreamOptions(this.getClient().rtspUrlFor(this.getRtspAddress(), id, params), index++);
             Object.assign(mso.video, channel?.video);
             mso.tool = 'scrypted';
             ret.push(mso);
