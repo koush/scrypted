@@ -21,8 +21,9 @@ export enum HikvisionDoorbellEvent {
     CaseTamperAlert = '02000000',
     TalkInvite = "11000000",
     TalkHangup = "12000000",
-    OpenDoor = '01000000',
-    CloseDoor = '06000000'
+    Unlock = '01000000',
+    DoorOpened = '06000000',
+    DoorClosed = '05000000'
 } 
 
 export function getChannel(channel: string) {
@@ -281,6 +282,7 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
     }
 
     async openDoor() {
+        this.console.info ('Open door lock runing')
         // const data = '<RemoteControlDoor><cmd>alwaysOpen</cmd></RemoteControlDoor>';
         const data = '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>';
         await this.request({
@@ -291,6 +293,7 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
     }
 
     async closeDoor() {
+        this.console.info ('Close door lock runing')
         const data = '<RemoteControlDoor><cmd>resume</cmd></RemoteControlDoor>';
         await this.request({
             url: `http://${this.endpoint}/ISAPI/AccessControl/RemoteControl/door/1`,
@@ -338,6 +341,27 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
             method: 'PUT',
             responseType: 'readable',
         }, data);
+    }
+
+    async getDoorOpenDuration(): Promise<number> {
+
+        let xml: string;
+        try {
+            const response = await this.request({
+                url: `http://${this.endpoint}/ISAPI/AccessControl/Door/param/1`,
+                responseType: 'text',
+            });
+            xml = response.body;
+            this.storage.setItem('doorOpenDuration', xml);
+        }
+        catch (e) {
+            xml = this.storage.getItem('doorOpenDuration');
+            if (!xml)
+                throw e;
+        }
+        const parsedXml = await xml2js.parseStringPromise(xml);
+        const ret = Number (parsedXml.DoorParam.openDuration[0]);
+        return ret;
     }
 
     async installHttpHosts() {
@@ -485,6 +509,8 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
         const serial = data.toString('utf8', 0x2C, 0x5C);
         const marker = data.toString('hex', 0xB0, 0xB4);
 
+        // this.console.debug (`Event string:\n${data.toString('hex')}`); 
+
         for (const [name, event] of Object.entries(HikvisionDoorbellEvent)) {
             if (marker == event) {
                 this.emitEvent('event', event, cameraNumber, inactive);
@@ -493,6 +519,6 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
             }
         }
 
-        this.console.info (`Unknown camera event: "${marker}"`);        
+        this.console.info (`Unknown camera event: "${marker}"`);       
     }
 }

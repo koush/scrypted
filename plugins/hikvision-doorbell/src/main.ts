@@ -17,6 +17,7 @@ import { join } from 'path';
 const { mediaManager, deviceManager } = sdk;
 
 const EXPOSE_LOCK_KEY: string = 'exposeLock';
+const USE_CONTACT_SENSOR_KEY: string = 'useContactSensor';
 const EXPOSE_ALERT_KEY: string = 'exposeAlert';
 
 const SIP_MODE_KEY: string = 'sipMode';
@@ -48,6 +49,7 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
     sipManager?: SipManager;
 
     private controlEvents: EventEmitter = new EventEmitter();
+    private doorOpenDurationTimeout: NodeJS.Timeout;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
@@ -118,6 +120,7 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
         const motionTimeoutDuration = (parseInt(this.storage.getItem('motionTimeout')) || 10) * 1000;
         let motionPings = 0;
         events.on('event', async (event: HikvisionDoorbellEvent, cameraNumber: string, inactive: boolean) => {
+
             if (event === HikvisionDoorbellEvent.CaseTamperAlert)
             {
                 const enabled = parseBooleans (this.storage.getItem (EXPOSE_ALERT_KEY));
@@ -193,21 +196,32 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
                     this.controlEvents.emit (event);
                 });
             }
-            else if (event === HikvisionDoorbellEvent.OpenDoor) 
+            else if (
+                event === HikvisionDoorbellEvent.Unlock 
+                || (event === HikvisionDoorbellEvent.DoorOpened && parseBooleans (this.storage.getItem (USE_CONTACT_SENSOR_KEY)))
+                ) 
             {
                 const provider = this.provider as HikvisionDoorbellProvider;
                 const lock = await provider.getLockDevice (this.nativeId);
-                if (lock)
+                if (lock) 
+                {
                     lock.lockState = LockState.Unlocked;
 
+                    clearTimeout (this.doorOpenDurationTimeout);
+                    const timeout = (await this.getClient().getDoorOpenDuration()) * 1000;
+                    this.doorOpenDurationTimeout = setTimeout ( async () => {
+    
+                        const provider = this.provider as HikvisionDoorbellProvider;
+                        const lock = await provider.getLockDevice (this.nativeId);
+                        if (lock) {
+                            lock.lockState = LockState.Locked;
+                            this.console.info (`Door lock was closed automatically after duration: ${timeout}`);
+                        }
+                    }
+                    , timeout);
+                }
+                    
                 setTimeout(() => this.stopRinging(), OPEN_LOCK_AUDIO_NOTIFY_DURASTION);
-            }
-            else if (event === HikvisionDoorbellEvent.CloseDoor) 
-            {
-                const provider = this.provider as HikvisionDoorbellProvider;
-                const lock = await provider.getLockDevice (this.nativeId);
-                if (lock)
-                    lock.lockState = LockState.Locked;
             }
         })
 
@@ -411,6 +425,14 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
                 description: 'Number of motion pings needed to trigger motion.',
                 value: parseInt(this.storage.getItem('motionPings')) || 1,
                 type: 'number',
+            },
+            {
+                subgroup: 'Advanced',
+                key: USE_CONTACT_SENSOR_KEY,
+                title: 'Use Contact Sensor',
+                description: "If you installed a contact sensor on the door when installing the Hikvision doorbell, you can use its status data to control the status of the doorlock controller, which you enabled in General Tab (\"Expose Door Lock Controller\" checkbox). To do this, enable this checkbox.",
+                value: parseBooleans (this.storage.getItem (USE_CONTACT_SENSOR_KEY)) || false,
+                type: 'boolean',
             },
         );
 
