@@ -6,7 +6,7 @@ import { PassThrough, Readable } from 'stream';
 import { listenZero } from '../listen-zero';
 
 // deno's createRequire or node console doesn't hook inspect...
-// so grab teh deno console from globalThis which was set earlier in deno-plugin-remote.ts
+// so grab teh deno console from globalThis which was set earlier in deno-plugin-remote.js
 if (process.versions.deno)
     console = (globalThis as any).denoConsole || console;
 

@@ -24,7 +24,7 @@ export class DenoWorker extends ChildProcessWorker {
             'run',
             ...execArgv,
             '--allow-all',
-            path.join(__dirname, '../../../deno', 'deno-plugin-remote.ts'),
+            path.join(__dirname, '../../../deno', 'deno-plugin-remote.js'),
             // TODO: send this across.
             // mainFilename.replace('dist', 'src').replace('.js', '.ts'),
             'child', this.pluginId
