@@ -2509,6 +2509,8 @@ export interface ForkWorker {
   terminate(): void;
   on(event: 'exit', listener: () => void): void;
   removeListener(event: 'exit', listener: () => void): void;
+  on(event: 'error', listener: () => void): void;
+  removeListener(event: 'error', listener: (e: Error) => void): void;
   nativeWorker?: NodeChildProcess | NodeWorker;
 }
 export interface PluginFork<T> {
