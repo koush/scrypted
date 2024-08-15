@@ -196,10 +196,7 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
                     this.controlEvents.emit (event);
                 });
             }
-            else if (
-                event === HikvisionDoorbellEvent.Unlock 
-                || (event === HikvisionDoorbellEvent.DoorOpened && parseBooleans (this.storage.getItem (USE_CONTACT_SENSOR_KEY)))
-                ) 
+            else if (event === HikvisionDoorbellEvent.Unlock)
             {
                 const provider = this.provider as HikvisionDoorbellProvider;
                 const lock = await provider.getLockDevice (this.nativeId);
@@ -222,6 +219,13 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
                 }
                     
                 setTimeout(() => this.stopRinging(), OPEN_LOCK_AUDIO_NOTIFY_DURASTION);
+            }
+            else if (event === HikvisionDoorbellEvent.DoorOpened && parseBooleans (this.storage.getItem (USE_CONTACT_SENSOR_KEY)))
+            {
+                const provider = this.provider as HikvisionDoorbellProvider;
+                const lock = await provider.getLockDevice (this.nativeId);
+                if (lock) 
+                    lock.unlock();
             }
         })
 
@@ -771,7 +775,7 @@ export class HikvisionDoorbellProvider extends RtspProvider
     override async releaseDevice(id: string, nativeId: string): Promise<void> {
 
         this.console.error(`Release device: ${id}, ${nativeId}`);
-        const camera = this.getCameraDeviceFor (nativeId);
+        const camera = this.getCameraDeviceFor (nativeId, false);
         if (this.isLockId (nativeId))
         {
             camera.onLockRemoved();
@@ -785,6 +789,7 @@ export class HikvisionDoorbellProvider extends RtspProvider
             return;
         }
         await this.disableLock (nativeId);
+        await this.disableAlert (nativeId);
         this.devices.delete(nativeId);
         camera?.destroy();
     }
@@ -969,14 +974,23 @@ export class HikvisionDoorbellProvider extends RtspProvider
         return nativeId;
     }
 
-    private getCameraDeviceFor (nativeId): HikvisionCameraDoorbell
+    private getCameraDeviceFor (nativeId, check: boolean = true): HikvisionCameraDoorbell
     {
-        const cameraId = this.cameraIdFrom (nativeId);
-        const state = deviceManager.getDeviceState (cameraId);
-        if (state?.nativeId === cameraId) {
+        try 
+        {
+            const cameraId = this.cameraIdFrom (nativeId);
+            if (check)
+            {
+                const state = deviceManager.getDeviceState (cameraId);
+                if (state?.nativeId !== cameraId)
+                    return null;
+            }
             return this.devices?.get (cameraId);
+        } catch (error) 
+        {
+            this.console.warn (`Error obtaining camera device: ${error}`);
+            return null;
         }
-        return null;
     }
 }
 
