@@ -2,7 +2,7 @@ import { HikvisionCamera } from "../../hikvision/src/main"
 import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, LockState, Readme } from "@scrypted/sdk";
 import { PassThrough } from "stream";
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { RtspProvider, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { createRtspMediaStreamOptions, RtspProvider, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionDoorbellAPI, HikvisionDoorbellEvent } from "./doorbell-api";
 import { SipManager, SipRegistration } from "./sip-manager";
@@ -17,6 +17,7 @@ import { join } from 'path';
 const { mediaManager, deviceManager } = sdk;
 
 const EXPOSE_LOCK_KEY: string = 'exposeLock';
+const USE_CONTACT_SENSOR_KEY: string = 'useContactSensor';
 const EXPOSE_ALERT_KEY: string = 'exposeAlert';
 
 const SIP_MODE_KEY: string = 'sipMode';
@@ -48,6 +49,7 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
     sipManager?: SipManager;
 
     private controlEvents: EventEmitter = new EventEmitter();
+    private doorOpenDurationTimeout: NodeJS.Timeout;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
@@ -118,6 +120,7 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
         const motionTimeoutDuration = (parseInt(this.storage.getItem('motionTimeout')) || 10) * 1000;
         let motionPings = 0;
         events.on('event', async (event: HikvisionDoorbellEvent, cameraNumber: string, inactive: boolean) => {
+
             if (event === HikvisionDoorbellEvent.CaseTamperAlert)
             {
                 const enabled = parseBooleans (this.storage.getItem (EXPOSE_ALERT_KEY));
@@ -193,21 +196,36 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
                     this.controlEvents.emit (event);
                 });
             }
-            else if (event === HikvisionDoorbellEvent.OpenDoor) 
+            else if (event === HikvisionDoorbellEvent.Unlock)
             {
                 const provider = this.provider as HikvisionDoorbellProvider;
                 const lock = await provider.getLockDevice (this.nativeId);
-                if (lock)
+                if (lock) 
+                {
                     lock.lockState = LockState.Unlocked;
 
+                    clearTimeout (this.doorOpenDurationTimeout);
+                    const timeout = (await this.getClient().getDoorOpenDuration()) * 1000;
+                    this.doorOpenDurationTimeout = setTimeout ( async () => {
+    
+                        const provider = this.provider as HikvisionDoorbellProvider;
+                        const lock = await provider.getLockDevice (this.nativeId);
+                        if (lock) {
+                            lock.lockState = LockState.Locked;
+                            this.console.info (`Door lock was closed automatically after duration: ${timeout}`);
+                        }
+                    }
+                    , timeout);
+                }
+                    
                 setTimeout(() => this.stopRinging(), OPEN_LOCK_AUDIO_NOTIFY_DURASTION);
             }
-            else if (event === HikvisionDoorbellEvent.CloseDoor) 
+            else if (event === HikvisionDoorbellEvent.DoorOpened && parseBooleans (this.storage.getItem (USE_CONTACT_SENSOR_KEY)))
             {
                 const provider = this.provider as HikvisionDoorbellProvider;
                 const lock = await provider.getLockDevice (this.nativeId);
-                if (lock)
-                    lock.lockState = LockState.Locked;
+                if (lock) 
+                    lock.unlock();
             }
         })
 
@@ -240,7 +258,7 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
                     return defaultMap;
                 } else {
                     try {
-                        return await this.getClient().getVideoChannels();
+                        return await this.getClient().getVideoChannels (camNumber);
                     }
                     catch (e) {
                         this.console.error('error retrieving channel ids', e);
@@ -255,14 +273,14 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
 
         // due to being able to override the channel number, and NVR providing per channel port access,
         // do not actually use these channel ids, and just use it to determine the number of channels
-        // available for a camera.q
+        // available for a camera.
         const ret = [];
         let index = 0;
         const cameraNumber = this.getCameraNumber();
         for (const [id, channel] of detectedChannels.entries()) {
             if (cameraNumber && channelToCameraNumber(id) !== cameraNumber)
                 continue;
-            const mso = this.createRtspMediaStreamOptions(this.getClient().rtspUrlFor(this.getRtspAddress(), id, params), index++);
+            const mso = createRtspMediaStreamOptions(this.getClient().rtspUrlFor(this.getRtspAddress(), id, params), index++);
             Object.assign(mso.video, channel?.video);
             mso.tool = 'scrypted';
             ret.push(mso);
@@ -411,6 +429,14 @@ class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Interco
                 description: 'Number of motion pings needed to trigger motion.',
                 value: parseInt(this.storage.getItem('motionPings')) || 1,
                 type: 'number',
+            },
+            {
+                subgroup: 'Advanced',
+                key: USE_CONTACT_SENSOR_KEY,
+                title: 'Use Contact Sensor',
+                description: "If you installed a contact sensor on the door when installing the Hikvision doorbell, you can use its status data to control the status of the doorlock controller, which you enabled in General Tab (\"Expose Door Lock Controller\" checkbox). To do this, enable this checkbox.",
+                value: parseBooleans (this.storage.getItem (USE_CONTACT_SENSOR_KEY)) || false,
+                type: 'boolean',
             },
         );
 
@@ -749,7 +775,7 @@ export class HikvisionDoorbellProvider extends RtspProvider
     override async releaseDevice(id: string, nativeId: string): Promise<void> {
 
         this.console.error(`Release device: ${id}, ${nativeId}`);
-        const camera = this.getCameraDeviceFor (nativeId);
+        const camera = this.getCameraDeviceFor (nativeId, false);
         if (this.isLockId (nativeId))
         {
             camera.onLockRemoved();
@@ -763,6 +789,7 @@ export class HikvisionDoorbellProvider extends RtspProvider
             return;
         }
         await this.disableLock (nativeId);
+        await this.disableAlert (nativeId);
         this.devices.delete(nativeId);
         camera?.destroy();
     }
@@ -947,14 +974,23 @@ export class HikvisionDoorbellProvider extends RtspProvider
         return nativeId;
     }
 
-    private getCameraDeviceFor (nativeId): HikvisionCameraDoorbell
+    private getCameraDeviceFor (nativeId, check: boolean = true): HikvisionCameraDoorbell
     {
-        const cameraId = this.cameraIdFrom (nativeId);
-        const state = deviceManager.getDeviceState (cameraId);
-        if (state?.nativeId === cameraId) {
+        try 
+        {
+            const cameraId = this.cameraIdFrom (nativeId);
+            if (check)
+            {
+                const state = deviceManager.getDeviceState (cameraId);
+                if (state?.nativeId !== cameraId)
+                    return null;
+            }
             return this.devices?.get (cameraId);
+        } catch (error) 
+        {
+            this.console.warn (`Error obtaining camera device: ${error}`);
+            return null;
         }
-        return null;
     }
 }
 

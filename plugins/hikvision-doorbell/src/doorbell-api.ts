@@ -1,4 +1,4 @@
-import { HikvisionAPI } from "../../hikvision/src/hikvision-api-interfaces"
+import { HikvisionCameraAPI } from "../../hikvision/src/hikvision-camera-api"
 import { HttpFetchOptions } from '@scrypted/common/src/http-auth-fetch';
 import { Readable, PassThrough } from 'stream';
 import { MediaStreamOptions } from '@scrypted/sdk';
@@ -21,8 +21,9 @@ export enum HikvisionDoorbellEvent {
     CaseTamperAlert = '02000000',
     TalkInvite = "11000000",
     TalkHangup = "12000000",
-    OpenDoor = '01000000',
-    CloseDoor = '06000000'
+    Unlock = '01000000',
+    DoorOpened = '06000000',
+    DoorClosed = '05000000'
 } 
 
 export function getChannel(channel: string) {
@@ -47,17 +48,21 @@ export class HikvisionDoorbell_Destroyable extends EventEmitter implements Destr
     }
 }
 
-export class HikvisionDoorbellAPI implements HikvisionAPI 
+export class HikvisionDoorbellAPI extends HikvisionCameraAPI 
 {
     endpoint: string;
     auth: AuthRequst;
 
-    private deviceModel: Promise<string>;
     private eventServer?: Server;
     private listener?: Destroyable;
+    private address: string;
 
-    constructor(public ip: string, public port: string, username: string, password: string, public console: Console, public storage: Storage) {
-        this.endpoint = libip.isV4Format(ip) ? `${ip}:${port}` : `[${ip}]:${port}`;
+    constructor(address: string, public port: string, username: string, password: string, public console: Console, public storage: Storage) 
+    {
+        let endpoint = libip.isV4Format(address) ? `${address}:${port}` : `[${address}]:${port}`;
+        super (endpoint, username, password, console);
+        this.address = address;
+        this.endpoint = endpoint;
         this.auth = new AuthRequst(username, password, console);
     }
 
@@ -67,7 +72,7 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
         this.eventServer?.close();
     }
 
-    async request(urlOrOptions: string | HttpFetchOptions<Readable>, body?: AuthRequestBody) {
+    override async request(urlOrOptions: string | HttpFetchOptions<Readable>, body?: AuthRequestBody) {
 
         let url: string = urlOrOptions as string;
         let opt: AuthRequestOptions;
@@ -86,21 +91,11 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
         return await this.auth.request(url, opt, body);
     }
 
-    async getDeviceInfo() {
+    override async getDeviceInfo() {
         return getDeviceInfo (this.auth, this.endpoint);
     }
 
-    async reboot() {
-        const response = await this.request({
-            url: `http://${this.endpoint}/ISAPI/System/reboot`,
-            method: "PUT",
-            responseType: 'text',
-        });
-
-        return response.body;
-    }
-
-    async checkTwoWayAudio() {
+    override async checkTwoWayAudio() {
         const response = await this.request({
             url: `http://${this.endpoint}/ISAPI/System/TwoWayAudio/channels`,
             responseType: 'text',
@@ -109,59 +104,10 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
         return response.body.includes('audioCompressionType');
     }
 
-    async checkDeviceModel(): Promise<string> {
-        if (!this.deviceModel) {
-            this.deviceModel = this.getDeviceInfo().then(d => d.deviceModel).catch(e => {
-                this.console.error('error checking NVR model', e);
-                return undefined;
-            });
-        }
-        return await this.deviceModel;
-    }
-
-    async checkIsOldModel() {
-        // The old Hikvision DS-7608NI-E2 doesn't support channel capability checks, and the requests cause errors
-        const model = await this.checkDeviceModel();
-        if (!model)
-            return;
-        return !!model?.match(/DS-7608NI-E2/);
-    }
-
-    async checkStreamSetup(channel: string, isOld: boolean): Promise<HikvisionCameraStreamSetup> {
-        if (isOld) {
-            this.console.error('NVR is old version.  Defaulting camera capabilities to H.264/AAC');
-            return {
-                videoCodecType: "H.264",
-                audioCodecType: "AAC",
-            }
-        }
-
-        const response = await this.request({
-            url: `http://${this.endpoint}/ISAPI/Streaming/channels/${getChannel(channel)}/capabilities`,
-            responseType: 'text',
-        });
-
-        // this is bad:
-        // <videoCodecType opt="H.264,H.265">H.265</videoCodecType>
-        const vcodec = response.body.match(/>(.*?)<\/videoCodecType>/);
-        const acodec = response.body.match(/>(.*?)<\/audioCompressionType>/);
-
-        return {
-            videoCodecType: vcodec?.[1],
-            audioCodecType: acodec?.[1],
-        }
-    }
-
-    async jpegSnapshot(channel: string): Promise<Buffer> {
-        const url = `http://${this.endpoint}/ISAPI/Streaming/channels/${getChannel(channel)}/picture?snapShotImageType=JPEG`
-
-        const response = await this.request({
-            url: url,
-            responseType: 'buffer',
-            timeout: 60000,
-        });
-
-        return response.body;
+    override async putVcaResource(channel: string, resource: 'smart' | 'facesnap' | 'close') {
+        // this feature is not supported by the doorbell 
+        // and we return true to prevent the device from rebooting
+        return true;
     }
 
     emitEvent(eventName: string | symbol, ...args: any[]) {
@@ -172,7 +118,7 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
         }
     }
 
-    async listenEvents() {
+    override async listenEvents() {
         // support multiple cameras listening to a single stream 
         if (!this.listener) {
 
@@ -186,41 +132,24 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
 
         return this.listener;
     }
-
-    async getVideoChannels(): Promise<Map<string, MediaStreamOptions>> {
-
-        let xml: string;
+    
+    async getVideoChannels(camNumber: string): Promise<Map<string, MediaStreamOptions>> 
+    {
+        let channels: MediaStreamOptions[];
         try {
-            const response = await this.request({
-                url: `http://${this.endpoint}/ISAPI/Streaming/channels`,
-                responseType: 'text',
-            });
-            xml = response.body;
-            this.storage.setItem('channels', xml);
+            channels = await this.getCodecs(camNumber);
+            this.storage.setItem('channelsJSON', JSON.stringify(channels));
         }
         catch (e) {
-            xml = this.storage.getItem('channels');
-            if (!xml)
+            const raw = this.storage.getItem('channelsJSON');
+            if (!raw)
                 throw e;
+            channels = JSON.parse(raw);
         }
-        const parsedXml = await xml2js.parseStringPromise(xml);
-
         const ret = new Map<string, MediaStreamOptions>();
-        for (const streamingChannel of parsedXml.StreamingChannelList.StreamingChannel) {
-            const [id] = streamingChannel.id;
-            const width = parseInt(streamingChannel?.Video?.[0]?.videoResolutionWidth?.[0]) || undefined;
-            const height = parseInt(streamingChannel?.Video?.[0]?.videoResolutionHeight?.[0]) || undefined;
-            let codec = streamingChannel?.Video?.[0]?.videoCodecType?.[0] as string;
-            codec = codec?.toLowerCase()?.replaceAll('.', '');
-            const vso: MediaStreamOptions = {
-                id,
-                video: {
-                    width,
-                    height,
-                    codec,
-                }
-            }
-            ret.set(id, vso);
+        for (const streamingChannel of channels) {
+            const channel = streamingChannel.id;
+            ret.set(channel, streamingChannel);
         }
 
         return ret;
@@ -281,6 +210,7 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
     }
 
     async openDoor() {
+        this.console.info ('Open door lock runing')
         // const data = '<RemoteControlDoor><cmd>alwaysOpen</cmd></RemoteControlDoor>';
         const data = '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>';
         await this.request({
@@ -291,6 +221,7 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
     }
 
     async closeDoor() {
+        this.console.info ('Close door lock runing')
         const data = '<RemoteControlDoor><cmd>resume</cmd></RemoteControlDoor>';
         await this.request({
             url: `http://${this.endpoint}/ISAPI/AccessControl/RemoteControl/door/1`,
@@ -338,6 +269,27 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
             method: 'PUT',
             responseType: 'readable',
         }, data);
+    }
+
+    async getDoorOpenDuration(): Promise<number> {
+
+        let xml: string;
+        try {
+            const response = await this.request({
+                url: `http://${this.endpoint}/ISAPI/AccessControl/Door/param/1`,
+                responseType: 'text',
+            });
+            xml = response.body;
+            this.storage.setItem('doorOpenDuration', xml);
+        }
+        catch (e) {
+            xml = this.storage.getItem('doorOpenDuration');
+            if (!xml)
+                throw e;
+        }
+        const parsedXml = await xml2js.parseStringPromise(xml);
+        const ret = Number (parsedXml.DoorParam?.openDuration?.[0]);
+        return ret;
     }
 
     async installHttpHosts() {
@@ -407,7 +359,7 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
 
         let server: Server = net.createServer((socket) => {
             
-            if (socket.remoteAddress != this.ip) {
+            if (socket.remoteAddress != this.address) {
                 this.console.warn(`Unknown client connected from: ${socket.remoteAddress}:${socket.remotePort}. Close it.`);
                 socket.destroy();
             }
@@ -440,7 +392,7 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
             });
         });
 
-        let host = await localServiceIpAddress (this.ip);
+        let host = await localServiceIpAddress (this.address);
 
         let result = new Promise<void>((resolve, reject) => {
             server.on('listening', () =>  {
@@ -485,6 +437,8 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
         const serial = data.toString('utf8', 0x2C, 0x5C);
         const marker = data.toString('hex', 0xB0, 0xB4);
 
+        // this.console.debug (`Event string:\n${data.toString('hex')}`); 
+
         for (const [name, event] of Object.entries(HikvisionDoorbellEvent)) {
             if (marker == event) {
                 this.emitEvent('event', event, cameraNumber, inactive);
@@ -493,6 +447,6 @@ export class HikvisionDoorbellAPI implements HikvisionAPI
             }
         }
 
-        this.console.info (`Unknown camera event: "${marker}"`);        
+        this.console.info (`Unknown camera event: "${marker}"`);       
     }
 }
