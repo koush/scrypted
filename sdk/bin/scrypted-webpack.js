@@ -116,8 +116,9 @@ else {
         if (out)
             rimraf.sync(out);
 
+        const promises = [];
         for (let entry of entries) {
-            await new Promise((resolve, reject) => {
+            const promise = new Promise((resolve, reject) => {
                 let webpackConfig;
                 const customWebpackConfig = path.resolve(cwd, nodeWebpackConfig);
                 const defaultWebpackConfig = path.resolve(__dirname, '..', nodeWebpackConfig);
@@ -190,7 +191,10 @@ else {
                     resolve();
                 })
             });
+            promises.push(promise);
         }
+
+        await Promise.all(promises);
 
         const zipfs = path.join(cwd, 'fs');
         if (fs.existsSync(zipfs))
