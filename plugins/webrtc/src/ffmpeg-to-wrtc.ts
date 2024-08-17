@@ -17,7 +17,6 @@ import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-requir
 import { WeriftSignalingSession } from "./werift-signaling-session";
 
 export const RTC_BRIDGE_NATIVE_ID = 'rtc-bridge';
-export const RTC_FFMPEG_BRIDGE_NATIVE_ID = 'ffmpeg-bridge';
 
 function getDebugModeH264EncoderArgs() {
     return [
