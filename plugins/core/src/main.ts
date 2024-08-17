@@ -88,7 +88,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                 {
                     name: 'Terminal Service',
                     nativeId: TerminalServiceNativeId,
-                    interfaces: [ScryptedInterface.StreamService],
+                    interfaces: [ScryptedInterface.StreamService, ScryptedInterface.TTY],
                     type: ScryptedDeviceType.Builtin,
                 },
             );
