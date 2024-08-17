@@ -13,7 +13,7 @@ import ip from 'ip';
 import net from 'net';
 import os from 'os';
 import { DataChannelDebouncer } from './datachannel-debouncer';
-import { RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement, createRTCPeerConnectionSink, createTrackForwarder } from "./ffmpeg-to-wrtc";
+import { WebRTCConnectionManagement, createRTCPeerConnectionSink, createTrackForwarder } from "./ffmpeg-to-wrtc";
 import { stunServers, turnServers, weriftStunServers, weriftTurnServers } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";

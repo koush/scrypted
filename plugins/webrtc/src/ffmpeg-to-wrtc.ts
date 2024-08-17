@@ -16,8 +16,6 @@ import { RtpCodecCopy, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./r
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
 import { WeriftSignalingSession } from "./werift-signaling-session";
 
-export const RTC_BRIDGE_NATIVE_ID = 'rtc-bridge';
-
 function getDebugModeH264EncoderArgs() {
     return [
         '-profile:v', 'baseline',
