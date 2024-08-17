@@ -175,19 +175,6 @@ else {
                         return reject(new Error('webpack failed'));
                     }
 
-                    // create a zip that has a main.js in the root, and an fs folder containing a read only virtual file system.
-                    // todo: read write file system? seems like a potential sandbox and backup nightmare to do a real fs. scripts should
-                    // use localStorage, etc?
-                    const jsFiles = fs.readdirSync(out, {
-                        withFileTypes: true
-                    }).filter(ft => ft.isFile() && ft.name.endsWith('.js')).map(ft => ft.name);
-                    for (const js of jsFiles) {
-                        zip.addLocalFile(path.join(out, js));
-                        const sourcemap = path.join(out, js + '.map');
-                        if (fs.existsSync(sourcemap))
-                            zip.addLocalFile(sourcemap);
-                        console.log(js);
-                    }
                     resolve();
                 })
             });
@@ -195,6 +182,20 @@ else {
         }
 
         await Promise.all(promises);
+
+        // create a zip that has a main.nodejs.js in the root, and an fs folder containing a read only virtual file system.
+        // todo: read write file system? seems like a potential sandbox and backup nightmare to do a real fs. scripts should
+        // use localStorage, etc?
+        const jsFiles = fs.readdirSync(out, {
+            withFileTypes: true
+        }).filter(ft => ft.isFile() && ft.name.endsWith('.js')).map(ft => ft.name);
+        for (const js of jsFiles) {
+            zip.addLocalFile(path.join(out, js));
+            const sourcemap = path.join(out, js + '.map');
+            if (fs.existsSync(sourcemap))
+                zip.addLocalFile(sourcemap);
+            console.log(js);
+        }
 
         const zipfs = path.join(cwd, 'fs');
         if (fs.existsSync(zipfs))
