@@ -195,8 +195,10 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
         if (usePrebufferSnapshots) {
             const takePicture = await preparePrebufferSnapshot()
-            if (!takePicture)
+            if (!takePicture) {
+                this.debugConsole?.warn('Prebuffer snapshot was requested but prebuffer is unavailable.');
                 throw new PrebufferUnavailableError();
+            }
             return takePicture();
         }
 
