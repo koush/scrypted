@@ -13,7 +13,7 @@ import ip from 'ip';
 import net from 'net';
 import os from 'os';
 import { DataChannelDebouncer } from './datachannel-debouncer';
-import { RTC_BRIDGE_NATIVE_ID, WebRTCConnectionManagement, createRTCPeerConnectionSink, createTrackForwarder } from "./ffmpeg-to-wrtc";
+import { RTC_BRIDGE_NATIVE_ID, RTC_FFMPEG_BRIDGE_NATIVE_ID, WebRTCConnectionManagement, createRTCPeerConnectionSink, createTrackForwarder } from "./ffmpeg-to-wrtc";
 import { stunServers, turnServers, weriftStunServers, weriftTurnServers } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
@@ -257,6 +257,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         }
     });
     bridge: WebRTCBridge;
+    ffmpegBridge: WebRTCFFmpegBridge;
     activeConnections = 0;
 
     constructor() {
@@ -275,6 +276,15 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             ],
         })
             .then(() => this.bridge = new WebRTCBridge(this, RTC_BRIDGE_NATIVE_ID));
+        deviceManager.onDeviceDiscovered({
+            name: 'RTC FFmpeg Bridge',
+            type: ScryptedDeviceType.API,
+            nativeId: RTC_FFMPEG_BRIDGE_NATIVE_ID,
+            interfaces: [
+                ScryptedInterface.BufferConverter,
+            ],
+        })
+            .then(() => this.ffmpegBridge = new WebRTCFFmpegBridge(this, RTC_FFMPEG_BRIDGE_NATIVE_ID));
     }
 
     getSettings(): Promise<Setting[]> {
@@ -420,6 +430,8 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
     async getDevice(nativeId: string) {
         if (nativeId === RTC_BRIDGE_NATIVE_ID)
             return this.bridge;
+        else if (nativeId === RTC_FFMPEG_BRIDGE_NATIVE_ID)
+            return this.ffmpegBridge;
         return new WebRTCCamera(this, nativeId);
     }
 
@@ -769,6 +781,43 @@ class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {
             cleanup.resolve(e.toString());
             throw e;
         }
+    }
+}
+
+class WebRTCFFmpegBridge extends ScryptedDeviceBase implements BufferConverter {
+    constructor(public plugin: WebRTCPlugin, nativeId: string) {
+        super(nativeId);
+
+        this.fromMimeType = ScryptedMimeTypes.RTCSignalingChannel;
+        this.toMimeType = ScryptedMimeTypes.FFmpegInput;
+    }
+
+    async convert(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+        const channel = data as RTCSignalingChannel;
+
+        const result = zygote();
+        this.plugin.activeConnections++;
+        result.worker.on('exit', () => {
+            this.plugin.activeConnections--;
+        });
+
+        const fork = await result.result;
+
+        const rtcSource = await fork.createRTCPeerConnectionSource({
+            __json_copy_serialize_children: true,
+            nativeId: undefined,
+            mixinId: undefined,
+            mediaStreamOptions: {
+                id: 'webrtc',
+                name: 'WebRTC',
+                source: 'cloud',
+            },
+            startRTCSignalingSession: (session) => channel.startRTCSignalingSession(session),
+            maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
+        });
+
+        const mediaStreamUrl = rtcSource.mediaObject;
+        return await mediaManager.convertMediaObject(mediaStreamUrl, ScryptedMimeTypes.FFmpegInput);
     }
 }
 
