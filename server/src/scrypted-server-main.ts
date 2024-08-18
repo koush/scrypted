@@ -108,7 +108,7 @@ app.use(bodyParser.urlencoded({ extended: false }) as any)
 app.use(bodyParser.json())
 
 // parse some custom thing into a Buffer
-app.use(bodyParser.raw({ type: 'application/zip', limit: 100000000 }) as any)
+app.use(bodyParser.raw({ type: 'application/*', limit: 100000000 }) as any)
 
 async function start(mainFilename: string, options?: {
     onRuntimeCreated?: (runtime: ScryptedRuntime) => Promise<void>,

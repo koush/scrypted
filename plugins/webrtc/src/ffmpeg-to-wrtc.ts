@@ -16,8 +16,6 @@ import { RtpCodecCopy, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./r
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
 import { WeriftSignalingSession } from "./werift-signaling-session";
 
-export const RTC_BRIDGE_NATIVE_ID = 'rtc-bridge';
-
 function getDebugModeH264EncoderArgs() {
     return [
         '-profile:v', 'baseline',
@@ -100,7 +98,7 @@ export async function createTrackForwarder(options: {
         });
     }
 
-    const console = sdk.deviceManager.getMixinConsole(mo.sourceId, RTC_BRIDGE_NATIVE_ID);
+    const console = sdk.deviceManager.getMixinConsole(mo.sourceId);
     const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
     const { mediaStreamOptions } = ffmpegInput;
 
