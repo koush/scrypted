@@ -14,7 +14,7 @@ import { evalLocal } from '../rpc-peer-eval';
 import { createDuplexRpcPeer } from '../rpc-serializer';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
-import { prepareConsoles } from './plugin-console';
+import { pipeWorkerConsole, prepareConsoles } from './plugin-console';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
 import { DeviceManagerImpl, attachPluginRemote, setupPluginRemote } from './plugin-remote';
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
@@ -375,15 +375,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                         zipHash,
                     }, undefined);
 
-                    if (runtimeWorker instanceof ChildProcessWorker)
+                    if (runtimeWorker instanceof ChildProcessWorker) {
                         nativeWorker = runtimeWorker.childProcess;
-
-                    nativeWorker.stdout.on('data', (data) => {
-                        console.log(data.toString());
-                    });
-                    nativeWorker.stderr.on('data', (data) => {
-                        console.error(data.toString());
-                    });
+                        pipeWorkerConsole(nativeWorker);
+                    }
                 }
                 else {
                     const ntw = new NodeThreadWorker(mainFilename, pluginId, {
