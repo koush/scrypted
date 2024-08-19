@@ -8,7 +8,7 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
     worker: worker_threads.Worker;
     port: worker_threads.MessagePort;
 
-    constructor(mainFilename: string, public pluginId: string, options: RuntimeWorkerOptions, workerOptions?: worker_threads.WorkerOptions) {
+    constructor(mainFilename: string, public pluginId: string, options: RuntimeWorkerOptions, workerOptions?: worker_threads.WorkerOptions, workerData?: any, transferList: Array<worker_threads.TransferListItem> = []) {
         super();
         const { env } = options;
 
@@ -19,8 +19,9 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
             env: Object.assign({}, process.env, env),
             workerData: {
                 port: port1,
+                ...workerData,
             },
-            transferList: [port1],
+            transferList: [port1, ...transferList],
             ...workerOptions,
         });
 
@@ -67,18 +68,32 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
         this.worker = undefined;
     }
 
-    send(message: RpcMessage, reject?: (e: Error) => void): void {
+    send(message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any): void {
+        NodeThreadWorker.send(message, this.port, reject, serializationContext);
+    }
+
+    setupRpcPeer(peer: RpcPeer): void {
+        NodeThreadWorker.setupRpcPeer(peer, this.port);
+    }
+
+    static send(message: RpcMessage, port: worker_threads.MessagePort, reject?: (e: Error) => void, serializationContext?: any) {
         try {
-            if (!this.worker)
-                throw new Error('thread worker has been killed');
-            this.port.postMessage(v8.serialize(message));
+            port.postMessage(v8.serialize(message));
         }
         catch (e) {
             reject?.(e);
         }
     }
 
-    setupRpcPeer(peer: RpcPeer): void {
-        this.port.on('message', message => peer.handleMessage(v8.deserialize(message)));
+    static setupRpcPeer(peer: RpcPeer, port: worker_threads.MessagePort) {
+        port.on('message', message => peer.handleMessage(v8.deserialize(message)));
+        peer.transportSafeArgumentTypes.add(Buffer.name);
+        peer.transportSafeArgumentTypes.add(Uint8Array.name);
+    }
+
+    static createRpcPeer(selfName: string, peerName: string, port: worker_threads.MessagePort): RpcPeer {
+        const peer = new RpcPeer(selfName, peerName, (message, reject, serializationContext) => NodeThreadWorker.send(message, port, reject, serializationContext));
+        NodeThreadWorker.setupRpcPeer(peer, port);
+        return peer;
     }
 }
