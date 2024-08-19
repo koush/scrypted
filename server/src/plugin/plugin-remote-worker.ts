@@ -317,8 +317,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 // connectThreadId to see if the target is main thread.
                 if (worker_threads.isMainThread)
                     mainThreadBrokerConnect(tid, worker_threads.threadId);
-                const threadPeer = await connectTidPeer(tid);
-                return peerConnectRPCObject(threadPeer, clusterObject);
+                const clusterPeer = await connectTidPeer(tid);
+                const existing = clusterPeer.remoteWeakProxies[clusterObject.proxyId]?.deref();
+                if (existing)
+                    return existing;
+                return peerConnectRPCObject(clusterPeer, clusterObject);
             }
 
             const brokeredConnections = new Set<string>();
