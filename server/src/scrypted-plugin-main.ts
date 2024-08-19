@@ -1,5 +1,4 @@
 import net from 'net';
-import v8 from 'v8';
 import worker_threads from "worker_threads";
 import { getPluginNodePath } from "./plugin/plugin-npm-dependencies";
 import { startPluginRemote } from "./plugin/plugin-remote-worker";

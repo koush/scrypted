@@ -262,8 +262,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             }
 
             function connectTidPeer(tid: number) {
-                if (tid === undefined)
-                    debugger;
                 let peerPromise = tidPeers.get(tid);
                 if (peerPromise)
                     return peerPromise;
@@ -575,7 +573,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 }
 
                 const result = (async () => {
-                    const threadPeer = new RpcPeer('main', 'thread', (message, reject) => runtimeWorker.send(message, reject));
+                    const threadPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
                     threadPeer.params.updateStats = (stats: PluginStats) => {
                         allMemoryStats.set(runtimeWorker, stats.memoryUsage);
                     }

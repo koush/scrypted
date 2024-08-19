@@ -529,8 +529,7 @@ class PrebufferSession {
       });
     }
     else {
-      const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
-      const ffmpegInput = JSON.parse(moBuffer.toString()) as FFmpegInput;
+      const ffmpegInput: FFmpegInput = await mediaManager.convertMediaObjectToJSON(mo, ScryptedMimeTypes.FFmpegInput);
       sessionMso = ffmpegInput.mediaStreamOptions || this.advertisedMediaStreamOptions;
 
       let { parser, isDefault } = this.getParser(sessionMso);
@@ -723,8 +722,7 @@ class PrebufferSession {
         if (!session.isActive)
           return;
         const mo = await this.mixinDevice.getVideoStream(mso);
-        const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
-        const ffmpegInput = JSON.parse(moBuffer.toString()) as FFmpegInput;
+        const ffmpegInput: FFmpegInput = await mediaManager.convertMediaObjectToJSON(mo, ScryptedMimeTypes.FFmpegInput);
         mso = ffmpegInput.mediaStreamOptions;
 
         scheduleRefresh(mso);
