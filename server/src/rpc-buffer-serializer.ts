@@ -2,9 +2,13 @@ import { RpcSerializer } from "./rpc";
 
 export class BufferSerializer implements RpcSerializer {
     serialize(value: Buffer) {
+        console.warn('Using slow buffer serialization. Ensure the peer supports SidebandBufferSerializer.');
+        debugger;
         return value.toString('base64');
     }
     deserialize(serialized: any) {
+        console.warn('Using slow buffer deserialization. Ensure the peer supports SidebandBufferSerializer.');
+        debugger;
         return Buffer.from(serialized, 'base64');
     }
 }
