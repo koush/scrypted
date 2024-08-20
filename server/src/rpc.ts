@@ -442,7 +442,7 @@ export class RpcPeer {
             result.reject(error);
         }
         for (const y of this.yieldedAsyncIterators) {
-            y.throw(error);
+            y.throw(error).catch(() => {});
         }
         this.yieldedAsyncIterators.clear();
         this.pendingResults = Object.freeze({});
@@ -742,7 +742,7 @@ export class RpcPeer {
                                 }
                                 else {
                                     if (Object.isFrozen(this.pendingResults)) {
-                                        (target as AsyncGenerator).throw(new RPCResultError(this, 'RpcPeer has been killed (yield)'));
+                                        (target as AsyncGenerator).throw(new RPCResultError(this, 'RpcPeer has been killed (yield)')).catch(() => {});
                                     }
                                     else {
                                         this.yieldedAsyncIterators.add(target);
