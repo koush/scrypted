@@ -18,7 +18,12 @@ export class ElectronForkWorker extends ChildProcessWorker {
 
         // @ts-expect-error
         const electronBin: string = require('electron');
-        const args = [electronBin];
+        const args = [
+            electronBin,
+
+            '--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights',
+            '--enable-features=SharedArrayBuffer',
+        ];
         if (process.platform === 'linux') {
             // crappy but should work.
             for (let i = 50; i < 100; i++) {
@@ -37,7 +42,13 @@ export class ElectronForkWorker extends ChildProcessWorker {
             // dummy up a DISPLAY env variable. this value numerical because of the way it is.
             args.unshift('xvfb-run', '-n', this.allocatedDisplay.toString());
             // https://github.com/gpuweb/gpuweb/wiki/Implementation-Status#chromium-chrome-edge-etc
-            args.push('--no-sandbox', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-features=Vulkan', '--disable-vulkan-surface');
+            args.push(
+                '--no-sandbox',
+                '--enable-unsafe-webgpu',
+                '--ignore-gpu-blocklist',
+                '--enable-features=Vulkan',
+                '--disable-vulkan-surface',
+            );
         }
 
         if (process.platform === 'darwin') {
@@ -77,7 +88,7 @@ export class ElectronForkWorker extends ChildProcessWorker {
                     ...options.pluginDebug,
                     // dont want to send/serialize this.
                     waitDebug: null,
-                }: undefined,
+                } : undefined,
             },
         });
 
