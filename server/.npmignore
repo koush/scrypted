@@ -13,3 +13,4 @@ __pycache__
 tsconfig.json
 test
 scripts
+electron/bin
