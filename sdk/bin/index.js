@@ -138,12 +138,11 @@ exports.debug = function (debugHost, entryPoint) {
     debugHost = toIpAndPort(debugHost);
 
     return new Promise((resolve, reject) => {
-        const outFilename = entryPoint || 'main.nodejs.js';
         var packageJson = path.resolve(process.cwd(), 'package.json');
         packageJson = JSON.parse(fs.readFileSync(packageJson));
         const npmPackage = packageJson.name || '';
 
-        const debugUrl = `https://${debugHost}/web/component/script/debug?filename=${outFilename}&npmPackage=${npmPackage}`
+        const debugUrl = `https://${debugHost}/web/component/script/debug?npmPackage=${npmPackage}`
         console.log(`initiating debugger on ${debugHost}`);
 
         axios.post(debugUrl, undefined, {
