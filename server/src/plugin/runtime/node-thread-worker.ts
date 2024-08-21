@@ -65,12 +65,6 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
 
         this.worker.on('exit', () => {
             this.emit('exit');
-            this.worker.removeAllListeners();
-            this.worker.stdout.removeAllListeners();
-            this.worker.stderr.removeAllListeners();
-            this.port.close();
-            this.port = undefined;
-            this.worker = undefined;
         });
         this.worker.on('error', e => {
             this.emit('error', e);
@@ -104,6 +98,9 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
         if (!this.worker)
             return;
         this.worker.terminate();
+        this.port.close();
+        this.port = undefined;
+        this.worker = undefined;
     }
 
     send(message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any): void {
