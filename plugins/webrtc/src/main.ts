@@ -6,12 +6,13 @@ import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect"
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { createZygote } from '@scrypted/common/src/zygote';
-import sdk, { BufferConverter, MediaConverter, ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import ip from 'ip';
 import net from 'net';
 import os from 'os';
+import worker_threads from 'worker_threads';
 import { DataChannelDebouncer } from './datachannel-debouncer';
 import { WebRTCConnectionManagement, createRTCPeerConnectionSink, createTrackForwarder } from "./ffmpeg-to-wrtc";
 import { stunServers, turnServers, weriftStunServers, weriftTurnServers } from './ice-servers';
@@ -20,7 +21,6 @@ import { WebRTCCamera } from "./webrtc-camera";
 import { MediaStreamTrack, PeerConfig, RTCPeerConnection, defaultPeerConfig } from './werift';
 import { WeriftSignalingSession } from './werift-signaling-session';
 import { RTCPeerConnectionPipe, createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
-import worker_threads from 'worker_threads';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -324,7 +324,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         }
     }
 
-    async convertToRTCConnectionManagement(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
+    async convertToRTCConnectionManagement(result: ReturnType<typeof zygote>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
         const weriftConfiguration = await this.getWeriftConfiguration();
         const session = data as RTCSignalingSession;
         const maximumCompatibilityMode = !!this.storageSettings.values.maximumCompatibilityMode;
@@ -347,14 +347,13 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             result.worker.terminate();
             throw e;
         }
-        handleCleanupConnection(cleanup, connection, result);
         await connection.negotiateRTCSignalingSession();
         await connection.waitConnected();
 
         return connection;
     }
 
-    async convertToFFmpegInput(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
+    async convertToFFmpegInput(result: ReturnType<typeof zygote>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
         const channel = data as RTCSignalingChannel;
         try {
             const { createRTCPeerConnectionSource } = await result.result;
@@ -380,39 +379,42 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
     }
 
     async convertMedia(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
-        const getFork = (cleanup: Deferred<string>) => {
+        const createTrackedFork = () => {
             const result = zygote();
             this.activeConnections++;
             result.worker.on('exit', () => {
                 this.activeConnections--;
-                cleanup.resolve('worker exited (convert)');
             });
             return result;
         }
 
-        let converter: () => Promise<any>;
-        let cleanup = new Deferred<string>();
         if (fromMimeType === ScryptedMimeTypes.RTCSignalingSession && toMimeType === ScryptedMimeTypes.RTCConnectionManagement) {
-            const result = getFork(cleanup);
-            converter = () => this.convertToRTCConnectionManagement(result, cleanup, data, fromMimeType, toMimeType, options);
+            const result = createTrackedFork();
+            try {
+                const connection = await timeoutPromise(2 * 60 * 1000, this.convertToRTCConnectionManagement(result, data, fromMimeType, toMimeType, options));
+                connection.waitClosed().finally(() => result.worker.terminate());
+                return connection;
+            }
+            catch (e) {
+                result.worker.terminate();
+                throw e;
+            }
         }
         else if (fromMimeType === ScryptedMimeTypes.RTCSignalingChannel && toMimeType === ScryptedMimeTypes.FFmpegInput) {
-            const result = getFork(cleanup);
-            converter = () => this.convertToFFmpegInput(result, cleanup, data, fromMimeType, toMimeType, options);
+            const result = createTrackedFork();
+            try {
+                return await timeoutPromise(2 * 60 * 1000, this.convertToFFmpegInput(result, data, fromMimeType, toMimeType, options));
+            }
+            catch (e) {
+                result.worker.terminate();
+                throw e;
+            }
         }
         else if (toMimeType === ScryptedMimeTypes.RTCSignalingChannel) {
-            converter = () => this.convertToSignalingChannel(data, fromMimeType, toMimeType, options);
+            return this.convertToSignalingChannel(data, fromMimeType, toMimeType, options);
         }
         else {
             throw new Error(`@scrypted/webrtc is unable to convert ${fromMimeType} to ${toMimeType}`);
-        }
-
-        try {
-            return await timeoutPromise(2 * 60 * 1000, converter());
-        }
-        catch (e) {
-            cleanup.resolve(e.toString());
-            throw e;
         }
     }
 
