@@ -4,9 +4,10 @@ const { download } = require('@electron/get');
 const fs = require('fs');
 
 const version = '31.4.0';
-const binDir = path.join(__dirname, '..', 'electron', 'bin', version);
-const tmpDir = path.join(binDir, 'tmp');
-const targetDir = path.join(binDir, 'target');
+const binDir = path.join(__dirname, '..', 'electron', 'bin');
+const versionedBinDir = path.join(binDir, process.platform, version);
+const tmpDir = path.join(versionedBinDir, 'tmp');
+const targetDir = path.join(versionedBinDir, 'target');
 
 let electronBin;
 switch (process.platform) {
@@ -30,19 +31,7 @@ module.exports.version = version;
 module.exports.electronBin = electronBin ? path.join(targetDir, electronBin) : undefined;
 
 function extractFile(zipPath) {
-    const distPath = process.env.ELECTRON_OVERRIDE_DIST_PATH || path.join(__dirname, 'dist');
-
-    return extract(zipPath, { dir: tmpDir }).then(() => {
-        // If the zip contains an "electron.d.ts" file,
-        // move that up
-        const srcTypeDefPath = path.join(distPath, 'electron.d.ts');
-        const targetTypeDefPath = path.join(__dirname, 'electron.d.ts');
-        const hasTypeDefinitions = fs.existsSync(srcTypeDefPath);
-
-        if (hasTypeDefinitions) {
-            fs.renameSync(srcTypeDefPath, targetTypeDefPath);
-        }
-    });
+    return extract(zipPath, { dir: tmpDir });
 }
 
 module.exports.installElectron = function installElectron() {
