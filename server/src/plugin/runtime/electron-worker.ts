@@ -47,7 +47,7 @@ export class ElectronForkWorker extends ChildProcessWorker {
         }
 
         if (options?.pluginDebug) {
-            args.push('--remote-debugging-port=9222');
+            args.push(`--remote-debugging-port=${options?.pluginDebug.inspectPort}`);
         }
 
         args.push(

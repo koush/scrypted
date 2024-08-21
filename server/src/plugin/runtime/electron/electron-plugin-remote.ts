@@ -15,11 +15,6 @@ const winQueue: any[] = [];
 
 const createWindow = (firstMessage: { plugindId: string, options: RuntimeWorkerOptions }) => {
     const message: { plugindId: string, options: RuntimeWorkerOptions } = firstMessage;
-    const { options } = message;
-
-    if (options?.pluginDebug) {
-        console.warn('debugging', options);
-    }
 
     win = new BrowserWindow({
         width: 800,
@@ -31,9 +26,6 @@ const createWindow = (firstMessage: { plugindId: string, options: RuntimeWorkerO
             nodeIntegration: true,
             webSecurity: false,
             allowRunningInsecureContent: true,
-            additionalArguments: options?.pluginDebug ? [
-                `--remote-debugging-port=9222`,
-            ] : undefined,
         }
     });
     win.webContents.send('scrypted-init', message);
