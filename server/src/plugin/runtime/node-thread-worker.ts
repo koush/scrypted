@@ -65,12 +65,6 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
 
         this.worker.on('exit', () => {
             this.emit('exit');
-            this.worker.removeAllListeners();
-            this.worker.stdout.removeAllListeners();
-            this.worker.stderr.removeAllListeners();
-            this.port.close();
-            this.port = undefined;
-            this.worker = undefined;
         });
         this.worker.on('error', e => {
             this.emit('error', e);
