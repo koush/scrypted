@@ -161,8 +161,11 @@ export abstract class MediaManagerBase implements MediaManager {
     }
 
     async convertMediaObjectToJSON<T>(mediaObject: MediaObjectInterface, toMimeType: string): Promise<T> {
-        const buffer = await this.convertMediaObjectToBuffer(mediaObject, toMimeType);
-        return JSON.parse(buffer.toString());
+        const json = await this.convertMediaObjectToBuffer(mediaObject, toMimeType);
+        // backcompat
+        if (json && (Buffer.isBuffer(json) || typeof json === 'string'))
+            return JSON.parse(json.toString());
+        return json as T;
     }
 
     abstract getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } };
