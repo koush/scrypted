@@ -29,7 +29,7 @@ RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesourc
 RUN apt-get update && apt-get install -y nodejs
 
 # electron dependencies
-RUN apt-get install -y libgtk3.0 libatk-bridge2.0-0 libatk1.0-0 mesa-vulkan-drivers
+RUN apt-get install -y xvfb libgtk3.0 libatk-bridge2.0-0 libatk1.0-0 mesa-vulkan-drivers
 
 # python native
 RUN echo "Installing python."
