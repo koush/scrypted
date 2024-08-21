@@ -5,14 +5,16 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { SidebandSocketSerializer } from "../socket-serializer";
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
+import type { ScryptedRuntime } from '../../runtime';
 
 export class ElectronForkWorker extends ChildProcessWorker {
+    static allocatedDisplays = new Set<number>();
+    allocatedDisplay: number;
 
-    constructor(mainFilename: string, pluginId: string, options: RuntimeWorkerOptions) {
+    constructor(mainFilename: string, pluginId: string, options: RuntimeWorkerOptions, runtime: ScryptedRuntime) {
         super(pluginId, options);
 
         const { env, pluginDebug } = options;
-
 
         const execArgv: string[] = process.execArgv.slice();
         if (pluginDebug) {
@@ -23,8 +25,22 @@ export class ElectronForkWorker extends ChildProcessWorker {
         const electronBin: string = require('electron');
         const args = [electronBin];
         if (process.platform === 'linux') {
+            // crappy but should work.
+            for (let i = 50; i < 100; i++) {
+                if (!ElectronForkWorker.allocatedDisplays.has(i)) {
+                    this.allocatedDisplay = i;
+                    break;
+                }
+            }
+
+            if (!this.allocatedDisplay)
+                throw new Error('unable to allocate DISPLAY for xvfb-run');
+
+            ElectronForkWorker.allocatedDisplays.add(this.allocatedDisplay);
+
             // requires xvfb-run as electron does not support the chrome --headless flag.
-            args.unshift('xvfb-run', '-n', '0');
+            // dummy up a DISPLAY env variable. this value numerical because of the way it is.
+            args.unshift('xvfb-run', '-n', this.allocatedDisplay.toString());
             // https://github.com/gpuweb/gpuweb/wiki/Implementation-Status#chromium-chrome-edge-etc
             args.push('--no-sandbox', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-features=Vulkan', '--disable-vulkan-surface');
         }
@@ -47,12 +63,21 @@ export class ElectronForkWorker extends ChildProcessWorker {
             // execArgv,
         });
 
+        this.worker.on('exit', () => {
+        });
+
         this.worker.send({
             pluginId,
             options,
         });
 
         this.setupWorker();
+    }
+
+    kill(): void {
+        super.kill();
+        if (this.worker)
+            ElectronForkWorker.allocatedDisplays.delete(this.allocatedDisplay);
     }
 
     setupRpcPeer(peer: RpcPeer): void {
