@@ -11,7 +11,7 @@ export class ElectronForkWorker extends ChildProcessWorker {
     static allocatedDisplays = new Set<number>();
     allocatedDisplay: number;
 
-    constructor(_mainFilename: string, pluginId: string, options: RuntimeWorkerOptions, runtime: ScryptedRuntime) {
+    constructor(_mainFilename: string, pluginId: string, options: RuntimeWorkerOptions, runtime: ScryptedRuntime, mode: 'default' | 'webgl' | 'webgpu') {
         super(pluginId, options);
 
         const { env } = options;
@@ -24,6 +24,13 @@ export class ElectronForkWorker extends ChildProcessWorker {
             '--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights',
             '--enable-features=SharedArrayBuffer',
         ];
+
+        if (mode !== 'default') {
+            args.push(
+                '--ignore-gpu-blocklist',
+            );
+        }
+
         if (process.platform === 'linux') {
             // crappy but should work.
             for (let i = 50; i < 100; i++) {
@@ -44,11 +51,15 @@ export class ElectronForkWorker extends ChildProcessWorker {
             // https://github.com/gpuweb/gpuweb/wiki/Implementation-Status#chromium-chrome-edge-etc
             args.push(
                 '--no-sandbox',
-                '--enable-unsafe-webgpu',
-                '--ignore-gpu-blocklist',
-                '--enable-features=Vulkan',
-                '--disable-vulkan-surface',
             );
+
+            if (mode === 'webgpu') {
+                args.push(
+                    '--enable-unsafe-webgpu',
+                    '--enable-features=Vulkan',
+                    '--disable-vulkan-surface',    
+                );
+            }
         }
 
         if (process.platform === 'darwin') {
