@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import child_process from 'child_process';
 import net from "net";
@@ -6,6 +7,7 @@ import { SidebandSocketSerializer } from "../socket-serializer";
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
 import type { ScryptedRuntime } from '../../runtime';
+import { electronBin } from '../../../bin/electron-get';
 
 export class ElectronForkWorker extends ChildProcessWorker {
     static allocatedDisplays = new Set<number>();
@@ -16,11 +18,9 @@ export class ElectronForkWorker extends ChildProcessWorker {
 
         const { env } = options;
 
-        // @ts-expect-error
-        const electronBin: string = require('electron');
+        fs.chmodSync(electronBin, 0o755);
         const args = [
             electronBin,
-
             '--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights',
             '--enable-features=SharedArrayBuffer',
         ];
@@ -57,7 +57,7 @@ export class ElectronForkWorker extends ChildProcessWorker {
                 args.push(
                     '--enable-unsafe-webgpu',
                     '--enable-features=Vulkan',
-                    '--disable-vulkan-surface',    
+                    '--disable-vulkan-surface',
                 );
             }
         }

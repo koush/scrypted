@@ -10,3 +10,4 @@ scrypted.db.bak
 .update
 .venv
 py
+electron/bin

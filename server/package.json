@@ -3,6 +3,7 @@
   "version": "0.115.32",
   "description": "",
   "dependencies": {
+    "@electron/get": "^3.1.0",
     "@mapbox/node-pre-gyp": "^1.0.11",
     "@scrypted/ffmpeg-static": "^6.1.0-build1",
     "@scrypted/node-pty": "^1.0.18",
@@ -11,9 +12,9 @@
     "body-parser": "^1.20.2",
     "cookie-parser": "^1.4.6",
     "dotenv": "^16.4.5",
-    "electron": "^31.4.0",
     "engine.io": "^6.6.0",
     "express": "^4.19.2",
+    "extract-zip": "^2.0.1",
     "follow-redirects": "^1.15.6",
     "http-auth": "^4.2.0",
     "level": "^8.0.1",
@@ -46,7 +47,8 @@
     "@types/semver": "^7.5.8",
     "@types/source-map-support": "^0.5.10",
     "@types/whatwg-mimetype": "^3.0.2",
-    "@types/ws": "^8.5.12"
+    "@types/ws": "^8.5.12",
+    "electron": "^31.4.0"
   },
   "bin": {
     "scrypted-serve": "bin/scrypted-serve"
