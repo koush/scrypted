@@ -4,7 +4,6 @@
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",
-    "@scrypted/deno": "^1.45.5",
     "@scrypted/ffmpeg-static": "^6.1.0-build1",
     "@scrypted/node-pty": "^1.0.18",
     "@scrypted/types": "^0.3.50",

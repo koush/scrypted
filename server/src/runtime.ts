@@ -46,7 +46,6 @@ import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
-import { DenoWorker } from './plugin/runtime/deno-worker';
 import { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
 
 interface DeviceProxyPair {
