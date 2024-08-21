@@ -19,10 +19,10 @@ export class ElectronForkWorker extends ChildProcessWorker {
         const { env } = options;
 
         fs.chmodSync(electronBin, 0o755);
+        const enabledFeatures = ['SharedArrayBuffer'];
         const args = [
             electronBin,
             '--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights',
-            '--enable-features=SharedArrayBuffer',
         ];
 
         if (mode !== 'default') {
@@ -56,11 +56,14 @@ export class ElectronForkWorker extends ChildProcessWorker {
             if (mode === 'webgpu') {
                 args.push(
                     '--enable-unsafe-webgpu',
-                    '--enable-features=Vulkan',
                     '--disable-vulkan-surface',
                 );
+                enabledFeatures.push('Vulkan');
             }
         }
+        args.push(
+            `--enable-features=${enabledFeatures.join(",")}`,
+        )
 
         if (process.platform === 'darwin') {
             // Electron plist must be modified with this to hide dock icon before start. app.dock.hide flashes the dock before program starts.
