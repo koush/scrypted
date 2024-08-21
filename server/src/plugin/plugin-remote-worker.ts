@@ -30,7 +30,8 @@ import { Deferred } from '../deferred';
 const serverVersion = require('../../package.json').version;
 
 export interface StartPluginRemoteOptions {
-    onClusterPeer(peer: RpcPeer): void;
+    onClusterPeer?(peer: RpcPeer): void;
+    sourceURL?(filename: string): string;
 }
 
 export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void, startPluginRemoteOptions?: StartPluginRemoteOptions) {
@@ -643,7 +644,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             try {
                 const filename = zipOptions?.debug ? pluginMainNodeJs : pluginIdMainNodeJs;
-                evalLocal(peer, script, filename, params);
+                evalLocal(peer, script, startPluginRemoteOptions?.sourceURL?.(filename) || filename, params);
 
                 if (zipOptions?.fork) {
                     // pluginConsole?.log('plugin forked');

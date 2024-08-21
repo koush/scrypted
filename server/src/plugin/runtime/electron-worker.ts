@@ -11,15 +11,10 @@ export class ElectronForkWorker extends ChildProcessWorker {
     static allocatedDisplays = new Set<number>();
     allocatedDisplay: number;
 
-    constructor(mainFilename: string, pluginId: string, options: RuntimeWorkerOptions, runtime: ScryptedRuntime) {
+    constructor(_mainFilename: string, pluginId: string, options: RuntimeWorkerOptions, runtime: ScryptedRuntime) {
         super(pluginId, options);
 
-        const { env, pluginDebug } = options;
-
-        const execArgv: string[] = process.execArgv.slice();
-        if (pluginDebug) {
-            // execArgv.push(`--inspect=0.0.0.0:${pluginDebug.inspectPort}`);
-        }
+        const { env } = options;
 
         // @ts-expect-error
         const electronBin: string = require('electron');
@@ -51,6 +46,10 @@ export class ElectronForkWorker extends ChildProcessWorker {
             // <string>1</string>
         }
 
+        if (options?.pluginDebug) {
+            args.push('--remote-debugging-port=9222');
+        }
+
         args.push(
             path.join(__dirname, 'electron', 'electron-plugin-remote.js'),
             '--', 'child', this.pluginId);
@@ -60,15 +59,26 @@ export class ElectronForkWorker extends ChildProcessWorker {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
             env: Object.assign({}, process.env, env),
             serialization: 'advanced',
-            // execArgv,
         });
 
         this.worker.on('exit', () => {
         });
 
+        if (options?.pluginDebug?.waitDebug) {
+            options.pluginDebug.waitDebug.catch(() => { });
+            options.pluginDebug.waitDebug = Promise.resolve(undefined);
+        }
+
         this.worker.send({
             pluginId,
-            options,
+            options: {
+                ...options,
+                pluginDebug: options?.pluginDebug ? {
+                    ...options.pluginDebug,
+                    // dont want to send/serialize this.
+                    waitDebug: null,
+                }: undefined,
+            },
         });
 
         this.setupWorker();

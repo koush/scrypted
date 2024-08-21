@@ -1,10 +1,8 @@
 import { DeviceManager, ScryptedNativeId, SystemManager } from '@scrypted/types';
-import { ChildProcess } from 'child_process';
 import { Console } from 'console';
 import { once } from 'events';
 import net, { Server } from 'net';
 import { PassThrough, Readable } from 'stream';
-import { Worker } from 'worker_threads';
 import { listenZero } from '../listen-zero';
 
 export interface ConsoleServer {
@@ -327,11 +325,11 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
     };
 }
 
-export function pipeWorkerConsole(nativeWorker: ChildProcess | Worker) {
+export function pipeWorkerConsole(nativeWorker: { stdout: Readable, stderr: Readable }, useConsole = console) {
     nativeWorker.stdout.on('data', (data) => {
-        console.log(data.toString());
+        useConsole.log(data.toString());
     });
     nativeWorker.stderr.on('data', (data) => {
-        console.error(data.toString());
+        useConsole.error(data.toString());
     });
 }

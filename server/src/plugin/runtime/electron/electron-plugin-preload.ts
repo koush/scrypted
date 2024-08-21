@@ -5,6 +5,7 @@ import { ipcRenderer } from 'electron';
 import { PassThrough } from "stream";
 import { Console } from "console";
 import type { RuntimeWorkerOptions } from "../runtime-worker";
+import { pipeWorkerConsole } from "../../plugin-console";
 
 // setNpmExecFunctionElectron();
 
@@ -18,12 +19,11 @@ ipcRenderer.on('scrypted-init', (e, initMessage: { pluginId: string, options: Ru
     const originalConsole = console;
     const stdout = new PassThrough();
     const stderr = new PassThrough();
+    pipeWorkerConsole({ stdout, stderr }, originalConsole);
     stdout.on('data', d => {
-        originalConsole.log(d.toString());
         ipcRenderer.send('scrypted-stdout', d);
     });
     stderr.on('data', d => {
-        originalConsole.error(d.toString())
         ipcRenderer.send('scrypted-stderr', d);
     });
     const pluginConsole = new Console(stdout, stderr);
@@ -37,6 +37,10 @@ ipcRenderer.on('scrypted-init', (e, initMessage: { pluginId: string, options: Ru
         }
         catch (e) {
             reject?.(e);
+        }
+    }, {
+        sourceURL(filename) {
+            return `scrypted-electron://${filename}`;
         }
     });
 

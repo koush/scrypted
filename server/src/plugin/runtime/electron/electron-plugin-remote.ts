@@ -1,5 +1,6 @@
+import { app, BrowserWindow } from 'electron';
 import path from 'path';
-import { app, BrowserWindow, ipcRenderer } from 'electron';
+import { Deferred } from '../../../deferred';
 import { RuntimeWorkerOptions } from '../runtime-worker';
 
 if (process.platform === 'darwin') {
@@ -12,8 +13,14 @@ if (process.platform === 'darwin') {
 let win: BrowserWindow;
 const winQueue: any[] = [];
 
-const createWindow = () => {
-    console.log('creating window');
+const createWindow = (firstMessage: { plugindId: string, options: RuntimeWorkerOptions }) => {
+    const message: { plugindId: string, options: RuntimeWorkerOptions } = firstMessage;
+    const { options } = message;
+
+    if (options?.pluginDebug) {
+        console.warn('debugging', options);
+    }
+
     win = new BrowserWindow({
         width: 800,
         height: 600,
@@ -24,8 +31,12 @@ const createWindow = () => {
             nodeIntegration: true,
             webSecurity: false,
             allowRunningInsecureContent: true,
+            additionalArguments: options?.pluginDebug ? [
+                `--remote-debugging-port=9222`,
+            ] : undefined,
         }
     });
+    win.webContents.send('scrypted-init', message);
 
     // win.loadURL('https://webglsamples.org/aquarium/aquarium.html');
     console.log(__dirname);
@@ -56,28 +67,33 @@ const createWindow = () => {
     win.on('close', kill);
 }
 
-let firstMessage = true;
+const firstMessage = new Deferred<any>;
 function processMessage(message: any) {
-    if (firstMessage) {
-        firstMessage = false;
-        win.webContents.send('scrypted-init', message);
-        return;
-    }
-
     win.webContents.send('scrypted', message);
 }
 
 process.on('message', (message) => {
+    if (!firstMessage.finished) {
+        firstMessage.resolve(message);
+        return;
+    }
+
     if (win)
         processMessage(message);
     else
         winQueue.push(message);
 });
 
+process.on('disconnect', () => {
+    console.error('peer host disconnected, exiting.');
+    process.exit(1);
+});
+
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
 })
 
-app.whenReady().then(() => {
-    createWindow()
+app.whenReady().then(async () => {
+     const message: { plugindId: string, options: RuntimeWorkerOptions } = await firstMessage.promise;
+    createWindow(message)
 });
