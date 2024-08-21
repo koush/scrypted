@@ -331,22 +331,16 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         const clientOptions = await legacyGetSignalingSessionOptions(session);
 
         let connection: WebRTCConnectionManagement;
-        try {
-            const { createConnection } = await result.result;
-            connection = await createConnection({}, undefined, session,
-                maximumCompatibilityMode,
-                clientOptions,
-                {
-                    configuration: this.getRTCConfiguration(),
-                    weriftConfiguration,
-                    ipv4Ban: this.storageSettings.values.ipv4Ban,
-                }
-            );
-        }
-        catch (e) {
-            result.worker.terminate();
-            throw e;
-        }
+        const { createConnection } = await result.result;
+        connection = await createConnection({}, undefined, session,
+            maximumCompatibilityMode,
+            clientOptions,
+            {
+                configuration: this.getRTCConfiguration(),
+                weriftConfiguration,
+                ipv4Ban: this.storageSettings.values.ipv4Ban,
+            }
+        );
         handleCleanupConnection(cleanup, connection, result);
         await connection.negotiateRTCSignalingSession();
         await connection.waitConnected();
@@ -356,27 +350,22 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
     async convertToFFmpegInput(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
         const channel = data as RTCSignalingChannel;
-        try {
-            const { createRTCPeerConnectionSource } = await result.result;
-            const rtcSource = await createRTCPeerConnectionSource({
-                __json_copy_serialize_children: true,
-                nativeId: undefined,
-                mixinId: undefined,
-                mediaStreamOptions: {
-                    id: 'webrtc',
-                    name: 'WebRTC',
-                    source: 'cloud',
-                },
-                startRTCSignalingSession: (session) => channel.startRTCSignalingSession(session),
-                maximumCompatibilityMode: this.storageSettings.values.maximumCompatibilityMode,
-            });
+        const { createRTCPeerConnectionSource } = await result.result;
+        const { mediaObject } = await createRTCPeerConnectionSource({
+            __json_copy_serialize_children: true,
+            nativeId: undefined,
+            mixinId: undefined,
+            mediaStreamOptions: {
+                id: 'webrtc',
+                name: 'WebRTC',
+                source: 'cloud',
+            },
+            startRTCSignalingSession: (session) => channel.startRTCSignalingSession(session),
+            maximumCompatibilityMode: this.storageSettings.values.maximumCompatibilityMode,
+            cleanup: (s) => cleanup.resolve(s),
+        });
 
-            const mediaStreamUrl = rtcSource.mediaObject;
-            return await mediaManager.convertMediaObject(mediaStreamUrl, ScryptedMimeTypes.FFmpegInput);
-        } catch (e) {
-            result.worker.terminate();
-            throw e;
-        }
+        return await mediaManager.convertMediaObject(mediaObject, ScryptedMimeTypes.FFmpegInput);
     }
 
     async convertMedia(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
@@ -387,6 +376,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                 this.activeConnections--;
                 cleanup.resolve('worker exited (convert)');
             });
+            cleanup.promise.finally(() => result.worker.terminate());
             return result;
         }
 
@@ -700,6 +690,7 @@ export async function fork() {
             mediaStreamOptions: ResponseMediaStreamOptions,
             startRTCSignalingSession: (session: RTCSignalingSession) => Promise<RTCSessionControl | undefined>,
             maximumCompatibilityMode: boolean,
+            cleanup?: (s: string) => void,
         }): Promise<RTCPeerConnectionPipe> {
             return createRTCPeerConnectionSource({
                 nativeId: this.nativeId,
@@ -707,6 +698,7 @@ export async function fork() {
                 mediaStreamOptions: options.mediaStreamOptions,
                 startRTCSignalingSession: (session) => options.startRTCSignalingSession(session),
                 maximumCompatibilityMode: options.maximumCompatibilityMode,
+                cleanup: (s) => options.cleanup?.(s),
             });
         },
 

@@ -33,8 +33,10 @@ export async function createRTCPeerConnectionSource(options: {
     mediaStreamOptions: ResponseMediaStreamOptions,
     startRTCSignalingSession: (session: RTCSignalingSession) => Promise<RTCSessionControl | undefined>,
     maximumCompatibilityMode: boolean,
+    cleanup?: (s: string) => void,
 }): Promise<RTCPeerConnectionPipe> {
     const { mediaStreamOptions, startRTCSignalingSession, mixinId, nativeId, maximumCompatibilityMode } = options;
+    const optionsCleanup = options.cleanup;
     const console = mixinId ? sdk.deviceManager.getMixinConsole(mixinId, nativeId) : sdk.deviceManager.getDeviceConsole(nativeId);
 
     const { clientPromise, port } = await listenZeroSingleClient('127.0.0.1');
@@ -52,6 +54,7 @@ export async function createRTCPeerConnectionSource(options: {
         sessionControl.promise.then(sc => sc.endSession()).catch(() => { });
         peerConnection.promise.then(pc => pc.close()).catch(() => { });
         ignorePromise(intercom.promise.then(intercom => intercom.stopIntercom()));
+        optionsCleanup?.('webrtc/rtsp cleaning up');
     };
 
     clientPromise.then(socket => socket.on('close', cleanup));
