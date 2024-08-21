@@ -1,12 +1,11 @@
-import {Worker} from 'worker_threads';
-import { ChildProcess } from 'child_process';
 import { DeviceManager, ScryptedNativeId, SystemManager } from '@scrypted/types';
+import { ChildProcess } from 'child_process';
 import { Console } from 'console';
 import { once } from 'events';
 import net, { Server } from 'net';
 import { PassThrough, Readable } from 'stream';
+import { Worker } from 'worker_threads';
 import { listenZero } from '../listen-zero';
-import { ChildProcessWorker } from './runtime/child-process-worker';
 
 export interface ConsoleServer {
     pluginConsole: Console;
