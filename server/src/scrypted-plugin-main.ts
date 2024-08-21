@@ -27,7 +27,8 @@ function start(mainFilename: string) {
     else {
         console.log('starting plugin', pluginId);
         const peer = startPluginRemote(mainFilename, process.argv[3], (message, reject, serializationContext) => process.send(message, serializationContext?.sendHandle, {
-            swallowErrors: !reject,
+            // what happened to this argument?
+            // swallowErrors: !reject,
         }, e => {
             if (e)
                 reject?.(e);
