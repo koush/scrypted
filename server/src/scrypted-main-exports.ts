@@ -25,7 +25,7 @@ function start(mainFilename: string, options?: {
         require(process.env.SCRYPTED_COMPATIBILITY_FILE);
     }
 
-    if (!globalThis.gc && !process.versions.deno) {
+    if (!globalThis.gc) {
         v8.setFlagsFromString('--expose_gc')
         globalThis.gc = vm.runInNewContext("gc");
     }

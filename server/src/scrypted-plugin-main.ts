@@ -1,10 +1,10 @@
 import net from 'net';
-import v8 from 'v8';
 import worker_threads from "worker_threads";
 import { getPluginNodePath } from "./plugin/plugin-npm-dependencies";
 import { startPluginRemote } from "./plugin/plugin-remote-worker";
 import { SidebandSocketSerializer } from "./plugin/socket-serializer";
 import { RpcMessage } from "./rpc";
+import { NodeThreadWorker } from './plugin/runtime/node-thread-worker';
 
 function start(mainFilename: string) {
     const pluginId = process.argv[3];
@@ -13,17 +13,8 @@ function start(mainFilename: string) {
     if (process.argv[2] === 'child-thread') {
         console.log('starting thread', pluginId);
         const { port } = worker_threads.workerData as { port: worker_threads.MessagePort };
-        const peer = startPluginRemote(mainFilename, pluginId, (message, reject) => {
-            try {
-                port.postMessage(v8.serialize(message));
-            }
-            catch (e) {
-                reject?.(e);
-            }
-        });
-        peer.transportSafeArgumentTypes.add(Buffer.name);
-        peer.transportSafeArgumentTypes.add(Uint8Array.name);
-        port.on('message', message => peer.handleMessage(v8.deserialize(message)));
+        const peer = startPluginRemote(mainFilename, pluginId, (message, reject, serializationContext) => NodeThreadWorker.send(message, port, reject, serializationContext));
+        NodeThreadWorker.setupRpcPeer(peer, port);
         port.on('messageerror', e => {
             console.error('message error', e);
             process.exit(1);
@@ -36,7 +27,8 @@ function start(mainFilename: string) {
     else {
         console.log('starting plugin', pluginId);
         const peer = startPluginRemote(mainFilename, process.argv[3], (message, reject, serializationContext) => process.send(message, serializationContext?.sendHandle, {
-            swallowErrors: !reject,
+            // what happened to this argument?
+            // swallowErrors: !reject,
         }, e => {
             if (e)
                 reject?.(e);

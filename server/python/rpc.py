@@ -22,6 +22,7 @@ async def maybe_await(value):
 
 
 class RPCResultError(Exception):
+    # i think this stuff shouldn't be here...
     name: str
     stack: str
     message: str
@@ -187,14 +188,7 @@ class RpcPeer:
         s = self.serializeError(e)
         result['result'] = s
         result['throw'] = True
-
-        # TODO 3/2/2023 deprecate these properties
-        tb = traceback.format_exc()
-        message = str(e)
-        result['stack'] = tb or '[no stack]',
-        result['message'] = message or '[no message]',
-        # END TODO
-
+        return result
 
     def deserializeError(e: Dict) -> RPCResultError:
         error = RPCResultError(None, e.get('message'))
@@ -390,6 +384,9 @@ class RpcPeer:
 
         return value
 
+    def sendResult(self, result: Dict, serializationContext: Dict):
+        self.send(result, lambda e: self.send(self.createErrorResult(result, e, None), None), serializationContext)
+
     async def handleMessage(self, message: Dict, deserializationContext: Dict):
         try:
             messageType = message['type']
@@ -409,7 +406,7 @@ class RpcPeer:
                     self.createErrorResult(
                         result, type(e).__name, str(e), tb)
 
-                self.send(result, None, serializationContext)
+                self.sendResult(result, serializationContext)
 
             elif messageType == 'apply':
                 result = {
@@ -450,7 +447,7 @@ class RpcPeer:
                     self.createErrorResult(result, e)
 
                 if not message.get('oneway', False):
-                    self.send(result, None, serializationContext)
+                    self.sendResult(result, serializationContext)
 
             elif messageType == 'result':
                 id = message['id']
@@ -459,13 +456,6 @@ class RpcPeer:
                     raise RPCResultError(
                         None, 'unknown result %s' % id)
                 del self.pendingResults[id]
-                if (hasattr(message, 'message') or hasattr(message, 'stack')) and not hasattr(message, 'throw'):
-                    e = RPCResultError(
-                        None, message.get('message', None))
-                    e.stack = message.get('stack', None)
-                    e.name = message.get('name', None)
-                    future.set_exception(e)
-                    return
                 deserialized = self.deserialize(message.get('result', None), deserializationContext)
                 if message.get('throw'):
                     future.set_exception(deserialized)

@@ -474,6 +474,8 @@ async function start(mainFilename: string, options?: {
             debugServer.on('connection', resolve);
         });
 
+        waitDebug.catch(() => {});
+
         workerInspectPort = Math.round(Math.random() * 10000) + 30000;
         try {
             await scrypted.installPlugin(plugin, {

@@ -48,17 +48,6 @@ export interface RpcApply extends RpcMessage {
 export interface RpcResult extends RpcMessage {
     type: 'result';
     id: string;
-    // TODO 3/2/2023
-    // deprecate these properties from rpc protocol. treat error results like any other result
-    // and auto serialize them.
-    /**
-     * @deprecated
-     */
-    stack?: string;
-    /**
-     * @deprecated
-     */
-    message?: string;
     throw?: boolean;
     result?: any;
 }
@@ -453,7 +442,7 @@ export class RpcPeer {
             result.reject(error);
         }
         for (const y of this.yieldedAsyncIterators) {
-            y.throw(error);
+            y.throw(error).catch(() => {});
         }
         this.yieldedAsyncIterators.clear();
         this.pendingResults = Object.freeze({});
@@ -493,16 +482,10 @@ export class RpcPeer {
         });
     }
 
-    /**
-     * @deprecated
-     * @param result
-     * @param e
-     */
     createErrorResult(result: RpcResult, e: ErrorType) {
         result.result = this.serializeError(e);
         result.throw = true;
-        result.message = (e as Error).message || 'no message';
-        result.stack = e.stack || 'no stack';
+        return result;
     }
 
     deserialize(value: any, deserializationContext: any): any {
@@ -688,6 +671,13 @@ export class RpcPeer {
         }
     }
 
+    sendResult(result: RpcResult, serializationContext: any) {
+        this.send(result, e => {
+            // attempt to handle transport serialization failure.
+            this.send(this.createErrorResult(result, e), undefined, serializationContext);
+        }, serializationContext);
+    }
+
     private async handleMessageInternal(message: RpcMessage, deserializationContext?: any) {
         if (Object.isFrozen(this.pendingResults))
             return;
@@ -710,7 +700,7 @@ export class RpcPeer {
                         this.createErrorResult(result, e as Error);
                     }
 
-                    this.send(result, undefined, serializationContext);
+                    this.sendResult(result, serializationContext);
                     break;
                 }
                 case 'apply': {
@@ -752,7 +742,7 @@ export class RpcPeer {
                                 }
                                 else {
                                     if (Object.isFrozen(this.pendingResults)) {
-                                        (target as AsyncGenerator).throw(new RPCResultError(this, 'RpcPeer has been killed (yield)'));
+                                        (target as AsyncGenerator).throw(new RPCResultError(this, 'RpcPeer has been killed (yield)')).catch(() => {});
                                     }
                                     else {
                                         this.yieldedAsyncIterators.add(target);
@@ -773,7 +763,7 @@ export class RpcPeer {
                     }
 
                     if (!rpcApply.oneway)
-                        this.send(result, undefined, serializationContext);
+                        this.sendResult(result, serializationContext);
                     break;
                 }
                 case 'result': {
@@ -783,14 +773,6 @@ export class RpcPeer {
                     delete this.pendingResults[rpcResult.id];
                     if (!deferred)
                         throw new Error(`unknown result ${rpcResult.id}`);
-                    if ((rpcResult.message || rpcResult.stack) && !rpcResult.throw) {
-                        const e = new RPCResultError(this, rpcResult.message || 'no message', undefined, {
-                            name: rpcResult.result,
-                            stack: rpcResult.stack,
-                        });
-                        deferred.reject(e);
-                        return;
-                    }
                     const deserialized = this.deserialize(rpcResult.result, deserializationContext);
                     if (rpcResult.throw)
                         deferred.reject(deserialized);
