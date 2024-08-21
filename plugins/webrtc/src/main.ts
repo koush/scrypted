@@ -324,7 +324,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         }
     }
 
-    async convertToRTCConnectionManagement(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+    async convertToRTCConnectionManagement(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
         const weriftConfiguration = await this.getWeriftConfiguration();
         const session = data as RTCSignalingSession;
         const maximumCompatibilityMode = !!this.storageSettings.values.maximumCompatibilityMode;
@@ -354,7 +354,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return connection;
     }
 
-    async convertToFFmpegInput(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+    async convertToFFmpegInput(result: ReturnType<typeof zygote>, cleanup: Deferred<string>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
         const channel = data as RTCSignalingChannel;
         try {
             const { createRTCPeerConnectionSource } = await result.result;
@@ -372,14 +372,14 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             });
 
             const mediaStreamUrl = rtcSource.mediaObject;
-            return await mediaManager.convertMediaObject(mediaStreamUrl, ScryptedMimeTypes.FFmpegInput);
+            return await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaStreamUrl, ScryptedMimeTypes.FFmpegInput);
         } catch (e) {
             result.worker.terminate();
             throw e;
         }
     }
 
-    async convertMedia(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<any> {
+    async convertMedia(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
         const getFork = (cleanup: Deferred<string>) => {
             const result = zygote();
             this.activeConnections++;
