@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.115.32",
+  "version": "0.115.33",
   "description": "",
   "dependencies": {
     "@electron/get": "^3.1.0",
