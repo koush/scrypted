@@ -17,7 +17,7 @@ const createWindow = () => {
     win = new BrowserWindow({
         width: 800,
         height: 600,
-        // show: false,
+        show: false,
         webPreferences: {
             backgroundThrottling: false,
             preload: path.join(__dirname, 'electron-plugin-preload.js'),

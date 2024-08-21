@@ -43,7 +43,7 @@ export class ElectronForkWorker extends ChildProcessWorker {
         this.worker = child_process.spawn(bin, args, {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
             env: Object.assign({}, process.env, env),
-            serialization: 'json',
+            serialization: 'advanced',
             // execArgv,
         });
 
