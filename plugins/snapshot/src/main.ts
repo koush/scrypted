@@ -728,7 +728,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
                 }
             };
 
-            if (mixin.storageSettings.values.snapshotResolution === 'Full Resolution')
+            if (mixin?.storageSettings.values.snapshotResolution === 'Full Resolution')
                 delete rpo.picture;
 
             if (mixin && iface === ScryptedInterface.Camera) {
