@@ -4,9 +4,9 @@ numpy==1.26.4
 # uncomment to require cuda 12, but most stuff is still targetting cuda 11.
 # however, stuff targetted for cuda 11 can still run on cuda 12.
 # --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
-onnxruntime-gpu; 'linux' in sys_platform and platform_machine == 'x86_64'
+onnxruntime-gpu; platform_machine == 'x86_64'
 # cpu and coreml execution provider
-onnxruntime; 'linux' not in sys_platform or platform_machine != 'x86_64'
+onnxruntime; platform_machine != 'x86_64'
 # nightly?
 # ort-nightly-gpu==1.17.3.dev20240409002
 
