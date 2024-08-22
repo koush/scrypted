@@ -138,19 +138,24 @@ export async function configureCodecs(console: Console, client: OnvifCameraAPI, 
         vc.rateControl.encodingInterval = 1;
     }
 
-    if (audioOptions?.codec)
-        ac.encoding = toOnvifAudioCodec(audioOptions.codec);
-    if (audioOptions?.bitrate)
-        ac.bitrate = Math.floor(audioOptions?.bitrate / 1000);
-    if (audioOptions?.sampleRate)
-        ac.sampleRate = audioOptions.sampleRate / 1000;
-
     // onvif on amcrest seems to get upset if rateControl is not filled out
     // so try to avoid no op.
     if (JSON.stringify(vc) !== originalVideo)
         await client.setVideoEncoderConfiguration(vc);
-    if (JSON.stringify(ac) !== originalAudio)
-        await client.setAudioEncoderConfiguration(ac);
+    
+
+    if (ac) {
+        if (audioOptions?.codec)
+            ac.encoding = toOnvifAudioCodec(audioOptions.codec);
+        if (audioOptions?.bitrate)
+            ac.bitrate = Math.floor(audioOptions?.bitrate / 1000);
+        if (audioOptions?.sampleRate)
+            ac.sampleRate = audioOptions.sampleRate / 1000;
+
+        if (JSON.stringify(ac) !== originalAudio)
+            await client.setAudioEncoderConfiguration(ac);
+    }
+
     const configuredVideo = await client.getVideoEncoderConfigurationOptions(profile.$.token, vc.$.token);
     client.profiles = undefined;
     const ret: MediaStreamConfiguration = {
