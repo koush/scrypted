@@ -42,7 +42,8 @@
     "@types/semver": "^7.5.8",
     "@types/source-map-support": "^0.5.10",
     "@types/whatwg-mimetype": "^3.0.2",
-    "@types/ws": "^8.5.12"
+    "@types/ws": "^8.5.12",
+    "rimraf": "^6.0.1"
   },
   "bin": {
     "scrypted-serve": "bin/scrypted-serve"
