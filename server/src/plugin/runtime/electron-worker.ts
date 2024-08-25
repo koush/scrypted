@@ -19,7 +19,7 @@ export class ElectronForkWorker extends ChildProcessWorker {
         const { env } = options;
 
         fs.chmodSync(electronBin, 0o755);
-        const enabledFeatures = ['SharedArrayBuffer'];
+        const enabledFeatures = ['SharedArrayBuffer', 'VaapiVideoDecodeLinuxGL'];
         const args = [
             electronBin,
             '--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights',
@@ -28,6 +28,8 @@ export class ElectronForkWorker extends ChildProcessWorker {
         if (mode !== 'default') {
             args.push(
                 '--ignore-gpu-blocklist',
+                '--use-gl=angle',
+                '--use-angle=gl-egl',
             );
         }
 
@@ -110,9 +112,11 @@ export class ElectronForkWorker extends ChildProcessWorker {
     }
 
     kill(): void {
-        super.kill();
-        if (this.worker)
+        if (this.worker) {
             ElectronForkWorker.allocatedDisplays.delete(this.allocatedDisplay);
+            this.worker.disconnect();
+        }
+        super.kill();
     }
 
     setupRpcPeer(peer: RpcPeer): void {
