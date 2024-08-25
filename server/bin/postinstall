@@ -4,5 +4,3 @@
 if (!process.env.SCRYPTED_PYTHON_PATH) {
     require('./packaged-python').installScryptedServerRequirements();
 }
-
-require('./electron-get').installElectron();
