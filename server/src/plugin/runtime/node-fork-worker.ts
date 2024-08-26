@@ -4,6 +4,7 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { SidebandSocketSerializer } from "../socket-serializer";
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
+import worker_threads from 'worker_threads';
 
 export class NodeForkWorker extends ChildProcessWorker {
 
@@ -17,7 +18,10 @@ export class NodeForkWorker extends ChildProcessWorker {
             execArgv.push(`--inspect=0.0.0.0:${pluginDebug.inspectPort}`);
         }
 
-        this.worker = child_process.fork(mainFilename, ['child', this.pluginId], {
+        this.worker = child_process.fork(mainFilename, [
+            worker_threads.isMainThread ? 'child' : 'fork',
+            this.pluginId
+        ], {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
             env: Object.assign({}, process.env, env),
             serialization: 'advanced',

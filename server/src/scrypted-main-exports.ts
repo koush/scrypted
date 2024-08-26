@@ -12,7 +12,7 @@ import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
 import type { Runtime } from './scrypted-server-main';
 
 export function isChildProcess() {
-    return process.argv[2] === 'child' || process.argv[2] === 'child-thread'
+    return process.argv[2] === 'child' || process.argv[2] === 'fork' || process.argv[2] === 'child-thread';
 }
 
 function start(mainFilename: string, options?: {
@@ -42,7 +42,7 @@ function start(mainFilename: string, options?: {
 
     startPeriodicGarbageCollection();
 
-    if (process.argv[2] === 'child' || process.argv[2] === 'child-thread') {
+    if (isChildProcess()) {
         // plugins should never crash. this handler will be removed, and then readded
         // after the plugin source map is retrieved.
         process.on('uncaughtException', e => {
