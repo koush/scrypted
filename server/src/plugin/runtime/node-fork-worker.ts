@@ -5,8 +5,24 @@ import { SidebandSocketSerializer } from "../socket-serializer";
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
 
-export function isChildProcess() {
-    return process.argv[2] === 'child' || process.argv[2] === 'fork' || process.argv[2] === 'child-thread';
+export const NODE_PLUGIN_CHILD_PROCESS = 'child';
+export const NODE_PLUGIN_FORK_PROCESS = 'fork';
+export const NODE_PLUGIN_THREAD_PROCESS = 'child-thread';
+
+export function isNodePluginWorkerProcess() {
+    return isNodePluginChildProcess() || isNodePluginForkProcess() || isNodePluginThreadProcess();
+}
+
+export function isNodePluginForkProcess() {
+    return process.argv[2] === NODE_PLUGIN_FORK_PROCESS;
+}
+
+export function isNodePluginThreadProcess() {
+    return process.argv[2] === NODE_PLUGIN_THREAD_PROCESS;
+}
+
+export function isNodePluginChildProcess() {
+    return process.argv[2] === NODE_PLUGIN_CHILD_PROCESS;
 }
 
 export class NodeForkWorker extends ChildProcessWorker {
@@ -22,7 +38,9 @@ export class NodeForkWorker extends ChildProcessWorker {
         }
 
         this.worker = child_process.fork(mainFilename, [
-            isChildProcess() ? 'fork': 'child',
+            // change the argument marker depending on whether this is the main scrypted server process
+            // starting a plugin vs the plugin forking for multiprocessing.
+            isNodePluginWorkerProcess() ? NODE_PLUGIN_FORK_PROCESS : NODE_PLUGIN_CHILD_PROCESS,
             this.pluginId
         ], {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],

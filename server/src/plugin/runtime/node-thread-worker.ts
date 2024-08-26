@@ -3,6 +3,7 @@ import { EventEmitter } from "events";
 import { RpcMessage, RpcPeer, RpcSerializer } from "../../rpc";
 import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 import { BufferSerializer } from '../../rpc-buffer-serializer';
+import { NODE_PLUGIN_THREAD_PROCESS } from "./node-fork-worker";
 
 
 class BufferTransfer implements RpcSerializer {
@@ -53,7 +54,7 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
         const message = new worker_threads.MessageChannel();
         const { port1, port2 } = message;
         this.worker = new worker_threads.Worker(mainFilename, {
-            argv: ['child-thread', this.pluginId],
+            argv: [NODE_PLUGIN_THREAD_PROCESS, this.pluginId],
             env: Object.assign({}, process.env, env),
             workerData: {
                 port: port1,
