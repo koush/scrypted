@@ -4,7 +4,10 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { SidebandSocketSerializer } from "../socket-serializer";
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
-import worker_threads from 'worker_threads';
+
+export function isChildProcess() {
+    return process.argv[2] === 'child' || process.argv[2] === 'fork' || process.argv[2] === 'child-thread';
+}
 
 export class NodeForkWorker extends ChildProcessWorker {
 
@@ -19,7 +22,7 @@ export class NodeForkWorker extends ChildProcessWorker {
         }
 
         this.worker = child_process.fork(mainFilename, [
-            worker_threads.isMainThread ? 'child' : 'fork',
+            isChildProcess() ? 'fork': 'child',
             this.pluginId
         ], {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
