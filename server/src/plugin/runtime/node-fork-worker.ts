@@ -32,9 +32,7 @@ export class NodeForkWorker extends ChildProcessWorker {
 
         const { env, pluginDebug } = options;
 
-        // execArgv will contain the inspect port when debugging the main plugin process.
-        // remove that argument to prevent a plugin fork from trying to listen on that port again.
-        const execArgv: string[] = process.execArgv.slice().filter(arg => !arg.startsWith('--inspect='));
+        const execArgv: string[] = process.execArgv.slice();
         if (pluginDebug) {
             execArgv.push(`--inspect=0.0.0.0:${pluginDebug.inspectPort}`);
         }
