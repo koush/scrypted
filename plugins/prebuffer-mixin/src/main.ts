@@ -840,7 +840,7 @@ class PrebufferSession {
     filter?: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk,
   }) {
     const { isActiveClient, session, socketPromise, requestedPrebuffer } = options;
-    this.console.log('sending prebuffer', requestedPrebuffer);
+    // this.console.log('sending prebuffer', requestedPrebuffer);
 
     let socket: Duplex;
 
@@ -945,7 +945,7 @@ class PrebufferSession {
         availablePrebuffers = [];
       }
       else {
-        this.console.log('Found sync frame in rtsp prebuffer.');
+        // this.console.log('Found sync frame in rtsp prebuffer.');
       }
       for (const prebuffer of availablePrebuffers) {
         safeWriteData(prebuffer, true);
@@ -1337,7 +1337,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       }
 
       id = result.stream.id;
-      this.console.log('Selected stream', result.stream.name);
+      // this.console.log('Selected stream', result.stream.name);
       // transcoding video should never happen transparently since it is CPU intensive.
       // encourage users at every step to configure proper codecs.
       // for this reason, do not automatically supply h264 encoder arguments
