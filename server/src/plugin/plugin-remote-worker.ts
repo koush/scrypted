@@ -32,6 +32,7 @@ const serverVersion = require('../../package.json').version;
 export interface StartPluginRemoteOptions {
     onClusterPeer?(peer: RpcPeer): void;
     sourceURL?(filename: string): string;
+    consoleId?: string;
 }
 
 export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void, startPluginRemoteOptions?: StartPluginRemoteOptions) {
@@ -540,7 +541,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                     if (runtimeWorker instanceof ChildProcessWorker) {
                         nativeWorker = runtimeWorker.childProcess;
-                        pipeWorkerConsole(nativeWorker);
+                        const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
+                        pipeWorkerConsole(nativeWorker, console);
                     }
                 }
                 else {

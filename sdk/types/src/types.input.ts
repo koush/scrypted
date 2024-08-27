@@ -2583,6 +2583,8 @@ export interface ForkOptions {
   name?: string;
   filename?: string;
   runtime?: string;
+  id?: string;
+  nativeId?: ScryptedNativeId;
 }
 
 export interface ScryptedStatic {
