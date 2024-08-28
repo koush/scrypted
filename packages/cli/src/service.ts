@@ -12,6 +12,7 @@ async function sleep(ms: number) {
 
 const EXIT_FILE = '.exit';
 const UPDATE_FILE = '.update';
+const VERSION_FILE = '.version';
 
 async function runCommand(command: string, ...args: string[]) {
     if (os.platform() === 'win32') {
@@ -117,6 +118,15 @@ export async function installServe(installVersion: string, ignoreError?: boolean
 }
 
 export async function serveMain(installVersion?: string) {
+    const { installDir, volume } = cwdInstallDir();
+    if (!installVersion) {
+        try {
+            installVersion = fs.readFileSync(path.join(volume, VERSION_FILE)).toString().trim();
+        }
+        catch (e) {
+        }
+    }
+
     const options = ((): { install: true; version: string } | { install: false } => {
         if (installVersion) {
             console.log(`Installing @scrypted/server@${installVersion}`);
@@ -139,7 +149,6 @@ export async function serveMain(installVersion?: string) {
         }
     })();
 
-    const { installDir, volume } = cwdInstallDir();
 
     if (options.install) {
         await installServe(options.version, true);

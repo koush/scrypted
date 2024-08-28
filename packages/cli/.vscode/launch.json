@@ -21,8 +21,7 @@
             ],
             "preLaunchTask": "npm: build",
             "args": [
-                "rtsp",
-                "/Volumes/Seagate/video/scrypted-1370/1720470474217/1720470474217/1720470474217.rtsp",
+                "serve",
             ],
             "sourceMaps": true,
             "resolveSourceMapLocations": [
