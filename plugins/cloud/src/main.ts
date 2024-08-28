@@ -25,8 +25,6 @@ import { qsparse, qsstringify } from "./qs";
 import { createLocallyManagedTunnel, runLocallyManagedTunnel } from "./cloudflared-local-managed";
 import { ChildProcess } from "child_process";
 
-// import { registerDuckDns } from "./greenlock";
-
 const { deviceManager, endpointManager, systemManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
@@ -85,15 +83,16 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             persistedDefaultValue: crypto.randomBytes(8).toString('hex'),
         },
         forwardingMode: {
-            title: "Port Forwarding Mode",
-            description: "The port forwarding mode used to expose the HTTPS port. If port forwarding is disabled or unavailable, Scrypted Cloud will fall back to push to initiate connections with this Scrypted server. Port Forwarding and UPNP are optional but will significantly speed up cloud connections.",
+            title: "Connection Mode",
+            description: "The connection mode that exposes this server to the internet.",
             choices: [
+                "Default",
                 "UPNP",
                 "Router Forward",
                 "Custom Domain",
                 "Disabled",
             ],
-            defaultValue: 'UPNP',
+            defaultValue: 'Default',
             onPut: () => this.scheduleRefreshPortForward(),
         },
         hostname: {
@@ -245,6 +244,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     reverseConnections = new Set<Duplex>();
     cloudflaredLoginController?: AbortController;
 
+    get portForwardingDisabled() {
+        return this.storageSettings.values.forwardingMode === 'Disabled' || this.storageSettings.values.forwardingMode === 'Default';
+    }
+
     get cloudflareTunnelHost() {
         if (!this.cloudflareTunnel)
             return;
@@ -281,8 +284,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         };
 
         this.storageSettings.settings.securePort.onGet = async () => {
+            const hide = this.portForwardingDisabled;
             return {
-                hide: this.storageSettings.values.forwardingMode === 'Disabled',
+                hide,
             }
         };
 
@@ -291,20 +295,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 hide: this.storageSettings.values.forwardingMode !== 'Custom Domain',
             }
         };
-
-        // this.storageSettings.settings.duckDnsToken.onGet = async () => {
-        //     return {
-        //         hide: this.storageSettings.values.forwardingMode === 'Custom Domain'
-        //             || this.storageSettings.values.forwardingMode === 'Disabled',
-        //     }
-        // };
-
-        // this.storageSettings.settings.duckDnsHostname.onGet = async () => {
-        //     return {
-        //         hide: this.storageSettings.values.forwardingMode === 'Custom Domain'
-        //             || this.storageSettings.values.forwardingMode === 'Disabled',
-        //     }
-        // };
 
         this.storageSettings.settings.cloudflaredTunnelCustomDomain.onGet =
             this.storageSettings.settings.cloudflaredTunnelUrl.onGet = async () => {
@@ -445,7 +435,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async testPortForward() {
         try {
-            if (this.storageSettings.values.forwardingMode === 'Disabled')
+            if (this.portForwardingDisabled)
                 throw new Error('Port forwarding is disabled.');
 
             const pluginPath = await endpointManager.getPath(undefined, {
@@ -480,7 +470,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         if (!upnpPort)
             upnpPort = Math.round(Math.random() * 20000 + 40000);
 
-        if (this.storageSettings.values.forwardingMode === 'Disabled') {
+        if (this.portForwardingDisabled) {
             this.updatePortForward(upnpPort);
             return;
         }
@@ -602,9 +592,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     getAuthority() {
-        const { forwardingMode } = this.storageSettings.values;
-        if (forwardingMode === 'Disabled')
+        if (this.portForwardingDisabled)
             return {};
+
+        const { forwardingMode } = this.storageSettings.values;
 
         const upnp_port = forwardingMode === 'Custom Domain' ? 443 : this.storageSettings.values.upnpPort;
         const hostname = forwardingMode === 'Custom Domain'
@@ -1217,6 +1208,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
 
         this.log.a('Visit the URL printed in the Scrypted Cloud plugin console to log into Cloudflare.');
+        const customDomain = this.storageSettings.values.cloudflaredTunnelCustomDomain;
         try {
             this.cloudflaredLoginController?.abort();
             this.cloudflaredLoginController = new AbortController();
@@ -1227,7 +1219,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.cloudflared?.child.kill();
         }
         catch (e) {
-            this.storageSettings.values.cloudflaredTunnelCustomDomain = undefined;
+            if (customDomain)
+                this.storageSettings.values.cloudflaredTunnelCustomDomain = undefined;
             this.console.error('cloudflared login error', e);
             this.log.a('Cloudflare login error. See console logs.');
         }

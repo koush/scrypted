@@ -58,6 +58,7 @@ async function login(bin: string, signal?: AbortSignal) {
 }
 
 async function createTunnel(bin: string, domain: string) {
+    await runLogWait(bin, ['tunnel', 'cleanup', domain], 30000).catch(() => { });
     await runLogWait(bin, ['tunnel', 'delete', domain], 30000).catch(() => { });
     return runLogWait(bin, ['tunnel', 'create', domain], 30000);
 }
