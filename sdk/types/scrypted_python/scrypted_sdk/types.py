@@ -648,7 +648,7 @@ class NotifierOptions(TypedDict):
     dir: NotificationDirection
     image: str
     lang: str
-    recordedEvent: RecordedEvent
+    recordedEvent: Union[RecordedEvent, Any]
     renotify: bool
     requireInteraction: bool
     silent: bool
