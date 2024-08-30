@@ -48,7 +48,7 @@ export async function checkLxcDependencies() {
         // the current workaround is to install the release manually.
         // https://github.com/intel/compute-runtime/releases/tag/24.13.29138.7
         const output = await new Promise<string>((r,f)=> child_process.exec("sh -c 'apt show versions intel-opencl-icd'", (err, stdout, stderr) => {
-            if (err)
+            if (err && !stdout && !stderr)
                 f(err);
             else
                 r(stdout + '\n' + stderr);
@@ -71,6 +71,30 @@ export async function checkLxcDependencies() {
     }
     catch (e) {
         sdk.log.a('Failed to verify/install intel-opencl-icd version.');
+    }
+
+    try {
+        const output = await new Promise<string>((r,f)=> child_process.exec("sh -c 'apt show versions intel-driver-compiler-npu'", (err, stdout, stderr) => {
+            if (err && !stdout && !stderr)
+                f(err);
+            else
+                r(stdout + '\n' + stderr);
+        }));
+
+        if (
+            // apt
+            output.includes('No packages found')
+            ) {
+            const cp = child_process.spawn('sh', ['-c', 'curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-npu.sh | bash']);
+            const [exitCode] = await once(cp, 'exit');
+            if (exitCode !== 0)
+                sdk.log.a('Failed to install intel-driver-compiler-npu.');
+            else
+                needRestart = true;
+        }
+    }
+    catch (e) {
+        sdk.log.a('Failed to verify/install intel-driver-compiler-npu.');
     }
 
     if (needRestart)
