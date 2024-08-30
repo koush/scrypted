@@ -10,7 +10,7 @@ function readyn() {
 }
 
 cd /tmp
-SCRYPTED_VERSION=v0.96.0
+SCRYPTED_VERSION=v0.116.0
 SCRYPTED_TAR_ZST=scrypted-$SCRYPTED_VERSION.tar.zst
 if [ -z "$VMID" ]
 then
