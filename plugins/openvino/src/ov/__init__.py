@@ -101,6 +101,8 @@ class OpenVINOPlugin(
         nvidia = False
         iris_xe = False
         arc = False
+        npu = False
+        gpu = False
 
         dgpus = []
         # search for NVIDIA dGPU, as that is not preferred by AUTO for some reason?
@@ -116,6 +118,10 @@ class OpenVINOPlugin(
                 if "NVIDIA" in full_device_name and "dGPU" in full_device_name:
                     dgpus.append(device)
                     nvidia = True
+                if "NPU" in device:
+                    npu = True
+                if "GPU" in device:
+                    gpu = True
             except:
                 pass
 
@@ -123,8 +129,15 @@ class OpenVINOPlugin(
         if mode == "Default":
             mode = "AUTO"
 
-            if len(dgpus):
+            if npu:
+                if gpu:
+                    mode = f"AUTO:NPU,GPU,CPU"
+                else:
+                    mode = f"AUTO:NPU,CPU"
+            elif len(dgpus):
                 mode = f"AUTO:{','.join(dgpus)},CPU"
+            elif gpu:
+                mode = f"GPU"
 
         mode = mode or "AUTO"
         self.mode = mode
@@ -137,7 +150,7 @@ class OpenVINOPlugin(
         if model == "Default" or model not in availableModels:
             if model != "Default":
                 self.storage.setItem("model", "Default")
-            if arc or nvidia:
+            if arc or nvidia or npu:
                 model = "scrypted_yolov9c_320"
             elif iris_xe:
                 model = "scrypted_yolov9s_320"
