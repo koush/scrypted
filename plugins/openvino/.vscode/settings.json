@@ -5,7 +5,7 @@
     // "scrypted.serverRoot": "/server",
 
     // proxmox installation
-    "scrypted.debugHost": "scrypted-server",
+    "scrypted.debugHost": "scrypted-nvr",
     "scrypted.serverRoot": "/root/.scrypted",
 
     // pi local installation
