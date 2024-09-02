@@ -729,10 +729,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async convertMedia(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<MediaObject | Buffer | any> {
-        if (toMimeType !== ScryptedMimeTypes.Url)
+        if (!toMimeType.startsWith(ScryptedMimeTypes.Url))
             throw new Error('unsupported cloud url conversion');
 
-        if (fromMimeType === ScryptedMimeTypes.LocalUrl) {
+        if (fromMimeType.startsWith(ScryptedMimeTypes.LocalUrl)) {
             // if cloudflare is enabled and the plugin isn't set up as a custom domain, try to use the cloudflare url for
             // short lived urls.
             if (this.cloudflareTunnel && this.storageSettings.values.forwardingMode !== 'Custom Domain') {
@@ -746,7 +746,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
             return this.whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.getHostname()}`);
         }
-        else if (fromMimeType === ScryptedMimeTypes.PushEndpoint) {
+        else if (fromMimeType.startsWith(ScryptedMimeTypes.PushEndpoint)) {
             const validDomain = this.getSSLHostname();
             if (validDomain)
                 return Buffer.from(`https://${validDomain}${await this.getCloudMessagePath()}/${data}`);
