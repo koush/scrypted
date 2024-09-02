@@ -1,6 +1,11 @@
 <details>
 <summary>Changelog</summary>
 
+### 0.3.2
+
+alexa: fix syncedDevices being undefined
+
+
 ### 0.3.1
 
 alexa/google-home: fix potential vulnerability. do not allow local network control using cloud tokens belonging to a different user. the plugins are now locked to a specific scrypted cloud account once paired.
