@@ -1,7 +1,8 @@
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
+import sdk, { HttpRequest, HttpRequestHandler, HttpResponse, MediaConverter, MediaObject, MediaObjectOptions, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import bpmux from 'bpmux';
+import { ChildProcess } from "child_process";
 import * as cloudflared from 'cloudflared';
 import crypto from 'crypto';
 import { once } from 'events';
@@ -20,10 +21,9 @@ import { sleep } from '../../../common/src/sleep';
 import { createSelfSignedCertificate } from '../../../server/src/cert';
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
 import { installCloudflared } from "./cloudflared-install";
+import { createLocallyManagedTunnel, runLocallyManagedTunnel } from "./cloudflared-local-managed";
 import { PushManager } from './push';
 import { qsparse, qsstringify } from "./qs";
-import { createLocallyManagedTunnel, runLocallyManagedTunnel } from "./cloudflared-local-managed";
-import { ChildProcess } from "child_process";
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -32,25 +32,7 @@ const SCRYPTED_SERVER = localStorage.getItem('scrypted-server') || 'home.scrypte
 
 const SCRYPTED_CLOUD_MESSAGE_PATH = '/_punch/cloudmessage';
 
-class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
-    constructor(public cloud: ScryptedCloud) {
-        super('push');
-
-        this.fromMimeType = ScryptedMimeTypes.PushEndpoint;
-        this.toMimeType = ScryptedMimeTypes.Url;
-    }
-
-    async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer> {
-        const validDomain = this.cloud.getSSLHostname();
-        if (validDomain)
-            return Buffer.from(`https://${validDomain}${await this.cloud.getCloudMessagePath()}/${data}`);
-
-        const url = `http://127.0.0.1/push/${data}`;
-        return this.cloud.whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.cloud.getHostname()}${SCRYPTED_CLOUD_MESSAGE_PATH}`);
-    }
-}
-
-class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider, HttpRequestHandler {
+class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, MediaConverter, HttpRequestHandler {
     cloudflareTunnel: string;
     cloudflared: {
         url: Promise<string>;
@@ -60,7 +42,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     server: http.Server;
     secureServer: https.Server;
     proxy: HttpProxy;
-    push: ScryptedPush;
     whitelisted = new Map<string, string>();
     reregisterTimer: NodeJS.Timeout;
     storageSettings = new StorageSettings(this, {
@@ -188,9 +169,26 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             title: 'Cloudflare Tunnel Custom Domain',
             placeholder: 'scrypted.example.com',
             description: 'Optional: Host a custom domain with Cloudflare. After setting the domain, complete the Cloudflare browser login link shown in Scrypted Cloud Plugin Console.',
+            mapPut: (ov, nv) => {
+                try {
+                    const url = new URL(nv);
+                    return url.hostname;
+                }
+                catch (e) {
+                    return nv;
+                }
+            },
             onPut: (_, nv) => {
+                if (!nv)
+                    this.storageSettings.values.cloudflaredTunnelCredentials = undefined;
                 this.doCloudflaredLogin(nv);
             },
+        },
+        cloudflaredTunnelLoginUrl: {
+            group: 'Cloudflare',
+            type: 'html',
+            title: 'Cloudflare Tunnel Login',
+            hide: true,
         },
         cloudflaredTunnelUrl: {
             group: 'Cloudflare',
@@ -257,6 +255,17 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     constructor() {
         super();
 
+        this.converters = [
+            [ScryptedMimeTypes.LocalUrl, ScryptedMimeTypes.Url],
+            [ScryptedMimeTypes.PushEndpoint, ScryptedMimeTypes.Url],
+        ];
+        // legacy cleanup
+        this.fromMimeType = undefined;
+        this.toMimeType = undefined;
+        deviceManager.onDevicesChanged({
+            devices: [],
+        });
+
         this.storageSettings.settings.register.onPut = async () => {
             await this.sendRegistrationId(await this.manager.registrationId);
         }
@@ -303,21 +312,21 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 }
             };
 
-        this.log.clearAlerts();
 
         this.storageSettings.settings.securePort.onPut = (ov, nv) => {
             if (ov && ov !== nv)
                 this.log.a('Reload the Scrypted Cloud Plugin to apply the port change.');
         };
 
-        this.fromMimeType = ScryptedMimeTypes.LocalUrl;
-        this.toMimeType = ScryptedMimeTypes.Url;
-
         if (!this.storageSettings.values.certificate)
             this.storageSettings.values.certificate = createSelfSignedCertificate();
 
+        if (this.storageSettings.values.cloudflaredTunnelCustomDomain && !this.storageSettings.values.cloudflaredTunnelCredentials)
+            this.storageSettings.values.cloudflaredTunnelCustomDomain = undefined;
+
+        this.log.clearAlerts();
+
         const proxy = this.setupProxyServer();
-        this.setupCloudPush();
         this.updateCors();
 
         const observeRegistrations = () => {
@@ -678,18 +687,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    async setupCloudPush() {
-        await deviceManager.onDeviceDiscovered(
-            {
-                name: 'Cloud Push Endpoint',
-                type: ScryptedDeviceType.API,
-                nativeId: 'push',
-                interfaces: [ScryptedInterface.BufferConverter],
-            },
-        );
-        this.push = new ScryptedPush(this);
-    }
-
     async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
         if (request.url.endsWith('/testPortForward')) {
             response.send(this.randomBytes);
@@ -716,10 +713,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    async getDevice(nativeId: string) {
-        return this.push;
-    }
-
     async releaseDevice(id: string, nativeId: string): Promise<void> {
     }
 
@@ -735,19 +728,34 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         return this.getSSLHostname() || SCRYPTED_SERVER;
     }
 
-    async convert(data: Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer> {
-        // if cloudflare is enabled and the plugin isn't set up as a custom domain, try to use the cloudflare url for
-        // short lived urls.
-        if (this.cloudflareTunnel && this.storageSettings.values.forwardingMode !== 'Custom Domain') {
-            const params = new URLSearchParams(toMimeType.split(';')[1] || '');
-            if (params.get('short-lived') === 'true') {
-                const u = new URL(data.toString(), this.cloudflareTunnel);
-                u.host = this.cloudflareTunnelHost;
-                u.port = '';
-                return Buffer.from(u.toString());
+    async convertMedia(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<MediaObject | Buffer | any> {
+        if (toMimeType !== ScryptedMimeTypes.Url)
+            throw new Error('unsupported cloud url conversion');
+
+        if (fromMimeType === ScryptedMimeTypes.LocalUrl) {
+            // if cloudflare is enabled and the plugin isn't set up as a custom domain, try to use the cloudflare url for
+            // short lived urls.
+            if (this.cloudflareTunnel && this.storageSettings.values.forwardingMode !== 'Custom Domain') {
+                const params = new URLSearchParams(toMimeType.split(';')[1] || '');
+                if (params.get('short-lived') === 'true') {
+                    const u = new URL(data.toString(), this.cloudflareTunnel);
+                    u.host = this.cloudflareTunnelHost;
+                    u.port = '';
+                    return Buffer.from(u.toString());
+                }
             }
+            return this.whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.getHostname()}`);
         }
-        return this.whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.getHostname()}`);
+        else if (fromMimeType === ScryptedMimeTypes.PushEndpoint) {
+            const validDomain = this.getSSLHostname();
+            if (validDomain)
+                return Buffer.from(`https://${validDomain}${await this.getCloudMessagePath()}/${data}`);
+
+            const url = `http://127.0.0.1/push/${data}`;
+            return this.whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.getHostname()}${SCRYPTED_CLOUD_MESSAGE_PATH}`);
+        }
+
+        throw new Error('unsupported cloud url conversion');
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -1207,13 +1215,18 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             return;
         }
 
-        this.log.a('Visit the URL printed in the Scrypted Cloud plugin console to log into Cloudflare.');
+        // this.log.a('Visit the URL printed in the Scrypted Cloud plugin console to log into Cloudflare.');
         const customDomain = this.storageSettings.values.cloudflaredTunnelCustomDomain;
         try {
             this.cloudflaredLoginController?.abort();
             this.cloudflaredLoginController = new AbortController();
             const { bin } = await installCloudflared();
-            const jsonContents = await createLocallyManagedTunnel(domain, bin, this.cloudflaredLoginController.signal);
+            const jsonContents = await createLocallyManagedTunnel(domain, bin, this.cloudflaredLoginController.signal, url => {
+                this.console.warn('Cloudflare login URL:', url);
+                this.storageSettings.values.cloudflaredTunnelLoginUrl = `<div style="padding-bottom: 16px"><a href="${url}" target="_blank" >Click here to log into Cloudflare</a></div>`;
+                this.storageSettings.settings.cloudflaredTunnelLoginUrl.hide = false;
+                this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+            });
             this.storageSettings.values.cloudflaredTunnelCredentials = jsonContents;
             this.storageSettings.values.cloudflaredTunnelToken = undefined;
             this.cloudflared?.child.kill();

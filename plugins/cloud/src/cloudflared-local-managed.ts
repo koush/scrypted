@@ -27,7 +27,7 @@ function runLog(bin: string, args: string[]) {
     return cp;
 }
 
-async function runLogWait(bin: string, args: string[], timeout: number, signal?: AbortSignal) {
+async function runLogWait(bin: string, args: string[], timeout: number, signal?: AbortSignal, outputChanged?: (output: string) => void) {
     const cp = runLog(bin, args);
 
     signal?.addEventListener('abort', () => {
@@ -37,9 +37,11 @@ async function runLogWait(bin: string, args: string[], timeout: number, signal?:
     let output: string = '';
     cp.stdio[1].on('data', (data) => {
         output += data.toString();
+        outputChanged?.(output);
     });
     cp.stdio[2].on('data', (data) => {
         output += data.toString();
+        outputChanged?.(output);
     });
 
     await timeoutPromise(timeout, once(cp, 'exit'));
@@ -49,12 +51,19 @@ async function runLogWait(bin: string, args: string[], timeout: number, signal?:
     return output;
 }
 
-async function login(bin: string, signal?: AbortSignal) {
+async function login(bin: string, signal?: AbortSignal, urlCallback?: (url: string) => void) {
     const userHome = process.env.HOME || process.env.USERPROFILE;
     const certPem = path.join(userHome, '.cloudflared', 'cert.pem');
     rmSync(certPem, { force: true, recursive: true });
 
-    await runLogWait(bin, ['tunnel', 'login'], 300000, signal);
+    await runLogWait(bin, ['tunnel', 'login'], 300000, signal, output => {
+        const match = output.match(/Please open the following URL and log in with your Cloudflare account:(?<url>.*?)Leave/s);
+        if (match) {
+            const url = match.groups.url.trim();
+            if (url)
+                urlCallback(url);
+        }
+    });
 }
 
 async function createTunnel(bin: string, domain: string) {
@@ -104,10 +113,10 @@ async function ensureBin(bin: string) {
     return bin;
 }
 
-export async function createLocallyManagedTunnel(domain: string, bin?: string, signal?: AbortSignal) {
+export async function createLocallyManagedTunnel(domain: string, bin?: string, signal?: AbortSignal, urlCallback?: (url: string) => void) {
     bin = await ensureBin(bin);
 
-    await login(bin, signal);
+    await login(bin, signal, urlCallback);
     const createOutput = await createTunnel(bin, domain);
     const jsonFilePath = extractJsonFilePath(createOutput);
 
