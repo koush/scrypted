@@ -116,7 +116,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                 // ensure globally stable proxyIds.
                 // worker threads will embed their pid and tid in the proxy id for cross worker fast path.
-                const proxyId = clusterEntry?.proxyId || (worker_threads.isMainThread ? RpcPeer.generateId() : `n-${process.pid}-${worker_threads.threadId}-${RpcPeer.generateId()}`);
+                const proxyId = clusterEntry?.proxyId || `n-${process.pid}-${worker_threads.threadId}-${RpcPeer.generateId()}`;
 
                 // if the cluster entry already exists, check if it belongs to this node.
                 // if it belongs to this node, the entry must also be for this peer.
@@ -148,7 +148,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const sourcePeer = sourceKey
                     ? await clusterPeers.get(sourceKey)
                     : peer;
-                return sourcePeer?.localProxyMap.get(id);
+                const ret = sourcePeer?.localProxyMap.get(id);
+                if (!ret)
+                    return;
+                return ret;
             }
 
             // all cluster clients, incoming and outgoing, connect with random ports which can be used as peer ids
