@@ -960,6 +960,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
                     socket.pipe(local).pipe(socket);
                 });
+                mux.on('error', () => {
+                    client.destroy();
+                });
             }
         });
 
