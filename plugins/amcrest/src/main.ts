@@ -8,6 +8,7 @@ import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { createRtspMediaStreamOptions, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { AmcrestCameraClient, AmcrestEvent, AmcrestEventData } from "./amcrest-api";
 import { amcrestAutoConfigureSettings, autoconfigureSettings } from "./amcrest-configure";
+import { group } from "console";
 
 const { mediaManager } = sdk;
 
@@ -336,10 +337,14 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         const ac = {
             ...automaticallyConfigureSettings,
+            subgroup: 'Advanced',
         };
         ac.type = 'button';
         ret.push(ac);
-        ret.push({ ...amcrestAutoConfigureSettings });
+        ret.push({
+            ...amcrestAutoConfigureSettings,
+            subgroup: 'Advanced',
+        });
 
         return ret;
     }

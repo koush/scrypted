@@ -465,10 +465,14 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
         const ac = {
             ...automaticallyConfigureSettings,
+            subgroup: 'Advanced',
         };
         ac.type = 'button';
         ret.push(ac);
-        ret.push({ ...hikvisionAutoConfigureSettings });
+        ret.push({
+            ...hikvisionAutoConfigureSettings,
+            subgroup: 'Advanced',
+        });
 
         return ret;
     }

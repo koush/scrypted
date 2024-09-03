@@ -227,9 +227,14 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
 
         const ac = {
             ...automaticallyConfigureSettings,
+            subgroup: 'Advanced',
         };
         ac.type = 'button';
         ret.push(ac);
+        ret.push({
+            ...onvifAutoConfigureSettings,
+            subgroup: 'Advanced',
+        });
 
         return ret;
     }
