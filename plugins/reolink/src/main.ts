@@ -797,6 +797,7 @@ class ReolinkProvider extends RtspProvider {
                 placeholder: '192.168.2.222',
             },
             {
+                subgroup: 'Advanced',
                 key: 'rtspChannel',
                 title: 'Channel Number Override',
                 description: "Optional: The channel number to use for snapshots and video. E.g., 0, 1, 2, etc.",
@@ -804,12 +805,14 @@ class ReolinkProvider extends RtspProvider {
                 type: 'number',
             },
             {
+                subgroup: 'Advanced',
                 key: 'httpPort',
                 title: 'HTTP Port',
                 description: 'Optional: Override the HTTP Port from the default value of 80.',
                 placeholder: '80',
             },
             {
+                subgroup: 'Advanced',
                 key: 'skipValidate',
                 title: 'Skip Validation',
                 description: 'Add the device without verifying the credentials and network settings.',
