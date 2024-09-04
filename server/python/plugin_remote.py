@@ -601,21 +601,24 @@ class PluginRemote:
                 return clusterPeerPromise
 
             async def connectClusterPeer():
-                reader, writer = await asyncio.open_connection(address, port)
-                sourceAddress, sourcePort = writer.get_extra_info("sockname")
-                if (
-                    sourceAddress != SCRYPTED_CLUSTER_ADDRESS
-                    and sourceAddress != "127.0.0.1"
-                ):
-                    print("source address mismatch", sourceAddress)
-                sourceKey = getClusterPeerKey(sourceAddress, sourcePort)
-                rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
-                clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(
-                    self.loop, rpcTransport
-                )
-                clusterPeer.onProxySerialization = lambda value: onProxySerialization(
-                    value, sourceKey
-                )
+                try:
+                    reader, writer = await asyncio.open_connection(address, port)
+                    sourceAddress, sourcePort = writer.get_extra_info("sockname")
+                    if (
+                        sourceAddress != SCRYPTED_CLUSTER_ADDRESS
+                        and sourceAddress != "127.0.0.1"
+                    ):
+                        print("source address mismatch", sourceAddress)
+                    rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
+                    clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(
+                        self.loop, rpcTransport
+                    )
+                    clusterPeer.onProxySerialization = lambda value: onProxySerialization(
+                        value, clusterPeerKey
+                    )
+                except:
+                    clusterPeers.pop(clusterPeerKey)
+                    raise
 
                 async def run_loop():
                     try:
