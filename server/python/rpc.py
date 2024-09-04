@@ -268,12 +268,21 @@ class RpcPeer:
 
         proxiedEntry = self.localProxied.get(value, None)
         if proxiedEntry:
+            if self.onProxySerialization:
+                proxyId, __remote_proxy_props = self.onProxySerialization(value)
+            else:
+                __remote_proxy_props = RpcPeer.prepareProxyProperties(value)
+                proxyId = proxiedEntry['id']
+
+            if proxyId != proxiedEntry['id']:
+                raise Exception('onProxySerialization proxy id mismatch')
+
             proxiedEntry['finalizerId'] = RpcPeer.generateId()
             ret = {
-                '__remote_proxy_id': proxiedEntry['id'],
+                '__remote_proxy_id': proxyId,
                 '__remote_proxy_finalizer_id': proxiedEntry['finalizerId'],
                 '__remote_constructor_name': __remote_constructor_name,
-                '__remote_proxy_props': RpcPeer.prepareProxyProperties(value),
+                '__remote_proxy_props': __remote_proxy_props,
                 '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
             }
             return ret

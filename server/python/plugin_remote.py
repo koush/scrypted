@@ -515,12 +515,17 @@ class PluginRemote:
         def isClusterAddress(address: str):
             return not address or address == SCRYPTED_CLUSTER_ADDRESS
 
-        def onProxySerialization(value: Any, sourceKey: str = None):
+        def onProxySerialization(peer: rpc.RpcPeer, value: Any, sourceKey: str = None):
             properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
             clusterEntry = properties.get("__cluster", None)
-            proxyId: str = (
-                clusterEntry and clusterEntry.get("proxyId", None)
-            ) or rpc.RpcPeer.generateId()
+            proxyId: str
+            existing = peer.localProxied.get(value, None)
+            if existing:
+                proxyId = existing["id"]
+            else:
+                proxyId = (
+                    clusterEntry and clusterEntry.get("proxyId", None)
+                ) or rpc.RpcPeer.generateId()
 
             if clusterEntry:
                 if (
@@ -543,7 +548,9 @@ class PluginRemote:
 
             return proxyId, properties
 
-        self.peer.onProxySerialization = onProxySerialization
+        self.peer.onProxySerialization = lambda value: onProxySerialization(
+            self.peer, value, None
+        )
 
         async def resolveObject(id: str, sourceKey: str):
             sourcePeer: rpc.RpcPeer = (
@@ -571,7 +578,7 @@ class PluginRemote:
                 self.loop, rpcTransport
             )
             peer.onProxySerialization = lambda value: onProxySerialization(
-                value, clusterPeerPort
+                peer, value, clusterPeerKey
             )
             future: asyncio.Future[rpc.RpcPeer] = asyncio.Future()
             future.set_result(peer)
@@ -621,7 +628,9 @@ class PluginRemote:
                         self.loop, rpcTransport
                     )
                     clusterPeer.onProxySerialization = (
-                        lambda value: onProxySerialization(value, clusterPeerKey)
+                        lambda value: onProxySerialization(
+                            clusterPeer, value, clusterPeerKey
+                        )
                     )
                 except:
                     clusterPeers.pop(clusterPeerKey)

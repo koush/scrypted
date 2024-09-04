@@ -114,13 +114,13 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 return !address || address === SCRYPTED_CLUSTER_ADDRESS;
             }
 
-            const onProxySerialization = (value: any, sourceKey?: string) => {
+            const onProxySerialization = (peer: RpcPeer, value: any, sourceKey: string) => {
                 const properties = RpcPeer.prepareProxyProperties(value) || {};
                 let clusterEntry: ClusterObject = properties.__cluster;
 
                 // ensure globally stable proxyIds.
                 // worker threads will embed their pid and tid in the proxy id for cross worker fast path.
-                const proxyId = clusterEntry?.proxyId || `n-${process.pid}-${worker_threads.threadId}-${RpcPeer.generateId()}`;
+                const proxyId = peer.localProxied.get(value)?.id || clusterEntry?.proxyId || `n-${process.pid}-${worker_threads.threadId}-${RpcPeer.generateId()}`;
 
                 // if the cluster entry already exists, check if it belongs to this node.
                 // if it belongs to this node, the entry must also be for this peer.
@@ -148,7 +148,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     properties,
                 };
             }
-            peer.onProxySerialization = onProxySerialization;
+
+            peer.onProxySerialization = value => onProxySerialization(peer, value, undefined);
 
             const resolveObject = async (id: string, sourceKey: string) => {
                 const sourcePeer = sourceKey
@@ -180,7 +181,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, client, client);
                 // the listening peer sourceKey (client address/port) is used by the OTHER peer (the client)
                 // to determine if it is already connected to THIS peer (the server).
-                clusterPeer.onProxySerialization = (value) => onProxySerialization(value, clusterPeerKey);
+                clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
                 clusterPeers.set(clusterPeerKey, Promise.resolve(clusterPeer));
                 startPluginRemoteOptions?.onClusterPeer?.(clusterPeer);
                 const connectRPCObject: ConnectRPCObject = async (o) => {
@@ -221,7 +222,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                             console.warn("source address mismatch", sourceAddress);
 
                         const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, socket, socket);
-                        clusterPeer.onProxySerialization = (value) => onProxySerialization(value, clusterPeerKey);
+                        clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
                         return clusterPeer;
                     }
                     catch (e) {
@@ -272,7 +273,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 }
                 peerPromise = tidDeferred.promise.then(port => {
                     const threadPeer = NodeThreadWorker.createRpcPeer(peer.selfName, threadPeerKey, port);
-                    threadPeer.onProxySerialization = value => onProxySerialization(value, threadPeerKey);
+                    threadPeer.onProxySerialization = value => onProxySerialization(threadPeer, value, threadPeerKey);
 
                     const connectRPCObject: ConnectRPCObject = async (o) => {
                         const sha256 = computeClusterObjectHash(o, clusterSecret);
