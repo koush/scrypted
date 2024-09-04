@@ -29,11 +29,14 @@ export class PushManager extends EventEmitter {
             const instance = new PushReceiver({
                 ...savedConfig,
                 firebase: {
-                    messagingSenderId: senderId,
-                    projectId: 'scrypted-app',
-                    apiKey: 'AIzaSyDI0bgFuVPIqKZoNpB-iTOU7ijIeepxOXE',
-                    appId: '1:827888101440:web:6ff9f8ada107e9cc0097a5',
-                } ,
+                    apiKey: "AIzaSyDI0bgFuVPIqKZoNpB-iTOU7ijIeepxOXE",
+                    authDomain: "scrypted-app.firebaseapp.com",
+                    databaseURL: "https://scrypted-app.firebaseio.com",
+                    projectId: "scrypted-app",
+                    storageBucket: "scrypted-app.appspot.com",
+                    messagingSenderId: "827888101440",
+                    appId: "1:827888101440:web:6ff9f8ada107e9cc0097a5"
+                },
                 heartbeatIntervalMs: 15 * 60 * 1000,
             });
 
@@ -57,7 +60,12 @@ export class PushManager extends EventEmitter {
                 this.emit('message', message.data);
             });
 
-            await instance.connect();
+            try {
+                await instance.connect();
+            }
+            catch (e) {
+                console.error('failed to connect to push server', e);
+            }
 
             return savedConfig.credentials?.fcm?.token || deferred.promise;
         })();
