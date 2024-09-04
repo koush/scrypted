@@ -26,12 +26,15 @@ import rpc_reader
 import scrypted_python.scrypted_sdk.types
 from plugin_pip import install_with_pip, need_requirements, remove_pip_dirs
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
-from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
-                                                EventDetails,
-                                                ScryptedInterface,
-                                                ScryptedInterfaceMethods,
-                                                ScryptedInterfaceProperty,
-                                                Storage)
+from scrypted_python.scrypted_sdk.types import (
+    Device,
+    DeviceManifest,
+    EventDetails,
+    ScryptedInterface,
+    ScryptedInterfaceMethods,
+    ScryptedInterfaceProperty,
+    Storage,
+)
 
 SCRYPTED_REQUIREMENTS = """
 ptpython
@@ -509,6 +512,9 @@ class PluginRemote:
             )
             return base64.b64encode(m.digest()).decode("utf-8")
 
+        def isClusterAddress(address: str):
+            return not address or address == SCRYPTED_CLUSTER_ADDRESS
+
         def onProxySerialization(value: Any, sourceKey: str = None):
             properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
             clusterEntry = properties.get("__cluster", None)
@@ -516,12 +522,13 @@ class PluginRemote:
                 clusterEntry and clusterEntry.get("proxyId", None)
             ) or rpc.RpcPeer.generateId()
 
-            if (
-                clusterEntry
-                and clusterPort == clusterEntry["port"]
-                and sourceKey != clusterEntry.get("sourceKey", None)
-            ):
-                clusterEntry = None
+            if clusterEntry:
+                if (
+                    isClusterAddress(clusterEntry.get("address", None))
+                    and clusterPort == clusterEntry["port"]
+                    and sourceKey != clusterEntry.get("sourceKey", None)
+                ):
+                    clusterEntry = None
 
             if not clusterEntry:
                 clusterEntry: ClusterObject = {
@@ -593,7 +600,7 @@ class PluginRemote:
         clusterPort = clusterRpcServer.sockets[0].getsockname()[1]
 
         def ensureClusterPeer(address: str, port: int):
-            if not address or address == SCRYPTED_CLUSTER_ADDRESS:
+            if isClusterAddress(address):
                 address = "127.0.0.1"
             clusterPeerKey = getClusterPeerKey(address, port)
             clusterPeerPromise = clusterPeers.get(clusterPeerKey)
@@ -613,8 +620,8 @@ class PluginRemote:
                     clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(
                         self.loop, rpcTransport
                     )
-                    clusterPeer.onProxySerialization = lambda value: onProxySerialization(
-                        value, clusterPeerKey
+                    clusterPeer.onProxySerialization = (
+                        lambda value: onProxySerialization(value, clusterPeerKey)
                     )
                 except:
                     clusterPeers.pop(clusterPeerKey)
