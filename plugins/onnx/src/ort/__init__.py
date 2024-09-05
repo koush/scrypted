@@ -94,7 +94,7 @@ class ONNXPlugin(
                 if sys.platform == 'darwin':
                     providers.append("CoreMLExecutionProvider")
 
-                if ('linux' in sys.platform or 'win' in sys.platform) and platform.machine() == 'x86_64':
+                if ('linux' in sys.platform or 'win' in sys.platform) and (platform.machine() == 'x86_64' or platform.machine() == 'AMD64'):
                     deviceId = int(deviceId)
                     providers.append(("CUDAExecutionProvider", { "device_id": deviceId }))
 
