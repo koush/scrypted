@@ -740,7 +740,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         return pluginHost;
     }
 
-    findPluginDevice?(pluginId: string, nativeId?: ScryptedNativeId): PluginDevice {
+    findPluginDevice(pluginId: string, nativeId?: ScryptedNativeId): PluginDevice {
         // JSON stringify over rpc turns undefined into null.
         if (nativeId === null)
             nativeId = undefined;
