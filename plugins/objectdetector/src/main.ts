@@ -661,12 +661,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       frameGenerator = this.plugin.storageSettings.values.defaultDecoder || 'Default';
 
     const pipelines = getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator));
-    const webcodec = process.env.SCRYPTED_INSTALL_ENVIRONMENT === 'electron' ? sdk.systemManager.getDeviceById('@scrypted/electron-core', 'webcodec') : undefined;
     const webassembly = sdk.systemManager.getDeviceById('@scrypted/nvr', 'decoder') || undefined;
     const gstreamer = sdk.systemManager.getDeviceById('@scrypted/python-codecs', 'gstreamer') || undefined;
     const libav = sdk.systemManager.getDeviceById('@scrypted/python-codecs', 'libav') || undefined;
     const ffmpeg = sdk.systemManager.getDeviceById('@scrypted/objectdetector', 'ffmpeg') || undefined;
-    const use = pipelines.find(p => p.name === frameGenerator) || webcodec || webassembly || gstreamer || libav || ffmpeg;
+    const use = pipelines.find(p => p.name === frameGenerator) || webassembly || gstreamer || libav || ffmpeg;
     return use.id;
   }
 
