@@ -152,7 +152,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         const portableInstallPath = path.join(pyPath, pyVersion);
 
         const py = new PortablePython(pluginPythonVersion, portableInstallPath, portablePythonOptions);
-        if (fs.existsSync(py.executablePath)) {
+        if (fs.existsSync(py.executablePath) && !py.isTagOutdated()) {
             pythonPath = py.executablePath;
             finishSetup();
         }
