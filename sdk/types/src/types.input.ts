@@ -2197,9 +2197,13 @@ export interface Setting {
   deviceFilter?: string;
   multiple?: boolean;
   /**
-   * Flat that the UI should immediately apply this setting.
+   * Flag that the UI should immediately apply this setting.
    */
   immediate?: boolean;
+  /**
+   * Flag that hte UI should open the console.
+   */
+  console?: boolean;
   value?: SettingValue;
 }
 
