@@ -158,18 +158,20 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             });
         }
 
-        const validateMedia = async (stepName: string, mo: MediaObject) => {
+        const validateMedia = async (stepName: string, mo: MediaObject, snapshot = false) => {
             await this.validate(stepName, async () => {
                 const jpeg = await sdk.mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg');
                 const metadata = await sharp(jpeg).metadata();
                 if (!metadata.width || !metadata.height || metadata.width < 100 || metadata.height < 100)
                     throw new Error('Malformed image.');
-            })
+                if (snapshot && device.pluginId === '@scrypted/unifi-protect' && metadata.width < 1280)
+                    this.warnStep('Unifi Protect provides low quality snapshots. Consider using Snapshot from Prebuffer for full resolution screenshots.');
+            });
         };
 
         await validateMedia('Snapshot', await device.takePicture({
             reason: 'event',
-        }));
+        }), true);
 
         await this.validate('Streams', async () => {
             const vsos = await device.getVideoStreamOptions();
