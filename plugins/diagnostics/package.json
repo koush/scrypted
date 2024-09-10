@@ -21,8 +21,9 @@
       ]
    },
    "dependencies": {
+      "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "@scrypted/common": "file:../../common"
+      "sharp": "^0.33.5"
    },
    "devDependencies": {
       "@types/node": "^22.5.4"
