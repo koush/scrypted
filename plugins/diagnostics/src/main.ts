@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import net from 'net';
 import fs from 'fs';
 import os from 'os';
-import sdk, { Camera, MediaObject, MotionSensor, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import sdk, { Camera, MediaObject, MotionSensor, Notifier, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { httpFetch, httpFetchParseIncomingMessage } from '../../../server/src/fetch/http-fetch';
 
@@ -12,7 +12,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             group: 'Device',
             title: 'Test Device',
             type: 'device',
-            deviceFilter: `type === '${ScryptedDeviceType.Camera}' || type === '${ScryptedDeviceType.Doorbell}'`,
+            deviceFilter: `type === '${ScryptedDeviceType.Camera}' || type === '${ScryptedDeviceType.Doorbell}'  || type === '${ScryptedDeviceType.Notifier}'`,
             immediate: true,
         },
         validateDevice: {
@@ -88,12 +88,42 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     }
 
     async validateDevice() {
-        const device = this.storageSettings.values.testDevice as ScryptedDevice & Camera & VideoCamera & MotionSensor;
+        const device = this.storageSettings.values.testDevice as ScryptedDevice & any;
 
         this.console.log(''.padEnd(80, '='));
         this.console.log(`Device Validation: ${device?.name}`);
         this.console.log(''.padEnd(80, '='));
 
+        if (device.type === ScryptedDeviceType.Camera || device.type === ScryptedDeviceType.Doorbell) {
+            await this.validateCamera(device);
+        }
+        else if (device.type === ScryptedDeviceType.Notifier) {
+            await this.validateNotifier(device);
+        }
+
+        this.console.log(''.padEnd(80, '='));
+        this.console.log(`Device Validation Complete: ${device?.name}`);
+        this.console.log(''.padEnd(80, '='));
+    }
+
+    async validateNotifier(device: ScryptedDevice & Notifier) {
+        this.validate('Test Notification', async () => {
+            const logo = await httpFetch({
+                url: 'https://home.scrypted.app/_punch/web_hi_res_512.png',
+                responseType: 'buffer',
+            });
+
+            const mo = await sdk.mediaManager.createMediaObject(logo.body, 'image/png');
+            await device.sendNotification('Scrypted Diagnostics', {
+                body: 'Body',
+                subtitle: 'Subtitle',
+            }, mo);
+
+            this.warnStep('Check the device for the notification.');
+        });
+    }
+
+    async validateCamera(device: ScryptedDevice & Camera & VideoCamera & MotionSensor) {
         await this.validate('Device Selected', async () => {
             if (!device)
                 throw new Error('Select a device in the Settings UI.');
@@ -204,10 +234,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 return;
             }
         });
-
-        this.console.log(''.padEnd(80, '='));
-        this.console.log(`Device Validation Complete: ${device?.name}`);
-        this.console.log(''.padEnd(80, '='));
     }
 
     async validateSystem() {
@@ -227,7 +253,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             }
 
             if (e !== 'docker' && e !== 'lxc')
-                throw new Error('Unrecognized Linux installation. Use the official Docker or Proxmox LXC script.');
+                throw new Error('Unrecognized Linux installation. Installation via Docker image or the official Proxmox LXC script is recommended.');
         });
 
         await this.validate('IPv4 Connectivity', httpFetch({
