@@ -83,13 +83,13 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
         body = newBody;
     }
 
-    let controller: AbortController;
+    let controller: AbortController | undefined;
     let timeout: NodeJS.Timeout;
     if (options.timeout) {
         controller = new AbortController();
-        timeout = setTimeout(() => controller.abort(), options.timeout);
+        timeout = setTimeout(() => controller!.abort(), options.timeout);
 
-        options.signal?.addEventListener('abort', () => controller.abort(options.signal?.reason));
+        options.signal?.addEventListener('abort', () => controller!.abort(options.signal?.reason));
     }
 
     const signal = controller?.signal || options.signal;
@@ -126,7 +126,7 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
         if (options?.checkStatusCode === undefined || options?.checkStatusCode) {
             try {
                 const checker = typeof options?.checkStatusCode === 'function' ? options.checkStatusCode : checkStatus;
-                if (!checker(response.statusCode))
+                if (!response.statusCode || !checker(response.statusCode))
                     throw new Error(`http response statusCode ${response.statusCode}`);
             }
             catch (e) {
@@ -137,19 +137,19 @@ export async function httpFetch<T extends HttpFetchOptions<Readable>>(options: T
 
         const incomingHeaders = new Headers();
         for (const [k, v] of Object.entries(response.headers)) {
-            for (const vv of (typeof v === 'string' ? [v] : v)) {
+            for (const vv of (typeof v === 'string' ? [v] : v!)) {
                 incomingHeaders.append(k, vv)
             }
         }
 
         return {
-            statusCode: response.statusCode,
+            statusCode: response.statusCode!,
             headers: incomingHeaders,
             body: await httpFetchParseIncomingMessage(response, options.responseType),
         };
     }
     finally {
-        clearTimeout(timeout);
+        clearTimeout(timeout!);
     }
 }
 
