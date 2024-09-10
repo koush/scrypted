@@ -66,12 +66,21 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         await this.storageSettings.putSetting(key, value);
     }
 
+    stepLogs: string[] = [];
+    warnStep(result: string) {
+        this.stepLogs.push(result);
+    }
+
     async validate(stepName: string, step: Promise<any> | (() => Promise<any>)) {
         try {
             if (step instanceof Function)
                 step = step();
             const result = await step;
             this.console.log(stepName.padEnd(24), `\x1b[32m ${result || 'OK'}\x1b[0m`);
+            for (const log of this.stepLogs) {
+                this.console.log(''.padEnd(24), `\x1b[33m ${log}\x1b[0m`);
+            }
+            this.stepLogs = [];
         }
         catch (e) {
             this.console.error(stepName.padEnd(24), '\x1b[31m Failed\x1b[0m'.padEnd(24), (e as Error).message);
@@ -132,6 +141,24 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             reason: 'event',
         }));
 
+        await this.validate('Streams', async () => {
+            const vsos = await device.getVideoStreamOptions();
+
+            if (!vsos?.length)
+                throw new Error('Stream configuration invalid.');
+
+            if (vsos.length < 3)
+                this.warnStep(`Camera has ${vsos.length} substream. Three streams are recommended.`);
+
+            const cloudStreams = vsos.filter(vso => vso.source === 'cloud');
+            if (cloudStreams.length)
+                this.warnStep(`Cloud camera. Upgrade recommended.`);
+
+            const usedStreams = vsos.filter(vso => vso.destinations?.length);
+            if (usedStreams.length < Math.min(3, vsos.length))
+                this.warnStep(`Unused streams detected.`);
+        });
+
         await validateMedia('Local Stream', await device.getVideoStream({
             destination: 'local',
         }));
@@ -152,6 +179,32 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             destination: 'low-resolution',
         }));
 
+        await this.validate('Audio Codecs', async () => {
+            const vsos = await device.getVideoStreamOptions();
+
+            let codec: string | undefined;
+            const codecs = new Set<string>();
+            for (const vso of vsos) {
+                if (vso.audio?.codec) {
+                    codec = vso.audio.codec;
+                    codecs.add(vso.audio.codec);
+                }
+            }
+
+            if (codecs.size > 1) {
+                this.warnStep(`Mismatched audio codecs detected.`);
+                return;
+            }
+
+            if (!codec)
+                return;
+
+            if (codec !== 'pcm_mulaw' && codec !== 'aac' && codec !== 'opus') {
+                this.warnStep(`Audio codec is ${codec}. pcm_mulaw, aac, or opus is recommended.`);
+                return;
+            }
+        });
+
         this.console.log(''.padEnd(80, '='));
         this.console.log(`Device Validation Complete: ${device?.name}`);
         this.console.log(''.padEnd(80, '='));
@@ -164,6 +217,18 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
         const nvrPlugin = sdk.systemManager.getDeviceById('@scrypted/nvr');
         const cloudPlugin = sdk.systemManager.getDeviceById('@scrypted/cloud');
+
+        await this.validate('Scrypted Installation', async () => {
+            const e = process.env.SCRYPTED_INSTALL_ENVIRONMENT;
+            if (process.platform !== 'linux') {
+                if (e !== 'electron')
+                    this.warnStep('Upgrading to the Scrypted Desktop application is recommened for Windows and macOS.');
+                return;
+            }
+
+            if (e !== 'docker' && e !== 'lxc')
+                throw new Error('Unrecognized Linux installation. Use the official Docker or Proxmox LXC script.');
+        });
 
         await this.validate('IPv4 Connectivity', httpFetch({
             url: 'https://jsonip.com',
