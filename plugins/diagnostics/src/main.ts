@@ -36,19 +36,25 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     });
 
     loggedMotion = new Map<string, number>();
+    loggedButton = new Map<string, number>();
 
     constructor(nativeId?: string) {
         super(nativeId);
         this.on = this.on || false;
 
         sdk.systemManager.listen((eventSource, eventDetails, eventData) => {
-            if (eventDetails.eventInterface !== ScryptedInterface.MotionSensor)
-                return;
-
             if (!eventData || !eventSource?.id)
                 return;
 
-            this.loggedMotion.set(eventSource.id, Date.now());
+            if (eventDetails.eventInterface === ScryptedInterface.MotionSensor) {
+                this.loggedMotion.set(eventSource.id, Date.now());
+                return;
+            }
+
+            if (eventDetails.eventInterface === ScryptedInterface.BinarySensor) {
+                this.loggedButton.set(eventSource.id, Date.now());
+                return;
+            }
         });
     }
 
@@ -103,6 +109,16 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 throw new Error('Last motion was over 8 hours ago.');
         });
 
+        if (device.type === ScryptedDeviceType.Doorbell) {
+            await this.validate('Recent Button Press', async () => {
+                const lastButton = this.loggedButton.get(device.id);
+                if (!lastButton)
+                    throw new Error('No recent button press detected. Go press the doorbell button.');
+                if (Date.now() - lastButton > 8 * 60 * 60 * 1000)
+                    throw new Error('Last button press was over 8 hours ago.');
+            });
+        }
+
         const validateMedia = async (stepName: string, mo: MediaObject) => {
             await this.validate(stepName, async () => {
                 const jpeg = await sdk.mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg');
@@ -135,12 +151,17 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         await validateMedia('Low Resolution Stream', await device.getVideoStream({
             destination: 'low-resolution',
         }));
+
+        this.console.log(''.padEnd(80, '='));
+        this.console.log(`Device Validation Complete: ${device?.name}`);
+        this.console.log(''.padEnd(80, '='));
     }
 
     async validateSystem() {
         this.console.log(''.padEnd(80, '='));
         this.console.log('System Validation');
         this.console.log(''.padEnd(80, '='));
+
         const nvrPlugin = sdk.systemManager.getDeviceById('@scrypted/nvr');
         const cloudPlugin = sdk.systemManager.getDeviceById('@scrypted/cloud');
 
@@ -209,6 +230,10 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                     throw new Error('Invalid response received.');
             });
         }
+
+        this.console.log(''.padEnd(80, '='));
+        this.console.log('System Validation Complete');
+        this.console.log(''.padEnd(80, '='));
     }
 }
 

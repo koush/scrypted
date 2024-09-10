@@ -1,5 +1,6 @@
 {
    "name": "@scrypted/diagnostics",
+   "version": "0.0.3",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -13,6 +14,11 @@
       "scrypted-readme": "scrypted-readme",
       "scrypted-package-json": "scrypted-package-json"
    },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "diagnostics"
+   ],
    "scrypted": {
       "name": "Scrypted Diagnostics Plugin",
       "type": "API",
