@@ -256,12 +256,12 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 throw new Error('Unrecognized Linux installation. Installation via Docker image or the official Proxmox LXC script is recommended.');
         });
 
-        await this.validate('IPv4 Connectivity', httpFetch({
+        await this.validate('IPv4 Connectivity (jsonip.com)', httpFetch({
             url: 'https://jsonip.com',
             family: 4,
         }).then(() => { }));
 
-        await this.validate('IPv6 Connectivity', httpFetch({
+        await this.validate('IPv6 Connectivity (jsonip.com)', httpFetch({
             url: 'https://jsonip.com',
             family: 6,
         }).then(() => { }));
