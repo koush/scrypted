@@ -1,5 +1,8 @@
 # must ensure numpy is pinned to prevent dependencies with an unpinned numpy from pulling numpy>=2.0.
 numpy==1.26.4
-openvino==2024.2.0
+# openvino 2024.3.0 crashes on older CPU
+# openvino 2024.2.0 crashes on current CPU.
+# older versions unsure about NPU support.
+openvino==2024.3.0
 Pillow==10.3.0
 opencv-python==4.10.0.84
