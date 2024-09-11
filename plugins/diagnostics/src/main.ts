@@ -1,3 +1,4 @@
+import child_process from 'child_process';
 import sharp from 'sharp';
 import net from 'net';
 import fs from 'fs';
@@ -5,12 +6,14 @@ import os from 'os';
 import sdk, { Camera, MediaObject, MediaStreamDestination, MotionSensor, Notifier, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { httpFetch, httpFetchParseIncomingMessage } from '../../../server/src/fetch/http-fetch';
-
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { Deferred } from '@scrypted/common/src/deferred';
 class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     storageSettings = new StorageSettings(this, {
         testDevice: {
             group: 'Device',
-            title: 'Test Device',
+            title: 'Validation Device',
+            description: "Select a device to validate.",
             type: 'device',
             deviceFilter: `type === '${ScryptedDeviceType.Camera}' || type === '${ScryptedDeviceType.Doorbell}'  || type === '${ScryptedDeviceType.Notifier}'`,
             immediate: true,
@@ -140,16 +143,27 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 throw new Error('Doorbell button not found.');
         });
 
-        await this.validate('Recent Motion', async () => {
+        await this.validate('Motion Detection', async () => {
             if (!device.interfaces.includes(ScryptedInterface.MotionSensor))
                 throw new Error('Motion Sensor not found. Enabling a software motion sensor extension is recommended.');
 
-            const lastMotion = this.loggedMotion.get(device.id);
-            if (!lastMotion)
-                throw new Error('No recent motion detected. Go wave your hand in front of the camera.');
-            if (Date.now() - lastMotion > 8 * 60 * 60 * 1000)
-                throw new Error('Last motion was over 8 hours ago.');
+            if (device.providedInterfaces.includes(ScryptedInterface.MotionSensor)) {
+                if (device.interfaces.find(i => i.startsWith('ObjectDetection:true')))
+                    this.warnStep('Camera hardware provides motion events, but a software motion detector is enabked. Consider disabling the software motion detector.');
+            }
         });
+
+        if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
+            await this.validate('Recent Motion', async () => {
+
+                const lastMotion = this.loggedMotion.get(device.id);
+                if (!lastMotion)
+                    throw new Error('No recent motion detected. Go wave your hand in front of the camera.');
+                if (Date.now() - lastMotion > 8 * 60 * 60 * 1000)
+                    throw new Error('Last motion was over 8 hours ago.');
+            });
+        }
+
 
         if (device.type === ScryptedDeviceType.Doorbell) {
             await this.validate('Recent Button Press', async () => {
@@ -359,6 +373,38 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 const availbleDevices = settings.find(s => s.key === 'available_devices');
                 if (!availbleDevices?.value?.toString().includes('GPU'))
                     throw new Error('GPU device unvailable or not passed through to container.');
+            });
+        }
+
+        if (nvrPlugin) {
+            await this.validate("GPU Decode", async () => {
+                const ffmpegPath = await sdk.mediaManager.getFFmpegPath();
+                const args = [
+                    '-y',
+                    '-hwaccel', 'auto',
+                    '-i', 'https://github.com/koush/scrypted-sample-cameraprovider/raw/main/fs/dog.mp4',
+                    '-f', 'rawvideo',
+                    'pipe:3',
+                ];
+                const cp = child_process.spawn(ffmpegPath, args, {
+                    stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+                });
+
+                const deferred = new Deferred<void>();
+                deferred.promise.catch(() => { }).finally(() => safeKillFFmpeg(cp));
+                cp.stdio[3]?.on('data', () => { });
+
+                cp.stderr!.on('data', data => {
+                    const str = data.toString();
+                    if (str.includes('nv12'))
+                        deferred.resolve();
+                });
+
+                setTimeout(() => {
+                    deferred.reject(new Error('GPU Decode failed.'));
+                }, 5000);
+
+                await deferred.promise;
             });
         }
 

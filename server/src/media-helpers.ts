@@ -17,8 +17,8 @@ export async function safeKillFFmpeg(cp: ChildProcess) {
         cp.on('exit', resolve);
         // this will allow ffmpeg to send rtsp TEARDOWN etc
         try {
-            cp.stdin.on('error', () => { });
-            cp.stdin.write('q\n');
+            cp.stdin!.on('error', () => { });
+            cp.stdin!.write('q\n');
         }
         catch (e) {
         }
@@ -55,8 +55,8 @@ export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forev
             if (!SCRYPTED_FFMPEG_NOISY && !forever && (str.indexOf('frame=') !== -1 || str.indexOf('size=') !== -1)) {
                 log(str);
                 log('video/audio detected, discarding further input');
-                cp.stdout.removeListener('data', ret);
-                cp.stderr.removeListener('data', ret);
+                cp.stdout!.removeListener('data', ret);
+                cp.stderr!.removeListener('data', ret);
                 return;
             }
 
