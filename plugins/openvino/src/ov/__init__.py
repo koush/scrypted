@@ -136,6 +136,7 @@ class OpenVINOPlugin(
                     mode = f"AUTO:NPU,CPU"
             elif len(dgpus):
                 mode = f"AUTO:{','.join(dgpus)},CPU"
+            # forcing GPU can cause crashes on older GPU.
             elif gpu:
                 mode = f"GPU"
 
@@ -214,6 +215,9 @@ class OpenVINOPlugin(
             self.storage.removeItem("mode")
             self.storage.removeItem("model")
             self.storage.removeItem("precision")
+            if mode == "GPU":
+                print("GPU mode failed, reverting to AUTO.")
+                self.storage.setItem("mode", "AUTO")
             self.requestRestart()
 
         # mobilenet 1,300,300,3
