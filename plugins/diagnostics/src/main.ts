@@ -206,7 +206,18 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             });
         };
 
+        const validated = new Set<string | undefined>();
         const validateMediaStream = async (stepName: string, destination: MediaStreamDestination) => {
+            const vsos = await device.getVideoStreamOptions();
+            const streamId = vsos.find(vso => vso.destinations?.includes(destination))?.id;
+
+            if (validated.has(streamId)) {
+                await this.validate(stepName, async () => "Skipped (Duplicate)");
+                return;
+            }
+
+            validated.add(streamId);
+
             await validateMedia(stepName, getVideoStream(destination));
             const start = Date.now();
             await validateMedia(stepName + ' (IDR)', getVideoStream(destination), false, async () => {
