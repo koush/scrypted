@@ -321,6 +321,10 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     this.console.log('skipping camera that is adopted by another nvr', camera.id, camera.name);
                     continue;
                 }
+                if (!camera.isAdopted) {
+                    this.console.log('skipping camera that is not adopted', camera.id, camera.name);
+                    continue;
+                }
 
                 let needUpdate = false;
                 for (const channel of camera.channels) {
