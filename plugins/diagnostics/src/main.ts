@@ -211,7 +211,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             const start = Date.now();
             await validateMedia(stepName + ' (IDR)', getVideoStream(destination), false, async () => {
                 const end = Date.now();
-                if (end - start > 4500)
+                if (end - start > 5000)
                     throw new Error(`High IDR Interval. This may cause issues with HomeKit Secure Video. Adjust codec configuration if possible.`);
             });
         };

@@ -1059,6 +1059,10 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     }, 10000)
   }
 
+  checkHasEnabledMixin(device: ScryptedDevice): boolean {
+    return false;
+  }
+
   pruneOldStatistics() {
     const now = Date.now();
     for (const [k, v] of this.objectDetectionStatistics.entries()) {

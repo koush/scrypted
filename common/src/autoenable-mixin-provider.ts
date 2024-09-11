@@ -41,11 +41,15 @@ export abstract class AutoenableMixinProvider extends ScryptedDeviceBase {
         return true;
     }
 
+    checkHasEnabledMixin(device: ScryptedDevice) {
+        return this.hasEnabledMixin[device.id] === this.autoIncludeToken;
+    }
+
     async maybeEnableMixin(device: ScryptedDevice) {
         if (!device || device.mixins?.includes(this.id))
             return;
 
-        if (this.hasEnabledMixin[device.id] === this.autoIncludeToken)
+        if (this.checkHasEnabledMixin(device))
             return;
 
         const match = await this.canMixin(device.type, device.interfaces);
