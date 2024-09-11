@@ -125,7 +125,7 @@ class OpenVINOPlugin(
             except:
                 pass
 
-        mode = self.storage.getItem("mode")
+        mode = self.storage.getItem("mode") or "Default"
         if mode == "Default":
             mode = "AUTO"
 
