@@ -165,8 +165,6 @@ class OpenVINOPlugin(
         self.sigmoid = model == "yolo-v4-tiny-tf"
         self.modelName = model
 
-        print(f"model/mode/precision: {model}/{mode}/{precision}")
-
         ovmodel = "best" if self.scrypted_model else model
 
         model_version = "v5"
@@ -203,22 +201,28 @@ class OpenVINOPlugin(
 
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
-            print(
-                "EXECUTION_DEVICES",
-                self.compiled_model.get_property("EXECUTION_DEVICES"),
-            )
         except:
-            import traceback
-
-            traceback.print_exc()
-            print("Reverting all settings.")
-            self.storage.removeItem("mode")
-            self.storage.removeItem("model")
-            self.storage.removeItem("precision")
             if mode == "GPU":
-                print("GPU mode failed, reverting to AUTO.")
-                self.storage.setItem("mode", "AUTO")
-            self.requestRestart()
+                try:
+                    print("GPU mode failed, reverting to AUTO.")
+                    mode = "AUTO"
+                    self.mode = mode
+                    self.compiled_model = self.core.compile_model(xmlFile, mode)
+                except:
+                    import traceback
+
+                    traceback.print_exc()
+                    print("Reverting all settings.")
+                    self.storage.removeItem("mode")
+                    self.storage.removeItem("model")
+                    self.storage.removeItem("precision")
+                    self.requestRestart()
+
+        print(
+            "EXECUTION_DEVICES",
+            self.compiled_model.get_property("EXECUTION_DEVICES"),
+        )
+        print(f"model/mode/precision: {model}/{mode}/{precision}")
 
         # mobilenet 1,300,300,3
         # yolov3/4 1,416,416,3
