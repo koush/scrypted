@@ -295,7 +295,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 return;
             }
 
-            if (e !== 'docker' && e !== 'lxc')
+            if (e !== 'docker' && e !== 'lxc' && e !== 'ha')
                 throw new Error('Unrecognized Linux installation. Installation via Docker image or the official Proxmox LXC script is recommended.');
         });
 
