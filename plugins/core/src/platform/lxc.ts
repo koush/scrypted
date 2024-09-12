@@ -54,7 +54,7 @@ export async function checkLxcDependencies() {
         if (cpuModel.includes('Core') && cpuModel.includes('Ultra')) {
             if (
                 // apt
-                output.includes('level-zero/')
+                !output.includes('level-zero/')
             ) {
                 const cp = child_process.spawn('sh', ['-c', 'curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-npu.sh | bash']);
                 const [exitCode] = await once(cp, 'exit');
@@ -69,7 +69,7 @@ export async function checkLxcDependencies() {
             // so ensure it is not installed if this is not a core ultra system with npu.
             if (
                 // apt
-                !output.includes('level-zero/')
+                output.includes('level-zero/')
             ) {
                 const cp = child_process.spawn('apt', ['-y', 'remove', 'level-zero']);
                 const [exitCode] = await once(cp, 'exit');
