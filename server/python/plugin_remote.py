@@ -443,6 +443,7 @@ class PluginRemote:
             "ioEvent",
             "setNativeId",
         ]
+        self.peer.params["createMediaManager"] = lambda: api.getMediaManager()
 
     async def print_async(
         self,
@@ -1042,11 +1043,6 @@ async def plugin_async_main(
     peer.params["getRemote"] = lambda api, pluginId, hostInfo: PluginRemote(
         peer, api, pluginId, hostInfo, loop
     )
-
-    async def createMediaManager():
-        return MediaManager(await peer.getParam("getMediaManager"))
-
-    peer.params["createMediaManager"] = createMediaManager
 
     try:
         await readLoop()
