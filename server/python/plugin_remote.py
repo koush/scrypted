@@ -1043,6 +1043,11 @@ async def plugin_async_main(
         peer, api, pluginId, hostInfo, loop
     )
 
+    async def createMediaManager():
+        return MediaManager(await peer.getParam("getMediaManager"))
+
+    peer.params["createMediaManager"] = createMediaManager
+
     try:
         await readLoop()
     finally:
