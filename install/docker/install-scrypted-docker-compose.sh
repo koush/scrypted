@@ -85,7 +85,7 @@ then
 fi
 
 echo "Setting permissions on $SCRYPTED_HOME"
-chown -R $SERVICE_USER $SCRYPTED_HOME
+chown -R $SERVICE_USER $SCRYPTED_HOME || true
 
 set +e
 
