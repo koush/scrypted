@@ -74,6 +74,7 @@ export async function checkLxcDependencies() {
                 const cp = child_process.spawn('apt', ['-y', 'remove', 'level-zero']);
                 const [exitCode] = await once(cp, 'exit');
                 console.log('level-zero removed', exitCode);
+                needRestart = true;
             }
         }
 
