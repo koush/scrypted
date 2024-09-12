@@ -443,6 +443,7 @@ class PluginRemote:
             "ioEvent",
             "setNativeId",
         ]
+        self.peer.params["createMediaManager"] = lambda: api.getMediaManager()
 
     async def print_async(
         self,
