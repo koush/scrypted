@@ -1,8 +1,8 @@
-import fs from 'fs';
+import sdk from '@scrypted/sdk';
 import child_process from 'child_process';
 import { once } from 'events';
-import sdk from '@scrypted/sdk';
-import { stdout } from 'process';
+import fs from 'fs';
+import os from 'os';
 
 export const SCRYPTED_INSTALL_ENVIRONMENT_LXC = 'lxc';
 
@@ -43,11 +43,51 @@ export async function checkLxcDependencies() {
     }
 
     try {
+        const output = await new Promise<string>((r, f) => child_process.exec("sh -c 'apt show versions level-zero'", (err, stdout, stderr) => {
+            if (err && !stdout && !stderr)
+                f(err);
+            else
+                r(stdout + '\n' + stderr);
+        }));
+
+        const cpuModel = os.cpus()[0].model;
+        if (cpuModel.includes('Core') && cpuModel.includes('Ultra')) {
+            if (
+                // apt
+                output.includes('No packages found')
+            ) {
+                const cp = child_process.spawn('sh', ['-c', 'curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-npu.sh | bash']);
+                const [exitCode] = await once(cp, 'exit');
+                if (exitCode !== 0)
+                    sdk.log.a('Failed to install intel-driver-compiler-npu.');
+                else
+                    needRestart = true;
+            }
+        }
+        else {
+            // level-zero crashes openvino on older CPU due to illegal instruction.
+            // so ensure it is not installed if this is not a core ultra system with npu.
+            if (
+                // apt
+                !output.includes('No packages found')
+            ) {
+                const cp = child_process.spawn('apt', ['-y', 'remove', 'level-zero']);
+                const [exitCode] = await once(cp, 'exit');
+                console.log('level-zero removed', exitCode);
+            }
+        }
+
+    }
+    catch (e) {
+        sdk.log.a('Failed to verify/install intel-driver-compiler-npu.');
+    }
+
+    try {
         // intel opencl icd is broken from their official apt repos on kernel versions 6.8, which ships with ubuntu 24.04 and proxmox 8.2.
         // the intel apt repo has not been updated yet.
         // the current workaround is to install the release manually.
         // https://github.com/intel/compute-runtime/releases/tag/24.13.29138.7
-        const output = await new Promise<string>((r,f)=> child_process.exec("sh -c 'apt show versions intel-opencl-icd'", (err, stdout, stderr) => {
+        const output = await new Promise<string>((r, f) => child_process.exec("sh -c 'apt show versions intel-opencl-icd'", (err, stdout, stderr) => {
             if (err && !stdout && !stderr)
                 f(err);
             else
@@ -60,7 +100,7 @@ export async function checkLxcDependencies() {
             // was installed via script at some point
             || output.includes('Version: 24.13.29138.7')
             // current script version: 24.17.29377.6
-            ) {
+        ) {
             const cp = child_process.spawn('sh', ['-c', 'curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-graphics.sh | bash']);
             const [exitCode] = await once(cp, 'exit');
             if (exitCode !== 0)
@@ -71,30 +111,6 @@ export async function checkLxcDependencies() {
     }
     catch (e) {
         sdk.log.a('Failed to verify/install intel-opencl-icd version.');
-    }
-
-    try {
-        const output = await new Promise<string>((r,f)=> child_process.exec("sh -c 'apt show versions intel-driver-compiler-npu'", (err, stdout, stderr) => {
-            if (err && !stdout && !stderr)
-                f(err);
-            else
-                r(stdout + '\n' + stderr);
-        }));
-
-        if (
-            // apt
-            output.includes('No packages found')
-            ) {
-            const cp = child_process.spawn('sh', ['-c', 'curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-npu.sh | bash']);
-            const [exitCode] = await once(cp, 'exit');
-            if (exitCode !== 0)
-                sdk.log.a('Failed to install intel-driver-compiler-npu.');
-            else
-                needRestart = true;
-        }
-    }
-    catch (e) {
-        sdk.log.a('Failed to verify/install intel-driver-compiler-npu.');
     }
 
     if (needRestart)

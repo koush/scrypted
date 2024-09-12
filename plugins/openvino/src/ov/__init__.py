@@ -202,6 +202,9 @@ class OpenVINOPlugin(
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
         except:
+            import traceback
+            traceback.print_exc()
+
             if mode == "GPU":
                 try:
                     print("GPU mode failed, reverting to AUTO.")
@@ -209,9 +212,6 @@ class OpenVINOPlugin(
                     self.mode = mode
                     self.compiled_model = self.core.compile_model(xmlFile, mode)
                 except:
-                    import traceback
-
-                    traceback.print_exc()
                     print("Reverting all settings.")
                     self.storage.removeItem("mode")
                     self.storage.removeItem("model")
