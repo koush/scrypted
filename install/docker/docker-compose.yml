@@ -19,6 +19,9 @@
 
 services:
     scrypted:
+        # LXC usage only
+        # lxc privileged: true
+
         environment:
             # Scrypted NVR Storage (Part 2 of 3)
 
@@ -31,6 +34,9 @@ services:
 
             - SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION=Bearer SET_THIS_TO_SOME_RANDOM_TEXT
             - SCRYPTED_WEBHOOK_UPDATE=http://localhost:10444/v1/update
+
+            # LXC usage only
+            # lxc - SCRYPTED_INSTALL_ENVIRONMENT=lxc-docker
 
             # Avahi can be used for network discovery by passing in the host daemon
             # or running the daemon inside the container. Choose one or the other.
@@ -77,6 +83,11 @@ services:
 
             # Default volume for the Scrypted database. Typically should not be changed.
             - ~/.scrypted/volume:/server/volume
+
+            # LXC usage only
+            # lxc - /var/run/docker.sock:/var/run/docker.sock
+            # lxc - ~/.scrypted/docker-compose.yml:/docker/docker-compose.yml
+
         # Uncomment the following lines to use Avahi daemon from the host
         # Without this, AppArmor will block the container's attempt to talk to Avahi via dbus
         # security_opt:

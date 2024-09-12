@@ -7,6 +7,12 @@ then
 fi
 
 function readyn() {
+    if [ "$SCRYPTED_NONINTERACTIVE" == "1" ]
+    then
+        yn="y"
+        return
+    fi
+
     while true; do
         read -p "$1 (y/n) " yn
         case $yn in
@@ -50,9 +56,15 @@ WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum)
 DOCKER_COMPOSE_YML=$SCRYPTED_HOME/docker-compose.yml
 echo "Created $DOCKER_COMPOSE_YML"
 curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/docker-compose.yml | sed s/SET_THIS_TO_SOME_RANDOM_TEXT/"$(echo $RANDOM | md5sum | head -c 32)"/g > $DOCKER_COMPOSE_YML
-if [ -d /dev/dri ]
+
+if [ -z "$SCRYPTED_LXC" ]
 then
-    sed -i 's/'#' "\/dev\/dri/"\/dev\/dri/g' $DOCKER_COMPOSE_YML
+    if [ -d /dev/dri ]
+    then
+        sed -i 's/'#' "\/dev\/dri/"\/dev\/dri/g' $DOCKER_COMPOSE_YML
+    fi
+else
+    sed -i 's/'#' lxc /g' $DOCKER_COMPOSE_YML
 fi
 
 readyn "Install avahi-daemon? This is the recommended for reliable HomeKit discovery and pairing."
