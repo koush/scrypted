@@ -43,7 +43,7 @@ export async function checkLxcDependencies() {
     }
 
     try {
-        const output = await new Promise<string>((r, f) => child_process.exec("sh -c 'apt show versions level-zero'", (err, stdout, stderr) => {
+        const output = await new Promise<string>((r, f) => child_process.exec("sh -c 'apt list --installed | grep level-zero/'", (err, stdout, stderr) => {
             if (err && !stdout && !stderr)
                 f(err);
             else
@@ -54,7 +54,7 @@ export async function checkLxcDependencies() {
         if (cpuModel.includes('Core') && cpuModel.includes('Ultra')) {
             if (
                 // apt
-                output.includes('No packages found')
+                output.includes('level-zero/')
             ) {
                 const cp = child_process.spawn('sh', ['-c', 'curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-npu.sh | bash']);
                 const [exitCode] = await once(cp, 'exit');
@@ -69,7 +69,7 @@ export async function checkLxcDependencies() {
             // so ensure it is not installed if this is not a core ultra system with npu.
             if (
                 // apt
-                !output.includes('No packages found')
+                !output.includes('level-zero/')
             ) {
                 const cp = child_process.spawn('apt', ['-y', 'remove', 'level-zero']);
                 const [exitCode] = await once(cp, 'exit');
