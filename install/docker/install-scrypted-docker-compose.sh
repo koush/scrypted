@@ -64,7 +64,7 @@ then
         sed -i 's/'#' "\/dev\/dri/"\/dev\/dri/g' $DOCKER_COMPOSE_YML
     fi
 else
-    sed -i 's/'#' lxc /g' $DOCKER_COMPOSE_YML
+    sed -i 's/'#' lxc //g' $DOCKER_COMPOSE_YML
 fi
 
 readyn "Install avahi-daemon? This is the recommended for reliable HomeKit discovery and pairing."
