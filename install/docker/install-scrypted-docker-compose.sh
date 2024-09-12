@@ -65,7 +65,8 @@ then
     fi
 else
     sed -i 's/'#' lxc //g' $DOCKER_COMPOSE_YML
-    sudo apt -y purge apparmor
+    sudo systemctl stop apparmor || true
+    sudo apt -y purge apparmor || true
 fi
 
 readyn "Install avahi-daemon? This is the recommended for reliable HomeKit discovery and pairing."
