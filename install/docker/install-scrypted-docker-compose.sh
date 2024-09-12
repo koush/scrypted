@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+if [ "$SCRYPTED_LXC" ]
+then
+    export SERVICE_USER="root"
+fi
+
 if [ -z "$SERVICE_USER" ]
 then
     echo "Scrypted SERVICE_USER environment variable was not specified. Service will not be installed."
