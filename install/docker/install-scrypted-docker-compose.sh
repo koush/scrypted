@@ -12,7 +12,7 @@ then
 fi
 
 function readyn() {
-    if [ "$SCRYPTED_NONINTERACTIVE" == "1" ]
+    if [ ! -z "$SCRYPTED_NONINTERACTIVE" ]
     then
         yn="y"
         return
