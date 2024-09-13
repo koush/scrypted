@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import net from 'net';
 import fs from 'fs';
 import os from 'os';
-import sdk, { Camera, MediaObject, MediaStreamDestination, MotionSensor, Notifier, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import sdk, { Camera, MediaObject, MediaStreamDestination, MotionSensor, Notifier, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { httpFetch, httpFetchParseIncomingMessage } from '../../../server/src/fetch/http-fetch';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
@@ -295,20 +295,22 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 return;
             }
 
-            if (e !== 'docker' && e !== 'lxc' && e !== 'ha')
-                throw new Error('Unrecognized Linux installation. Installation via Docker image or the official Proxmox LXC script is recommended.');
+            if (e !== 'docker' && e !== 'lxc' && e !== 'ha' && e !== 'lxc-docker')
+                throw new Error('Unrecognized Linux installation. Installation via Docker image or the official Proxmox LXC script (not tteck) is recommended: https://docs.scrypted.app/installation');
         });
 
         await this.validate('IPv4 Check (jsonip.com)', httpFetch({
             url: 'https://jsonip.com',
             family: 4,
             responseType: 'json',
+            timeout: 5000,
         }).then(r => r.body.ip));
 
         await this.validate('IPv6 Check (jsonip.com)', httpFetch({
             url: 'https://jsonip.com',
             family: 6,
             responseType: 'json',
+            timeout: 5000,
         }).then(r => r.body.ip));
 
         await this.validate('Scrypted Server Address', async () => {
@@ -364,6 +366,15 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
                 if (Buffer.compare(logo.body, logoCheck.body))
                     throw new Error('Invalid response received.');
+
+                const shortUrl: any = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.Url + ";short-lived=true");
+                const shortLogoCheck = await httpFetch({
+                    url: shortUrl.toString(),
+                    responseType: 'buffer',
+                });
+
+                if (Buffer.compare(logo.body, shortLogoCheck.body))
+                    throw new Error('Invalid response received from short lived URL.');
             });
         }
 
@@ -405,6 +416,27 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 }, 5000);
 
                 await deferred.promise;
+            });
+
+
+            this.validate('Defunct Plugins', async () => {
+                const defunctPlugins = [
+                    '@scrypted/opencv',
+                    '@scrypted/python-codecs',
+                    '@scrypted/pam-diff',
+                ];
+                let found = false;
+
+                for (const plugin of defunctPlugins) {
+                    const pluginDevice = sdk.systemManager.getDeviceById(plugin);
+                    if (pluginDevice) {
+                        this.warnStep(`Scrypted NVR users can remove: ${plugin}`);
+                        found = true;
+                    }
+                }
+
+                if (found)
+                    throw new Error('Defunct plugins found.');
             });
         }
 
