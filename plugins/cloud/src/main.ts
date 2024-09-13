@@ -1038,7 +1038,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
                         const lines = string.split('\n');
                         for (const line of lines) {
-                            if ((line.includes('Unregistered tunnel connection') || line.includes('Register tunnel error'))
+                            if ((line.includes('Unregistered tunnel connection')
+                                || line.includes('Register tunnel error')
+                                || line.includes('Failed to get tunnel'))
                                 && deferred.finished) {
                                 this.console.warn('Cloudflare registration failed after tunnel started. The old tunnel may be invalid. Terminating.');
                                 cloudflareTunnel.child.kill();
