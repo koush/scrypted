@@ -419,7 +419,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             });
 
 
-            this.validate('Defunct Plugins', async () => {
+            await this.validate('Deprecated Plugins', async () => {
                 const defunctPlugins = [
                     '@scrypted/opencv',
                     '@scrypted/python-codecs',
@@ -436,7 +436,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 }
 
                 if (found)
-                    throw new Error('Defunct plugins found.');
+                    throw new Error('Deprecated plugins found.');
             });
         }
 
