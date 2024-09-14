@@ -22,6 +22,13 @@ if [ ! -f "$FILE" ]; then
   exit 1
 fi
 
+if [ ! -d "/mnt/pve/nvr-storage/mounts/$NVR_STORAGE" ]
+then
+  echo "Error: /mnt/pve/nvr-storage/mounts/$NVR_STORAGE not found."
+  echo "The Proxmox Directory Storage must be created using the UI prior to running this script."
+  exit 1
+fi
+
 # Remove all lines containing "mnt/nvr"
 sed -i '/mnt\/nvr/d' "$FILE"
 
