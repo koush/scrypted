@@ -6,7 +6,6 @@ DISK_TYPE="large"
 if [ ! -z "$FAST_DISK" ]
 then
     DISK_TYPE="fast"
-    ADD_DISK="true"
 fi
 
 if [ -z "$NVR_STORAGE" ]; then
@@ -50,7 +49,7 @@ pct stop "$VMID"
 
 if [ -z "$ADD_DISK" ]
 then
-  sed -i '/mnt\/nvr/d' "$FILE"
+  sed -i "/mnt\/nvr\/$DISK_TYPE/d" "$FILE"
 fi
 
 echo "lxc.mount.entry: $STORAGE mnt/nvr/$DISK_TYPE/$NVR_STORAGE none bind,optional,create=dir" >> "$FILE"
