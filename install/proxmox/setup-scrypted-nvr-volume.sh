@@ -2,17 +2,14 @@
 
 NVR_STORAGE=$1
 
-# Check if NVR_STORAGE is set
 if [ -z "$NVR_STORAGE" ]; then
-  echo "Error: Proxmox Directory Disk not provided."
+  echo "Error: Proxmox Directory Disk not provided. Usage:"
   echo ""
-  echo "Usage:"
+  echo "$0 <proxmox-directory-disk>"
   echo ""
-  echo "  $0 <proxmox-directory-disk>"
   exit 1
 fi
 
-# File to be modified
 if [ -z "$VMID" ]
 then
     VMID="10443"
@@ -26,18 +23,25 @@ if [ ! -f "$FILE" ]; then
   exit 1
 fi
 
-if [ ! -d "/mnt/pve/nvr-storage/mounts/$NVR_STORAGE" ]
+STORAGE="/mnt/pve/$NVR_STORAGE"
+
+if [ ! -d "$STORAGE" ]
 then
-  echo "Error: /mnt/pve/nvr-storage/mounts/$NVR_STORAGE not found."
+  echo "Error: $STORAGE not found."
   echo "The Proxmox Directory Storage must be created using the UI prior to running this script."
   exit 1
 fi
 
-# Remove all lines containing "mnt/nvr"
+# use subdirectory doesn't conflict with Proxmox storage of backups etc...
+STORAGE="$STORAGE/mounts/scrypted-nvr"
+mkdir -p $STORAGE
+chmod 0777 $STORAGE
+
+pct stop "$VMID"
+
 sed -i '/mnt\/nvr/d' "$FILE"
 
-# Append the new line with the substituted $NVR_STORAGE
-echo "lxc.mount.entry: /mnt/pve/nvr-storage/mounts/$NVR_STORAGE mnt/nvr/large/$NVR_STORAGE none bind,optional,create=dir // [!code focus]" >> "$FILE"
+echo "lxc.mount.entry: $STORAGE mnt/nvr/large/$NVR_STORAGE none bind,optional,create=dir" >> "$FILE"
 
 echo "$FILE modified successfully. Starting Scrypted..."
 pct start $VMID
