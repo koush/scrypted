@@ -33,8 +33,9 @@ then
   exit 1
 fi
 
-# use subdirectory doesn't conflict with Proxmox storage of backups etc...
-STORAGE="$STORAGE/mounts/scrypted-nvr"
+# use subdirectory doesn't conflict with Proxmox storage of backups etc.
+# create the hidden folder that can be used as a marker.
+STORAGE="$STORAGE/mounts/scrypted-nvr/.scrypted-nvr"
 mkdir -p $STORAGE
 chmod 0777 $STORAGE
 
