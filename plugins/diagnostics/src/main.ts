@@ -69,21 +69,17 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         await this.storageSettings.putSetting(key, value);
     }
 
-    stepLogs: string[] = [];
     warnStep(result: string) {
-        this.stepLogs.push(result);
+        this.console.log(''.padEnd(24), `\x1b[33m ${result}\x1b[0m`);
     }
 
     async validate(stepName: string, step: Promise<any> | (() => Promise<any>)) {
         try {
             if (step instanceof Function)
                 step = step();
+            this.console.log(stepName.padEnd(24), '\x1b[34mRunning\x1b[0m');
             const result = await step;
-            this.console.log(stepName.padEnd(24), `\x1b[32m ${result || 'OK'}\x1b[0m`);
-            for (const log of this.stepLogs) {
-                this.console.log(''.padEnd(24), `\x1b[33m ${log}\x1b[0m`);
-            }
-            this.stepLogs = [];
+            this.console.log(''.padEnd(24), `\x1b[32m${result || 'OK'}\x1b[0m`);
         }
         catch (e) {
             this.console.error(stepName.padEnd(24), '\x1b[31m Failed\x1b[0m'.padEnd(24), (e as Error).message);
@@ -93,9 +89,9 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     async validateDevice() {
         const device = this.storageSettings.values.testDevice as ScryptedDevice & any;
 
-        this.console.log(''.padEnd(80, '='));
+        this.console.log(''.padEnd(44, '='));
         this.console.log(`Device Validation: ${device?.name}`);
-        this.console.log(''.padEnd(80, '='));
+        this.console.log(''.padEnd(44, '='));
 
         await this.validate('Device Selected', async () => {
             if (!device)
@@ -112,9 +108,9 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             await this.validateNotifier(device);
         }
 
-        this.console.log(''.padEnd(80, '='));
+        this.console.log(''.padEnd(44, '='));
         this.console.log(`Device Validation Complete: ${device?.name}`);
-        this.console.log(''.padEnd(80, '='));
+        this.console.log(''.padEnd(44, '='));
     }
 
     async validateNotifier(device: ScryptedDevice & Notifier) {
@@ -279,9 +275,9 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     }
 
     async validateSystem() {
-        this.console.log(''.padEnd(80, '='));
+        this.console.log(''.padEnd(44, '='));
         this.console.log('System Validation');
-        this.console.log(''.padEnd(80, '='));
+        this.console.log(''.padEnd(44, '='));
 
         const nvrPlugin = sdk.systemManager.getDeviceById('@scrypted/nvr');
         const cloudPlugin = sdk.systemManager.getDeviceById('@scrypted/cloud');
@@ -299,19 +295,34 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 throw new Error('Unrecognized Linux installation. Installation via Docker image or the official Proxmox LXC script (not tteck) is recommended: https://docs.scrypted.app/installation');
         });
 
-        await this.validate('IPv4 Check (jsonip.com)', httpFetch({
+        await this.validate('IPv4 (jsonip.com)', httpFetch({
             url: 'https://jsonip.com',
             family: 4,
             responseType: 'json',
             timeout: 5000,
         }).then(r => r.body.ip));
 
-        await this.validate('IPv6 Check (jsonip.com)', httpFetch({
+        await this.validate('IPv6 (jsonip.com)', httpFetch({
             url: 'https://jsonip.com',
             family: 6,
             responseType: 'json',
             timeout: 5000,
         }).then(r => r.body.ip));
+
+
+        await this.validate('IPv4 (wtfismyip.com)', httpFetch({
+            url: 'https://wtfismyip.com/text',
+            family: 4,
+            responseType: 'text',
+            timeout: 5000,
+        }).then(r => r.body.trim()));
+
+        await this.validate('IPv6 (wtfismyip.com)', httpFetch({
+            url: 'https://wtfismyip.com/text',
+            family: 6,
+            responseType: 'text',
+            timeout: 5000,
+        }).then(r => r.body.trim()));
 
         await this.validate('Scrypted Server Address', async () => {
             const addresses = await sdk.endpointManager.getLocalAddresses();
@@ -440,9 +451,9 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             });
         }
 
-        this.console.log(''.padEnd(80, '='));
+        this.console.log(''.padEnd(44, '='));
         this.console.log('System Validation Complete');
-        this.console.log(''.padEnd(80, '='));
+        this.console.log(''.padEnd(44, '='));
     }
 }
 
