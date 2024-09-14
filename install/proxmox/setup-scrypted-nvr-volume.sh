@@ -4,7 +4,11 @@ NVR_STORAGE=$1
 
 # Check if NVR_STORAGE is set
 if [ -z "$NVR_STORAGE" ]; then
-  echo "Error: NVR_STORAGE environment variable is not set."
+  echo "Error: Proxmox Directory Disk not provided."
+  echo ""
+  echo "Usage:"
+  echo ""
+  echo "  $0 <proxmox-directory-disk>"
   exit 1
 fi
 
