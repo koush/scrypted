@@ -3,9 +3,10 @@
 NVR_STORAGE=$1
 
 if [ -z "$NVR_STORAGE" ]; then
+  echo ""
   echo "Error: Proxmox Directory Disk not provided. Usage:"
   echo ""
-  echo "$0 <proxmox-directory-disk>"
+  echo "bash $0 <proxmox-directory-disk>"
   echo ""
   exit 1
 fi
