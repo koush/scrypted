@@ -45,14 +45,19 @@ STORAGE="$STORAGE/mounts/scrypted-nvr"
 mkdir -p $STORAGE/.nvr
 chmod 0777 $STORAGE
 
+echo "Stopping Scrypted..."
 pct stop "$VMID"
+
+echo "Modifying $FILE."
 
 if [ -z "$ADD_DISK" ]
 then
+  echo "Removing previous $DISK_TYPE lxc.mount.entry."
   sed -i "/mnt\/nvr\/$DISK_TYPE/d" "$FILE"
 fi
 
+echo "Adding new $DISK_TYPE lxc.mount.entry."
 echo "lxc.mount.entry: $STORAGE mnt/nvr/$DISK_TYPE/$NVR_STORAGE none bind,optional,create=dir" >> "$FILE"
 
-echo "$FILE modified successfully. Starting Scrypted..."
+echo "Starting Scrypted..."
 pct start $VMID
