@@ -70,7 +70,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     }
 
     warnStep(result: string) {
-        this.console.log(''.padEnd(24), `\x1b[33m ${result}\x1b[0m`);
+        this.console.log(''.padEnd(24), `\x1b[33m${result}\x1b[0m`);
     }
 
     async validate(stepName: string, step: Promise<any> | (() => Promise<any>)) {
@@ -328,6 +328,8 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             const addresses = await sdk.endpointManager.getLocalAddresses();
             const hasIPv4 = addresses.find(address => net.isIPv4(address));
             const hasIPv6 = addresses.find(address => net.isIPv6(address));
+            if (addresses.length)
+                this.warnStep(addresses.join(', '));
             if (!hasIPv4)
                 throw new Error('Scrypted Settings IPv4 address not set.');
             if (!hasIPv6)
