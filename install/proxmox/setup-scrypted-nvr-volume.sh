@@ -2,6 +2,12 @@
 
 NVR_STORAGE=$1
 
+DISK_TYPE="large"
+if [ ! -z "$FAST_DISK " ]
+then
+    DISK_TYPE="fast"
+fi
+
 if [ -z "$NVR_STORAGE" ]; then
   echo ""
   echo "Error: Proxmox Directory Disk not provided. Usage:"
@@ -43,7 +49,7 @@ pct stop "$VMID"
 
 sed -i '/mnt\/nvr/d' "$FILE"
 
-echo "lxc.mount.entry: $STORAGE mnt/nvr/large/$NVR_STORAGE none bind,optional,create=dir" >> "$FILE"
+echo "lxc.mount.entry: $STORAGE mnt/nvr/$DISK_TYPE/$NVR_STORAGE none bind,optional,create=dir" >> "$FILE"
 
 echo "$FILE modified successfully. Starting Scrypted..."
 pct start $VMID
