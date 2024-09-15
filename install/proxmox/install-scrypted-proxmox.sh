@@ -1,3 +1,11 @@
+PCT=$(which pct)
+if [ -z "$PCT" ]
+then
+    echo "pct command not found. This script must be run on the Proxmox host, not a container."
+    echo "Installation Documentation: https://docs.scrypted.app/installation.html#proxmox-ve"
+    exit 1
+fi
+
 function readyn() {
     while true; do
         read -p "$1 (y/n) " yn
