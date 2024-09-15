@@ -23,7 +23,6 @@
       "name": "WebRTC Plugin",
       "type": "API",
       "interfaces": [
-         "EngineIOHandler",
          "Settings",
          "MediaConverter",
          "MixinProvider",

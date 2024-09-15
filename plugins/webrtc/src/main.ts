@@ -1,12 +1,10 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { Deferred } from '@scrypted/common/src/deferred';
-import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
-import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { createZygote } from '@scrypted/common/src/zygote';
-import sdk, { ConnectOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import ip from 'ip';
@@ -586,111 +584,6 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             ...ret,
         };
     }
-
-    async onConnection(request: HttpRequest, webSocketUrl: string) {
-        const weriftConfiguration = await this.getWeriftConfiguration();
-
-        const cleanup = new Deferred<string>();
-        cleanup.promise.then(e => this.console.log('cleaning up rtc connection:', e));
-
-        try {
-            const ws = new WebSocket(webSocketUrl);
-            cleanup.promise.finally(() => ws.close());
-
-            if (request.isPublicEndpoint) {
-                cleanup.resolve('public endpoint not supported');
-                return;
-            }
-
-            const client = await listenZeroSingleClient('127.0.0.1');
-            cleanup.promise.finally(() => {
-                client.cancel();
-                client.clientPromise.then(cp => cp.destroy()).catch(() => { });
-            });
-
-            const message = await new Promise<{
-                connectionManagementId: string,
-                updateSessionId: string,
-            } & ConnectOptions>((resolve, reject) => {
-                const close = () => {
-                    const str = 'Connection closed while waiting for message';
-                    reject(new Error(str));
-                    cleanup.resolve(str);
-                };
-                ws.addEventListener('close', close);
-
-                ws.onmessage = message => {
-                    ws.removeEventListener('close', close);
-                    resolve(JSON.parse(message.data));
-                }
-            });
-
-            message.username = request.username;
-
-            const { connectionManagementId, updateSessionId } = message;
-            if (connectionManagementId) {
-                cleanup.promise.finally(async () => {
-                    const plugins = await systemManager.getComponent('plugins');
-                    plugins.setHostParam('@scrypted/webrtc', connectionManagementId);
-                });
-            }
-            if (updateSessionId) {
-                cleanup.promise.finally(async () => {
-                    const plugins = await systemManager.getComponent('plugins');
-                    plugins.setHostParam('@scrypted/webrtc', updateSessionId);
-                });
-            }
-
-            const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
-            const clientOptions = await legacyGetSignalingSessionOptions(session);
-
-            const result = zygote();
-            this.activeConnections++;
-            result.worker.on('exit', () => {
-                this.activeConnections--;
-                cleanup.resolve('worker exited (onConnection)');
-            });
-
-            let connection: WebRTCConnectionManagement;
-            try {
-                const { createConnection } = await result.result;
-                connection = await createConnection(message, client.port, session,
-                    this.storageSettings.values.maximumCompatibilityMode, clientOptions, {
-                    configuration: this.getRTCConfiguration(),
-                    weriftConfiguration,
-                    ipv4Ban: this.storageSettings.values.ipv4Ban,
-                });
-            }
-            catch (e) {
-                result.worker.terminate();
-                throw e;
-            }
-            handleCleanupConnection(cleanup, connection, result);
-
-            timeoutPromise(60000, connection.waitConnected())
-                .catch(() => {
-                    cleanup.resolve('timeout');
-                });
-
-            await connection.negotiateRTCSignalingSession();
-
-            const cp = await client.clientPromise;
-            cp.on('close', () => cleanup.resolve('socket client closed'));
-            sdk.connect(cp, message);
-        }
-        catch (e) {
-            console.error("error negotiating browser RTCC signaling", e);
-            cleanup.resolve('error');
-        }
-    }
-}
-
-function handleCleanupConnection(cleanup: Deferred<string>, connection: WebRTCConnectionManagement, result: ReturnType<typeof zygote>) {
-    cleanup.promise.finally(() => {
-        connection.close().catch(() => { });
-        setTimeout(() => result.worker.terminate(), 30000)
-    });
-    connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
 }
 
 export async function fork() {
