@@ -111,6 +111,7 @@ function isCodecCopy(desiredCodec: RtpCodecCopy, checkCodec: string) {
 export type RtpForwarderProcess = Awaited<ReturnType<typeof startRtpForwarderProcess>>;
 
 export async function startRtpForwarderProcess(console: Console, ffmpegInput: FFmpegInput, rtpTracks: RtpTracks, options?: {
+    ffmpegPath?: string,
     rtspClientForceTcp?: boolean,
     rtspMode?: 'udp' | 'tcp' | 'pull',
     onRtspClient?: (rtspClient: RtspClient, optionsResponse: RtspServerResponse) => Promise<boolean>,
@@ -150,7 +151,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     rtpTracks = Object.assign({}, rtpTracks);
     const videoCodec = video?.codecCopy;
     const audioCodec = audio?.codecCopy;
-    const ffmpegPath = await mediaManager.getFFmpegPath();
+    const ffmpegPath = options?.ffmpegPath || await mediaManager.getFFmpegPath();
 
     const isRtsp = ffmpegInput.container?.startsWith('rtsp');
 
