@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/diagnostics",
-   "version": "0.0.11",
+   "version": "0.0.12",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",

@@ -309,7 +309,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             timeout: 5000,
         }).then(r => r.body.ip));
 
-
         await this.validate('IPv4 (wtfismyip.com)', httpFetch({
             url: 'https://wtfismyip.com/text',
             family: 4,
@@ -362,34 +361,37 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             });
         }
 
-        if (cloudPlugin) {
-            await this.validate('Cloud Plugin', async () => {
-                const logo = await httpFetch({
-                    url: 'https://home.scrypted.app/_punch/web_hi_res_512.png',
-                    responseType: 'buffer',
-                });
+        await this.validate('Cloud Plugin', async () => {
+            if (!cloudPlugin) {
+                this.warnStep('Cloud plugin not installed. Consider installing for remote access.');
+                return;
+            }
 
-                const mo = await sdk.mediaManager.createMediaObject(logo.body, 'image/png');
-                const url = await sdk.mediaManager.convertMediaObjectToUrl(mo, 'image/png');
-
-                const logoCheck = await httpFetch({
-                    url,
-                    responseType: 'buffer',
-                });
-
-                if (Buffer.compare(logo.body, logoCheck.body))
-                    throw new Error('Invalid response received.');
-
-                const shortUrl: any = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.Url + ";short-lived=true");
-                const shortLogoCheck = await httpFetch({
-                    url: shortUrl.toString(),
-                    responseType: 'buffer',
-                });
-
-                if (Buffer.compare(logo.body, shortLogoCheck.body))
-                    throw new Error('Invalid response received from short lived URL.');
+            const logo = await httpFetch({
+                url: 'https://home.scrypted.app/_punch/web_hi_res_512.png',
+                responseType: 'buffer',
             });
-        }
+
+            const mo = await sdk.mediaManager.createMediaObject(logo.body, 'image/png');
+            const url = await sdk.mediaManager.convertMediaObjectToUrl(mo, 'image/png');
+
+            const logoCheck = await httpFetch({
+                url,
+                responseType: 'buffer',
+            });
+
+            if (Buffer.compare(logo.body, logoCheck.body))
+                throw new Error('Invalid response received.');
+
+            const shortUrl: any = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.Url + ";short-lived=true");
+            const shortLogoCheck = await httpFetch({
+                url: shortUrl.toString(),
+                responseType: 'buffer',
+            });
+
+            if (Buffer.compare(logo.body, shortLogoCheck.body))
+                throw new Error('Invalid response received from short lived URL.');
+        });
 
         if (openvinoPlugin) {
             await this.validate('OpenVINO Plugin', async () => {
