@@ -390,7 +390,8 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const result = createTrackedFork();
             try {
                 const connection = await timeoutPromise(2 * 60 * 1000, this.convertToRTCConnectionManagement(result, data, fromMimeType, toMimeType, options));
-                connection.waitClosed().finally(() => result.worker.terminate());
+                // wait a bit to allow ffmpegs to get terminated by the thread.
+                connection.waitClosed().finally(() => setTimeout(() => result.worker.terminate(), 30000));
                 return connection;
             }
             catch (e) {
