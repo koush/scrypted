@@ -638,6 +638,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         const q = qsstringify({
             ...authority,
+            cloudflare_hostname: this.cloudflareTunnelHost,
             registration_id,
             server_id: this.storageSettings.values.serverId,
             server_name: this.storageSettings.values.serverName,

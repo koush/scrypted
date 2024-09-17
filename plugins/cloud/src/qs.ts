@@ -1,6 +1,8 @@
 export function qsstringify(dict: any) {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(dict)) {
+        if (v == null)
+            continue;
         params.set(k, v?.toString());
     }
 
