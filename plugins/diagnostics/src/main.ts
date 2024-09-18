@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import net from 'net';
 import fs from 'fs';
 import os from 'os';
-import sdk, { Camera, MediaObject, MediaStreamDestination, MotionSensor, Notifier, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import sdk, { Camera, FFmpegInput, MediaObject, MediaStreamDestination, MotionSensor, Notifier, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { httpFetch, httpFetchParseIncomingMessage } from '../../../server/src/fetch/http-fetch';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
@@ -227,6 +227,10 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             }
 
             validated.add(streamId);
+
+            const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await getVideoStream(destination), ScryptedMimeTypes.FFmpegInput);
+            if (ffmpegInput.mediaStreamOptions?.video?.codec !== 'h264')
+                this.warnStep(`Stream ${stepName} is using codec ${ffmpegInput.mediaStreamOptions?.video?.codec}. h264 is recommended.`);
 
             await validateMedia(stepName, getVideoStream(destination));
             const start = Date.now();
