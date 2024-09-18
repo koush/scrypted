@@ -266,10 +266,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             devices: [],
         });
 
-        this.storageSettings.settings.register.onPut = async () => {
-            await this.sendRegistrationId(await this.manager.registrationId);
-        }
-
         this.storageSettings.settings.upnpStatus.onGet = async () => {
             return {
                 hide: this.storageSettings.values.forwardingMode !== 'UPNP',
@@ -312,11 +308,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 }
             };
 
-
-        this.storageSettings.settings.securePort.onPut = (ov, nv) => {
-            if (ov && ov !== nv)
-                this.log.a('Reload the Scrypted Cloud Plugin to apply the port change.');
-        };
 
         if (!this.storageSettings.values.certificate)
             this.storageSettings.values.certificate = createSelfSignedCertificate();
