@@ -29,6 +29,7 @@ const { deviceManager, endpointManager, systemManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
 const SCRYPTED_SERVER = localStorage.getItem('scrypted-server') || 'home.scrypted.app';
+const SCRYPTED_SERVER_PORT = 4001;
 
 const SCRYPTED_CLOUD_MESSAGE_PATH = '/_punch/cloudmessage';
 
@@ -147,7 +148,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             type: 'boolean',
             description: 'Optional: Create a Cloudflare Tunnel to this server at a random domain name. Providing a Cloudflare token will allow usage of a custom domain name.',
             defaultValue: true,
-            onPut: () => deviceManager.requestRestart(),
         },
         cloudflaredTunnelToken: {
             group: 'Cloudflare',
@@ -836,6 +836,17 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     return;
                 }
             }
+            else if (url.pathname === '/_punch/callback') {
+                const query = qsparse(url.searchParams);
+                if (query.registration_secret === this.storageSettings.values.registrationSecret) {
+                    res.writeHead(200);
+                    this.serverCallback(port, SCRYPTED_SERVER_PORT, SCRYPTED_SERVER);
+                }
+                else {
+                    res.writeHead(401);
+                }
+                res.end();
+            }
             else if (url.pathname === '/web/') {
                 const validDomain = this.getSSLHostname();
                 if (validDomain) {
@@ -882,6 +893,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const port = (this.server.address() as any).port;
         this.console.log('scrypted cloud server listening on', port);
 
+        this.storageSettings.settings.cloudflareEnabled.onPut = () => {
+            this.cloudflared?.child.kill();
+            this.startCloudflared(port);
+        };
+
         const agent = new http.Agent({ maxSockets: Number.MAX_VALUE, keepAlive: true });
         this.proxy = HttpProxy.createProxy({
             agent,
@@ -919,42 +935,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 if (Date.now() < backoff + 5000)
                     return;
                 backoff = Date.now();
-                const random = Math.random().toString(36).substring(2);
-                this.console.log('scrypted server requested a connection:', random);
-
-                const registrationId = await this.manager.registrationId;
-
                 const { address } = message;
-                const [serverHost, serverPort] = address?.split(':') || [SCRYPTED_SERVER, 4001];
-
-                this.ensureReverseConnections(registrationId, serverPort, serverHost);
-
-                const client = tls.connect(serverPort, serverHost, {
-                    rejectUnauthorized: false,
-                });
-                client.on('close', () => this.console.log('scrypted server connection ended:', random));
-                client.write(registrationId + '\n');
-                const mux: any = new bpmux.BPMux(client as any);
-                mux.on('handshake', async (socket: Duplex) => {
-                    this.ensureReverseConnections(registrationId, serverPort, serverHost);
-
-                    this.console.warn('mux connection required');
-
-                    let local: any;
-
-                    await new Promise(resolve => process.nextTick(resolve));
-
-                    local = net.connect({
-                        port,
-                        host: '127.0.0.1',
-                    });
-                    await new Promise(resolve => process.nextTick(resolve));
-
-                    socket.pipe(local).pipe(socket);
-                });
-                mux.on('error', () => {
-                    client.destroy();
-                });
+                const [serverHost, serverPort] = address?.split(':') || [SCRYPTED_SERVER, SCRYPTED_SERVER_PORT];
+                this.serverCallback(port, Number(serverPort), serverHost);
             }
         });
 
@@ -979,6 +962,40 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 await sleep(60000);
             }
         }
+    }
+
+    serverCallback(port: number, serverPort: number, serverHost: string) {
+        const random = Math.random().toString(36).substring(2);
+        this.console.log('scrypted server requested a connection:', random);
+
+        this.ensureReverseConnections(serverPort, serverHost);
+
+        const client = tls.connect(serverPort, serverHost, {
+            rejectUnauthorized: false,
+        });
+        client.on('close', () => this.console.log('scrypted server connection ended:', random));
+        client.write(this.serverIdentifier + '\n');
+        const mux: any = new bpmux.BPMux(client as any);
+        mux.on('handshake', async (socket: Duplex) => {
+            this.ensureReverseConnections(serverPort, serverHost);
+
+            this.console.warn('mux connection required');
+
+            let local: any;
+
+            await new Promise(resolve => process.nextTick(resolve));
+
+            local = net.connect({
+                port,
+                host: '127.0.0.1',
+            });
+            await new Promise(resolve => process.nextTick(resolve));
+
+            socket.pipe(local).pipe(socket);
+        });
+        mux.on('error', () => {
+            client.destroy();
+        });
     }
 
     async startCloudflared(quickTunnelPort: number) {
@@ -1107,13 +1124,18 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    ensureReverseConnections(registrationId: string, serverPort: number, serverHost: string) {
+    get serverIdentifier() {
+        const serverIdentifier = `${this.storageSettings.values.registrationSecret}@${this.storageSettings.values.serverId}`;
+        return serverIdentifier;
+    }
+
+    ensureReverseConnections(serverPort: number, serverHost: string) {
         while (this.reverseConnections.size < 10) {
-            this.createReverseConnection(registrationId, serverPort, serverHost);
+            this.createReverseConnection(serverPort, serverHost);
         }
     }
 
-    async createReverseConnection(registrationId: string, serverPort: number, serverHost: string) {
+    async createReverseConnection(serverPort: number, serverHost: string) {
         const client = tls.connect(serverPort, serverHost, {
             rejectUnauthorized: false,
         });
@@ -1125,9 +1147,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.reverseConnections.delete(client);
 
             if (claimed)
-                this.ensureReverseConnections(registrationId, serverPort, serverHost);
+                this.ensureReverseConnections(serverPort, serverHost);
         });
-        client.write(`reverse:${registrationId}\n`);
+
+        client.write(`reverse:${this.serverIdentifier}\n`);
 
         try {
             const read = await readLine(client);
