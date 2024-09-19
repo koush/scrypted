@@ -64,7 +64,7 @@ then
     echo "'local-lvm' or 'local-zfs'."
     echo ""
     echo "#############################################################################"
-    echo "\033[32mPaste the following command into this shell to install to local-lvm instead:\033[0m"
+    echo -e "\033[32mPaste the following command into this shell to install to local-lvm instead:\033[0m"
     echo ""
     echo "bash $0 --storage local-lvm"
     echo "#############################################################################"
