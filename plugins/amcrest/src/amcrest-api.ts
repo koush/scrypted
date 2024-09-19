@@ -199,6 +199,14 @@ export class AmcrestCameraClient {
         return response.body;
     }
 
+    async setWatermark(cameraNumber: number, enable: boolean) {
+        const response = await this.request({
+            url: `http://${this.ip}/cgi-bin/configManager.cgi?action=setConfig&VideoWidget[${cameraNumber - 1}].PictureTitle.EncodeBlend=${enable}`,
+            responseType: 'text',
+        });
+        return response.body;
+    }
+
     async listenEvents(): Promise<Destroyable> {
         const events = new EventEmitter();
         const url = `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[All]`;

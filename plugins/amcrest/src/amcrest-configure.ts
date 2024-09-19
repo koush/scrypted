@@ -9,6 +9,8 @@ export const amcrestAutoConfigureSettings: Setting = {
 };
 
 export async function autoconfigureSettings(client: AmcrestCameraClient, cameraNumber: number) {
+    await client.setWatermark(cameraNumber, false).catch(() => { });
+
     const audioOptions: AudioStreamConfiguration = {
         codec: 'aac',
         sampleRate: 8000,
