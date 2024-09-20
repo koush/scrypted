@@ -214,6 +214,7 @@ class ScryptedMimeTypes(str, Enum):
     RequestMediaObject = "x-scrypted/x-scrypted-request-media-object"
     RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
+    ServerId = "text/x-server-id"
     Url = "text/x-uri"
 
 class SecuritySystemMode(str, Enum):

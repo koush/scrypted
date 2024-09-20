@@ -2478,6 +2478,7 @@ export enum ScryptedMimeTypes {
   Url = 'text/x-uri',
   InsecureLocalUrl = 'text/x-insecure-local-uri',
   LocalUrl = 'text/x-local-uri',
+  ServerId = 'text/x-server-id',
 
   PushEndpoint = 'text/x-push-endpoint',
 

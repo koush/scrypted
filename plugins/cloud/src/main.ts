@@ -258,6 +258,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         this.converters = [
             [ScryptedMimeTypes.LocalUrl, ScryptedMimeTypes.Url],
             [ScryptedMimeTypes.PushEndpoint, ScryptedMimeTypes.Url],
+            ['*/*', ScryptedMimeTypes.ServerId],
         ];
         // legacy cleanup
         this.fromMimeType = undefined;
@@ -723,10 +724,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async convertMedia(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions): Promise<MediaObject | Buffer | any> {
-        if (!toMimeType.startsWith(ScryptedMimeTypes.Url))
-            throw new Error('unsupported cloud url conversion');
-
-        if (fromMimeType.startsWith(ScryptedMimeTypes.LocalUrl)) {
+        if (toMimeType.startsWith(ScryptedMimeTypes.Url) && fromMimeType.startsWith(ScryptedMimeTypes.LocalUrl)) {
             // if cloudflare is enabled and the plugin isn't set up as a custom domain, try to use the cloudflare url for
             // short lived urls.
             if (this.cloudflareTunnel && this.storageSettings.values.forwardingMode !== 'Custom Domain') {
@@ -740,13 +738,16 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
             return this.whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.getHostname()}`);
         }
-        else if (fromMimeType.startsWith(ScryptedMimeTypes.PushEndpoint)) {
+        else if (toMimeType.startsWith(ScryptedMimeTypes.Url) && fromMimeType.startsWith(ScryptedMimeTypes.PushEndpoint)) {
             const validDomain = this.getSSLHostname();
             if (validDomain)
                 return Buffer.from(`https://${validDomain}${await this.getCloudMessagePath()}/${data}`);
 
             const url = `http://127.0.0.1/push/${data}`;
             return this.whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.getHostname()}${SCRYPTED_CLOUD_MESSAGE_PATH}`);
+        }
+        else if (toMimeType === ScryptedMimeTypes.ServerId) {
+            return this.storageSettings.values.serverId;
         }
 
         throw new Error('unsupported cloud url conversion');
