@@ -331,6 +331,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.refreshPortForward();
         }
 
+        // auto login from electron
         if (!this.storageSettings.values.token_info && process.env.SCRYPTED_CLOUD_TOKEN) {
             this.storageSettings.values.token_info = process.env.SCRYPTED_CLOUD_TOKEN;
             this.manager.registrationId.then(r => {
@@ -355,6 +356,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.reregisterTimer = undefined;
             this.refreshPortForward();
         }, 1000);
+    }
+
+    async getCachedRegistrationId() {
+        return this.manager.currentRegistrationId || this.storageSettings.values.lastPersistedRegistrationId;
     }
 
     async updatePortForward(upnpPort: number) {
@@ -422,8 +427,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         if (this.storageSettings.values.lastPersistedUpnpPort !== upnpPort || ip !== this.storageSettings.values.lastPersistedIp) {
             this.console.log('Registering IP and Port', ip, upnpPort);
 
-            const registrationId = await this.manager.registrationId;
-            const data = await this.sendRegistrationId(registrationId);
+            const data = await this.sendRegistrationId(await this.getCachedRegistrationId());
             if (data?.error)
                 return;
             if (ip !== 'localhost' && ip !== data.ip_address && ip !== this.cloudflareTunnelHost) {
@@ -442,11 +446,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 public: true,
             });
             const url = new URL(`https://${SCRYPTED_SERVER}/_punch/curl`);
-            let { upnp_port, hostname } = this.getAuthority();
+            let { port, hostname } = this.getAuthority();
             // scrypted cloud will replace localhost with requesting ip
             if (!hostname)
                 hostname = 'localhost';
-            url.searchParams.set('url', `https://${hostname}:${upnp_port}${pluginPath}/testPortForward`);
+            url.searchParams.set('url', `https://${hostname}:${port}${pluginPath}/testPortForward`);
             const response = await httpFetch({
                 url: url.toString(),
                 responseType: 'json',
@@ -612,13 +616,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         if (!hostname) {
             return {
-                upnp_port,
                 port: upnp_port,
             };
         }
 
         return {
-            upnp_port,
             port: upnp_port,
             hostname,
         }
@@ -669,7 +671,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
             this.console.log('registered', response.body);
             this.storageSettings.values.lastPersistedRegistrationId = registration_id;
-            this.storageSettings.values.lastPersistedUpnpPort = authority.upnp_port;
+            this.storageSettings.values.lastPersistedUpnpPort = authority.port;
             return response.body;
         }
         catch (e) {
@@ -784,7 +786,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const args = qsstringify({
             ...authority,
 
-            registration_id: await this.manager.registrationId,
+            registration_id: await this.getCachedRegistrationId() || 'undefined',
+            cloudflare_hostname: this.cloudflareTunnelHost,
             registration_secret: this.storageSettings.values.registrationSecret,
             server_id: this.storageSettings.values.serverId,
             server_name: this.storageSettings.values.serverName,
@@ -825,7 +828,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 const query = qsparse(url.searchParams);
                 if (!query.callback_url && query.token_info && query.user_info) {
                     this.storageSettings.values.token_info = query.token_info;
-                    this.storageSettings.values.lastPersistedRegistrationId = await this.manager.registrationId;
+                    this.storageSettings.values.lastPersistedRegistrationId = await this.getCachedRegistrationId();
                     res.setHeader('Location', `https://${this.getHostname()}/endpoint/@scrypted/core/public/`);
                     res.writeHead(302);
                     res.end();
@@ -1013,6 +1016,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     if (this.storageSettings.values.cloudflaredTunnelCredentials && this.storageSettings.values.cloudflaredTunnelCustomDomain) {
                         const tunnelUrl = `http://127.0.0.1:${quickTunnelPort}`;
                         const url = this.cloudflareTunnel = `https://${this.storageSettings.values.cloudflaredTunnelCustomDomain}`;
+                        this.updateExternalAddresses();
                         this.console.log(`cloudflare url mapped ${this.cloudflareTunnel} to ${tunnelUrl}`);
 
                         const ret = await runLocallyManagedTunnel(this.storageSettings.values.cloudflaredTunnelCredentials, tunnelUrl, cloudflareD, bin);

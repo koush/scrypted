@@ -10,6 +10,7 @@ export declare interface PushManager {
 
 export class PushManager extends EventEmitter {
     registrationId: Promise<string>;
+    currentRegistrationId: string;
 
     constructor(public senderId: string) {
         super();
@@ -47,11 +48,12 @@ export class PushManager extends EventEmitter {
             }
 
             const stopListeningToCredentials = instance.onCredentialsChanged(({ oldCredentials, newCredentials }) => {
+                this.currentRegistrationId = newCredentials.fcm.token;
                 savedConfig.credentials = newCredentials;
-                deferred.resolve(newCredentials.fcm.token);
-                this.registrationId = Promise.resolve(newCredentials.fcm.token);
+                deferred.resolve(this.currentRegistrationId);
+                this.registrationId = Promise.resolve( this.currentRegistrationId);
                 saveConfig();
-                this.emit('registrationId', newCredentials.fcm.token);
+                this.emit('registrationId',  this.currentRegistrationId);
             });
 
             const stopListeningToNotifications = instance.onNotification(({ message }) => {
