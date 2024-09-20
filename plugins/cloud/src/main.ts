@@ -917,7 +917,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             if (!domain && this.storageSettings.values.forwardingMode === 'Custom Domain' && this.storageSettings.values.hostname)
                 domain = `https://${this.storageSettings.values.hostname}`;
             res.headers['X-Scrypted-Cloud-Address'] = domain;
-            res.headers['Access-Control-Expose-Headers'] = 'X-Scrypted-Cloud, X-Scrypted-Direct-Address, X-Scrypted-Cloud-Address';
+            res.headers['Access-Control-Expose-Headers'] = 'X-Scrypted-Cloud, X-Scrypted-Direct-Address, X-Scrypted-Cloud-Address, X-Scrypted-Server-Id';
         });
 
         let backoff = 0;

@@ -169,6 +169,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
         scryptedCloud: response.headers.get('x-scrypted-cloud') === 'true',
         directAddress: response.headers.get('x-scrypted-direct-address'),
         cloudAddress: response.headers.get('x-scrypted-cloud-address'),
+        serverId: response.headers.get('x-scrypted-server-id'),
     };
 }
 
@@ -213,6 +214,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         scryptedCloud: response.headers.get('x-scrypted-cloud') === 'true',
         directAddress: response.headers.get('x-scrypted-direct-address'),
         cloudAddress: response.headers.get('x-scrypted-cloud-address'),
+        serverId: response.headers.get('x-scrypted-server-id'),
     };
 }
 
@@ -227,6 +229,7 @@ export interface ScryptedClientLoginResult {
     directAddress: string;
     cloudAddress: string;
     hostname: string;
+    serverId: string;
 }
 
 export class ScryptedClientLoginError extends Error {
@@ -274,6 +277,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let cloudAddress: string;
     let hostname: string;
     let token: string;
+    let serverId: string;
 
     console.log('@scrypted/client', packageJson.version);
 
@@ -299,6 +303,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         queryToken = loginResult.queryToken;
         token = loginResult.token;
         hostname = loginResult.hostname;
+        serverId = loginResult.serverId;
         console.log('login result', Date.now() - start, loginResult);
     }
     else {
@@ -372,6 +377,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         queryToken = loginCheck.queryToken;
         token = loginCheck.token;
         hostname = loginCheck.hostname;
+        serverId = loginCheck.serverId;
         console.log('login checked', Date.now() - start, loginCheck);
     }
 
@@ -874,6 +880,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 authorization,
                 cloudAddress,
                 hostname,
+                serverId,
             },
             connectRPCObject,
             fork: undefined,
