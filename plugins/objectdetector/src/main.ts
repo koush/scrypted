@@ -417,7 +417,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     const frameGenerator = this.model.decoder ? undefined : this.getFrameGenerator();
     for await (const detected of
       await sdk.connectRPCObject(
-        await this.objectDetection.generateObjectDetections( 
+        await this.objectDetection.generateObjectDetections(
           await this.createFrameGenerator(
             frameGenerator,
             options,
@@ -610,7 +610,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.detections.set(detectionId, detectionInput);
     setTimeout(() => {
       this.detections.delete(detectionId);
-    }, 2000);
+    }, 10000);
   }
 
   async getNativeObjectTypes(): Promise<ObjectDetectionTypes> {
