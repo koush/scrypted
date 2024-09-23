@@ -59,6 +59,14 @@ class SystemDeviceState(TypedDict):
     value: any
 
 
+def ensure_not_coroutine(fn: Callable | Coroutine) -> Callable:
+    if inspect.iscoroutinefunction(fn):
+        def wrapper(*args, **kwargs):
+            return asyncio.create_task(fn(*args, **kwargs))
+        return wrapper
+    return fn
+
+
 class DeviceProxy(object):
     def __init__(self, systemManager: SystemManager, id: str):
         self.systemManager = systemManager
@@ -100,15 +108,10 @@ class DeviceProxy(object):
 
 
 class EventListenerRegisterImpl(scrypted_python.scrypted_sdk.EventListenerRegister):
-    removeListener: Coroutine[Any, None, None]
+    removeListener: Callable[[], None]
 
     def __init__(self, removeListener: Callable[[], None] | Coroutine[Any, None, None]) -> None:
-        if not inspect.iscoroutinefunction(removeListener):
-            async def wrapper():
-                removeListener()
-            self.removeListener = wrapper
-        else:
-            self.removeListener = removeListener
+        self.removeListener = ensure_not_coroutine(removeListener)
 
 
 class EventRegistry(object):
@@ -143,13 +146,14 @@ class EventRegistry(object):
         alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
         return "".join(random.choices(alphabet, k=10))
 
-    async def listen(
+    def listen(
         self, callback: scrypted_python.scrypted_sdk.EventListener
     ) -> scrypted_python.scrypted_sdk.EventListenerRegister:
+        callback = ensure_not_coroutine(callback)
         self.systemListeners.add(callback)
         return EventListenerRegisterImpl(lambda: self.systemListeners.remove(callback))
 
-    async def listenDevice(
+    def listenDevice(
         self,
         id: str,
         options: str | scrypted_python.scrypted_sdk.EventListenerOptions,
@@ -161,10 +165,11 @@ class EventRegistry(object):
         if not events:
             events = set()
             self.listeners[token] = events
+        callback = ensure_not_coroutine(callback)
         self.listeners[id].add(callback)
         return EventListenerRegisterImpl(lambda: self.listeners[id].remove(callback))
 
-    async def notify(self, id: str, eventTime: int, eventInterface: str, property: str, value: Any, options: dict = None):
+    def notify(self, id: str, eventTime: int, eventInterface: str, property: str, value: Any, options: dict = None):
         options = options or {}
         changed = options.get("changed")
         mixinId = options.get("mixinId")
@@ -181,9 +186,9 @@ class EventRegistry(object):
             "mixinId": mixinId,
         }
 
-        return await self.notifyEventDetails(id, eventDetails, value)
+        return self.notifyEventDetails(id, eventDetails, value)
 
-    async def notifyEventDetails(self, id: str, eventDetails: scrypted_python.scrypted_sdk.EventDetails, value: Any, eventInterface: str = None):
+    def notifyEventDetails(self, id: str, eventDetails: scrypted_python.scrypted_sdk.EventDetails, value: Any, eventInterface: str = None):
         if not eventDetails.get("eventId"):
             eventDetails["eventId"] = self.__generateBase36Str()
         if not eventInterface:
@@ -195,19 +200,19 @@ class EventRegistry(object):
         if (eventDetails.get("property") and not eventDetails.get("mixinId")) or \
             (eventInterface in EventRegistry.__allowedEventInterfaces):
             for listener in self.systemListeners:
-                await rpc.maybe_await(listener(id, eventDetails, value))
+                listener(id, eventDetails, value)
 
         token = f"{id}#{eventInterface}"
         listeners = self.listeners.get(token)
         if listeners:
             for listener in listeners:
-                await rpc.maybe_await(listener(eventDetails, value))
+                listener(eventDetails, value)
 
         token = f"{id}#undefined"
         listeners = self.listeners.get(token)
         if listeners:
             for listener in listeners:
-                await rpc.maybe_await(listener(eventDetails, value))
+                listener(eventDetails, value)
 
         return True
 
@@ -286,28 +291,34 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
             if checkName.get("value", None) == name:
                 return self.getDeviceById(check)
 
-    async def listen(
+    def listen(
         self, callback: scrypted_python.scrypted_sdk.EventListener
     ) -> scrypted_python.scrypted_sdk.EventListenerRegister:
-        return await self.events.listen(callback)
+        return self.events.listen(callback)
 
-    async def listenDevice(
+    def listenDevice(
         self,
         id: str,
         options: str | scrypted_python.scrypted_sdk.EventListenerOptions,
         callback: scrypted_python.scrypted_sdk.EventListener,
     ) -> scrypted_python.scrypted_sdk.EventListenerRegister:
+        callback = ensure_not_coroutine(callback)
         if type(options) != str and options.get("watch"):
-            return await self.events.listenDevice(
+            return self.events.listenDevice(
                 id, options,
                 lambda eventDetails, eventData: callback(self.getDeviceById(id), eventDetails, eventData)
             )
 
-        register = await self.api.listenDevice(
-            id, options,
-            lambda eventDetails, eventData: callback(self.getDeviceById(id), eventDetails, eventData)
+        register_fut = asyncio.ensure_future(
+            self.api.listenDevice(
+                id, options,
+                lambda eventDetails, eventData: callback(self.getDeviceById(id), eventDetails, eventData)
+            )
         )
-        return EventListenerRegisterImpl(register.removeListener)
+        async def unregister():
+            register = await register_fut
+            await register.removeListener()
+        return EventListenerRegisterImpl(lambda: asyncio.ensure_future(unregister()))
 
     async def removeDevice(self, id: str) -> None:
         return await self.api.removeDevice(id)
