@@ -4,6 +4,7 @@ import asyncio
 import base64
 import gc
 import hashlib
+import inspect
 import multiprocessing
 import multiprocessing.connection
 import os
@@ -102,11 +103,12 @@ class EventListenerRegisterImpl(scrypted_python.scrypted_sdk.EventListenerRegist
     removeListener: Coroutine[Any, None, None]
 
     def __init__(self, removeListener: Callable[[], None] | Coroutine[Any, None, None]) -> None:
-        if not asyncio.iscoroutinefunction(removeListener):
+        if not inspect.iscoroutinefunction(removeListener):
             async def wrapper():
                 removeListener()
-            removeListener = wrapper
-        self.removeListener = removeListener
+            self.removeListener = wrapper
+        else:
+            self.removeListener = removeListener
 
 
 class EventRegistry(object):
@@ -301,11 +303,11 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
                 lambda eventDetails, eventData: callback(self.getDeviceById(id), eventDetails, eventData)
             )
 
-        unregister = await self.api.listenDevice(
+        register = await self.api.listenDevice(
             id, options,
             lambda eventDetails, eventData: callback(self.getDeviceById(id), eventDetails, eventData)
         )
-        return EventListenerRegisterImpl(unregister)
+        return EventListenerRegisterImpl(register.removeListener)
 
     async def removeDevice(self, id: str) -> None:
         return await self.api.removeDevice(id)
