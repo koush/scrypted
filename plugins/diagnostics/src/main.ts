@@ -1,13 +1,14 @@
-import child_process from 'child_process';
-import sharp from 'sharp';
-import net from 'net';
-import fs from 'fs';
-import os from 'os';
-import sdk, { Camera, FFmpegInput, MediaObject, MediaStreamDestination, MotionSensor, Notifier, ObjectDetection, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
-import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import { httpFetch, httpFetchParseIncomingMessage } from '../../../server/src/fetch/http-fetch';
-import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { Deferred } from '@scrypted/common/src/deferred';
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import sdk, { Camera, FFmpegInput, Image, MediaObject, MediaStreamDestination, MotionSensor, Notifier, ObjectDetection, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
+import child_process from 'child_process';
+import { once } from 'events';
+import fs from 'fs';
+import net from 'net';
+import os from 'os';
+import sharp from 'sharp';
+import { httpFetch } from '../../../server/src/fetch/http-fetch';
 class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     storageSettings = new StorageSettings(this, {
         testDevice: {
@@ -415,32 +416,92 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         if (nvrPlugin) {
             await this.validate("GPU Decode", async () => {
                 const ffmpegPath = await sdk.mediaManager.getFFmpegPath();
-                const args = [
-                    '-y',
-                    '-hwaccel', 'auto',
-                    '-i', 'https://github.com/koush/scrypted-sample-cameraprovider/raw/main/fs/dog.mp4',
-                    '-f', 'rawvideo',
-                    'pipe:3',
-                ];
-                const cp = child_process.spawn(ffmpegPath, args, {
-                    stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-                });
+                let hasVaapi = false;
+                {
+                    const args = [
+                        '-y',
+                        '-hwaccel', 'auto',
+                        '-i', 'https://github.com/koush/scrypted-sample-cameraprovider/raw/main/fs/dog.mp4',
+                        '-f', 'rawvideo',
+                        'pipe:3',
+                    ];
+                    const cp = child_process.spawn(ffmpegPath, args, {
+                        stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+                    });
 
-                const deferred = new Deferred<void>();
-                deferred.promise.catch(() => { }).finally(() => safeKillFFmpeg(cp));
-                cp.stdio[3]?.on('data', () => { });
+                    const deferred = new Deferred<void>();
+                    deferred.promise.catch(() => { }).finally(() => safeKillFFmpeg(cp));
+                    cp.stdio[3]?.on('data', () => { });
 
-                cp.stderr!.on('data', data => {
-                    const str = data.toString();
-                    if (str.includes('nv12'))
-                        deferred.resolve();
-                });
+                    cp.stderr!.on('data', data => {
+                        const str = data.toString();
+                        hasVaapi ||= str.includes('Using auto hwaccel type vaapi');
 
-                setTimeout(() => {
-                    deferred.reject(new Error('GPU Decode failed.'));
-                }, 5000);
+                        if (str.includes('nv12'))
+                            deferred.resolve();
+                    });
 
-                await deferred.promise;
+                    setTimeout(() => {
+                        deferred.reject(new Error('GPU Decode timed out.'));
+                    }, 5000);
+
+                    await deferred.promise;
+                }
+
+                if (!hasVaapi || !openvinoPlugin)
+                    return;
+
+                {
+                    const args = [
+                        '-y',
+                        '-init_hw_device', 'vaapi=renderD128:/dev/dri/renderD128',
+                        '-hwaccel', 'vaapi',
+                        '-hwaccel_output_format', 'vaapi',
+                        '-i', 'https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg',
+                        '-vf', 'format=nv12,hwupload,scale_vaapi=w=320:h=-2,hwdownload,format=nv12',
+                        '-f', 'mjpeg',
+                        '-frames:v', '1',
+                        'pipe:3',
+                    ];
+
+                    const cp = child_process.spawn(ffmpegPath, args, {
+                        stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+                    });
+                    let std = '';
+                    cp.stderr!.on('data', data => {
+                        std += data.toString();
+                    });
+
+                    cp.stdout!.on('data', data => {
+                        std += data.toString();
+                    });
+
+                    const buffers: Buffer[] = [];
+                    cp.stdio[3]?.on('data', buffer => {
+                        buffers.push(buffer);
+                    });
+
+                    setTimeout(() => {
+                        safeKillFFmpeg(cp)
+                    }, 5000);
+
+                    const [exitCode] = await once(cp, 'exit');
+                    if (exitCode) {
+                        this.warnStep(std);
+                        throw new Error('GPU Transform failed.');
+                    }
+
+                    const jpeg = Buffer.concat(buffers);
+                    const zidane = await sdk.mediaManager.createMediaObject(jpeg, 'image/jpeg');
+                    const image = await sdk.mediaManager.convertMediaObject<Image>(zidane, ScryptedMimeTypes.Image);
+                    if (image.width !== 320)
+                        throw new Error('Unexpected image with from GPU transform.')
+                    const detected = await openvinoPlugin.detectObjects(zidane);
+                    const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
+                    if (!personFound)
+                        throw new Error('Person not detected in test image.');
+                }
+
             });
 
 
