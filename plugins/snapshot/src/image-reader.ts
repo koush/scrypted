@@ -20,7 +20,7 @@ export function loadSharp() {
 
 export const ImageReaderNativeId = 'imagereader';
 
-async function createVipsMediaObject(image: VipsImage): Promise<Image & MediaObject> {
+export async function createVipsMediaObject(image: VipsImage): Promise<Image & MediaObject> {
     const ret: Image & MediaObject = await sdk.mediaManager.createMediaObject(image, ScryptedMimeTypes.Image, {
         sourceId: image.sourceId,
         width: image.width,
