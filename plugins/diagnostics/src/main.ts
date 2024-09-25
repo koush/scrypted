@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import net from 'net';
 import fs from 'fs';
 import os from 'os';
-import sdk, { Camera, FFmpegInput, MediaObject, MediaStreamDestination, MotionSensor, Notifier, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import sdk, { Camera, FFmpegInput, MediaObject, MediaStreamDestination, MotionSensor, Notifier, ObjectDetection, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { httpFetch, httpFetchParseIncomingMessage } from '../../../server/src/fetch/http-fetch';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
@@ -285,7 +285,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
         const nvrPlugin = sdk.systemManager.getDeviceById('@scrypted/nvr');
         const cloudPlugin = sdk.systemManager.getDeviceById('@scrypted/cloud');
-        const openvinoPlugin = sdk.systemManager.getDeviceById<Settings>('@scrypted/openvino');
+        const openvinoPlugin = sdk.systemManager.getDeviceById<Settings & ObjectDetection>('@scrypted/openvino');
 
         await this.validate('Scrypted Installation', async () => {
             const e = process.env.SCRYPTED_INSTALL_ENVIRONMENT;
@@ -402,7 +402,13 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 const settings = await openvinoPlugin.getSettings();
                 const availbleDevices = settings.find(s => s.key === 'available_devices');
                 if (!availbleDevices?.value?.toString().includes('GPU'))
-                    throw new Error('GPU device unvailable or not passed through to container.');
+                    this.warnStep('GPU device unvailable or not passed through to container.');
+
+                const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
+                const detected = await openvinoPlugin.detectObjects(zidane);
+                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
+                if (!personFound)
+                    throw new Error('Person not detected in test image.');
             });
         }
 
