@@ -3,14 +3,14 @@ import { RefreshPromise } from "@scrypted/common/src/promise-utils";
 import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
-import sdk, { BinarySensor, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, MediaStreamUrl, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, Device, DeviceProvider, FFmpegInput, MediaObject, MediaStreamUrl, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { VideoSearchResult, BasicPeerConnection, CameraData, clientApi, isStunMessage, RingBaseApi, RingCamera, RtpDescription, rxjs, SimpleWebRtcSession, SipSession, StreamingSession } from './ring-client-api';
+import { BasicPeerConnection, CameraData, clientApi, isStunMessage, RingBaseApi, RingCamera, RtpDescription, rxjs, SimpleWebRtcSession, SipSession, StreamingSession, VideoSearchResult } from './ring-client-api';
 import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
 
 const STREAM_TIMEOUT = 120000;
@@ -101,26 +101,12 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
             this.console.log(camera.name, 'onDoorbellPressed', e);
             this.triggerBinaryState();
         });
-        camera.onDoorbellPressedPolling.subscribe(async e => {
-            this.console.log(camera.name, 'onDoorbellPressed', e);
-            this.triggerBinaryState();
-        });
         let motionTimeout: NodeJS.Timeout;
         const resetTimeout = () => {
             clearTimeout(motionTimeout);
             motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
         };
         camera.onMotionDetected?.subscribe(async motionDetected => {
-            if (motionDetected) {
-                this.console.log(camera.name, 'onMotionDetected');
-                resetTimeout();
-            }
-            else {
-                clearTimeout(motionTimeout);
-            }
-            this.motionDetected = motionDetected;
-        });
-        camera.onMotionDetectedPolling?.subscribe(async motionDetected => {
             if (motionDetected) {
                 this.console.log(camera.name, 'onMotionDetected');
                 resetTimeout();
@@ -279,7 +265,7 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
         this.stopSession();
 
 
-        const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient();
+        const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient('127.0.0.1');
 
         const useRtsp = this.useRtsp;
 
@@ -527,6 +513,11 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
             let answerSdp: string;
             const simple = this.camera.createSimpleWebRtcSession();
 
+            const options: RTCSignalingOptions = {
+                requiresOffer: true,
+                disableTrickle: true,
+            };
+
             await connectRTCSignalingClients(this.console, session, {
                 type: 'offer',
                 audio: {
@@ -537,6 +528,10 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
                 },
                 getUserMediaSafariHack: true,
             }, {
+                __proxy_props: {
+                    options,
+                },
+                options,
                 createLocalDescription: async (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) => {
                     if (type !== 'answer')
                         throw new Error('Ring Camera default endpoint only supports RTC answer');
@@ -639,7 +634,7 @@ export class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvid
                 createPeerConnection: () => basicPc,
             });
             ringSession.connection.onMessage.subscribe(message => this.console.log('incoming message', message));
-            ringSession.onCallEnded.subscribe(() => this.console.error('call ended', ringSession.sessionId));
+            ringSession.onCallEnded.subscribe(() => this.console.error('call ended'));
 
             sessionControl = new RingWebSocketRTCSessionControl(ringSession, onConnectionState);
 

@@ -69,12 +69,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings,
             description: 'Optional: If supplied will on show this locationID.',
             hide: true,
         },
-        cameraDingsPollingSeconds: {
-            title: 'Poll Interval',
-            type: 'number',
-            description: 'Optional: Change the default polling interval for motion and doorbell events.',
-            defaultValue: 5,
-        },
         nightModeBypassAlarmState: {
             title: 'Night Mode Bypass Alarm State',
             description: 'Set this to enable the "Night" option on the alarm panel. When arming in "Night" mode, all open sensors will be bypassed and the alarm will be armed to the selected option.',
@@ -95,12 +89,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings,
 
     constructor() {
         super();
-
-        this.settingsStorage.settings.cameraDingsPollingSeconds.onGet = async () => {
-            return {
-                hide: !this.settingsStorage.values.polling,
-            };
-        }
 
         this.discoverDevices()
             .catch(e => this.console.error('discovery failure', e));
@@ -172,7 +160,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 locationIds,
                 cameraStatusPollingSeconds: this.settingsStorage.values.polling ? cameraStatusPollingSeconds : undefined,
-                cameraDingsPollingSeconds: this.settingsStorage.values.polling ? this.settingsStorage.values.cameraDingsPollingSeconds : undefined,
+                locationModePollingSeconds: this.settingsStorage.values.polling ? cameraStatusPollingSeconds : undefined,
                 systemId: this.settingsStorage.values.systemId,
             }, {
                 createPeerConnection: () => {
