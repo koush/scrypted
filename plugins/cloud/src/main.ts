@@ -1054,6 +1054,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                         const lines = string.split('\n');
                         for (const line of lines) {
                             if ((line.includes('Unregistered tunnel connection')
+                                || line.includes('Connection terminated error')
                                 || line.includes('Register tunnel error')
                                 || line.includes('Failed to get tunnel'))
                                 && deferred.finished) {
