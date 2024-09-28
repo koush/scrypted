@@ -16,7 +16,7 @@ export async function autoconfigureSettings(client: AmcrestCameraClient, cameraN
         sampleRate: 8000,
     };
 
-    await client.resetMotionDetection(cameraNumber);
+    await client.resetMotionDetection(cameraNumber).catch(() => {});
 
     return ac(
         () => client.getCodecs(cameraNumber),
