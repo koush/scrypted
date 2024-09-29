@@ -330,9 +330,9 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
         await this.validate('Scrypted Server Address', async () => {
             const addresses = await sdk.endpointManager.getLocalAddresses();
-            const hasIPv4 = addresses.find(address => net.isIPv4(address));
-            const hasIPv6 = addresses.find(address => net.isIPv6(address));
-            if (addresses.length)
+            const hasIPv4 = addresses?.find(address => net.isIPv4(address));
+            const hasIPv6 = addresses?.find(address => net.isIPv6(address));
+            if (addresses?.length)
                 this.warnStep(addresses.join(', '));
             if (!hasIPv4)
                 throw new Error('Scrypted Settings IPv4 address not set.');
