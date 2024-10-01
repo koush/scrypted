@@ -146,7 +146,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
             if (device.providedInterfaces.includes(ScryptedInterface.MotionSensor)) {
                 if (device.interfaces.find(i => i.startsWith('ObjectDetection:true')))
-                    this.warnStep('Camera hardware provides motion events, but a software motion detector is enabked. Consider disabling the software motion detector.');
+                    this.warnStep('Camera hardware provides motion events, but a software motion detector is enabled. Consider disabling the software motion detector.');
             }
         });
 
