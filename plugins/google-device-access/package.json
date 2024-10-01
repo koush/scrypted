@@ -49,5 +49,5 @@
       "@types/lodash": "^4.14.195",
       "@types/node": "^20.4.1"
    },
-   "version": "0.0.98"
+   "version": "0.0.99"
 }
