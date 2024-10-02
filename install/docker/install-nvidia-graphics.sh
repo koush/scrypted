@@ -7,7 +7,7 @@ then
         && dpkg -i /cuda-keyring.deb \
         && apt update -q \
         && apt install -y cuda-nvcc-11-8 libcublas-11-8 libcudnn8 cuda-libraries-11-8 \
-        && apt install -y cuda-nvcc-12-4 libcublas-12-4 libcudnn8 cuda-libraries-12-4;
+        && apt install -y cuda-nvcc-12-6 libcublas-12-6 libcudnn9-cuda-12 cuda-libraries-12-6;
 
     if [ "$" != "0" ]
     then
