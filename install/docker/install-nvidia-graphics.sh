@@ -15,12 +15,15 @@ then
         exit 1
     fi
 
+
+    # Update: the libnvidia-opencl.so.1 file is not present in the container image, it is
+    # mounted via the nvidia container runtime. This is why the following check is commented out.
     # this file is present but for some reason the icd file is not created by nvidia runtime.
-    if [ ! -f "/usr/lib/x86_64-linux-gnu/libnvidia-opencl.so.1" ]
-    then
-        echo "Error: NVIDIA OpenCL library not found."
-        exit 1
-    fi
+    # if [ ! -f "/usr/lib/x86_64-linux-gnu/libnvidia-opencl.so.1" ]
+    # then
+    #     echo "Error: NVIDIA OpenCL library not found."
+    #     exit 1
+    # fi
 
     mkdir -p /etc/OpenCL/vendors/
     echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
