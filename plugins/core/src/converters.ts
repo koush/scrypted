@@ -59,6 +59,7 @@ export class BufferHost extends ScryptedDeviceBase implements HttpRequestHandler
         const filename = uuid + (extension ? `.${extension}` : '');
 
         this.hosted.set(`/${filename}`, { data: buffer, fromMimeType, toMimeType });
+        setTimeout(() => this.hosted.delete(`/${filename}`), 10 * 1000); // free this resource after 10 seconds.
 
         return Buffer.from(`${endpoint}${filename}`);
     }
