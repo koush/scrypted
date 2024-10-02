@@ -4,7 +4,8 @@ numpy==1.26.4
 # uncomment to require cuda 12, but most stuff is still targetting cuda 11.
 # however, stuff targetted for cuda 11 can still run on cuda 12.
 # --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
-onnxruntime-gpu==1.18.1; 'darwin' not in sys_platform and platform_machine != 'aarch64'
+onnxruntime-gpu==1.18.1; 'linux' in sys_platform and platform_machine != 'aarch64'
+onnxruntime-gpu==1.19.2; 'win32' in sys_platform and platform_machine != 'aarch64'
 # cpu and coreml execution provider
 onnxruntime; 'darwin' in sys_platform or platform_machine == 'aarch64'
 # nightly?
