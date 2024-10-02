@@ -25,6 +25,10 @@ then
     #     exit 1
     # fi
 
+    # the container runtime doesn't mount this file for some reason. seems to be a bug.
+    # https://github.com/NVIDIA/nvidia-container-toolkit/issues/682
+    # but the contents are simply the .so file, which is a symlink the nvidia runtime
+    # will mount in.
     mkdir -p /etc/OpenCL/vendors/
     echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
 else
