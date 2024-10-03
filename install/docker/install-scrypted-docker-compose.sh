@@ -75,7 +75,7 @@ else
     # never restart, systemd will handle it
     sed -i 's/restart: unless-stopped/restart: no/g' $DOCKER_COMPOSE_YML
     # remove the watchtower env.
-    sed -i "/SCRYPTED_WEBHOOK_UPDATE/d" "$1"
+    sed -i "/SCRYPTED_WEBHOOK_UPDATE/d" $DOCKER_COMPOSE_YML
 
     sudo systemctl stop apparmor || true
     sudo apt -y purge apparmor || true
