@@ -1,5 +1,5 @@
 #!/bin/bash
-cat /etc/issue <<EOT
+cat > /etc/issue <<EOT
 Welcome to Scrypted!
 To access the Scrypted Management Console visit:
 
