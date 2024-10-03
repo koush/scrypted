@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# disable core dumps.
+# this doesn't disable core dumps on the scrypted service itself, only stuff run by init.
+ulimit -c 0
+
 if [[ "${SCRYPTED_DOCKER_AVAHI}" != "true" ]]; then
   echo "SCRYPTED_DOCKER_AVAHI != true, won't manage dbus nor avahi-daemon" >/dev/stderr
   exit 0
