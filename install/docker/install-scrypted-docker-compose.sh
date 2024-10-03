@@ -44,6 +44,11 @@ systemctl disable scrypted.service 2> /dev/null
 USER_HOME=$(eval echo ~$SERVICE_USER)
 SCRYPTED_HOME=$USER_HOME/.scrypted
 mkdir -p $SCRYPTED_HOME
+# remove various things from a previous local install.
+rm -rf $SCRYPTED_HOME/node_modules
+rm -rf $SCRYPTED_HOME/install.json
+rm -rf $SCRYPTED_HOME/package.json
+rm -rf $SCRYPTED_HOME/package-lock.json
 
 set -e
 cd $SCRYPTED_HOME
