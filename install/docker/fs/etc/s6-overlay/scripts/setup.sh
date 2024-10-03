@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# disable core dumps.
-ulimit -c 0
-
 if [[ "${SCRYPTED_DOCKER_AVAHI}" != "true" ]]; then
   echo "SCRYPTED_DOCKER_AVAHI != true, won't manage dbus nor avahi-daemon" >/dev/stderr
   exit 0
