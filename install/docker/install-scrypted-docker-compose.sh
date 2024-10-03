@@ -135,10 +135,11 @@ EOT
 #!/bin/bash
 cd $SCRYPTED_HOME
 
-# always immediately update in case there's a broken image.
+# always immediately upgrade everything in case there's a broken update.
 # this will also be preferable for troubleshooting via lxc reboot.
-DEBIAN_FRONTEND=noninteractive apt -y update && apt -y dist-upgrade
-docker compose pull
+export DEBIAN_FRONTEND=noninteractive
+(apt -y --fix-broken install && dpkg --configure -a && apt -y update && apt -y dist-upgrade) &
+docker compose pull &
 
 # do not daemonize, when it exits, systemd will restart it.
 docker compose up
