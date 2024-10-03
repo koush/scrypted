@@ -133,8 +133,6 @@ StandardError=null
 WantedBy=multi-user.target
 EOT
 
-    chmod +x $DOCKER_COMPOSE_SH
-
     cat > $DOCKER_COMPOSE_SH <<EOT
 #!/bin/bash
 cd $SCRYPTED_HOME
@@ -147,6 +145,8 @@ docker compose pull
 # do not daemonize, when it exits, systemd will restart it.
 docker compose up
 EOT
+
+    chmod +x $DOCKER_COMPOSE_SH
 
     systemctl daemon-reload
     systemctl enable scrypted.service
