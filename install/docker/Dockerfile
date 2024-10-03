@@ -18,4 +18,5 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 # if this base image changes, this version must be updated.
 ENV SCRYPTED_BASE_VERSION="20240321"
 
-CMD npm --prefix /server exec scrypted-serve
+# need a way to disable core dumps without s6 overlay
+CMD ["/bin/sh", "-c", "ulimit -c 0; exec npm --prefix /server exec scrypted-serve"]
