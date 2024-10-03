@@ -43,8 +43,7 @@ systemctl disable scrypted.service 2> /dev/null
 
 USER_HOME=$(eval echo ~$SERVICE_USER)
 SCRYPTED_HOME=$USER_HOME/.scrypted
-SCRYPTED_VOLUME=$SCRYPTED_HOME/volume
-mkdir -p $SCRYPTED_VOLUME
+mkdir -p $SCRYPTED_HOME
 
 set -e
 cd $SCRYPTED_HOME
@@ -111,8 +110,7 @@ then
     echo "docker compose up -d"
     sudo -u $SERVICE_USER docker compose up -d
 else
-    # place this in the volume so core plugin can update it.
-    export DOCKER_COMPOSE_SH=$SCRYPTED_VOLUME/docker-compose.sh
+    export DOCKER_COMPOSE_SH=$SCRYPTED_HOME/docker-compose.sh
 
     cat > /etc/systemd/system/scrypted.service <<EOT
 [Unit]

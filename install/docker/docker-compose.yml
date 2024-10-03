@@ -84,6 +84,7 @@ services:
             # LXC usage only
             # lxc - /var/run/docker.sock:/var/run/docker.sock
             # lxc - /root/.scrypted/docker-compose.yml:/root/.scrypted/docker-compose.yml
+            # lxc - /root/.scrypted/docker-compose.sh:/root/.scrypted/docker-compose.sh
             # lxc - /mnt:/mnt
 
         # Uncomment the following lines to use Avahi daemon from the host
