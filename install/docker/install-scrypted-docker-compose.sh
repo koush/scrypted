@@ -117,6 +117,10 @@ then
 else
     export DOCKER_COMPOSE_SH=$SCRYPTED_HOME/docker-compose.sh
 
+    curl https://raw.githubusercontent.com/koush/scrypted/main/install/proxmox/docker-compose.sh > $DOCKER_COMPOSE_SH
+
+    chmod +x $DOCKER_COMPOSE_SH
+
     cat > /etc/systemd/system/scrypted.service <<EOT
 [Unit]
 Description=Scrypted service
@@ -135,22 +139,6 @@ StandardError=null
 [Install]
 WantedBy=multi-user.target
 EOT
-
-    cat > $DOCKER_COMPOSE_SH <<EOT
-#!/bin/bash
-cd $SCRYPTED_HOME
-
-# always immediately upgrade everything in case there's a broken update.
-# this will also be preferable for troubleshooting via lxc reboot.
-export DEBIAN_FRONTEND=noninteractive
-(apt -y --fix-broken install && dpkg --configure -a && apt -y update && apt -y dist-upgrade) &
-docker compose pull &
-
-# do not daemonize, when it exits, systemd will restart it.
-docker compose up
-EOT
-
-    chmod +x $DOCKER_COMPOSE_SH
 
     systemctl daemon-reload
     systemctl enable scrypted.service

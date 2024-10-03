@@ -1,4 +1,15 @@
 #!/bin/bash
+cat /etc/issue <<EOT
+Welcome to Scrypted!
+To access the Scrypted Management Console visit:
+
+  https://scrypted:10443
+
+  or
+
+  https://192.168.2.181:10443
+EOT
+
 cd /root/.scrypted
 
 # always immediately upgrade everything in case there's a broken update.
