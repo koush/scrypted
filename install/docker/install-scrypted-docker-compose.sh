@@ -69,7 +69,10 @@ then
         sed -i 's/'#' "\/dev\/dri/"\/dev\/dri/g' $DOCKER_COMPOSE_YML
     fi
 else
+    # uncomment lxc specific stuff
     sed -i 's/'#' lxc //g' $DOCKER_COMPOSE_YML
+    # never restart, systemd will handle it
+    sed -i 's/restart: unless-stopped/restart: no/g' $DOCKER_COMPOSE_YML
     sudo systemctl stop apparmor || true
     sudo apt -y purge apparmor || true
 fi
