@@ -43,7 +43,8 @@ systemctl disable scrypted.service 2> /dev/null
 
 USER_HOME=$(eval echo ~$SERVICE_USER)
 SCRYPTED_HOME=$USER_HOME/.scrypted
-mkdir -p $SCRYPTED_HOME
+SCRYPTED_VOLUME=$SCRYPTED_HOME/volume
+mkdir -p $SCRYPTED_VOLUME
 
 set -e
 cd $SCRYPTED_HOME
@@ -73,6 +74,9 @@ else
     sed -i 's/'#' lxc //g' $DOCKER_COMPOSE_YML
     # never restart, systemd will handle it
     sed -i 's/restart: unless-stopped/restart: no/g' $DOCKER_COMPOSE_YML
+    # remove the watchtower env.
+    sed -i "/SCRYPTED_WEBHOOK_UPDATE/d" "$1"
+
     sudo systemctl stop apparmor || true
     sudo apt -y purge apparmor || true
 fi
@@ -101,8 +105,53 @@ set -e
 
 echo "docker compose pull"
 sudo -u $SERVICE_USER docker compose pull
-echo "docker compose up -d"
-sudo -u $SERVICE_USER docker compose up -d
+
+if [ -z "$SCRYPTED_LXC" ]
+then
+    echo "docker compose up -d"
+    sudo -u $SERVICE_USER docker compose up -d
+else
+    # place this in the volume so core plugin can update it.
+    export DOCKER_COMPOSE_SH=$SCRYPTED_VOLUME/docker-compose.sh
+
+    cat > /etc/systemd/system/scrypted.service <<EOT
+[Unit]
+Description=Scrypted service
+After=network.target
+
+[Service]
+User=root
+Group=root
+Type=simple
+ExecStart=$DOCKER_COMPOSE_SH
+Restart=always
+RestartSec=3
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
+EOT
+
+    chmod +x $DOCKER_COMPOSE_SH
+
+    cat > $DOCKER_COMPOSE_SH <<EOT
+#!/bin/bash
+cd $SCRYPTED_HOME
+
+# always immediately update in case there's a broken image.
+# this will also be preferable for troubleshooting via lxc reboot.
+DEBIAN_FRONTEND=noninteractive apt -y update && apt -y dist-upgrade
+docker compose pull
+
+# do not daemonize, when it exits, systemd will restart it.
+docker compose up
+EOT
+
+    systemctl daemon-reload
+    systemctl enable scrypted.service
+    systemctl restart scrypted.service
+fi
 
 echo
 echo
