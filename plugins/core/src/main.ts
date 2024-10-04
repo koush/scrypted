@@ -1,7 +1,10 @@
 import { readFileAsString, tsCompile } from '@scrypted/common/src/eval/scrypted-eval';
 import sdk, { DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import { writeFileSync } from 'fs';
+import path from 'path';
 import Router from 'router';
+import yaml from 'yaml';
 import { getUsableNetworkAddresses } from '../../../server/src/ip';
 import { AggregateCore, AggregateCoreNativeId } from './aggregate-core';
 import { AutomationCore, AutomationCoreNativeId } from './automations-core';
@@ -48,7 +51,41 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                 const service = await sdk.systemManager.getComponent('addresses');
                 service.setLocalAddresses(this.localAddresses);
             },
-        }
+        },
+        releaseChannel: {
+            group: 'Advanced',
+            title: 'Server Release Channel',
+            description: 'The release channel to use for server updates. A specific version or tag can be manually entered as well. Changing this setting will update the image field in /root/.scrypted/docker-compose.yml. Invalid values may prevent the server from properly starting.',
+            defaultValue: 'Default',
+            choices: [
+                'Default',
+                'latest',
+                'beta',
+                `v${sdk.serverVersion}-jammy-full`,
+            ],
+            combobox: true,
+            onPut: (ov, nv) => {
+                this.updateReleaseChannel(nv);
+            },
+            mapGet: () => {
+                try {
+                    const dockerCompose = yaml.parseDocument(readFileAsString('/root/.scrypted/docker-compose.yml'));
+                    // @ts-ignore
+                    const image: string = dockerCompose.contents.get('services').get('scrypted').get('image');
+                    const label = image.split(':')[1] || undefined;
+                    return label || 'Default';
+                }
+                catch (e) {
+                    return 'Default';
+                }
+            }
+        },
+        pullImage: {
+            hide: true,
+            onPut: () => {
+                this.setPullImage();
+            }
+        },
     });
     indexHtml: string;
 
@@ -60,6 +97,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
         }
 
         checkLxcDependencies();
+
+        this.storageSettings.settings.releaseChannel.hide = process.env.SCRYPTED_INSTALL_ENVIRONMENT !== 'lxc-docker';
 
         this.indexHtml = readFileAsString('dist/index.html');
 
@@ -247,6 +286,27 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                 code: 404,
             });
         }
+    }
+
+    setPullImage() {
+        writeFileSync(path.join(process.env.SCRYPTED_VOLUME, '.pull'), '');
+    }
+
+    async updateReleaseChannel(releaseChannel: string) {
+        if (!releaseChannel || releaseChannel === 'Default')
+            releaseChannel = '';
+        else
+            releaseChannel = `:${releaseChannel}`;
+        const dockerCompose = yaml.parseDocument(readFileAsString('/root/.scrypted/docker-compose.yml'));
+        // @ts-ignore
+        dockerCompose.contents.get('services').get('scrypted').set('image', `ghcr.io/koush/scrypted${releaseChannel}`);
+        yaml.stringify(dockerCompose);
+        writeFileSync('/root/.scrypted/docker-compose.yml', yaml.stringify(dockerCompose));
+        this.setPullImage();
+
+        const serviceControl = await sdk.systemManager.getComponent("service-control");
+        await serviceControl.exit().catch(() => { });
+        await serviceControl.restart();
     }
 }
 
