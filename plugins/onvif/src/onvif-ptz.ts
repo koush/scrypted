@@ -79,23 +79,53 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
                     if (e)
                         return f(e);
                     r();
-                })
+                });
             })
         }
         else if (movement === PanTiltZoomMovement.Continuous) {
+            let x= command.pan;
+            let y = command.tilt;
+            let zoom = command.zoom;
+            if (command.speed?.pan)
+                x *= command.speed.pan;
+            if (command.speed?.tilt)
+                y *= command.speed.tilt;
+            if (command.speed?.zoom)
+                zoom *= command.speed.zoom;
             return new Promise<void>((r, f) => {
                 client.cam.continuousMove({
                     x: command.pan,
                     y: command.tilt,
                     zoom: command.zoom,
-                    speed: speed,
                     timeout: command.timeout || 1000,
                 }, (e, result, xml) => {
                     if (e)
                         return f(e);
                     r();
                 })
-            })
+            });
+        }
+        else if (movement === PanTiltZoomMovement.Home) {
+            return new Promise<void>((r, f) => {
+                client.cam.gotoHomePosition({
+                    speed: speed,
+                }, (e, result, xml) => {
+                    if (e)
+                        return f(e);
+                    r();
+                })
+            });
+        }
+        else if (movement === PanTiltZoomMovement.Preset) {
+            return new Promise<void>((r, f) => {
+                client.cam.gotoPreset({
+                    preset: command.preset,
+                }, (e, result, xml) => {
+                    if (e)
+                        return f(e);
+                    r();
+                })
+            });
         }
         else {
             // relative movement is default.
@@ -110,7 +140,7 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
                         return f(e);
                     r();
                 })
-            })
+            });
         }
     }
 

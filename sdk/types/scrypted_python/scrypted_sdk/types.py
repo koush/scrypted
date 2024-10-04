@@ -65,6 +65,8 @@ class PanTiltZoomMovement(str, Enum):
 
     Absolute = "Absolute"
     Continuous = "Continuous"
+    Home = "Home"
+    Preset = "Preset"
     Relative = "Relative"
 
 class ScryptedDeviceType(str, Enum):
@@ -709,8 +711,9 @@ class PanTiltZoomCapabilities(TypedDict):
 
 class PanTiltZoomCommand(TypedDict):
 
-    movement: PanTiltZoomMovement  # Specify the movement origin. If unspecified, the movement will be relative to the current position.
+    movement: PanTiltZoomMovement  # Specify the movement type. If unspecified, the movement will be relative to the current position.
     pan: float  # Ranges between -1 and 1.
+    preset: str  # The preset to move to.
     speed: Any  # The speed of the movement.
     tilt: float  # Ranges between -1 and 1.
     timeout: float  # The duration of the movement in milliseconds.
