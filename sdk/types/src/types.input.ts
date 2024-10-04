@@ -949,7 +949,8 @@ export interface VideoCameraMask {
 
 export enum PanTiltZoomMovement {
   Absolute = "Absolute",
-  Relative = "Relative"
+  Relative = "Relative",
+  Continuous = "Continuous",
 }
 
 export interface PanTiltZoomCommand {
@@ -985,7 +986,11 @@ export interface PanTiltZoomCommand {
      * Ranges between 0 and 1 for max zoom.
      */
     zoom?: number;
-  }
+  };
+  /**
+   * The duration of the movement in milliseconds.
+   */
+  timeout?: number;
 }
 
 export interface PanTiltZoomCapabilities {

@@ -25,7 +25,19 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
                     zoom: ptz.includes('Zoom'),
                 }
             }
-        }
+        },
+        ptzMovementType: {
+            title: 'PTZ Movement Type',
+            description: 'The type of movement to use for PTZ commands by default.',
+            type: 'string',
+            choices: [
+                'Default',
+                PanTiltZoomMovement.Absolute,
+                PanTiltZoomMovement.Relative,
+                PanTiltZoomMovement.Continuous,
+            ],
+            defaultValue: 'Default',
+        },
     });
 
     constructor(options: SettingsMixinDeviceOptions<Settings>) {
@@ -55,13 +67,29 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
             };
         }
 
-        if (command.movement === PanTiltZoomMovement.Absolute) {
+        let movement = command.movement || this.storageSettings.values.ptzMovementType;
+        if (movement === PanTiltZoomMovement.Absolute) {
             return new Promise<void>((r, f) => {
                 client.cam.absoluteMove({
                     x: command.pan,
                     y: command.tilt,
                     zoom: command.zoom,
-                    speed: speed
+                    speed: speed,
+                }, (e, result, xml) => {
+                    if (e)
+                        return f(e);
+                    r();
+                })
+            })
+        }
+        else if (movement === PanTiltZoomMovement.Continuous) {
+            return new Promise<void>((r, f) => {
+                client.cam.continuousMove({
+                    x: command.pan,
+                    y: command.tilt,
+                    zoom: command.zoom,
+                    speed: speed,
+                    timeout: command.timeout || 1000,
                 }, (e, result, xml) => {
                     if (e)
                         return f(e);

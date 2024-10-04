@@ -64,6 +64,7 @@ class MediaPlayerState(str, Enum):
 class PanTiltZoomMovement(str, Enum):
 
     Absolute = "Absolute"
+    Continuous = "Continuous"
     Relative = "Relative"
 
 class ScryptedDeviceType(str, Enum):
@@ -712,6 +713,7 @@ class PanTiltZoomCommand(TypedDict):
     pan: float  # Ranges between -1 and 1.
     speed: Any  # The speed of the movement.
     tilt: float  # Ranges between -1 and 1.
+    timeout: float  # The duration of the movement in milliseconds.
     zoom: float  # Ranges between 0 and 1 for max zoom.
 
 class Position(TypedDict):
