@@ -1,4 +1,4 @@
-import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { LockState, MixinDeviceBase, PanTiltZoomMovement, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes } from "@scrypted/sdk";
 import { SettingsMixinDeviceBase } from "@scrypted/sdk/settings-mixin";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import fs from 'fs';
@@ -76,6 +76,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         localStorage: device.storage,
         device,
         exports: {} as any,
+        PanTiltZoomMovement,
         SettingsMixinDeviceBase,
         ScryptedMimeTypes,
         ScryptedInterface,
