@@ -263,6 +263,7 @@ export class ReolinkCameraClient {
             await this.ptzOp(op, Math.round((command?.pan || command?.tilt || 1) * 10));
         }
 
+        op = undefined;
         if (command.zoom < 0)
             op = 'ZoomDec';
         else if (command.zoom > 0)
