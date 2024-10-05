@@ -249,6 +249,9 @@ export class ReolinkCameraClient {
     }
 
     async ptz(command: PanTiltZoomCommand) {
+        // reolink doesnt accept signed values to ptz
+        // in favor of explicit direction.
+        // so we need to convert the signed values to abs explicit direction.
         let op = '';
         if (command.pan < 0)
             op += 'Left';
@@ -260,7 +263,7 @@ export class ReolinkCameraClient {
             op += 'Up';
 
         if (op) {
-            await this.ptzOp(op, Math.round((command?.pan || command?.tilt || 1) * 10));
+            await this.ptzOp(op, Math.round(Math.abs(command?.pan || command?.tilt || 1) * 10));
         }
 
         op = undefined;
@@ -270,7 +273,7 @@ export class ReolinkCameraClient {
             op = 'ZoomInc';
 
         if (op) {
-            await this.ptzOp(op, Math.round((command?.zoom || 1) * 10));
+            await this.ptzOp(op, Math.round(Math.abs(command?.zoom || 1) * 10));
         }
     }
 
