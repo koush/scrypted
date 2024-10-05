@@ -706,6 +706,7 @@ class ObjectsDetected(TypedDict):
 class PanTiltZoomCapabilities(TypedDict):
 
     pan: bool
+    presets: Any  # Preset id mapped to friendly name.
     tilt: bool
     zoom: bool
 

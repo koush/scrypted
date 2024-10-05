@@ -1003,6 +1003,12 @@ export interface PanTiltZoomCapabilities {
   pan?: boolean;
   tilt?: boolean;
   zoom?: boolean;
+  /**
+   * Preset id mapped to friendly name.
+   */
+  presets?: {
+    [key: string]: string;
+  };
 }
 export interface PanTiltZoom {
   ptzCapabilities?: PanTiltZoomCapabilities;
