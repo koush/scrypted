@@ -602,6 +602,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 anonymousDeviceId: {},
                 id: {},
                 nativeId: {},
+                host: {},
             },
         }
     });
@@ -611,14 +612,15 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         return this.storageSettings.values.idMaps.nativeId?.[nativeId] || nativeId;
     }
 
-    getNativeId(device: { id?: string, mac?: string; anonymousDeviceId?: string }, update: boolean) {
-        const { id, mac, anonymousDeviceId } = device;
+    getNativeId(device: { id?: string, mac?: string; anonymousDeviceId?: string, host?: string }, update: boolean) {
+        const { id, mac, anonymousDeviceId,host } = device;
         const idMaps = this.storageSettings.values.idMaps;
 
         // try to find an existing nativeId given the mac and anonymous device id
         const found = (mac && idMaps.mac[mac])
             || (anonymousDeviceId && idMaps.anonymousDeviceId[anonymousDeviceId])
             || (id && idMaps.id[id])
+            || (host && idMaps.host[host])
             ;
 
         // use the found id if one exists (device got provisioned a new id), otherwise use the id provided by the device.
@@ -627,7 +629,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         if (!update)
             return nativeId;
 
-        // map the mac and anonymous device id to the native id.
+        // map the mac, host, and anonymous device id to the native id.
         if (mac) {
             idMaps.mac ||= {};
             idMaps.mac[mac] = nativeId;
@@ -635,6 +637,10 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         if (anonymousDeviceId) {
             idMaps.anonymousDeviceId ||= {};
             idMaps.anonymousDeviceId[anonymousDeviceId] = nativeId;
+        }
+        if (host) {
+            idMaps.host ||= {};
+            idMaps.host[host] = nativeId;
         }
 
         // map the id and native id to each other.
