@@ -40,7 +40,7 @@ export function createAsyncQueue<T>() {
             return false;
 
         if (waiting.length) {
-            const deferred = waiting.shift();
+            const deferred = waiting.shift()!;
             dequeued?.resolve();
             deferred.resolve(item);
             return true;
@@ -66,7 +66,7 @@ export function createAsyncQueue<T>() {
             dequeued?.reject(new Error('abort'));
         };
 
-        dequeued.promise.catch(() => {}).finally(() => signal.removeEventListener('abort', h));
+        dequeued?.promise.catch(() => {}).finally(() => signal.removeEventListener('abort', h));
         signal.addEventListener('abort', h);
 
         return true;
@@ -79,7 +79,7 @@ export function createAsyncQueue<T>() {
         ended = e || new EndError();
         endDeferred.resolve();
         while (waiting.length) {
-            waiting.shift().reject(ended);
+            waiting.shift()!.reject(ended);
         }
         return true;
     }
