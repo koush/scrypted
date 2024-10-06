@@ -70,31 +70,32 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         await this.storageSettings.putSetting(key, value);
     }
 
-    warnStep(result: string) {
-        this.console.log(''.padEnd(24), `\x1b[33m${result}\x1b[0m`);
+    warnStep(console: Console, result: string) {
+        console.log(''.padEnd(24), `\x1b[33m${result}\x1b[0m`);
     }
 
-    async validate(stepName: string, step: Promise<any> | (() => Promise<any>)) {
+    async validate(console: Console, stepName: string, step: Promise<any> | (() => Promise<any>)) {
         try {
             if (step instanceof Function)
                 step = step();
-            this.console.log(stepName.padEnd(24), '\x1b[34mRunning\x1b[0m');
+            console.log(stepName.padEnd(24), '\x1b[34mRunning\x1b[0m');
             const result = await step;
-            this.console.log(''.padEnd(24), `\x1b[32m${result || 'OK'}\x1b[0m`);
+            console.log(''.padEnd(24), `\x1b[32m${result || 'OK'}\x1b[0m`);
         }
         catch (e) {
-            this.console.error(stepName.padEnd(24), '\x1b[31m Failed\x1b[0m'.padEnd(24), (e as Error).message);
+            console.error(stepName.padEnd(24), '\x1b[31m Failed\x1b[0m'.padEnd(24), (e as Error).message);
         }
     }
 
     async validateDevice() {
         const device = this.storageSettings.values.testDevice as ScryptedDevice & any;
+        const console = sdk.deviceManager.getMixinConsole(device.id);
 
-        this.console.log(''.padEnd(44, '='));
-        this.console.log(`Device Validation: ${device?.name}`);
-        this.console.log(''.padEnd(44, '='));
+        console.log(''.padEnd(44, '='));
+        console.log(`Device Validation: ${device?.name}`);
+        console.log(''.padEnd(44, '='));
 
-        await this.validate('Device Selected', async () => {
+        await this.validate(console, 'Device Selected', async () => {
             if (!device)
                 throw new Error('Select a device in the Settings UI.');
         });
@@ -109,13 +110,15 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             await this.validateNotifier(device);
         }
 
-        this.console.log(''.padEnd(44, '='));
-        this.console.log(`Device Validation Complete: ${device?.name}`);
-        this.console.log(''.padEnd(44, '='));
+        console.log(''.padEnd(44, '='));
+        console.log(`Device Validation Complete: ${device?.name}`);
+        console.log(''.padEnd(44, '='));
     }
 
     async validateNotifier(device: ScryptedDevice & Notifier) {
-        await this.validate('Test Notification', async () => {
+        const console = sdk.deviceManager.getMixinConsole(device.id);
+
+        await this.validate(console, 'Test Notification', async () => {
             const logo = await httpFetch({
                 url: 'https://home.scrypted.app/_punch/web_hi_res_512.png',
                 responseType: 'buffer',
@@ -127,12 +130,14 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 subtitle: 'Subtitle',
             }, mo);
 
-            this.warnStep('Check the device for the notification.');
+            this.warnStep(console, 'Check the device for the notification.');
         });
     }
 
     async validateCamera(device: ScryptedDevice & Camera & VideoCamera & MotionSensor) {
-        await this.validate('Device Capabilities', async () => {
+        const console = sdk.deviceManager.getMixinConsole(device.id);
+
+        await this.validate(console, 'Device Capabilities', async () => {
             if (!device.interfaces.includes(ScryptedInterface.MotionSensor))
                 throw new Error('Motion Sensor not found.');
 
@@ -140,18 +145,18 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 throw new Error('Doorbell button not found.');
         });
 
-        await this.validate('Motion Detection', async () => {
+        await this.validate(console, 'Motion Detection', async () => {
             if (!device.interfaces.includes(ScryptedInterface.MotionSensor))
                 throw new Error('Motion Sensor not found. Enabling a software motion sensor extension is recommended.');
 
             if (device.providedInterfaces.includes(ScryptedInterface.MotionSensor)) {
                 if (device.interfaces.find(i => i.startsWith('ObjectDetection:true')))
-                    this.warnStep('Camera hardware provides motion events, but a software motion detector is enabled. Consider disabling the software motion detector.');
+                    this.warnStep(console, 'Camera hardware provides motion events, but a software motion detector is enabled. Consider disabling the software motion detector.');
             }
         });
 
         if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
-            await this.validate('Recent Motion', async () => {
+            await this.validate(console, 'Recent Motion', async () => {
 
                 const lastMotion = this.loggedMotion.get(device.id);
                 if (!lastMotion)
@@ -163,7 +168,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
 
         if (device.type === ScryptedDeviceType.Doorbell) {
-            await this.validate('Recent Button Press', async () => {
+            await this.validate(console, 'Recent Button Press', async () => {
                 const lastButton = this.loggedButton.get(device.id);
                 if (!lastButton)
                     throw new Error('No recent button press detected. Go press the doorbell button.');
@@ -173,7 +178,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         }
 
         const validateMedia = async (stepName: string, mo: Promise<MediaObject>, snapshot = false, and?: () => Promise<void>) => {
-            await this.validate(stepName, async () => {
+            await this.validate(console, stepName, async () => {
                 if (snapshot && !device.interfaces.includes(ScryptedInterface.Camera))
                     throw new Error('Snapshot not supported. Enable the Snapshot extension.');
                 const jpeg = await sdk.mediaManager.convertMediaObjectToBuffer(await mo, 'image/jpeg');
@@ -181,7 +186,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 if (!metadata.width || !metadata.height || metadata.width < 100 || metadata.height < 100)
                     throw new Error('Malformed image.');
                 if (!and && snapshot && device.pluginId === '@scrypted/unifi-protect' && metadata.width < 1280)
-                    this.warnStep('Unifi Protect provides low quality snapshots. Consider using Snapshot from Prebuffer for full resolution screenshots.');
+                    this.warnStep(console, 'Unifi Protect provides low quality snapshots. Consider using Snapshot from Prebuffer for full resolution screenshots.');
                 await and?.();
             });
         };
@@ -190,22 +195,22 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             reason: 'event',
         }), true);
 
-        await this.validate('Streams', async () => {
+        await this.validate(console, 'Streams', async () => {
             const vsos = await device.getVideoStreamOptions();
 
             if (!vsos?.length)
                 throw new Error('Stream configuration invalid.');
 
             if (vsos.length < 3)
-                this.warnStep(`Camera has ${vsos.length} substream. Three streams are recommended.`);
+                this.warnStep(console, `Camera has ${vsos.length} substream. Three streams are recommended.`);
 
             const cloudStreams = vsos.filter(vso => vso.source === 'cloud');
             if (cloudStreams.length)
-                this.warnStep(`Cloud camera. Upgrade recommended.`);
+                this.warnStep(console, `Cloud camera. Upgrade recommended.`);
 
             const usedStreams = vsos.filter(vso => vso.destinations?.length);
             if (usedStreams.length < Math.min(3, vsos.length))
-                this.warnStep(`Unused streams detected.`);
+                this.warnStep(console, `Unused streams detected.`);
         });
 
         const getVideoStream = async (destination: MediaStreamDestination) => {
@@ -223,7 +228,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             const streamId = vsos.find(vso => vso.destinations?.includes(destination))?.id;
 
             if (validated.has(streamId)) {
-                await this.validate(stepName, async () => "Skipped (Duplicate)");
+                await this.validate(console, stepName, async () => "Skipped (Duplicate)");
                 return;
             }
 
@@ -231,7 +236,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
             const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await getVideoStream(destination), ScryptedMimeTypes.FFmpegInput);
             if (ffmpegInput.mediaStreamOptions?.video?.codec !== 'h264')
-                this.warnStep(`Stream ${stepName} is using codec ${ffmpegInput.mediaStreamOptions?.video?.codec}. h264 is recommended.`);
+                this.warnStep(console, `Stream ${stepName} is using codec ${ffmpegInput.mediaStreamOptions?.video?.codec}. h264 is recommended.`);
 
             await validateMedia(stepName, getVideoStream(destination));
             const start = Date.now();
@@ -252,7 +257,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
         await validateMediaStream('Low Resolution', 'low-resolution');
 
-        await this.validate('Audio Codecs', async () => {
+        await this.validate(console, 'Audio Codecs', async () => {
             const vsos = await device.getVideoStreamOptions();
 
             let codec: string | undefined;
@@ -265,7 +270,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             }
 
             if (codecs.size > 1) {
-                this.warnStep(`Mismatched audio codecs detected.`);
+                this.warnStep(console, `Mismatched audio codecs detected.`);
                 return;
             }
 
@@ -273,7 +278,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 return;
 
             if (codec !== 'pcm_mulaw' && codec !== 'aac' && codec !== 'opus') {
-                this.warnStep(`Audio codec is ${codec}. pcm_mulaw, aac, or opus is recommended.`);
+                this.warnStep(console, `Audio codec is ${codec}. pcm_mulaw, aac, or opus is recommended.`);
                 return;
             }
         });
@@ -288,11 +293,11 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         const cloudPlugin = sdk.systemManager.getDeviceById('@scrypted/cloud');
         const openvinoPlugin = sdk.systemManager.getDeviceById<Settings & ObjectDetection>('@scrypted/openvino');
 
-        await this.validate('Scrypted Installation', async () => {
+        await this.validate(this.console, 'Scrypted Installation', async () => {
             const e = process.env.SCRYPTED_INSTALL_ENVIRONMENT;
             if (process.platform !== 'linux') {
                 if (e !== 'electron')
-                    this.warnStep('Upgrading to the Scrypted Desktop application is recommened for Windows and macOS.');
+                    this.warnStep(this.console, 'Upgrading to the Scrypted Desktop application is recommened for Windows and macOS.');
                 return;
             }
 
@@ -300,53 +305,53 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 throw new Error('Unrecognized Linux installation. Installation via Docker image or the official Proxmox LXC script (not tteck) is recommended: https://docs.scrypted.app/installation');
         });
 
-        await this.validate('IPv4 (jsonip.com)', httpFetch({
+        await this.validate(this.console, 'IPv4 (jsonip.com)', httpFetch({
             url: 'https://jsonip.com',
             family: 4,
             responseType: 'json',
             timeout: 5000,
         }).then(r => r.body.ip));
 
-        await this.validate('IPv6 (jsonip.com)', httpFetch({
+        await this.validate(this.console, 'IPv6 (jsonip.com)', httpFetch({
             url: 'https://jsonip.com',
             family: 6,
             responseType: 'json',
             timeout: 5000,
         }).then(r => r.body.ip));
 
-        await this.validate('IPv4 (wtfismyip.com)', httpFetch({
+        await this.validate(this.console, 'IPv4 (wtfismyip.com)', httpFetch({
             url: 'https://wtfismyip.com/text',
             family: 4,
             responseType: 'text',
             timeout: 5000,
         }).then(r => r.body.trim()));
 
-        await this.validate('IPv6 (wtfismyip.com)', httpFetch({
+        await this.validate(this.console, 'IPv6 (wtfismyip.com)', httpFetch({
             url: 'https://wtfismyip.com/text',
             family: 6,
             responseType: 'text',
             timeout: 5000,
         }).then(r => r.body.trim()));
 
-        await this.validate('Scrypted Server Address', async () => {
+        await this.validate(this.console, 'Scrypted Server Address', async () => {
             const addresses = await sdk.endpointManager.getLocalAddresses();
             const hasIPv4 = addresses?.find(address => net.isIPv4(address));
             const hasIPv6 = addresses?.find(address => net.isIPv6(address));
             if (addresses?.length)
-                this.warnStep(addresses.join(', '));
+                this.warnStep(this.console, addresses.join(', '));
             if (!hasIPv4)
                 throw new Error('Scrypted Settings IPv4 address not set.');
             if (!hasIPv6)
                 throw new Error('Scrypted Settings IPv6 address not set.');
         });
 
-        await this.validate('CPU Count', async () => {
+        await this.validate(this.console, 'CPU Count', async () => {
             if (os.cpus().length < 2)
                 throw new Error('CPU Count is too low. 4 CPUs are recommended.');
             return os.cpus().length;
         });
 
-        await this.validate('Memory', async () => {
+        await this.validate(this.console, 'Memory', async () => {
             if (!nvrPlugin) {
                 if (os.totalmem() < 8 * 1024 * 1024 * 1024)
                     throw new Error('Memory is too low. 8GB is recommended.');
@@ -360,15 +365,15 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
         if (process.platform === 'linux' && nvrPlugin) {
             // ensure /dev/dri/renderD128 is available
-            await this.validate('GPU Passthrough', async () => {
+            await this.validate(this.console, 'GPU Passthrough', async () => {
                 if (!fs.existsSync('/dev/dri/renderD128'))
                     throw new Error('GPU device unvailable or not passed through to container.');
             });
         }
 
-        await this.validate('Cloud Plugin', async () => {
+        await this.validate(this.console, 'Cloud Plugin', async () => {
             if (!cloudPlugin) {
-                this.warnStep('Cloud plugin not installed. Consider installing for remote access.');
+                this.warnStep(this.console, 'Cloud plugin not installed. Consider installing for remote access.');
                 return;
             }
 
@@ -399,11 +404,11 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         });
 
         if (openvinoPlugin) {
-            await this.validate('OpenVINO Plugin', async () => {
+            await this.validate(this.console, 'OpenVINO Plugin', async () => {
                 const settings = await openvinoPlugin.getSettings();
                 const availbleDevices = settings.find(s => s.key === 'available_devices');
                 if (!availbleDevices?.value?.toString().includes('GPU'))
-                    this.warnStep('GPU device unvailable or not passed through to container.');
+                    this.warnStep(this.console, 'GPU device unvailable or not passed through to container.');
 
                 const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
                 const detected = await openvinoPlugin.detectObjects(zidane);
@@ -414,7 +419,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         }
 
         if (nvrPlugin) {
-            await this.validate("GPU Decode", async () => {
+            await this.validate(this.console, "GPU Decode", async () => {
                 const ffmpegPath = await sdk.mediaManager.getFFmpegPath();
                 let hasVaapi = false;
                 {
@@ -487,7 +492,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
                     const [exitCode] = await once(cp, 'exit');
                     if (exitCode) {
-                        this.warnStep(std);
+                        this.warnStep(this.console, std);
                         throw new Error('GPU Transform failed.');
                     }
 
@@ -505,7 +510,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             });
 
 
-            await this.validate('Deprecated Plugins', async () => {
+            await this.validate(this.console, 'Deprecated Plugins', async () => {
                 const defunctPlugins = [
                     '@scrypted/opencv',
                     '@scrypted/python-codecs',
@@ -516,7 +521,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 for (const plugin of defunctPlugins) {
                     const pluginDevice = sdk.systemManager.getDeviceById(plugin);
                     if (pluginDevice) {
-                        this.warnStep(`Scrypted NVR users can remove: ${plugin}`);
+                        this.warnStep(this.console, `Scrypted NVR users can remove: ${plugin}`);
                         found = true;
                     }
                 }
