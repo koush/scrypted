@@ -154,5 +154,7 @@ echo "Note that it is https and that you'll be asked to approve/ignore the websi
 echo
 echo
 echo "Optional:"
-echo "Scrypted NVR Recording storage directory can be configured with an additional script:"
-echo "https://docs.scrypted.app/scrypted-nvr/installation.html#docker-volume"
+echo "Scrypted NVR Recording storage directory can be configured with an additional script located at:"
+echo "https://docs.scrypted.app/scrypted-nvr/recording-storage.html#docker-volume"
+echo "or run directly by copying:" 
+echo "mkdir -p ~/.scrypted curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/setup-scrypted-nvr-volume.sh > ~/.scrypted/setup-scrypted-nvr-volume.sh"
