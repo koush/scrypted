@@ -10,10 +10,10 @@ export DEBIAN_FRONTEND=noninteractive
 if [ -e "volume/.pull" ]
 then
   rm -rf volume/.pull
-  docker compose pull && docker container prune && docker image prune -a
+  docker compose pull && docker container prune -f && docker image prune -a -f
 else
   # always background pull in case there's a broken image.
-  (docker compose pull && docker container prune && docker image prune -a) &
+  (docker compose pull && docker container prune -f && docker image prune -a -f) &
 fi
 
 # do not daemonize, when it exits, systemd will restart it.
