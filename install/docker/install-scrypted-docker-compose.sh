@@ -156,5 +156,3 @@ echo
 echo "Optional:"
 echo "Scrypted NVR Recording storage directory can be configured with an additional script located at:"
 echo "https://docs.scrypted.app/scrypted-nvr/recording-storage.html#docker-volume"
-echo "or run directly by copying:" 
-echo "mkdir -p ~/.scrypted curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/setup-scrypted-nvr-volume.sh > ~/.scrypted/setup-scrypted-nvr-volume.sh"
