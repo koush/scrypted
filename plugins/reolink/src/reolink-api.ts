@@ -39,6 +39,11 @@ export type SirenResponse = {
     rspCode: number;
 }
 
+export interface PtzPreset {
+    id: number;
+    name: string;
+}
+
 export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
     parameters: Record<string, string>;
@@ -59,6 +64,13 @@ export class ReolinkCameraClient {
             body,
         });
         return response;
+    }
+
+    private createReadable = (data: any) => {
+        const pt = new PassThrough();
+        pt.write(Buffer.from(JSON.stringify(data)));
+        pt.end();
+        return pt;
     }
 
     async login() {
@@ -201,23 +213,37 @@ export class ReolinkCameraClient {
         return response.body?.[0]?.value?.DevInfo;
     }
 
-    private async ptzOp(op: string, speed: number) {
+    async getPtzPresets(): Promise<PtzPreset[]> {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'GetPtzPreset');
+        const body = [
+            {
+                cmd: "GetPtzPreset",
+                action: 1,
+                param: {
+                    channel: this.channelId
+                }
+            }
+        ];
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST'
+        }, this.createReadable(body));
+        return response.body?.[0]?.value?.PtzPreset?.filter(preset => preset.enable === 1);
+    }
+
+    private async ptzOp(op: string, speed: number, id?: string) {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'PtzCtrl');
-
-        const createReadable = (data: any) => {
-            const pt = new PassThrough();
-            pt.write(Buffer.from(JSON.stringify(data)));
-            pt.end();
-            return pt;
-        }
 
         const c1 = this.requestWithLogin({
             url,
             method: 'POST',
             responseType: 'text',
-        }, createReadable([
+        }, this.createReadable([
             {
                 cmd: "PtzCtrl",
                 param: {
@@ -225,16 +251,21 @@ export class ReolinkCameraClient {
                     op,
                     speed,
                     timeout: 1,
+                    id: id ? Number(id) : undefined
                 }
             },
         ]));
+
+        if(op === 'ToPos') {
+            return ;
+        }
 
         await sleep(500);
 
         const c2 = this.requestWithLogin({
             url,
             method: 'POST',
-        }, createReadable([
+        }, this.createReadable([
             {
                 cmd: "PtzCtrl",
                 param: {
@@ -275,18 +306,16 @@ export class ReolinkCameraClient {
         if (op) {
             await this.ptzOp(op, Math.round(Math.abs(command?.zoom || 1) * 10));
         }
+
+        if (command.preset)
+            await this.ptzOp('ToPos', 1, command.preset)
+
     }
 
     async setSiren(on: boolean, duration?: number) {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'AudioAlarmPlay');
-        const createReadable = (data: any) => {
-            const pt = new PassThrough();
-            pt.write(Buffer.from(JSON.stringify(data)));
-            pt.end();
-            return pt;
-        }
 
         let alarmMode;
         if (duration) {
@@ -306,7 +335,7 @@ export class ReolinkCameraClient {
             url,
             method: 'POST',
             responseType: 'json',
-        }, createReadable([
+        }, this.createReadable([
             {
                 cmd: "AudioAlarmPlay",
                 action: 0,

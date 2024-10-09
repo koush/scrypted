@@ -94,6 +94,35 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 this.updatePtzCaps();
             },
         },
+        presets: {
+            subgroup: 'Advanced',
+            title: 'Presets',
+            description: 'PTZ Presets in the format "id=name". Where id is the PTZ Preset identifier and name is a friendly name.',
+            multiple: true,
+            defaultValue: [],
+            combobox: true,
+            onPut: async (ov, presets: string[]) => {
+                const caps = {
+                    ...this.ptzCapabilities,
+                    presets: {},
+                };
+                for (const preset of presets) {
+                    const [key, name] = preset.split('=');
+                    caps.presets[key] = name;
+                }
+                this.ptzCapabilities = caps;
+            },
+            mapGet: () => {
+                const presets = this.ptzCapabilities?.presets || {};
+                return Object.entries(presets).map(([key, name]) => key + '=' + name);
+            },
+        },
+        cachedPresets: {
+            multiple: true,
+            hide: true,
+            json: true,
+            defaultValue: [],
+        },
         deviceInfo: {
             json: true,
             hide: true
@@ -134,9 +163,21 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
         };
 
+        this.storageSettings.settings.presets.onGet = async () => {
+            const choices = this.storageSettings.values.cachedPresets.map((preset) => preset.id + '=' + preset.name);
+            return {
+                choices,
+            };
+        };
+
         this.updateDeviceInfo();
         (async () => {
             this.updatePtzCaps();
+            try {
+                await this.getPresets();
+            } catch (e) {
+                this.console.log('Fail fetching presets', e);
+            }
             const api = this.getClient();
             const deviceInfo = await api.getDeviceInfo();
             this.storageSettings.values.deviceInfo = deviceInfo;
@@ -160,10 +201,18 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     updatePtzCaps() {
         const { ptz } = this.storageSettings.values;
         this.ptzCapabilities = {
+            ...this.ptzCapabilities,
             pan: ptz?.includes('Pan'),
             tilt: ptz?.includes('Tilt'),
             zoom: ptz?.includes('Zoom'),
         }
+    }
+
+    async getPresets() {
+        const client = this.getClient();
+        const ptzPresets = await client.getPtzPresets();
+        this.console.log(`Presets: ${JSON.stringify(ptzPresets)}`)
+        this.storageSettings.values.cachedPresets = ptzPresets;
     }
 
     async updateAbilities() {
