@@ -234,7 +234,7 @@ export class ReolinkCameraClient {
         return response.body?.[0]?.value?.PtzPreset?.filter(preset => preset.enable === 1);
     }
 
-    private async ptzOp(op: string, speed: number, id?: string) {
+    private async ptzOp(op: string, speed: number, id?: number) {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'PtzCtrl');
@@ -251,7 +251,7 @@ export class ReolinkCameraClient {
                     op,
                     speed,
                     timeout: 1,
-                    id: id ? Number(id) : undefined
+                    id
                 }
             },
         ]));
@@ -277,6 +277,28 @@ export class ReolinkCameraClient {
 
         this.console.log(await c1);
         this.console.log(await c2);
+    }
+
+    private async presetOp(speed: number, id: number) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'PtzCtrl');
+
+        const c1 = this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'text',
+        }, this.createReadable([
+            {
+                cmd: "PtzCtrl",
+                param: {
+                    channel: this.channelId,
+                    op: 'ToPos',
+                    speed,
+                    id
+                }
+            },
+        ]));
     }
 
     async ptz(command: PanTiltZoomCommand) {
@@ -307,8 +329,8 @@ export class ReolinkCameraClient {
             await this.ptzOp(op, Math.ceil(Math.abs(command?.zoom || 1) * 10));
         }
 
-        if (command.preset)
-            await this.ptzOp('ToPos', 1, command.preset)
+        if (command.preset && !Number.isNaN(Number(command.preset)))
+            await this.presetOp(1, Number(command.preset))
 
     }
 
