@@ -1,9 +1,26 @@
 if [ "$(uname -m)" = "x86_64" ]
 then
+    UBUNTU_22_04=$(lsb_release -r | grep "22.04")
+    UBUNTU_24_04=$(lsb_release -r | grep "24.04")
+
+    # needs either ubuntu 22.0.4 or 24.04
+    if [ -z "$UBUNTU_22_04" ] && [ -z "$UBUNTU_24_04" ]
+    then
+        echo "NVIDIA graphics package can not be installed. Ubuntu version could not be detected when checking lsb-release and /etc/os-release."
+        exit 1
+    fi
+
+    if [ -n "$UBUNTU_22_04" ]
+    then
+        distro="ubuntu2204"
+    else
+        distro="ubuntu2404"
+    fi
+
     echo "Installing NVIDIA graphics packages."
     apt update -q \
         && apt install -y wget \
-        && wget -qO /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/$(uname -m)/cuda-keyring_1.1-1_all.deb \
+        && wget -qO /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/$distro/$(uname -m)/cuda-keyring_1.1-1_all.deb \
         && dpkg -i /cuda-keyring.deb \
         && apt update -q \
         && apt install -y cuda-nvcc-11-8 libcublas-11-8 libcudnn8 cuda-libraries-11-8 \
