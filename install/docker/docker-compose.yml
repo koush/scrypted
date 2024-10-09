@@ -81,6 +81,7 @@ services:
             # lxc - /var/run/docker.sock:/var/run/docker.sock
             # lxc - /root/.scrypted/docker-compose.yml:/root/.scrypted/docker-compose.yml
             # lxc - /root/.scrypted/docker-compose.sh:/root/.scrypted/docker-compose.sh
+            # lxc - /root/.scrypted/.env:/root/.scrypted/.env
             # lxc - /mnt:/mnt
 
         # Uncomment the following lines to use Avahi daemon from the host
@@ -129,9 +130,6 @@ services:
             - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_HTTP_API_TOKEN}
             - WATCHTOWER_HTTP_API_UPDATE=true
             - WATCHTOWER_SCOPE=scrypted
-            # remove the following line to never allow docker to auto update.
-            # this is not recommended.
-            - WATCHTOWER_HTTP_API_PERIODIC_POLLS=true
         image: containrrr/watchtower
         container_name: scrypted-watchtower
         restart: unless-stopped

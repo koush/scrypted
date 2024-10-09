@@ -64,6 +64,9 @@ fi
 
 WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum | head -c 32)
 echo "WATCHTOWER_HTTP_API_TOKEN=$WATCHTOWER_HTTP_API_TOKEN" > $SCRYPTED_HOME/.env
+# remove the following line from .env to disable autoupdates.
+# this is not recommended.
+echo "WATCHTOWER_HTTP_API_PERIODIC_POLLS=true" >> $SCRYPTED_HOME/.env
 
 DOCKER_COMPOSE_YML=$SCRYPTED_HOME/docker-compose.yml
 curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/docker-compose.yml > $DOCKER_COMPOSE_YML

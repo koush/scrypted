@@ -17,4 +17,7 @@ else
 fi
 
 # do not daemonize, when it exits, systemd will restart it.
-docker compose up
+# force a recreate as .env may have changed.
+# furthermore force recreate gets the container back into a known state
+# which is preferable in case the user has made manual changes and then restarts.
+docker compose up --force-recreate
