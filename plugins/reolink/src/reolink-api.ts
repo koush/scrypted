@@ -305,6 +305,9 @@ export class ReolinkCameraClient {
         // reolink doesnt accept signed values to ptz
         // in favor of explicit direction.
         // so we need to convert the signed values to abs explicit direction.
+        if (command.preset && !Number.isNaN(Number(command.preset)))
+            await this.presetOp(1, Number(command.preset))
+
         let op = '';
         if (command.pan < 0)
             op += 'Left';
@@ -328,10 +331,6 @@ export class ReolinkCameraClient {
         if (op) {
             await this.ptzOp(op, Math.ceil(Math.abs(command?.zoom || 1) * 10));
         }
-
-        if (command.preset && !Number.isNaN(Number(command.preset)))
-            await this.presetOp(1, Number(command.preset))
-
     }
 
     async setSiren(on: boolean, duration?: number) {
