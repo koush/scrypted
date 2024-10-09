@@ -256,8 +256,8 @@ export class ReolinkCameraClient {
             },
         ]));
 
-        if(op === 'ToPos') {
-            return ;
+        if (op === 'ToPos') {
+            return;
         }
 
         await sleep(500);
@@ -305,8 +305,10 @@ export class ReolinkCameraClient {
         // reolink doesnt accept signed values to ptz
         // in favor of explicit direction.
         // so we need to convert the signed values to abs explicit direction.
-        if (command.preset && !Number.isNaN(Number(command.preset)))
-            await this.presetOp(1, Number(command.preset))
+        if (command.preset && !Number.isNaN(Number(command.preset))) {
+            await this.presetOp(1, Number(command.preset));
+            return;
+        }
 
         let op = '';
         if (command.pan < 0)
