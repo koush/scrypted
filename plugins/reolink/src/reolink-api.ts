@@ -39,6 +39,11 @@ export type SirenResponse = {
     rspCode: number;
 }
 
+export interface PtzPreset {
+    id: number;
+    name: string;
+}
+
 export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
     parameters: Record<string, string>;
@@ -59,6 +64,13 @@ export class ReolinkCameraClient {
             body,
         });
         return response;
+    }
+
+    private createReadable = (data: any) => {
+        const pt = new PassThrough();
+        pt.write(Buffer.from(JSON.stringify(data)));
+        pt.end();
+        return pt;
     }
 
     async login() {
@@ -201,23 +213,37 @@ export class ReolinkCameraClient {
         return response.body?.[0]?.value?.DevInfo;
     }
 
-    private async ptzOp(op: string, speed: number) {
+    async getPtzPresets(): Promise<PtzPreset[]> {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'GetPtzPreset');
+        const body = [
+            {
+                cmd: "GetPtzPreset",
+                action: 1,
+                param: {
+                    channel: this.channelId
+                }
+            }
+        ];
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST'
+        }, this.createReadable(body));
+        return response.body?.[0]?.value?.PtzPreset?.filter(preset => preset.enable === 1);
+    }
+
+    private async ptzOp(op: string, speed: number, id?: number) {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'PtzCtrl');
-
-        const createReadable = (data: any) => {
-            const pt = new PassThrough();
-            pt.write(Buffer.from(JSON.stringify(data)));
-            pt.end();
-            return pt;
-        }
 
         const c1 = this.requestWithLogin({
             url,
             method: 'POST',
             responseType: 'text',
-        }, createReadable([
+        }, this.createReadable([
             {
                 cmd: "PtzCtrl",
                 param: {
@@ -225,6 +251,7 @@ export class ReolinkCameraClient {
                     op,
                     speed,
                     timeout: 1,
+                    id
                 }
             },
         ]));
@@ -234,7 +261,7 @@ export class ReolinkCameraClient {
         const c2 = this.requestWithLogin({
             url,
             method: 'POST',
-        }, createReadable([
+        }, this.createReadable([
             {
                 cmd: "PtzCtrl",
                 param: {
@@ -248,10 +275,37 @@ export class ReolinkCameraClient {
         this.console.log(await c2);
     }
 
+    private async presetOp(speed: number, id: number) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'PtzCtrl');
+
+        const c1 = this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'text',
+        }, this.createReadable([
+            {
+                cmd: "PtzCtrl",
+                param: {
+                    channel: this.channelId,
+                    op: 'ToPos',
+                    speed,
+                    id
+                }
+            },
+        ]));
+    }
+
     async ptz(command: PanTiltZoomCommand) {
         // reolink doesnt accept signed values to ptz
         // in favor of explicit direction.
         // so we need to convert the signed values to abs explicit direction.
+        if (command.preset && !Number.isNaN(Number(command.preset))) {
+            await this.presetOp(1, Number(command.preset));
+            return;
+        }
+
         let op = '';
         if (command.pan < 0)
             op += 'Left';
@@ -263,7 +317,7 @@ export class ReolinkCameraClient {
             op += 'Up';
 
         if (op) {
-            await this.ptzOp(op, Math.round(Math.abs(command?.pan || command?.tilt || 1) * 10));
+            await this.ptzOp(op, Math.ceil(Math.abs(command?.pan || command?.tilt || 1) * 10));
         }
 
         op = undefined;
@@ -273,7 +327,7 @@ export class ReolinkCameraClient {
             op = 'ZoomInc';
 
         if (op) {
-            await this.ptzOp(op, Math.round(Math.abs(command?.zoom || 1) * 10));
+            await this.ptzOp(op, Math.ceil(Math.abs(command?.zoom || 1) * 10));
         }
     }
 
@@ -281,12 +335,6 @@ export class ReolinkCameraClient {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'AudioAlarmPlay');
-        const createReadable = (data: any) => {
-            const pt = new PassThrough();
-            pt.write(Buffer.from(JSON.stringify(data)));
-            pt.end();
-            return pt;
-        }
 
         let alarmMode;
         if (duration) {
@@ -306,7 +354,7 @@ export class ReolinkCameraClient {
             url,
             method: 'POST',
             responseType: 'json',
-        }, createReadable([
+        }, this.createReadable([
             {
                 cmd: "AudioAlarmPlay",
                 action: 0,
