@@ -62,10 +62,12 @@ then
     usermod -aG docker $SERVICE_USER
 fi
 
-WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum)
+WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum | head -c 32)
+echo "WATCHTOWER_HTTP_API_TOKEN=$WATCHTOWER_HTTP_API_TOKEN" > $SCRYPTED_HOME/.env
+
 DOCKER_COMPOSE_YML=$SCRYPTED_HOME/docker-compose.yml
+curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/docker-compose.yml > $DOCKER_COMPOSE_YML
 echo "Created $DOCKER_COMPOSE_YML"
-curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/docker-compose.yml | sed s/SET_THIS_TO_SOME_RANDOM_TEXT/"$(echo $RANDOM | md5sum | head -c 32)"/g > $DOCKER_COMPOSE_YML
 
 if [ -z "$SCRYPTED_LXC" ]
 then
@@ -78,8 +80,6 @@ else
     sed -i 's/'#' lxc //g' $DOCKER_COMPOSE_YML
     # never restart, systemd will handle it
     sed -i 's/restart: unless-stopped/restart: no/g' $DOCKER_COMPOSE_YML
-    # remove the watchtower env.
-    sed -i "/SCRYPTED_WEBHOOK_UPDATE/d" $DOCKER_COMPOSE_YML
 
     sudo systemctl stop apparmor || true
     sudo apt -y purge apparmor || true
