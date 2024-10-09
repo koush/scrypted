@@ -1,6 +1,3 @@
-cd ~/.scrypted
-docker compose down
-
 set -e
 
 # https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
