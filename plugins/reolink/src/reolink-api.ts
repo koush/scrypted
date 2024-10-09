@@ -256,10 +256,6 @@ export class ReolinkCameraClient {
             },
         ]));
 
-        if (op === 'ToPos') {
-            return;
-        }
-
         await sleep(500);
 
         const c2 = this.requestWithLogin({
