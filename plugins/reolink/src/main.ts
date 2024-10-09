@@ -1,5 +1,5 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import sdk, { Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, PanTiltZoomMovement, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { createRtspMediaStreamOptions, Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -81,7 +81,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             hide: true,
         },
         ptz: {
-            subgroup: 'Advanced',
+            subgroup: 'ONVIF',
             title: 'PTZ Capabilities',
             choices: [
                 'Pan',
@@ -94,6 +94,35 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 this.updatePtzCaps();
             },
         },
+        presets: {
+            subgroup: 'ONVIF',
+            title: 'Presets',
+            description: 'PTZ Presets in the format "key=name". Where key is the PTZ Preset identifier and name is a friendly name.',
+            multiple: true,
+            defaultValue: [],
+            combobox: true,
+            onPut: async (ov, presets: string[]) => {
+                const caps = {
+                    ...this.ptzCapabilities,
+                    presets: {},
+                };
+                for (const preset of presets) {
+                    const [key, name] = preset.split('=');
+                    caps.presets[key] = name;
+                }
+                this.ptzCapabilities = caps;
+            },
+            mapGet: () => {
+                const presets = this.ptzCapabilities?.presets || {};
+                return Object.entries(presets).map(([key, name]) => key + '=' + name);
+            },
+        },
+        cachedPresets: {
+            multiple: true,
+            hide: true,
+            json: true,
+            defaultValue: {},
+        },
         deviceInfo: {
             json: true,
             hide: true
@@ -103,7 +132,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             hide: true
         },
         useOnvifDetections: {
-            subgroup: 'Advanced',
+            subgroup: 'ONVIF',
             title: 'Use ONVIF for Object Detection',
             choices: [
                 'Default',
@@ -113,7 +142,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             defaultValue: 'Default',
         },
         useOnvifTwoWayAudio: {
-            subgroup: 'Advanced',
+            subgroup: 'ONVIF',
             title: 'Use ONVIF for Two-Way Audio',
             type: 'boolean',
         },
@@ -134,9 +163,16 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
         };
 
+        this.storageSettings.settings.presets.onGet = async () => {
+            const choices = Object.entries(this.storageSettings.values.cachedPresets).map(([name, key]) => key + '=' + name);
+            return {
+                choices,
+            };
+        };
+
         this.updateDeviceInfo();
         (async () => {
-            this.updatePtzCaps();
+            await this.updatePtzCaps();
             const api = this.getClient();
             const deviceInfo = await api.getDeviceInfo();
             this.storageSettings.values.deviceInfo = deviceInfo;
@@ -157,9 +193,21 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             });
     }
 
-    updatePtzCaps() {
+    async updatePtzCaps() {
+        const client = await this.getOnvifClient();
+        client.cam.getPresets({}, (e, result, xml) => {
+            if (e) {
+                this.console.error('failed to get presets', e);
+            }
+            else {
+                this.console.log('presets', result);
+                this.storageSettings.values.cachedPresets = result;
+            }
+        });
+
         const { ptz } = this.storageSettings.values;
         this.ptzCapabilities = {
+            ...this.ptzCapabilities,
             pan: ptz?.includes('Pan'),
             tilt: ptz?.includes('Tilt'),
             zoom: ptz?.includes('Zoom'),
@@ -193,6 +241,41 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
     async ptzCommand(command: PanTiltZoomCommand): Promise<void> {
         const client = this.getClient();
+
+        const { movement, tilt, speed } = command;
+        if (movement) {
+            const onvifClient = await this.getOnvifClient();
+            if (movement === PanTiltZoomMovement.Home) {
+                return new Promise<void>((r, f) => {
+                    onvifClient.cam.gotoHomePosition({
+                       speed,
+                   }, (e, result, xml) => {
+                       if (e)
+                           return f(e);
+                       r();
+                   })
+                });
+            } else if (movement === PanTiltZoomMovement.Preset) {
+                return new Promise<void>((r, f) => {
+                    onvifClient.cam.gotoPreset({
+                       preset: command.preset,
+                   }, (e, result, xml) => {
+                       if (e)
+                           return f(e);
+                       r();
+                   })
+                });
+            }
+        }
+        else if (tilt) {
+            const absValue = Math.abs(command.tilt);
+            const sign = Math.sign(command.tilt);
+            const min = 0.05;
+            if (absValue < min) {
+                command.tilt = min * sign;
+            }
+        }
+
         client.ptz(command);
     }
 
