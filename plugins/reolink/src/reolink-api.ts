@@ -13,6 +13,11 @@ export interface Enc {
     subStream: Stream;
 }
 
+export interface PtzPreset {
+    id: number;
+    name: string;
+}
+
 export interface Stream {
     bitRate: number;
     frameRate: number;
@@ -201,10 +206,10 @@ export class ReolinkCameraClient {
         return response.body?.[0]?.value?.DevInfo;
     }
 
-    private async ptzOp(op: string, speed: number) {
+    async getPtzPresets(): Promise<PtzPreset[]> {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
-        params.set('cmd', 'PtzCtrl');
+        params.set('cmd', 'GetPtzPreset');
 
         const createReadable = (data: any) => {
             const pt = new PassThrough();
@@ -213,45 +218,56 @@ export class ReolinkCameraClient {
             return pt;
         }
 
-        const c1 = this.requestWithLogin({
-            url,
-            method: 'POST',
-            responseType: 'text',
-        }, createReadable([
+        const body = [
             {
-                cmd: "PtzCtrl",
-                param: {
-                    channel: this.channelId,
+                "cmd": "GetPtzPreset",
+                "action": 1,
+                "param": {
+                    "channel": this.channelId
+                }
+            }
+        ];
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, createReadable(body));
+        return response.body?.[0]?.value?.PtzPreset?.filter(preset => preset.enable === 1) ?? [];
+    }
+
+    private async ptzOp(op: string, speed?: number, id?: string) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'PtzCtrl');
+        const body = [
+            {
+                "cmd": "PtzCtrl",
+                "param": {
+                    "channel": this.channelId,
                     op,
                     speed,
-                    timeout: 1,
+                    id: id ? Number(id) : undefined
                 }
             },
-        ]));
+        ];
 
-        await sleep(500);
+        const createReadable = (data: any) => {
+            const pt = new PassThrough();
+            pt.write(Buffer.from(JSON.stringify(data)));
+            pt.end();
+            return pt;
+        }
 
-        const c2 = this.requestWithLogin({
+        const response = await this.requestWithLogin({
             url,
+            responseType: 'json',
             method: 'POST',
-        }, createReadable([
-            {
-                cmd: "PtzCtrl",
-                param: {
-                    channel: this.channelId,
-                    op: "Stop"
-                }
-            },
-        ]));
-
-        this.console.log(await c1);
-        this.console.log(await c2);
+        }, createReadable(body));
+        this.console.log(`Response for PtzCtrl is ${JSON.stringify(response)}`);
     }
 
     async ptz(command: PanTiltZoomCommand) {
-        // reolink doesnt accept signed values to ptz
-        // in favor of explicit direction.
-        // so we need to convert the signed values to abs explicit direction.
+        this.console.log(`PTZ command: ${JSON.stringify(command)}`)
         let op = '';
         if (command.pan < 0)
             op += 'Left';
@@ -261,19 +277,21 @@ export class ReolinkCameraClient {
             op += 'Down';
         else if (command.tilt > 0)
             op += 'Up';
-
-        if (op) {
-            await this.ptzOp(op, Math.round(Math.abs(command?.pan || command?.tilt || 1) * 10));
-        }
-
-        op = undefined;
-        if (command.zoom < 0)
+        else if (command.zoom < 0)
             op = 'ZoomDec';
         else if (command.zoom > 0)
             op = 'ZoomInc';
+        else if (command.preset)
+            op = 'ToPos'
 
         if (op) {
-            await this.ptzOp(op, Math.round(Math.abs(command?.zoom || 1) * 10));
+            const movement = Math.ceil(Math.abs(command?.pan || command?.tilt || command?.zoom || 1));
+            await this.ptzOp(op, movement * 10, command.preset ?? undefined);
+
+            if (!command.preset) {
+                await sleep(500);
+                await this.ptzOp('Stop');
+            }
         }
     }
 
