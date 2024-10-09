@@ -242,7 +242,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     async ptzCommand(command: PanTiltZoomCommand): Promise<void> {
         const client = this.getClient();
 
-        const { movement, tilt, speed } = command;
+        const { movement, speed } = command;
         if (movement) {
             const onvifClient = await this.getOnvifClient();
             if (movement === PanTiltZoomMovement.Home) {
@@ -265,14 +265,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                        r();
                    })
                 });
-            }
-        }
-        else if (tilt) {
-            const absValue = Math.abs(command.tilt);
-            const sign = Math.sign(command.tilt);
-            const min = 0.05;
-            if (absValue < min) {
-                command.tilt = min * sign;
             }
         }
 
