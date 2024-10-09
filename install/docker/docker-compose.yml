@@ -32,7 +32,7 @@ services:
             # section below.
             # - SCRYPTED_NVR_VOLUME=/nvr
 
-            - SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION=Bearer SET_THIS_TO_SOME_RANDOM_TEXT
+            - SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION=Bearer ${WATCHTOWER_HTTP_API_TOKEN}
             - SCRYPTED_WEBHOOK_UPDATE=http://localhost:10444/v1/update
 
             # LXC usage only
@@ -126,7 +126,7 @@ services:
     # watchtower manages updates for Scrypted.
     watchtower:
         environment:
-            - WATCHTOWER_HTTP_API_TOKEN=SET_THIS_TO_SOME_RANDOM_TEXT
+            - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_HTTP_API_TOKEN}
             - WATCHTOWER_HTTP_API_UPDATE=true
             - WATCHTOWER_SCOPE=scrypted
             # remove the following line to never allow docker to auto update.
