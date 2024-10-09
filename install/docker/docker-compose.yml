@@ -145,6 +145,3 @@ services:
             - 10444:8080
         # check for updates once an hour (interval is in seconds)
         command: --interval 3600 --cleanup --scope scrypted
-        # LXC usage only
-        # lxc profiles:
-        # lxc     - disabled
