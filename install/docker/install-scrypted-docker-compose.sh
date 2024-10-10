@@ -3,6 +3,7 @@
 if [ "$SCRYPTED_LXC" ]
 then
     export SERVICE_USER="root"
+    export SCRYPTED_NONINTERACTIVE="true"
 fi
 
 if [ -z "$SERVICE_USER" ]
@@ -60,6 +61,11 @@ then
     curl -fsSL https://get.docker.com -o get-docker.sh
     sh get-docker.sh
     usermod -aG docker $SERVICE_USER
+fi
+
+if [ "$SCRYPTED_LXC" ]
+then
+    curl https://raw.githubusercontent.com/koush/scrypted/refs/heads/main/install/docker/install-nvidia-container-toolkit.sh | bash
 fi
 
 WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum | head -c 32)
