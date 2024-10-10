@@ -270,6 +270,9 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         super();
         this.unshiftMixin = true;
 
+        // never want this on, should only be used for debugging.
+        this.storageSettings.values.maximumCompatibilityMode = false;
+
         this.converters = [
             ["*/*", ScryptedMimeTypes.RTCSignalingChannel],
             [ScryptedMimeTypes.RTCSignalingSession, ScryptedMimeTypes.RTCConnectionManagement],
