@@ -20,4 +20,4 @@ fi
 # force a recreate as .env may have changed.
 # furthermore force recreate gets the container back into a known state
 # which is preferable in case the user has made manual changes and then restarts.
-docker compose up --force-recreate
+WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum | head -c 32) docker compose up --force-recreate
