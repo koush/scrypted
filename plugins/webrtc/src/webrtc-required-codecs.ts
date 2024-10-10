@@ -41,6 +41,14 @@ export const requiredAudioCodecs = [
     }),
 ];
 
+export const opusAudioCodecOnly = [
+    new RTCRtpCodecParameters({
+        mimeType: "audio/opus",
+        clockRate: 48000,
+        channels: 2,
+        payloadType: 111,
+    }),
+];
 
 export function getAudioCodec(outputCodecParameters: RTCRtpCodecParameters) {
     if (outputCodecParameters.name === 'PCMA') {

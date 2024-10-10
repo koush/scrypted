@@ -54,6 +54,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
                 this.console,
                 undefined,
                 media,
+                this.plugin.storageSettings.values.requireOpus,
                 this.plugin.storageSettings.values.maximumCompatibilityMode,
                 this.plugin.getRTCConfiguration(),
                 await this.plugin.getWeriftConfiguration(),
@@ -127,6 +128,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
             this.console,
             hasIntercom ? device : undefined,
             mo,
+            this.plugin.storageSettings.values.requireOpus,
             this.plugin.storageSettings.values.maximumCompatibilityMode,
             this.plugin.getRTCConfiguration(),
             await this.plugin.getWeriftConfiguration(options?.disableTurn),
@@ -202,10 +204,15 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             ],
             defaultValue: 'Default',
         },
+        requireOpus: {
+            group: 'Advanced',
+            title: 'Require Opus Audio Codec',
+            type: 'boolean',
+        },
         maximumCompatibilityMode: {
             group: 'Advanced',
             title: 'Maximum Compatibility Mode',
-            description: 'Enables maximum compatibility with WebRTC clients by using the most conservative transcode options.',
+            description: 'Debug: Enables maximum compatibility with WebRTC clients by transcoding to known safe reference codecs. This setting will automatically reset when the plugin or Scrypted restarts.',
             defaultValue: false,
             type: 'boolean',
         },
@@ -226,20 +233,6 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                 }
             },
         },
-        rtcConfiguration: {
-            title: "Custom Client RTC Configuration",
-            type: 'textarea',
-            description: "RTCConfiguration that can be used to specify custom TURN and STUN servers. https://gist.github.com/koush/f7dafec7dbca04982a76db8243abc57e",
-        },
-        weriftConfiguration: {
-            title: "Custom Server RTC Configuration",
-            type: 'textarea',
-            description: "RTCConfiguration that can be used to specify custom TURN and STUN servers. https://gist.github.com/koush/631d38ac8647a86baaac7b22d863f010",
-        },
-        debugLog: {
-            title: 'Debug Log',
-            type: 'boolean',
-        },
         ipv4Ban: {
             group: 'Advanced',
             title: '6to4 Ban',
@@ -252,7 +245,24 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             ],
             combobox: true,
             multiple: true,
-        }
+        },
+        debugLog: {
+            group: 'Advanced',
+            title: 'Debug Log',
+            type: 'boolean',
+        },
+        rtcConfiguration: {
+            group: 'Advanced',
+            title: "Custom Client RTC Configuration",
+            type: 'textarea',
+            description: "RTCConfiguration that can be used to specify custom TURN and STUN servers. https://gist.github.com/koush/f7dafec7dbca04982a76db8243abc57e",
+        },
+        weriftConfiguration: {
+            group: 'Advanced',
+            title: "Custom Server RTC Configuration",
+            type: 'textarea',
+            description: "RTCConfiguration that can be used to specify custom TURN and STUN servers. https://gist.github.com/koush/631d38ac8647a86baaac7b22d863f010",
+        },
     });
     activeConnections = 0;
 
@@ -291,6 +301,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                     return createRTCPeerConnectionSink(session, console,
                         undefined,
                         mo,
+                        plugin.storageSettings.values.requireOpus,
                         plugin.storageSettings.values.maximumCompatibilityMode,
                         plugin.getRTCConfiguration(),
                         await plugin.getWeriftConfiguration(),
@@ -308,6 +319,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                     return createRTCPeerConnectionSink(session, console,
                         undefined,
                         mo,
+                        plugin.storageSettings.values.requireOpus,
                         plugin.storageSettings.values.maximumCompatibilityMode,
                         plugin.getRTCConfiguration(),
                         await plugin.getWeriftConfiguration(),
@@ -653,7 +665,7 @@ export async function fork() {
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
 
-            const connection = new WebRTCConnectionManagement(console, clientSession, maximumCompatibilityMode, clientOptions, options);
+            const connection = new WebRTCConnectionManagement(console, clientSession, this.storageSettings.values.requireOpus, maximumCompatibilityMode, clientOptions, options);
             cleanup.promise.finally(() => connection.close().catch(() => { }));
             const { pc } = connection;
             waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));

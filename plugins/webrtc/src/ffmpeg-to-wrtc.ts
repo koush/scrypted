@@ -3,7 +3,7 @@ import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RTCRtpCodecParameters,
 import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCInputMediaObjectTrack, RTCOutputMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ScryptedSessionControl } from "./session-control";
-import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
+import { opusAudioCodecOnly, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { logIsLocalIceTransport } from "./werift-util";
 
 import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
@@ -481,6 +481,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     closed = false;
 
     constructor(public console: Console, public clientSession: RTCSignalingSession,
+        public requireOpus: boolean,
         public maximumCompatibilityMode: boolean,
         public clientOptions: RTCSignalingOptions,
         public options: {
@@ -494,7 +495,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             // the cameras and alexa targets will also provide externally reachable addresses.
             codecs: {
                 audio: [
-                    ...requiredAudioCodecs,
+                    ...(requireOpus ? opusAudioCodecOnly : requiredAudioCodecs),
                 ],
                 video: [
                     requiredVideoCodec,
@@ -660,6 +661,7 @@ export async function createRTCPeerConnectionSink(
     console: Console,
     intercom: ScryptedDevice & Intercom,
     mo: MediaObject,
+    requireOpus: boolean,
     maximumCompatibilityMode: boolean,
     configuration: RTCConfiguration,
     weriftConfiguration: Partial<PeerConfig>,
@@ -668,7 +670,7 @@ export async function createRTCPeerConnectionSink(
     const clientOptions = await legacyGetSignalingSessionOptions(clientSignalingSession);
     // console.log('remote options', clientOptions);
 
-    const connection = new WebRTCConnectionManagement(console, clientSignalingSession, maximumCompatibilityMode, clientOptions, {
+    const connection = new WebRTCConnectionManagement(console, clientSignalingSession, requireOpus, maximumCompatibilityMode, clientOptions, {
         configuration,
         weriftConfiguration,
     });
