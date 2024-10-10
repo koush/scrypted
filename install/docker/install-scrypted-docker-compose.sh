@@ -63,11 +63,6 @@ then
     usermod -aG docker $SERVICE_USER
 fi
 
-if [ "$SCRYPTED_LXC" ]
-then
-    curl https://raw.githubusercontent.com/koush/scrypted/refs/heads/main/install/docker/install-nvidia-container-toolkit.sh | bash
-fi
-
 WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum | head -c 32)
 echo "WATCHTOWER_HTTP_API_TOKEN=$WATCHTOWER_HTTP_API_TOKEN" > $SCRYPTED_HOME/.env
 # remove the following line from .env to disable autoupdates.
