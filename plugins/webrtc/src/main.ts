@@ -347,6 +347,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         try {
             const { createConnection } = await result.result;
             connection = await createConnection({}, undefined, session,
+                this.storageSettings.values.requireOpus,
                 maximumCompatibilityMode,
                 clientOptions,
                 {
@@ -624,6 +625,7 @@ export async function fork() {
         async createConnection(message: any,
             port: number,
             clientSession: RTCSignalingSession,
+            requireOpus,
             maximumCompatibilityMode: boolean,
             clientOptions: RTCSignalingOptions,
             options: {
@@ -668,7 +670,7 @@ export async function fork() {
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
 
-            const connection = new WebRTCConnectionManagement(console, clientSession, this.storageSettings.values.requireOpus, maximumCompatibilityMode, clientOptions, options);
+            const connection = new WebRTCConnectionManagement(console, clientSession, requireOpus, maximumCompatibilityMode, clientOptions, options);
             cleanup.promise.finally(() => connection.close().catch(() => { }));
             const { pc } = connection;
             waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
