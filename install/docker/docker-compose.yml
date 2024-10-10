@@ -32,7 +32,7 @@ services:
             # section below.
             # - SCRYPTED_NVR_VOLUME=/nvr
 
-            - SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION=Bearer ${WATCHTOWER_HTTP_API_TOKEN}
+            - SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION=Bearer ${WATCHTOWER_HTTP_API_TOKEN:-env_missing_fallback}
             - SCRYPTED_WEBHOOK_UPDATE=http://localhost:10444/v1/update
 
             # LXC usage only
@@ -127,10 +127,10 @@ services:
     # watchtower manages updates for Scrypted.
     watchtower:
         environment:
-            - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_HTTP_API_TOKEN}
+            - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_HTTP_API_TOKEN:-env_missing_fallback}
             - WATCHTOWER_HTTP_API_UPDATE=true
             - WATCHTOWER_SCOPE=scrypted
-            - WATCHTOWER_HTTP_API_PERIODIC_POLLS=${WATCHTOWER_HTTP_API_PERIODIC_POLLS}
+            - WATCHTOWER_HTTP_API_PERIODIC_POLLS=${WATCHTOWER_HTTP_API_PERIODIC_POLLS:-true}
         image: containrrr/watchtower
         container_name: scrypted-watchtower
         restart: unless-stopped
