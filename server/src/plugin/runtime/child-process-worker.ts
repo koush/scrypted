@@ -19,6 +19,12 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
         this.worker.on('disconnect', () => this.emit('error', new Error('disconnect')));
         this.worker.on('exit', (code, signal) => this.emit('exit', code, signal));
         this.worker.on('error', e => this.emit('error', e));
+        // aggressively catch errors
+        // ECONNRESET can be raised when the child process is killed
+        for (const stdio of this.worker.stdio || []) {
+            if (stdio)
+                stdio.on('error', e => this.emit('error', e));
+        }
     }
 
     get pid() {
