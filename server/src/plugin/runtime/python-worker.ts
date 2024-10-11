@@ -113,6 +113,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             this.worker.stderr.pipe(this.stderr);
 
             // aggressively catch errors
+            // ECONNRESET can be raised when the child process is killed
             const onErr = (e: Error) => this.emit('error', e);
             this.worker.stdout.on('error', onErr);
             this.worker.stderr.on('error', onErr);
