@@ -1893,7 +1893,10 @@ export interface DeviceInformation {
   mac?: string;
   metadata?: any;
   managementUrl?: string;
-  deeplink?: string;
+  deeplink?: {
+    apple?: string;
+    android?: string;
+  };
 }
 /**
  * Device objects are created by DeviceProviders when new devices are discover and synced to Scrypted via the DeviceManager.
