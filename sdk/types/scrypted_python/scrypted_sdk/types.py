@@ -496,6 +496,7 @@ class DeviceCreatorSettings(TypedDict):
 
 class DeviceInformation(TypedDict):
 
+    deeplink: str
     firmware: str
     ip: str
     mac: str
