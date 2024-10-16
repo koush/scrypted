@@ -116,9 +116,8 @@ readyn "Add udev rule for hardware acceleration? This may conflict with existing
 if [ "$yn" == "y" ]
 then
     sh -c "echo 'SUBSYSTEM==\"apex\", MODE=\"0666\"' > /etc/udev/rules.d/65-scrypted.rules"
-    sh -c "echo 'KERNEL==\"renderD128\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
-    sh -c "echo 'KERNEL==\"card0\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
-    sh -c "echo 'KERNEL==\"accel0\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
+    sh -c "echo 'SUBSYSTEM==\"drm\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
+    sh -c "echo 'SUBSYSTEM==\"accel\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1a6e\", ATTRS{idProduct}==\"089a\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"18d1\", ATTRS{idProduct}==\"9302\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     udevadm control --reload-rules && udevadm trigger
