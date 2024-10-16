@@ -100,7 +100,9 @@ export async function checkLxcDependencies() {
             output.includes('Version: 23')
             // was installed via script at some point
             || output.includes('Version: 24.13.29138.7')
-            // current script version: 24.17.29377.6
+            || output.includes('Version: 24.26.30049.6')
+            || output.includes('Version: 24.31.30508.7')
+            // current script version: 24.35.30872.22
         ) {
             const cp = child_process.spawn('sh', ['-c', 'curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-graphics.sh | bash']);
             const [exitCode] = await once(cp, 'exit');
