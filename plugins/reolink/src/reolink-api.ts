@@ -96,7 +96,7 @@ export class ReolinkCameraClient {
             this.console.log(`token expired at ${this.tokenLease}, renewing...`);
 
             const { leaseTimeSeconds, parameters: { token } } = await getToken(this.host, this.username, this.password);
-            this.tokenData = { leaseTime: leaseTimeSeconds, token };
+            this.tokenData = { leaseTime: Date.now() + 1000 * leaseTimeSeconds, token };
         }
 
         const url = options.url as URL;
