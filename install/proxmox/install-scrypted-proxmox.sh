@@ -25,10 +25,11 @@ then
     VMID=10443
 fi
 
+SCRYPTED_BACKUP_VMID=10445
 if [ -n "$SCRYPTED_RESTORE" ]
 then
     RESTORE_VMID=$VMID
-    VMID=10444
+    VMID=$SCRYPTED_BACKUP_VMID
     pct destroy $VMID 2>&1 > /dev/null
 fi
 
@@ -44,11 +45,25 @@ pct config $VMID
 if [ "$?" == "0" ]
 then
     echo ""
-    echo "Existing container $VMID found. Run this script with --force to overwrite the existing container."
-    echo "This will wipe all existing data. Clone the existing container to retain the data, then reassign the owner of the scrypted volume after installation is complete."
+    echo "Existing container $VMID found."
+    echo ""
+    echo "To reinstall and reset Scrypted, run this script with --force to overwrite the existing container."
+    echo "THIS WILL WIPE THE EXISTING CONFIGURATION:"
     echo ""
     echo "bash $0 --force"
     echo ""
+    echo "To reinstall Scrypted and and retain existing configuration, run this script with the environment variable SCRYPTED_RESTORE=true."
+    echo "This preserve existing data. Creating a backup within Scrypted is highly recommended in case the reset fails."
+    echo "THIS WILL WIPE ADDITIONAL VOLUMES SUCH AS NVR STORAGE. NVR volumes will need to be readded after the restore:"
+    echo ""
+    echo "SCRYPTED_RESTORE=true bash $0"
+    echo ""
+    echo "To install an additional new Scrypted container, run this script with the environment variable specifying"
+    echo "the new VMID=<number>. For example, to create a new LXC with VMID 12345:"
+    echo ""
+    echo "VMID=12345 bash $0"
+
+    exit 1
 fi
 
 pct restore $VMID $SCRYPTED_TAR_ZST $@
@@ -92,23 +107,35 @@ fi
 
 if [ -n "$SCRYPTED_RESTORE" ]
 then
-    readyn "Running this script will reset Scrypted to a factory state while preserving existing data. IT IS RECOMMENDED TO CREATE A BACKUP FIRST. Are you sure you want to continue?"
+    echo ""
+    echo ""
+    readyn "Running this script will reset the Scrypted container to a factory state while preserving existing data. IT IS RECOMMENDED TO CREATE A BACKUP INSIDE SCRYPTED FIRST. Are you sure you want to continue?"
     if [ "$yn" != "y" ]
     then
         exit 1
     fi
 
+    echo "Stopping scrypted..."
+    pct stop $RESTORE_VMID
+
     echo "Preparing rootfs reset..."
-    # this copies the 
-    pct set 10444 --delete mp0 && pct set 10444 --delete unused0 && pct move-volume $RESTORE_VMID mp0 --target-vmid 10444 --target-volume mp0
+    pct destroy $SCRYPTED_BACKUP_VMID
+
+    # this moves the data volume from the current scrypted instance to the backup target.
+    pct set $SCRYPTED_BACKUP_VMID --delete mp0 && pct set $SCRYPTED_BACKUP_VMID --delete unused0 && pct move-volume $RESTORE_VMID mp0 --target-vmid $SCRYPTED_BACKUP_VMID --target-volume mp0
+    if [ "$?" != "0" ]
+    then
+        echo "Failed to move data volume to backup."
+        exit 1
+    fi
 
     rm *.tar
-    vzdump 10444 --dumpdir /tmp
+    vzdump $SCRYPTED_BACKUP_VMID --dumpdir /tmp
     VMID=$RESTORE_VMID
-    echo "Moving data volume to backup..."
-    pct restore $VMID *.tar $@
+    echo "Restoring with reset image..."
+    pct restore --force 1 $VMID *.tar $@
 
-    pct destroy 10444
+    pct destroy $SCRYPTED_BACKUP_VMID
 fi
 
 readyn "Add udev rule for hardware acceleration? This may conflict with existing rules."
