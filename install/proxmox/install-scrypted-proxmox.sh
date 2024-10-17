@@ -42,10 +42,15 @@ fi
 
 if [[ "$@" =~ "--force" ]]
 then
-    FORCE=true
+    IGNORE_EXISTING=true
 fi
 
-if [ -z "$FORCE" ]
+if [ -n "$SCRYPTED_RESTORE" ]
+then
+    IGNORE_EXISTING=true
+fi
+
+if [ -z "$IGNORE_EXISTING" ]
 then
     echo "Checking for existing container."
     pct config $VMID
