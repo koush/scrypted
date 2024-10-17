@@ -182,4 +182,5 @@ then
 fi
 
 echo "Scrypted setup is complete and the container resources can be started."
-echo "Scrypted NVR users should provide at least 4 cores and 16GB RAM prior to starting."
+echo ""
+echo "Scrypted NVR servers should run the disk setup script in the documentation to add storage prior to starting the container."
