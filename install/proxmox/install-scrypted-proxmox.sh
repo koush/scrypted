@@ -77,6 +77,7 @@ then
     fi
 fi
 
+pct stop $VMID 2>&1 > /dev/null
 pct restore $VMID $SCRYPTED_TAR_ZST $@
 
 if [ "$?" != "0" ]
@@ -127,7 +128,7 @@ then
     fi
 
     echo "Stopping scrypted..."
-    pct stop $RESTORE_VMID
+    pct stop $RESTORE_VMID 2>&1 > /dev/null
 
     echo "Preparing rootfs reset..."
     pct destroy $SCRYPTED_BACKUP_VMID
