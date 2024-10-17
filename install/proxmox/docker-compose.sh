@@ -11,6 +11,7 @@ if [ -e "volume/.pull" ]
 then
   rm -rf volume/.pull
   PULL="--pull"
+  (sleep 300 && docker container prune -f && docker image prune -a -f) &
 else
   # always background pull in case there's a broken image.
   (sleep 300 && docker compose pull && docker container prune -f && docker image prune -a -f) &
