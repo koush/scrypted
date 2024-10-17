@@ -40,8 +40,6 @@ echo "Installing Scrypted dependencies..."
 RUN_IGNORE xcode-select --install
 RUN brew update
 RUN_IGNORE brew install node@20
-# snapshot plugin and others
-RUN brew install libvips
 # dlib
 RUN brew install cmake
 
