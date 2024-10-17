@@ -13,7 +13,7 @@ then
   PULL="--pull"
 else
   # always background pull in case there's a broken image.
-  (sleep 10 && docker compose pull && docker container prune -f && docker image prune -a -f) &
+  (sleep 300 && docker compose pull && docker container prune -f && docker image prune -a -f) &
 fi
 
 # do not daemonize, when it exits, systemd will restart it.
