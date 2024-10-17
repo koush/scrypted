@@ -28,6 +28,7 @@ fi
 SCRYPTED_BACKUP_VMID=10445
 if [ -n "$SCRYPTED_RESTORE" ]
 then
+    pct destroy $SCRYPTED_BACKUP_VMID 2>&1 > /dev/null
     RESTORE_VMID=$VMID
     VMID=$SCRYPTED_BACKUP_VMID
     pct destroy $VMID 2>&1 > /dev/null
@@ -136,7 +137,6 @@ then
     pct stop $RESTORE_VMID 2>&1 > /dev/null
 
     echo "Preparing rootfs reset..."
-    pct destroy $SCRYPTED_BACKUP_VMID
 
     # this moves the data volume from the current scrypted instance to the backup target.
     pct set $SCRYPTED_BACKUP_VMID --delete mp0 && pct set $SCRYPTED_BACKUP_VMID --delete unused0 && pct move-volume $RESTORE_VMID mp0 --target-vmid $SCRYPTED_BACKUP_VMID --target-volume mp0
