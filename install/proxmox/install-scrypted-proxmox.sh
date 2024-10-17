@@ -111,16 +111,35 @@ then
     pct destroy 10444
 fi
 
-echo "Adding udev rule: /etc/udev/rules.d/65-scrypted.rules"
 readyn "Add udev rule for hardware acceleration? This may conflict with existing rules."
 if [ "$yn" == "y" ]
 then
+    echo "Adding udev rule: /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"apex\", MODE=\"0666\"' > /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"drm\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"accel\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1a6e\", ATTRS{idProduct}==\"089a\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"18d1\", ATTRS{idProduct}==\"9302\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     udevadm control --reload-rules && udevadm trigger
+fi
+
+# check if intel
+INTEL=$(cat /proc/cpuinfo | grep GenuineIntel)
+if [ -n "$INTEL" ]
+then
+    readyn "Install intel-microcode package? This will update your CPU and GPU firmware."
+    if [ "$yn" == "y" ]
+    then
+        echo "Installing intel-microcode..."
+        # remove it first to allow reinsertion
+        sed -i 's/main contrib non-free-firmware/main/g' /etc/apt/sources.list
+        sed -i 's/main/main contrib non-free-firmware/g' /etc/apt/sources.list
+        apt update
+        apt install -y intel-microcode
+        echo "#############################"
+        echo "System Reboot is recommended."
+        echo "#############################"
+    fi
 fi
 
 echo "Scrypted setup is complete and the container resources can be started."
