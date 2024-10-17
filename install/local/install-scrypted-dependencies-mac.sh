@@ -52,30 +52,29 @@ RUN_IGNORE gobject-introspection libffi pkg-config
 RUN_IGNORE brew install gstreamer
 
 ARCH=$(arch)
-# this is no longer necessary since tflite uses portable python.
-# if [ "$ARCH" = "arm64" ]
-# then
-#     PYTHON_VERSION=3.10
-# else
-#     PYTHON_VERSION=3.9
-# fi
-PYTHON_VERSION=3
+if [ "$ARCH" = "arm64" ]
+then
+    PYTHON_VERSION=3.10
+else
+    PYTHON_VERSION=3.9
+fi
 
 RUN_IGNORE brew install python@$PYTHON_VERSION
-# will return /opt/homebrew/opt/python@3.13 or similar
 PYTHON_PATH=$(brew --prefix python@$PYTHON_VERSION)
 PYTHON_BIN_PATH=
 SCRYPTED_PYTHON_PATH=
 if [ -d "$PYTHON_PATH" ]
 then
-    # strip off the versioned path from above, and use brew bin path directly in case user updates python version.
-    PYTHON_BIN_PATH=$(brew --prefix)/bin
-    PYTHON_PATH=$PYTHON_BIN_PATH/python$PYTHON_VERSION
+    PYTHON_BIN_PATH=$PYTHON_PATH/bin
     export PATH=$PYTHON_BIN_PATH:$PATH
     export SCRYPTED_PYTHON_PATH=python$PYTHON_VERSION
 fi
 
 RUN python$PYTHON_VERSION -m pip install --upgrade pip
+if [ "$PYTHON_VERSION" != "3.10" ]
+then
+    RUN python$PYTHON_VERSION -m pip install typing
+fi
 RUN python$PYTHON_VERSION -m pip install debugpy typing_extensions opencv-python psutil
 
 echo "Installing Scrypted Launch Agent..."
