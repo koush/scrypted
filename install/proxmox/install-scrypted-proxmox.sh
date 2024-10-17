@@ -125,7 +125,7 @@ fi
 
 # check if intel
 INTEL=$(cat /proc/cpuinfo | grep GenuineIntel)
-if [ -z "$INTEL" ]
+if [ ! -z "$INTEL" ]
 then
     readyn "Install intel-microcode package? This will update your CPU and GPU firmware."
     if [ "$yn" == "y" ]
