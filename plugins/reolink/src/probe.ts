@@ -61,9 +61,6 @@ export async function getLoginParameters(host: string, username: string, passwor
         catch (e) {
         }
     }
-    if(forceToken) {
-        console.log('FORCING TOKEN');
-    }
     try {
         const url = new URL(`http://${host}/api.cgi`);
         const params = url.searchParams;
