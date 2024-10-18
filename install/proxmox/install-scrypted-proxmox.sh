@@ -146,6 +146,36 @@ then
         exit 1
     fi
 
+    function move_volume() {
+        HAS_VOLUME=$(pct config $RESTORE_VMID | grep $1:)
+        if [ -n "$HAS_VOLUME" ]
+        then
+            echo "Moving $1..."
+            pct move-volume $RESTORE_VMID $1 --target-vmid $SCRYPTED_BACKUP_VMID --target-volume $1
+            # volume must be inside /mnt to get into docker container
+            INSIDE_MNT=$(echo $HAS_VOLUME | grep /mnt)
+            if [ -z "$INSIDE_MNT" ]
+            then
+                echo "##################################################################"
+                echo "The following path is not visible to the"
+                echo "Scrypted docker container within the LXC:"
+                echo ""
+                echo "$1"
+                echo ""
+                echo "This recordings directory will be unavailable."
+                echo "The mount point must be updated to a path within /mnt."
+                echo "##################################################################"
+            fi
+        fi
+    }
+
+    # try moving 5 volumes, any more than that seems unlikely
+    move_volume mp1
+    move_volume mp2
+    move_volume mp3
+    move_volume mp4
+    move_volume mp5
+
     rm *.tar
     vzdump $SCRYPTED_BACKUP_VMID --dumpdir /tmp
     VMID=$RESTORE_VMID
