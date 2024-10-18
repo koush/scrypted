@@ -73,25 +73,30 @@ export class ReolinkCameraClient {
         return pt;
     }
 
-    async login() {
-        if (this.tokenLease > Date.now()) {
+    async login(forceToken?: boolean) {
+        if ((!forceToken ? true : this.tokenLease !== Infinity) && this.tokenLease > Date.now()) {
             return;
         }
 
         this.console.log(`token expired at ${this.tokenLease}, renewing...`);
 
-        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password);
+        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password, forceToken);
         this.parameters = parameters
         this.tokenLease = Date.now() + 1000 * leaseTimeSeconds;
     }
 
-    async requestWithLogin(options: HttpFetchOptions<Readable>, body?: Readable) {
-        await this.login();
+    async requestWithLogin(options: HttpFetchOptions<Readable>, body?: Readable, forceToken?: boolean) {
+        await this.login(forceToken);
         const url = options.url as URL;
         const params = url.searchParams;
-        for (const [k, v] of Object.entries(this.parameters)) {
-            params.set(k, v);
+        if (forceToken) {
+            params.set('token', this.parameters.token);
+        } else {
+            for (const [k, v] of Object.entries(this.parameters)) {
+                params.set(k, v);
+            }
         }
+
         return this.request(options, body);
     }
 
@@ -149,7 +154,7 @@ export class ReolinkCameraClient {
     }
 
     async getAbility() {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        let url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'GetAbility');
         params.set('channel', this.channelId.toString());
@@ -159,8 +164,35 @@ export class ReolinkCameraClient {
         });
         const error = response.body?.[0]?.error;
         if (error) {
-            this.console.error('error during call to getAbility', error);
-            throw new Error('error during call to getAbility');
+            this.console.error('error during call to getAbility GET. Trying POST', error);
+
+            const body = [{
+                cmd: 'GetAbility',
+                param: {
+                    User: {
+                        userName: this.username
+                    }
+                }
+            }];
+            const urlPost = new URL(`http://${this.host}/api.cgi`);
+            const paramsPost = urlPost.searchParams;
+            paramsPost.set('cmd', 'GetAbility');
+            paramsPost.set('channel', this.channelId.toString());
+            const responsePost = await this.requestWithLogin({
+                url: urlPost,
+                responseType: 'json',
+                method: 'POST',
+            }, this.createReadable(body), true);
+            const errorPost = responsePost.body?.[0]?.error;
+            if (errorPost) {
+                this.console.error('error during call to getAbility POST', errorPost);
+                throw new Error('error during call to getAbility POST');
+            }
+
+            return {
+                value: response.body?.[0]?.value || response.body?.value,
+                data: response.body,
+            };
         }
         return {
             value: response.body?.[0]?.value || response.body?.value,
