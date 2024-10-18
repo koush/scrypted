@@ -166,6 +166,7 @@ then
                 echo ""
                 echo "This recordings directory will be unavailable."
                 echo "The mount point must be updated to a path within /mnt."
+                echo "https://docs.scrypted.app/scrypted-nvr/recording-storage.html#proxmox-ve-mount-point"
                 echo "##################################################################"
             fi
         fi
