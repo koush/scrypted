@@ -148,9 +148,8 @@ then
         exit 1
     fi
 
-    PCT_CONFIG=$(pct config $RESTORE_VMID)
     function move_volume() {
-        HAS_VOLUME=$(echo $PCT_CONFIG | grep $1:)
+        HAS_VOLUME=$(pct config $RESTORE_VMID | grep $1:)
         if [ -n "$HAS_VOLUME" ]
         then
             echo "Moving $1..."
