@@ -512,6 +512,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
             await this.validate(this.console, 'Deprecated Plugins', async () => {
                 const defunctPlugins = [
+                    '@scrypted/electron-core',
                     '@scrypted/opencv',
                     '@scrypted/python-codecs',
                     '@scrypted/pam-diff',
