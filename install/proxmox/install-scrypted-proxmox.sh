@@ -127,7 +127,7 @@ if [ -n "$SCRYPTED_RESTORE" ]
 then
     echo ""
     echo ""
-    readyn "Running this script will reset the Scrypted container to a factory state while preserving existing data. Scrypted NVR recording volumes will be removed. IT IS RECOMMENDED TO CREATE A BACKUP INSIDE SCRYPTED FIRST. Are you sure you want to continue?"
+    readyn "Running this script will reset the Scrypted container to a factory state while preserving existing data. IT IS RECOMMENDED TO CREATE A BACKUP INSIDE SCRYPTED FIRST. Are you sure you want to continue?"
     if [ "$yn" != "y" ]
     then
         exit 1
@@ -146,8 +146,9 @@ then
         exit 1
     fi
 
+    PCT_CONFIG=$(pct config $RESTORE_VMID)
     function move_volume() {
-        HAS_VOLUME=$(pct config $RESTORE_VMID | grep $1:)
+        HAS_VOLUME=$(echo $PCT_CONFIG | grep $1:)
         if [ -n "$HAS_VOLUME" ]
         then
             echo "Moving $1..."
@@ -157,10 +158,10 @@ then
             if [ -z "$INSIDE_MNT" ]
             then
                 echo "##################################################################"
-                echo "The following path is not visible to the"
+                echo "The following mount point is not visible to the"
                 echo "Scrypted docker container within the LXC:"
                 echo ""
-                echo "$1"
+                echo "$HAS_VOLUME"
                 echo ""
                 echo "This recordings directory will be unavailable."
                 echo "The mount point must be updated to a path within /mnt."
