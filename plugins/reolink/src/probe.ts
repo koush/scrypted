@@ -46,20 +46,24 @@ async function getDeviceInfo(host: string, username: string, password: string): 
     return response.body?.[0]?.value?.DevInfo;
 }
 
-export async function getLoginParameters(host: string, username: string, password: string) {
-    try {
-        await getDeviceInfo(host, username, password);
-        return {
-            parameters: {
-                user: username,
-                password,
-            },
-            leaseTimeSeconds: Infinity,
+export async function getLoginParameters(host: string, username: string, password: string, forceToken?: boolean) {
+    if(!forceToken) {
+        try {
+            await getDeviceInfo(host, username, password);
+            return {
+                parameters: {
+                    user: username,
+                    password,
+                },
+                leaseTimeSeconds: Infinity,
+            }
+        }
+        catch (e) {
         }
     }
-    catch (e) {
+    if(forceToken) {
+        console.log('FORCING TOKEN');
     }
-
     try {
         const url = new URL(`http://${host}/api.cgi`);
         const params = url.searchParams;
