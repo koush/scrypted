@@ -140,23 +140,39 @@ then
 
     echo "Preparing rootfs reset..."
 
-    # this moves the data volume from the current scrypted instance to the backup target.
-    pct set $SCRYPTED_BACKUP_VMID --delete mp0 && pct set $SCRYPTED_BACKUP_VMID --delete unused0 && pct move-volume $RESTORE_VMID mp0 --target-vmid $SCRYPTED_BACKUP_VMID --target-volume mp0
+    # remove the empty data volume from the downloaded image.
+    pct set $SCRYPTED_BACKUP_VMID --delete mp0 && pct set $SCRYPTED_BACKUP_VMID --delete unused0
+    if [ "$?" != "0" ]
+    then
+        echo "Failed to remove data volume from image."
+        exit 1
+    fi
+
+    # create a backup that contains only the root disk.
+    rm *.tar
+    vzdump $SCRYPTED_BACKUP_VMID --dumpdir /tmp
+
+    # this moves the data volume from the current scrypted instance to the backup target to preserve it during
+    # the restore.
+    pct move-volume $RESTORE_VMID mp0 --target-vmid $SCRYPTED_BACKUP_VMID --target-volume mp0
     if [ "$?" != "0" ]
     then
         echo "Failed to move data volume to backup."
         exit 1
     fi
 
+    # arguments: from to mp hide-warning
     function move_volume() {
-        HAS_VOLUME=$(pct config $RESTORE_VMID | grep $1:)
+        HAS_VOLUME=$(pct config $1 | grep $3:)
         if [ -n "$HAS_VOLUME" ]
         then
-            echo "Moving $1..."
-            pct move-volume $RESTORE_VMID $1 --target-vmid $SCRYPTED_BACKUP_VMID --target-volume $1
+            echo "Moving $3..."
+            # this may error and there may be recording loss. bailing at ths point is already too late.
+            pct move-volume $1 $3 --target-vmid $2 --target-volume $3
+
             # volume must be inside /mnt to get into docker container
             INSIDE_MNT=$(echo $HAS_VOLUME | grep /mnt)
-            if [ -z "$INSIDE_MNT" ]
+            if [ -z "$INSIDE_MNT" -a -z "$4" ]
             then
                 echo "##################################################################"
                 echo "The following mount point is not visible to the"
@@ -173,17 +189,23 @@ then
     }
 
     # try moving 5 volumes, any more than that seems unlikely
-    move_volume mp1
-    move_volume mp2
-    move_volume mp3
-    move_volume mp4
-    move_volume mp5
+    move_volume $RESTORE_VMID $SCRYPTED_BACKUP_VMID mp1 hide-warning
+    move_volume $RESTORE_VMID $SCRYPTED_BACKUP_VMID mp2 hide-warning
+    move_volume $RESTORE_VMID $SCRYPTED_BACKUP_VMID mp3 hide-warning
+    move_volume $RESTORE_VMID $SCRYPTED_BACKUP_VMID mp4 hide-warning
+    move_volume $RESTORE_VMID $SCRYPTED_BACKUP_VMID mp5 hide-warning
 
-    rm *.tar
-    vzdump $SCRYPTED_BACKUP_VMID --dumpdir /tmp
     VMID=$RESTORE_VMID
     echo "Restoring with reset image..."
     pct restore --force 1 $VMID *.tar $@
+
+    echo "Restoring volumes..."
+    move_volume $SCRYPTED_BACKUP_VMID $VMID mp0 hide-warning
+    move_volume $SCRYPTED_BACKUP_VMID $VMID mp1
+    move_volume $SCRYPTED_BACKUP_VMID $VMID mp2
+    move_volume $SCRYPTED_BACKUP_VMID $VMID mp3
+    move_volume $SCRYPTED_BACKUP_VMID $VMID mp4
+    move_volume $SCRYPTED_BACKUP_VMID $VMID mp5
 
     pct destroy $SCRYPTED_BACKUP_VMID
 fi
