@@ -127,7 +127,9 @@ if [ -n "$SCRYPTED_RESTORE" ]
 then
     echo ""
     echo ""
-    readyn "Running this script will reset the Scrypted container to a factory state while preserving existing data. IT IS RECOMMENDED TO CREATE A BACKUP INSIDE SCRYPTED FIRST. Are you sure you want to continue?"
+    echo "Running this script will reset the Scrypted container to a factory state while preserving existing data."
+    echo "IT IS RECOMMENDED TO CREATE A BACKUP INSIDE SCRYPTED FIRST."
+    readyn "Are you sure you want to continue?"
     if [ "$yn" != "y" ]
     then
         exit 1
