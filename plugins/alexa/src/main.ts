@@ -53,6 +53,12 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             title: "Pairing Key",
             description: "The pairing key used to validate requests from Alexa. Clear this key or delete the plugin to allow pairing with a different Alexa login.",
         },
+        disableAutoAdd: {
+            title: "Disable auto add",
+            description: "Disable automatic enablement of devices.",
+            type: 'boolean',
+            defaultValue: false,
+        },
     });
 
     accessToken: Promise<string>;
@@ -115,6 +121,10 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
 
         if (!supportedTypes.has(device.type))
             return DeviceMixinStatus.NotSupported;
+
+        if (this.storageSettings.values.disableAutoAdd) {
+            return DeviceMixinStatus.Skip;
+        }
 
         mixins.push(this.id);
 
@@ -671,7 +681,8 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
 enum DeviceMixinStatus {
     NotSupported = 0,
     Setup = 1,
-    AlreadySetup = 2
+    AlreadySetup = 2,
+    Skip = 3,
 }
 
 class HttpResponseLoggingImpl implements AlexaHttpResponse {
