@@ -49,7 +49,7 @@ export class ReolinkCameraClient {
     parameters: Record<string, string>;
     tokenLease: number;
 
-    constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console, public forceToken?: boolean) {
+    constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console, public readonly forceToken?: boolean) {
         this.credential = {
             username,
             password,
@@ -74,7 +74,7 @@ export class ReolinkCameraClient {
     }
 
     async login() {
-        if ((!this.forceToken ? true : this.tokenLease !== Infinity) && this.tokenLease > Date.now()) {
+        if (this.tokenLease > Date.now()) {
             return;
         }
 
@@ -89,12 +89,8 @@ export class ReolinkCameraClient {
         await this.login();
         const url = options.url as URL;
         const params = url.searchParams;
-        if(this.forceToken) {
-            params.set('token', this.parameters.token)
-        } else {
-            for (const [k, v] of Object.entries(this.parameters)) {
-                params.set(k, v);
-            }
+        for (const [k, v] of Object.entries(this.parameters)) {
+            params.set(k, v);
         }
         return this.request(options, body);
     }
