@@ -49,7 +49,7 @@ export class ReolinkCameraClient {
     parameters: Record<string, string>;
     tokenLease: number;
 
-    constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console) {
+    constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console, public forceToken?: boolean) {
         this.credential = {
             username,
             password,
@@ -74,13 +74,13 @@ export class ReolinkCameraClient {
     }
 
     async login() {
-        if (this.tokenLease > Date.now()) {
+        if ((!this.forceToken ? true : this.tokenLease !== Infinity) && this.tokenLease > Date.now()) {
             return;
         }
 
         this.console.log(`token expired at ${this.tokenLease}, renewing...`);
 
-        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password);
+        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password, this.forceToken);
         this.parameters = parameters
         this.tokenLease = Date.now() + 1000 * leaseTimeSeconds;
     }
@@ -89,8 +89,12 @@ export class ReolinkCameraClient {
         await this.login();
         const url = options.url as URL;
         const params = url.searchParams;
-        for (const [k, v] of Object.entries(this.parameters)) {
-            params.set(k, v);
+        if(this.forceToken) {
+            params.set('token', this.parameters.token)
+        } else {
+            for (const [k, v] of Object.entries(this.parameters)) {
+                params.set(k, v);
+            }
         }
         return this.request(options, body);
     }
