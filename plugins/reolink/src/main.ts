@@ -181,8 +181,13 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
             const api = this.getClient();
             const deviceInfo = await api.getDeviceInfo();
+            this.console.log('deviceInfo', JSON.stringify(deviceInfo));
             this.storageSettings.values.deviceInfo = deviceInfo;
-            await this.updateAbilities();
+            try {
+                await this.updateAbilities();
+            } catch (e) {
+                this.console.log('Fail fetching abilities', e);
+            }
             await this.updateDevice();
             if (this.hasSiren()) {
                 this.reportSirenDevice();
@@ -313,7 +318,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (this.hasSiren())
             interfaces.push(ScryptedInterface.DeviceProvider);
 
-        await this.provider.updateDevice(this.nativeId, name, interfaces, type);
+        await this.provider.updateDevice(this.nativeId, this.name ?? name, interfaces, type);
     }
 
     async reboot() {
@@ -619,7 +624,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // 1: support main/extern/sub stream
         // 2: support main/sub stream
 
-        const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[0].live?.ver;
+        const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()].live?.ver;
         const [rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub] = streams;
         streams.splice(0, streams.length);
 
@@ -628,7 +633,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // 1: main stream enc type is H265
 
         // anecdotally, encoders of type h265 do not have a working RTMP main stream.
-        const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[0].mainEncType?.ver;
+        const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()].mainEncType?.ver;
 
         if (live === 2) {
             if (mainEncType === 1) {
