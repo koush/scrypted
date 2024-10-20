@@ -129,6 +129,13 @@ fi
 if [ -n "$RESTORE_HOSTNAME" ]
 then
     pct set $VMID --hostname $RESTORE_HOSTNAME
+    if [ "$?" != "0" ]
+    then
+        echo ""
+        echo "pct hostname restore failed"
+        echo ""
+        echo "Ignoring... Please verify your container's dns settings."
+    fi
 fi
 
 CONF=/etc/pve/lxc/$VMID.conf
