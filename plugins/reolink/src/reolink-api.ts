@@ -149,8 +149,8 @@ export class ReolinkCameraClient {
     }
 
     async getAbility() {
-        let url = new URL(`http://${this.host}/api.cgi`);
-        let params = url.searchParams;
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
         params.set('cmd', 'GetAbility');
         params.set('channel', this.channelId.toString());
         let response = await this.requestWithLogin({
@@ -161,7 +161,7 @@ export class ReolinkCameraClient {
         if (error) {
             this.console.error('error during call to getAbility GET, Trying with POST', error);
 
-            url = new URL(`http://${this.host}/api.cgi`);
+            url.search = '';
 
             const body = [
                 {
