@@ -52,6 +52,7 @@ class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
 
 class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, Reboot, Intercom, ObjectDetector, PanTiltZoom {
     client: ReolinkCameraClient;
+    clientWithToken: ReolinkCameraClient;
     onvifClient: OnvifCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
@@ -339,6 +340,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (!this.client)
             this.client = new ReolinkCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.getRtspChannel(), this.console);
         return this.client;
+    }
+
+    getClientWithToken() {
+        if (!this.clientWithToken)
+            this.clientWithToken = new ReolinkCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.getRtspChannel(), this.console, true);
+        return this.clientWithToken;
     }
 
     async getOnvifClient() {

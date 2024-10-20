@@ -49,7 +49,7 @@ export class ReolinkCameraClient {
     parameters: Record<string, string>;
     tokenLease: number;
 
-    constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console) {
+    constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console, public readonly forceToken?: boolean) {
         this.credential = {
             username,
             password,
@@ -80,7 +80,7 @@ export class ReolinkCameraClient {
 
         this.console.log(`token expired at ${this.tokenLease}, renewing...`);
 
-        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password);
+        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password, this.forceToken);
         this.parameters = parameters
         this.tokenLease = Date.now() + 1000 * leaseTimeSeconds;
     }
