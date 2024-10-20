@@ -37,6 +37,7 @@ then
 
     # append existing mac address.
     HWADDR=",hwaddr=$(pct config $VMID | grep -oE 'hwaddr=[A-Z0-9:]+' | cut -d '=' -f 2)"
+    RESTORE_HOSTNAME=$(pct config $VMID | grep -oE 'hostname: [^[:space:]]+' | cut -d ':' -f 2- | tr -d ' ')
 
     pct destroy $SCRYPTED_BACKUP_VMID 2>&1 > /dev/null
     RESTORE_VMID=$VMID
@@ -123,6 +124,11 @@ then
     echo "pct set network failed"
     echo ""
     echo "Ignoring... Please verify your container's network settings."
+fi
+
+if [ -n "$RESTORE_HOSTNAME" ]
+then
+    pct set $VMID --hostname $RESTORE_HOSTNAME
 fi
 
 CONF=/etc/pve/lxc/$VMID.conf
