@@ -217,7 +217,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     async updateAbilities() {
-        const api = this.getClient();
+        const api = this.getClientWithToken();
         const abilities = await api.getAbility();
         this.storageSettings.values.abilities = abilities;
         this.console.log('getAbility', JSON.stringify(abilities));
@@ -797,6 +797,7 @@ class ReolinkProvider extends RtspProvider {
         const rtspChannel = parseInt(settings.rtspChannel?.toString()) || 0;
         if (!skipValidate) {
             const api = new ReolinkCameraClient(httpAddress, username, password, rtspChannel, this.console);
+            const apiWithToken = new ReolinkCameraClient(httpAddress, username, password, rtspChannel, this.console, true);
             try {
                 await api.jpegSnapshot();
             }
@@ -810,7 +811,7 @@ class ReolinkProvider extends RtspProvider {
                 doorbell = deviceInfo.type === 'BELL';
                 name = deviceInfo.name ?? 'Reolink Camera';
                 ai = await api.getAiState();
-                abilities = await api.getAbility();
+                abilities = await apiWithToken.getAbility();
             }
             catch (e) {
                 this.console.error('Reolink camera does not support AI events', e);
