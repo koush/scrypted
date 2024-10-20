@@ -28,6 +28,16 @@ fi
 SCRYPTED_BACKUP_VMID=10445
 if [ -n "$SCRYPTED_RESTORE" ]
 then
+    pct config $VMID 2>&1 > /dev/null
+    if [ "$?" != "0" ]
+    then
+        echo "VMID $VMID not found."
+        exit 1
+    fi
+
+    # append existing mac address.
+    HWADDR=",hwaddr=$(pct config $VMID | grep -oE 'hwaddr=[A-Z0-9:]+' | cut -d '=' -f 2)"
+
     pct destroy $SCRYPTED_BACKUP_VMID 2>&1 > /dev/null
     RESTORE_VMID=$VMID
     VMID=$SCRYPTED_BACKUP_VMID
@@ -106,7 +116,7 @@ then
     exit 1
 fi
 
-pct set $VMID -net0 name=eth0,bridge=vmbr0,ip=dhcp,ip6=auto
+pct set $VMID -net0 name=eth0,bridge=vmbr0,ip=dhcp,ip6=auto$HWADDR
 if [ "$?" != "0" ]
 then
     echo ""
