@@ -1991,7 +1991,6 @@ export interface EndpointManager {
 
   /**
    * Get an URL that can be externally accessed by anyone with the link. Plugin implementation is responsible for authentication.
-   * @deprecated
    */
   getCloudEndpoint(nativeId?: ScryptedNativeId, options?: {
     /**
