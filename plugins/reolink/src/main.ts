@@ -223,7 +223,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         let abilities;
         try {
             abilities = await api.getAbility();
-        } catch (e) {
+        } catch(e) {
             abilities = await apiWithToken.getAbility();
         }
         this.storageSettings.values.abilities = abilities;
@@ -843,7 +843,7 @@ class ReolinkProvider extends RtspProvider {
                 ai = await api.getAiState();
                 try {
                     abilities = await api.getAbility();
-                } catch (e) {
+                } catch(e) {
                     abilities = await apiWithToken.getAbility();
                 }
             }
