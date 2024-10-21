@@ -198,8 +198,8 @@ export class ReolinkCameraClient {
     }
 
     async getDeviceInfo(): Promise<DevInfo> {
-        let url = new URL(`http://${this.host}/api.cgi`);
-        let params = url.searchParams;
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
         params.set('cmd', 'GetDevInfo');
         let response = await this.requestWithLogin({
             url,
@@ -214,12 +214,12 @@ export class ReolinkCameraClient {
         const deviceInfo: DevInfo = await response.body?.[0]?.value?.DevInfo;
 
         // Will need to check if it's valid for NVR and NVR_WIFI
-        if(['HOMEHUB'].includes(deviceInfo.exactType)) {
+        if (['HOMEHUB'].includes(deviceInfo.exactType)) {
             // If the device is listed as homehub, fetch the channel specific information
-            url = new URL(`http://${this.host}/api.cgi`);
-            const body =  [
-                {cmd: "GetChnTypeInfo", action: 0, param: {channel: this.channelId}},
-                {cmd: "GetChannelstatus", action: 0, param: {}},
+            url.search = '';
+            const body = [
+                { cmd: "GetChnTypeInfo", action: 0, param: { channel: this.channelId } },
+                { cmd: "GetChannelstatus", action: 0, param: {} },
             ]
 
             response = await this.requestWithLogin({
@@ -231,22 +231,22 @@ export class ReolinkCameraClient {
             const chnTypeInfo = response?.body?.find(elem => elem.cmd === 'GetChnTypeInfo');
             const chnStatus = response?.body?.find(elem => elem.cmd === 'GetChannelstatus');
 
-            if(chnTypeInfo?.value) {
+            if (chnTypeInfo?.value) {
                 deviceInfo.firmVer = chnTypeInfo.value.firmVer;
                 deviceInfo.model = chnTypeInfo.value.typeInfo;
                 deviceInfo.pakSuffix = chnTypeInfo.value.pakSuffix;
             }
 
-            if(chnStatus?.value) {
+            if (chnStatus?.value) {
                 const specificChannelStatus = chnStatus.value?.status?.find(elem => elem.channel === this.channelId);
 
-                if(specificChannelStatus) {
+                if (specificChannelStatus) {
                     deviceInfo.name = specificChannelStatus.name;
                 }
             }
 
         }
-        
+
         return deviceInfo;
     }
 

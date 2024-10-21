@@ -183,11 +183,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             const deviceInfo = await api.getDeviceInfo();
             this.console.log('deviceInfo', JSON.stringify(deviceInfo));
             this.storageSettings.values.deviceInfo = deviceInfo;
-            try {
-                await this.updateAbilities();
-            } catch (e) {
-                this.console.log('Fail fetching abilities', e);
-            }
+            await this.updateAbilities();
             await this.updateDevice();
             if (this.hasSiren()) {
                 this.reportSirenDevice();
@@ -317,6 +313,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         }
         if (this.hasSiren())
             interfaces.push(ScryptedInterface.DeviceProvider);
+
 
         await this.provider.updateDevice(this.nativeId, this.name ?? name, interfaces, type);
     }
