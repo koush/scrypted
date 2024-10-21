@@ -153,15 +153,37 @@ export class ReolinkCameraClient {
         const params = url.searchParams;
         params.set('cmd', 'GetAbility');
         params.set('channel', this.channelId.toString());
-        const response = await this.requestWithLogin({
+        let response = await this.requestWithLogin({
             url,
             responseType: 'json',
         });
-        const error = response.body?.[0]?.error;
+        let error = response.body?.[0]?.error;
         if (error) {
-            this.console.error('error during call to getAbility', error);
-            throw new Error('error during call to getAbility');
+            this.console.error('error during call to getAbility GET, Trying with POST', error);
+
+            url.search = '';
+
+            const body = [
+                {
+                    cmd: "GetAbility",
+                    action: 0,
+                    param: { User: { userName: this.username } }
+                }
+            ];
+
+            response = await this.requestWithLogin({
+                url,
+                responseType: 'json',
+                method: 'POST',
+            }, this.createReadable(body));
+
+            error = response.body?.[0]?.error;
+            if (error) {
+                this.console.error('error during call to getAbility GET, Trying with POST', error);
+                throw new Error('error during call to getAbility');
+            }
         }
+
         return {
             value: response.body?.[0]?.value || response.body?.value,
             data: response.body,
