@@ -30,8 +30,8 @@ apt-get -y install intel-media-va-driver-non-free &&
 apt-get -y dist-upgrade;
 
 # manual installation
-# https://github.com/intel/compute-runtime/releases/tag/24.13.29138.7
-
+# https://github.com/intel/compute-runtime/releases/tag/24.35.30872.22
+# these debs are seemingly ubuntu 22.04 only.
 
 rm -rf /tmp/gpu && mkdir -p /tmp/gpu && cd /tmp/gpu
 
