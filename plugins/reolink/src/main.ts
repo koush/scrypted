@@ -314,7 +314,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (this.hasSiren())
             interfaces.push(ScryptedInterface.DeviceProvider);
 
-
         await this.provider.updateDevice(this.nativeId, this.name ?? name, interfaces, type);
     }
 
