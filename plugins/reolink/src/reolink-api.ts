@@ -418,7 +418,7 @@ export class ReolinkCameraClient {
         const whiteledStatus = response.body?.[0]?.value?.WhiteLed;
 
         return {
-            on: whiteledStatus?.state,
+            on: whiteledStatus?.state === 1,
             brightness: whiteledStatus?.bright,
         }
     }
