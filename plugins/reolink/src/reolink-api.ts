@@ -232,7 +232,46 @@ export class ReolinkCameraClient {
             this.console.error('error during call to getDeviceInfo', error);
             throw new Error('error during call to getDeviceInfo');
         }
-        return response.body?.[0]?.value?.DevInfo;
+
+        const deviceInfo: DevInfo = await response.body?.[0]?.value?.DevInfo;
+
+        // Will need to check if it's valid for NVR and NVR_WIFI
+        if (['HOMEHUB'].includes(deviceInfo.exactType)) {
+            return deviceInfo;
+        }
+
+        // If the device is listed as homehub, fetch the channel specific information
+        url.search = '';
+        const body = [
+            { cmd: "GetChnTypeInfo", action: 0, param: { channel: this.channelId } },
+            { cmd: "GetChannelstatus", action: 0, param: {} },
+        ]
+
+        const additionalInfoResponse = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json'
+        }, this.createReadable(body));
+
+        const chnTypeInfo = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChnTypeInfo');
+        const chnStatus = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChannelstatus');
+
+        if (chnTypeInfo?.value) {
+            deviceInfo.firmVer = chnTypeInfo.value.firmVer;
+            deviceInfo.model = chnTypeInfo.value.typeInfo;
+            deviceInfo.pakSuffix = chnTypeInfo.value.pakSuffix;
+        }
+
+        if (chnStatus?.value) {
+            const specificChannelStatus = chnStatus.value?.status?.find(elem => elem.channel === this.channelId);
+
+            if (specificChannelStatus) {
+                deviceInfo.name = specificChannelStatus.name;
+            }
+        }
+
+
+        return deviceInfo;
     }
 
     async getPtzPresets(): Promise<PtzPreset[]> {
