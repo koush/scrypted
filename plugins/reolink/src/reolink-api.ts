@@ -201,11 +201,11 @@ export class ReolinkCameraClient {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'GetDevInfo');
-        let response = await this.requestWithLogin({
+        const response = await this.requestWithLogin({
             url,
             responseType: 'json',
         });
-        let error = response.body?.[0]?.error;
+        const error = response.body?.[0]?.error;
         if (error) {
             this.console.error('error during call to getDeviceInfo', error);
             throw new Error('error during call to getDeviceInfo');
@@ -215,37 +215,39 @@ export class ReolinkCameraClient {
 
         // Will need to check if it's valid for NVR and NVR_WIFI
         if (['HOMEHUB'].includes(deviceInfo.exactType)) {
-            // If the device is listed as homehub, fetch the channel specific information
-            url.search = '';
-            const body = [
-                { cmd: "GetChnTypeInfo", action: 0, param: { channel: this.channelId } },
-                { cmd: "GetChannelstatus", action: 0, param: {} },
-            ]
-
-            response = await this.requestWithLogin({
-                url,
-                method: 'POST',
-                responseType: 'json'
-            }, this.createReadable(body));
-
-            const chnTypeInfo = response?.body?.find(elem => elem.cmd === 'GetChnTypeInfo');
-            const chnStatus = response?.body?.find(elem => elem.cmd === 'GetChannelstatus');
-
-            if (chnTypeInfo?.value) {
-                deviceInfo.firmVer = chnTypeInfo.value.firmVer;
-                deviceInfo.model = chnTypeInfo.value.typeInfo;
-                deviceInfo.pakSuffix = chnTypeInfo.value.pakSuffix;
-            }
-
-            if (chnStatus?.value) {
-                const specificChannelStatus = chnStatus.value?.status?.find(elem => elem.channel === this.channelId);
-
-                if (specificChannelStatus) {
-                    deviceInfo.name = specificChannelStatus.name;
-                }
-            }
-
+            return deviceInfo;
         }
+
+        // If the device is listed as homehub, fetch the channel specific information
+        url.search = '';
+        const body = [
+            { cmd: "GetChnTypeInfo", action: 0, param: { channel: this.channelId } },
+            { cmd: "GetChannelstatus", action: 0, param: {} },
+        ]
+
+        const additionalInfoResponse = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json'
+        }, this.createReadable(body));
+
+        const chnTypeInfo = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChnTypeInfo');
+        const chnStatus = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChannelstatus');
+
+        if (chnTypeInfo?.value) {
+            deviceInfo.firmVer = chnTypeInfo.value.firmVer;
+            deviceInfo.model = chnTypeInfo.value.typeInfo;
+            deviceInfo.pakSuffix = chnTypeInfo.value.pakSuffix;
+        }
+
+        if (chnStatus?.value) {
+            const specificChannelStatus = chnStatus.value?.status?.find(elem => elem.channel === this.channelId);
+
+            if (specificChannelStatus) {
+                deviceInfo.name = specificChannelStatus.name;
+            }
+        }
+
 
         return deviceInfo;
     }
