@@ -369,4 +369,57 @@ export class ReolinkCameraClient {
             data: response.body,
         };
     }
+
+    async setWhiteLedState(on?: boolean, brightness?: number) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const settings: any = { channel: this.channelId };
+
+        if (on !== undefined) {
+            settings.state = on ? 1 : 0;
+        }
+
+        if (brightness !== undefined) {
+            settings.bright = brightness;
+        }
+
+        const body = [{
+            cmd: 'SetWhiteLed',
+            param: { WhiteLed: settings }
+        }];
+
+        const response = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json',
+        }, this.createReadable(body));
+
+        const error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to setWhiteLedState', JSON.stringify(body), error);
+        }
+    }
+
+    async getWhiteLedState() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [{
+            cmd: 'GetWhiteLed',
+            action: 0,
+            param: { channel: this.channelId }
+        }];
+
+        const response = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json',
+        }, this.createReadable(body));
+
+        const whiteledStatus = response.body?.[0]?.value?.WhiteLed;
+
+        return {
+            on: whiteledStatus?.state,
+            brightness: whiteledStatus?.bright,
+        }
+    }
 }
