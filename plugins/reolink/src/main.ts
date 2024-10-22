@@ -343,7 +343,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             const { batteryPercent, sleep } = await api.getBatteryInfo();
             this.batteryLevel = batteryPercent;
             this.online = !sleep;
-        }, 10000);
+        }, 1000 * 60 * 30);
     }
 
     async reboot() {
