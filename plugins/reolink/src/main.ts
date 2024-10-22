@@ -54,21 +54,6 @@ class ReolinkCameraFloodlight extends ScryptedDeviceBase implements OnOff, Brigh
     constructor(public camera: ReolinkCamera, nativeId: string) {
         super(nativeId);
         this.on = false;
-
-        // Battery cameras get woken up when pinged on the light status
-        if (!this.interfaces.includes[ScryptedInterface.Battery]) {
-            this.startInterval().then().catch(e => this.console.log('Error in flashlight interval', e));
-        }
-    }
-
-    async startInterval() {
-        setInterval(async () => {
-            const api = this.camera.getClientWithToken();
-            const { brightness, on } = await api.getWhiteLedState();
-
-            this.on = on;
-            this.brightness = brightness;
-        }, 5000)
     }
 
     async setBrightness(brightness: number): Promise<void> {
