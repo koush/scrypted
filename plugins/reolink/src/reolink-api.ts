@@ -236,7 +236,7 @@ export class ReolinkCameraClient {
         const deviceInfo: DevInfo = await response.body?.[0]?.value?.DevInfo;
 
         // Will need to check if it's valid for NVR and NVR_WIFI
-        if (['HOMEHUB'].includes(deviceInfo.exactType)) {
+        if (!['HOMEHUB', 'NVR', 'NVR_WIFI'].includes(deviceInfo.exactType)) {
             return deviceInfo;
         }
 
