@@ -225,6 +225,7 @@ export interface NotifierOptions {
   badge?: string;
   bodyWithSubtitle?: string;
   body?: string;
+  channel?: string;
   data?: any;
   dir?: NotificationDirection;
   lang?: string;
@@ -2014,7 +2015,6 @@ export interface EndpointManager {
    * Get the recommended local addresess used by Scrypted plugins that listen for incoming connections.
    */
   getLocalAddresses(): Promise<string[]>;
-
 
   /**
    * Set the allowed origins for an endpoint for cross origin requests.
