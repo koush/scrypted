@@ -649,6 +649,7 @@ class NotifierOptions(TypedDict):
     badge: str
     body: str
     bodyWithSubtitle: str
+    channel: str
     data: Any
     dir: NotificationDirection
     image: str

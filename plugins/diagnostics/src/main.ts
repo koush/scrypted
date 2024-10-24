@@ -128,6 +128,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             await device.sendNotification('Scrypted Diagnostics', {
                 body: 'Body',
                 subtitle: 'Subtitle',
+                channel: 'diagnostics',
             }, mo);
 
             this.warnStep(console, 'Check the device for the notification.');
@@ -165,7 +166,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                     throw new Error('Last motion was over 8 hours ago.');
             });
         }
-
 
         if (device.type === ScryptedDeviceType.Doorbell) {
             await this.validate(console, 'Recent Button Press', async () => {
@@ -508,7 +508,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 }
 
             });
-
 
             await this.validate(this.console, 'Deprecated Plugins', async () => {
                 const defunctPlugins = [
