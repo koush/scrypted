@@ -225,6 +225,7 @@ export interface NotifierOptions {
   badge?: string;
   bodyWithSubtitle?: string;
   body?: string;
+  channel?: string;
   data?: any;
   dir?: NotificationDirection;
   lang?: string;

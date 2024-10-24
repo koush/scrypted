@@ -128,6 +128,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             await device.sendNotification('Scrypted Diagnostics', {
                 body: 'Body',
                 subtitle: 'Subtitle',
+                channel: 'diagnostics',
             }, mo);
 
             this.warnStep(console, 'Check the device for the notification.');
