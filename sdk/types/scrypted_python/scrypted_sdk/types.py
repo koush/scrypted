@@ -643,13 +643,16 @@ class MediaStreamOptions(TypedDict):
     tool: MediaStreamTool  # The tool was used to write the container or will be used to read teh container. Ie, scrypted, the ffmpeg tools, gstreamer.
     video: VideoStreamOptions
 
+class AndroidNotificationOptions(TypedDict):
+    channel: str
+
 class NotifierOptions(TypedDict):
 
     actions: list[NotificationAction]
+    android: AndroidNotificationOptions
     badge: str
     body: str
     bodyWithSubtitle: str
-    channel: str
     data: Any
     dir: NotificationDirection
     image: str

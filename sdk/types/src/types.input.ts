@@ -225,7 +225,9 @@ export interface NotifierOptions {
   badge?: string;
   bodyWithSubtitle?: string;
   body?: string;
-  channel?: string;
+  android?: {
+    channel?: string;
+  }
   data?: any;
   dir?: NotificationDirection;
   lang?: string;
