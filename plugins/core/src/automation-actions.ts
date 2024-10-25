@@ -81,10 +81,6 @@ addAction(ScryptedInterface.Notifier, {
         type: 'interface',
         deviceFilter: `deviceInterface === '${ScryptedInterface.VideoCamera}' || deviceInterface === '${ScryptedInterface.Camera}'`,
     },
-    notificationChannel: {
-        title: 'Channel (Android only)',
-        type: 'string',
-    },
 }, async function invoke(device: ScryptedDevice & Notifier, storageSettings) {
     let { notificationMediaUrl } = storageSettings;
     if (notificationMediaUrl && !notificationMediaUrl?.includes('://')) {
@@ -104,6 +100,5 @@ addAction(ScryptedInterface.Notifier, {
 
     return device.sendNotification(storageSettings.notificationTitle as string, {
         body: storageSettings.notificationBody as string,
-        channel: storageSettings.notificationChannel as string,
     }, notificationMediaUrl);
 });
