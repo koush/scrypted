@@ -1,8 +1,8 @@
-import stringifyObject from 'stringify-object';
-import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
-import path from 'path';
 import fs from "fs";
-import { DeclarationReflection, ProjectReflection, ReflectionKind, SomeType } from 'typedoc';
+import path from 'path';
+import stringifyObject from 'stringify-object';
+import { DeclarationReflection, ProjectReflection, ReflectionKind } from 'typedoc';
+import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 
 const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../gen/schema.json')).toString()) as ProjectReflection;
 const packageJson = require('../package.json');

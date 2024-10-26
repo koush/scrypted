@@ -12,8 +12,6 @@
   "scripts": {
     "prepublishOnly": "npm run build && cd types && npm version patch && npm publish",
     "prebuild": "cd types && npm run build",
-    "predocs": "npm run build",
-    "docs": "typedoc",
     "build": "rimraf dist && tsc",
     "webpack": "webpack-cli --config webpack.config.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -49,9 +47,7 @@
     "@types/stringify-object": "^4.0.5",
     "stringify-object": "^3.3.0",
     "ts-node": "^10.9.2",
-    "typedoc": "^0.26.10",
-    "typedoc-plugin-markdown": "^4.2.9",
-    "typedoc-vitepress-theme": "^1.0.2"
+    "typedoc": "^0.26.10"
   },
   "types": "dist/src/index.d.ts"
 }
