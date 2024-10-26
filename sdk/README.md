@@ -1,23 +1,8 @@
-# Table of Contents
-  * [Getting Started](#getting-started)
-    * [Typescript Sample Setup](#typescript-sample-setup)
-    * [Creating a Switch](#creating-a-switch)
-  * [Core Concepts](#core-concepts)
-    * [Interfaces](#interfaces)
-    * [Events](#events)
-  * [Creating Multiple Devices](#creating-multiple-devices)
-  * [Full Reference](/modules)
-  * [Sample Plugins](https://github.com/koush/scrypted/tree/main/plugins)
-    * [Camera Provider Sample](https://github.com/koush/scrypted-sample-cameraprovider)
+# Scrypted Developer
 
-<br/>
-<br/>
-
-# Getting Started
+## Getting Started
 
 The quickest way to get started is to check out the the [Typescript sample](https://github.com/koush/scrypted-vscode-typescript) and open it in Visual Studio Code. The setup instructions can be found in the readme for the [project](https://github.com/koush/scrypted-vscode-typescript).
-
-<br/>
 
 ## Typescript Sample Setup
 

@@ -71,8 +71,8 @@ class PanTiltZoomMovement(str, Enum):
 
 class ScryptedDeviceType(str, Enum):
 
-    API = "API"
     AirPurifier = "AirPurifier"
+    API = "API"
     Automation = "Automation"
     Builtin = "Builtin"
     Camera = "Camera"
@@ -117,9 +117,9 @@ class ScryptedInterface(str, Enum):
     BinarySensor = "BinarySensor"
     Brightness = "Brightness"
     BufferConverter = "BufferConverter"
-    CO2Sensor = "CO2Sensor"
     Camera = "Camera"
     Charger = "Charger"
+    CO2Sensor = "CO2Sensor"
     ColorSettingHsv = "ColorSettingHsv"
     ColorSettingRgb = "ColorSettingRgb"
     ColorSettingTemperature = "ColorSettingTemperature"
@@ -147,8 +147,8 @@ class ScryptedInterface(str, Enum):
     Microphone = "Microphone"
     MixinProvider = "MixinProvider"
     MotionSensor = "MotionSensor"
-    NOXSensor = "NOXSensor"
     Notifier = "Notifier"
+    NOXSensor = "NOXSensor"
     OauthClient = "OauthClient"
     ObjectDetection = "ObjectDetection"
     ObjectDetectionGenerator = "ObjectDetectionGenerator"
@@ -156,22 +156,22 @@ class ScryptedInterface(str, Enum):
     ObjectDetector = "ObjectDetector"
     ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
-    OnOff = "OnOff"
     Online = "Online"
-    PM10Sensor = "PM10Sensor"
-    PM25Sensor = "PM25Sensor"
+    OnOff = "OnOff"
     PanTiltZoom = "PanTiltZoom"
     PasswordStore = "PasswordStore"
     Pause = "Pause"
+    PM10Sensor = "PM10Sensor"
+    PM25Sensor = "PM25Sensor"
     PositionSensor = "PositionSensor"
     PowerSensor = "PowerSensor"
     Program = "Program"
     PushHandler = "PushHandler"
-    RTCSignalingChannel = "RTCSignalingChannel"
-    RTCSignalingClient = "RTCSignalingClient"
     Readme = "Readme"
     Reboot = "Reboot"
     Refresh = "Refresh"
+    RTCSignalingChannel = "RTCSignalingChannel"
+    RTCSignalingClient = "RTCSignalingClient"
     Scene = "Scene"
     Scriptable = "Scriptable"
     ScryptedDevice = "ScryptedDevice"
@@ -185,13 +185,12 @@ class ScryptedInterface(str, Enum):
     Settings = "Settings"
     StartStop = "StartStop"
     StreamService = "StreamService"
-    TTY = "TTY"
-    TTYSettings = "TTYSettings"
     TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
     Thermometer = "Thermometer"
+    TTY = "TTY"
+    TTYSettings = "TTYSettings"
     UltravioletSensor = "UltravioletSensor"
-    VOCSensor = "VOCSensor"
     VideoCamera = "VideoCamera"
     VideoCameraConfiguration = "VideoCameraConfiguration"
     VideoCameraMask = "VideoCameraMask"
@@ -199,6 +198,7 @@ class ScryptedInterface(str, Enum):
     VideoFrameGenerator = "VideoFrameGenerator"
     VideoRecorder = "VideoRecorder"
     VideoRecorderManagement = "VideoRecorderManagement"
+    VOCSensor = "VOCSensor"
 
 class ScryptedMimeTypes(str, Enum):
 
@@ -211,11 +211,11 @@ class ScryptedMimeTypes(str, Enum):
     MediaStreamFeedback = "x-scrypted/x-media-stream-feedback"
     MediaStreamUrl = "text/x-media-url"
     PushEndpoint = "text/x-push-endpoint"
+    RequestMediaObject = "x-scrypted/x-scrypted-request-media-object"
+    RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
     RTCConnectionManagement = "x-scrypted/x-scrypted-rtc-connection-management"
     RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel"
     RTCSignalingSession = "x-scrypted/x-scrypted-rtc-signaling-session"
-    RequestMediaObject = "x-scrypted/x-scrypted-request-media-object"
-    RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
     ServerId = "text/x-server-id"
     Url = "text/x-uri"
@@ -543,20 +543,6 @@ class EventListenerOptions(TypedDict):
     mixinId: str  # The EventListener will listen to events and property changes from a device or mixin that is suppressed by a mixin.
     watch: bool  # This EventListener will passively watch for events, and not initiate polling.
 
-class FFmpegInput(TypedDict):
-
-    container: str
-    destinationVideoBitrate: float
-    env: Any  # Environment variables to set when launching FFmpeg.
-    ffmpegPath: str  # Path to a custom FFmpeg binary.
-    h264EncoderArguments: list[str]
-    h264FilterArguments: list[str]
-    inputArguments: list[str]
-    mediaStreamOptions: ResponseMediaStreamOptions
-    url: str  # The media url for this FFmpegInput.
-    urls: list[str]  # Alternate media urls for this FFmpegInput.
-    videoDecoderArguments: list[str]
-
 class FanState(TypedDict):
 
     counterClockwise: bool
@@ -573,6 +559,20 @@ class FanStatus(TypedDict):
     mode: FanMode
     speed: float  # Rotations per minute, if available, otherwise 0 or 1.
     swing: bool
+
+class FFmpegInput(TypedDict):
+
+    container: str
+    destinationVideoBitrate: float
+    env: Any  # Environment variables to set when launching FFmpeg.
+    ffmpegPath: str  # Path to a custom FFmpeg binary.
+    h264EncoderArguments: list[str]
+    h264FilterArguments: list[str]
+    inputArguments: list[str]
+    mediaStreamOptions: ResponseMediaStreamOptions
+    url: str  # The media url for this FFmpegInput.
+    urls: list[str]  # Alternate media urls for this FFmpegInput.
+    videoDecoderArguments: list[str]
 
 class HttpRequest(TypedDict):
 
@@ -982,10 +982,6 @@ class BufferConverter:
         pass
 
 
-class CO2Sensor:
-
-    co2ppm: float
-
 class Camera:
     """Camera devices can take still photos."""
 
@@ -1000,6 +996,10 @@ class Charger:
     """Charger reports whether or not a device is being charged from an external power source. Usually used for battery powered devices."""
 
     chargeState: ChargeState
+
+class CO2Sensor:
+
+    co2ppm: float
 
 class ColorSettingHsv:
     """ColorSettingHsv sets the color of a colored light using the HSV representation."""
@@ -1218,16 +1218,16 @@ class MotionSensor:
 
     motionDetected: bool
 
-class NOXSensor:
-
-    noxDensity: float
-
 class Notifier:
     """Notifier can be any endpoint that can receive messages, such as speakers, phone numbers, messaging clients, etc. The messages may optionally contain media."""
 
     async def sendNotification(self, title: str, options: NotifierOptions = None, media: str | MediaObject = None, icon: str | MediaObject = None) -> None:
         pass
 
+
+class NOXSensor:
+
+    noxDensity: float
 
 class OauthClient:
     """The OauthClient can be implemented to perform the browser based Oauth process from within a plugin."""
@@ -1283,6 +1283,11 @@ class OccupancySensor:
 
     occupied: bool
 
+class Online:
+    """Online denotes whether the device is online or unresponsive. It may be unresponsive due to being unplugged, network error, etc."""
+
+    online: bool
+
 class OnOff:
     """OnOff is a basic binary switch."""
 
@@ -1293,19 +1298,6 @@ class OnOff:
     async def turnOn(self) -> None:
         pass
 
-
-class Online:
-    """Online denotes whether the device is online or unresponsive. It may be unresponsive due to being unplugged, network error, etc."""
-
-    online: bool
-
-class PM10Sensor:
-
-    pm10Density: float
-
-class PM25Sensor:
-
-    pm25Density: float
 
 class PanTiltZoom:
 
@@ -1336,6 +1328,14 @@ class Pause:
     async def resume(self) -> None:
         pass
 
+
+class PM10Sensor:
+
+    pm10Density: float
+
+class PM25Sensor:
+
+    pm25Density: float
 
 class PositionSensor:
 
@@ -1510,19 +1510,6 @@ class StreamService:
         pass
 
 
-class TTY:
-    """TTY connection offered by a remote device that can be connected to by an interactive terminal interface.  Implementors should also implement StreamService to handle the actual data transfer."""
-
-
-    pass
-
-class TTYSettings:
-    """TTYSettings allows TTY backends to query plugins for modifications to the (non-)interactive terminal environment."""
-
-    async def getTTYSettings(self) -> Any:
-        pass
-
-
 class TamperSensor:
 
     tampered: TamperState
@@ -1543,13 +1530,22 @@ class Thermometer:
         pass
 
 
+class TTY:
+    """TTY connection offered by a remote device that can be connected to by an interactive terminal interface.  Implementors should also implement StreamService to handle the actual data transfer."""
+
+
+    pass
+
+class TTYSettings:
+    """TTYSettings allows TTY backends to query plugins for modifications to the (non-)interactive terminal environment."""
+
+    async def getTTYSettings(self) -> Any:
+        pass
+
+
 class UltravioletSensor:
 
     ultraviolet: float
-
-class VOCSensor:
-
-    vocDensity: float
 
 class VideoCamera:
     """VideoCamera devices can capture video streams."""
@@ -1581,10 +1577,10 @@ class VideoClips:
     async def getVideoClip(self, videoId: str) -> MediaObject:
         pass
 
-    async def getVideoClipThumbnail(self, thumbnailId: str, options: VideoClipThumbnailOptions = None) -> MediaObject:
+    async def getVideoClips(self, options: VideoClipOptions = None) -> list[VideoClip]:
         pass
 
-    async def getVideoClips(self, options: VideoClipOptions = None) -> list[VideoClip]:
+    async def getVideoClipThumbnail(self, thumbnailId: str, options: VideoClipThumbnailOptions = None) -> MediaObject:
         pass
 
     async def removeVideoClips(self, videoClipIds: list[str]) -> None:
@@ -1621,6 +1617,10 @@ class VideoRecorderManagement:
     async def setRecordingActive(self, recordingActive: bool) -> None:
         pass
 
+
+class VOCSensor:
+
+    vocDensity: float
 
 class Logger:
     """Logger is exposed via log.* to allow writing to the Scrypted log."""
@@ -1911,8 +1911,8 @@ class ScryptedInterfaceMethods(str, Enum):
     ptzCommand = "ptzCommand"
     getRecordedEvents = "getRecordedEvents"
     getVideoClip = "getVideoClip"
-    getVideoClipThumbnail = "getVideoClipThumbnail"
     getVideoClips = "getVideoClips"
+    getVideoClipThumbnail = "getVideoClipThumbnail"
     removeVideoClips = "removeVideoClips"
     setVideoStreamOptions = "setVideoStreamOptions"
     startIntercom = "startIntercom"
@@ -2721,8 +2721,8 @@ ScryptedInterfaceDescriptors = {
     "name": "VideoClips",
     "methods": [
       "getVideoClip",
-      "getVideoClipThumbnail",
       "getVideoClips",
+      "getVideoClipThumbnail",
       "removeVideoClips"
     ],
     "properties": []

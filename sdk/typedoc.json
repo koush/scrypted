@@ -5,7 +5,7 @@
   "sort": ["source-order"],
   "name": "Scrypted Documentation",
   "tsconfig": "./tsconfig.json",
-  "out": "./developer.scrypted.app/docs",
+  "out": "./developer.scrypted.app/gen",
   "categorizeByGroup": false,
   "defaultCategory": "Device Interfaces Reference",
   "excludePrivate": true,
@@ -18,6 +18,6 @@
     "Mixin Reference",
     "WebRTC Reference"
   ],
-  "customCss": "./developer.scrypted.app/docs.css",
+  "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
   "readme": "./README.md"
 }
