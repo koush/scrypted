@@ -111,6 +111,12 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             hide: true,
             description: 'The last home hub to request a recording. Internally used to determine if a streaming request is coming from remote wifi.',
         },
+        autoAdd: {
+            title: "Auto enable",
+            description: "Automatically enable this mixin on new devices.",
+            type: 'boolean',
+            defaultValue: true,
+        },
     });
     mergedDevices = new Set<string>();
 
@@ -218,7 +224,8 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
             try {
                 const mixins = (device.mixins || []).slice();
-                if (!mixins.includes(this.id)) {
+                const autoAdd = this.storageSettings.values.autoAdd ?? true;
+                if (!mixins.includes(this.id) && autoAdd) {
                     // don't sync this by default, as it's solely for automations
                     if (device.type === ScryptedDeviceType.Notifier)
                         continue;
