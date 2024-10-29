@@ -9,7 +9,8 @@ const PI_MODEL_NO = [
     'BCM2836', // Raspberry Pi 2
     'BCM2837', // Raspberry Pi 3 (and later Raspberry Pi 2)
     'BCM2837B0', // Raspberry Pi 3B+ and 3A+
-    'BCM2711' // Raspberry Pi 4B
+    'BCM2711', // Raspberry Pi 4B
+    'BCM2712' // Raspberry Pi 5
 ];
 
 function isPi(model: string) {
