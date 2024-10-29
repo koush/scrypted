@@ -16,7 +16,7 @@ class BufferTransfer implements RpcSerializer {
         // allow transfer of the buffer only if it sets the __rpc_transferable property.
         // this is the only safe way to do this, since call sites may return the same buffer
         // multiple times (like an image/jpeg MediaObject).
-        if ((value as any).__rpc_transferable === true) {
+        if ((value as any).__rpc_transferable !== true) {
             const ab = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
             value = Buffer.from(ab);
         }
