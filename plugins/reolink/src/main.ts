@@ -58,6 +58,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     motionTimeout: NodeJS.Timeout;
     siren: ReolinkCameraSiren;
+    batteryTimeout: NodeJS.Timeout;
 
     storageSettings = new StorageSettings(this, {
         doorbell: {
@@ -223,7 +224,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         let abilities;
         try {
             abilities = await api.getAbility();
-        } catch(e) {
+        } catch (e) {
             abilities = await apiWithToken.getAbility();
         }
         this.storageSettings.values.abilities = abilities;
@@ -294,6 +295,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             && this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm?.ver !== 0;
     }
 
+    hasBattery() {
+        const batteryConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.battery?.ver ?? 0;
+        return batteryConfigVer > 0;
+    }
+
     async updateDevice() {
         const interfaces = this.provider.getInterfaces();
         let type = ScryptedDeviceType.Camera;
@@ -319,8 +325,31 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         }
         if (this.hasSiren())
             interfaces.push(ScryptedInterface.DeviceProvider);
+        if (this.hasBattery()) {
+            interfaces.push(ScryptedInterface.Battery, ScryptedInterface.Online);
+            this.startBatteryCheckInterval();
+        }
 
         await this.provider.updateDevice(this.nativeId, this.name ?? name, interfaces, type);
+    }
+
+    startBatteryCheckInterval() {
+        if (this.batteryTimeout) {
+            clearInterval(this.batteryTimeout);
+        }
+
+        this.batteryTimeout = setInterval(async () => {
+            const api = this.getClientWithToken();
+
+            try {
+                const { batteryPercent, sleep } = await api.getBatteryInfo();
+                this.batteryLevel = batteryPercent;
+                this.online = !sleep;
+            }
+            catch (e) {
+                this.console.log('Error in getting battery info', e);
+            }
+        }, 1000 * 60 * 30);
     }
 
     async reboot() {
@@ -820,7 +849,7 @@ class ReolinkProvider extends RtspProvider {
                 ai = await api.getAiState();
                 try {
                     abilities = await api.getAbility();
-                } catch(e) {
+                } catch (e) {
                     abilities = await apiWithToken.getAbility();
                 }
             }

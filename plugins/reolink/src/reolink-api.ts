@@ -430,4 +430,39 @@ export class ReolinkCameraClient {
             data: response.body,
         };
     }
+
+    async getBatteryInfo() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [
+            {
+                cmd: "GetBatteryInfo",
+                action: 0,
+                param: { channel: this.channelId }
+            },
+            {
+                cmd: "GetChannelstatus",
+            }
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, this.createReadable(body));
+
+        const error = response.body?.find(elem => elem.error)?.error;
+        if (error) {
+            this.console.error('error during call to getBatteryInfo', error);
+        }
+
+        const batteryInfoEntry = response.body.find(entry => entry.cmd === 'GetBatteryInfo')?.value?.Battery;
+        const channelStatusEntry = response.body.find(entry => entry.cmd === 'GetChannelstatus')?.value?.status
+            ?.find(chStatus => chStatus.channel === this.channelId)
+
+        return {
+            batteryPercent: batteryInfoEntry?.batteryPercent,
+            sleep: channelStatusEntry?.sleep === 1,
+        }
+    }
 }
