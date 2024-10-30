@@ -13,11 +13,10 @@ class BufferTransfer implements RpcSerializer {
         if (!serializationContext)
             return this.bufferSerializer.serialize(value);
 
-        // node may used pooled buffers for Buffer.allocUnsafe, Buffer.from, and other calls.
-        // these buffers will be smaller than Buffer.poolSize.
-        // In these instances, do not transfer the buffer, as it may not be transferible.
-        // create a copy so it can be safely transfered.
-        if (value.buffer.byteLength <= Buffer.poolSize) {
+        // allow transfer of the buffer only if it sets the __rpc_transferable property.
+        // this is the only safe way to do this, since call sites may return the same buffer
+        // multiple times (like an image/jpeg MediaObject).
+        if ((value as any).__rpc_transferable !== true) {
             const ab = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
             value = Buffer.from(ab);
         }

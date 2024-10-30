@@ -196,13 +196,33 @@ class PrebufferSession {
       return;
     this.console.log(this.streamName, 'prebuffer session started');
     this.parserSessionPromise = this.startPrebufferSession();
-    this.parserSessionPromise.then(pso => pso.killed.finally(() => {
-      this.console.error(this.streamName, 'prebuffer session ended');
-      this.parserSessionPromise = undefined;
-    }))
+    let active = false;
+    this.parserSessionPromise.then(pso => {
+      pso.once('rtsp', () => {
+        active = true;
+        if (!this.mixin.online)
+          this.mixin.online = true;
+      });
+
+      pso.killed.finally(() => {
+        this.console.error(this.streamName, 'prebuffer session ended');
+        this.parserSessionPromise = undefined;
+      });
+    })
       .catch(e => {
         this.console.error(this.streamName, 'prebuffer session ended with error', e);
         this.parserSessionPromise = undefined;
+
+        if (!active) {
+          // find sessions that arent this one, and check their prebuffers to see if any data has been received.
+          // if there's no data, then consider this camera offline.
+          const others = [...this.mixin.sessions.values()].filter(s => s !== this);
+          if (others.length) {
+            const hasData = others.some(s => s.rtspPrebuffer.length);
+            if (!hasData && this.mixin.online)
+              this.mixin.online = false;
+          }
+        }
       });
   }
 
@@ -1415,11 +1435,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       }
     }
 
-    if (!enabledIds.length)
-      this.online = true;
-
-    let active = 0;
-
     // figure out the default stream and streams that may have been removed due to
     // a config change.
     const toRemove = new Set(this.sessions.keys());
@@ -1462,22 +1477,12 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
           }
 
           session.ensurePrebufferSession();
-          let wasActive = false;
           try {
             this.console.log(name, 'prebuffer session starting');
             const ps = await session.parserSessionPromise;
-            active++;
-            wasActive = true;
-            this.online = !!active;
             await ps.killed;
           }
           catch (e) {
-          }
-          finally {
-            if (wasActive)
-              active--;
-            wasActive = false;
-            this.online = !!active;
           }
           this.console.log(this.name, 'restarting prebuffer session in 5 seconds');
           await new Promise(resolve => setTimeout(resolve, 5000));

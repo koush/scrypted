@@ -646,6 +646,7 @@ class MediaStreamOptions(TypedDict):
 class NotifierOptions(TypedDict):
 
     actions: list[NotificationAction]
+    android: Any
     badge: str
     body: str
     bodyWithSubtitle: str

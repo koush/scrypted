@@ -225,6 +225,9 @@ export interface NotifierOptions {
   badge?: string;
   bodyWithSubtitle?: string;
   body?: string;
+  android?: {
+    channel?: string;
+  }
   data?: any;
   dir?: NotificationDirection;
   lang?: string;
@@ -1991,7 +1994,6 @@ export interface EndpointManager {
 
   /**
    * Get an URL that can be externally accessed by anyone with the link. Plugin implementation is responsible for authentication.
-   * @deprecated
    */
   getCloudEndpoint(nativeId?: ScryptedNativeId, options?: {
     /**

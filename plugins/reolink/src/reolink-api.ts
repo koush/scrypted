@@ -153,15 +153,37 @@ export class ReolinkCameraClient {
         const params = url.searchParams;
         params.set('cmd', 'GetAbility');
         params.set('channel', this.channelId.toString());
-        const response = await this.requestWithLogin({
+        let response = await this.requestWithLogin({
             url,
             responseType: 'json',
         });
-        const error = response.body?.[0]?.error;
+        let error = response.body?.[0]?.error;
         if (error) {
-            this.console.error('error during call to getAbility', error);
-            throw new Error('error during call to getAbility');
+            this.console.error('error during call to getAbility GET, Trying with POST', error);
+
+            url.search = '';
+
+            const body = [
+                {
+                    cmd: "GetAbility",
+                    action: 0,
+                    param: { User: { userName: this.username } }
+                }
+            ];
+
+            response = await this.requestWithLogin({
+                url,
+                responseType: 'json',
+                method: 'POST',
+            }, this.createReadable(body));
+
+            error = response.body?.[0]?.error;
+            if (error) {
+                this.console.error('error during call to getAbility GET, Trying with POST', error);
+                throw new Error('error during call to getAbility');
+            }
         }
+
         return {
             value: response.body?.[0]?.value || response.body?.value,
             data: response.body,
@@ -210,7 +232,46 @@ export class ReolinkCameraClient {
             this.console.error('error during call to getDeviceInfo', error);
             throw new Error('error during call to getDeviceInfo');
         }
-        return response.body?.[0]?.value?.DevInfo;
+
+        const deviceInfo: DevInfo = await response.body?.[0]?.value?.DevInfo;
+
+        // Will need to check if it's valid for NVR and NVR_WIFI
+        if (!['HOMEHUB', 'NVR', 'NVR_WIFI'].includes(deviceInfo.exactType)) {
+            return deviceInfo;
+        }
+
+        // If the device is listed as homehub, fetch the channel specific information
+        url.search = '';
+        const body = [
+            { cmd: "GetChnTypeInfo", action: 0, param: { channel: this.channelId } },
+            { cmd: "GetChannelstatus", action: 0, param: {} },
+        ]
+
+        const additionalInfoResponse = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json'
+        }, this.createReadable(body));
+
+        const chnTypeInfo = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChnTypeInfo');
+        const chnStatus = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChannelstatus');
+
+        if (chnTypeInfo?.value) {
+            deviceInfo.firmVer = chnTypeInfo.value.firmVer;
+            deviceInfo.model = chnTypeInfo.value.typeInfo;
+            deviceInfo.pakSuffix = chnTypeInfo.value.pakSuffix;
+        }
+
+        if (chnStatus?.value) {
+            const specificChannelStatus = chnStatus.value?.status?.find(elem => elem.channel === this.channelId);
+
+            if (specificChannelStatus) {
+                deviceInfo.name = specificChannelStatus.name;
+            }
+        }
+
+
+        return deviceInfo;
     }
 
     async getPtzPresets(): Promise<PtzPreset[]> {
@@ -420,6 +481,41 @@ export class ReolinkCameraClient {
         return {
             on: whiteledStatus?.state === 1,
             brightness: whiteledStatus?.bright,
+        }
+    }
+
+    async getBatteryInfo() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [
+            {
+                cmd: "GetBatteryInfo",
+                action: 0,
+                param: { channel: this.channelId }
+            },
+            {
+                cmd: "GetChannelstatus",
+            }
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, this.createReadable(body));
+
+        const error = response.body?.find(elem => elem.error)?.error;
+        if (error) {
+            this.console.error('error during call to getBatteryInfo', error);
+        }
+
+        const batteryInfoEntry = response.body.find(entry => entry.cmd === 'GetBatteryInfo')?.value?.Battery;
+        const channelStatusEntry = response.body.find(entry => entry.cmd === 'GetChannelstatus')?.value?.status
+            ?.find(chStatus => chStatus.channel === this.channelId)
+
+        return {
+            batteryPercent: batteryInfoEntry?.batteryPercent,
+            sleep: channelStatusEntry?.sleep === 1,
         }
     }
 }
