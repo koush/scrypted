@@ -1643,7 +1643,7 @@ export interface ObjectDetectionPreview {
 }
 export interface ObjectDetectionGenerator {
 }
-export type ImageFormat = 'gray' | 'rgba' | 'rgb' | 'jpg';
+export type ImageFormat = 'gray' | 'rgba' | 'rgb' | 'jpg' | string;
 export interface ImageOptions {
   crop?: {
     left: number;
@@ -1667,6 +1667,7 @@ export interface Image {
    * this format, or a compressed format such as jpg.
    */
   format?: ImageFormat;
+  ffmpegFormats?: boolean;
   toBuffer(options?: ImageOptions): Promise<Buffer>;
   toImage(options?: ImageOptions): Promise<Image & MediaObject>;
   close(): Promise<void>;

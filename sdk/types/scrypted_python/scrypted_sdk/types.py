@@ -267,7 +267,7 @@ class H264Info(TypedDict):
 class ImageOptions(TypedDict):
 
     crop: Any
-    format: ImageFormat
+    format: str
     resize: Any
 
 class ObjectDetectionHistory(TypedDict):
@@ -419,11 +419,6 @@ class VideoStreamOptions(TypedDict):
     profile: str
     quality: float
     width: float
-
-class ImageFormat(TypedDict):
-
-    pass
-
 
 class MediaStreamDestination(TypedDict):
 
@@ -915,7 +910,7 @@ class VideoFrameGeneratorOptions(TypedDict):
 
     crop: Any
     firstFrameOnly: bool
-    format: ImageFormat
+    format: str
     fps: float
     queue: float
     resize: Any
@@ -3255,7 +3250,8 @@ class WritableDeviceState:
 
 class Image:
 
-    format: ImageFormat  # The in raw memory format of this image. Operations of this image may only safely request this format, or a compressed format such as jpg.
+    ffmpegFormats: bool
+    format: str  # The in raw memory format of this image. Operations of this image may only safely request this format, or a compressed format such as jpg.
     height: float
     width: float
     async def close(self) -> None:
