@@ -1779,7 +1779,7 @@ export interface OauthClient {
   onOauthCallback(callbackUrl: string): Promise<void>;
 
 }
-export type SerializableType = null | undefined | number | string | { [key: string]: SerializableType } | SerializableType[];
+export type SerializableType = null | undefined | boolean | number | string | { [key: string]: SerializableType } | SerializableType[];
 export type TopLevelSerializableType = Function | Buffer | SerializableType;
 
 export interface MediaObjectOptions {
