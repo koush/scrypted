@@ -1,6 +1,7 @@
 #!/bin/bash
 
 NVR_STORAGE=$1
+NVR_STORAGE_DIRECTORY=$2
 
 DISK_TYPE="large"
 if [ ! -z "$FAST_DISK" ]
@@ -10,9 +11,9 @@ fi
 
 if [ -z "$NVR_STORAGE" ]; then
   echo ""
-  echo "Error: Proxmox Directory Disk not provided. Usage:"
+  echo "Error: Directory name not provided. Usage:"
   echo ""
-  echo "bash $0 <proxmox-directory-disk>"
+  echo "bash $0 directory-name [/optional/path/to/storage]"
   echo ""
   exit 1
 fi
@@ -30,20 +31,30 @@ if [ ! -f "$FILE" ]; then
   exit 1
 fi
 
-STORAGE="/mnt/pve/$NVR_STORAGE"
-
-if [ ! -d "$STORAGE" ]
+if [ ! -z "$NVR_STORAGE_DIRECTORY" ]
 then
-  echo "Error: $STORAGE not found."
-  echo "The Proxmox Directory Storage must be created using the UI prior to running this script."
-  exit 1
+  if [ ! -d "$NVR_STORAGE_DIRECTORY" ]
+  then
+    echo ""
+    echo "Error: $NVR_STORAGE_DIRECTORY directory not found."
+    echo ""
+    exit 1
+  fi
+else
+  STORAGE="/mnt/pve/$NVR_STORAGE"
+  if [ ! -d "$STORAGE" ]
+  then
+    echo "Error: $STORAGE not found."
+    echo "The Proxmox Directory Storage must be created using the UI prior to running this script."
+    exit 1
+  fi
+  # use subdirectory doesn't conflict with Proxmox storage of backups etc.
+  NVR_STORAGE_DIRECTORY="$STORAGE/mounts/scrypted-nvr"
 fi
 
-# use subdirectory doesn't conflict with Proxmox storage of backups etc.
-STORAGE="$STORAGE/mounts/scrypted-nvr"
 # create the hidden folder that can be used as a marker.
-mkdir -p $STORAGE/.nvr
-chmod 0777 $STORAGE
+mkdir -p $NVR_STORAGE_DIRECTORY/.nvr
+chmod 0777 $NVR_STORAGE_DIRECTORY
 
 echo "Stopping Scrypted..."
 pct stop "$VMID"
@@ -57,7 +68,7 @@ then
 fi
 
 echo "Adding new $DISK_TYPE lxc.mount.entry."
-echo "lxc.mount.entry: $STORAGE mnt/nvr/$DISK_TYPE/$NVR_STORAGE none bind,optional,create=dir" >> "$FILE"
+echo "lxc.mount.entry: $NVR_STORAGE_DIRECTORY mnt/nvr/$DISK_TYPE/$NVR_STORAGE none bind,optional,create=dir" >> "$FILE"
 
 echo "Starting Scrypted..."
 pct start $VMID
