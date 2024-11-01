@@ -6,6 +6,9 @@ FROM header as base
 # intel opencl gpu and npu for openvino
 RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-graphics.sh | bash
 
+# vulkan
+RUN apt -y install libvulkan1
+
 # Disable NPU on docker, because level-zero crashes openvino on older systems.
 # RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-npu.sh | bash
 
