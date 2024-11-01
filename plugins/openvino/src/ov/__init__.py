@@ -30,6 +30,7 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
 
 availableModels = [
     "Default",
+    "scrypted_yolov9t_yuv_320",
     "scrypted_yolov10m_320",
     "scrypted_yolov10s_320",
     "scrypted_yolov10n_320",
@@ -45,6 +46,7 @@ availableModels = [
     "yolo-v3-tiny-tf",
     "yolo-v4-tiny-tf",
 ]
+
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -87,7 +89,10 @@ def dump_device_properties(core):
 
 
 class OpenVINOPlugin(
-    PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings, scrypted_sdk.DeviceProvider
+    PredictPlugin,
+    scrypted_sdk.BufferConverter,
+    scrypted_sdk.Settings,
+    scrypted_sdk.DeviceProvider,
 ):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
@@ -162,6 +167,7 @@ class OpenVINOPlugin(
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
         self.scrypted_model = "scrypted" in model
+        self.scrypted_yuv = "yuv" in model
         self.sigmoid = model == "yolo-v4-tiny-tf"
         self.modelName = model
 
@@ -203,6 +209,7 @@ class OpenVINOPlugin(
             self.compiled_model = self.core.compile_model(xmlFile, mode)
         except:
             import traceback
+
             traceback.print_exc()
 
             if mode == "GPU":
@@ -283,6 +290,11 @@ class OpenVINOPlugin(
     def get_input_size(self) -> Tuple[int, int]:
         return [self.model_dim, self.model_dim]
 
+    def get_input_format(self):
+        if self.scrypted_yuv:
+            return "yuvj444p"
+        return super().get_input_format()
+
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         def predict(input_tensor):
             infer_request = self.compiled_model.create_infer_request()
@@ -347,14 +359,24 @@ class OpenVINOPlugin(
 
             return objs
 
-
-        def prepare(): 
+        def prepare():
             # the input_tensor can be created with the shared_memory=True parameter,
             # but that seems to cause issues on some platforms.
             if self.scrypted_yolo:
-                im = np.array(input)
-                im = np.expand_dims(input, axis=0)
-                im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+                if not self.scrypted_yuv:
+                    im = np.expand_dims(input, axis=0)
+                    im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+                else:
+                    # when a yuv image is requested, it may be either planar or interleaved
+                    # as as hack, the input will come as RGB if already planar.
+                    if input.mode != "RGB":
+                        im = np.array(input)
+                        im = im.reshape((1, self.model_dim, self.model_dim, 3))
+                        im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+
+                    else:
+                        im = np.array(input)
+                        im = im.reshape((1, 3, self.model_dim, self.model_dim))
                 im = im.astype(np.float32) / 255.0
                 im = np.ascontiguousarray(im)  # contiguous
                 input_tensor = ov.Tensor(array=im)

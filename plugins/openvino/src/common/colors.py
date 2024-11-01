@@ -34,3 +34,21 @@ async def ensureRGBAData(data: bytes, size: Tuple[int, int], format: str):
         finally:
             rgb.close()
     return await to_thread(convert)
+
+async def ensureYCbCrAData(data: bytes, size: Tuple[int, int], format: str):
+    # if the format is already yuvj444p, just return the data as is.
+    if format == 'yuvj444p':
+        # return RGB as a hack to indicate the data is already yuv planar.
+        return Image.frombuffer('RGB', size, data)
+
+    def convert():
+        if format == 'rgb':
+            tmp = Image.frombuffer('RGB', size, data)
+        else:
+            tmp = Image.frombuffer('RGBA', size, data)
+
+        try:
+            return tmp.convert('YCbCr')
+        finally:
+            tmp.close()
+    return await to_thread(convert)

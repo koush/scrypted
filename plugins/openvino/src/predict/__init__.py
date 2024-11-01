@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-import re
+import math
 import traceback
 import urllib.request
 from typing import Any, List, Tuple
@@ -97,6 +97,10 @@ class PredictPlugin(DetectPlugin):
             detection: ObjectDetectionResult = {}
             detection['boundingBox'] = (
                 obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
+            # check bounding box for nan
+            if any(map(lambda x: not math.isfinite(x), detection['boundingBox'])):
+                print("unexpected nan detected", obj.bbox)
+                continue
             detection['className'] = className
             detection['score'] = obj.score
             if hasattr(obj, 'embedding') and obj.embedding is not None:
@@ -112,6 +116,9 @@ class PredictPlugin(DetectPlugin):
                 x2, y2 = convert_to_src_size(
                     (bb[0] + bb[2], bb[1] + bb[3]))
                 detection['boundingBox'] = (x, y, x2 - x + 1, y2 - y + 1)
+                if any(map(lambda x: not math.isfinite(x), detection['boundingBox'])):
+                    print("unexpected nan detected", obj.bbox)
+                    continue
                 detection_result['detections'].append(detection)
 
         # print(detection_result)
@@ -205,6 +212,13 @@ class PredictPlugin(DetectPlugin):
                 }
 
         format = image.format or self.get_input_format()
+
+        # if the model requires yuvj444p, convert the image to yuvj444p directly
+        # if possible, otherwise use whatever is available and convert in the detection plugin
+        if self.get_input_format() == 'yuvj444p':
+            if image.ffmpegFormats != True:
+                format = image.format or 'rgb'
+
         b = await image.toBuffer({
             'resize': resize,
             'format': format,
@@ -214,6 +228,10 @@ class PredictPlugin(DetectPlugin):
             data = await common.colors.ensureRGBData(b, (w, h), format)
         elif self.get_input_format() == 'rgba':
             data = await common.colors.ensureRGBAData(b, (w, h), format)
+        elif self.get_input_format() == 'yuvj444p':
+            data = await common.colors.ensureYCbCrAData(b, (w, h), format)
+        else:
+            raise Exception("unsupported format")
 
         try:
             ret = await self.safe_detect_once(data, settings, (iw, ih), cvss)
