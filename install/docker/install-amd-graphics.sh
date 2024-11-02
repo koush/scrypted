@@ -15,6 +15,8 @@ else
     distro="noble"
 fi
 
+# https://amdgpu-install.readthedocs.io/en/latest/install-prereq.html#installing-the-installer-package
+
 FILENAME="amdgpu-install_6.2.60202-1_all.deb"
 set -e
 mkdir -p /tmp/amd
