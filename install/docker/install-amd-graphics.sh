@@ -18,8 +18,11 @@ fi
 FILENAME="amdgpu-install_6.2.60202-1_all.deb"
 set -e
 mkdir -p /tmp/amd
+cd /tmp/amd
 curl -O -L http://repo.radeon.com/amdgpu-install/latest/ubuntu/$distro/$FILENAME
 apt -y install rsync
 dpkg -i $FILENAME
-
 amdgpu-install --usecase=opencl --no-dkms -y --accept-eula
+cd /tmp
+rm -rf /tmp/amd
+
