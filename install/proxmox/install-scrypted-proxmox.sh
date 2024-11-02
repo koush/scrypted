@@ -239,6 +239,7 @@ then
     echo "Adding udev rule: /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"apex\", MODE=\"0666\"' > /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"drm\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
+    sh -c "echo 'SUBSYSTEM==\"kfd\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"accel\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1a6e\", ATTRS{idProduct}==\"089a\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
     sh -c "echo 'SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"18d1\", ATTRS{idProduct}==\"9302\", MODE=\"0666\"' >> /etc/udev/rules.d/65-scrypted.rules"
