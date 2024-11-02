@@ -318,10 +318,17 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
     hasFloodlight() {
         const channel = this.getRtspChannel();
-        const floodLightConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel].floodLight?.ver ?? 0;
-        const supportFLswitchConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel].supportFLswitch?.ver ?? 0;
-        const supportFLBrightnessConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel].supportFLBrightness?.ver ?? 0;
-        return floodLightConfigVer > 0 || supportFLswitchConfigVer > 0 || supportFLBrightnessConfigVer > 0;
+
+        const channelData = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel];
+        if (channelData) {
+            const floodLightConfigVer = channelData.floodLight?.ver ?? 0;
+            const supportFLswitchConfigVer = channelData.supportFLswitch?.ver ?? 0;
+            const supportFLBrightnessConfigVer = channelData.supportFLBrightness?.ver ?? 0;
+
+            return floodLightConfigVer > 0 || supportFLswitchConfigVer > 0 || supportFLBrightnessConfigVer > 0;
+        }
+
+        return false;
     }
 
     hasBattery() {
@@ -857,7 +864,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (nativeId.endsWith('-siren')) {
             delete this.siren;
         } else
-            if (nativeId.endsWith('--floodlight')) {
+            if (nativeId.endsWith('-floodlight')) {
                 delete this.floodlight;
             }
     }

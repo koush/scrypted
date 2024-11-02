@@ -461,29 +461,6 @@ export class ReolinkCameraClient {
         }
     }
 
-    async getWhiteLedState() {
-        const url = new URL(`http://${this.host}/api.cgi`);
-
-        const body = [{
-            cmd: 'GetWhiteLed',
-            action: 0,
-            param: { channel: this.channelId }
-        }];
-
-        const response = await this.requestWithLogin({
-            url,
-            method: 'POST',
-            responseType: 'json',
-        }, this.createReadable(body));
-
-        const whiteledStatus = response.body?.[0]?.value?.WhiteLed;
-
-        return {
-            on: whiteledStatus?.state === 1,
-            brightness: whiteledStatus?.bright,
-        }
-    }
-
     async getBatteryInfo() {
         const url = new URL(`http://${this.host}/api.cgi`);
 
