@@ -1,5 +1,5 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import sdk, { Brightness, Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { createRtspMediaStreamOptions, Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -50,6 +50,34 @@ class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     }
 }
 
+class ReolinkCameraFloodlight extends ScryptedDeviceBase implements OnOff, Brightness {
+    constructor(public camera: ReolinkCamera, nativeId: string) {
+        super(nativeId);
+        this.on = false;
+    }
+
+    async setBrightness(brightness: number): Promise<void> {
+        this.brightness = brightness;
+        await this.setFloodlight(undefined, brightness);
+    }
+
+    async turnOff() {
+        this.on = false;
+        await this.setFloodlight(false);
+    }
+
+    async turnOn() {
+        this.on = true;
+        await this.setFloodlight(true);
+    }
+
+    private async setFloodlight(on?: boolean, brightness?: number) {
+        const api = this.camera.getClientWithToken();
+
+        await api.setWhiteLedState(on, brightness);
+    }
+}
+
 class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, Reboot, Intercom, ObjectDetector, PanTiltZoom {
     client: ReolinkCameraClient;
     clientWithToken: ReolinkCameraClient;
@@ -58,6 +86,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     motionTimeout: NodeJS.Timeout;
     siren: ReolinkCameraSiren;
+    floodlight: ReolinkCameraFloodlight;
     batteryTimeout: NodeJS.Timeout;
 
     storageSettings = new StorageSettings(this, {
@@ -186,15 +215,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             this.storageSettings.values.deviceInfo = deviceInfo;
             await this.updateAbilities();
             await this.updateDevice();
-            if (this.hasSiren()) {
-                this.reportSirenDevice();
-            }
-            else {
-                sdk.deviceManager.onDevicesChanged({
-                    providerNativeId: this.nativeId,
-                    devices: []
-                });
-            }
+            await this.reportDevices();
         })()
             .catch(e => {
                 this.console.log('device refresh failed', e);
@@ -295,6 +316,21 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             && this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm?.ver !== 0;
     }
 
+    hasFloodlight() {
+        const channel = this.getRtspChannel();
+
+        const channelData = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel];
+        if (channelData) {
+            const floodLightConfigVer = channelData.floodLight?.ver ?? 0;
+            const supportFLswitchConfigVer = channelData.supportFLswitch?.ver ?? 0;
+            const supportFLBrightnessConfigVer = channelData.supportFLBrightness?.ver ?? 0;
+
+            return floodLightConfigVer > 0 || supportFLswitchConfigVer > 0 || supportFLBrightnessConfigVer > 0;
+        }
+
+        return false;
+    }
+
     hasBattery() {
         const batteryConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.battery?.ver ?? 0;
         return batteryConfigVer > 0;
@@ -323,7 +359,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (this.storageSettings.values.hasObjectDetector) {
             interfaces.push(ScryptedInterface.ObjectDetector);
         }
-        if (this.hasSiren())
+        if (this.hasSiren() || this.hasFloodlight())
             interfaces.push(ScryptedInterface.DeviceProvider);
         if (this.hasBattery()) {
             interfaces.push(ScryptedInterface.Battery, ScryptedInterface.Online);
@@ -766,40 +802,71 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         return `${this.getIPAddress()}:${this.storage.getItem('rtmpPort') || 1935}`;
     }
 
-    reportSirenDevice() {
-        const sirenNativeId = `${this.nativeId}-siren`;
-        const sirenDevice: Device = {
-            providerNativeId: this.nativeId,
-            name: 'Reolink Siren',
-            nativeId: sirenNativeId,
-            info: {
-                ...this.info,
-            },
-            interfaces: [
-                ScryptedInterface.OnOff
-            ],
-            type: ScryptedDeviceType.Siren,
-        };
+    async reportDevices() {
+        const hasSiren = this.hasSiren();
+        const hasFloodlight = this.hasFloodlight();
+
+        const devices: Device[] = [];
+
+        if (hasSiren) {
+            const sirenNativeId = `${this.nativeId}-siren`;
+            const sirenDevice: Device = {
+                providerNativeId: this.nativeId,
+                name: `${this.name} Siren`,
+                nativeId: sirenNativeId,
+                info: {
+                    ...this.info,
+                },
+                interfaces: [
+                    ScryptedInterface.OnOff
+                ],
+                type: ScryptedDeviceType.Siren,
+            };
+
+            devices.push(sirenDevice);
+        }
+
+        if (hasFloodlight) {
+            const floodlightNativeId = `${this.nativeId}-floodlight`;
+            const floodlightDevice: Device = {
+                providerNativeId: this.nativeId,
+                name: `${this.name} Floodlight`,
+                nativeId: floodlightNativeId,
+                info: {
+                    ...this.info,
+                },
+                interfaces: [
+                    ScryptedInterface.OnOff
+                ],
+                type: ScryptedDeviceType.Light,
+            };
+
+            devices.push(floodlightDevice);
+        }
 
         sdk.deviceManager.onDevicesChanged({
             providerNativeId: this.nativeId,
-            devices: [sirenDevice]
+            devices
         });
-
-        return sirenNativeId;
     }
 
     async getDevice(nativeId: string): Promise<any> {
         if (nativeId.endsWith('-siren')) {
             this.siren ||= new ReolinkCameraSiren(this, nativeId);
             return this.siren;
+        } else if (nativeId.endsWith('-floodlight')) {
+            this.floodlight ||= new ReolinkCameraFloodlight(this, nativeId);
+            return this.floodlight;
         }
     }
 
     async releaseDevice(id: string, nativeId: string) {
         if (nativeId.endsWith('-siren')) {
             delete this.siren;
-        }
+        } else
+            if (nativeId.endsWith('-floodlight')) {
+                delete this.floodlight;
+            }
     }
 }
 
