@@ -688,6 +688,20 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 name: '',
                 id: 'autotrack.bcs',
                 container: 'rtmp',
+                video: { width: 2560, height: 1920 },
+                url: '',
+            },
+            streams.push({
+                name: '',
+                id: 'autotrack_main.bcs',
+                container: 'rtmp',
+                video: { width: 3840, height: 2160 },
+                url: '',
+            },
+            streams.push({
+                name: '',
+                id: 'autotrack_sub.bcs',
+                container: 'rtmp',
                 video: { width: 896, height: 512 },
                 url: '',
             });
@@ -706,7 +720,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 name: '',
                 id: `h264Preview_02_main`,
                 container: 'rtsp',
-                video: { codec: 'h264', width: 2560, height: 1920 },
+                video: { codec: 'h264', width: 3840, height: 2160 },
                 url: ''
             }, {
                 name: '',
