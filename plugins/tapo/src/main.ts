@@ -11,6 +11,12 @@ class TapoIntercomMixin extends SettingsMixinDeviceBase<VideoCamera & Settings> 
             title: 'Cloud Password',
             description: 'The Tapo Cloud account password. This is not the same as the ONVIF/RTSP local password.',
             type: 'password',
+        },
+        cameraIP: {
+            title: 'Camera IP Address',
+            description: 'The actual IP address of your Tapo camera, Defaults to the one Scrypted provides.',
+            type: 'string',
+            placeholder: 'e.g., 192.168.1.100',
         }
     });
     client: Promise<TapoAPI>;
@@ -19,7 +25,9 @@ class TapoIntercomMixin extends SettingsMixinDeviceBase<VideoCamera & Settings> 
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
         const settings = await this.mixinDevice.getSettings();
-        const ip = settings.find(s => s.key === 'ip')?.value?.toString();
+        const ipFromSetting = this.storageSettings.values.cameraIP;
+        const ipFromCamera = settings.find(s => s.key === 'ip')?.value?.toString();
+        const ip = ipFromSetting || ipFromCamera;
         await this.stopIntercom();
 
         if (!this.storageSettings.values.cloudPassword) {
