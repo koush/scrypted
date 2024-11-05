@@ -212,9 +212,9 @@ class OpenVINOPlugin(
 
             traceback.print_exc()
 
-            if mode == "GPU":
+            if "GPU" in mode:
                 try:
-                    print("GPU mode failed, reverting to AUTO.")
+                    print(f"{mode} mode failed, reverting to AUTO.")
                     mode = "AUTO"
                     self.mode = mode
                     self.compiled_model = self.core.compile_model(xmlFile, mode)
