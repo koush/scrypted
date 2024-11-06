@@ -160,7 +160,7 @@ export function createAsyncQueueFromGenerator<T>(generator: AsyncGenerator<T>) {
     (async() => {
         try {
             for await (const i of generator) {
-                q.submit(i);
+                await q.enqueue(i);
             }
         }
         catch (e) {
