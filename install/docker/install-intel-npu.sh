@@ -38,7 +38,7 @@ set -e
 rm -rf /tmp/npu && mkdir -p /tmp/npu && cd /tmp/npu
 
 # level zero must also be installed
-LEVEL_ZERO_VERSION=1.18.3
+LEVEL_ZERO_VERSION=1.18.5
 # https://github.com/oneapi-src/level-zero
 curl -O -L https://github.com/oneapi-src/level-zero/releases/download/v"$LEVEL_ZERO_VERSION"/level-zero_"$LEVEL_ZERO_VERSION"+u$distro.deb
 curl -O -L https://github.com/oneapi-src/level-zero/releases/download/v"$LEVEL_ZERO_VERSION"/level-zero-devel_"$LEVEL_ZERO_VERSION"+u$distro.deb
