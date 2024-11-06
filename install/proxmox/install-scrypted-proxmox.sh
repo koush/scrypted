@@ -172,7 +172,7 @@ then
     fi
 
     # create a backup that contains only the root disk.
-    rm *.tar
+    rm -f *.tar
     vzdump $SCRYPTED_BACKUP_VMID --dumpdir /tmp
 
     # this moves the data volume from the current scrypted instance to the backup target to preserve it during
