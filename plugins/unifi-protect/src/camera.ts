@@ -1,6 +1,6 @@
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { fitHeightToWidth } from "@scrypted/common/src/resolution-utils";
-import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, NotifierOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, Online, PanTiltZoom, PanTiltZoomCommand, PictureOptions, PrivacyMasks, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration, VideoCameraMask } from "@scrypted/sdk";
+import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamConfiguration, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, NotifierOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, Online, PanTiltZoom, PanTiltZoomCommand, PictureOptions, PrivacyMasks, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration, VideoCameraMask } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { once } from "events";
 import { PassThrough, Readable } from "stream";
@@ -382,7 +382,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
                 minBitrate: channel.minBitrate,
                 maxBitrate: channel.maxBitrate,
                 fps: channel.fps,
-                idrIntervalMillis: channel.idrInterval * 1000,
+                keyframeInterval: channel.idrInterval * channel.fps,
             },
             audio: {
                 codec: 'aac',
@@ -404,7 +404,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return vsos;
     }
 
-    async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
+    async setVideoStreamOptions(options: MediaStreamOptions): Promise<MediaStreamConfiguration> {
         const bitrate = options?.video?.bitrate;
         if (!bitrate)
             return;
