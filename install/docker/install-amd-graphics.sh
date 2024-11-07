@@ -1,3 +1,9 @@
+if [ "$(uname -m)" != "x86_64" ]
+then
+    echo "AMD graphics will not be installed on this architecture."
+    exit 0
+fi
+
 UBUNTU_22_04=$(lsb_release -r | grep "22.04")
 UBUNTU_24_04=$(lsb_release -r | grep "24.04")
 
