@@ -5,10 +5,23 @@ export interface UnifiMotionDevice {
     setMotionDetected(motionDetected: boolean): void;
 }
 
+export interface UnifiFingerprintDevice {
+    fingerprintTimeout: NodeJS.Timeout;
+    setFingerprintDetected(fingerprintDetected: boolean): void;
+}
+
 export function debounceMotionDetected(device: UnifiMotionDevice) {
     device.setMotionDetected(true);
     clearTimeout(device.motionTimeout);
     device.motionTimeout = setTimeout(() => {
         device.setMotionDetected(false);
+    }, MOTION_SENSOR_TIMEOUT);
+}
+
+export function debounceFingerprintDetected(device: UnifiFingerprintDevice) {
+    device.setFingerprintDetected(true);
+    clearTimeout(device.fingerprintTimeout);
+    device.fingerprintTimeout = setTimeout(() => {
+        device.setFingerprintDetected(false);
     }, MOTION_SENSOR_TIMEOUT);
 }

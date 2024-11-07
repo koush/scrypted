@@ -6,7 +6,7 @@ import axios from "axios";
 import { UnifiCamera } from "./camera";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
-import { debounceMotionDetected } from "./motion";
+import { debounceFingerprintDetected, debounceMotionDetected } from "./motion";
 import { UnifiSensor } from "./sensor";
 import { FeatureFlagsShim, LastSeenShim } from "./shim";
 import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect";
@@ -219,6 +219,9 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     }
                     else if (payload.type === 'motion') {
                         debounceMotionDetected(unifiCamera);
+                    }
+                    else if (payload.type === 'fingerprintIdentified') {
+                        debounceFingerprintDetected(unifiCamera);
                     }
                 }
 
@@ -482,31 +485,58 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
             // handle package cameras as a sub device
             for (const camera of this.api.cameras) {
-                if (!(camera.featureFlags as any as FeatureFlagsShim).hasPackageCamera)
+                const devices: Device[] = [];
+
+                if ((camera.featureFlags as any as FeatureFlagsShim).hasPackageCamera) {
+                    const nativeId = camera.id + '-packageCamera';
+                    const d: Device = {
+                        providerNativeId: this.getNativeId(camera, true),
+                        name: camera.name + ' Package Camera',
+                        nativeId,
+                        info: {
+                            manufacturer: 'Ubiquiti',
+                            model: camera.type,
+                            firmware: camera.firmwareVersion,
+                            version: camera.hardwareRevision,
+                            serialNumber: camera.id,
+                        },
+                        interfaces: [
+                            ScryptedInterface.Camera,
+                            ScryptedInterface.VideoCamera,
+                            ScryptedInterface.MotionSensor,
+                        ],
+                        type: ScryptedDeviceType.Camera,
+                    };
+                    devices.push(d);
+                }
+
+                if ((camera.featureFlags as any as FeatureFlagsShim).hasFingerprintSensor) {
+                    const nativeId = camera.id + '-fingerprintSensor';
+                    const d: Device = {
+                        providerNativeId: this.getNativeId(camera, true),
+                        name: camera.name + ' Fingerprint Sensor',
+                        nativeId,
+                        info: {
+                            manufacturer: 'Ubiquiti',
+                            model: camera.type,
+                            firmware: camera.firmwareVersion,
+                            version: camera.hardwareRevision,
+                            serialNumber: camera.id,
+                        },
+                        interfaces: [
+                            ScryptedInterface.BinarySensor,
+                        ],
+                        type: ScryptedDeviceType.Sensor,
+                    };
+                    devices.push(d);
+                }
+
+                if (!devices.length)
                     continue;
-                const nativeId = camera.id + '-packageCamera';
-                const d: Device = {
-                    providerNativeId: this.getNativeId(camera, true),
-                    name: camera.name + ' Package Camera',
-                    nativeId,
-                    info: {
-                        manufacturer: 'Ubiquiti',
-                        model: camera.type,
-                        firmware: camera.firmwareVersion,
-                        version: camera.hardwareRevision,
-                        serialNumber: camera.id,
-                    },
-                    interfaces: [
-                        ScryptedInterface.Camera,
-                        ScryptedInterface.VideoCamera,
-                        ScryptedInterface.MotionSensor,
-                    ],
-                    type: ScryptedDeviceType.Camera,
-                };
 
                 await deviceManager.onDevicesChanged({
                     providerNativeId: this.getNativeId(camera, true),
-                    devices: [d],
+                    devices,
                 });
             }
         }
@@ -613,7 +643,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     }
 
     getNativeId(device: { id?: string, mac?: string; anonymousDeviceId?: string, host?: string }, update: boolean) {
-        const { id, mac, anonymousDeviceId,host } = device;
+        const { id, mac, anonymousDeviceId, host } = device;
         const idMaps = this.storageSettings.values.idMaps;
 
         // try to find an existing nativeId given the mac and anonymous device id
