@@ -3,7 +3,4 @@ numpy>=1.16.2
 
 av>=10.0.0
 
-# in case pyvips fails to load, use a pillow fallback.
-# pillow for anything not intel linux, pillow-simd is available on x64 linux
-Pillow>=5.4.1; 'linux' not in sys_platform or platform_machine != 'x86_64'
-pillow-simd; 'linux' in sys_platform and platform_machine == 'x86_64'
+Pillow>=5.4.1

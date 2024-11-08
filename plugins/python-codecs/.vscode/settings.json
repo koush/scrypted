@@ -1,31 +1,20 @@
 
 {
     // docker installation
-    // "scrypted.debugHost": "scrypted-server",
-    // "scrypted.serverRoot": "/server",
-
-    // lxc installation
-    // "scrypted.debugHost": "scrypted-server",
-    // "scrypted.serverRoot": "/root/.scrypted",
-
-    // windows installation
-    // "scrypted.debugHost": "koushik-windows",
-    // "scrypted.serverRoot": "C:\\Users\\koush\\.scrypted",
+    "scrypted.debugHost": "scrypted-nvr",
+    "scrypted.serverRoot": "/server",
 
     // pi local installation
     // "scrypted.debugHost": "192.168.2.119",
     // "scrypted.serverRoot": "/home/pi/.scrypted",
 
     // local checkout
-    "scrypted.debugHost": "127.0.0.1",
-    "scrypted.serverRoot": "/Users/koush/.scrypted",
+    // "scrypted.debugHost": "127.0.0.1",
+    // "scrypted.serverRoot": "/Users/koush/.scrypted",
+    // "scrypted.debugHost": "koushik-winvm",
+    // "scrypted.serverRoot": "C:\\Users\\koush\\.scrypted",
 
-    "scrypted.pythonRemoteRoot": "${config:scrypted.serverRoot}/volume/plugin.zip",
     "python.analysis.extraPaths": [
         "./node_modules/@scrypted/sdk/types/scrypted_python"
-    ],
-    "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter"
-    },
-    "python.formatting.provider": "none"
+    ]
 }

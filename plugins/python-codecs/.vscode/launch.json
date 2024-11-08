@@ -21,21 +21,10 @@
                 },
                 {
                     "localRoot": "${workspaceFolder}/src",
-                    "remoteRoot": "${config:scrypted.pythonRemoteRoot}"
+                    "remoteRoot": "."
                 },
 
             ]
-        },
-        {
-            "name": "Python: Test",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/test.py",
-            "console": "internalConsole",
-            "justMyCode": true,
-            "env": {
-                "GST_PLUGIN_PATH": "/opt/homebrew/lib/gstreamer-1.0"
-            }
         }
     ]
 }
