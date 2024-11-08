@@ -1,7 +1,5 @@
-# must ensure numpy is pinned to prevent dependencies with an unpinned numpy from pulling numpy>=2.0.
-numpy==1.26.4
 # openvino 2024.3.0 crashes on older CPU (J4105 and older) if level-zero is installed via apt.
 # openvino 2024.2.0 and older crashes on arc dGPU.
-openvino==2024.4.0
+openvino-nightly==2024.5.0.dev20241105
 Pillow==10.3.0
-opencv-python==4.10.0.84
+opencv-python-headless==4.10.0.84
