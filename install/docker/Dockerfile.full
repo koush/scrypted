@@ -40,7 +40,7 @@ RUN echo "Installing gstreamer."
 # python-codecs pygobject dependencies
 RUN apt-get -y install libcairo2-dev libgirepository1.0-dev
 RUN apt-get -y install \
-    gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav gstreamer1.0-alsa \
+    gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav \
     gstreamer1.0-vaapi
 
 # python3 gstreamer bindings
