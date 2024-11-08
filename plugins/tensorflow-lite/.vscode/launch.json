@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Scrypted Debugger",
-            "type": "python",
+            "type": "debugpy",
             "request": "attach",
             "connect": {
                 "host": "${config:scrypted.debugHost}",
@@ -21,9 +21,8 @@
                 },
                 {
                     "localRoot": "${workspaceFolder}/src",
-                    "remoteRoot": "${config:scrypted.pythonRemoteRoot}"
+                    "remoteRoot": "."
                 },
-
             ]
         }
     ]
