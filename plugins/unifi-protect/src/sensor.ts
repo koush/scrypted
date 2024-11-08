@@ -1,6 +1,6 @@
 import { AudioSensor, BinarySensor, HumiditySensor, MotionSensor, ScryptedDeviceBase, TemperatureUnit, Thermometer } from "@scrypted/sdk";
 import { UnifiProtect } from "./main";
-import { UnifiMotionDevice, debounceMotionDetected } from "./motion";
+import { UnifiMotionDevice, debounceMotionDetected } from "./camera-sensors";
 import { ProtectSensorConfig } from "./unifi-protect";
 
 export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, HumiditySensor, AudioSensor, BinarySensor, MotionSensor, UnifiMotionDevice {

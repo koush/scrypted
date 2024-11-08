@@ -7,7 +7,7 @@ import { once } from "events";
 import { Readable } from "stream";
 import WS from 'ws';
 import { UnifiProtect } from "./main";
-import { MOTION_SENSOR_TIMEOUT, UnifiFingerprintDevice, UnifiMotionDevice, debounceMotionDetected } from './motion';
+import { MOTION_SENSOR_TIMEOUT, UnifiFingerprintDevice, UnifiMotionDevice, debounceMotionDetected } from './camera-sensors';
 import { FeatureFlagsShim, PrivacyZone } from "./shim";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 

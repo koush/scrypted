@@ -6,7 +6,7 @@ import axios from "axios";
 import { UnifiCamera } from "./camera";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
-import { debounceFingerprintDetected, debounceMotionDetected } from "./motion";
+import { debounceFingerprintDetected, debounceMotionDetected } from "./camera-sensors";
 import { UnifiSensor } from "./sensor";
 import { FeatureFlagsShim, LastSeenShim } from "./shim";
 import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect";
@@ -489,10 +489,12 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             for (const camera of this.api.cameras) {
                 const devices: Device[] = [];
 
+                const providerNativeId = this.getNativeId(camera, true);
+
                 if ((camera.featureFlags as any as FeatureFlagsShim).hasPackageCamera) {
-                    const nativeId = camera.id + '-packageCamera';
+                    const nativeId = providerNativeId + '-packageCamera';
                     const d: Device = {
-                        providerNativeId: this.getNativeId(camera, true),
+                        providerNativeId,
                         name: camera.name + ' Package Camera',
                         nativeId,
                         info: {
@@ -513,9 +515,9 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 }
 
                 if ((camera.featureFlags as any as FeatureFlagsShim).hasFingerprintSensor) {
-                    const nativeId = camera.id + '-fingerprintSensor';
+                    const nativeId = providerNativeId + '-fingerprintSensor';
                     const d: Device = {
-                        providerNativeId: this.getNativeId(camera, true),
+                        providerNativeId,
                         name: camera.name + ' Fingerprint Sensor',
                         nativeId,
                         info: {

@@ -1,4 +1,5 @@
 export const MOTION_SENSOR_TIMEOUT = 25000;
+export const FINGERPRINT_SENSOR_TIMEOUT = 5000;
 
 export interface UnifiMotionDevice {
     motionTimeout: NodeJS.Timeout;
@@ -23,5 +24,5 @@ export function debounceFingerprintDetected(device: UnifiFingerprintDevice) {
     clearTimeout(device.fingerprintTimeout);
     device.fingerprintTimeout = setTimeout(() => {
         device.setFingerprintDetected(false);
-    }, MOTION_SENSOR_TIMEOUT);
+    }, FINGERPRINT_SENSOR_TIMEOUT);
 }

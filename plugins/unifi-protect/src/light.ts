@@ -1,6 +1,6 @@
 import { Brightness, MotionSensor, OnOff, ScryptedDeviceBase, TemperatureUnit } from "@scrypted/sdk";
 import { UnifiProtect } from "./main";
-import { UnifiMotionDevice, debounceMotionDetected } from "./motion";
+import { UnifiMotionDevice, debounceMotionDetected } from "./camera-sensors";
 import { ProtectLightConfig } from "./unifi-protect";
 
 export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness, MotionSensor, UnifiMotionDevice {
