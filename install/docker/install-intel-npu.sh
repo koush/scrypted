@@ -45,8 +45,8 @@ curl -O -L https://github.com/oneapi-src/level-zero/releases/download/v"$LEVEL_Z
 
 # npu driver
 # https://github.com/intel/linux-npu-driver
-NPU_VERSION=1.8.0
-NPU_VERSION_DATE=20240916-10885588273
+NPU_VERSION=1.10.0
+NPU_VERSION_DATE=20241107-11729849322
 curl -O -L https://github.com/intel/linux-npu-driver/releases/download/v"$NPU_VERSION"/intel-driver-compiler-npu_$NPU_VERSION."$NPU_VERSION_DATE"_ubuntu$distro.deb
 # firmware can only be installed on host. will cause problems inside container.
 if [ -n "$INTEL_FW_NPU" ]
