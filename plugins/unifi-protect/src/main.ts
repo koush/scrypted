@@ -221,8 +221,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         debounceMotionDetected(unifiCamera);
                     }
                     else if (payload.type === 'fingerprintIdentified') {
-                        if ((payload as any).metadata?.fingerprint?.userId) {
+                        const userId: string = (payload as any).metadata?.fingerprint?.userId
+                        if (userId) {
                             debounceFingerprintDetected(unifiCamera);
+                            detections[0].label = userId;
+                            detections[0].labelScore = 1;
                         }
                     }
                 }

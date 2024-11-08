@@ -275,6 +275,8 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             classes.push('ring');
         if (this.interfaces.includes(ScryptedInterface.ObjectDetector))
             classes.push(...this.findCamera().featureFlags.smartDetectTypes);
+        if ((this.findCamera().featureFlags as any as FeatureFlagsShim).hasFingerprintSensor)
+            classes.push('fingerprintIdentified');
         return {
             classes,
         };
