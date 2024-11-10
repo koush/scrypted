@@ -94,7 +94,7 @@ class RpcFileTransport(RpcTransport):
                 reject(e)
 
     def writeJSON(self, j, reject):
-        return self.writeMessage(0, bytes(json.dumps(j), 'utf8'), reject)
+        return self.writeMessage(0, bytes(json.dumps(j, allow_nan=False), 'utf8'), reject)
 
     def writeBuffer(self, buffer, reject):
         return self.writeMessage(1, buffer, reject)
@@ -128,7 +128,7 @@ class RpcStreamTransport(RpcTransport):
                 reject(e)
 
     def writeJSON(self, j, reject):
-        return self.writeMessage(0, bytes(json.dumps(j), 'utf8'), reject)
+        return self.writeMessage(0, bytes(json.dumps(j, allow_nan=False), 'utf8'), reject)
 
     def writeBuffer(self, buffer, reject):
         return self.writeMessage(1, buffer, reject)
