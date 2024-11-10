@@ -30,6 +30,7 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
 
 availableModels = [
     "Default",
+    "scrypted_yolov9c_junk_320",
     "scrypted_yolov9t_yuv_320",
     "scrypted_yolov10m_320",
     "scrypted_yolov10s_320",
