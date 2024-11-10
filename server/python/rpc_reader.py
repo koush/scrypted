@@ -12,23 +12,7 @@ import multiprocessing.connection
 import rpc
 import concurrent.futures
 import json
-import math
 
-def convert_nan_inf_to_none(obj):
-    if isinstance(obj, dict):
-        return {key: convert_nan_inf_to_none(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_nan_inf_to_none(item) for item in obj]
-    elif isinstance(obj, float):
-        if math.isnan(obj):
-            return None
-        if math.isinf(obj):
-            return None
-    return obj
-
-def json_dumps_clean(obj, **kwargs):
-    cleaned_obj = convert_nan_inf_to_none(obj)
-    return json.dumps(cleaned_obj, **kwargs)
 
 class BufferSerializer(rpc.RpcSerializer):
     def serialize(self, value, serializationContext):
@@ -110,7 +94,7 @@ class RpcFileTransport(RpcTransport):
                 reject(e)
 
     def writeJSON(self, j, reject):
-        return self.writeMessage(0, bytes(json_dumps_clean(j), 'utf8'), reject)
+        return self.writeMessage(0, bytes(json.dumps(j), 'utf8'), reject)
 
     def writeBuffer(self, buffer, reject):
         return self.writeMessage(1, buffer, reject)
@@ -144,7 +128,7 @@ class RpcStreamTransport(RpcTransport):
                 reject(e)
 
     def writeJSON(self, j, reject):
-        return self.writeMessage(0, bytes(json_dumps_clean(j), 'utf8'), reject)
+        return self.writeMessage(0, bytes(json.dumps(j), 'utf8'), reject)
 
     def writeBuffer(self, buffer, reject):
         return self.writeMessage(1, buffer, reject)
