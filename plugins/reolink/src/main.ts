@@ -683,30 +683,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         }
 
 
-        if (deviceInfo?.model == "Reolink TrackMix PoE") {
-            streams.push({
-                name: '',
-                id: 'autotrack.bcs',
-                container: 'rtmp',
-                video: { width: 2560, height: 1920 },
-                url: '',
-            },
-            streams.push({
-                name: '',
-                id: 'autotrack_main.bcs',
-                container: 'rtmp',
-                video: { width: 3840, height: 2160 },
-                url: '',
-            },
-            streams.push({
-                name: '',
-                id: 'autotrack_sub.bcs',
-                container: 'rtmp',
-                video: { width: 896, height: 512 },
-                url: '',
-            });
-        }
-
         // https://github.com/starkillerOG/reolink_aio/blob/main/reolink_aio/api.py#L93C1-L97C2
         // single motion models have 2*2 RTSP channels
         if (deviceInfo?.model &&
@@ -717,6 +693,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 "RLC-81MA"
             ].includes(deviceInfo?.model)) {
             streams.push({
+                name: '',
+                id: 'autotrack.bcs',
+                container: 'rtmp',
+                video: { width: 2560, height: 1920 },
+                url: '',
+            }, {
                 name: '',
                 id: `h264Preview_02_main`,
                 container: 'rtsp',
