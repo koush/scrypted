@@ -342,7 +342,7 @@ class OpenVINOPlugin(
                 return objs
 
             output = infer_request.get_output_tensor(0)
-            for values in output.data[0][0].astype(float):
+            for values in output.data[0][0]:
                 valid, index, confidence, l, t, r, b = values
                 if valid == -1:
                     break

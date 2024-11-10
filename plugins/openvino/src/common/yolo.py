@@ -12,11 +12,11 @@ def parse_yolov10(results, threshold = defaultThreshold, scale = None, confidenc
     for indices in keep:
         class_id = indices[0]
         index = indices[1]
-        confidence = results[class_id + 4, index].astype(float)
-        l = results[0][index].astype(float)
-        t = results[1][index].astype(float)
-        r = results[2][index].astype(float)
-        b = results[3][index].astype(float)
+        confidence = results[class_id + 4, index]
+        l = results[0][index]
+        t = results[1][index]
+        r = results[2][index]
+        b = results[3][index]
         if scale:
             l = scale(l)
             t = scale(t)
@@ -47,7 +47,7 @@ def parse_yolo_nas(predictions):
         pred_cls_label = j[:]
         for box, conf, label in zip(pred_bboxes, pred_cls_conf, pred_cls_label):
             obj = Prediction(
-                int(label), conf.astype(float), Rectangle(box[0].astype(float), box[1].astype(float), box[2].astype(float), box[3].astype(float))
+                int(label), conf, Rectangle(box[0], box[1], box[2], box[3])
             )
             objs.append(obj)
     return objs
@@ -58,11 +58,11 @@ def parse_yolov9(results, threshold = defaultThreshold, scale = None, confidence
     for indices in keep:
         class_id = indices[0]
         index = indices[1]
-        confidence = results[class_id + 4, index].astype(float)
-        x = results[0][index].astype(float)
-        y = results[1][index].astype(float)
-        w = results[2][index].astype(float)
-        h = results[3][index].astype(float)
+        confidence = results[class_id + 4, index]
+        x = results[0][index]
+        y = results[1][index]
+        w = results[2][index]
+        h = results[3][index]
         if scale:
             x = scale(x)
             y = scale(y)
@@ -190,12 +190,12 @@ def parse_yolo_region(blob, original_im_shape, anchors, sigmoid = True):
                 ymax = y + height /2 
                 objects.append(
                     {
-                        'xmin': xmin.astype(float),
-                        'xmax': xmax.astype(float),
-                        'ymin': ymin.astype(float),
-                        'ymax': ymax.astype(float),
-                        'confidence': confidence.astype(float),
-                        'classId': class_id.astype(float),
+                        'xmin': xmin,
+                        'xmax': xmax,
+                        'ymin': ymin,
+                        'ymax': ymax,
+                        'confidence': confidence,
+                        'classId': class_id,
                     }
                 )
 

@@ -14,12 +14,20 @@ from scrypted_sdk.types import (ObjectDetectionResult, ObjectDetectionSession,
 
 import common.colors
 from detect import DetectPlugin
+from predict.rectangle import Rectangle
 
 class Prediction:
-    def __init__(self, id: int, score: float, bbox: Tuple[float, float, float, float], embedding: str = None):
-        self.id = id
-        self.score = score
-        self.bbox = bbox
+    def __init__(self, id: int, score: float, bbox: Rectangle, embedding: str = None):
+        # these may be numpy values. sanitize them.
+        self.id = int(id)
+        self.score = float(score)
+        # ensure all floats from numpy
+        self.bbox = Rectangle(
+            float(bbox.xmin),
+            float(bbox.ymin),
+            float(bbox.xmax),
+            float(bbox.ymax),
+        )
         self.embedding = embedding
 
 class PredictPlugin(DetectPlugin):
