@@ -686,7 +686,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // https://github.com/starkillerOG/reolink_aio/blob/main/reolink_aio/api.py#L93C1-L97C2
         // single motion models have 2*2 RTSP channels
         if (deviceInfo?.model &&
-            rtspChannel === 0 &&
             [
                 "Reolink TrackMix PoE",
                 "Reolink TrackMix WiFi",
@@ -698,19 +697,23 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 container: 'rtmp',
                 video: { width: 896, height: 512 },
                 url: '',
-            }, {
-                name: '',
-                id: `h264Preview_02_main`,
-                container: 'rtsp',
-                video: { codec: 'h264', width: 3840, height: 2160 },
-                url: ''
-            }, {
-                name: '',
-                id: `h264Preview_02_sub`,
-                container: 'rtsp',
-                video: { codec: 'h264', width: 640, height: 480 },
-                url: ''
             });
+
+            if (rtspChannel === 0) {
+                streams.push({
+                    name: '',
+                    id: `h264Preview_02_main`,
+                    container: 'rtsp',
+                    video: { codec: 'h264', width: 3840, height: 2160 },
+                    url: ''
+                }, {
+                    name: '',
+                    id: `h264Preview_02_sub`,
+                    container: 'rtsp',
+                    video: { codec: 'h264', width: 640, height: 480 },
+                    url: ''
+                })
+            }
         }
 
         for (const stream of streams) {
