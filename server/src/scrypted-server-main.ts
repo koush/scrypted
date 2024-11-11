@@ -11,38 +11,24 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 import process from 'process';
-import semver from 'semver';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { Plugin, ScryptedUser, Settings } from './db-types';
 import { getUsableNetworkAddresses } from './ip';
 import Level from './level';
-import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
-import { RPCResultError } from './rpc';
 import { ScryptedRuntime } from './runtime';
 import { SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { getNpmPackageInfo } from './services/plugin';
 import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
+import { createClusterServer, getScryptedClusterMode } from './scrypted-cluster';
 
 export type Runtime = ScryptedRuntime;
 
-if (!semver.gte(process.version, '18.0.0')) {
-    throw new Error('"node" version out of date. Please update node to v18 or higher.')
-}
-
-process.on('unhandledRejection', error => {
-    if (error?.constructor !== RPCResultError && error?.constructor !== PluginError) {
-        console.error('pending crash', error);
-        throw error;
-    }
-    console.warn('unhandled rejection of RPC Result', error);
-});
-
-async function listenServerPort(env: string, port: number, server: any) {
-    server.listen(port);
+async function listenServerPort(env: string, port: number, server: http.Server | https.Server | net.Server, hostname?: string) {
+    server.listen(port, hostname);
     try {
         await once(server, 'listening');
     }
@@ -474,7 +460,7 @@ async function start(mainFilename: string, options?: {
             debugServer.on('connection', resolve);
         });
 
-        waitDebug.catch(() => {});
+        waitDebug.catch(() => { });
 
         workerInspectPort = Math.round(Math.random() * 10000) + 30000;
         try {
@@ -737,6 +723,12 @@ async function start(mainFilename: string, options?: {
     await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
     await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
 
+    const clusterMode = getScryptedClusterMode();
+    if (clusterMode?.[0] === 'server') {
+        const clusterServer = createClusterServer(scrypted, keyPair);
+        await listenServerPort('SCRYPTED_CLUSTER_SERVER', clusterMode[2], clusterServer);
+    }
+
     console.log('#######################################################');
     console.log(`Scrypted Volume           : ${volumeDir}`);
     console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
@@ -746,13 +738,13 @@ async function start(mainFilename: string, options?: {
     console.log(`Version:       : ${await scrypted.info.getVersion()}`);
     console.log('#######################################################');
     console.log('Scrypted insecure http service port:', SCRYPTED_INSECURE_PORT);
-    console.log('Ports can be changed with environment variables.')
-    console.log('https: $SCRYPTED_SECURE_PORT')
-    console.log('http : $SCRYPTED_INSECURE_PORT')
-    console.log('Certificate can be modified via tls.createSecureContext options in')
+    console.log('Ports can be changed with environment variables.');
+    console.log('https: $SCRYPTED_SECURE_PORT');
+    console.log('http : $SCRYPTED_INSECURE_PORT');
+    console.log('Certificate can be modified via tls.createSecureContext options in');
     console.log('JSON file located at SCRYPTED_HTTPS_OPTIONS_FILE environment variable:');
     console.log('export SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/options.json');
-    console.log('https://nodejs.org/api/tls.html#tlscreatesecurecontextoptions')
+    console.log('https://nodejs.org/api/tls.html#tlscreatesecurecontextoptions');
     console.log('#######################################################');
 
     return scrypted;

@@ -1,10 +1,11 @@
 import os from 'os';
 import net from 'net';
 
+export const loopbackList = new net.BlockList();
+loopbackList.addSubnet('127.0.0.0', 8);
+loopbackList.addAddress('::1', 'ipv6');
+
 const unusableList = new net.BlockList();
-// loopback
-unusableList.addSubnet('127.0.0.0', 8);
-unusableList.addAddress('::1', 'ipv6');
 
 // link local
 unusableList.addSubnet('169.254.0.0', 16);
@@ -56,7 +57,7 @@ function isUsableNetworkAddress(address: string) {
         if (type === 'ipv6' && privateList.check(address, type))
             return false;
 
-        return !unusableList.check(address, type);
+        return !unusableList.check(address, type) && !loopbackList.check(address, type);
     }
     catch (e) {
         return false;

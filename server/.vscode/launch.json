@@ -39,5 +39,67 @@
                 // "DEBUG": "*",
             }
         },
+
+        {
+            "autoAttachChildProcesses": false,
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Cluster Server",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "preLaunchTask": "npm: build",
+            "program": "${workspaceFolder}/bin/scrypted-serve",
+            "runtimeArgs": [
+                "--trace-warnings",
+                "--nolazy",
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "env": {
+                "SCRYPTED_CLUSTER_MODE": "server",
+                "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",
+                "SCRYPTED_CLUSTER_SECRET": "swordfish",
+                "SCRYPTED_CAN_RESTART": "true",
+                "SCRYPTED_VOLUME": "/Users/koush/.scrypted-cluster/volume-server",
+            }
+        },
+
+        {
+            "autoAttachChildProcesses": false,
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Cluster Client",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "preLaunchTask": "npm: build",
+            "program": "${workspaceFolder}/bin/scrypted-serve",
+            "runtimeArgs": [
+                "--trace-warnings",
+                "--nolazy",
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "env": {
+                "SCRYPTED_CLUSTER_MODE": "client",
+                "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",
+                "SCRYPTED_CLUSTER_SECRET": "swordfish",
+                "SCRYPTED_CAN_RESTART": "true",
+                "SCRYPTED_VOLUME": "/Users/koush/.scrypted-cluster/volume-client",
+            }
+        },
     ]
 }

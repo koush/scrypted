@@ -43,6 +43,7 @@ import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
+import { ClusterWorker } from './scrypted-cluster';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -59,7 +60,8 @@ interface HttpPluginData {
 
 export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     clusterId = crypto.randomBytes(3).toString('hex');
-    clusterSecret = crypto.randomBytes(16).toString('hex');
+    clusterSecret = process.env.SCRYPTED_CLUSTER_SECRET || crypto.randomBytes(16).toString('hex');
+    clusterWorkers = new Set<ClusterWorker>();
     plugins: { [id: string]: PluginHost } = {};
     pluginDevices: { [id: string]: PluginDevice } = {};
     devices: { [id: string]: DeviceProxyPair } = {};
