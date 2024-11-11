@@ -42,6 +42,29 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
     return [mode, server, port];
 }
 
+function preparePeer(socket: tls.TLSSocket, type: 'server' | 'client') {
+    const serializer = createRpcDuplexSerializer(socket);
+    const peer = new RpcPeer('cluster-remote', 'cluster-host', (message, reject, serializationContext) => {
+        serializer.sendMessage(message, reject, serializationContext);
+    });
+
+    serializer.setupRpcPeer(peer);
+
+    socket.on('data', data => serializer.onData(data));
+
+    socket.on('error', e => {
+        peer.kill(e.message);
+    });
+    socket.on('close', () => {
+        peer.kill(`cluster ${type} closed`);
+    });
+    peer.killed.then(() => {
+        socket.destroy();
+    });
+
+    return peer;
+}
+
 export function startClusterClient(mainFilename: string) {
     let labels = process.env.SCRYPTED_CLUSTER_LABELS?.split(',') || [];
     labels.push(process.arch, process.platform, os.hostname());
@@ -54,29 +77,19 @@ export function startClusterClient(mainFilename: string) {
         (async () => {
             while (true) {
                 const backoff = sleep(10000);
-                try {
-                    const client = tls.connect({
-                        host,
-                        port,
-                        rejectUnauthorized: false,
-                    });
+                const socket = tls.connect({
+                    host,
+                    port,
+                    rejectUnauthorized: false,
+                });
 
-                    const serializer = createRpcDuplexSerializer(client);
-                    const peer = new RpcPeer('cluster-remote', 'cluster-host', (message, reject, serializationContext) => {
-                        serializer.sendMessage(message, reject, serializationContext);
-                    });
-                    serializer.setupRpcPeer(peer);
-                    client.on('data', data => serializer.onData(data));
-                    client.on('error', e => {
-                        peer.kill(e);
-                    });
-                    client.on('close', () => {
-                        peer.kill('cluster server closed');
-                    });
+                const peer = preparePeer(socket, 'client');
+                
+                try {
                     const connectForkWorker = await peer.getParam('connectForkWorker');
                     const auth: ClusterObject = {
-                        address: client.localAddress,
-                        port: client.localPort,
+                        address: socket.localAddress,
+                        port: socket.localPort,
                         id: undefined,
                         proxyId: undefined,
                         sourceKey: undefined,
@@ -89,9 +102,10 @@ export function startClusterClient(mainFilename: string) {
                     };
 
                     await connectForkWorker(auth, properties);
-                    console.warn('worker ready');
                 }
                 catch (e) {
+                    peer.kill(e.message);
+                    socket.destroy();
                 }
                 await backoff;
             }
@@ -104,21 +118,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
         key: certificate.serviceKey,
         cert: certificate.certificate,
     }, (socket) => {
-        const serializer = createRpcDuplexSerializer(socket);
-        const peer = new RpcPeer('cluster-host', 'cluster-remote', (message, reject, serializationContext) => {
-            serializer.sendMessage(message, reject, serializationContext);
-        });
-        serializer.setupRpcPeer(peer);
-        socket.on('data', data => serializer.onData(data));
-        socket.on('error', e => {
-            peer.kill(e);
-        });
-        socket.on('close', () => {
-            peer.kill('cluster client closed');
-        });
-        peer.killed.then(() => {
-            socket.destroy();
-        });
+        const peer = preparePeer(socket, 'server');
 
         peer.params['connectForkWorker'] = async (auth: ClusterObject, properties: ClusterWorkerProperties) => {
             try {
@@ -143,6 +143,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
             }
             catch (e) {
                 peer.kill(e);
+                socket.destroy();
             }
         }
     });
