@@ -2614,6 +2614,7 @@ export interface ForkOptions {
   runtime?: string;
   id?: string;
   nativeId?: ScryptedNativeId;
+  labels?: string[];
 }
 
 export interface ScryptedStatic {
