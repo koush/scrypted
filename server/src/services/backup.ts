@@ -5,7 +5,6 @@ import Level from '../level';
 import { getPluginsVolume, getScryptedVolume } from '../plugin/plugin-volume';
 import { ScryptedRuntime } from '../runtime';
 import { sleep } from '../sleep';
-import util from 'util';
 
 export class Backup {
     constructor(public runtime: ScryptedRuntime) {}
