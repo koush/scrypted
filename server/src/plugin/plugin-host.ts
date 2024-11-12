@@ -333,24 +333,6 @@ export class PluginHost {
             disconnect();
         });
 
-        this.worker.on('rpc', async (message, sendHandle) => {
-            const socket = sendHandle as net.Socket;
-            const { pluginId, username } = message;
-            const host = this.scrypted.plugins[pluginId];
-            if (!host) {
-                socket.destroy();
-                return;
-            }
-            try {
-                const accessControls = await this.scrypted.getAccessControls(username)
-                host.createRpcPeer(socket, accessControls);
-            }
-            catch (e) {
-                socket.destroy();
-                return;
-            }
-        });
-
         const startupTime = Date.now();
         // the plugin is expected to send process stats every 10 seconds.
         // this can be used as a check for liveness.
@@ -444,21 +426,6 @@ export class PluginHost {
         }
         socket.on('close', kill);
         socket.on('error', kill);
-
-        return setupPluginRemote(rpcPeer, api, null, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
-    }
-
-    async createRpcPeer(duplex: Duplex, accessControls: AccessControls) {
-        const rpcPeer = createDuplexRpcPeer(`api/${this.pluginId}`, 'duplex', duplex, duplex);
-        rpcPeer.tags.acl = accessControls;
-
-        // wrap the host api with a connection specific api that can be torn down on disconnect
-        const createMediaManager = await this.peer.getParam('createMediaManager');
-        const api = new PluginAPIProxy(this.api, await createMediaManager());
-        const kill = () => {
-            api.removeListeners();
-        };
-        duplex.on('close', kill);
 
         return setupPluginRemote(rpcPeer, api, null, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
     }
