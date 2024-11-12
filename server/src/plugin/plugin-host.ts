@@ -15,7 +15,7 @@ import { ScryptedRuntime } from '../runtime';
 import { sleep } from '../sleep';
 import { AccessControls } from './acl';
 import { MediaManagerHostImpl } from './media';
-import { PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
+import { PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
 import { ConsoleServer, createConsoleServer } from './plugin-console';
 import { PluginDebug } from './plugin-debug';
 import { PluginHostAPI } from './plugin-host-api';
@@ -25,6 +25,7 @@ import { WebSocketConnection } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { prepareZipSync } from './runtime/node-worker-common';
 import { RuntimeWorker } from './runtime/runtime-worker';
+import { PluginStats } from './plugin-remote-stats';
 
 const serverVersion = require('../../package.json').version;
 
@@ -59,10 +60,8 @@ export class PluginHost {
     api: PluginHostAPI;
     pluginName: string;
     packageJson: any;
-    stats: {
-        cpuUsage: NodeJS.CpuUsage,
-        memoryUsage: NodeJS.MemoryUsage,
-    };
+    lastStats: number;
+    stats: PluginStats;
     killed = false;
     consoleServer: Promise<ConsoleServer>;
     zipHash: string;
@@ -248,7 +247,14 @@ export class PluginHost {
                 };
                 // original implementation sent the zipBuffer, sending the zipFile name now.
                 // can switch back for non-local plugins.
-                const modulePromise = remote.loadZip(this.packageJson, async () => fs.promises.readFile(this.zipFile), loadZipOptions);
+                const modulePromise = remote.loadZip(this.packageJson,
+                    // the plugin is expected to send process stats every 10 seconds.
+                    // this can be used as a check for liveness.
+                    new PluginZipAPI(async () => fs.promises.readFile(this.zipFile), async (stats: PluginStats) => {
+                        this.lastStats = Date.now();
+                        this.stats = stats;
+                    }),
+                    loadZipOptions);
                 // allow garbage collection of the zip buffer
                 const module = await modulePromise;
                 logger.log('i', `loaded ${this.pluginName}`);
@@ -334,14 +340,6 @@ export class PluginHost {
         });
 
         const startupTime = Date.now();
-        // the plugin is expected to send process stats every 10 seconds.
-        // this can be used as a check for liveness.
-        let lastStats: number;
-        this.peer.params.updateStats = (stats: any) => {
-            lastStats = Date.now();
-            this.stats = stats;
-        }
-
         let lastPong: number;
         this.peer.params.pong = (time: number) => {
             lastPong = time;
@@ -368,7 +366,7 @@ export class PluginHost {
             const now = Date.now();
             // plugin may take a while to install, so wait 10 minutes.
             // after that, require 1 minute checkins.
-            if (!lastStats || !lastPong) {
+            if (!this.lastStats || !lastPong) {
                 if (now - startupTime > 10 * 60 * 1000) {
                     const logger = await this.api.getLogger(undefined);
                     logger.log('e', 'plugin failed to start in a timely manner. restarting.');
@@ -376,7 +374,7 @@ export class PluginHost {
                 }
                 return;
             }
-            if (!pluginDebug && (lastStats + 60000 < now)) {
+            if (!pluginDebug && (this.lastStats + 60000 < now)) {
                 const logger = await this.api.getLogger(undefined);
                 logger.log('e', 'plugin is not reporting stats. restarting.');
                 this.api.requestRestart();

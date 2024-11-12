@@ -2,11 +2,11 @@ import { RuntimeWorker } from "./runtime/runtime-worker";
 
 export interface PluginStats {
     type: 'stats',
-    cpu: NodeJS.CpuUsage;
+    cpuUsage: NodeJS.CpuUsage;
     memoryUsage: NodeJS.MemoryUsage;
 }
 
-export function startStatsUpdater(allMemoryStats: Map<RuntimeWorker, NodeJS.MemoryUsage>, updateStats: (stats: PluginStats) => void) {
+export function startStatsUpdater(allMemoryStats: Map<RuntimeWorker, NodeJS.MemoryUsage>, updateStats: (stats: PluginStats) => Promise<void>) {
     if (!updateStats)
         console.warn('wtf')
     setInterval(() => {
@@ -37,8 +37,8 @@ export function startStatsUpdater(allMemoryStats: Map<RuntimeWorker, NodeJS.Memo
 
         updateStats({
             type: 'stats',
-            cpu: cpuUsage,
+            cpuUsage,
             memoryUsage,
-        });
+        }).catch(() => {});
     }, 10000);
 }

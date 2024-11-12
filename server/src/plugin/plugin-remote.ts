@@ -2,7 +2,7 @@ import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointAccessContr
 import { RpcPeer, RPCResultError } from '../rpc';
 import { AccessControls } from './acl';
 import { BufferSerializer } from '../rpc-buffer-serializer';
-import { PluginAPI, PluginHostInfo, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
+import { PluginAPI, PluginHostInfo, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketConnection, WebSocketMethods, WebSocketSerializer } from './plugin-remote-websocket';
 import { checkProperty } from './plugin-state-check';
 import { SystemManagerImpl } from './system';
@@ -460,7 +460,7 @@ export interface PluginRemoteAttachOptions {
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
-    onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, getZip: () => Promise<Buffer>, zipOptions: PluginRemoteLoadZipOptions) => Promise<any>;
+    onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, zipAPI: PluginZipAPI, zipOptions: PluginRemoteLoadZipOptions) => Promise<any>;
     onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<PluginAPI>;
 }
 
@@ -634,7 +634,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 done(ret);
             },
 
-            async loadZip(packageJson: any, getZip: () => Promise<Buffer>, zipOptions?: PluginRemoteLoadZipOptions) {
+            async loadZip(packageJson: any, zipAPI: PluginZipAPI, zipOptions?: PluginRemoteLoadZipOptions) {
                 const params: any = {
                     __filename: undefined,
                     deviceManager,
@@ -657,7 +657,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 params.pluginRuntimeAPI = ret;
 
                 try {
-                    return await options.onLoadZip(ret, params, packageJson, getZip, zipOptions);
+                    return await options.onLoadZip(ret, params, packageJson, zipAPI, zipOptions);
                 }
                 catch (e) {
                     console.error('plugin start/fork failed', e)

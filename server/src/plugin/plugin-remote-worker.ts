@@ -14,10 +14,10 @@ import { listenZero } from '../listen-zero';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
 import { createDuplexRpcPeer } from '../rpc-serializer';
-import { getClusterLabels, InitializeCluster, matchesClusterLabels } from '../scrypted-cluster';
+import { getClusterLabels, InitializeCluster, matchesClusterLabels, PeerLiveness } from '../scrypted-cluster';
 import type { ClusterFork } from '../services/cluster-fork';
 import { MediaManagerImpl } from './media';
-import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
+import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
 import { pipeWorkerConsole, prepareConsoles } from './plugin-console';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, DeviceManagerImpl, setupPluginRemote } from './plugin-remote';
@@ -215,14 +215,14 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             }
             throw new Error(`unknown service ${name}`);
         },
-        async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, getZip: () => Promise<Buffer>, zipOptions: PluginRemoteLoadZipOptions) {
+        async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, zipAPI: PluginZipAPI, zipOptions: PluginRemoteLoadZipOptions) {
             const mainFile = zipOptions?.main || 'main';
             const mainNodejs = `${mainFile}.nodejs.js`;
             const pluginMainNodeJs = `/plugin/${mainNodejs}`;
             const pluginIdMainNodeJs = `/${pluginId}/${mainNodejs}`;
 
             const { zipHash } = zipOptions;
-            const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, getZip);
+            const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, zipAPI.getZip);
 
             await initializeCluster(zipOptions);
 
@@ -524,9 +524,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             // process.cpuUsage is for the entire process.
             // process.memoryUsage is per thread.
             const allMemoryStats = new Map<RuntimeWorker, NodeJS.MemoryUsage>();
-            const apiPeer: RpcPeer = (await scrypted.connectRPCObject(originalAPI) as any)[RpcPeer.PROPERTY_PROXY_PEER];
             // start the stats updater/watchdog after installation has finished, as that may take some time.
-            apiPeer.getParam('updateStats').then(updateStats => startStatsUpdater(allMemoryStats, updateStats));
+            startStatsUpdater(allMemoryStats, zipAPI.updateStats);
 
             let pong: (time: number) => Promise<void>;
             peer.params.ping = async (time: number) => {
@@ -564,7 +563,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                     forkPeer = (async () => {
                         const forkComponent: ClusterFork = await api.getComponent('cluster-fork');
-                        const clusterForkResult = await forkComponent.fork(options, packageJson, getZip, zipOptions);
+                        const peerLiveness = new PeerLiveness(new Deferred().promise);
+                        const clusterForkResult = await forkComponent.fork(peerLiveness, options, packageJson, zipAPI, zipOptions);
                         clusterForkResult.waitKilled().catch(() => { })
                             .finally(() => {
                                 waitKilled.resolve();
@@ -650,9 +650,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                 const result = (async () => {
                     const threadPeer = await forkPeer;
-                    threadPeer.params.updateStats = (stats: PluginStats) => {
-                        allMemoryStats.set(runtimeWorker, stats.memoryUsage);
-                    }
 
                     class PluginForkAPI extends PluginAPIProxy {
                         [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];
@@ -692,7 +689,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     const forkOptions = Object.assign({}, zipOptions);
                     forkOptions.fork = true;
                     forkOptions.main = options?.filename;
-                    return remote.loadZip(packageJson, getZip, forkOptions)
+                    const forkZipAPI = new PluginZipAPI(zipAPI.getZip, async (stats: PluginStats) => {
+                        allMemoryStats.set(runtimeWorker, stats.memoryUsage);
+                    });
+                    return remote.loadZip(packageJson, forkZipAPI, forkOptions)
                 })();
 
                 result.catch(() => runtimeWorker.kill());

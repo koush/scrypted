@@ -1,5 +1,5 @@
 import { EventDetails, ScryptedNativeId, SystemDeviceState } from '@scrypted/types'
-import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
+import { PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
 
 /**
  * This remote is necessary as the host needs to create a remote synchronously
@@ -17,10 +17,10 @@ import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
         })();
     }
 
-    async loadZip(packageJson: any, getZip: () => Promise<Buffer>, options?: PluginRemoteLoadZipOptions): Promise<any> {
+    async loadZip(packageJson: any, zipAPI: PluginZipAPI, options?: PluginRemoteLoadZipOptions): Promise<any> {
         if (!this.remote)
             await this.remoteReadyPromise;
-        return this.remote.loadZip(packageJson, getZip, options);
+        return this.remote.loadZip(packageJson, zipAPI, options);
     }
     async setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState; }; }): Promise<void> {
         if (!this.remote)

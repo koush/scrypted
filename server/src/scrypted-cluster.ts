@@ -8,7 +8,7 @@ import type { createSelfSignedCertificate } from './cert';
 import { computeClusterObjectHash } from './cluster/cluster-hash';
 import { ClusterObject } from './cluster/connect-rpc-object';
 import { listenZeroSingleClient } from './listen-zero';
-import { PluginRemoteLoadZipOptions } from './plugin/plugin-api';
+import { PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin/plugin-api';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { ChildProcessWorker } from './plugin/runtime/child-process-worker';
 import { prepareZip } from './plugin/runtime/node-worker-common';
@@ -19,29 +19,30 @@ import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
 import { sleep } from './sleep';
 
-class PeerLiveness {
+export class PeerLiveness {
     __proxy_oneway_methods = ['kill'];
-    constructor(private peer: RpcPeer, private killed: Promise<any>) {
+    constructor(private killed: Promise<any>) {
     }
     async waitKilled() {
         return this.killed;
     }
+}
+
+export class ClusterForkResult extends PeerLiveness {
+    constructor(private peer: RpcPeer, killed: Promise<any>, private result: any) {
+        super(killed);
+    }
+
     async kill() {
         this.peer.kill('killed');
     }
 
-}
-
-export class ClusterForkResult extends PeerLiveness {
-    constructor(peer: RpcPeer, killed: Promise<any>, private result: any) {
-        super(peer, killed);
-    }
     async getResult() {
         return this.result;
     }
 }
 
-export type ClusterForkParam = (options: ForkOptions, packageJson: any, getZip: () => Promise<Buffer>, zipOptions: PluginRemoteLoadZipOptions) => Promise<ClusterForkResult>;
+export type ClusterForkParam = (peerLiveness: PeerLiveness, options: ForkOptions, packageJson: any, zipAPI: PluginZipAPI, zipOptions: PluginRemoteLoadZipOptions) => Promise<ClusterForkResult>;
 export type InitializeCluster = (cluster: { clusterId: string, clusterSecret: string }) => Promise<void>;
 
 export interface ClusterWorkerProperties {
@@ -153,9 +154,11 @@ export function startClusterClient(mainFilename: string) {
 
                 const { clusterId } = await connectForkWorker(auth, properties);
 
-                const clusterForkParam: ClusterForkParam = async (options: ForkOptions,
+                const clusterForkParam: ClusterForkParam = async (
+                    peerLiveness: PeerLiveness,
+                    options: ForkOptions,
                     packageJson: any,
-                    getZip: () => Promise<Buffer>,
+                    zipAPI: PluginZipAPI,
                     zipOptions: PluginRemoteLoadZipOptions) => {
                     if (!options.runtime || !options.labels?.length) {
                         console.warn('invalid cluster fork options');
@@ -173,7 +176,7 @@ export function startClusterClient(mainFilename: string) {
 
                     const { zipHash } = zipOptions;
                     const pluginId: string = packageJson.name;
-                    const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, getZip);
+                    const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, zipAPI.getZip);
 
                     runtimeWorker = runtime(mainFilename, pluginId, {
                         packageJson,
@@ -200,6 +203,9 @@ export function startClusterClient(mainFilename: string) {
                     });
                     threadPeer.killed.catch(() => { }).finally(() => {
                         runtimeWorker.kill();
+                    });
+                    peerLiveness.waitKilled().catch(() => { }).finally(() => {
+                        threadPeer.kill('peer killed');
                     });
                     let getRemote: any;
                     try {
