@@ -1,5 +1,6 @@
 import { once } from 'events';
 import net from 'net';
+import tls from 'tls';
 
 export class ListenZeroSingleClientTimeoutError extends Error {
     constructor() {
@@ -13,8 +14,8 @@ export async function listenZero(server: net.Server, hostname: string) {
     return (server.address() as net.AddressInfo).port;
 }
 
-export async function listenZeroSingleClient(hostname: string, options?: net.ServerOpts, listenTimeout = 30000) {
-    const server = new net.Server(options);
+export async function listenZeroSingleClient(hostname: string, options?: net.ServerOpts & { tls?: boolean }, listenTimeout = 30000) {
+    const server = options?.tls ? new tls.Server(options) : new net.Server(options);
     const port = await listenZero(server, hostname);
 
     let cancel: () => void;
