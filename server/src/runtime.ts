@@ -33,17 +33,18 @@ import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
+import { ClusterWorker } from './scrypted-cluster';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
 import { Backup } from './services/backup';
+import { ClusterFork } from './services/cluster-fork';
 import { CORSControl } from './services/cors';
 import { Info } from './services/info';
 import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
-import { ClusterWorker } from './scrypted-cluster';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -87,6 +88,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     corsControl = new CORSControl(this);
     addressSettings = new AddressSettings(this);
     usersService = new UsersService(this);
+    clusterFork = new ClusterFork(this);
     info = new Info();
     backup = new Backup(this);
     pluginHosts = getBuiltinRuntimeHosts();
@@ -363,6 +365,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 return this.usersService;
             case 'backup':
                 return this.backup;
+            case 'cluster-fork':
+                return this.clusterFork;
         }
     }
 

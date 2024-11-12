@@ -4,6 +4,7 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { SidebandSocketSerializer } from "../socket-serializer";
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
+import { getScryptedClusterMode } from '../../scrypted-cluster';
 
 export const NODE_PLUGIN_CHILD_PROCESS = 'child';
 export const NODE_PLUGIN_FORK_PROCESS = 'fork';
@@ -39,12 +40,14 @@ export class NodeForkWorker extends ChildProcessWorker {
             execArgv.push(`--inspect=0.0.0.0:${pluginDebug.inspectPort}`);
         }
 
-        this.worker = child_process.fork(mainFilename, [
+        const args = [
             // change the argument marker depending on whether this is the main scrypted server process
             // starting a plugin vs the plugin forking for multiprocessing.
-            isNodePluginWorkerProcess() ? NODE_PLUGIN_FORK_PROCESS : NODE_PLUGIN_CHILD_PROCESS,
+            isNodePluginWorkerProcess() || getScryptedClusterMode()?.[0] === 'client' ? NODE_PLUGIN_FORK_PROCESS : NODE_PLUGIN_CHILD_PROCESS,
             this.pluginId
-        ], {
+        ];
+
+        this.worker = child_process.fork(mainFilename, args, {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
             env: Object.assign({}, process.env, env),
             serialization: 'advanced',

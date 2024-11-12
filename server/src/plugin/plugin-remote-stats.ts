@@ -7,6 +7,8 @@ export interface PluginStats {
 }
 
 export function startStatsUpdater(allMemoryStats: Map<RuntimeWorker, NodeJS.MemoryUsage>, updateStats: (stats: PluginStats) => void) {
+    if (!updateStats)
+        console.warn('wtf')
     setInterval(() => {
         let cpuUsage: NodeJS.CpuUsage;
         let memoryUsage: NodeJS.MemoryUsage;

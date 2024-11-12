@@ -41,7 +41,7 @@
         },
 
         {
-            "autoAttachChildProcesses": false,
+            // "autoAttachChildProcesses": false,
             "type": "node",
             "request": "launch",
             "name": "Launch Cluster Server",
@@ -72,14 +72,13 @@
         },
 
         {
-            "autoAttachChildProcesses": false,
+            // "autoAttachChildProcesses": false,
             "type": "node",
             "request": "launch",
             "name": "Launch Cluster Client",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "preLaunchTask": "npm: build",
             "program": "${workspaceFolder}/bin/scrypted-serve",
             "runtimeArgs": [
                 "--trace-warnings",
@@ -94,6 +93,7 @@
                 "${workspaceFolder}/**/*.js"
             ],
             "env": {
+                "SCRYPTED_CLUSTER_LABELS": "compute",
                 "SCRYPTED_CLUSTER_MODE": "client",
                 "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",
                 "SCRYPTED_CLUSTER_SECRET": "swordfish",

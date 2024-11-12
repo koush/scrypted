@@ -5,27 +5,30 @@ import fs from 'fs';
 import net from 'net';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
+import { EventEmitter } from 'stream';
 import worker_threads from 'worker_threads';
 import { computeClusterObjectHash } from '../cluster/cluster-hash';
 import { ClusterObject, ConnectRPCObject } from '../cluster/connect-rpc-object';
+import { Deferred } from '../deferred';
 import { listenZero } from '../listen-zero';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
 import { createDuplexRpcPeer } from '../rpc-serializer';
+import { getClusterLabels, InitializeCluster, matchesClusterLabels } from '../scrypted-cluster';
+import type { ClusterFork } from '../services/cluster-fork';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { pipeWorkerConsole, prepareConsoles } from './plugin-console';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
-import { DeviceManagerImpl, attachPluginRemote, setupPluginRemote } from './plugin-remote';
+import { attachPluginRemote, DeviceManagerImpl, setupPluginRemote } from './plugin-remote';
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { getPluginVolume } from './plugin-volume';
+import { ChildProcessWorker } from './runtime/child-process-worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
-import { RuntimeWorker } from './runtime/runtime-worker';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
-import { ChildProcessWorker } from './runtime/child-process-worker';
-import { Deferred } from '../deferred';
+import { RuntimeWorker } from './runtime/runtime-worker';
 
 const serverVersion = require('../../package.json').version;
 
@@ -38,10 +41,122 @@ export interface StartPluginRemoteOptions {
 export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void, startPluginRemoteOptions?: StartPluginRemoteOptions) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
+    const SCRYPTED_CLUSTER_ADDRESS = process.env.SCRYPTED_CLUSTER_ADDRESS;
+    let clusterId: string;
+    let clusterSecret: string;
+    let clusterPort: number;
+
+    // all cluster clients, incoming and outgoing, connect with random ports which can be used as peer ids
+    // on the cluster server that is listening on the actual port/
+    // incoming connections: use the remote random/unique port
+    // outgoing connections: use the local random/unique port
+    const clusterPeers = new Map<string, Promise<RpcPeer>>();
+    function getClusterPeerKey(address: string, port: number) {
+        return `${address}:${port}`;
+    }
+
+    const resolveObject = async (id: string, sourceKey: string) => {
+        const sourcePeer = sourceKey
+            ? await clusterPeers.get(sourceKey)
+            : peer;
+        if (!sourcePeer)
+            console.error('source peer not found', sourceKey);
+        const ret = sourcePeer?.localProxyMap.get(id);
+        if (!ret) {
+            console.error('source key not found', sourceKey, id);
+            return;
+        }
+        return ret;
+    }
+
+    const connectRPCObject = async (o: ClusterObject) => {
+        const sha256 = computeClusterObjectHash(o, clusterSecret);
+        if (sha256 !== o.sha256)
+            throw new Error('secret incorrect');
+        return resolveObject(o.proxyId, o.sourceKey);
+    }
+
+    function isClusterAddress(address: string) {
+        return !address || address === SCRYPTED_CLUSTER_ADDRESS;
+    }
+
+    const onProxySerialization = (peer: RpcPeer, value: any, sourceKey: string) => {
+        const properties = RpcPeer.prepareProxyProperties(value) || {};
+        let clusterEntry: ClusterObject = properties.__cluster;
+
+        // ensure globally stable proxyIds.
+        // worker threads will embed their pid and tid in the proxy id for cross worker fast path.
+        const proxyId = peer.localProxied.get(value)?.id || clusterEntry?.proxyId || `n-${process.pid}-${worker_threads.threadId}-${RpcPeer.generateId()}`;
+
+        // if the cluster entry already exists, check if it belongs to this node.
+        // if it belongs to this node, the entry must also be for this peer.
+        // relying on the liveness/gc of a different peer may cause race conditions.
+        if (clusterEntry) {
+            if (isClusterAddress(clusterEntry?.address) && clusterPort === clusterEntry.port && sourceKey !== clusterEntry.sourceKey)
+                clusterEntry = undefined;
+        }
+
+        if (!clusterEntry) {
+            clusterEntry = {
+                id: clusterId,
+                address: SCRYPTED_CLUSTER_ADDRESS,
+                port: clusterPort,
+                proxyId,
+                sourceKey,
+                sha256: null,
+            };
+            clusterEntry.sha256 = computeClusterObjectHash(clusterEntry, clusterSecret);
+            properties.__cluster = clusterEntry;
+        }
+
+        return {
+            proxyId,
+            properties,
+        };
+    }
+
+    const initializeCluster: InitializeCluster = async (options: {
+        clusterId: string;
+        clusterSecret: string;
+    }) => {
+        if (clusterPort)
+            return;
+
+        ({ clusterId, clusterSecret } = options);
+
+        const clusterRpcServer = net.createServer(client => {
+            const clusterPeerAddress = client.remoteAddress;
+            const clusterPeerPort = client.remotePort;
+            const clusterPeerKey = getClusterPeerKey(clusterPeerAddress, clusterPeerPort);
+            const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, client, client);
+            Object.assign(clusterPeer.params, peer.params);
+            // the listening peer sourceKey (client address/port) is used by the OTHER peer (the client)
+            // to determine if it is already connected to THIS peer (the server).
+            clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
+            clusterPeers.set(clusterPeerKey, Promise.resolve(clusterPeer));
+            startPluginRemoteOptions?.onClusterPeer?.(clusterPeer);
+            clusterPeer.params.connectRPCObject = connectRPCObject;
+            client.on('close', () => {
+                clusterPeers.delete(clusterPeerKey);
+                clusterPeer.kill('cluster socket closed');
+            });
+        })
+
+        const listenAddress = SCRYPTED_CLUSTER_ADDRESS
+            ? '0.0.0.0'
+            : '127.0.0.1';
+
+        clusterPort = await listenZero(clusterRpcServer, listenAddress);
+        peer.onProxySerialization = value => onProxySerialization(peer, value, undefined);
+        delete peer.params.initializeCluster;
+    }
+
+    peer.params.initializeCluster = initializeCluster;
+
     let systemManager: SystemManager;
     let deviceManager: DeviceManagerImpl;
     let api: PluginAPI;
-
+    let originalAPI: PluginAPI;
 
     let pluginsPromise: Promise<any>;
     function getPlugins() {
@@ -84,6 +199,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 }
             }
 
+            originalAPI = _api;
             api = new PluginForkableAPI(_api);
             peer.selfName = pluginId;
             return api;
@@ -105,102 +221,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             const pluginMainNodeJs = `/plugin/${mainNodejs}`;
             const pluginIdMainNodeJs = `/${pluginId}/${mainNodejs}`;
 
-            const { clusterId, clusterSecret, zipHash } = zipOptions;
+            const { zipHash } = zipOptions;
             const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, getZip);
 
-            const SCRYPTED_CLUSTER_ADDRESS = process.env.SCRYPTED_CLUSTER_ADDRESS;
-
-            function isClusterAddress(address: string) {
-                return !address || address === SCRYPTED_CLUSTER_ADDRESS;
-            }
-
-            const onProxySerialization = (peer: RpcPeer, value: any, sourceKey: string) => {
-                const properties = RpcPeer.prepareProxyProperties(value) || {};
-                let clusterEntry: ClusterObject = properties.__cluster;
-
-                // ensure globally stable proxyIds.
-                // worker threads will embed their pid and tid in the proxy id for cross worker fast path.
-                const proxyId = peer.localProxied.get(value)?.id || clusterEntry?.proxyId || `n-${process.pid}-${worker_threads.threadId}-${RpcPeer.generateId()}`;
-
-                // if the cluster entry already exists, check if it belongs to this node.
-                // if it belongs to this node, the entry must also be for this peer.
-                // relying on the liveness/gc of a different peer may cause race conditions.
-                if (clusterEntry) {
-                    if (isClusterAddress(clusterEntry?.address) && clusterPort === clusterEntry.port && sourceKey !== clusterEntry.sourceKey)
-                        clusterEntry = undefined;
-                }
-
-                if (!clusterEntry) {
-                    clusterEntry = {
-                        id: clusterId,
-                        address: SCRYPTED_CLUSTER_ADDRESS,
-                        port: clusterPort,
-                        proxyId,
-                        sourceKey,
-                        sha256: null,
-                    };
-                    clusterEntry.sha256 = computeClusterObjectHash(clusterEntry, clusterSecret);
-                    properties.__cluster = clusterEntry;
-                }
-
-                return {
-                    proxyId,
-                    properties,
-                };
-            }
-
-            peer.onProxySerialization = value => onProxySerialization(peer, value, undefined);
-
-            const resolveObject = async (id: string, sourceKey: string) => {
-                const sourcePeer = sourceKey
-                    ? await clusterPeers.get(sourceKey)
-                    : peer;
-                if (!sourcePeer)
-                    console.error('source peer not found', sourceKey);
-                const ret = sourcePeer?.localProxyMap.get(id);
-                if (!ret) {
-                    console.error('source key not found', sourceKey, id);
-                    return;
-                }
-                return ret;
-            }
-
-            // all cluster clients, incoming and outgoing, connect with random ports which can be used as peer ids
-            // on the cluster server that is listening on the actual port/
-            // incoming connections: use the remote random/unique port
-            // outgoing connections: use the local random/unique port
-            const clusterPeers = new Map<string, Promise<RpcPeer>>();
-            function getClusterPeerKey(address: string, port: number) {
-                return `${address}:${port}`;
-            }
-
-            const clusterRpcServer = net.createServer(client => {
-                const clusterPeerAddress = client.remoteAddress;
-                const clusterPeerPort = client.remotePort;
-                const clusterPeerKey = getClusterPeerKey(clusterPeerAddress, clusterPeerPort);
-                const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, client, client);
-                // the listening peer sourceKey (client address/port) is used by the OTHER peer (the client)
-                // to determine if it is already connected to THIS peer (the server).
-                clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
-                clusterPeers.set(clusterPeerKey, Promise.resolve(clusterPeer));
-                startPluginRemoteOptions?.onClusterPeer?.(clusterPeer);
-                const connectRPCObject: ConnectRPCObject = async (o) => {
-                    const sha256 = computeClusterObjectHash(o, clusterSecret);
-                    if (sha256 !== o.sha256)
-                        throw new Error('secret incorrect');
-                    return resolveObject(o.proxyId, o.sourceKey);
-                }
-                clusterPeer.params['connectRPCObject'] = connectRPCObject;
-                client.on('close', () => {
-                    clusterPeers.delete(clusterPeerKey);
-                    clusterPeer.kill('cluster socket closed');
-                });
-            })
-
-            const listenAddress = SCRYPTED_CLUSTER_ADDRESS
-                ? '0.0.0.0'
-                : '127.0.0.1';
-            const clusterPort = await listenZero(clusterRpcServer, listenAddress);
+            await initializeCluster(zipOptions);
 
             const ensureClusterPeer = (address: string, connectPort: number) => {
                 if (isClusterAddress(address))
@@ -275,13 +299,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     const threadPeer = NodeThreadWorker.createRpcPeer(peer.selfName, threadPeerKey, port);
                     threadPeer.onProxySerialization = value => onProxySerialization(threadPeer, value, threadPeerKey);
 
-                    const connectRPCObject: ConnectRPCObject = async (o) => {
-                        const sha256 = computeClusterObjectHash(o, clusterSecret);
-                        if (sha256 !== o.sha256)
-                            throw new Error('secret incorrect');
-                        return resolveObject(o.proxyId, o.sourceKey);
-                    }
-                    threadPeer.params['connectRPCObject'] = connectRPCObject;
+                    threadPeer.params.connectRPCObject = connectRPCObject;
 
                     function cleanup(message: string) {
                         peerCleanup();
@@ -389,11 +407,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const clusterObject: ClusterObject = value?.__cluster;
                 if (clusterObject?.id !== clusterId)
                     return value;
-                const { address, port, proxyId, sourceKey } = clusterObject;
+                const { address, port, proxyId } = clusterObject;
                 // handle the case when trying to connect to an object is on this cluster node,
                 // returning the actual object, rather than initiating a loopback connection.
                 if (port === clusterPort)
-                    return resolveObject(proxyId, sourceKey);
+                    return connectRPCObject(clusterObject);
 
                 // can use worker to worker ipc if the address and pid matches and both side are node.
                 if (address === SCRYPTED_CLUSTER_ADDRESS && proxyId.startsWith('n-')) {
@@ -506,8 +524,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             // process.cpuUsage is for the entire process.
             // process.memoryUsage is per thread.
             const allMemoryStats = new Map<RuntimeWorker, NodeJS.MemoryUsage>();
+            const apiPeer: RpcPeer = (await scrypted.connectRPCObject(originalAPI) as any)[RpcPeer.PROPERTY_PROXY_PEER];
             // start the stats updater/watchdog after installation has finished, as that may take some time.
-            peer.getParam('updateStats').then(updateStats => startStatsUpdater(allMemoryStats, updateStats));
+            apiPeer.getParam('updateStats').then(updateStats => startStatsUpdater(allMemoryStats, updateStats));
 
             let pong: (time: number) => Promise<void>;
             peer.params.ping = async (time: number) => {
@@ -525,67 +544,115 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             const pluginRemoteAPI: PluginRemote = scrypted.pluginRemoteAPI;
 
             scrypted.fork = (options) => {
+                let forkPeer: Promise<RpcPeer>;
                 let runtimeWorker: RuntimeWorker;
                 let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
-                if (options?.runtime) {
-                    const builtins = getBuiltinRuntimeHosts();
-                    const runtime = builtins.get(options.runtime);
-                    if (!runtime)
-                        throw new Error('unknown runtime ' + options.runtime);
-                    runtimeWorker = runtime(mainFilename, pluginId, {
-                        packageJson,
-                        env: process.env,
-                        pluginDebug: undefined,
-                        zipFile,
-                        unzippedPath,
-                        zipHash,
-                    }, undefined);
 
-                    if (runtimeWorker instanceof ChildProcessWorker) {
-                        nativeWorker = runtimeWorker.childProcess;
-                        const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
-                        pipeWorkerConsole(nativeWorker, console);
-                    }
+                if (options?.labels?.length && options.runtime && !matchesClusterLabels(options, getClusterLabels())) {
+                    const waitKilled = new Deferred<void>();
+                    waitKilled.promise.finally(() => events.emit('exit'));
+                    const events = new EventEmitter();
+
+                    runtimeWorker = {
+                        on: events.on.bind(events),
+                        once: events.once.bind(events),
+                        removeListener: events.removeListener.bind(events),
+                        kill: () => {
+                            waitKilled.resolve();
+                        },
+                    } as any;
+
+                    forkPeer = (async () => {
+                        const forkComponent: ClusterFork = await api.getComponent('cluster-fork');
+                        const clusterForkResult = await forkComponent.fork(options, packageJson, getZip, zipOptions);
+                        clusterForkResult.waitKilled().catch(() => { })
+                            .finally(() => {
+                                waitKilled.resolve();
+                            });
+                        waitKilled.promise.finally(() => {
+                            clusterForkResult.kill();
+                        });
+
+                        try {
+                            const clusterGetRemote = await clusterForkResult.getResult();
+                            const getRemote = await clusterGetRemote();
+                            const directGetRemote = await scrypted.connectRPCObject(getRemote);
+                            if (directGetRemote === getRemote)
+                                throw new Error('cluster fork peer not direct connected');
+                            const peer = directGetRemote[RpcPeer.PROPERTY_PROXY_PEER];
+                            if (!peer)
+                                throw new Error('cluster fork peer undefined?');
+                            return peer;
+                        }
+                        catch (e) {
+                            clusterForkResult.kill();
+                        }
+                    })();
                 }
                 else {
-                    // when a node thread is created, also create a secondary message channel to link the grandparent (or mainthread) and child.
-                    const mainThreadChannel = new worker_threads.MessageChannel();
+                    if (options?.runtime) {
+                        const builtins = getBuiltinRuntimeHosts();
+                        const runtime = builtins.get(options.runtime);
+                        if (!runtime)
+                            throw new Error('unknown runtime ' + options.runtime);
+                        runtimeWorker = runtime(mainFilename, pluginId, {
+                            packageJson,
+                            env: process.env,
+                            pluginDebug: undefined,
+                            zipFile,
+                            unzippedPath,
+                            zipHash,
+                        }, undefined);
 
-                    const ntw = new NodeThreadWorker(mainFilename, pluginId, {
-                        packageJson,
-                        env: process.env,
-                        pluginDebug: undefined,
-                        zipFile,
-                        unzippedPath,
-                        zipHash,
-                    }, {
-                        name: options?.name,
-                    }, {
-                        // child connection to grandparent
-                        mainThreadPort: mainThreadChannel.port1,
-                    }, [mainThreadChannel.port1]);
-                    runtimeWorker = ntw;
-                    nativeWorker = ntw.worker;
-
-                    const { threadId } = ntw.worker;
-                    if (mainThreadPort) {
-                        // grandparent connection to child
-                        mainThreadPort.postMessage({
-                            port: mainThreadChannel.port2,
-                            threadId,
-                        }, [mainThreadChannel.port2]);
+                        if (runtimeWorker instanceof ChildProcessWorker) {
+                            nativeWorker = runtimeWorker.childProcess;
+                            const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
+                            pipeWorkerConsole(nativeWorker, console);
+                        }
                     }
                     else {
-                        mainThreadBrokerRegister(mainThreadChannel.port2, threadId);
+                        // when a node thread is created, also create a secondary message channel to link the grandparent (or mainthread) and child.
+                        const mainThreadChannel = new worker_threads.MessageChannel();
+
+                        const ntw = new NodeThreadWorker(mainFilename, pluginId, {
+                            packageJson,
+                            env: process.env,
+                            pluginDebug: undefined,
+                            zipFile,
+                            unzippedPath,
+                            zipHash,
+                        }, {
+                            name: options?.name,
+                        }, {
+                            // child connection to grandparent
+                            mainThreadPort: mainThreadChannel.port1,
+                        }, [mainThreadChannel.port1]);
+                        runtimeWorker = ntw;
+                        nativeWorker = ntw.worker;
+
+                        const { threadId } = ntw.worker;
+                        if (mainThreadPort) {
+                            // grandparent connection to child
+                            mainThreadPort.postMessage({
+                                port: mainThreadChannel.port2,
+                                threadId,
+                            }, [mainThreadChannel.port2]);
+                        }
+                        else {
+                            mainThreadBrokerRegister(mainThreadChannel.port2, threadId);
+                        }
                     }
+
+                    const localPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
+                    runtimeWorker.setupRpcPeer(localPeer);
+                    forkPeer = Promise.resolve(localPeer);
                 }
 
                 const result = (async () => {
-                    const threadPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
+                    const threadPeer = await forkPeer;
                     threadPeer.params.updateStats = (stats: PluginStats) => {
                         allMemoryStats.set(runtimeWorker, stats.memoryUsage);
                     }
-                    runtimeWorker.setupRpcPeer(threadPeer);
 
                     class PluginForkAPI extends PluginAPIProxy {
                         [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];

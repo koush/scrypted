@@ -206,7 +206,7 @@ export class PluginHost {
         const self = this;
 
         const { runtime } = this.packageJson.scrypted;
-        const mediaManager = runtime === 'python'
+        const mediaManager = runtime !== 'node'
             ? new MediaManagerHostImpl(pluginDeviceId, () => scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id))
             : undefined;
 
