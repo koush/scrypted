@@ -18,6 +18,8 @@ import { RpcPeer } from './rpc';
 import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
 import { sleep } from './sleep';
+import { prepareClusterPeer } from './scrypted-cluster-common';
+import { Readable } from 'stream';
 
 export class PeerLiveness {
     __proxy_oneway_methods = ['kill'];
@@ -153,6 +155,8 @@ export function startClusterClient(mainFilename: string) {
                 };
 
                 const { clusterId } = await connectForkWorker(auth, properties);
+                const clusterPeerSetup = prepareClusterPeer(peer);
+                await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret });
 
                 const clusterForkParam: ClusterForkParam = async (
                     peerLiveness: PeerLiveness,
@@ -218,12 +222,23 @@ export function startClusterClient(mainFilename: string) {
                         throw e;
                     }
 
+                    const readStream = async function* (stream: Readable) {
+                        for await (const buffer of stream) {
+                            yield buffer;
+                        }
+                    }
+
                     const timeout = setTimeout(() => {
                         threadPeer.kill('cluster fork timeout');
                     }, 10000);
                     const clusterGetRemote = (...args: any[]) => {
                         clearTimeout(timeout);
-                        return getRemote;
+                        return {
+                            [RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN]: true,
+                            stdout: readStream(runtimeWorker.stdout),
+                            stderr: readStream(runtimeWorker.stderr),
+                            getRemote,
+                        };
                     };
 
                     const result = new ClusterForkResult(threadPeer, threadPeer.killed, clusterGetRemote);
