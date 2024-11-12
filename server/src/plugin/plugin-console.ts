@@ -334,10 +334,19 @@ export function pipeWorkerConsole(nativeWorker: { stdout: Readable, stderr: Read
     });
 }
 
-export async function iterateWorkerConsole(asyncIterator: AsyncGenerator<Buffer>, useConsole = console) {
+export async function iterateWorkerConsoleLog(asyncIterator: AsyncGenerator<Buffer>, useConsole = console) {
     try {
         for await (const data of asyncIterator) {
             useConsole.log(data.toString());
+        }
+    }
+    catch (e) {
+    }
+}
+export async function iterateWorkerConsoleError(asyncIterator: AsyncGenerator<Buffer>, useConsole = console) {
+    try {
+        for await (const data of asyncIterator) {
+            useConsole.error(data.toString());
         }
     }
     catch (e) {

@@ -7,18 +7,17 @@ import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { EventEmitter } from 'stream';
 import worker_threads from 'worker_threads';
-import { computeClusterObjectHash } from '../cluster/cluster-hash';
 import { ClusterObject, ConnectRPCObject } from '../cluster/connect-rpc-object';
 import { Deferred } from '../deferred';
-import { listenZero } from '../listen-zero';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
 import { createDuplexRpcPeer } from '../rpc-serializer';
-import { getClusterLabels, InitializeCluster, matchesClusterLabels, PeerLiveness } from '../scrypted-cluster';
+import { getClusterLabels, matchesClusterLabels, PeerLiveness } from '../scrypted-cluster';
+import { getClusterPeerKey, prepareClusterPeer } from '../scrypted-cluster-common';
 import type { ClusterFork } from '../services/cluster-fork';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
-import { iterateWorkerConsole, pipeWorkerConsole, prepareConsoles } from './plugin-console';
+import { iterateWorkerConsoleError, iterateWorkerConsoleLog, pipeWorkerConsole, prepareConsoles } from './plugin-console';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, DeviceManagerImpl, setupPluginRemote } from './plugin-remote';
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
@@ -29,7 +28,6 @@ import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
 import { RuntimeWorker } from './runtime/runtime-worker';
-import { getClusterPeerKey, prepareClusterPeer } from '../scrypted-cluster-common';
 
 const serverVersion = require('../../package.json').version;
 
@@ -468,7 +466,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                         });
 
                         try {
-                            const clusterGetRemote = await clusterForkResult.getResult();
+                            const clusterGetRemote = await scrypted.connectRPCObject(await clusterForkResult.getResult());
                             const {
                                 stdout,
                                 stderr,
@@ -476,8 +474,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                             } = await clusterGetRemote();
 
                             const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
-                            iterateWorkerConsole(stdout, console).catch(() => {});
-                            iterateWorkerConsole(stderr, console).catch(() => {});
+                            iterateWorkerConsoleLog(stdout, console).catch(() => {});
+                            iterateWorkerConsoleError(stderr, console).catch(() => {});
 
                             const directGetRemote = await scrypted.connectRPCObject(getRemote);
                             if (directGetRemote === getRemote)
