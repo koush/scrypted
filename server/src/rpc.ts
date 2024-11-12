@@ -117,7 +117,7 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
             return this.entry.id;
         if (p === '__proxy_constructor')
             return this.constructorName;
-        if (p === '__proxy_peer')
+        if (p === RpcPeer.PROPERTY_PROXY_PEER)
             return this.peer;
         if (p === RpcPeer.PROPERTY_PROXY_PROPERTIES)
             return this.proxyProps;
@@ -374,6 +374,7 @@ export class RpcPeer {
     static readonly RANDOM_DIGITS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     static readonly RPC_RESULT_ERROR_NAME = 'RPCResultError';
     static readonly PROPERTY_PROXY_ID = '__proxy_id';
+    static readonly PROPERTY_PROXY_PEER = '__proxy_peer';
     static readonly PROPERTY_PROXY_ONEWAY_METHODS = '__proxy_oneway_methods';
     static readonly PROPERTY_JSON_DISABLE_SERIALIZATION = '__json_disable_serialization';
     static readonly PROPERTY_PROXY_PROPERTIES = '__proxy_props';
@@ -383,7 +384,7 @@ export class RpcPeer {
         'constructor',
         '__proxy_id',
         '__proxy_constructor',
-        '__proxy_peer',
+        RpcPeer.PROPERTY_PROXY_PEER,
         RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS,
         RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION,
         RpcPeer.PROPERTY_PROXY_PROPERTIES,
