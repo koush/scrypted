@@ -300,7 +300,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             scrypted.connectRPCObject = async (value: any) => {
                 const clusterObject: ClusterObject = value?.__cluster;
-                if (clusterObject?.id !== clusterPeerSetup.clusterId)
+                if (clusterObject?.id !== zipOptions.clusterId)
                     return value;
                 const { address, port, proxyId } = clusterObject;
                 // handle the case when trying to connect to an object is on this cluster node,

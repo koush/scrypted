@@ -1,11 +1,11 @@
 import net from 'net';
+import worker_threads from 'worker_threads';
 import { computeClusterObjectHash } from "./cluster/cluster-hash";
 import { ClusterObject } from "./cluster/connect-rpc-object";
+import { listenZero } from './listen-zero';
 import { RpcPeer } from "./rpc";
 import { createDuplexRpcPeer } from "./rpc-serializer";
 import { InitializeCluster } from "./scrypted-cluster";
-import worker_threads from 'worker_threads';
-import { listenZero } from './listen-zero';
 
 export function getClusterPeerKey(address: string, port: number) {
     return `${address}:${port}`;
@@ -18,11 +18,10 @@ export function prepareClusterPeer(peer: RpcPeer, onClusterPeer?: (clusterPeer: 
     let clusterPort: number;
 
     // all cluster clients, incoming and outgoing, connect with random ports which can be used as peer ids
-    // on the cluster server that is listening on the actual port/
+    // on the cluster server that is listening on the actual port.
     // incoming connections: use the remote random/unique port
     // outgoing connections: use the local random/unique port
     const clusterPeers = new Map<string, Promise<RpcPeer>>();
-
 
     const resolveObject = async (id: string, sourceKey: string) => {
         const sourcePeer = sourceKey
@@ -108,7 +107,7 @@ export function prepareClusterPeer(peer: RpcPeer, onClusterPeer?: (clusterPeer: 
                 clusterPeers.delete(clusterPeerKey);
                 clusterPeer.kill('cluster socket closed');
             });
-        })
+        });
 
         const listenAddress = SCRYPTED_CLUSTER_ADDRESS
             ? '0.0.0.0'
@@ -123,12 +122,6 @@ export function prepareClusterPeer(peer: RpcPeer, onClusterPeer?: (clusterPeer: 
         initializeCluster,
         get clusterPort() {
             return clusterPort;
-        },
-        get clusterId() {
-            return clusterId;
-        },
-        get clusterSecret() {
-            return clusterSecret;
         },
         SCRYPTED_CLUSTER_ADDRESS,
         isClusterAddress,
