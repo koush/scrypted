@@ -100,12 +100,12 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
                 cwd: options.unzippedPath,
                 // stdin, stdout, stderr, peer in, peer out
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
-                env: Object.assign({
+                env: Object.assign({}, process.env, env, gstEnv, {
                     // rev this if the base python version or server characteristics change.
                     SCRYPTED_PYTHON_VERSION: '20240317',
                     PYTHONUNBUFFERED: '1',
                     PYTHONPATH,
-                }, gstEnv, process.env, env),
+                }),
             });
             this.setupWorker();
 

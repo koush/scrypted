@@ -502,7 +502,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                             throw new Error('unknown runtime ' + options.runtime);
                         runtimeWorker = runtime(mainFilename, pluginId, {
                             packageJson,
-                            env: process.env,
+                            env: undefined,
                             pluginDebug: undefined,
                             zipFile,
                             unzippedPath,
@@ -521,7 +521,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                         const ntw = new NodeThreadWorker(mainFilename, pluginId, {
                             packageJson,
-                            env: process.env,
+                            env: undefined,
                             pluginDebug: undefined,
                             zipFile,
                             unzippedPath,

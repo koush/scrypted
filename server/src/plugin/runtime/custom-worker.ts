@@ -26,13 +26,13 @@ export class CustomRuntimeWorker extends ChildProcessWorker {
         const opts: child_process.ForkOptions | child_process.SpawnOptions = {
             // stdin, stdout, stderr, peer in, peer out
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
-            env: Object.assign({
+            env: Object.assign({}, process.env, env, {
                 SCRYYPTED_PLUGIN_ID: pluginId,
                 SCRYPTED_DEBUG_PORT: pluginDebug?.inspectPort?.toString(),
                 SCRYPTED_UNZIPPED_PATH: options.unzippedPath,
                 SCRYPTED_ZIP_FILE: options.zipFile,
                 SCRYPTED_ZIP_HASH: options.zipHash,
-            }, process.env, env),
+            }),
         };
 
         if (!scryptedRuntimeArguments.executable) {
