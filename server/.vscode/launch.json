@@ -130,7 +130,7 @@
                 "SCRYPTED_CLUSTER_ADDRESS": "192.168.215.19",
                 "SCRYPTED_CLUSTER_SECRET": "swordfish",
                 "SCRYPTED_CAN_RESTART": "true",
-                "SCRYPTED_VOLUME": "/Users/koush/.scrypted-cluster/volume-client",
+                "SCRYPTED_VOLUME": "/cluster/volume",
             }
         },
     ]

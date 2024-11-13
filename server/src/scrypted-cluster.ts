@@ -9,7 +9,7 @@ import { computeClusterObjectHash } from './cluster/cluster-hash';
 import { ClusterObject } from './cluster/connect-rpc-object';
 import { listenZeroSingleClient } from './listen-zero';
 import { PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin/plugin-api';
-import { getPluginVolume } from './plugin/plugin-volume';
+import { getPluginVolume, getScryptedVolume } from './plugin/plugin-volume';
 import { ChildProcessWorker } from './plugin/runtime/child-process-worker';
 import { prepareZip } from './plugin/runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
@@ -193,9 +193,15 @@ export function startClusterClient(mainFilename: string) {
                     const pluginId: string = packageJson.name;
                     const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, zipAPI.getZip);
 
+                    const volume = getScryptedVolume();
+                    const pluginVolume = getPluginVolume(pluginId);
+
                     runtimeWorker = runtime(mainFilename, pluginId, {
                         packageJson,
-                        env: process.env,
+                        env: {
+                            SCRYPTED_VOLUME: volume,
+                            SCRYPTED_PLUGIN_VOLUME: pluginVolume,
+                        },
                         pluginDebug: undefined,
                         zipFile,
                         unzippedPath,

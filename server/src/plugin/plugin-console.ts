@@ -137,7 +137,8 @@ export function prepareConsoles(getConsoleName: () => string, systemManager: () 
                     return;
                 const { pluginId, nativeId: mixinNativeId } = mixin;
                 const port = await plugins.getRemoteServicePort(pluginId, 'console-writer');
-                const socket = net.connect(port);
+                const socket = net.connect(port, process.env.SCRYPTED_CLUSTER_SERVER);
+                socket.on('error', ()=>{} );
                 socket.write(mixinNativeId + '\n');
                 const writer = (data: Buffer) => {
                     let str = data.toString().trim();
