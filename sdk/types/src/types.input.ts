@@ -2614,7 +2614,24 @@ export interface ForkOptions {
   runtime?: string;
   id?: string;
   nativeId?: ScryptedNativeId;
-  labels?: string[];
+  /**
+   * The labels used to select the cluster worker that will execute this fork.
+   */
+  labels?: {
+    /**
+     * The worker must have all these labels.
+     */
+    require?: string[];
+    /**
+     * The worker must have one of these labels.
+     */
+    any?: string[];
+    /**
+     * The worker is preferred to have one of these labels.
+     * The nearest match will be selected.
+     */
+    prefer?: string[];
+  }
 }
 
 export interface ScryptedStatic {

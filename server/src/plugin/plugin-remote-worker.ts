@@ -442,7 +442,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 let runtimeWorker: RuntimeWorker;
                 let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
 
-                if (options?.labels?.length && options.runtime && !matchesClusterLabels(options, getClusterLabels())) {
+                // if running in a cluster, fork to a matching cluster worker only if necessary.
+                if (process.env.SCRYPTED_CLUSTER_ADDRESS && options?.runtime && !matchesClusterLabels(options, getClusterLabels())) {
                     const waitKilled = new Deferred<void>();
                     waitKilled.promise.finally(() => events.emit('exit'));
                     const events = new EventEmitter();

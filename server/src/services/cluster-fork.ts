@@ -7,7 +7,14 @@ export class ClusterFork {
     constructor(public runtime: ScryptedRuntime) { }
 
     async fork(peerLiveness: PeerLiveness, options: ForkOptions, packageJson: any, zipAPI: PluginZipAPI, zipOptions: PluginRemoteLoadZipOptions) {
-        const worker = [...this.runtime.clusterWorkers].find(worker => matchesClusterLabels);
+        const matchingWorkers = [...this.runtime.clusterWorkers].map(worker => ({
+            worker,
+            matches: matchesClusterLabels(options, worker.labels),
+        }))
+        .filter(({ matches }) => matches);
+        matchingWorkers.sort((a, b) => b.worker.labels.length - a.worker.labels.length);
+        const worker = matchingWorkers[0]?.worker;
+
         if (!worker)
             throw new Error(`no worker found for cluster labels ${options.labels}`);
 

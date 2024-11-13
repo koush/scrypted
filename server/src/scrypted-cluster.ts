@@ -116,11 +116,30 @@ function preparePeer(socket: tls.TLSSocket, type: 'server' | 'client') {
 }
 
 export function matchesClusterLabels(options: ForkOptions, labels: string[]) {
-    for (const label of options.labels) {
+    let matched = 0;
+    for (const label of options?.labels?.require || []) {
         if (!labels.includes(label))
-            return false;
+            return 0;
     }
-    return true;
+
+    // if there is nothing in the any list, consider it matched
+    let foundAny = !options?.labels?.any?.length;
+    for (const label of options.labels?.any || []) {
+        if (!labels.includes(label)) {
+            matched++;
+            foundAny = true;
+        }
+    }
+    if (!foundAny)
+        return 0;
+
+    for (const label of options?.labels?.prefer || []) {
+        if (labels.includes(label))
+            matched++;
+    }
+    // ensure non zero result.
+    matched++;
+    return matched;
 }
 
 export function getClusterLabels() {
@@ -175,12 +194,6 @@ export function startClusterClient(mainFilename: string) {
                     packageJson: any,
                     zipAPI: PluginZipAPI,
                     zipOptions: PluginRemoteLoadZipOptions) => {
-                    if (!options.runtime || !options.labels?.length) {
-                        console.warn('invalid cluster fork options');
-                        peer.kill('invalid cluster fork options');
-                        throw new Error('invalid cluster fork options');
-                    }
-
                     let runtimeWorker: RuntimeWorker;
                     let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
 
