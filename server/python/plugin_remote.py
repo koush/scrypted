@@ -562,7 +562,8 @@ def getClusterPeerKey(address: str, port: int):
     return f"{address}:{port}"
 
 class ClusterSetup():
-    def __init__(self, peer: rpc.RpcPeer):
+    def __init__(self, loop: AbstractEventLoop, peer: rpc.RpcPeer):
+        self.loop = loop
         self.peer = peer
         self.clusterId: str = None
         self.clusterSecret: str = None
@@ -1180,7 +1181,7 @@ async def plugin_async_main(
     peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, rpcTransport)
     peer.params["print"] = print
 
-    clusterSetup = ClusterSetup(peer)
+    clusterSetup = ClusterSetup(loop, peer)
     peer.params["initializeCluster"] = lambda options: clusterSetup.initializeCluster(options)
 
     peer.params["getRemote"] = lambda api, pluginId, hostInfo: PluginRemote(
