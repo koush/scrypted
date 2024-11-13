@@ -37,7 +37,12 @@
          "Settings",
          "ObjectDetection",
          "ObjectDetectionPreview"
-      ]
+      ],
+      "labels": {
+         "require": [
+            "openvino"
+         ]
+      }
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"

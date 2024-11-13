@@ -48,7 +48,12 @@
          "Settings",
          "ObjectDetection",
          "ObjectDetectionPreview"
-      ]
+      ],
+      "labels": {
+         "require": [
+            "edgetpu"
+         ]
+      }
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"

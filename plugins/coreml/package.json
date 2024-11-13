@@ -37,7 +37,13 @@
          "DeviceProvider",
          "ObjectDetection",
          "ObjectDetectionPreview"
-      ]
+      ],
+      "labels": {
+         "require": [
+            "darwin",
+            "arm64"
+         ]
+      }
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"

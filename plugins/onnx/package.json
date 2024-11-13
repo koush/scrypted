@@ -37,7 +37,12 @@
          "Settings",
          "ObjectDetection",
          "ObjectDetectionPreview"
-      ]
+      ],
+      "labels": {
+         "require": [
+            "onnx"
+         ]
+      }
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
