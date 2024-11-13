@@ -186,7 +186,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
 
     async requestRestart() {
         const logger = await this.getLogger(undefined);
-        logger.log('i', 'plugin restart was requested');
+        logger?.log('i', 'plugin restart was requested');
         return this.restartDebounced();
     }
 

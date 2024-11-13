@@ -231,6 +231,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     getDeviceLogger(device: PluginDevice): Logger {
+        if (!device)
+            return;
         return this.devicesLogger.getLogger(device._id, getState(device, ScryptedInterfaceProperty.name));
     }
 
