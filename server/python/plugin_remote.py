@@ -593,8 +593,8 @@ class PluginRemote:
             consoleFuture = Future()
             self.consoles[nativeId] = consoleFuture
             plugins = await self.api.getComponent("plugins")
-            port = await plugins.getRemoteServicePort(self.pluginId, "console-writer")
-            connection = await asyncio.open_connection(port=port)
+            port, hostname = await plugins.getRemoteServicePort(self.pluginId, "console-writer")
+            connection = await asyncio.open_connection(host=hostname, port=port)
             _, writer = connection
             if not nativeId:
                 nid = "undefined"
@@ -1119,7 +1119,7 @@ class PluginRemote:
                 raise Exception("REPL unavailable: Plugin not loaded.")
             if self.replPort == 0:
                 raise Exception("REPL unavailable: Python REPL not available.")
-            return self.replPort
+            return [self.replPort, os.getenv("SCRYPTED_CLUSTER_ADDRESS", None)]
         raise Exception(f"unknown service {name}")
 
     async def start_stats_runner(self):

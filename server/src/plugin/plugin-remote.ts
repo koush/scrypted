@@ -456,7 +456,7 @@ export interface WebSocketCustomHandler {
 
 export interface PluginRemoteAttachOptions {
     createMediaManager?: (systemManager: SystemManager, deviceManager: DeviceManagerImpl) => Promise<MediaManager>;
-    getServicePort?: (name: string, ...args: any[]) => Promise<number>;
+    getServicePort?: (name: string, ...args: any[]) => Promise<[number, string]>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;

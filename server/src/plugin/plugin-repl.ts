@@ -75,5 +75,6 @@ export async function createREPLServer(scrypted: ScryptedStatic, params: any, pl
         socket.on('error', cleanup);
         socket.on('end', cleanup);
     });
-    return listenZero(server, '127.0.0.1');
+    const address = process.env.SCRYPTED_CLUSTER_ADDRESS ? '0.0.0.0' : '127.0.0.1';
+    return listenZero(server, address);
 }

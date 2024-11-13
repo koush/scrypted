@@ -11,6 +11,10 @@ export function getClusterPeerKey(address: string, port: number) {
     return `${address}:${port}`;
 }
 
+export function isClusterAddress(address: string) {
+    return !address || address === process.env.SCRYPTED_CLUSTER_ADDRESS;
+}
+
 export function prepareClusterPeer(peer: RpcPeer, onClusterPeer?: (clusterPeer: RpcPeer) => void) {
     const SCRYPTED_CLUSTER_ADDRESS = process.env.SCRYPTED_CLUSTER_ADDRESS;
     let clusterId: string;
@@ -42,10 +46,6 @@ export function prepareClusterPeer(peer: RpcPeer, onClusterPeer?: (clusterPeer: 
         if (sha256 !== o.sha256)
             throw new Error('secret incorrect');
         return resolveObject(o.proxyId, o.sourceKey);
-    }
-
-    function isClusterAddress(address: string) {
-        return !address || address === SCRYPTED_CLUSTER_ADDRESS;
     }
 
     const onProxySerialization = (peer: RpcPeer, value: any, sourceKey: string) => {
@@ -124,7 +124,6 @@ export function prepareClusterPeer(peer: RpcPeer, onClusterPeer?: (clusterPeer: 
             return clusterPort;
         },
         SCRYPTED_CLUSTER_ADDRESS,
-        isClusterAddress,
         clusterPeers,
         onProxySerialization,
         connectRPCObject,

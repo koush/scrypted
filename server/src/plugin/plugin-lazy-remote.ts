@@ -65,7 +65,7 @@ import { PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin
         return this.remote.createDeviceState(id, setState);
     }
 
-    async getServicePort(name: string, ...args: any[]): Promise<number> {
+    async getServicePort(name: string, ...args: any[]): Promise<[number, string]> {
         const remote = await this.remotePromise;
         return remote.getServicePort(name, ...args);
     }

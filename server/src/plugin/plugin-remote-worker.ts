@@ -13,7 +13,7 @@ import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
 import { createDuplexRpcPeer } from '../rpc-serializer';
 import { getClusterLabels, matchesClusterLabels, PeerLiveness } from '../scrypted-cluster';
-import { getClusterPeerKey, prepareClusterPeer } from '../scrypted-cluster-common';
+import { getClusterPeerKey, isClusterAddress, prepareClusterPeer } from '../scrypted-cluster-common';
 import type { ClusterFork } from '../services/cluster-fork';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
@@ -41,7 +41,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
     const clusterPeerSetup = prepareClusterPeer(peer, startPluginRemoteOptions?.onClusterPeer);
-    const { initializeCluster, isClusterAddress, clusterPeers, onProxySerialization, SCRYPTED_CLUSTER_ADDRESS, connectRPCObject } = clusterPeerSetup;
+    const { initializeCluster, clusterPeers, onProxySerialization, SCRYPTED_CLUSTER_ADDRESS, connectRPCObject } = clusterPeerSetup;
 
     peer.params.initializeCluster = initializeCluster;
 
@@ -103,7 +103,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             if (name === 'repl') {
                 if (!replPort)
                     throw new Error('REPL unavailable: Plugin not loaded.')
-                return replPort;
+                return [await replPort, process.env.SCRYPTED_CLUSTER_ADDRESS];
             }
             throw new Error(`unknown service ${name}`);
         },

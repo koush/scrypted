@@ -17,9 +17,13 @@ export class PluginSocketService extends ScryptedDeviceBase implements StreamSer
             throw new Error('must provide pluginId');
 
         const plugins = await sdk.systemManager.getComponent('plugins');
-        const replPort: number = await plugins.getRemoteServicePort(pluginId, this.serviceName);
+        const servicePort = await plugins.getRemoteServicePort(pluginId, this.serviceName) as number | [number, string];
+        const [port, host] = Array.isArray(servicePort) ? servicePort : [servicePort, undefined];
 
-        const socket = net.connect(replPort);
+        const socket = net.connect({
+            port,
+            host,
+        });
         await once(socket, 'connect');
 
         const queue = createAsyncQueue<Buffer>();

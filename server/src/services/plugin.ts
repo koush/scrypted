@@ -174,14 +174,14 @@ export class PluginComponent {
         consoleServer.clear(pluginDevice.nativeId);
     }
 
-    async getRemoteServicePort(pluginId: string, name: string, ...args: any[]): Promise<number> {
+    async getRemoteServicePort(pluginId: string, name: string, ...args: any[]): Promise<[number, string]> {
         if (name === 'console') {
             const consoleServer = await this.scrypted.plugins[pluginId].consoleServer;
-            return consoleServer.readPort;
+            return [consoleServer.readPort, process.env.SCRYPTED_CLUSTER_ADDRESS];
         }
         if (name === 'console-writer') {
             const consoleServer = await this.scrypted.plugins[pluginId].consoleServer;
-            return consoleServer.writePort;
+            return [consoleServer.writePort, process.env.SCRYPTED_CLUSTER_ADDRESS];
         }
 
         return this.scrypted.plugins[pluginId].remote.getServicePort(name, ...args);

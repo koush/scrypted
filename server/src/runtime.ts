@@ -45,6 +45,7 @@ import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
+import { isClusterAddress } from './scrypted-cluster-common';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -123,7 +124,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     return;
                 }
 
-                const socket = net.connect(clusterObject.port, '127.0.0.1');
+                let address = clusterObject.address;
+                if (isClusterAddress(address)) 
+                    address = '127.0.0.1';
+                const socket = net.connect({
+                    port: clusterObject.port,
+                    host: address,
+                });
                 socket.on('error', () => connection.close());
                 socket.on('close', () => connection.close());
                 socket.on('data', data => connection.send(data));
