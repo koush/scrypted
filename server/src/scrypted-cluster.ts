@@ -74,6 +74,17 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
     }
     if (!process.env.SCRYPTED_CLUSTER_SECRET)
         throw new Error('SCRYPTED_CLUSTER_SERVER is set but SCRYPTED_CLUSTER_SECRET is not set.');
+
+    const address = process.env.SCRYPTED_CLUSTER_ADDRESS;
+    if (mode === 'server') {
+        if (address && address !== server)
+            throw new Error('SCRYPTED_CLUSTER_ADDRESS does not match server address. This setting should be removed.');
+        process.env.SCRYPTED_CLUSTER_ADDRESS = address || server;
+    }
+    else if (!net.isIP(address)) {
+        throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set to a valid IP address.');
+    }
+
     return [mode, server, port];
 }
 
@@ -272,8 +283,10 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
                     throw new Error('cluster object hash mismatch');
                 // the remote address may be ipv6 prefixed so use a fuzzy match.
                 // eg ::ffff:192.168.2.124
-                if (auth.port !== socket.remotePort || !socket.remoteAddress.endsWith(auth.address))
-                    throw new Error('cluster object address mismatch');
+                if (!process.env.SCRYPTED_DISABLE_CLUSTER_SERVER_TRUST) {
+                    if (auth.port !== socket.remotePort || !socket.remoteAddress.endsWith(auth.address))
+                        throw new Error('cluster object address mismatch');
+                }
                 const worker: ClusterWorker = {
                     ...properties,
                     peer,

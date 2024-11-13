@@ -134,8 +134,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     try {
                         await once(socket, 'connect');
                         const { address: sourceAddress } = (socket.address() as net.AddressInfo);
-                        if (sourceAddress !== SCRYPTED_CLUSTER_ADDRESS && sourceAddress !== '127.0.0.1')
-                            console.warn("source address mismatch", sourceAddress);
+                        if (sourceAddress !== SCRYPTED_CLUSTER_ADDRESS && sourceAddress !== '127.0.0.1') {
+                            // source address may end with .0 if its a gateway into docker.
+                            if (!sourceAddress.endsWith('.0'))
+                                console.warn("source address mismatch", sourceAddress);
+                        }
 
                         const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, socket, socket);
                         clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);

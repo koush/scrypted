@@ -68,9 +68,6 @@ function start(mainFilename: string, options?: {
     });
 
     const clusterMode = getScryptedClusterMode();
-    if (clusterMode)
-        process.env.SCRYPTED_CLUSTER_ADDRESS = clusterMode[1];
-
     if (clusterMode?.[0] === 'client') {
         const start = require('./scrypted-cluster-main').default;
         return start(mainFilename);
