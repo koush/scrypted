@@ -15,7 +15,7 @@ export function isClusterAddress(address: string) {
     return !address || address === process.env.SCRYPTED_CLUSTER_ADDRESS;
 }
 
-export function prepareClusterPeer(peer: RpcPeer, onClusterPeer?: (clusterPeer: RpcPeer) => void) {
+export function prepareClusterPeer(peer: RpcPeer) {
     const SCRYPTED_CLUSTER_ADDRESS = process.env.SCRYPTED_CLUSTER_ADDRESS;
     let clusterId: string;
     let clusterSecret: string;
@@ -101,7 +101,6 @@ export function prepareClusterPeer(peer: RpcPeer, onClusterPeer?: (clusterPeer: 
             // to determine if it is already connected to THIS peer (the server).
             clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
             clusterPeers.set(clusterPeerKey, Promise.resolve(clusterPeer));
-            onClusterPeer?.(clusterPeer);
             clusterPeer.params.connectRPCObject = connectRPCObject;
             client.on('close', () => {
                 clusterPeers.delete(clusterPeerKey);

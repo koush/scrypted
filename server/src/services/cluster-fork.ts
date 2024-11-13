@@ -1,12 +1,10 @@
-import { ForkOptions } from "@scrypted/types";
-import { PluginRemoteLoadZipOptions, PluginZipAPI } from "../plugin/plugin-api";
 import type { ScryptedRuntime } from "../runtime";
-import { PeerLiveness, ClusterForkParam, matchesClusterLabels } from "../scrypted-cluster";
+import { ClusterForkOptions, ClusterForkParam, matchesClusterLabels, PeerLiveness } from "../scrypted-cluster";
 
 export class ClusterFork {
     constructor(public runtime: ScryptedRuntime) { }
 
-    async fork(peerLiveness: PeerLiveness, options: ForkOptions, packageJson: any, zipAPI: PluginZipAPI, zipOptions: PluginRemoteLoadZipOptions) {
+    async fork(peerLiveness: PeerLiveness, options: ClusterForkOptions, packageJson: any, zipHash: string, getZip: () => Promise<Buffer>) {
         const matchingWorkers = [...this.runtime.clusterWorkers].map(worker => ({
             worker,
             matches: matchesClusterLabels(options, worker.labels),
@@ -19,6 +17,6 @@ export class ClusterFork {
             throw new Error(`no worker found for cluster labels ${options.labels}`);
 
         const fork: ClusterForkParam = await worker.peer.getParam('fork');
-        return fork(peerLiveness, options, packageJson, zipAPI, zipOptions);
+        return fork(peerLiveness, options.runtime, packageJson, zipHash, getZip);
     }
 }

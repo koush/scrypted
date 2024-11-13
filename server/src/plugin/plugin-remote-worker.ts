@@ -5,25 +5,24 @@ import fs from 'fs';
 import net from 'net';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
-import { EventEmitter } from 'stream';
 import worker_threads from 'worker_threads';
 import { ClusterObject, ConnectRPCObject } from '../cluster/connect-rpc-object';
 import { Deferred } from '../deferred';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
 import { createDuplexRpcPeer } from '../rpc-serializer';
-import { getClusterLabels, matchesClusterLabels, PeerLiveness } from '../scrypted-cluster';
+import { getClusterLabels, matchesClusterLabels } from '../scrypted-cluster';
 import { getClusterPeerKey, isClusterAddress, prepareClusterPeer } from '../scrypted-cluster-common';
-import type { ClusterFork } from '../services/cluster-fork';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
-import { iterateWorkerConsoleError, iterateWorkerConsoleLog, pipeWorkerConsole, prepareConsoles } from './plugin-console';
+import { pipeWorkerConsole, prepareConsoles } from './plugin-console';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, DeviceManagerImpl, setupPluginRemote } from './plugin-remote';
 import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { getPluginVolume } from './plugin-volume';
 import { ChildProcessWorker } from './runtime/child-process-worker';
+import { createClusterForkWorker } from './runtime/cluster-fork.worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
@@ -32,7 +31,6 @@ import { RuntimeWorker } from './runtime/runtime-worker';
 const serverVersion = require('../../package.json').version;
 
 export interface StartPluginRemoteOptions {
-    onClusterPeer?(peer: RpcPeer): void;
     sourceURL?(filename: string): string;
     consoleId?: string;
 }
@@ -40,7 +38,7 @@ export interface StartPluginRemoteOptions {
 export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void, startPluginRemoteOptions?: StartPluginRemoteOptions) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
-    const clusterPeerSetup = prepareClusterPeer(peer, startPluginRemoteOptions?.onClusterPeer);
+    const clusterPeerSetup = prepareClusterPeer(peer);
     const { initializeCluster, clusterPeers, onProxySerialization, SCRYPTED_CLUSTER_ADDRESS, connectRPCObject } = clusterPeerSetup;
 
     peer.params.initializeCluster = initializeCluster;
@@ -444,55 +442,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                 // if running in a cluster, fork to a matching cluster worker only if necessary.
                 if (process.env.SCRYPTED_CLUSTER_ADDRESS && options?.runtime && !matchesClusterLabels(options, getClusterLabels())) {
-                    const waitKilled = new Deferred<void>();
-                    waitKilled.promise.finally(() => events.emit('exit'));
-                    const events = new EventEmitter();
-
-                    runtimeWorker = {
-                        on: events.on.bind(events),
-                        once: events.once.bind(events),
-                        removeListener: events.removeListener.bind(events),
-                        kill: () => {
-                            waitKilled.resolve();
-                        },
-                    } as any;
-
-                    forkPeer = (async () => {
-                        const forkComponent: ClusterFork = await api.getComponent('cluster-fork');
-                        const peerLiveness = new PeerLiveness(new Deferred().promise);
-                        const clusterForkResult = await forkComponent.fork(peerLiveness, options, packageJson, zipAPI, zipOptions);
-                        clusterForkResult.waitKilled().catch(() => { })
-                            .finally(() => {
-                                waitKilled.resolve();
-                            });
-                        waitKilled.promise.finally(() => {
-                            clusterForkResult.kill();
-                        });
-
-                        try {
-                            const clusterGetRemote = await scrypted.connectRPCObject(await clusterForkResult.getResult());
-                            const {
-                                stdout,
-                                stderr,
-                                getRemote
-                            } = await clusterGetRemote();
-
-                            const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
-                            iterateWorkerConsoleLog(stdout, console).catch(() => {});
-                            iterateWorkerConsoleError(stderr, console).catch(() => {});
-
-                            const directGetRemote = await scrypted.connectRPCObject(getRemote);
-                            if (directGetRemote === getRemote)
-                                throw new Error('cluster fork peer not direct connected');
-                            const peer = directGetRemote[RpcPeer.PROPERTY_PROXY_PEER];
-                            if (!peer)
-                                throw new Error('cluster fork peer undefined?');
-                            return peer;
-                        }
-                        catch (e) {
-                            clusterForkResult.kill();
-                        }
-                    })();
+                    const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
+                    ({runtimeWorker, forkPeer} = createClusterForkWorker(console, api.getComponent('cluster-fork'), zipHash, zipAPI.getZip, options, packageJson, scrypted.connectRPCObject));
                 }
                 else {
                     if (options?.runtime) {

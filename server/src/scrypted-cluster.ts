@@ -1,25 +1,20 @@
-import { ForkOptions } from '@scrypted/types';
-import child_process, { fork } from 'child_process';
+import type { ForkOptions } from '@scrypted/types';
 import net from 'net';
 import os from 'os';
+import type { Readable } from 'stream';
 import tls from 'tls';
-import worker_threads from 'worker_threads';
 import type { createSelfSignedCertificate } from './cert';
 import { computeClusterObjectHash } from './cluster/cluster-hash';
-import { ClusterObject } from './cluster/connect-rpc-object';
-import { listenZeroSingleClient } from './listen-zero';
-import { PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin/plugin-api';
+import type { ClusterObject } from './cluster/connect-rpc-object';
 import { getPluginVolume, getScryptedVolume } from './plugin/plugin-volume';
-import { ChildProcessWorker } from './plugin/runtime/child-process-worker';
 import { prepareZip } from './plugin/runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
 import { RuntimeWorker } from './plugin/runtime/runtime-worker';
 import { RpcPeer } from './rpc';
 import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
-import { sleep } from './sleep';
 import { prepareClusterPeer } from './scrypted-cluster-common';
-import { Readable } from 'stream';
+import { sleep } from './sleep';
 
 export class PeerLiveness {
     __proxy_oneway_methods = ['kill'];
@@ -44,7 +39,7 @@ export class ClusterForkResult extends PeerLiveness {
     }
 }
 
-export type ClusterForkParam = (peerLiveness: PeerLiveness, options: ForkOptions, packageJson: any, zipAPI: PluginZipAPI, zipOptions: PluginRemoteLoadZipOptions) => Promise<ClusterForkResult>;
+export type ClusterForkParam = (peerLiveness: PeerLiveness, runtime: string, packageJson: any, zipHash: string, getZip: () => Promise<Buffer>) => Promise<ClusterForkResult>;
 export type InitializeCluster = (cluster: { clusterId: string, clusterSecret: string }) => Promise<void>;
 
 export interface ClusterWorkerProperties {
@@ -115,7 +110,12 @@ function preparePeer(socket: tls.TLSSocket, type: 'server' | 'client') {
     return peer;
 }
 
-export function matchesClusterLabels(options: ForkOptions, labels: string[]) {
+export interface ClusterForkOptions {
+    runtime?: ForkOptions['runtime'];
+    labels?: ForkOptions['labels'];
+}
+
+export function matchesClusterLabels(options: ClusterForkOptions, labels: string[]) {
     let matched = 0;
     for (const label of options?.labels?.require || []) {
         if (!labels.includes(label))
@@ -190,26 +190,24 @@ export function startClusterClient(mainFilename: string) {
 
                 const clusterForkParam: ClusterForkParam = async (
                     peerLiveness: PeerLiveness,
-                    options: ForkOptions,
+                    runtime: string,
                     packageJson: any,
-                    zipAPI: PluginZipAPI,
-                    zipOptions: PluginRemoteLoadZipOptions) => {
+                    zipHash: string, 
+                    getZip: () => Promise<Buffer>) => {
                     let runtimeWorker: RuntimeWorker;
-                    let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
 
                     const builtins = getBuiltinRuntimeHosts();
-                    const runtime = builtins.get(options.runtime);
-                    if (!runtime)
-                        throw new Error('unknown runtime ' + options.runtime);
+                    const rt = builtins.get(runtime);
+                    if (!rt)
+                        throw new Error('unknown runtime ' + runtime);
 
-                    const { zipHash } = zipOptions;
                     const pluginId: string = packageJson.name;
-                    const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, zipAPI.getZip);
+                    const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, getZip);
 
                     const volume = getScryptedVolume();
                     const pluginVolume = getPluginVolume(pluginId);
 
-                    runtimeWorker = runtime(mainFilename, pluginId, {
+                    runtimeWorker = rt(mainFilename, pluginId, {
                         packageJson,
                         env: {
                             SCRYPTED_VOLUME: volume,
@@ -220,12 +218,6 @@ export function startClusterClient(mainFilename: string) {
                         unzippedPath,
                         zipHash,
                     }, undefined);
-
-                    if (runtimeWorker instanceof ChildProcessWorker) {
-                        nativeWorker = runtimeWorker.childProcess;
-                        // const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
-                        // pipeWorkerConsole(nativeWorker, console);
-                    }
 
                     const threadPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
                     runtimeWorker.setupRpcPeer(threadPeer);
