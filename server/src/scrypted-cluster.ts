@@ -170,11 +170,12 @@ export function startClusterClient(mainFilename: string) {
                 rejectUnauthorized: false,
             });
 
+            const { localAddress, localPort } = socket;
             socket.on('secureConnect', () => {
-                console.log('Cluster server connected.', socket.localAddress, socket.localPort);
+                console.log('Cluster server connected.', localAddress, localPort);
             });
             socket.on('close', () => {
-                console.log('Cluster server disconnected.', socket.localAddress, socket.localPort);
+                console.log('Cluster server disconnected.', localAddress, localPort);
             });
 
             const peer = preparePeer(socket, 'client');
@@ -285,7 +286,7 @@ export function startClusterClient(mainFilename: string) {
             catch (e) {
                 peer.kill(e.message);
                 socket.destroy();
-                console.warn('Cluster client error:', e);
+                console.warn('Cluster client error:', localAddress, localPort, e);
             }
             await backoff;
         }
