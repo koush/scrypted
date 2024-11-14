@@ -744,9 +744,9 @@ class PluginRemote:
             self.loop,
         )
 
-    async def loadZip(self, packageJson, getZip: Any, options: dict):
+    async def loadZip(self, packageJson, zipAPI: Any, options: dict):
         try:
-            return await self.loadZipWrapped(packageJson, getZip, options)
+            return await self.loadZipWrapped(packageJson, zipAPI, options)
         except:
             print("plugin start/fork failed")
             traceback.print_exc()
@@ -978,7 +978,7 @@ class PluginRemote:
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
         self.mediaManager = MediaManager(await self.api.getMediaManager())
 
-        await self.start_stats_runner(zipAPI.updateState)
+        await self.start_stats_runner(zipAPI.updateStats)
 
         try:
             from scrypted_sdk import sdk_init2  # type: ignore
@@ -1017,12 +1017,6 @@ class PluginRemote:
                     )
                     forkPeer.peerName = "thread"
 
-                    async def updateStats(stats):
-                        self.ptimeSum += stats["cpu"]["user"]
-                        self.allMemoryStats[forkPeer] = stats
-
-                    forkPeer.params["updateStats"] = updateStats
-
                     async def forkReadLoop():
                         try:
                             await readLoop()
@@ -1046,7 +1040,16 @@ class PluginRemote:
                     forkOptions = options.copy()
                     forkOptions["fork"] = True
                     forkOptions["debug"] = debug
-                    return await remote.loadZip(packageJson, zipAPI.getZip, forkOptions)
+
+                    class PluginZipAPI:
+                        async def updateStats(stats):
+                            self.ptimeSum += stats["cpu"]["user"]
+                            self.allMemoryStats[forkPeer] = stats
+                        
+                        async def getZip(self):
+                            return await zipAPI.getZip()
+
+                    return await remote.loadZip(packageJson, PluginZipAPI(), forkOptions)
 
                 pluginFork.result = asyncio.create_task(getFork())
                 return pluginFork
