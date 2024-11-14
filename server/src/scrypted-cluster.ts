@@ -74,13 +74,14 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
     }
     else {
         // the cluster address may come from the server:port combo or address variable but not both.
-        if (address && server)
+        if (address && server && server !== address)
             throw new Error('SCRYPTED_CLUSTER_ADDRESS and SCRYPTED_CLUSTER_SERVER must not both be used.');
 
         const serverAddress = address || server;
         if (!net.isIP(serverAddress))
             throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set.');
         process.env.SCRYPTED_CLUSTER_ADDRESS = serverAddress;
+        delete process.env.SCRYPTED_CLUSTER_SERVER;
     }
 
     return [mode, server, port];
