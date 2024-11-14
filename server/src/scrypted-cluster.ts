@@ -129,7 +129,7 @@ export function matchesClusterLabels(options: ClusterForkOptions, labels: string
     // if there is nothing in the any list, consider it matched
     let foundAny = !options?.labels?.any?.length;
     for (const label of options.labels?.any || []) {
-        if (!labels.includes(label)) {
+        if (labels.includes(label)) {
             matched++;
             foundAny = true;
         }

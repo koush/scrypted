@@ -40,8 +40,7 @@
       ],
       "labels": {
          "require": [
-            "darwin",
-            "arm64"
+            "darwin"
          ]
       }
    },
