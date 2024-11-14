@@ -38,7 +38,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
     const clusterPeerSetup = prepareClusterPeer(peer);
-    const { initializeCluster, connectRPCObject, SCRYPTED_CLUSTER_ADDRESS, connectClusterObject, ensureClusterPeer, mainThreadBrokerRegister , mainThreadPort } = clusterPeerSetup;
+    const { initializeCluster, connectRPCObject, mainThreadBrokerRegister , mainThreadPort } = clusterPeerSetup;
 
     peer.params.initializeCluster = initializeCluster;
 
@@ -96,7 +96,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
         getPluginConsole,
         getDeviceConsole,
         getMixinConsole,
-        async getServicePort(name, ...args: any[]) {
+        async getServicePort(name) {
             if (name === 'repl') {
                 if (!replPort)
                     throw new Error('REPL unavailable: Plugin not loaded.')
@@ -111,7 +111,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             const pluginIdMainNodeJs = `/${pluginId}/${mainNodejs}`;
 
             const { zipHash } = zipOptions;
-            const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, zipAPI.getZip);
+            // todo: fix rpc method call, passing zipAPI.getZip directly should work.
+            const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, () => zipAPI.getZip());
 
             await initializeCluster(zipOptions);
 
@@ -229,7 +230,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 // if running in a cluster, fork to a matching cluster worker only if necessary.
                 if (needsClusterForkWorker(options)) {
                     ({ runtimeWorker, forkPeer } = createClusterForkWorker(
-                        api.getComponent('cluster-fork'), zipHash, zipAPI.getZip, options, packageJson, scrypted.connectRPCObject)
+                        api.getComponent('cluster-fork'), zipHash, () => zipAPI.getZip(), options, packageJson, scrypted.connectRPCObject)
                     );
                 }
                 else {
@@ -337,7 +338,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     const forkOptions = Object.assign({}, zipOptions);
                     forkOptions.fork = true;
                     forkOptions.main = options?.filename;
-                    const forkZipAPI = new PluginZipAPI(zipAPI.getZip, async (stats: PluginStats) => {
+                    const forkZipAPI = new PluginZipAPI(() => zipAPI.getZip(), async (stats: PluginStats) => {
                         allMemoryStats.set(runtimeWorker, stats.memoryUsage);
                     });
                     return remote.loadZip(packageJson, forkZipAPI, forkOptions)
