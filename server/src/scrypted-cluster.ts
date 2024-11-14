@@ -58,26 +58,29 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
     if (!['server', 'client'].includes(mode))
         throw new Error('SCRYPTED_CLUSTER_MODE must be set to either "server" or "client".');
 
+    if (!process.env.SCRYPTED_CLUSTER_SECRET)
+        throw new Error('SCRYPTED_CLUSTER_MODE is set but SCRYPTED_CLUSTER_SECRET is not set.');
+
     const [server, sport] = process.env.SCRYPTED_CLUSTER_SERVER?.split(':') || [];
     const port = parseInt(sport) || 10556;
-    if (!net.isIP(server)) {
-        if (server)
-            throw new Error('SCRYPTED_CLUSTER_SERVER is set but is not a valid IP address.');
-        if (process.env.SCRYPTED_CLUSTER_SECRET)
-            throw new Error('SCRYPTED_CLUSTER_SECRET is set but SCRYPTED_CLUSTER_SERVER is not set.');
-        return;
-    }
-    if (!process.env.SCRYPTED_CLUSTER_SECRET)
-        throw new Error('SCRYPTED_CLUSTER_SERVER is set but SCRYPTED_CLUSTER_SECRET is not set.');
-
     const address = process.env.SCRYPTED_CLUSTER_ADDRESS;
-    if (mode === 'server') {
-        if (address && address !== server)
-            throw new Error('SCRYPTED_CLUSTER_ADDRESS does not match server address. This setting should be removed.');
-        process.env.SCRYPTED_CLUSTER_ADDRESS = address || server;
+
+    if (mode === 'client') {
+        if (!net.isIP(server))
+            throw new Error('SCRYPTED_CLUSTER_SERVER is not a valid IP address:port.');
+
+        if (!net.isIP(address))
+            throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set to a valid IP address.');
     }
-    else if (!net.isIP(address)) {
-        throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set to a valid IP address.');
+    else {
+        // the cluster address may come from the server:port combo or address variable but not both.
+        if (address && server)
+            throw new Error('SCRYPTED_CLUSTER_ADDRESS and SCRYPTED_CLUSTER_SERVER must not both be used.');
+
+        const serverAddress = address || server;
+        if (!net.isIP(serverAddress))
+            throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set.');
+        process.env.SCRYPTED_CLUSTER_ADDRESS = serverAddress;
     }
 
     return [mode, server, port];
@@ -192,7 +195,7 @@ export function startClusterClient(mainFilename: string) {
                     peerLiveness: PeerLiveness,
                     runtime: string,
                     packageJson: any,
-                    zipHash: string, 
+                    zipHash: string,
                     getZip: () => Promise<Buffer>) => {
                     let runtimeWorker: RuntimeWorker;
 
