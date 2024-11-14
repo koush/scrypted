@@ -2,7 +2,7 @@ import { DeviceManager, ScryptedNativeId, SystemManager } from '@scrypted/types'
 import { Console } from 'console';
 import { once } from 'events';
 import net, { Server } from 'net';
-import { PassThrough, Readable } from 'stream';
+import { PassThrough, Readable, Writable } from 'stream';
 import { listenZero } from '../listen-zero';
 import { isClusterAddress } from '../scrypted-cluster-common';
 
@@ -346,19 +346,10 @@ export function pipeWorkerConsole(nativeWorker: { stdout: Readable, stderr: Read
     });
 }
 
-export async function iterateWorkerConsoleLog(asyncIterator: AsyncGenerator<Buffer>, useConsole = console) {
+export async function writeWorkerGenerator(asyncIterator: AsyncGenerator<Buffer>, writable: Writable) {
     try {
         for await (const data of asyncIterator) {
-            useConsole.log(data.toString());
-        }
-    }
-    catch (e) {
-    }
-}
-export async function iterateWorkerConsoleError(asyncIterator: AsyncGenerator<Buffer>, useConsole = console) {
-    try {
-        for await (const data of asyncIterator) {
-            useConsole.error(data.toString());
+            writable.write(data);
         }
     }
     catch (e) {

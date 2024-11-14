@@ -638,6 +638,9 @@ class ClusterSetup():
             peer, peerReadLoop = await rpc_reader.prepare_peer_readloop(
                 self.loop, rpcTransport
             )
+            # set all params from self.peer
+            for key, value in self.peer.params.items():
+                peer.params[key] = value
             peer.onProxySerialization = lambda value: self.onProxySerialization(
                 peer, value, clusterPeerKey
             )
@@ -775,6 +778,9 @@ class PluginRemote:
                     clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(
                         self.loop, rpcTransport
                     )
+                    # set all params from self.peer
+                    for key, value in self.peer.params.items():
+                        clusterPeer.params[key] = value
                     clusterPeer.onProxySerialization = (
                         lambda value: self.clusterSetup.onProxySerialization(
                             clusterPeer, value, clusterPeerKey

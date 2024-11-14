@@ -14,7 +14,7 @@ export class ClusterFork {
         const worker = matchingWorkers[0]?.worker;
 
         if (!worker)
-            throw new Error(`no worker found for cluster labels ${options.labels}`);
+            throw new Error(`no worker found for cluster labels ${JSON.stringify(options.labels)}`);
 
         const fork: ClusterForkParam = await worker.peer.getParam('fork');
         return fork(peerLiveness, options.runtime, packageJson, zipHash, getZip);

@@ -124,7 +124,7 @@
                 "${workspaceFolder}/**/*.js"
             ],
             "env": {
-                "SCRYPTED_CLUSTER_LABELS": "compute",
+                "SCRYPTED_CLUSTER_LABELS": "openvino",
                 "SCRYPTED_CLUSTER_MODE": "client",
                 "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",
                 "SCRYPTED_CLUSTER_ADDRESS": "192.168.215.19",

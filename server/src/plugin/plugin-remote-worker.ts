@@ -11,8 +11,7 @@ import { Deferred } from '../deferred';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
 import { createDuplexRpcPeer } from '../rpc-serializer';
-import { getClusterLabels, matchesClusterLabels } from '../scrypted-cluster';
-import { getClusterPeerKey, isClusterAddress, prepareClusterPeer } from '../scrypted-cluster-common';
+import { getClusterPeerKey, isClusterAddress, peerConnectRPCObject, prepareClusterPeer } from '../scrypted-cluster-common';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
 import { pipeWorkerConsole, prepareConsoles } from './plugin-console';
@@ -22,7 +21,7 @@ import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { getPluginVolume } from './plugin-volume';
 import { ChildProcessWorker } from './runtime/child-process-worker';
-import { createClusterForkWorker } from './runtime/cluster-fork.worker';
+import { createClusterForkWorker, needsClusterForkWorker } from './runtime/cluster-fork.worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
@@ -39,7 +38,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
     const clusterPeerSetup = prepareClusterPeer(peer);
-    const { initializeCluster, clusterPeers, onProxySerialization, SCRYPTED_CLUSTER_ADDRESS, connectRPCObject } = clusterPeerSetup;
+    const { initializeCluster, connectRPCObject, SCRYPTED_CLUSTER_ADDRESS, connectClusterObject, ensureClusterPeer, mainThreadBrokerRegister , mainThreadPort } = clusterPeerSetup;
 
     peer.params.initializeCluster = initializeCluster;
 
@@ -116,221 +115,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             await initializeCluster(zipOptions);
 
-            const ensureClusterPeer = (address: string, connectPort: number) => {
-                if (isClusterAddress(address))
-                    address = '127.0.0.1';
+            scrypted.connectRPCObject = connectRPCObject;
 
-                const clusterPeerKey = getClusterPeerKey(address, connectPort);
-                let clusterPeerPromise = clusterPeers.get(clusterPeerKey);
-                if (clusterPeerPromise)
-                    return clusterPeerPromise;
-
-                clusterPeerPromise = (async () => {
-                    const socket = net.connect(connectPort, address);
-                    socket.on('close', () => clusterPeers.delete(clusterPeerKey));
-
-                    try {
-                        await once(socket, 'connect');
-                        const { address: sourceAddress } = (socket.address() as net.AddressInfo);
-                        if (sourceAddress !== SCRYPTED_CLUSTER_ADDRESS && sourceAddress !== '127.0.0.1') {
-                            // source address may end with .0 if its a gateway into docker.
-                            if (!sourceAddress.endsWith('.0'))
-                                console.warn("source address mismatch", sourceAddress);
-                        }
-
-                        const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, socket, socket);
-                        clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
-                        return clusterPeer;
-                    }
-                    catch (e) {
-                        console.error('failure ipc connect', e);
-                        socket.destroy();
-                        throw e;
-                    }
-                })();
-
-                clusterPeers.set(clusterPeerKey, clusterPeerPromise);
-                return clusterPeerPromise;
-            };
-
-            async function peerConnectRPCObject(peer: RpcPeer, o: ClusterObject) {
-                let peerConnectRPCObject: Promise<ConnectRPCObject> = peer.tags['connectRPCObject'];
-                if (!peerConnectRPCObject) {
-                    peerConnectRPCObject = peer.getParam('connectRPCObject');
-                    peer.tags['connectRPCObject'] = peerConnectRPCObject;
-                }
-                const resolved = await peerConnectRPCObject;
-                return resolved(o);
-            }
-
-            const tidChannels = new Map<number, Deferred<worker_threads.MessagePort>>();
-            const tidPeers = new Map<number, Promise<RpcPeer>>();
-
-            function connectTidPeer(tid: number) {
-                let peerPromise = tidPeers.get(tid);
-                if (peerPromise)
-                    return peerPromise;
-                let tidDeferred = tidChannels.get(tid);
-                // if the tid port is not available yet, request it.
-                if (!tidDeferred) {
-                    tidDeferred = new Deferred<worker_threads.MessagePort>();
-                    tidChannels.set(tid, tidDeferred);
-
-                    if (mainThreadPort) {
-                        // request the connection via the main thread
-                        mainThreadPort.postMessage({
-                            threadId: tid,
-                        });
-                    }
-                }
-
-                const threadPeerKey = `thread:${tid}`;
-                function peerCleanup() {
-                    clusterPeers.delete(threadPeerKey);
-                }
-                peerPromise = tidDeferred.promise.then(port => {
-                    const threadPeer = NodeThreadWorker.createRpcPeer(peer.selfName, threadPeerKey, port);
-                    threadPeer.onProxySerialization = value => onProxySerialization(threadPeer, value, threadPeerKey);
-
-                    threadPeer.params.connectRPCObject = connectRPCObject;
-
-                    function cleanup(message: string) {
-                        peerCleanup();
-                        tidChannels.delete(tid);
-                        tidPeers.delete(tid);
-                        threadPeer.kill(message);
-                    }
-                    port.on('close', () => cleanup('connection closed.'));
-                    port.on('messageerror', () => cleanup('message error.'));
-                    return threadPeer;
-                });
-                peerPromise.catch(() => peerCleanup());
-                clusterPeers.set(threadPeerKey, peerPromise);
-                tidPeers.set(tid, peerPromise);
-
-                return peerPromise;
-            }
-
-            const mainThreadPort: worker_threads.MessagePort = worker_threads.isMainThread ? undefined : worker_threads.workerData.mainThreadPort;
-            if (!worker_threads.isMainThread) {
-                // the main thread port will send messages with a thread port when a thread wants to initiate a connection.
-                mainThreadPort.on('message', async (message: { port: worker_threads.MessagePort, threadId: number }) => {
-                    const { port, threadId } = message;
-                    let tidDeferred = tidChannels.get(threadId);
-                    if (!tidDeferred) {
-                        tidDeferred = new Deferred<worker_threads.MessagePort>();
-                        tidChannels.set(threadId, tidDeferred);
-                    }
-                    tidDeferred.resolve(port);
-                    connectTidPeer(threadId);
-                });
-            }
-
-            async function connectIPCObject(clusterObject: ClusterObject, tid: number) {
-                // if the main thread is trying to connect to an object,
-                // the argument order matters here, as the connection attempt looks at the
-                // connectThreadId to see if the target is main thread.
-                if (worker_threads.isMainThread)
-                    mainThreadBrokerConnect(tid, worker_threads.threadId);
-                const clusterPeer = await connectTidPeer(tid);
-                const existing = clusterPeer.remoteWeakProxies[clusterObject.proxyId]?.deref();
-                if (existing)
-                    return existing;
-                return peerConnectRPCObject(clusterPeer, clusterObject);
-            }
-
-            const brokeredConnections = new Set<string>();
-            const workers = new Map<number, worker_threads.MessagePort>();
-            function mainThreadBrokerConnect(threadId: number, connectThreadId: number) {
-                if (worker_threads.isMainThread && threadId === worker_threads.threadId) {
-                    const msg = 'invalid ipc, main thread cannot connect to itself';
-                    console.error(msg);
-                    throw new Error(msg);
-                }
-                // both workers nay initiate connection to each other at same time, so this
-                // is a synchronization point.
-                const key = JSON.stringify([threadId, connectThreadId].sort());
-                if (brokeredConnections.has(key))
-                    return;
-
-                brokeredConnections.add(key);
-
-                const worker = workers.get(threadId);
-                const connect = workers.get(connectThreadId);
-                const channel = new worker_threads.MessageChannel();
-
-                worker.postMessage({
-                    port: channel.port1,
-                    threadId: connectThreadId,
-                }, [channel.port1]);
-
-                if (connect) {
-                    connect.postMessage({
-                        port: channel.port2,
-                        threadId,
-                    }, [channel.port2]);
-                }
-                else if (connectThreadId === worker_threads.threadId) {
-                    connectTidPeer(threadId);
-                    const deferred = tidChannels.get(threadId);
-                    deferred.resolve(channel.port2);
-                }
-                else {
-                    channel.port2.close();
-                }
-            }
-
-            function mainThreadBrokerRegister(workerPort: worker_threads.MessagePort, threadId: number) {
-                workers.set(threadId, workerPort);
-
-                // this is main thread, so there will be two types of requests from the child: registration requests from grandchildren and connection requests.
-                workerPort.on('message', async (message: { port: worker_threads.MessagePort, threadId: number }) => {
-                    const { port, threadId: connectThreadId } = message;
-
-                    if (port) {
-                        mainThreadBrokerRegister(port, connectThreadId);
-                    }
-                    else {
-                        mainThreadBrokerConnect(threadId, connectThreadId);
-                    }
-                });
-            }
-
-            scrypted.connectRPCObject = async (value: any) => {
-                const clusterObject: ClusterObject = value?.__cluster;
-                if (clusterObject?.id !== zipOptions.clusterId)
-                    return value;
-                const { address, port, proxyId } = clusterObject;
-                // handle the case when trying to connect to an object is on this cluster node,
-                // returning the actual object, rather than initiating a loopback connection.
-                if (port === clusterPeerSetup.clusterPort)
-                    return connectRPCObject(clusterObject);
-
-                // can use worker to worker ipc if the address and pid matches and both side are node.
-                if (address === SCRYPTED_CLUSTER_ADDRESS && proxyId.startsWith('n-')) {
-                    const parts = proxyId.split('-');
-                    const pid = parseInt(parts[1]);
-                    if (pid === process.pid)
-                        return connectIPCObject(clusterObject, parseInt(parts[2]));
-                }
-
-                try {
-                    const clusterPeerPromise = ensureClusterPeer(address, port);
-                    const clusterPeer = await clusterPeerPromise;
-                    // may already have this proxy so check first.
-                    const existing = clusterPeer.remoteWeakProxies[proxyId]?.deref();
-                    if (existing)
-                        return existing;
-                    const newValue = await peerConnectRPCObject(clusterPeer, clusterObject);
-                    if (!newValue)
-                        throw new Error('rpc object not found?');
-                    return newValue;
-                }
-                catch (e) {
-                    console.error('failure rpc', clusterObject, e);
-                    return value;
-                }
-            }
             if (worker_threads.isMainThread) {
                 const fsDir = path.join(unzippedPath, 'fs')
                 await fs.promises.mkdir(fsDir, {
@@ -441,9 +227,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
 
                 // if running in a cluster, fork to a matching cluster worker only if necessary.
-                if (process.env.SCRYPTED_CLUSTER_ADDRESS && options?.runtime && !matchesClusterLabels(options, getClusterLabels())) {
-                    const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
-                    ({runtimeWorker, forkPeer} = createClusterForkWorker(console, api.getComponent('cluster-fork'), zipHash, zipAPI.getZip, options, packageJson, scrypted.connectRPCObject));
+                if (needsClusterForkWorker(options)) {
+                    ({ runtimeWorker, forkPeer } = createClusterForkWorker(
+                        api.getComponent('cluster-fork'), zipHash, zipAPI.getZip, options, packageJson, scrypted.connectRPCObject)
+                    );
                 }
                 else {
                     if (options?.runtime) {
@@ -462,8 +249,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                         if (runtimeWorker instanceof ChildProcessWorker) {
                             nativeWorker = runtimeWorker.childProcess;
-                            const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
-                            pipeWorkerConsole(nativeWorker, console);
                         }
                     }
                     else {
@@ -499,6 +284,12 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                         }
                     }
 
+                    // thread workers inherit main console. pipe anything else.
+                    if (!(runtimeWorker instanceof NodeThreadWorker)) {
+                        const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
+                        pipeWorkerConsole(nativeWorker, console);
+                    }
+
                     const localPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
                     runtimeWorker.setupRpcPeer(localPeer);
                     forkPeer = Promise.resolve(localPeer);
@@ -507,6 +298,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const result = (async () => {
                     const threadPeer = await forkPeer;
 
+                    // todo: handle nested forks and skip wrap. this is probably buggy.
                     class PluginForkAPI extends PluginAPIProxy {
                         [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];
 

@@ -7,9 +7,10 @@ import WebSocket from 'ws';
 import { Plugin } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
 import { Logger } from '../logger';
-import { RpcPeer } from '../rpc';
+import { RpcPeer, RPCResultError } from '../rpc';
 import { createRpcSerializer } from '../rpc-serializer';
 import { ScryptedRuntime } from '../runtime';
+import { prepareClusterPeer } from '../scrypted-cluster-common';
 import { sleep } from '../sleep';
 import { AccessControls } from './acl';
 import { MediaManagerHostImpl } from './media';
@@ -22,6 +23,7 @@ import { setupPluginRemote } from './plugin-remote';
 import { PluginStats } from './plugin-remote-stats';
 import { WebSocketConnection } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
+import { createClusterForkWorker, needsClusterForkWorker } from './runtime/cluster-fork.worker';
 import { prepareZipSync } from './runtime/node-worker-common';
 import { RuntimeWorker } from './runtime/runtime-worker';
 
@@ -142,7 +144,7 @@ export class PluginHost {
             this.unzippedPath = unzippedPath;
         }
 
-        this.startPluginHost(logger, {
+        const peerPromise = this.startPluginHost(logger, {
             SCRYPTED_VOLUME: volume,
             SCRYPTED_PLUGIN_VOLUME: pluginVolume,
         }, pluginDebug);
@@ -203,7 +205,7 @@ export class PluginHost {
         const self = this;
 
         const { runtime } = this.packageJson.scrypted;
-        const mediaManager = runtime !== 'node'
+        const mediaManager = runtime && runtime !== 'node'
             ? new MediaManagerHostImpl(pluginDeviceId, () => scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id))
             : undefined;
 
@@ -212,7 +214,18 @@ export class PluginHost {
         logger.log('i', `loading ${this.pluginName}`);
         logger.log('i', 'pid ' + this.worker?.pid);
 
-        const remotePromise = setupPluginRemote(this.peer, this.api, self.pluginId, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
+        const remotePromise = (async () => {
+            let peer: RpcPeer;
+            try {
+                peer = await peerPromise;
+            }
+            catch (e) {
+                logger.log('e', 'plugin failed to start ' + e);
+                throw new RPCResultError(this.peer, 'cluster plugin start failed', e);
+            }
+            return setupPluginRemote(peer, this.api, self.pluginId, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
+        })();
+
         const init = (async () => {
             const remote = await remotePromise;
 
@@ -292,28 +305,65 @@ export class PluginHost {
         if (!workerHost)
             throw new UnsupportedRuntimeError(this.packageJson.scrypted.runtime);
 
-        this.worker = workerHost(this.scrypted.mainFilename, this.pluginId, {
-            packageJson: this.packageJson,
-            env,
-            pluginDebug,
-            unzippedPath: this.unzippedPath,
-            zipFile: this.zipFile,
-            zipHash: this.zipHash,
-        }, this.scrypted);
+        let peer: Promise<RpcPeer>
+        if (!needsClusterForkWorker(this.packageJson.scrypted)) {
+            this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
+                if (connected) {
+                    this.worker.send(message, reject, serializationContext);
+                }
+                else if (reject) {
+                    reject(new Error('peer disconnected'));
+                }
+            });
 
-        this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
-            if (connected) {
-                this.worker.send(message, reject, serializationContext);
-            }
-            else if (reject) {
-                reject(new Error('peer disconnected'));
-            }
-        });
+            peer = Promise.resolve(this.peer);
 
-        this.worker.setupRpcPeer(this.peer);
+            this.worker = workerHost(this.scrypted.mainFilename, this.pluginId, {
+                packageJson: this.packageJson,
+                env,
+                pluginDebug,
+                unzippedPath: this.unzippedPath,
+                zipFile: this.zipFile,
+                zipHash: this.zipHash,
+            }, this.scrypted);
 
-        this.worker.stdout.on('data', data => console.log(data.toString()));
-        this.worker.stderr.on('data', data => console.error(data.toString()));
+            this.worker.setupRpcPeer(this.peer);
+
+            this.worker.stdout.on('data', data => console.log(data.toString()));
+            this.worker.stderr.on('data', data => console.error(data.toString()));
+        }
+        else {
+            this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
+                if (connected) {
+                    console.warn('unexpected message to cluster fork worker', message);
+                }
+                else if (reject) {
+                    reject(new Error('peer disconnected'));
+                }
+            });
+
+            const clusterSetup = prepareClusterPeer(this.peer);
+            const { runtimeWorker, forkPeer } = createClusterForkWorker((async () => {
+                await clusterSetup.initializeCluster({
+                    clusterId: this.scrypted.clusterId,
+                    clusterSecret: this.scrypted.clusterSecret,
+                });
+                return this.scrypted.clusterFork;
+            })(),
+                this.zipHash, async () => fs.promises.readFile(this.zipFile),
+                this.packageJson.scrypted, this.packageJson, clusterSetup.connectRPCObject);
+
+            forkPeer.then(peer => {
+                const originalPeer = this.peer;
+                originalPeer.killed.then(s => peer.kill(s)).catch(e => peer.kill(e));
+                this.peer = peer;
+                peer.killed.catch(() =>{} ).finally(() => originalPeer.kill());
+            }).catch(() => {});
+
+            this.worker = runtimeWorker;
+            peer = forkPeer;
+        }
+
         let consoleHeader = `${os.platform()} ${os.arch()} ${os.version()}\nserver version: ${serverVersion}\nplugin version: ${this.pluginId} ${this.packageJson.version}\n`;
         if (process.env.SCRYPTED_DOCKER_FLAVOR)
             consoleHeader += `${process.env.SCRYPTED_DOCKER_FLAVOR}\n`;
@@ -349,7 +399,7 @@ export class PluginHost {
                     await sleep(30000);
                     if (this.killed)
                         return;
-                    pingPromise ||= await this.peer.getParam('ping');
+                    pingPromise ||= peer.then(p => p.getParam('ping'));
                     const ping = await pingPromise;
                     await ping(Date.now());
                 }
@@ -384,6 +434,8 @@ export class PluginHost {
             }
         }, 60000);
         this.peer.killed.finally(() => clearInterval(healthInterval));
+
+        return peer;
     }
 
     async createRpcIoPeer(socket: IOServerSocket, accessControls: AccessControls) {
