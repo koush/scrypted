@@ -105,7 +105,7 @@ function peerLifecycle(serializer: ReturnType<typeof createRpcDuplexSerializer>,
 
 function preparePeer(socket: tls.TLSSocket, type: 'server' | 'client') {
     const serializer = createRpcDuplexSerializer(socket);
-    const peer = new RpcPeer('cluster-remote', 'cluster-host', (message, reject, serializationContext) => {
+    const peer = new RpcPeer(`cluster-remote:${socket.remoteAddress}:${socket.remotePort}`, 'cluster-host', (message, reject, serializationContext) => {
         serializer.sendMessage(message, reject, serializationContext);
     });
 
@@ -168,6 +168,13 @@ export function startClusterClient(mainFilename: string) {
                 host,
                 port,
                 rejectUnauthorized: false,
+            });
+
+            socket.on('secureConnect', () => {
+                console.log('Cluster server connected.', socket.localAddress, socket.localPort);
+            });
+            socket.on('close', () => {
+                console.log('Cluster server disconnected.', socket.localAddress, socket.localPort);
             });
 
             const peer = preparePeer(socket, 'client');
@@ -278,6 +285,7 @@ export function startClusterClient(mainFilename: string) {
             catch (e) {
                 peer.kill(e.message);
                 socket.destroy();
+                console.warn('Cluster client error:', e);
             }
             await backoff;
         }
@@ -289,6 +297,11 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
         key: certificate.serviceKey,
         cert: certificate.certificate,
     }, (socket) => {
+        console.log('Cluster client connected.', socket.remoteAddress, socket.remotePort);
+        socket.on('close', () => {
+            console.log('Cluster client disconnected.', socket.remoteAddress, socket.remotePort);
+        });
+
         const peer = preparePeer(socket, 'server');
 
         const connectForkWorker: ConnectForkWorker = async (auth: ClusterObject, properties: ClusterWorkerProperties) => {
@@ -313,6 +326,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
                 socket.on('close', () => {
                     runtime.clusterWorkers.delete(worker);
                 });
+                console.log('Cluster client authenticated.', socket.remoteAddress, socket.remotePort, properties);
             }
             catch (e) {
                 peer.kill(e);

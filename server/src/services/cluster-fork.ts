@@ -19,4 +19,14 @@ export class ClusterFork {
         const fork: ClusterForkParam = await worker.peer.getParam('fork');
         return fork(peerLiveness, options.runtime, packageJson, zipHash, getZip);
     }
+
+    async getClusterWorkers() {
+        const ret: any = {};
+        for (const worker of this.runtime.clusterWorkers) {
+            ret[worker.peer.peerName] = {
+                labels: worker.labels,
+            };
+        }
+        return ret;
+    }
 }
