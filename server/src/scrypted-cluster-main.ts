@@ -102,7 +102,12 @@ export function startClusterClient(mainFilename: string) {
     const [, host, port] = clusterMode;
     (async () => {
         while (true) {
-            const backoff = sleep(10000);
+            // this sleep is here to prevent a tight loop if the server is down.
+            // furthermore, the mac desktop app needs to pop a privacy warning
+            // for local network, and having the immediate socket connection seems
+            // to hang the app since no window is created yet.
+            await sleep(10000);
+
             const socket = tls.connect({
                 host,
                 port,
@@ -232,7 +237,6 @@ export function startClusterClient(mainFilename: string) {
                 socket.destroy();
                 console.warn('Cluster client error:', localAddress, localPort, e);
             }
-            await backoff;
         }
     })();
 }
