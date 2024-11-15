@@ -75,9 +75,13 @@ echo "Created $DOCKER_COMPOSE_YML"
 
 if [ -z "$SCRYPTED_LXC" ]
 then
-    if [ -d /dev/dri ]
+    if [ -e /dev/dri ]
     then
         sed -i 's/'#' "\/dev\/dri/"\/dev\/dri/g' $DOCKER_COMPOSE_YML
+    fi
+    if [ -e /dev/kfd ]
+    then
+        sed -i 's/'#' "\/dev\/kfd/"\/dev\/kfd/g' $DOCKER_COMPOSE_YML
     fi
 else
     # uncomment lxc specific stuff

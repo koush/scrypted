@@ -98,6 +98,9 @@ services:
             # hardware accelerated video decoding, opencl, etc.
             # "/dev/dri:/dev/dri",
 
+            # AMD GPU
+            # "/dev/kfd:/dev/kfd",
+
             # uncomment below as necessary.
             # zwave usb serial device
 
