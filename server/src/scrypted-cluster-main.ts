@@ -108,17 +108,23 @@ export function startClusterClient(mainFilename: string) {
                 port,
                 rejectUnauthorized: false,
             });
+            const peer = preparePeer(socket, 'client');
 
-            await once(socket, 'secureConnect');
+            try {
+                await once(socket, 'secureConnect');
+            }
+            catch (e) {
+                continue;
+            }
+
             const { localAddress, localPort } = socket;
             console.log('Cluster server connected.', localAddress, localPort);
             socket.on('close', () => {
                 console.log('Cluster server disconnected.', localAddress, localPort);
             });
 
-            const peer = preparePeer(socket, 'client');
-
             try {
+
                 const connectForkWorker: ConnectForkWorker = await peer.getParam('connectForkWorker');
                 const auth: ClusterObject = {
                     address: socket.localAddress,
