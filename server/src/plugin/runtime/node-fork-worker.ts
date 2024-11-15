@@ -4,7 +4,7 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { SidebandSocketSerializer } from "../socket-serializer";
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
-import { getScryptedClusterMode } from '../../scrypted-cluster';
+import { getScryptedClusterMode } from '../../cluster/cluster-setup';
 
 export const NODE_PLUGIN_CHILD_PROCESS = 'child';
 export const NODE_PLUGIN_FORK_PROCESS = 'fork';

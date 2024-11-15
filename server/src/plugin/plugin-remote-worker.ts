@@ -1,17 +1,12 @@
 import { ForkWorker, ScryptedStatic, SystemManager } from '@scrypted/types';
 import child_process from 'child_process';
-import { once } from 'events';
 import fs from 'fs';
-import net from 'net';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import worker_threads from 'worker_threads';
-import { ClusterObject, ConnectRPCObject } from '../cluster/connect-rpc-object';
-import { Deferred } from '../deferred';
+import { setupCluster } from '../cluster/cluster-setup';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
-import { createDuplexRpcPeer } from '../rpc-serializer';
-import { getClusterPeerKey, isClusterAddress, peerConnectRPCObject, prepareClusterPeer } from '../scrypted-cluster-common';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
 import { pipeWorkerConsole, prepareConsoles } from './plugin-console';
@@ -37,7 +32,7 @@ export interface StartPluginRemoteOptions {
 export function startPluginRemote(mainFilename: string, pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void, startPluginRemoteOptions?: StartPluginRemoteOptions) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
-    const clusterPeerSetup = prepareClusterPeer(peer);
+    const clusterPeerSetup = setupCluster(peer);
     const { initializeCluster, connectRPCObject, mainThreadBrokerRegister , mainThreadPort } = clusterPeerSetup;
 
     peer.params.initializeCluster = initializeCluster;

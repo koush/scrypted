@@ -4,7 +4,7 @@ import { once } from 'events';
 import net, { Server } from 'net';
 import { PassThrough, Readable, Writable } from 'stream';
 import { listenZero } from '../listen-zero';
-import { isClusterAddress } from '../scrypted-cluster-common';
+import { isClusterAddress } from '../cluster/cluster-setup';
 
 export interface ConsoleServer {
     pluginConsole: Console;

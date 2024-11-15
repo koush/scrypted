@@ -23,7 +23,8 @@ import { getNpmPackageInfo } from './services/plugin';
 import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
-import { createClusterServer, getScryptedClusterMode } from './scrypted-cluster';
+import { createClusterServer } from './scrypted-cluster-main';
+import { getScryptedClusterMode } from './cluster/cluster-setup';
 
 export type Runtime = ScryptedRuntime;
 

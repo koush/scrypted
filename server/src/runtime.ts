@@ -33,7 +33,6 @@ import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
-import { ClusterWorker } from './scrypted-cluster';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
@@ -45,7 +44,8 @@ import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
-import { isClusterAddress } from './scrypted-cluster-common';
+import { isClusterAddress } from './cluster/cluster-setup';
+import { ClusterWorker } from './scrypted-cluster-main';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;

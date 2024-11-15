@@ -11,7 +11,7 @@ import { getScryptedVolume } from './plugin/plugin-volume';
 import { isNodePluginWorkerProcess } from './plugin/runtime/node-fork-worker';
 import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
 import type { Runtime } from './scrypted-server-main';
-import { getScryptedClusterMode } from './scrypted-cluster';
+import { getScryptedClusterMode } from './cluster/cluster-setup';
 
 function start(mainFilename: string, options?: {
     onRuntimeCreated?: (runtime: Runtime) => Promise<void>,

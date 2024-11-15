@@ -1,5 +1,6 @@
 import type { ScryptedRuntime } from "../runtime";
-import { ClusterForkOptions, ClusterForkParam, matchesClusterLabels, PeerLiveness } from "../scrypted-cluster";
+import { matchesClusterLabels } from "../cluster/cluster-labels";
+import { ClusterForkOptions, ClusterForkParam, PeerLiveness } from "../scrypted-cluster-main";
 
 export class ClusterFork {
     constructor(public runtime: ScryptedRuntime) { }

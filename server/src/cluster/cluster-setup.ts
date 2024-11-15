@@ -1,16 +1,15 @@
 import { once } from 'events';
 import net from 'net';
 import worker_threads from 'worker_threads';
-import { computeClusterObjectHash } from "./cluster/cluster-hash";
-import { ClusterObject, ConnectRPCObject } from "./cluster/connect-rpc-object";
-import { Deferred } from './deferred';
-import { listenZero } from './listen-zero';
-import { NodeThreadWorker } from './plugin/runtime/node-thread-worker';
-import { RpcPeer } from "./rpc";
-import { createDuplexRpcPeer } from "./rpc-serializer";
-import { InitializeCluster } from "./scrypted-cluster";
+import { Deferred } from '../deferred';
+import { listenZero } from '../listen-zero';
+import { NodeThreadWorker } from '../plugin/runtime/node-thread-worker';
+import { RpcPeer } from "../rpc";
+import { createDuplexRpcPeer } from "../rpc-serializer";
+import { computeClusterObjectHash } from "./cluster-hash";
+import { ClusterObject, ConnectRPCObject } from "./connect-rpc-object";
 
-export function getClusterPeerKey(address: string, port: number) {
+function getClusterPeerKey(address: string, port: number) {
     return `${address}:${port}`;
 }
 
@@ -18,7 +17,7 @@ export function isClusterAddress(address: string) {
     return !address || address === process.env.SCRYPTED_CLUSTER_ADDRESS;
 }
 
-export async function peerConnectRPCObject(peer: RpcPeer, o: ClusterObject) {
+async function peerConnectRPCObject(peer: RpcPeer, o: ClusterObject) {
     let peerConnectRPCObject: Promise<ConnectRPCObject> = peer.tags['connectRPCObject'];
     if (!peerConnectRPCObject) {
         peerConnectRPCObject = peer.getParam('connectRPCObject');
@@ -28,7 +27,7 @@ export async function peerConnectRPCObject(peer: RpcPeer, o: ClusterObject) {
     return resolved(o);
 }
 
-export function prepareClusterPeer(peer: RpcPeer) {
+export function setupCluster(peer: RpcPeer) {
     const SCRYPTED_CLUSTER_ADDRESS = process.env.SCRYPTED_CLUSTER_ADDRESS;
     let clusterId: string;
     let clusterSecret: string;
@@ -371,4 +370,57 @@ export function prepareClusterPeer(peer: RpcPeer) {
         mainThreadBrokerRegister,
         connectRPCObject,
     }
+}
+
+export type InitializeCluster = (cluster: { clusterId: string, clusterSecret: string }) => Promise<void>;
+
+export function getScryptedClusterMode(): ['server' | 'client', string, number] {
+    const mode = process.env.SCRYPTED_CLUSTER_MODE as 'server' | 'client';
+
+    if (!mode) {
+        if (process.env.SCRYPTED_CLUSTER_ADDRESS) {
+            console.warn('SCRYPTED_CLUSTER_ADDRESS, but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
+            delete process.env.SCRYPTED_CLUSTER_ADDRESS;
+        }
+        if (process.env.SCRPYTED_CLUSTER_SERVER) {
+            console.warn('SCRYPTED_CLUSTER_SERVER, but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
+            delete process.env.SCRPYTED_CLUSTER_SERVER
+        }
+        if (process.env.SCRYPTED_CLUSTER_SECRET) {
+            console.warn('SCRYPTED_CLUSTER_SECRET, but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
+            delete process.env.SCRYPTED_CLUSTER_SECRET;
+        }
+        return;
+    }
+
+    if (!['server', 'client'].includes(mode))
+        throw new Error('SCRYPTED_CLUSTER_MODE must be set to either "server" or "client".');
+
+    if (!process.env.SCRYPTED_CLUSTER_SECRET)
+        throw new Error('SCRYPTED_CLUSTER_MODE is set but SCRYPTED_CLUSTER_SECRET is not set.');
+
+    const [server, sport] = process.env.SCRYPTED_CLUSTER_SERVER?.split(':') || [];
+    const port = parseInt(sport) || 10556;
+    const address = process.env.SCRYPTED_CLUSTER_ADDRESS;
+
+    if (mode === 'client') {
+        if (!net.isIP(server))
+            throw new Error('SCRYPTED_CLUSTER_SERVER is not a valid IP address:port.');
+
+        if (!net.isIP(address))
+            throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set to a valid IP address.');
+    }
+    else {
+        // the cluster address may come from the server:port combo or address variable but not both.
+        if (address && server && server !== address)
+            throw new Error('SCRYPTED_CLUSTER_ADDRESS and SCRYPTED_CLUSTER_SERVER must not both be used.');
+
+        const serverAddress = address || server;
+        if (!net.isIP(serverAddress))
+            throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set.');
+        process.env.SCRYPTED_CLUSTER_ADDRESS = serverAddress;
+        delete process.env.SCRYPTED_CLUSTER_SERVER;
+    }
+
+    return [mode, server, port];
 }

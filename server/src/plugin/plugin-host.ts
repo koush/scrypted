@@ -10,7 +10,7 @@ import { Logger } from '../logger';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { createRpcSerializer } from '../rpc-serializer';
 import { ScryptedRuntime } from '../runtime';
-import { prepareClusterPeer } from '../scrypted-cluster-common';
+import { setupCluster } from '../cluster/cluster-setup';
 import { sleep } from '../sleep';
 import { AccessControls } from './acl';
 import { MediaManagerHostImpl } from './media';
@@ -342,7 +342,7 @@ export class PluginHost {
                 }
             });
 
-            const clusterSetup = prepareClusterPeer(this.peer);
+            const clusterSetup = setupCluster(this.peer);
             const { runtimeWorker, forkPeer } = createClusterForkWorker((async () => {
                 await clusterSetup.initializeCluster({
                     clusterId: this.scrypted.clusterId,

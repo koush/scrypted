@@ -1,11 +1,11 @@
 import { EventEmitter, PassThrough } from "stream";
 import { Deferred } from "../../deferred";
 import { RpcPeer } from "../../rpc";
-import { ClusterForkOptions, getClusterLabels, matchesClusterLabels, PeerLiveness } from "../../scrypted-cluster";
+import { getClusterLabels, matchesClusterLabels } from "../../cluster/cluster-labels";
+import { ClusterForkOptions, PeerLiveness } from "../../scrypted-cluster-main";
 import type { ClusterFork } from "../../services/cluster-fork";
 import { writeWorkerGenerator } from "../plugin-console";
 import type { RuntimeWorker } from "./runtime-worker";
-import { sleep } from "../../sleep";
 
 export function needsClusterForkWorker(options: ClusterForkOptions) {
     return process.env.SCRYPTED_CLUSTER_ADDRESS && options?.runtime && !matchesClusterLabels(options, getClusterLabels())
