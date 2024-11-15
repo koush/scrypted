@@ -1,9 +1,12 @@
 import type { ForkOptions } from '@scrypted/types';
+import { once } from 'events';
 import { install as installSourceMapSupport } from 'source-map-support';
 import type { Readable } from 'stream';
 import tls from 'tls';
 import type { createSelfSignedCertificate } from './cert';
 import { computeClusterObjectHash } from './cluster/cluster-hash';
+import { getClusterLabels } from './cluster/cluster-labels';
+import { getScryptedClusterMode, InitializeCluster, setupCluster } from './cluster/cluster-setup';
 import type { ClusterObject } from './cluster/connect-rpc-object';
 import { getPluginVolume, getScryptedVolume } from './plugin/plugin-volume';
 import { prepareZip } from './plugin/runtime/node-worker-common';
@@ -12,10 +15,7 @@ import { RuntimeWorker } from './plugin/runtime/runtime-worker';
 import { RpcPeer } from './rpc';
 import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
-import { getScryptedClusterMode, InitializeCluster, setupCluster } from './cluster/cluster-setup';
 import { sleep } from './sleep';
-import { getClusterLabels } from './cluster/cluster-labels';
-import { once } from 'events';
 
 installSourceMapSupport({
     environment: 'node',
@@ -170,6 +170,14 @@ export function startClusterClient(mainFilename: string) {
                     }, undefined);
 
                     const threadPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
+
+                    let pongPromise: Promise<(time: number) => Promise<void>>
+                    threadPeer.params.pong = async  (time: number) => {
+                        pongPromise = pongPromise || threadPeer.getParam('pong');
+                        const pong =  await pongPromise;
+                        await pong(time);
+                    };
+
                     runtimeWorker.setupRpcPeer(threadPeer);
                     runtimeWorker.on('exit', () => {
                         threadPeer.kill('worker exited');

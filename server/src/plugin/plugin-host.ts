@@ -394,12 +394,12 @@ export class PluginHost {
         };
         (async () => {
             try {
-                let pingPromise: Promise<any>
+                let pingPromise: Promise<(time: number) => Promise<void>>
                 while (!this.killed) {
                     await sleep(30000);
                     if (this.killed)
                         return;
-                    pingPromise ||= peer.then(p => p.getParam('ping'));
+                    pingPromise ||= this.peer.getParam('ping');
                     const ping = await pingPromise;
                     await ping(Date.now());
                 }

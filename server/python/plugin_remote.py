@@ -1141,15 +1141,6 @@ class PluginRemote:
         raise Exception(f"unknown service {name}")
 
     async def start_stats_runner(self, update_stats):
-        pong = None
-
-        async def ping(time: int):
-            nonlocal pong
-            pong = pong or await self.peer.getParam("pong")
-            await pong(time)
-
-        self.peer.params["ping"] = ping
-
         def stats_runner():
             ptime = round(time.process_time() * 1000000) + self.ptimeSum
             try:
@@ -1191,6 +1182,14 @@ async def plugin_async_main(
 
     clusterSetup = ClusterSetup(loop, peer)
     peer.params["initializeCluster"] = lambda options: clusterSetup.initializeCluster(options)
+
+    pong = None
+    async def ping(time: int):
+        nonlocal pong
+        pong = pong or await peer.getParam("pong")
+        await pong(time)
+
+    peer.params["ping"] = ping
 
     peer.params["getRemote"] = lambda api, pluginId, hostInfo: PluginRemote(
         clusterSetup, api, pluginId, hostInfo, loop
