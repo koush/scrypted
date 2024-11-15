@@ -404,11 +404,13 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
     const address = process.env.SCRYPTED_CLUSTER_ADDRESS;
 
     if (mode === 'client') {
-        if (!net.isIP(server))
+        // server may be a hostname so no IP check is necessary
+        if (!server)
             throw new Error('SCRYPTED_CLUSTER_SERVER is not a valid IP address:port.');
 
-        if (!net.isIP(address))
-            throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set to a valid IP address.');
+        // the address can be determined by checking the socket.localAddress after connection.
+        // if (!net.isIP(address))
+        //     throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set to a valid IP address.');
     }
     else {
         // the cluster address may come from the server:port combo or address variable but not both.

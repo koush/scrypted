@@ -95,6 +95,7 @@ export class ClusterForkResult extends PeerLiveness {
 export type ClusterForkParam = (peerLiveness: PeerLiveness, runtime: string, packageJson: any, zipHash: string, getZip: () => Promise<Buffer>) => Promise<ClusterForkResult>;
 
 export function startClusterClient(mainFilename: string) {
+    const originalClusterAddress = process.env.SCRYPTED_CLUSTER_ADDRESS;
     const labels = getClusterLabels();
 
     const clusterSecret = process.env.SCRYPTED_CLUSTER_SECRET;
@@ -106,7 +107,7 @@ export function startClusterClient(mainFilename: string) {
             // furthermore, the mac desktop app needs to pop a privacy warning
             // for local network, and having the immediate socket connection seems
             // to hang the app since no window is created yet.
-            await sleep(10000);
+            await sleep(1000);
 
             const socket = tls.connect({
                 host,
@@ -120,6 +121,11 @@ export function startClusterClient(mainFilename: string) {
             catch (e) {
                 continue;
             }
+
+            if (originalClusterAddress && originalClusterAddress !== socket.localAddress)
+                console.warn('SCRYPTED_CLUSTER_ADDRESS mismatch? Ignoring auto detected address and using the user specified setting.', originalClusterAddress, socket.localAddress);
+            else
+                process.env.SCRYPTED_CLUSTER_ADDRESS = socket.localAddress;
 
             const peer = preparePeer(socket, 'client');
             const { localAddress, localPort } = socket;
