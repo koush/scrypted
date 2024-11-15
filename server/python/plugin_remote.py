@@ -11,7 +11,6 @@ import os
 import platform
 import random
 import sys
-import threading
 import time
 import traceback
 import zipfile
@@ -582,7 +581,7 @@ class ClusterSetup():
             return
         return sourcePeer.localProxyMap.get(id, None)
 
-    async def connectRPCObject(self, o: ClusterObject):
+    async def connectClusterObject(self, o: ClusterObject):
         sha256 = self.computeClusterObjectHash(o)
         if sha256 != o["sha256"]:
             raise Exception("secret incorrect")
@@ -647,7 +646,7 @@ class ClusterSetup():
             future: asyncio.Future[rpc.RpcPeer] = asyncio.Future()
             future.set_result(peer)
             self.clusterPeers[clusterPeerKey] = future
-            peer.params["connectRPCObject"] = lambda o: self.connectRPCObject(o)
+            peer.params["connectRPCObject"] = lambda o: self.connectClusterObject(o)
             try:
                 await peerReadLoop()
             except:
@@ -674,6 +673,93 @@ class ClusterSetup():
             )
         )
         return base64.b64encode(m.digest()).decode("utf-8")
+
+    def ensureClusterPeer(self, address: str, port: int):
+        if isClusterAddress(address):
+            address = "127.0.0.1"
+        clusterPeerKey = getClusterPeerKey(address, port)
+        clusterPeerPromise = self.clusterPeers.get(clusterPeerKey)
+        if clusterPeerPromise:
+            return clusterPeerPromise
+
+        async def connectClusterPeer():
+            try:
+                reader, writer = await asyncio.open_connection(address, port)
+                sourceAddress, sourcePort = writer.get_extra_info("sockname")
+                if (
+                    sourceAddress != self.SCRYPTED_CLUSTER_ADDRESS
+                    and sourceAddress != "127.0.0.1"
+                ):
+                    print("source address mismatch", sourceAddress)
+                rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
+                clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(
+                    self.loop, rpcTransport
+                )
+                # set all params from self.peer
+                for key, value in self.peer.params.items():
+                    clusterPeer.params[key] = value
+                clusterPeer.onProxySerialization = (
+                    lambda value: self.clusterSetup.onProxySerialization(
+                        clusterPeer, value, clusterPeerKey
+                    )
+                )
+            except:
+                self.clusterPeers.pop(clusterPeerKey)
+                raise
+
+            async def run_loop():
+                try:
+                    await peerReadLoop()
+                except:
+                    pass
+                finally:
+                    self.clusterPeers.pop(clusterPeerKey)
+
+            asyncio.run_coroutine_threadsafe(run_loop(), self.loop)
+            return clusterPeer
+
+        clusterPeerPromise = self.loop.create_task(connectClusterPeer())
+
+        self.clusterPeers[clusterPeerKey] = clusterPeerPromise
+        return clusterPeerPromise
+
+    async def connectRPCObject(self, value):
+        __cluster = getattr(value, "__cluster")
+        if type(__cluster) is not dict:
+            return value
+
+        clusterObject: ClusterObject = __cluster
+
+        if clusterObject.get("id", None) != self.clusterId:
+            return value
+
+        address = clusterObject.get("address", None)
+        port = clusterObject["port"]
+        proxyId = clusterObject["proxyId"]
+        if port == self.clusterPort:
+            return await self.connectRPCObject(clusterObject)
+
+        clusterPeerPromise = self.ensureClusterPeer(address, port)
+
+        try:
+            clusterPeer = await clusterPeerPromise
+            weakref = clusterPeer.remoteWeakProxies.get(proxyId, None)
+            existing = weakref() if weakref else None
+            if existing:
+                return existing
+
+            peerConnectRPCObject = clusterPeer.tags.get("connectRPCObject")
+            if not peerConnectRPCObject:
+                peerConnectRPCObject = await clusterPeer.getParam(
+                    "connectRPCObject"
+                )
+                clusterPeer.tags["connectRPCObject"] = peerConnectRPCObject
+            newValue = await peerConnectRPCObject(clusterObject)
+            if not newValue:
+                raise Exception("rpc object not found?")
+            return newValue
+        except Exception as e:
+            return value
 
 class PluginRemote:
     def __init__(
@@ -757,94 +843,7 @@ class PluginRemote:
 
         sdk = ScryptedStatic()
 
-        def ensureClusterPeer(address: str, port: int):
-            if isClusterAddress(address):
-                address = "127.0.0.1"
-            clusterPeerKey = getClusterPeerKey(address, port)
-            clusterPeerPromise = self.clusterSetup.clusterPeers.get(clusterPeerKey)
-            if clusterPeerPromise:
-                return clusterPeerPromise
-
-            async def connectClusterPeer():
-                try:
-                    reader, writer = await asyncio.open_connection(address, port)
-                    sourceAddress, sourcePort = writer.get_extra_info("sockname")
-                    if (
-                        sourceAddress != self.clusterSetup.SCRYPTED_CLUSTER_ADDRESS
-                        and sourceAddress != "127.0.0.1"
-                    ):
-                        print("source address mismatch", sourceAddress)
-                    rpcTransport = rpc_reader.RpcStreamTransport(reader, writer)
-                    clusterPeer, peerReadLoop = await rpc_reader.prepare_peer_readloop(
-                        self.loop, rpcTransport
-                    )
-                    # set all params from self.peer
-                    for key, value in self.peer.params.items():
-                        clusterPeer.params[key] = value
-                    clusterPeer.onProxySerialization = (
-                        lambda value: self.clusterSetup.onProxySerialization(
-                            clusterPeer, value, clusterPeerKey
-                        )
-                    )
-                except:
-                    self.clusterSetup.clusterPeers.pop(clusterPeerKey)
-                    raise
-
-                async def run_loop():
-                    try:
-                        await peerReadLoop()
-                    except:
-                        pass
-                    finally:
-                        self.clusterSetup.clusterPeers.pop(clusterPeerKey)
-
-                asyncio.run_coroutine_threadsafe(run_loop(), self.loop)
-                return clusterPeer
-
-            clusterPeerPromise = self.loop.create_task(connectClusterPeer())
-
-            self.clusterSetup.clusterPeers[clusterPeerKey] = clusterPeerPromise
-            return clusterPeerPromise
-
-        async def connectRPCObject(value):
-            __cluster = getattr(value, "__cluster")
-            if type(__cluster) is not dict:
-                return value
-
-            clusterObject: ClusterObject = __cluster
-
-            if clusterObject.get("id", None) != self.clusterSetup.clusterId:
-                return value
-
-            address = clusterObject.get("address", None)
-            port = clusterObject["port"]
-            proxyId = clusterObject["proxyId"]
-            if port == self.clusterSetup.clusterPort:
-                return await self.clusterSetup.connectRPCObject(clusterObject)
-
-            clusterPeerPromise = ensureClusterPeer(address, port)
-
-            try:
-                clusterPeer = await clusterPeerPromise
-                weakref = clusterPeer.remoteWeakProxies.get(proxyId, None)
-                existing = weakref() if weakref else None
-                if existing:
-                    return existing
-
-                peerConnectRPCObject = clusterPeer.tags.get("connectRPCObject")
-                if not peerConnectRPCObject:
-                    peerConnectRPCObject = await clusterPeer.getParam(
-                        "connectRPCObject"
-                    )
-                    clusterPeer.tags["connectRPCObject"] = peerConnectRPCObject
-                newValue = await peerConnectRPCObject(clusterObject)
-                if not newValue:
-                    raise Exception("rpc object not found?")
-                return newValue
-            except Exception as e:
-                return value
-
-        sdk.connectRPCObject = connectRPCObject
+        sdk.connectRPCObject = lambda v: self.clusterSetup.connectRPCObject(v)
 
         forkMain = options and options.get("fork")
         debug = options.get("debug", None)
@@ -1215,48 +1214,9 @@ def main(rpcTransport: rpc_reader.RpcTransport):
     loop.run_until_complete(plugin_async_main(loop, rpcTransport))
     loop.close()
 
-
-def plugin_main(rpcTransport: rpc_reader.RpcTransport):
-    if True:
-        main(rpcTransport)
-        return
-
-    # 03/05/2024
-    # Not sure why this code below was necessary. I thought it was gstreamer needing to
-    # be initialized on the main thread, but that no longer seems to be the case.
-
-    # gi import will fail on windows (and posisbly elsewhere)
-    # if it does, try starting without it.
-    try:
-        import gi
-
-        gi.require_version("Gst", "1.0")
-        from gi.repository import GLib, Gst
-
-        Gst.init(None)
-
-        # can't remember why starting the glib main loop is necessary.
-        # maybe gstreamer on linux and other things needed it?
-        # seems optional on other platforms.
-        loop = GLib.MainLoop()
-
-        worker = threading.Thread(
-            target=main, args=(rpcTransport,), name="asyncio-main"
-        )
-        worker.start()
-
-        loop.run()
-        return
-    except:
-        pass
-
-    # reattempt without gi outside of the exception handler in case the plugin fails.
-    main(rpcTransport)
-
-
 def plugin_fork(conn: multiprocessing.connection.Connection):
-    plugin_main(rpc_reader.RpcConnectionTransport(conn))
+    main(rpc_reader.RpcConnectionTransport(conn))
 
 
 if __name__ == "__main__":
-    plugin_main(rpc_reader.RpcFileTransport(3, 4))
+    main(rpc_reader.RpcFileTransport(3, 4))
