@@ -1183,10 +1183,7 @@ async def plugin_async_main(
     clusterSetup = ClusterSetup(loop, peer)
     peer.params["initializeCluster"] = lambda options: clusterSetup.initializeCluster(options)
 
-    pong = None
-    async def ping(time: int):
-        nonlocal pong
-        pong = pong or await peer.getParam("pong")
+    async def ping(time: int, pong: Any):
         await pong(time)
 
     peer.params["ping"] = ping

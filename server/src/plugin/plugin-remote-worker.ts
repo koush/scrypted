@@ -202,8 +202,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             // start the stats updater/watchdog after installation has finished, as that may take some time.
             startStatsUpdater(allMemoryStats, zipAPI.updateStats);
 
-            let pong: (time: number) => Promise<void>;
-            peer.params.ping = async (time: number) => {
+            peer.params.ping = async (time: number, pong: (time: number) => Promise<void>) => {
                 pong ||= await peer.getParam('pong');
                 await pong(time);
             };

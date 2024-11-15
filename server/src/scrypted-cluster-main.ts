@@ -170,14 +170,6 @@ export function startClusterClient(mainFilename: string) {
                     }, undefined);
 
                     const threadPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
-
-                    let pongPromise: Promise<(time: number) => Promise<void>>
-                    threadPeer.params.pong = async  (time: number) => {
-                        pongPromise = pongPromise || threadPeer.getParam('pong');
-                        const pong =  await pongPromise;
-                        await pong(time);
-                    };
-
                     runtimeWorker.setupRpcPeer(threadPeer);
                     runtimeWorker.on('exit', () => {
                         threadPeer.kill('worker exited');

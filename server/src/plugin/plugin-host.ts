@@ -389,19 +389,19 @@ export class PluginHost {
 
         const startupTime = Date.now();
         let lastPong: number;
-        this.peer.params.pong = (time: number) => {
+        const pong = (time: number) => {
             lastPong = time;
         };
         (async () => {
             try {
-                let pingPromise: Promise<(time: number) => Promise<void>>
+                let pingPromise: Promise<(time: number, p: typeof pong) => Promise<void>>
                 while (!this.killed) {
                     await sleep(30000);
                     if (this.killed)
                         return;
                     pingPromise ||= this.peer.getParam('ping');
                     const ping = await pingPromise;
-                    await ping(Date.now());
+                    await ping(Date.now(), pong);
                 }
             }
             catch (e) {
