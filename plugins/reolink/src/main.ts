@@ -646,7 +646,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             this.console.error("Codec query failed. Falling back to known defaults.", e);
         }
 
-        const channel = (this.getRtspChannel() + 1).toString().padStart(2, '0');
+        const rtspChannel = this.getRtspChannel();
+        const channel = (rtspChannel + 1).toString().padStart(2, '0');
 
         const streams: UrlMediaStreamOptions[] = [
             {
@@ -691,7 +692,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // 1: support main/extern/sub stream
         // 2: support main/sub stream
 
-        const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()].live?.ver;
+        const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[rtspChannel].live?.ver;
         const [rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub] = streams;
         streams.splice(0, streams.length);
 
@@ -700,7 +701,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // 1: main stream enc type is H265
 
         // anecdotally, encoders of type h265 do not have a working RTMP main stream.
-        const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()].mainEncType?.ver;
+        const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[rtspChannel].mainEncType?.ver;
 
         if (live === 2) {
             if (mainEncType === 1) {
@@ -718,7 +719,14 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         }
 
 
-        if (deviceInfo?.model == "Reolink TrackMix PoE") {
+        // https://github.com/starkillerOG/reolink_aio/blob/main/reolink_aio/api.py#L93C1-L97C2
+        // single motion models have 2*2 RTSP channels
+        if (deviceInfo?.model &&
+            [
+                "Reolink TrackMix PoE",
+                "Reolink TrackMix WiFi",
+                "RLC-81MA"
+            ].includes(deviceInfo?.model)) {
             streams.push({
                 name: '',
                 id: 'autotrack.bcs',
@@ -726,14 +734,30 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 video: { width: 896, height: 512 },
                 url: '',
             });
+
+            if (rtspChannel === 0) {
+                streams.push({
+                    name: '',
+                    id: `h264Preview_02_main`,
+                    container: 'rtsp',
+                    video: { codec: 'h264', width: 3840, height: 2160 },
+                    url: ''
+                }, {
+                    name: '',
+                    id: `h264Preview_02_sub`,
+                    container: 'rtsp',
+                    video: { codec: 'h264', width: 640, height: 480 },
+                    url: ''
+                })
+            }
         }
 
         for (const stream of streams) {
             var streamUrl;
             if (stream.container === 'rtmp') {
-                streamUrl = new URL(`rtmp://${this.getRtmpAddress()}/bcs/channel${this.getRtspChannel()}_${stream.id}`)
+                streamUrl = new URL(`rtmp://${this.getRtmpAddress()}/bcs/channel${rtspChannel}_${stream.id}`)
                 const params = streamUrl.searchParams;
-                params.set("channel", this.getRtspChannel().toString())
+                params.set("channel", rtspChannel.toString())
                 params.set("stream", '0')
                 stream.url = streamUrl.toString();
                 stream.name = `RTMP ${stream.id}`;
