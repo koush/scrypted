@@ -52,8 +52,22 @@ export interface ClusterWorker extends ClusterWorkerProperties {
 
 export function getScryptedClusterMode(): ['server' | 'client', string, number] {
     const mode = process.env.SCRYPTED_CLUSTER_MODE as 'server' | 'client';
-    if (!mode)
+
+    if (!mode) {
+        if (process.env.SCRYPTED_CLUSTER_ADDRESS) {
+            console.warn('SCRYPTED_CLUSTER_ADDRESS, but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
+            delete process.env.SCRYPTED_CLUSTER_ADDRESS;
+        }
+        if (process.env.SCRPYTED_CLUSTER_SERVER) {
+            console.warn('SCRYPTED_CLUSTER_SERVER, but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
+            delete process.env.SCRPYTED_CLUSTER_SERVER
+        }
+        if (process.env.SCRYPTED_CLUSTER_SECRET) {
+            console.warn('SCRYPTED_CLUSTER_SECRET, but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
+            delete process.env.SCRYPTED_CLUSTER_SECRET;
+        }
         return;
+    }
 
     if (!['server', 'client'].includes(mode))
         throw new Error('SCRYPTED_CLUSTER_MODE must be set to either "server" or "client".');
