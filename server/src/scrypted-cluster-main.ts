@@ -108,7 +108,6 @@ export function startClusterClient(mainFilename: string) {
                 port,
                 rejectUnauthorized: false,
             });
-            const peer = preparePeer(socket, 'client');
 
             try {
                 await once(socket, 'secureConnect');
@@ -117,6 +116,7 @@ export function startClusterClient(mainFilename: string) {
                 continue;
             }
 
+            const peer = preparePeer(socket, 'client');
             const { localAddress, localPort } = socket;
             console.log('Cluster server connected.', localAddress, localPort);
             socket.on('close', () => {
