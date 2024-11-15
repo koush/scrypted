@@ -162,7 +162,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   getCurrentSettings() {
     const settings = this.model.settings;
     if (!settings)
-      return { id : this.id };
+      return { id: this.id };
 
     const ret: { [key: string]: any } = {};
     for (const setting of settings) {
@@ -338,7 +338,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     if (this.model.decoder) {
       if (!options?.suppress)
-      this.console.log(this.objectDetection.name, '(with builtin decoder)');
+        this.console.log(this.objectDetection.name, '(with builtin decoder)');
       return stream;
     }
 
@@ -456,10 +456,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!this.hasMotionType) {
         this.plugin.trackDetection();
 
-        // const numZonedDetections = zonedDetections.filter(d => d.className !== 'motion').length;
-        // const numOriginalDetections = originalDetections.filter(d => d.className !== 'motion').length;
-        // if (numZonedDetections !== numOriginalDetections)
-        //   this.console.log('Zone filtered detections:', numZonedDetections - numOriginalDetections);
+        const numZonedDetections = zonedDetections.filter(d => d.className !== 'motion').length;
+        const numOriginalDetections = originalDetections.filter(d => d.className !== 'motion').length;
+        if (numZonedDetections !== numOriginalDetections)
+          currentDetections.set('filtered', (currentDetections.get('filtered') || 0) + 1);
 
         for (const d of detected.detected.detections) {
           currentDetections.set(d.className, Math.max(currentDetections.get(d.className) || 0, d.score));
