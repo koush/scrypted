@@ -203,7 +203,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             startStatsUpdater(allMemoryStats, zipAPI.updateStats);
 
             peer.params.ping = async (time: number, pong: (time: number) => Promise<void>) => {
-                pong ||= await peer.getParam('pong');
                 await pong(time);
             };
 
