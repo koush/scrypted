@@ -1,3 +1,4 @@
+import os from 'os';
 import type { ForkOptions } from '@scrypted/types';
 import { once } from 'events';
 import net from 'net';
@@ -155,7 +156,7 @@ export function startClusterClient(mainFilename: string) {
                 const auth: ClusterObject = {
                     address: socket.localAddress,
                     port: socket.localPort,
-                    id: undefined,
+                    id: process.env.SCRYPTED_CLUSTER_ID || os.hostname(),
                     proxyId: undefined,
                     sourceKey: undefined,
                     sha256: undefined,
@@ -285,6 +286,9 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
                 const sha256 = computeClusterObjectHash(auth, runtime.clusterSecret);
                 if (sha256 !== auth.sha256)
                     throw new Error('cluster object hash mismatch');
+
+                peer.peerName = auth.id || `${socket.remoteAddress}`;
+
                 // the remote address may be ipv6 prefixed so use a fuzzy match.
                 // eg ::ffff:192.168.2.124
                 if (!process.env.SCRYPTED_DISABLE_CLUSTER_SERVER_TRUST) {
