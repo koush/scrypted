@@ -4,13 +4,13 @@ import * as io from 'engine.io';
 import fs from 'fs';
 import os from 'os';
 import WebSocket from 'ws';
+import { setupCluster } from '../cluster/cluster-setup';
 import { Plugin } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
 import { Logger } from '../logger';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { createRpcSerializer } from '../rpc-serializer';
 import { ScryptedRuntime } from '../runtime';
-import { setupCluster } from '../cluster/cluster-setup';
 import { sleep } from '../sleep';
 import { AccessControls } from './acl';
 import { MediaManagerHostImpl } from './media';
@@ -20,7 +20,6 @@ import { PluginDebug } from './plugin-debug';
 import { PluginHostAPI } from './plugin-host-api';
 import { LazyRemote } from './plugin-lazy-remote';
 import { setupPluginRemote } from './plugin-remote';
-import { PluginStats } from './plugin-remote-stats';
 import { WebSocketConnection } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { createClusterForkWorker, needsClusterForkWorker } from './runtime/cluster-fork.worker';
@@ -60,8 +59,6 @@ export class PluginHost {
     api: PluginHostAPI;
     pluginName: string;
     packageJson: any;
-    lastStats: number;
-    stats: PluginStats;
     killed = false;
     consoleServer: Promise<ConsoleServer>;
     zipHash: string;
@@ -259,12 +256,7 @@ export class PluginHost {
                 // original implementation sent the zipBuffer, sending the zipFile name now.
                 // can switch back for non-local plugins.
                 const modulePromise = remote.loadZip(this.packageJson,
-                    // the plugin is expected to send process stats every 10 seconds.
-                    // this can be used as a check for liveness.
-                    new PluginZipAPI(async () => fs.promises.readFile(this.zipFile), async (stats: PluginStats) => {
-                        this.lastStats = Date.now();
-                        this.stats = stats;
-                    }),
+                    new PluginZipAPI(async () => fs.promises.readFile(this.zipFile)),
                     loadZipOptions);
                 // allow garbage collection of the zip buffer
                 const module = await modulePromise;
@@ -414,18 +406,13 @@ export class PluginHost {
             const now = Date.now();
             // plugin may take a while to install, so wait 10 minutes.
             // after that, require 1 minute checkins.
-            if (!this.lastStats || !lastPong) {
+            if (!lastPong) {
                 if (now - startupTime > 10 * 60 * 1000) {
                     const logger = await this.api.getLogger(undefined);
                     logger.log('e', 'plugin failed to start in a timely manner. restarting.');
                     this.api.requestRestart();
                 }
                 return;
-            }
-            if (!pluginDebug && (this.lastStats + 60000 < now)) {
-                const logger = await this.api.getLogger(undefined);
-                logger.log('e', 'plugin is not reporting stats. restarting.');
-                this.api.requestRestart();
             }
             if (!pluginDebug && (lastPong + 60000 < now)) {
                 const logger = await this.api.getLogger(undefined);

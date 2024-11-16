@@ -547,8 +547,6 @@ class PluginRemote:
         self.nativeIds: Mapping[str, DeviceStorage] = {}
         self.mediaManager: MediaManager
         self.consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
-        self.ptimeSum = 0
-        self.allMemoryStats = {}
         self.peer = clusterSetup.peer
         self.clusterSetup = clusterSetup
         self.api = api
@@ -755,8 +753,6 @@ class PluginRemote:
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
         self.mediaManager = MediaManager(await self.api.getMediaManager())
 
-        await self.start_stats_runner(zipAPI.updateStats)
-
         try:
             from scrypted_sdk import sdk_init2  # type: ignore
 
@@ -801,7 +797,6 @@ class PluginRemote:
                             # traceback.print_exc()
                             print("fork read loop exited")
                         finally:
-                            self.allMemoryStats.pop(forkPeer)
                             parent_conn.close()
                             rpcTransport.executor.shutdown()
                             pluginFork.worker.kill()
@@ -819,10 +814,7 @@ class PluginRemote:
                     forkOptions["debug"] = debug
 
                     class PluginZipAPI:
-                        async def updateStats(stats):
-                            self.ptimeSum += stats["cpu"]["user"]
-                            self.allMemoryStats[forkPeer] = stats
-                        
+
                         async def getZip(self):
                             return await zipAPI.getZip()
 
@@ -917,39 +909,6 @@ class PluginRemote:
                 raise Exception("REPL unavailable: Python REPL not available.")
             return [self.replPort, os.getenv("SCRYPTED_CLUSTER_ADDRESS", None)]
         raise Exception(f"unknown service {name}")
-
-    async def start_stats_runner(self, update_stats):
-        def stats_runner():
-            ptime = round(time.process_time() * 1000000) + self.ptimeSum
-            try:
-                import psutil
-
-                process = psutil.Process(os.getpid())
-                heapTotal = process.memory_info().rss
-            except:
-                try:
-                    import resource
-
-                    heapTotal = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-                except:
-                    heapTotal = 0
-
-            for _, stats in self.allMemoryStats.items():
-                heapTotal += stats["memoryUsage"]["heapTotal"]
-
-            stats = {
-                "cpu": {
-                    "user": ptime,
-                    "system": 0,
-                },
-                "memoryUsage": {
-                    "heapTotal": heapTotal,
-                },
-            }
-            asyncio.run_coroutine_threadsafe(update_stats(stats), self.loop)
-            self.loop.call_later(10, stats_runner)
-
-        stats_runner()
 
 
 async def plugin_async_main(

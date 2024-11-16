@@ -12,7 +12,6 @@ import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, Pl
 import { pipeWorkerConsole, prepareConsoles } from './plugin-console';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, DeviceManagerImpl, setupPluginRemote } from './plugin-remote';
-import { PluginStats, startStatsUpdater } from './plugin-remote-stats';
 import { createREPLServer } from './plugin-repl';
 import { getPluginVolume } from './plugin-volume';
 import { ChildProcessWorker } from './runtime/child-process-worker';
@@ -196,12 +195,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             await installOptionalDependencies(getPluginConsole(), packageJson);
 
-            // process.cpuUsage is for the entire process.
-            // process.memoryUsage is per thread.
-            const allMemoryStats = new Map<RuntimeWorker, NodeJS.MemoryUsage>();
-            // start the stats updater/watchdog after installation has finished, as that may take some time.
-            startStatsUpdater(allMemoryStats, zipAPI.updateStats);
-
             peer.params.ping = async (time: number, pong: (time: number) => Promise<void>) => {
                 await pong(time);
             };
@@ -315,13 +308,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                         threadPeer.kill('worker exited');
                         forkApi.removeListeners();
                         forks.delete(remote);
-                        allMemoryStats.delete(runtimeWorker);
                     });
                     runtimeWorker.on('error', e => {
                         threadPeer.kill('worker error ' + e);
                         forkApi.removeListeners();
                         forks.delete(remote);
-                        allMemoryStats.delete(runtimeWorker);
                     });
 
                     for (const [nativeId, dmd] of deviceManager.nativeIds.entries()) {
@@ -331,9 +322,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     const forkOptions = Object.assign({}, zipOptions);
                     forkOptions.fork = true;
                     forkOptions.main = options?.filename;
-                    const forkZipAPI = new PluginZipAPI(() => zipAPI.getZip(), async (stats: PluginStats) => {
-                        allMemoryStats.set(runtimeWorker, stats.memoryUsage);
-                    });
+                    const forkZipAPI = new PluginZipAPI(() => zipAPI.getZip());
                     return remote.loadZip(packageJson, forkZipAPI, forkOptions)
                 })();
 

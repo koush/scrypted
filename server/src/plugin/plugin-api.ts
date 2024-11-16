@@ -1,6 +1,5 @@
 import type { Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, MediaManager, MediaObject, ScryptedDevice, ScryptedInterfaceDescriptor, ScryptedInterfaceProperty, ScryptedNativeId, SystemDeviceState } from '@scrypted/types';
 import type { AccessControls } from './acl';
-import type { PluginStats } from './plugin-remote-stats';
 
 export interface PluginLogger {
     log(level: string, message: string): Promise<void>;
@@ -170,8 +169,8 @@ export interface PluginRemoteLoadZipOptions {
 
 export class PluginZipAPI {
     constructor(
-        public getZip: () => Promise<Buffer>,
-        public updateStats: (stats: PluginStats) => Promise<void>) {
+        public getZip: () => Promise<Buffer>
+    ) {
     }
 }
 
