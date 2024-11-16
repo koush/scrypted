@@ -1,5 +1,6 @@
 import type { ForkOptions } from '@scrypted/types';
 import { once } from 'events';
+import net from 'net';
 import { install as installSourceMapSupport } from 'source-map-support';
 import type { Readable } from 'stream';
 import tls from 'tls';
@@ -109,9 +110,22 @@ export function startClusterClient(mainFilename: string) {
             // to hang the app since no window is created yet.
             await sleep(1000);
 
-            const socket = tls.connect({
+            const rawSocket = net.connect({
                 host,
                 port,
+                // require ipv4 to normalize cluster address.
+                family: 4,
+            });
+
+            try {
+                await once(rawSocket, 'connect');
+            }
+            catch( e) {
+                continue;
+            }
+
+            const socket = tls.connect({
+                socket: rawSocket,
                 rejectUnauthorized: false,
             });
 
