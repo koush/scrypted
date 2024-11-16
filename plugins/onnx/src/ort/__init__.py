@@ -83,8 +83,9 @@ class ONNXPlugin(
             deviceIds = ["0"]
         self.deviceIds = deviceIds
 
-        compiled_models = []
-        self.compiled_models = {}
+        compiled_models: list[onnxruntime.InferenceSession] = []
+        self.compiled_models: dict[str, onnxruntime.InferenceSession] = {}
+        self.provider = "Unknown"
 
         try:
             for deviceId in deviceIds:
@@ -121,6 +122,7 @@ class ONNXPlugin(
             thread_name = threading.current_thread().name
             interpreter = compiled_models.pop()
             self.compiled_models[thread_name] = interpreter
+            self.provider = "CUDAExecutionProvider" if "CUDAExecutionProvider" in interpreter.get_providers() else "CPUExecutionProvider"
             print('Runtime initialized on thread {}'.format(thread_name))
 
         self.executor = concurrent.futures.ThreadPoolExecutor(
@@ -133,6 +135,8 @@ class ONNXPlugin(
             max_workers=len(compiled_models),
             thread_name_prefix="onnx-prepare",
         )
+
+        self.executor.submit(lambda: None)
 
         self.faceDevice = None
         self.textDevice = None
@@ -206,7 +210,7 @@ class ONNXPlugin(
                 "key": "execution_device",
                 "title": "Execution Device",
                 "readonly": True,
-                "value": onnxruntime.get_device(),
+                "value": self.provider,
             }
         ]
 
