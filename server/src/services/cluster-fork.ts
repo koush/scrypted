@@ -18,7 +18,12 @@ export class ClusterFork {
             throw new Error(`no worker found for cluster labels ${JSON.stringify(options.labels)}`);
 
         const fork: ClusterForkParam = await worker.peer.getParam('fork');
-        return fork(peerLiveness, options.runtime, packageJson, zipHash, getZip);
+        const forkResult = await fork(peerLiveness, options.runtime, packageJson, zipHash, getZip);
+        worker.forks.add(options);
+        forkResult.waitKilled().catch(() => {}).finally(() => {
+            worker.forks.delete(options);
+        });
+        return forkResult;
     }
 
     async getClusterWorkers() {
@@ -26,6 +31,7 @@ export class ClusterFork {
         for (const worker of this.runtime.clusterWorkers) {
             ret[worker.peer.peerName] = {
                 labels: worker.labels,
+                forks: [...worker.forks],
             };
         }
         return ret;

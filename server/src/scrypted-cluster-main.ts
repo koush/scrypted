@@ -68,6 +68,7 @@ export interface ClusterWorkerProperties {
 
 export interface ClusterWorker extends ClusterWorkerProperties {
     peer: RpcPeer;
+    forks: Set<ClusterForkOptions>;
 }
 
 export class PeerLiveness {
@@ -287,6 +288,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
                 const worker: ClusterWorker = {
                     ...properties,
                     peer,
+                    forks: new Set(),
                 };
                 runtime.clusterWorkers.add(worker);
                 peer.killed.then(() => {
