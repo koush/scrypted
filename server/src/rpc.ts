@@ -300,6 +300,7 @@ export class RpcPeer {
     constructorSerializerMap = new Map<any, string>();
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
     killed: Promise<string>;
+    killedSafe: Promise<void>;
     killedDeferred: Deferred;
     tags: any = {};
     yieldedAsyncIterators = new Set<AsyncGenerator>();
@@ -395,6 +396,7 @@ export class RpcPeer {
         this.killed = new Promise<string>((resolve, reject) => {
             this.killedDeferred = { resolve, reject, method: undefined };
         }).catch(e => e.message || 'Unknown Error');
+        this.killedSafe = this.killed.then(() => {}).catch(() => { });
     }
 
     static isTransportSafe(value: any) {

@@ -32,7 +32,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
     const clusterPeerSetup = setupCluster(peer);
-    const { initializeCluster, connectRPCObject, mainThreadBrokerRegister , mainThreadPort } = clusterPeerSetup;
+    const { initializeCluster, connectRPCObject, mainThreadBrokerRegister, mainThreadPort } = clusterPeerSetup;
 
     peer.params.initializeCluster = initializeCluster;
 
@@ -195,8 +195,8 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             await installOptionalDependencies(getPluginConsole(), packageJson);
 
-            peer.params.ping = async (time: number, pong: (time: number) => Promise<void>) => {
-                await pong(time);
+            peer.params.ping = async (time: number) => {
+                return time;
             };
 
             const main = pluginReader(mainNodejs);

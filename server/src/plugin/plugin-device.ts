@@ -161,7 +161,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
                         console.warn('no device was returned by the plugin', this.id);
                 }
                 catch (e) {
-                    console.error('error occured retrieving device from plugin', e);
+                    console.error('error occurred retrieving device from plugin', e);
                 }
 
                 const interfaces: ScryptedInterface[] = getState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces) || [];

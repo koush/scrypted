@@ -39,7 +39,7 @@ function peerLifecycle(serializer: ReturnType<typeof createRpcDuplexSerializer>,
     socket.on('close', () => {
         peer.kill(`cluster ${type} closed`);
     });
-    peer.killed.then(() => {
+    peer.killedSafe.finally(() => {
         socket.destroy();
     });
 }
@@ -121,7 +121,7 @@ export function startClusterClient(mainFilename: string) {
             try {
                 await once(rawSocket, 'connect');
             }
-            catch( e) {
+            catch (e) {
                 continue;
             }
 
@@ -209,17 +209,19 @@ export function startClusterClient(mainFilename: string) {
                     runtimeWorker.on('error', e => {
                         threadPeer.kill('worker error ' + e);
                     });
-                    threadPeer.killed.catch(() => { }).finally(() => {
+                    threadPeer.killedSafe.finally(() => {
                         runtimeWorker.kill();
                     });
                     peerLiveness.waitKilled().catch(() => { }).finally(() => {
                         threadPeer.kill('peer killed');
                     });
                     let getRemote: any;
+                    let ping: any;
                     try {
                         const initializeCluster: InitializeCluster = await threadPeer.getParam('initializeCluster');
                         await initializeCluster({ clusterId, clusterSecret });
                         getRemote = await threadPeer.getParam('getRemote');
+                        ping = await threadPeer.getParam('ping');
                     }
                     catch (e) {
                         threadPeer.kill('cluster fork failed');
@@ -242,6 +244,7 @@ export function startClusterClient(mainFilename: string) {
                             stdout: readStream(runtimeWorker.stdout),
                             stderr: readStream(runtimeWorker.stderr),
                             getRemote,
+                            ping,
                         };
                     };
 
@@ -255,8 +258,11 @@ export function startClusterClient(mainFilename: string) {
             }
             catch (e) {
                 peer.kill(e.message);
-                socket.destroy();
                 console.warn('Cluster client error:', localAddress, localPort, e);
+            }
+            finally {
+                peer.kill();
+                socket.destroy();
             }
         }
     })();
@@ -291,7 +297,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
                     forks: new Set(),
                 };
                 runtime.clusterWorkers.add(worker);
-                peer.killed.then(() => {
+                peer.killedSafe.finally(() => {
                     runtime.clusterWorkers.delete(worker);
                 });
                 socket.on('close', () => {

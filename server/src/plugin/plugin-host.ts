@@ -170,7 +170,6 @@ export class PluginHost {
                     return;
                 }
 
-
                 const handler = this.scrypted.getDevice<EngineIOHandler>(pluginDevice._id);
 
                 // @ts-expect-error
@@ -199,8 +198,6 @@ export class PluginHost {
             }
         })
 
-        const self = this;
-
         const { runtime } = this.packageJson.scrypted;
         const mediaManager = runtime && runtime !== 'node'
             ? new MediaManagerHostImpl(pluginDeviceId, () => scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id))
@@ -211,74 +208,120 @@ export class PluginHost {
         logger.log('i', `loading ${this.pluginName}`);
         logger.log('i', 'pid ' + this.worker?.pid);
 
-        const remotePromise = (async () => {
-            let peer: RpcPeer;
-            try {
-                peer = await peerPromise;
-            }
-            catch (e) {
-                logger.log('e', 'plugin failed to start ' + e);
-                throw new RPCResultError(this.peer, 'cluster plugin start failed', e);
-            }
-            return setupPluginRemote(peer, this.api, self.pluginId, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
-        })();
-
-        const init = (async () => {
-            const remote = await remotePromise;
-
-            await Promise.all(
-                scrypted.findPluginDevices(self.pluginId)
-                    .map(pluginDevice => remote.setNativeId(pluginDevice.nativeId, pluginDevice._id, pluginDevice.storage || {}))
-            );
-
-            const waitDebug = pluginDebug?.waitDebug;
-            if (waitDebug) {
-                console.info('waiting for debugger...');
-                try {
-                    await waitDebug;
-                    console.info('debugger attached.');
-                    await sleep(1000);
-                }
-                catch (e) {
-                    console.error('debugger failed', e);
-                }
-            }
-
-            const fail = 'Plugin failed to load. View Console for more information.';
-            try {
-                const loadZipOptions: PluginRemoteLoadZipOptions = {
-                    clusterId: scrypted.clusterId,
-                    clusterSecret: scrypted.clusterSecret,
-                    // debug flag can be used to affect path resolution for sourcemaps etc.
-                    debug: !!pluginDebug,
-                    zipHash: this.zipHash,
-                };
-                // original implementation sent the zipBuffer, sending the zipFile name now.
-                // can switch back for non-local plugins.
-                const modulePromise = remote.loadZip(this.packageJson,
-                    new PluginZipAPI(async () => fs.promises.readFile(this.zipFile)),
-                    loadZipOptions);
-                // allow garbage collection of the zip buffer
-                const module = await modulePromise;
-                logger.log('i', `loaded ${this.pluginName}`);
-                logger.clearAlert(fail)
-                return { module, remote };
-            }
-            catch (e) {
-                logger.log('a', fail);
-                logger.log('e', `plugin load error ${e}`);
-                console.error('plugin load error', e);
-                throw e;
-            }
-        })();
-
-        this.module = init.then(({ module }) => module);
-        this.remote = new LazyRemote(remotePromise, init.then(({ remote }) => remote));
+        const remotePromise = this.prepareRemote(peerPromise, logger, pluginDebug);
+        const init = this.initializeRemote(remotePromise, logger, pluginDebug);
 
         init.catch(e => {
             console.error('plugin failed to load', e);
             this.api.removeListeners();
         });
+
+        this.module = init.then(({ module }) => module);
+        const remote = init.then(({ remote }) => remote);
+        this.remote = new LazyRemote(remotePromise, remote);
+    }
+
+    private async initializeRemote(remotePromise: Promise<PluginRemote>, logger: Logger, pluginDebug: PluginDebug) {
+        const remote = await remotePromise;
+
+        await Promise.all(
+            this.scrypted.findPluginDevices(this.pluginId)
+                .map(pluginDevice => remote.setNativeId(pluginDevice.nativeId, pluginDevice._id, pluginDevice.storage || {}))
+        );
+
+        const waitDebug = pluginDebug?.waitDebug;
+        if (waitDebug) {
+            console.info('waiting for debugger...');
+            try {
+                await waitDebug;
+                console.info('debugger attached.');
+                await sleep(1000);
+            }
+            catch (e) {
+                console.error('debugger failed', e);
+            }
+        }
+
+        const fail = 'Plugin failed to load. View Console for more information.';
+        try {
+            const loadZipOptions: PluginRemoteLoadZipOptions = {
+                clusterId: this.scrypted.clusterId,
+                clusterSecret: this.scrypted.clusterSecret,
+                // debug flag can be used to affect path resolution for sourcemaps etc.
+                debug: !!pluginDebug,
+                zipHash: this.zipHash,
+            };
+            // original implementation sent the zipBuffer, sending the zipFile name now.
+            // can switch back for non-local plugins.
+            const modulePromise = remote.loadZip(this.packageJson,
+                new PluginZipAPI(async () => fs.promises.readFile(this.zipFile)),
+                loadZipOptions);
+            // allow garbage collection of the zip buffer
+            const module = await modulePromise;
+            logger.log('i', `loaded ${this.pluginName}`);
+            logger.clearAlert(fail)
+            return { module, remote };
+        }
+        catch (e) {
+            logger.log('a', fail);
+            logger.log('e', `plugin load error ${e}`);
+            console.error('plugin load error', e);
+            throw e;
+        }
+    }
+
+    private async prepareRemote(peerPromise: Promise<RpcPeer>, logger: Logger, pluginDebug: PluginDebug) {
+        let peer: RpcPeer;
+        try {
+            peer = await peerPromise;
+        }
+        catch (e) {
+            logger.log('e', 'plugin failed to start ' + e);
+            throw new RPCResultError(this.peer, 'cluster plugin start failed', e);
+        }
+
+        const startupTime = Date.now();
+        let lastPong: number;
+
+        (async () => {
+            try {
+                let pingPromise: Promise<(time: number) => Promise<number>>
+                while (!this.killed) {
+                    await sleep(30000);
+                    if (this.killed)
+                        return;
+                    pingPromise ||= peer.getParam('ping');
+                    const ping = await pingPromise;
+                    lastPong = await ping(Date.now());
+                }
+            }
+            catch (e) {
+                logger.log('e', 'plugin ping failed. restarting.');
+                this.api.requestRestart();
+            }
+        })();
+
+        const healthInterval = setInterval(async () => {
+            const now = Date.now();
+            // plugin may take a while to install, so wait 10 minutes.
+            // after that, require 1 minute checkins.
+            if (!lastPong) {
+                if (now - startupTime > 10 * 60 * 1000) {
+                    const logger = await this.api.getLogger(undefined);
+                    logger.log('e', 'plugin failed to start in a timely manner. restarting.');
+                    this.api.requestRestart();
+                }
+                return;
+            }
+            if (!pluginDebug && (lastPong + 60000 < now)) {
+                const logger = await this.api.getLogger(undefined);
+                logger.log('e', 'plugin is not responding to ping. restarting.');
+                this.api.requestRestart();
+            }
+        }, 60000);
+        peer.killedSafe.finally(() => clearInterval(healthInterval));
+
+        return setupPluginRemote(peer, this.api, this.pluginId, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
     }
 
     startPluginHost(logger: Logger, env: any, pluginDebug: PluginDebug) {
@@ -347,9 +390,9 @@ export class PluginHost {
 
             forkPeer.then(peer => {
                 const originalPeer = this.peer;
-                originalPeer.killed.then(s => peer.kill(s)).catch(e => peer.kill(e));
+                originalPeer.killedSafe.finally(() => peer.kill());
                 this.peer = peer;
-                peer.killed.catch(() =>{} ).finally(() => originalPeer.kill());
+                peer.killedSafe.finally(() => originalPeer.kill());
             }).catch(() => {});
 
             this.worker = runtimeWorker;
@@ -378,49 +421,6 @@ export class PluginHost {
             logger.log('e', `${this.pluginName} error ${e}`);
             disconnect();
         });
-
-        const startupTime = Date.now();
-        let lastPong: number;
-        const pong = (time: number) => {
-            lastPong = time;
-        };
-        (async () => {
-            try {
-                let pingPromise: Promise<(time: number, p: typeof pong) => Promise<void>>
-                while (!this.killed) {
-                    await sleep(30000);
-                    if (this.killed)
-                        return;
-                    pingPromise ||= this.peer.getParam('ping');
-                    const ping = await pingPromise;
-                    await ping(Date.now(), pong);
-                }
-            }
-            catch (e) {
-                logger.log('e', 'plugin ping failed. restarting.');
-                this.api.requestRestart();
-            }
-        })();
-
-        const healthInterval = setInterval(async () => {
-            const now = Date.now();
-            // plugin may take a while to install, so wait 10 minutes.
-            // after that, require 1 minute checkins.
-            if (!lastPong) {
-                if (now - startupTime > 10 * 60 * 1000) {
-                    const logger = await this.api.getLogger(undefined);
-                    logger.log('e', 'plugin failed to start in a timely manner. restarting.');
-                    this.api.requestRestart();
-                }
-                return;
-            }
-            if (!pluginDebug && (lastPong + 60000 < now)) {
-                const logger = await this.api.getLogger(undefined);
-                logger.log('e', 'plugin is not responding to ping. restarting.');
-                this.api.requestRestart();
-            }
-        }, 60000);
-        this.peer.killed.finally(() => clearInterval(healthInterval));
 
         return peer;
     }

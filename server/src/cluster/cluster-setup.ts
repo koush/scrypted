@@ -345,7 +345,7 @@ export function setupCluster(peer: RpcPeer) {
         peer.onProxySerialization = value => onProxySerialization(peer, value, undefined);
         delete peer.params.initializeCluster;
 
-        peer.killed.catch(() => { }).finally(() => clusterRpcServer.close());
+        peer.killedSafe.finally(() => clusterRpcServer.close());
         clusterRpcServer.on('close', () => {
             peer.kill('cluster server closed');
             // close all clusterRpcServer clients
