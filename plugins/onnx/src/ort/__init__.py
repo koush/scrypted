@@ -122,7 +122,14 @@ class ONNXPlugin(
             thread_name = threading.current_thread().name
             interpreter = compiled_models.pop()
             self.compiled_models[thread_name] = interpreter
-            self.provider = "CUDAExecutionProvider" if "CUDAExecutionProvider" in interpreter.get_providers() else "CPUExecutionProvider"
+            # remove CPUExecutionProider from providers
+            providers = interpreter.get_providers()
+            if not len(providers):
+                providers = ["CPUExecutionProvider"]
+            if "CPUExecutionProvider" in providers:
+                providers.remove("CPUExecutionProvider")
+            # join the remaining providers string
+            self.provider = ", ".join(providers)
             print('Runtime initialized on thread {}'.format(thread_name))
 
         self.executor = concurrent.futures.ThreadPoolExecutor(
