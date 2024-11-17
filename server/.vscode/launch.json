@@ -94,7 +94,7 @@
                 "${workspaceFolder}/**/*.js"
             ],
             "env": {
-                "SCRYPTED_CLUSTER_LABELS": "compute",
+                // "SCRYPTED_CLUSTER_LABELS": "compute",
                 "SCRYPTED_CLUSTER_MODE": "client",
                 "SCRYPTED_CLUSTER_SERVER": "scrypted-nvr",
                 "SCRYPTED_CLUSTER_SECRET": "swordfish",

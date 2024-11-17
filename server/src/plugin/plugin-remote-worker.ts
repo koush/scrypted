@@ -35,11 +35,13 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
     const { initializeCluster, connectRPCObject, mainThreadBrokerRegister, mainThreadPort } = clusterPeerSetup;
 
     peer.params.initializeCluster = initializeCluster;
+    peer.params.ping = async (time: number) => {
+        return time;
+    };
 
     let systemManager: SystemManager;
     let deviceManager: DeviceManagerImpl;
     let api: PluginAPI;
-    let originalAPI: PluginAPI;
 
     let pluginsPromise: Promise<any>;
     function getPlugins() {
@@ -82,7 +84,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 }
             }
 
-            originalAPI = _api;
             api = new PluginForkableAPI(_api);
             peer.selfName = pluginId;
             return api;
@@ -194,10 +195,6 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             };
 
             await installOptionalDependencies(getPluginConsole(), packageJson);
-
-            peer.params.ping = async (time: number) => {
-                return time;
-            };
 
             const main = pluginReader(mainNodejs);
             const script = main.toString();
