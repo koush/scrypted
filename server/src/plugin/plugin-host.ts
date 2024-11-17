@@ -22,7 +22,7 @@ import { LazyRemote } from './plugin-lazy-remote';
 import { setupPluginRemote } from './plugin-remote';
 import { WebSocketConnection } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
-import { createClusterForkWorker, needsClusterForkWorker } from './runtime/cluster-fork.worker';
+import { createClusterForkWorker, needsClusterForkWorker } from './runtime/cluster-fork-worker';
 import { prepareZipSync } from './runtime/node-worker-common';
 import { RuntimeWorker } from './runtime/runtime-worker';
 

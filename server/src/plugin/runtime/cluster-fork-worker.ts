@@ -45,7 +45,7 @@ export function createClusterForkWorker(
         // need to ensure this happens on next tick to prevent unhandled promise rejection.
         // await sleep(0);
         const forkComponent = await forkComponentPromise;
-        const peerLiveness = new PeerLiveness(new Deferred().promise);
+        const peerLiveness = new PeerLiveness(waitKilled.promise);
         const clusterForkResult = await forkComponent.fork(peerLiveness, options, packageJson, zipHash, getZip);
         waitKilled.promise.finally(() => {
             runtimeWorker.pid = undefined;

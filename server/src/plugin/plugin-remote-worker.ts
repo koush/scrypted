@@ -15,7 +15,7 @@ import { attachPluginRemote, DeviceManagerImpl, setupPluginRemote } from './plug
 import { createREPLServer } from './plugin-repl';
 import { getPluginVolume } from './plugin-volume';
 import { ChildProcessWorker } from './runtime/child-process-worker';
-import { createClusterForkWorker, needsClusterForkWorker } from './runtime/cluster-fork.worker';
+import { createClusterForkWorker, needsClusterForkWorker } from './runtime/cluster-fork-worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
