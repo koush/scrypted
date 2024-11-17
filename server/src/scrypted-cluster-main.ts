@@ -59,6 +59,7 @@ function preparePeer(socket: tls.TLSSocket, type: 'server' | 'client') {
 export interface ClusterForkOptions {
     runtime?: ForkOptions['runtime'];
     labels?: ForkOptions['labels'];
+    id?: ForkOptions['id'];
 }
 
 type ConnectForkWorker = (auth: ClusterObject, properties: ClusterWorkerProperties) => Promise<{ clusterId: string }>;

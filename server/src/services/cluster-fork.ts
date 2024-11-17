@@ -1,6 +1,6 @@
 import type { ScryptedRuntime } from "../runtime";
 import { matchesClusterLabels } from "../cluster/cluster-labels";
-import { ClusterForkOptions, ClusterForkParam, PeerLiveness } from "../scrypted-cluster-main";
+import { ClusterForkOptions, ClusterForkParam, ClusterWorker, PeerLiveness } from "../scrypted-cluster-main";
 
 export class ClusterFork {
     constructor(public runtime: ScryptedRuntime) { }
@@ -10,9 +10,18 @@ export class ClusterFork {
             worker,
             matches: matchesClusterLabels(options, worker.labels),
         }))
-        .filter(({ matches }) => matches);
+            .filter(({ matches }) => matches);
         matchingWorkers.sort((a, b) => b.worker.labels.length - a.worker.labels.length);
-        const worker = matchingWorkers[0]?.worker;
+
+        let worker: ClusterWorker;
+
+        // try to keep fork id affinity to single worker if present. this presents the opportunity for
+        // IPC.
+        if (options.id)
+            worker = matchingWorkers.find(({ worker }) => [...worker.forks].find(f => f.id === options.id))?.worker;
+
+        // TODO: round robin?
+        worker ||= matchingWorkers[0]?.worker;
 
         if (!worker)
             throw new Error(`no worker found for cluster labels ${JSON.stringify(options.labels)}`);
@@ -20,7 +29,7 @@ export class ClusterFork {
         const fork: ClusterForkParam = await worker.peer.getParam('fork');
         const forkResult = await fork(peerLiveness, options.runtime, packageJson, zipHash, getZip);
         worker.forks.add(options);
-        forkResult.waitKilled().catch(() => {}).finally(() => {
+        forkResult.waitKilled().catch(() => { }).finally(() => {
             worker.forks.delete(options);
         });
         return forkResult;
