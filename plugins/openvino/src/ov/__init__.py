@@ -38,6 +38,7 @@ availableModels = [
     "scrypted_yolov6n_320",
     "scrypted_yolov6s_320",
     "scrypted_yolov9c_320",
+    "scrypted_yolov9m_320",
     "scrypted_yolov9s_320",
     "scrypted_yolov9t_320",
     "scrypted_yolov8n_320",
@@ -163,6 +164,7 @@ class OpenVINOPlugin(
             else:
                 model = "scrypted_yolov9t_320"
         self.yolo = "yolo" in model
+        self.scrypted_yolov9 = "scrypted_yolov9" in model
         self.scrypted_yolov10 = "scrypted_yolov10" in model
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
         self.scrypted_yolo = "scrypted_yolo" in model
@@ -171,9 +173,9 @@ class OpenVINOPlugin(
         self.sigmoid = model == "yolo-v4-tiny-tf"
         self.modelName = model
 
-        ovmodel = "best" if self.scrypted_model else model
+        ovmodel = "best-converted" if self.scrypted_yolov9 else "best" if self.scrypted_model else model
 
-        model_version = "v5"
+        model_version = "v7"
         xmlFile = self.downloadFile(
             f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
             f"{model_version}/{model}/{precision}/{ovmodel}.xml",

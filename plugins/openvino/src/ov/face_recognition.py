@@ -22,9 +22,10 @@ class OpenVINOFaceRecognition(FaceRecognizeDetection):
         super().__init__(nativeId=nativeId)
 
     def downloadModel(self, model: str):
-        ovmodel = "best"
+        scrypted_yolov9 = "scrypted_yolov9" in model
+        ovmodel = "best-converted" if scrypted_yolov9 else "best"
         precision = self.plugin.precision
-        model_version = "v5"
+        model_version = "v7"
         xmlFile = self.downloadFile(
             f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
             f"{model_version}/{model}/{precision}/{ovmodel}.xml",
