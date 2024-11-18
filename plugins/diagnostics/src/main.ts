@@ -294,6 +294,8 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
         const nvrPlugin = sdk.systemManager.getDeviceById('@scrypted/nvr');
         const cloudPlugin = sdk.systemManager.getDeviceById('@scrypted/cloud');
+        const hasCUDA = process.env.NVIDIA_VISIBLE_DEVICES && process.env.NVIDIA_DRIVER_CAPABILITIES;
+        const onnxPlugin = sdk.systemManager.getDeviceById<Settings & ObjectDetection>('@scrypted/onnx');
         const openvinoPlugin = sdk.systemManager.getDeviceById<Settings & ObjectDetection>('@scrypted/openvino');
 
         await this.validate(this.console, 'Scrypted Installation', async () => {
@@ -367,10 +369,14 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         });
 
         if (process.platform === 'linux' && nvrPlugin) {
-            // ensure /dev/dri/renderD128 is available
+            // ensure /dev/dri/renderD128 or /dev/dri/renderD129 is available
             await this.validate(this.console, 'GPU Passthrough', async () => {
-                if (!fs.existsSync('/dev/dri/renderD128'))
-                    throw new Error('GPU device unvailable or not passed through to container.');
+                if (!fs.existsSync('/dev/dri/renderD128') && !fs.existsSync('/dev/dri/renderD129'))
+                    throw new Error('GPU device unvailable or not passed through to container. (/dev/dri/renderD128, /dev/dri/renderD129)');
+                // also check /dev/kfd for AMD CPU
+                const amdCPU = os.cpus().find(c => c.model.includes('AMD'));
+                if (amdCPU && !fs.existsSync('/dev/kfd'))
+                    throw new Error('GPU device unvailable or not passed through to container. (/dev/kfd)');
             });
         }
 
@@ -406,7 +412,22 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 throw new Error('Invalid response received from short lived URL.');
         });
 
-        if (openvinoPlugin) {
+        if ((hasCUDA || process.platform === 'win32') && onnxPlugin) {
+            await this.validate(this.console, 'ONNX Plugin', async () => {
+                const settings = await onnxPlugin.getSettings();
+                const executionDevice = settings.find(s => s.key === 'execution_device');
+                if (executionDevice?.value?.toString().includes('CPU'))
+                    this.warnStep(this.console, 'GPU device unvailable or not passed through to container.');
+
+                const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
+                const detected = await onnxPlugin.detectObjects(zidane);
+                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
+                if (!personFound)
+                    throw new Error('Person not detected in test image.');
+            });
+        }
+
+        if (!hasCUDA && openvinoPlugin && (process.platform !== 'win32' || !onnxPlugin)) {
             await this.validate(this.console, 'OpenVINO Plugin', async () => {
                 const settings = await openvinoPlugin.getSettings();
                 const availbleDevices = settings.find(s => s.key === 'available_devices');

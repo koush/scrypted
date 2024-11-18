@@ -2,9 +2,13 @@ UBUNTU_22_04=$(lsb_release -r | grep "22.04")
 UBUNTU_24_04=$(lsb_release -r | grep "24.04")
 
 set -e
+
+# Install CUDA for 22.04
 # https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=24.04&target_type=deb_network
-# need this apt for nvidia-utils
-# needs either ubuntu 22.0.4 or 24.04
+# Install CUDA for 24.04
+# https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=24.04&target_type=deb_network
+# Do not apt install nvidia-open, must use cuda-drivers.
+
 if [ -z "$UBUNTU_22_04" ] && [ -z "$UBUNTU_24_04" ]
 then
     echo "NVIDIA container toolkit can not be installed. Ubuntu version could not be detected when checking lsb-release and /etc/os-release."
