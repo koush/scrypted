@@ -24,6 +24,7 @@ import rpc
 import rpc_reader
 import scrypted_python.scrypted_sdk.types
 from cluster_setup import ClusterSetup
+import cluster_labels
 from plugin_pip import install_with_pip, need_requirements, remove_pip_dirs
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
@@ -539,6 +540,13 @@ class DeviceManager(scrypted_python.scrypted_sdk.types.DeviceManager):
     def getDeviceStorage(self, nativeId: str = None) -> Storage:
         return self.nativeIds.get(nativeId, None)
 
+class PeerLiveness:
+    def __init__(self, loop: AbstractEventLoop):
+        self.killed = Future(loop=loop)
+
+    async def waitKilled(self):
+        await self.killed
+
 class PluginRemote:
     def __init__(
         self, clusterSetup: ClusterSetup, api, pluginId: str, hostInfo, loop: AbstractEventLoop
@@ -624,7 +632,8 @@ class PluginRemote:
         forkMain = options and options.get("fork")
         debug = options.get("debug", None)
         plugin_volume = pv.ensure_plugin_volume(self.pluginId)
-        plugin_zip_paths = pv.prep(plugin_volume, options.get("zipHash"))
+        zipHash = options.get("zipHash")
+        plugin_zip_paths = pv.prep(plugin_volume, zipHash)
 
         if debug:
             scrypted_volume = pv.get_scrypted_volume()
@@ -763,7 +772,46 @@ class PluginRemote:
             sdk.api = self.api
             sdk.zip = zip
 
-            def host_fork() -> PluginFork:
+            def host_fork(options: dict = None) -> PluginFork:
+                if cluster_labels.needs_cluster_fork_worker(options):
+                    peerLiveness = PeerLiveness(self.loop)
+                    async def startClusterFork():
+                        forkComponent = await self.api.getComponent("cluster-fork")
+                        clusterForkResult = await forkComponent.fork(peerLiveness, options, packageJson, zipHash, lambda: zipAPI.getZip())
+                        
+                        async def waitPeerLiveness():
+                            try:
+                                await peerLiveness.waitKilled()
+                            except:
+                                try:
+                                    await clusterForkResult.kill()
+                                except:
+                                    pass
+                        asyncio.ensure_future(waitPeerLiveness(), loop=self.loop)
+
+                        async def waitClusterForkResult():
+                            try:
+                                await clusterForkResult.waitKilled()
+                            except:
+                                pass
+                            peerLiveness.killed.set_result(None)
+                        asyncio.ensure_future(waitClusterForkResult(), loop=self.loop)
+
+                    result = asyncio.ensure_future(startClusterFork(), loop=self.loop)
+                    pluginFork = PluginFork()
+                    pluginFork.result = result
+                    def terminate():
+                        peerLiveness.killed.set_result(None)
+                    pluginFork.terminate = terminate
+                    return pluginFork
+
+                if options:
+                    runtime = options.get("runtime", None)
+                    if runtime and runtime != "python":
+                        raise Exception("cross runtime cluster fork not supported")
+                    if options.get("filename", None):
+                        raise Exception("python fork to filename not supported")
+
                 parent_conn, child_conn = multiprocessing.Pipe()
                 pluginFork = PluginFork()
                 print("new fork")

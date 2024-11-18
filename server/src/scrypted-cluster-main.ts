@@ -1,7 +1,8 @@
-import os from 'os';
 import type { ForkOptions } from '@scrypted/types';
+import crypto from 'crypto';
 import { once } from 'events';
 import net from 'net';
+import os from 'os';
 import { install as installSourceMapSupport } from 'source-map-support';
 import type { Readable } from 'stream';
 import tls from 'tls';
@@ -18,7 +19,6 @@ import { RpcPeer } from './rpc';
 import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
 import { sleep } from './sleep';
-import crypto from 'crypto';
 
 installSourceMapSupport({
     environment: 'node',
@@ -76,7 +76,6 @@ export interface ClusterWorker extends ClusterWorkerProperties {
 }
 
 export class PeerLiveness {
-    __proxy_oneway_methods = ['kill'];
     constructor(private killed: Promise<any>) {
     }
     async waitKilled() {
@@ -85,6 +84,8 @@ export class PeerLiveness {
 }
 
 export class ClusterForkResult extends PeerLiveness {
+    [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = ['kill'];
+
     constructor(private peer: RpcPeer, killed: Promise<any>, private result: any) {
         super(killed);
     }

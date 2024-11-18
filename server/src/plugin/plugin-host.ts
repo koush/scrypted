@@ -4,6 +4,7 @@ import * as io from 'engine.io';
 import fs from 'fs';
 import os from 'os';
 import WebSocket from 'ws';
+import { needsClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
 import { Plugin } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
@@ -22,7 +23,7 @@ import { LazyRemote } from './plugin-lazy-remote';
 import { setupPluginRemote } from './plugin-remote';
 import { WebSocketConnection } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
-import { createClusterForkWorker, needsClusterForkWorker } from './runtime/cluster-fork-worker';
+import { createClusterForkWorker } from './runtime/cluster-fork-worker';
 import { prepareZipSync } from './runtime/node-worker-common';
 import { RuntimeWorker } from './runtime/runtime-worker';
 

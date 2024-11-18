@@ -34,3 +34,7 @@ export function getClusterLabels() {
     labels = [...new Set(labels)];
     return labels;
 }
+
+export function needsClusterForkWorker(options: ClusterForkOptions) {
+    return process.env.SCRYPTED_CLUSTER_ADDRESS && options?.runtime && !matchesClusterLabels(options, getClusterLabels())
+}

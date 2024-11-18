@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import worker_threads from 'worker_threads';
+import { needsClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
@@ -15,7 +16,7 @@ import { attachPluginRemote, DeviceManagerImpl, setupPluginRemote } from './plug
 import { createREPLServer } from './plugin-repl';
 import { getPluginVolume } from './plugin-volume';
 import { ChildProcessWorker } from './runtime/child-process-worker';
-import { createClusterForkWorker, needsClusterForkWorker } from './runtime/cluster-fork-worker';
+import { createClusterForkWorker } from './runtime/cluster-fork-worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
