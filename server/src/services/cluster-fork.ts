@@ -6,7 +6,7 @@ export class ClusterFork {
     constructor(public runtime: ScryptedRuntime) { }
 
     async fork(peerLiveness: PeerLiveness, options: ClusterForkOptions, packageJson: any, zipHash: string, getZip: () => Promise<Buffer>) {
-        const matchingWorkers = [...this.runtime.clusterWorkers].map(worker => ({
+        const matchingWorkers = [...this.runtime.clusterWorkers.values()].map(worker => ({
             worker,
             matches: matchesClusterLabels(options, worker.labels),
         }))
@@ -37,8 +37,8 @@ export class ClusterFork {
 
     async getClusterWorkers() {
         const ret: any = {};
-        for (const worker of this.runtime.clusterWorkers) {
-            ret[worker.peer.peerName] = {
+        for (const worker of this.runtime.clusterWorkers.values()) {
+            ret[worker.id] = {
                 labels: worker.labels,
                 forks: [...worker.forks],
             };

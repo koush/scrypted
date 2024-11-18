@@ -18,6 +18,7 @@ import { RpcPeer } from './rpc';
 import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
 import { sleep } from './sleep';
+import crypto from 'crypto';
 
 installSourceMapSupport({
     environment: 'node',
@@ -69,6 +70,7 @@ export interface ClusterWorkerProperties {
 }
 
 export interface ClusterWorker extends ClusterWorkerProperties {
+    id: string;
     peer: RpcPeer;
     forks: Set<ClusterForkOptions>;
 }
@@ -296,17 +298,20 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
                     if (auth.port !== socket.remotePort || !socket.remoteAddress.endsWith(auth.address))
                         throw new Error('cluster object address mismatch');
                 }
+                const id = crypto.randomUUID();
                 const worker: ClusterWorker = {
                     ...properties,
+                    // generate a random uuid.
+                    id,
                     peer,
                     forks: new Set(),
                 };
-                runtime.clusterWorkers.add(worker);
+                runtime.clusterWorkers.set(id, worker);
                 peer.killedSafe.finally(() => {
-                    runtime.clusterWorkers.delete(worker);
+                    runtime.clusterWorkers.delete(id);
                 });
                 socket.on('close', () => {
-                    runtime.clusterWorkers.delete(worker);
+                    runtime.clusterWorkers.delete(id);
                 });
                 console.log('Cluster client authenticated.', socket.remoteAddress, socket.remotePort, properties);
             }
