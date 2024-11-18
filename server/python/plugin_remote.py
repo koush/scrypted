@@ -800,15 +800,13 @@ class PluginRemote:
                     result = asyncio.ensure_future(startClusterFork(), loop=self.loop)
                     pluginFork = PluginFork()
                     pluginFork.result = result
-                    def terminate():
-                        peerLiveness.killed.set_result(None)
-                    pluginFork.terminate = terminate
+                    pluginFork.terminate = lambda: peerLiveness.killed.set_result(None)
                     return pluginFork
 
                 if options:
                     runtime = options.get("runtime", None)
                     if runtime and runtime != "python":
-                        raise Exception("cross runtime cluster fork not supported")
+                        raise Exception("cross runtime fork not supported")
                     if options.get("filename", None):
                         raise Exception("python fork to filename not supported")
 
