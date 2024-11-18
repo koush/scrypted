@@ -2543,6 +2543,10 @@ export interface ForkWorker {
   nativeWorker?: NodeChildProcess | NodeWorker;
 }
 export interface PluginFork<T> {
+  /**
+   * The cluster worker id that is executing this fork when in cluster mode.
+   */
+  workerId?: Promise<string>;
   result: Promise<T>;
   worker: ForkWorker;
 }
@@ -2609,11 +2613,31 @@ export interface ConnectOptions extends APIOptions {
 }
 
 export interface ForkOptions {
+  /**
+   * The name of this fork. This will be used to set the thread name
+   */
   name?: string;
-  filename?: string;
+  /**
+   * The runtime to use for this fork. If not specified, the current runtime will be used.
+   */
   runtime?: string;
+  /**
+   * The filename to execute in the fork. Not supported in all runtimes.
+   */
+  filename?: string;
+  /**
+   * The id of the device that is associated with this fork.
+   */
   id?: string;
+  /**
+   * The native id of the mixin that is associated with this fork.
+   */
   nativeId?: ScryptedNativeId;
+
+  /**
+   * The worker id that will execute this fork.
+   */
+  workerId?: string;
   /**
    * The labels used to select the cluster worker that will execute this fork.
    */
@@ -2631,7 +2655,7 @@ export interface ForkOptions {
      * The nearest match will be selected.
      */
     prefer?: string[];
-  }
+  };
 }
 
 export interface ScryptedStatic {
