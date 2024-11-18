@@ -37,10 +37,16 @@
          "Settings",
          "ObjectDetection",
          "ObjectDetectionPreview"
-      ]
+      ],
+      "labels": {
+         "require": [
+            "compute",
+            "x64"
+         ]
+      }
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.127"
+   "version": "0.1.129"
 }
