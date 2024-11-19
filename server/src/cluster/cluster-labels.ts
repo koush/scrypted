@@ -37,5 +37,6 @@ export function getClusterLabels() {
 
 export function needsClusterForkWorker(options: ClusterForkOptions) {
     return process.env.SCRYPTED_CLUSTER_ADDRESS
+        && options
         && (!matchesClusterLabels(options, getClusterLabels()) || options.clusterWorkerId);
 }
