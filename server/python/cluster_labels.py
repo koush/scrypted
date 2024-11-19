@@ -6,6 +6,7 @@ class ClusterForkOptions(TypedDict):
     runtime: Optional[str]
     labels: Optional[Dict[str, List[str]]]
     id: Optional[str]
+    clusterWorkerId: Optional[str]
 
 
 def matches_cluster_labels(options: ClusterForkOptions, labels: List[str]) -> int:
@@ -46,6 +47,5 @@ def needs_cluster_fork_worker(options: ClusterForkOptions) -> bool:
     return (
         os.environ.get("SCRYPTED_CLUSTER_ADDRESS")
         and options
-        and options.get("runtime", None)
-        and not matches_cluster_labels(options, get_cluster_labels())
+        and (not matches_cluster_labels(options, get_cluster_labels()) or options.get("clusterWorkerId", None))
     )
