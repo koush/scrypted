@@ -37,7 +37,10 @@ export function createClusterForkWorker(
     });
 
     const peerLiveness = new PeerLiveness(waitKilled.promise);
-    const clusterForkResultPromise = forkComponentPromise.then(forkComponent => forkComponent.fork(peerLiveness, options, packageJson, zipHash, getZip));
+    const clusterForkResultPromise = forkComponentPromise.then(forkComponent => forkComponent.fork(peerLiveness, {
+        runtime: options.runtime || 'node',
+        ...options,
+    }, packageJson, zipHash, getZip));
     clusterForkResultPromise.catch(() => {});
 
     const clusterWorkerId = clusterForkResultPromise.then(clusterForkResult => clusterForkResult.clusterWorkerId);

@@ -777,7 +777,9 @@ class PluginRemote:
                     peerLiveness = PeerLiveness(self.loop)
                     async def startClusterFork():
                         forkComponent = await self.api.getComponent("cluster-fork")
-                        clusterForkResult = await forkComponent.fork(peerLiveness, options, packageJson, zipHash, lambda: zipAPI.getZip())
+                        sanitizedOptions = options.copy()
+                        sanitizedOptions["runtime"] = sanitizedOptions.get("runtime", "python")
+                        clusterForkResult = await forkComponent.fork(peerLiveness, sanitizedOptions, packageJson, zipHash, lambda: zipAPI.getZip())
                         
                         async def waitPeerLiveness():
                             try:
