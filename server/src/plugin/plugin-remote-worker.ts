@@ -210,10 +210,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 let forkPeer: Promise<RpcPeer>;
                 let runtimeWorker: RuntimeWorker;
                 let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
+                let clusterWorkerId: Promise<string>;
 
                 // if running in a cluster, fork to a matching cluster worker only if necessary.
                 if (needsClusterForkWorker(options)) {
-                    ({ runtimeWorker, forkPeer } = createClusterForkWorker(
+                    ({ runtimeWorker, forkPeer, clusterWorkerId } = createClusterForkWorker(
                         api.getComponent('cluster-fork'), zipHash, () => zipAPI.getZip(), options, packageJson, scrypted.connectRPCObject)
                     );
                 }
@@ -337,6 +338,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     nativeWorker,
                 };
                 return {
+                    clusterWorkerId,
                     worker,
                     result,
                 };

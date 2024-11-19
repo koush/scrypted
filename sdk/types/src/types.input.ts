@@ -2544,9 +2544,9 @@ export interface ForkWorker {
 }
 export interface PluginFork<T> {
   /**
-   * The cluster worker id that is executing this fork when in cluster mode.
+   * The id of the cluster worker that is executing this fork when in cluster mode.
    */
-  workerId?: Promise<string>;
+  clusterWorkerId?: Promise<string>;
   result: Promise<T>;
   worker: ForkWorker;
 }
@@ -2635,9 +2635,9 @@ export interface ForkOptions {
   nativeId?: ScryptedNativeId;
 
   /**
-   * The worker id that will execute this fork.
+   * The id of the cluster worker id that will execute this fork.
    */
-  workerId?: string;
+  clusterWorkerId?: string;
   /**
    * The labels used to select the cluster worker that will execute this fork.
    */

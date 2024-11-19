@@ -1,16 +1,21 @@
 import type { ScryptedRuntime } from "../runtime";
 import { matchesClusterLabels } from "../cluster/cluster-labels";
 import { ClusterForkOptions, ClusterForkParam, ClusterWorker, PeerLiveness } from "../scrypted-cluster-main";
+import { RpcPeer } from "../rpc";
 
 export class ClusterFork {
     constructor(public runtime: ScryptedRuntime) { }
 
     async fork(peerLiveness: PeerLiveness, options: ClusterForkOptions, packageJson: any, zipHash: string, getZip: () => Promise<Buffer>) {
-        const matchingWorkers = [...this.runtime.clusterWorkers.values()].map(worker => ({
+        const matchingWorkers = [...this.runtime.clusterWorkers.entries()].map(([id, worker]) => ({
             worker,
             matches: matchesClusterLabels(options, worker.labels),
         }))
-            .filter(({ matches }) => matches);
+            .filter(({ matches, worker }) => {
+                // labels must match
+                // and worker id must match if provided
+                return matches && (!options.clusterWorkerId || worker.id === options.clusterWorkerId);
+            });
         matchingWorkers.sort((a, b) => b.worker.labels.length - a.worker.labels.length);
 
         let worker: ClusterWorker;
@@ -23,8 +28,11 @@ export class ClusterFork {
         // TODO: round robin?
         worker ||= matchingWorkers[0]?.worker;
 
-        if (!worker)
+        if (!worker) {
+            if (options.clusterWorkerId)
+                throw new Error(`no worker found for cluster id ${options.clusterWorkerId}`);
             throw new Error(`no worker found for cluster labels ${JSON.stringify(options.labels)}`);
+        }
 
         const fork: ClusterForkParam = await worker.peer.getParam('fork');
         const forkResult = await fork(peerLiveness, options.runtime, packageJson, zipHash, getZip);
@@ -32,6 +40,8 @@ export class ClusterFork {
         forkResult.waitKilled().catch(() => { }).finally(() => {
             worker.forks.delete(options);
         });
+
+        forkResult.clusterWorkerId = worker.id;
         return forkResult;
     }
 
@@ -39,6 +49,7 @@ export class ClusterFork {
         const ret: any = {};
         for (const worker of this.runtime.clusterWorkers.values()) {
             ret[worker.id] = {
+                name: worker.peer.peerName,
                 labels: worker.labels,
                 forks: [...worker.forks],
             };

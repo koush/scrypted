@@ -61,6 +61,7 @@ export interface ClusterForkOptions {
     runtime?: ForkOptions['runtime'];
     labels?: ForkOptions['labels'];
     id?: ForkOptions['id'];
+    clusterWorkerId?: ForkOptions['clusterWorkerId'];
 }
 
 type ConnectForkWorker = (auth: ClusterObject, properties: ClusterWorkerProperties) => Promise<{ clusterId: string }>;
@@ -85,6 +86,7 @@ export class PeerLiveness {
 
 export class ClusterForkResult extends PeerLiveness {
     [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = ['kill'];
+    clusterWorkerId?: string;
 
     constructor(private peer: RpcPeer, killed: Promise<any>, private result: any) {
         super(killed);

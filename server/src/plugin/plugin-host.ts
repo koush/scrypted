@@ -379,7 +379,7 @@ export class PluginHost {
             });
 
             const clusterSetup = setupCluster(this.peer);
-            const { runtimeWorker, forkPeer } = createClusterForkWorker((async () => {
+            const { runtimeWorker, forkPeer, clusterWorkerId } = createClusterForkWorker((async () => {
                 await clusterSetup.initializeCluster({
                     clusterId: this.scrypted.clusterId,
                     clusterSecret: this.scrypted.clusterSecret,
@@ -394,6 +394,9 @@ export class PluginHost {
                 originalPeer.killedSafe.finally(() => peer.kill());
                 this.peer = peer;
                 peer.killedSafe.finally(() => originalPeer.kill());
+            }).catch(() => {});
+            clusterWorkerId.then(clusterWorkerId => {
+                console.log('cluster worker id', clusterWorkerId);
             }).catch(() => {});
 
             this.worker = runtimeWorker;

@@ -7,7 +7,7 @@ import { writeWorkerGenerator } from "../plugin-console";
 import type { RuntimeWorker } from "./runtime-worker";
 
 export function createClusterForkWorker(
-    forkComponentPromise: ClusterFork | Promise<ClusterFork>,
+    forkComponentPromise: Promise<ClusterFork>,
     zipHash: string,
     getZip: () => Promise<Buffer>,
     options: ClusterForkOptions,
@@ -36,12 +36,15 @@ export function createClusterForkWorker(
         runtimeWorker.pid = undefined;
     });
 
+    const peerLiveness = new PeerLiveness(waitKilled.promise);
+    const clusterForkResultPromise = forkComponentPromise.then(forkComponent => forkComponent.fork(peerLiveness, options, packageJson, zipHash, getZip));
+    clusterForkResultPromise.catch(() => {});
+
+    const clusterWorkerId = clusterForkResultPromise.then(clusterForkResult => clusterForkResult.clusterWorkerId);
+    clusterWorkerId.catch(() => {});
+
     const forkPeer = (async () => {
-        // need to ensure this happens on next tick to prevent unhandled promise rejection.
-        // await sleep(0);
-        const forkComponent = await forkComponentPromise;
-        const peerLiveness = new PeerLiveness(waitKilled.promise);
-        const clusterForkResult = await forkComponent.fork(peerLiveness, options, packageJson, zipHash, getZip);
+        const clusterForkResult = await clusterForkResultPromise;
         waitKilled.promise.finally(() => {
             runtimeWorker.pid = undefined;
             clusterForkResult.kill().catch(() => {});
@@ -83,5 +86,6 @@ export function createClusterForkWorker(
     return {
         runtimeWorker,
         forkPeer,
+        clusterWorkerId,
     }
 }
