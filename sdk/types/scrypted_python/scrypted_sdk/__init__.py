@@ -15,6 +15,7 @@ class PluginFork:
 deviceManager: DeviceManager = None
 systemManager: SystemManager = None
 mediaManager: MediaManager = None
+clusterManager: ClusterManager = None
 zip: ZipFile = None
 remote: Any = None
 api: Any
@@ -28,6 +29,7 @@ class ScryptedStatic:
         self.systemManager: SystemManager = None
         self.deviceManager: DeviceManager = None
         self.mediaManager: MediaManager = None
+        self.clusterManager: ClusterManager = None
         self.zip: ZipFile = None
         self.remote: Any = None
         self.api: Any = None
@@ -52,6 +54,7 @@ def sdk_init2(scryptedStatic: ScryptedStatic):
     global systemManager
     global deviceManager
     global mediaManager
+    global clusterManager
     global sdk
     global api
     global fork
@@ -59,6 +62,8 @@ def sdk_init2(scryptedStatic: ScryptedStatic):
     systemManager = sdk.systemManager
     deviceManager = sdk.deviceManager
     mediaManager = sdk.mediaManager
+    if hasattr(sdk, 'clusterManager'):
+        clusterManager = sdk.clusterManager
     zip = sdk.zip
     remote = sdk.remote
     api = sdk.api

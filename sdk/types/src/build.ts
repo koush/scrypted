@@ -95,6 +95,8 @@ function toPythonType(type: any): string {
         return type.types.map((type: any) => toPythonType(type)).join(' | ')
     if (type.name === 'AsyncGenerator')
         return `AsyncGenerator[${toPythonType(type.typeArguments[0])}, None]`;
+    if (type.name === 'Record')
+        return `Mapping[${toPythonType(type.typeArguments[0])}, ${toPythonType(type.typeArguments[1])}]`;
     type = type.typeArguments?.[0]?.name || type.name || type;
     if (parameterTypes.has(type))
         return 'Any';
@@ -344,9 +346,9 @@ ${toDocstring(td)}
 const pythonTypes = `from __future__ import annotations
 from enum import Enum
 try:
-    from typing import TypedDict
+    from typing import TypedDict, Mapping
 except:
-    from typing_extensions import TypedDict
+    from typing_extensions import TypedDict, Mapping
 from typing import Union, Any, AsyncGenerator
 
 from .other import *

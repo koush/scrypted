@@ -1,9 +1,9 @@
 from __future__ import annotations
 from enum import Enum
 try:
-    from typing import TypedDict
+    from typing import TypedDict, Mapping
 except:
-    from typing_extensions import TypedDict
+    from typing_extensions import TypedDict, Mapping
 from typing import Union, Any, AsyncGenerator
 
 from .other import *
@@ -299,6 +299,16 @@ class AudioStreamOptions(TypedDict):
     profile: str
     sampleRate: float
 
+class ClusterFork(TypedDict):
+
+    clusterWorkerId: str  # The id of the cluster worker id that will execute this fork.
+    filename: str  # The filename to execute in the fork. Not supported in all runtimes.
+    id: str  # The id of the device that is associated with this fork.
+    labels: Any  # The labels used to select the cluster worker that will execute this fork.
+    name: str  # The name of this fork. This will be used to set the thread name
+    nativeId: str  # The native id of the mixin that is associated with this fork.
+    runtime: str  # The runtime to use for this fork. If not specified, the current runtime will be used.
+
 class HttpResponseOptions(TypedDict):
 
     code: float
@@ -458,6 +468,13 @@ class ClusterForkInterfaceOptions(TypedDict):
     clusterWorkerId: str  # The id of the cluster worker id that will execute this fork.
     id: str  # The id of the device that is associated with this fork.
     nativeId: str  # The native id of the mixin that is associated with this fork.
+
+class ClusterWorker(TypedDict):
+
+    forks: list[ClusterFork]
+    id: str
+    labels: list[str]
+    name: str
 
 class ColorHsv(TypedDict):
     """Represents an HSV color value component."""
@@ -1821,7 +1838,7 @@ class ClusterManager:
     def getClusterWorkerId(self) -> str:
         pass
 
-    async def getClusterWorkers(self) -> str:
+    async def getClusterWorkers(self) -> Mapping[str, ClusterWorker]:
         pass
 
 
