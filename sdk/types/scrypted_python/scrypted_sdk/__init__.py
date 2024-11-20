@@ -9,6 +9,8 @@ import asyncio
 class PluginFork:
     result: asyncio.Task
     worker: Process
+    def terminate(self):
+        pass
 
 deviceManager: DeviceManager = None
 systemManager: SystemManager = None
@@ -18,7 +20,7 @@ remote: Any = None
 api: Any
 sdk: ScryptedStatic
 
-def fork() -> PluginFork:
+def fork(options: Any) -> PluginFork:
     pass
 
 class ScryptedStatic:

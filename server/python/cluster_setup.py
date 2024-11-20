@@ -164,7 +164,7 @@ class ClusterSetup():
                 for key, value in self.peer.params.items():
                     clusterPeer.params[key] = value
                 clusterPeer.onProxySerialization = (
-                    lambda value: self.clusterSetup.onProxySerialization(
+                    lambda value: self.onProxySerialization(
                         clusterPeer, value, clusterPeerKey
                     )
                 )

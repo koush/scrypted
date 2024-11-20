@@ -207,6 +207,8 @@ export function startClusterClient(mainFilename: string) {
                         unzippedPath,
                         zipHash,
                     }, undefined);
+                    runtimeWorker.stdout.on('data', data => console.log(data.toString()));
+                    runtimeWorker.stderr.on('data', data => console.error(data.toString()));
 
                     const threadPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
                     runtimeWorker.setupRpcPeer(threadPeer);

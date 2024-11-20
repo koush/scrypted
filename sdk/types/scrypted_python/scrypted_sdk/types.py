@@ -120,6 +120,7 @@ class ScryptedInterface(str, Enum):
     CO2Sensor = "CO2Sensor"
     Camera = "Camera"
     Charger = "Charger"
+    ClusterForkInterface = "ClusterForkInterface"
     ColorSettingHsv = "ColorSettingHsv"
     ColorSettingRgb = "ColorSettingRgb"
     ColorSettingTemperature = "ColorSettingTemperature"
@@ -451,6 +452,12 @@ class AudioVolumes(TypedDict):
 
     pass
 
+
+class ClusterForkInterfaceOptions(TypedDict):
+
+    clusterWorkerId: str  # The id of the cluster worker id that will execute this fork.
+    id: str  # The id of the device that is associated with this fork.
+    nativeId: str  # The native id of the mixin that is associated with this fork.
 
 class ColorHsv(TypedDict):
     """Represents an HSV color value component."""
@@ -996,6 +1003,13 @@ class Charger:
     """Charger reports whether or not a device is being charged from an external power source. Usually used for battery powered devices."""
 
     chargeState: ChargeState
+
+class ClusterForkInterface:
+    """Requests that the ScryptedDevice create a fork to"""
+
+    async def forkInterface(self, forkInterface: ObjectDetection, options: ClusterForkInterfaceOptions = None) -> ObjectDetection:
+        pass
+
 
 class ColorSettingHsv:
     """ColorSettingHsv sets the color of a colored light using the HSV representation."""
@@ -1957,6 +1971,7 @@ class ScryptedInterfaceMethods(str, Enum):
     eval = "eval"
     loadScripts = "loadScripts"
     saveScript = "saveScript"
+    forkInterface = "forkInterface"
     trackObjects = "trackObjects"
     getDetectionInput = "getDetectionInput"
     getObjectTypes = "getObjectTypes"
@@ -3083,6 +3098,13 @@ ScryptedInterfaceDescriptors = {
       "eval",
       "loadScripts",
       "saveScript"
+    ],
+    "properties": []
+  },
+  "ClusterForkInterface": {
+    "name": "ClusterForkInterface",
+    "methods": [
+      "forkInterface"
     ],
     "properties": []
   },

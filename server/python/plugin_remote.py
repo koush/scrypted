@@ -18,7 +18,7 @@ from asyncio.streams import StreamReader, StreamWriter
 from collections.abc import Mapping
 from io import StringIO
 from typing import Any, Callable, Coroutine, Optional, Set, Tuple, TypedDict
-
+import plugin_console
 import plugin_volume as pv
 import rpc
 import rpc_reader
@@ -622,17 +622,17 @@ class PluginRemote:
             traceback.print_exc()
             raise
 
-    async def loadZipWrapped(self, packageJson, zipAPI: Any, options: dict):
-        await self.clusterSetup.initializeCluster(options)
+    async def loadZipWrapped(self, packageJson, zipAPI: Any, zipOptions: dict):
+        await self.clusterSetup.initializeCluster(zipOptions)
 
         sdk = ScryptedStatic()
 
         sdk.connectRPCObject = lambda v: self.clusterSetup.connectRPCObject(v)
 
-        forkMain = options and options.get("fork")
-        debug = options.get("debug", None)
+        forkMain = zipOptions and zipOptions.get("fork")
+        debug = zipOptions.get("debug", None)
         plugin_volume = pv.ensure_plugin_volume(self.pluginId)
-        zipHash = options.get("zipHash")
+        zipHash = zipOptions.get("zipHash")
         plugin_zip_paths = pv.prep(plugin_volume, zipHash)
 
         if debug:
@@ -660,6 +660,13 @@ class PluginRemote:
 
         if not forkMain:
             multiprocessing.set_start_method("spawn")
+        
+        # forkMain may be set to true, but the environment may not be initialized
+        # if the plugin is loaded in another cluster worker.
+        # instead rely on a environemnt variable that will be passed to
+        # child processes.
+        if not os.environ.get("SCRYPTED_PYTHON_INITIALIZED", None):
+            os.environ["SCRYPTED_PYTHON_INITIALIZED"] = "1"
 
             # it's possible to run 32bit docker on aarch64, which cause pip requirements
             # to fail because pip only allows filtering on machine, even if running a different architeture.
@@ -763,8 +770,6 @@ class PluginRemote:
         self.mediaManager = MediaManager(await self.api.getMediaManager())
 
         try:
-            from scrypted_sdk import sdk_init2  # type: ignore
-
             sdk.systemManager = self.systemManager
             sdk.deviceManager = self.deviceManager
             sdk.mediaManager = self.mediaManager
@@ -773,12 +778,32 @@ class PluginRemote:
             sdk.zip = zip
 
             def host_fork(options: dict = None) -> PluginFork:
+                async def finishFork(forkPeer: rpc.RpcPeer):
+                    getRemote = await forkPeer.getParam("getRemote")
+                    remote: PluginRemote = await getRemote(
+                        self.api, self.pluginId, self.hostInfo
+                    )
+                    await remote.setSystemState(self.systemManager.getSystemState())
+                    for nativeId, ds in self.nativeIds.items():
+                        await remote.setNativeId(nativeId, ds.id, ds.storage)
+                    forkOptions = zipOptions.copy()
+                    forkOptions["fork"] = True
+                    forkOptions["debug"] = debug
+
+                    class PluginZipAPI:
+
+                        async def getZip(self):
+                            return await zipAPI.getZip()
+
+                    return await remote.loadZip(packageJson, PluginZipAPI(), forkOptions)
+
                 if cluster_labels.needs_cluster_fork_worker(options):
                     peerLiveness = PeerLiveness(self.loop)
-                    async def startClusterFork():
+                    async def getClusterFork():
                         forkComponent = await self.api.getComponent("cluster-fork")
                         sanitizedOptions = options.copy()
                         sanitizedOptions["runtime"] = sanitizedOptions.get("runtime", "python")
+                        sanitizedOptions["zipHash"] = zipHash
                         clusterForkResult = await forkComponent.fork(peerLiveness, sanitizedOptions, packageJson, zipHash, lambda: zipAPI.getZip())
                         
                         async def waitPeerLiveness():
@@ -799,9 +824,22 @@ class PluginRemote:
                             peerLiveness.killed.set_result(None)
                         asyncio.ensure_future(waitClusterForkResult(), loop=self.loop)
 
-                    result = asyncio.ensure_future(startClusterFork(), loop=self.loop)
+                        clusterGetRemote = await self.clusterSetup.connectRPCObject(await clusterForkResult.getResult())
+                        remoteDict = await clusterGetRemote()
+                        asyncio.ensure_future(plugin_console.writeWorkerGenerator(remoteDict["stdout"], sys.stdout))
+                        asyncio.ensure_future(plugin_console.writeWorkerGenerator(remoteDict["stderr"], sys.stderr))
+
+                        getRemote = remoteDict["getRemote"]
+                        directGetRemote = await self.clusterSetup.connectRPCObject(getRemote)
+                        if directGetRemote is getRemote:
+                            raise Exception("cluster fork peer not direct connected")
+
+                        forkPeer = getattr(directGetRemote, rpc.RpcPeer.PROPERTY_PROXY_PEER)
+                        return await finishFork(forkPeer)
+
+
                     pluginFork = PluginFork()
-                    pluginFork.result = result
+                    pluginFork.result = asyncio.create_task(getClusterFork())
                     pluginFork.terminate = lambda: peerLiveness.killed.set_result(None)
                     return pluginFork
 
@@ -819,6 +857,7 @@ class PluginRemote:
                     target=plugin_fork, args=(child_conn,), daemon=True
                 )
                 pluginFork.worker.start()
+                pluginFork.terminate = lambda: pluginFork.worker.kill()
 
                 def schedule_exit_check():
                     def exit_check():
@@ -847,26 +886,11 @@ class PluginRemote:
                         finally:
                             parent_conn.close()
                             rpcTransport.executor.shutdown()
-                            pluginFork.worker.kill()
+                            pluginFork.terminate()
 
                     asyncio.run_coroutine_threadsafe(forkReadLoop(), loop=self.loop)
-                    getRemote = await forkPeer.getParam("getRemote")
-                    remote: PluginRemote = await getRemote(
-                        self.api, self.pluginId, self.hostInfo
-                    )
-                    await remote.setSystemState(self.systemManager.getSystemState())
-                    for nativeId, ds in self.nativeIds.items():
-                        await remote.setNativeId(nativeId, ds.id, ds.storage)
-                    forkOptions = options.copy()
-                    forkOptions["fork"] = True
-                    forkOptions["debug"] = debug
 
-                    class PluginZipAPI:
-
-                        async def getZip(self):
-                            return await zipAPI.getZip()
-
-                    return await remote.loadZip(packageJson, PluginZipAPI(), forkOptions)
+                    return await finishFork(forkPeer)
 
                 pluginFork.result = asyncio.create_task(getFork())
                 return pluginFork
@@ -874,6 +898,7 @@ class PluginRemote:
             sdk.fork = host_fork
             # sdk.
 
+            from scrypted_sdk import sdk_init2  # type: ignore
             sdk_init2(sdk)
         except:
             from scrypted_sdk import sdk_init  # type: ignore

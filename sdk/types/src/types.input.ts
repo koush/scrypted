@@ -1690,7 +1690,7 @@ export interface VideoFrameGenerator {
 /**
  * Generic bidirectional stream connection.
  */
-export interface StreamService<Input, Output=Input> {
+export interface StreamService<Input, Output = Input> {
   connectStream(input?: AsyncGenerator<Input, void>, options?: any): Promise<AsyncGenerator<Output, void>>;
 }
 /**
@@ -2320,6 +2320,7 @@ export enum ScryptedInterface {
   PushHandler = "PushHandler",
   Program = "Program",
   Scriptable = "Scriptable",
+  ClusterForkInterface = "ClusterForkInterface",
   ObjectTracker = "ObjectTracker",
   ObjectDetector = "ObjectDetector",
   ObjectDetection = "ObjectDetection",
@@ -2534,6 +2535,17 @@ export interface FFmpegTranscode {
 }
 export type FFmpegTranscodeStream = (options: FFmpegTranscode) => Promise<void>;
 
+export interface ClusterForkInterfaceOptions extends Required<Pick<ForkOptions, 'clusterWorkerId'>>, Pick<ForkOptions, 'id' | 'nativeId'> {
+}
+
+/**
+ * Requests that the ScryptedDevice create a fork to 
+ */
+export interface ClusterForkInterface {
+  forkInterface(forkInterface: ScryptedInterface.ObjectDetection, options?: ClusterForkInterfaceOptions): Promise<ObjectDetection>;
+  forkInterface<T>(forkInterface: ScryptedInterface, options?: ClusterForkInterfaceOptions): Promise<T>;
+}
+
 export interface ForkWorker {
   terminate(): void;
   on(event: 'exit', listener: () => void): void;
@@ -2658,6 +2670,30 @@ export interface ForkOptions {
   };
 }
 
+export interface ClusterFork extends ForkOptions {
+  runtime?: ForkOptions['runtime'];
+  labels?: ForkOptions['labels'];
+  id?: ForkOptions['id'];
+  clusterWorkerId: ForkOptions['clusterWorkerId'];
+}
+
+export interface ClusterWorker {
+  name: string;
+  id: string;
+  labels: string[];
+  forks: ClusterFork[];
+}
+
+export interface ClusterManager {
+  /**
+   * Returns the id of this cluster worker.
+   * Returns undefined if this is not a cluster worker.
+   */
+  getClusterWorkerId(): string;
+  getClusterMode(): 'server' | 'client' | undefined;
+  getClusterWorkers(): Promise<Record<string, ClusterWorker>>;
+}
+
 export interface ScryptedStatic {
   /**
    * @deprecated
@@ -2668,6 +2704,7 @@ export interface ScryptedStatic {
   endpointManager: EndpointManager,
   mediaManager: MediaManager,
   systemManager: SystemManager,
+  clusterManager: ClusterManager;
 
   serverVersion?: string;
 

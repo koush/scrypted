@@ -62,7 +62,7 @@ class RpcProxy(object):
         self.__dict__['__proxy_id'] = entry['id']
         self.__dict__['__proxy_entry'] = entry
         self.__dict__['__proxy_constructor'] = proxyConstructorName
-        self.__dict__['__proxy_peer'] = peer
+        self.__dict__[RpcPeer.PROPERTY_PROXY_PEER] = peer
         self.__dict__[RpcPeer.PROPERTY_PROXY_PROPERTIES] = proxyProps
         self.__dict__['__proxy_oneway_methods'] = proxyOneWayMethods
 
@@ -105,17 +105,18 @@ class RpcProxy(object):
         return super().__setattr__(name, value)
 
     def __call__(self, *args, **kwargs):
-        return self.__dict__['__proxy_peer'].__apply__(self.__dict__['__proxy_id'], self.__dict__['__proxy_oneway_methods'], None, args)
+        return self.__dict__[RpcPeer.PROPERTY_PROXY_PEER].__apply__(self.__dict__['__proxy_id'], self.__dict__['__proxy_oneway_methods'], None, args)
 
 
     def __apply__(self, method: str, args: list):
-        return self.__dict__['__proxy_peer'].__apply__(self.__dict__['__proxy_id'], self.__dict__['__proxy_oneway_methods'], method, args)
+        return self.__dict__[RpcPeer.PROPERTY_PROXY_PEER].__apply__(self.__dict__['__proxy_id'], self.__dict__['__proxy_oneway_methods'], method, args)
 
 
 class RpcPeer:
     RPC_RESULT_ERROR_NAME = 'RPCResultError'
     PROPERTY_PROXY_PROPERTIES = '__proxy_props'
     PROPERTY_JSON_COPY_SERIALIZE_CHILDREN = '__json_copy_serialize_children'
+    PROPERTY_PROXY_PEER = '__proxy_peer'
 
     def __init__(self, send: Callable[[object, Callable[[Exception], None], Dict], None]) -> None:
         self.send = send
@@ -288,7 +289,7 @@ class RpcPeer:
             return ret
 
         __proxy_id = getattr(value, '__proxy_id', None)
-        __proxy_peer = getattr(value, '__proxy_peer', None)
+        __proxy_peer = getattr(value, RpcPeer.PROPERTY_PROXY_PEER, None)
         if __proxy_id and __proxy_peer == self:
             ret = {
                 '__local_proxy_id': __proxy_id,
