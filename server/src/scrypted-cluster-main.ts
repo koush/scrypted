@@ -1,4 +1,4 @@
-import type { ForkOptions } from '@scrypted/types';
+import type { ClusterManager, ClusterWorker, ForkOptions } from '@scrypted/types';
 import crypto from 'crypto';
 import { once } from 'events';
 import net from 'net';
@@ -11,13 +11,15 @@ import { computeClusterObjectHash } from './cluster/cluster-hash';
 import { getClusterLabels } from './cluster/cluster-labels';
 import { getScryptedClusterMode, InitializeCluster, setupCluster } from './cluster/cluster-setup';
 import type { ClusterObject } from './cluster/connect-rpc-object';
+import type { PluginAPI } from './plugin/plugin-api';
 import { getPluginVolume, getScryptedVolume } from './plugin/plugin-volume';
 import { prepareZip } from './plugin/runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
-import { RuntimeWorker } from './plugin/runtime/runtime-worker';
+import type { RuntimeWorker } from './plugin/runtime/runtime-worker';
 import { RpcPeer } from './rpc';
 import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
+import type { ClusterForkService } from './services/cluster-fork';
 import { sleep } from './sleep';
 
 installSourceMapSupport({
@@ -64,13 +66,13 @@ export interface ClusterForkOptions {
     clusterWorkerId?: ForkOptions['clusterWorkerId'];
 }
 
-type ConnectForkWorker = (auth: ClusterObject, properties: ClusterWorkerProperties) => Promise<{ clusterId: string }>;
+type ConnectForkWorker = (auth: ClusterObject, properties: ClusterWorkerProperties) => Promise<{ clusterId: string, clusterWorkerId: string }>;
 
 export interface ClusterWorkerProperties {
     labels: string[];
 }
 
-export interface ClusterWorker extends ClusterWorkerProperties {
+export interface RunningClusterWorker extends ClusterWorkerProperties {
     id: string;
     peer: RpcPeer;
     forks: Set<ClusterForkOptions>;
@@ -157,12 +159,11 @@ export function startClusterClient(mainFilename: string) {
             });
 
             try {
-
                 const connectForkWorker: ConnectForkWorker = await peer.getParam('connectForkWorker');
                 const auth: ClusterObject = {
                     address: socket.localAddress,
                     port: socket.localPort,
-                    id: process.env.SCRYPTED_CLUSTER_ID || os.hostname(),
+                    id: process.env.SCRYPTED_CLUSTER_CLIENT_NAME || os.hostname(),
                     proxyId: undefined,
                     sourceKey: undefined,
                     sha256: undefined,
@@ -173,7 +174,8 @@ export function startClusterClient(mainFilename: string) {
                     labels,
                 };
 
-                const { clusterId } = await connectForkWorker(auth, properties);
+                const { clusterId, clusterWorkerId } = await connectForkWorker(auth, properties);
+                process.env.SCRYPTED_CLUSTER_WORKER_ID = clusterWorkerId;
                 const clusterPeerSetup = setupCluster(peer);
                 await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret });
 
@@ -290,6 +292,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
         const peer = preparePeer(socket, 'server');
 
         const connectForkWorker: ConnectForkWorker = async (auth: ClusterObject, properties: ClusterWorkerProperties) => {
+            const id = crypto.randomUUID();
             try {
                 const sha256 = computeClusterObjectHash(auth, runtime.clusterSecret);
                 if (sha256 !== auth.sha256)
@@ -303,8 +306,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
                     if (auth.port !== socket.remotePort || !socket.remoteAddress.endsWith(auth.address))
                         throw new Error('cluster object address mismatch');
                 }
-                const id = crypto.randomUUID();
-                const worker: ClusterWorker = {
+                const worker: RunningClusterWorker = {
                     ...properties,
                     // generate a random uuid.
                     id,
@@ -327,10 +329,36 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
 
             return {
                 clusterId: runtime.clusterId,
+                clusterWorkerId: id,
             }
         }
         peer.params['connectForkWorker'] = connectForkWorker;
     });
 
     return server;
+}
+
+export class ClusterManagerImpl implements ClusterManager {
+    private  clusterServicePromise: Promise<ClusterForkService>;
+
+    constructor(private api: PluginAPI) {
+    }
+
+    getClusterWorkerId(): string {
+        return process.env.SCRYPTED_CLUSTER_WORKER_ID;
+    }
+
+    getClusterMode(): 'server' | 'client' | undefined {
+        return getScryptedClusterMode()[0];
+    }
+
+    async getClusterWorkers(): Promise<Record<string, ClusterWorker>> {
+        const clusterFork = await this.getClusterService();
+        return clusterFork.getClusterWorkers();
+    }
+
+    private getClusterService() {
+        this.clusterServicePromise ||= this.api.getComponent('cluster-fork');
+        return this.clusterServicePromise;
+    }
 }

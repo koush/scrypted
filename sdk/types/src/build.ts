@@ -151,7 +151,10 @@ function selfSignature(method: any) {
 
 const enums = schema.children?.filter((child) => child.kind === ReflectionKind.Enum) ?? [];
 const interfaces = schema.children?.filter((child: any) => Object.values(ScryptedInterface).includes(child.name)) ?? [];
-let python = '';
+let python = `
+TYPES_VERSION = "${typesVersion}"
+
+`;
 
 for (const iface of ['Logger', 'DeviceManager', 'SystemManager', 'MediaManager', 'EndpointManager', 'ClusterManager']) {
     const child = schema.children?.find((child: any) => child.name === iface);

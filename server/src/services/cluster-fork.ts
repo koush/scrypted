@@ -1,8 +1,8 @@
 import { matchesClusterLabels } from "../cluster/cluster-labels";
 import type { ScryptedRuntime } from "../runtime";
-import { ClusterForkOptions, ClusterForkParam, ClusterWorker, PeerLiveness } from "../scrypted-cluster-main";
+import type { ClusterForkOptions, ClusterForkParam, PeerLiveness, RunningClusterWorker } from "../scrypted-cluster-main";
 
-export class ClusterFork {
+export class ClusterForkService {
     constructor(public runtime: ScryptedRuntime) { }
 
     async fork(peerLiveness: PeerLiveness, options: ClusterForkOptions, packageJson: any, zipHash: string, getZip: () => Promise<Buffer>) {
@@ -17,7 +17,7 @@ export class ClusterFork {
             });
         matchingWorkers.sort((a, b) => b.worker.labels.length - a.worker.labels.length);
 
-        let worker: ClusterWorker;
+        let worker: RunningClusterWorker;
 
         // try to keep fork id affinity to single worker if present. this presents the opportunity for
         // IPC.
@@ -35,6 +35,7 @@ export class ClusterFork {
 
         const fork: ClusterForkParam = await worker.peer.getParam('fork');
         const forkResult = await fork(peerLiveness, options.runtime, packageJson, zipHash, getZip);
+        options.id ||= this.runtime.findPluginDevice(packageJson.name)?._id;
         worker.forks.add(options);
         forkResult.waitKilled().catch(() => { }).finally(() => {
             worker.forks.delete(options);

@@ -1,16 +1,17 @@
+import type { ClusterFork } from "@scrypted/types";
 import { EventEmitter, PassThrough } from "stream";
 import { Deferred } from "../../deferred";
 import { RpcPeer } from "../../rpc";
-import { ClusterForkOptions, PeerLiveness } from "../../scrypted-cluster-main";
-import type { ClusterFork } from "../../services/cluster-fork";
+import { PeerLiveness } from "../../scrypted-cluster-main";
+import type { ClusterForkService } from "../../services/cluster-fork";
 import { writeWorkerGenerator } from "../plugin-console";
 import type { RuntimeWorker } from "./runtime-worker";
 
 export function createClusterForkWorker(
-    forkComponentPromise: Promise<ClusterFork>,
+    forkComponentPromise: Promise<ClusterForkService>,
     zipHash: string,
     getZip: () => Promise<Buffer>,
-    options: ClusterForkOptions,
+    options: Partial<ClusterFork>,
     packageJson: any,
     connectRPCObject: (o: any) => Promise<any>) {
     const waitKilled = new Deferred<void>();
@@ -39,6 +40,7 @@ export function createClusterForkWorker(
     const peerLiveness = new PeerLiveness(waitKilled.promise);
     const clusterForkResultPromise = forkComponentPromise.then(forkComponent => forkComponent.fork(peerLiveness, {
         runtime: options.runtime || 'node',
+        id: options.id,
         ...options,
     }, packageJson, zipHash, getZip));
     clusterForkResultPromise.catch(() => {});

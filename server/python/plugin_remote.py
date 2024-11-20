@@ -202,6 +202,21 @@ class EventRegistry(object):
 
         return True
 
+class ClusterManager(scrypted_python.scrypted_sdk.types.ClusterManager):
+    def __init__(self, api: Any):
+        self.api = api
+        self.clusterService = None
+
+    def getClusterMode(self) -> Any | Any:
+        return os.getenv("SCRYPTED_CLUSTER_MODE", None)
+
+    def getClusterWorkerId(self) -> str:
+        return os.getenv("SCRYPTED_CLUSTER_WORKER_ID", None)
+
+    async def getClusterWorkers(self) -> Mapping[str, scrypted_python.scrypted_sdk.types.ClusterWorker]:
+        self.clusterService = self.clusterService or asyncio.ensure_future(self.api.getComponent("cluster-fork"))
+        cs = await self.clusterService
+        return await cs.getClusterWorkers()
 
 class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
     def __init__(
@@ -554,6 +569,7 @@ class PluginRemote:
         self.systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}
         self.nativeIds: Mapping[str, DeviceStorage] = {}
         self.mediaManager: MediaManager
+        self.clusterManager: ClusterManager
         self.consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
         self.peer = clusterSetup.peer
         self.clusterSetup = clusterSetup
@@ -768,11 +784,13 @@ class PluginRemote:
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
         self.mediaManager = MediaManager(await self.api.getMediaManager())
+        self.clusterManager = ClusterManager(self.api)
 
         try:
             sdk.systemManager = self.systemManager
             sdk.deviceManager = self.deviceManager
             sdk.mediaManager = self.mediaManager
+            sdk.clusterManager = self.clusterManager
             sdk.remote = self
             sdk.api = self.api
             sdk.zip = zip

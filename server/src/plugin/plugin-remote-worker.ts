@@ -8,11 +8,12 @@ import { needsClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
+import type { DeviceManagerImpl } from './device';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
 import { pipeWorkerConsole, prepareConsoles } from './plugin-console';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
-import { attachPluginRemote, DeviceManagerImpl, setupPluginRemote } from './plugin-remote';
+import { attachPluginRemote, setupPluginRemote } from './plugin-remote';
 import { createREPLServer } from './plugin-repl';
 import { getPluginVolume } from './plugin-volume';
 import { ChildProcessWorker } from './runtime/child-process-worker';
@@ -21,6 +22,9 @@ import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
 import { RuntimeWorker } from './runtime/runtime-worker';
+import type { ClusterForkService } from '../services/cluster-fork';
+import type { PluginComponent } from '../services/plugin';
+import { ClusterManagerImpl } from '../scrypted-cluster-main';
 
 const serverVersion = require('../../package.json').version;
 
@@ -44,10 +48,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
     let deviceManager: DeviceManagerImpl;
     let api: PluginAPI;
 
-    let pluginsPromise: Promise<any>;
+    let pluginsPromise: Promise<PluginComponent>;
     function getPlugins() {
-        if (!pluginsPromise)
-            pluginsPromise = api.getComponent('plugins');
+        pluginsPromise ||= api.getComponent('plugins');
         return pluginsPromise;
     }
 
@@ -113,6 +116,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             await initializeCluster(zipOptions);
 
             scrypted.connectRPCObject = connectRPCObject;
+            scrypted.clusterManager = new ClusterManagerImpl(api);
 
             if (worker_threads.isMainThread) {
                 const fsDir = path.join(unzippedPath, 'fs')
@@ -270,15 +274,15 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                         }
                     }
 
-                    // thread workers inherit main console. pipe anything else.
-                    if (!(runtimeWorker instanceof NodeThreadWorker)) {
-                        const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
-                        pipeWorkerConsole(nativeWorker, console);
-                    }
-
                     const localPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
                     runtimeWorker.setupRpcPeer(localPeer);
                     forkPeer = Promise.resolve(localPeer);
+                }
+
+                // thread workers inherit main console. pipe anything else.
+                if (!(runtimeWorker instanceof NodeThreadWorker)) {
+                    const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
+                    pipeWorkerConsole(runtimeWorker, console);
                 }
 
                 const result = (async () => {

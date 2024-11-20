@@ -62,6 +62,13 @@ def sdk_init2(scryptedStatic: ScryptedStatic):
     systemManager = sdk.systemManager
     deviceManager = sdk.deviceManager
     mediaManager = sdk.mediaManager
+    async def initDescriptors():
+        global api
+        try:
+            await api.setScryptedInterfaceDescriptors(TYPES_VERSION, ScryptedInterfaceDescriptors)
+        except:
+            pass
+    asyncio.ensure_future(initDescriptors())
     if hasattr(sdk, 'clusterManager'):
         clusterManager = sdk.clusterManager
     zip = sdk.zip
