@@ -9,6 +9,7 @@ import asyncio
 class PluginFork:
     result: asyncio.Task
     worker: Process
+    exit: asyncio.Task
     def terminate(self):
         pass
 
