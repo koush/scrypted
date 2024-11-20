@@ -1813,6 +1813,18 @@ class EndpointManager:
         pass
 
 
+class ClusterManager:
+
+    def getClusterMode(self) -> Any | Any:
+        pass
+
+    def getClusterWorkerId(self) -> str:
+        pass
+
+    async def getClusterWorkers(self) -> str:
+        pass
+
+
 class ScryptedInterfaceProperty(str, Enum):
     id = "id"
     info = "info"

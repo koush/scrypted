@@ -151,7 +151,7 @@ const enums = schema.children?.filter((child) => child.kind === ReflectionKind.E
 const interfaces = schema.children?.filter((child: any) => Object.values(ScryptedInterface).includes(child.name)) ?? [];
 let python = '';
 
-for (const iface of ['Logger', 'DeviceManager', 'SystemManager', 'MediaManager', 'EndpointManager']) {
+for (const iface of ['Logger', 'DeviceManager', 'SystemManager', 'MediaManager', 'EndpointManager', 'ClusterManager']) {
     const child = schema.children?.find((child: any) => child.name === iface);
 
     if (child)
