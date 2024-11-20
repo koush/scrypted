@@ -25,7 +25,7 @@ import { WebSocketConnection } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { createClusterForkWorker } from './runtime/cluster-fork-worker';
 import { prepareZipSync } from './runtime/node-worker-common';
-import { RuntimeWorker } from './runtime/runtime-worker';
+import type { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
 
 const serverVersion = require('../../package.json').version;
 
@@ -341,7 +341,15 @@ export class PluginHost {
         if (!workerHost)
             throw new UnsupportedRuntimeError(this.packageJson.scrypted.runtime);
 
-        let peer: Promise<RpcPeer>
+        let peer: Promise<RpcPeer>;
+        const runtimeWorkerOptions: RuntimeWorkerOptions = {
+            packageJson: this.packageJson,
+            env,
+            pluginDebug,
+            unzippedPath: this.unzippedPath,
+            zipFile: this.zipFile,
+            zipHash: this.zipHash,
+        };
         if (!needsClusterForkWorker(this.packageJson.scrypted)) {
             this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
                 if (connected) {
@@ -354,14 +362,7 @@ export class PluginHost {
 
             peer = Promise.resolve(this.peer);
 
-            this.worker = workerHost(this.scrypted.mainFilename, this.pluginId, {
-                packageJson: this.packageJson,
-                env,
-                pluginDebug,
-                unzippedPath: this.unzippedPath,
-                zipFile: this.zipFile,
-                zipHash: this.zipHash,
-            }, this.scrypted);
+            this.worker = workerHost(this.scrypted.mainFilename, runtimeWorkerOptions, this.scrypted);
 
             this.worker.setupRpcPeer(this.peer);
 
@@ -379,25 +380,28 @@ export class PluginHost {
             });
 
             const clusterSetup = setupCluster(this.peer);
-            const { runtimeWorker, forkPeer, clusterWorkerId } = createClusterForkWorker((async () => {
-                await clusterSetup.initializeCluster({
-                    clusterId: this.scrypted.clusterId,
-                    clusterSecret: this.scrypted.clusterSecret,
-                });
-                return this.scrypted.clusterFork;
-            })(),
-                this.zipHash, async () => fs.promises.readFile(this.zipFile),
-                this.packageJson.scrypted, this.packageJson, clusterSetup.connectRPCObject);
+            const { runtimeWorker, forkPeer, clusterWorkerId } = createClusterForkWorker(
+                runtimeWorkerOptions,
+                this.packageJson.scrypted,
+                (async () => {
+                    await clusterSetup.initializeCluster({
+                        clusterId: this.scrypted.clusterId,
+                        clusterSecret: this.scrypted.clusterSecret,
+                    });
+                    return this.scrypted.clusterFork;
+                })(),
+                async () => fs.promises.readFile(this.zipFile),
+                clusterSetup.connectRPCObject);
 
             forkPeer.then(peer => {
                 const originalPeer = this.peer;
                 originalPeer.killedSafe.finally(() => peer.kill());
                 this.peer = peer;
                 peer.killedSafe.finally(() => originalPeer.kill());
-            }).catch(() => {});
+            }).catch(() => { });
             clusterWorkerId.then(clusterWorkerId => {
                 console.log('cluster worker id', clusterWorkerId);
-            }).catch(() => {});
+            }).catch(() => { });
 
             this.worker = runtimeWorker;
             peer = forkPeer;

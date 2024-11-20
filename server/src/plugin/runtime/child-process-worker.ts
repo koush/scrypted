@@ -4,14 +4,16 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 
 export abstract class ChildProcessWorker extends EventEmitter implements RuntimeWorker {
+    public pluginId: string;
     protected worker: child_process.ChildProcess;
 
     get childProcess() {
         return this.worker;
     }
 
-    constructor(public pluginId: string, options: RuntimeWorkerOptions) {
+    constructor(options: RuntimeWorkerOptions) {
         super();
+        this.pluginId = options.packageJson.name;
     }
 
     setupWorker() {

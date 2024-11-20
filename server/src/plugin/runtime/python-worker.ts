@@ -41,8 +41,8 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         return this._stderr;
     }
 
-    constructor(pluginId: string, options: RuntimeWorkerOptions) {
-        super(pluginId, options);
+    constructor(options: RuntimeWorkerOptions) {
+        super(options);
 
         const { env, pluginDebug } = options;
         const args: string[] = [
@@ -148,7 +148,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         };
 
         const pyVersion = require('py/package.json').version;
-        const pyPath = path.join(getPluginVolume(pluginId), 'py');
+        const pyPath = path.join(getPluginVolume(this.pluginId), 'py');
         const portableInstallPath = path.join(pyPath, pyVersion);
 
         const py = new PortablePython(pluginPythonVersion, portableInstallPath, portablePythonOptions);

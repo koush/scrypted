@@ -21,7 +21,7 @@ import { createClusterForkWorker } from './runtime/cluster-fork-worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
-import { RuntimeWorker } from './runtime/runtime-worker';
+import { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
 import type { ClusterForkService } from '../services/cluster-fork';
 import type { PluginComponent } from '../services/plugin';
 import { ClusterManagerImpl } from '../scrypted-cluster-main';
@@ -216,10 +216,23 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
                 let clusterWorkerId: Promise<string>;
 
+                const runtimeWorkerOptions: RuntimeWorkerOptions = {
+                    packageJson,
+                    env: undefined,
+                    pluginDebug: undefined,
+                    zipFile,
+                    unzippedPath,
+                    zipHash,
+                };
+
                 // if running in a cluster, fork to a matching cluster worker only if necessary.
                 if (needsClusterForkWorker(options)) {
                     ({ runtimeWorker, forkPeer, clusterWorkerId } = createClusterForkWorker(
-                        api.getComponent('cluster-fork'), zipHash, () => zipAPI.getZip(), options, packageJson, scrypted.connectRPCObject)
+                        runtimeWorkerOptions,
+                        options,
+                        api.getComponent('cluster-fork'),
+                        () => zipAPI.getZip(),
+                        scrypted.connectRPCObject)
                     );
                 }
                 else {
@@ -228,14 +241,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                         const runtime = builtins.get(options.runtime);
                         if (!runtime)
                             throw new Error('unknown runtime ' + options.runtime);
-                        runtimeWorker = runtime(mainFilename, pluginId, {
-                            packageJson,
-                            env: undefined,
-                            pluginDebug: undefined,
-                            zipFile,
-                            unzippedPath,
-                            zipHash,
-                        }, undefined);
+                        runtimeWorker = runtime(mainFilename, runtimeWorkerOptions, undefined);
 
                         if (runtimeWorker instanceof ChildProcessWorker) {
                             nativeWorker = runtimeWorker.childProcess;

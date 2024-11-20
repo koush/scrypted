@@ -15,7 +15,7 @@ import type { PluginAPI } from './plugin/plugin-api';
 import { getPluginVolume, getScryptedVolume } from './plugin/plugin-volume';
 import { prepareZip } from './plugin/runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
-import type { RuntimeWorker } from './plugin/runtime/runtime-worker';
+import type { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runtime-worker';
 import { RpcPeer } from './rpc';
 import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
@@ -103,7 +103,7 @@ export class ClusterForkResult extends PeerLiveness {
     }
 }
 
-export type ClusterForkParam = (peerLiveness: PeerLiveness, runtime: string, packageJson: any, zipHash: string, getZip: () => Promise<Buffer>) => Promise<ClusterForkResult>;
+export type ClusterForkParam = (runtime: string, options: RuntimeWorkerOptions, peerLiveness: PeerLiveness, getZip: () => Promise<Buffer>) => Promise<ClusterForkResult>;
 
 export function startClusterClient(mainFilename: string) {
     const originalClusterAddress = process.env.SCRYPTED_CLUSTER_ADDRESS;
@@ -179,12 +179,7 @@ export function startClusterClient(mainFilename: string) {
                 const clusterPeerSetup = setupCluster(peer);
                 await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret });
 
-                const clusterForkParam: ClusterForkParam = async (
-                    peerLiveness: PeerLiveness,
-                    runtime: string,
-                    packageJson: any,
-                    zipHash: string,
-                    getZip: () => Promise<Buffer>) => {
+                const clusterForkParam: ClusterForkParam = async (runtime, runtimeWorkerOptions, peerLiveness, getZip) => {
                     let runtimeWorker: RuntimeWorker;
 
                     const builtins = getBuiltinRuntimeHosts();
@@ -192,23 +187,22 @@ export function startClusterClient(mainFilename: string) {
                     if (!rt)
                         throw new Error('unknown runtime ' + runtime);
 
-                    const pluginId: string = packageJson.name;
-                    const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), zipHash, getZip);
+                    const pluginId: string = runtimeWorkerOptions.packageJson.name;
+                    const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), runtimeWorkerOptions.zipHash, getZip);
 
                     const volume = getScryptedVolume();
                     const pluginVolume = getPluginVolume(pluginId);
 
-                    runtimeWorker = rt(mainFilename, pluginId, {
-                        packageJson,
-                        env: {
-                            SCRYPTED_VOLUME: volume,
-                            SCRYPTED_PLUGIN_VOLUME: pluginVolume,
-                        },
-                        pluginDebug: undefined,
-                        zipFile,
-                        unzippedPath,
-                        zipHash,
-                    }, undefined);
+                    runtimeWorkerOptions.zipFile = zipFile;
+                    runtimeWorkerOptions.unzippedPath = unzippedPath;
+
+                    runtimeWorkerOptions.env = {
+                        ...runtimeWorkerOptions.env,
+                        SCRYPTED_VOLUME: volume,
+                        SCRYPTED_PLUGIN_VOLUME: pluginVolume,
+                    };
+
+                    runtimeWorker = rt(mainFilename, runtimeWorkerOptions, undefined);
                     runtimeWorker.stdout.on('data', data => console.log(data.toString()));
                     runtimeWorker.stderr.on('data', data => console.error(data.toString()));
 

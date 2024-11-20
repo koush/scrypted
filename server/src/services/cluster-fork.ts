@@ -1,11 +1,13 @@
+import { ClusterWorker } from "@scrypted/types";
 import { matchesClusterLabels } from "../cluster/cluster-labels";
 import type { ScryptedRuntime } from "../runtime";
 import type { ClusterForkOptions, ClusterForkParam, PeerLiveness, RunningClusterWorker } from "../scrypted-cluster-main";
+import type { RuntimeWorkerOptions } from "../plugin/runtime/runtime-worker";
 
 export class ClusterForkService {
     constructor(public runtime: ScryptedRuntime) { }
 
-    async fork(peerLiveness: PeerLiveness, options: ClusterForkOptions, packageJson: any, zipHash: string, getZip: () => Promise<Buffer>) {
+    async fork(runtimeWorkerOptions: RuntimeWorkerOptions, options: ClusterForkOptions, peerLiveness: PeerLiveness, getZip: () => Promise<Buffer>) {
         const matchingWorkers = [...this.runtime.clusterWorkers.entries()].map(([id, worker]) => ({
             worker,
             matches: matchesClusterLabels(options, worker.labels),
@@ -34,8 +36,8 @@ export class ClusterForkService {
         }
 
         const fork: ClusterForkParam = await worker.peer.getParam('fork');
-        const forkResult = await fork(peerLiveness, options.runtime, packageJson, zipHash, getZip);
-        options.id ||= this.runtime.findPluginDevice(packageJson.name)?._id;
+        const forkResult = await fork(options.runtime, runtimeWorkerOptions, peerLiveness, getZip);
+        options.id ||= this.runtime.findPluginDevice(runtimeWorkerOptions.packageJson.name)?._id;
         worker.forks.add(options);
         forkResult.waitKilled().catch(() => { }).finally(() => {
             worker.forks.delete(options);
@@ -43,7 +45,7 @@ export class ClusterForkService {
 
         forkResult.clusterWorkerId = worker.id;
         return forkResult;
-    }
+    };
 
     async getClusterWorkers() {
         const ret: any = {};

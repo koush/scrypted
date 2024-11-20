@@ -5,15 +5,20 @@ import { RpcPeer } from "../../rpc";
 import { PeerLiveness } from "../../scrypted-cluster-main";
 import type { ClusterForkService } from "../../services/cluster-fork";
 import { writeWorkerGenerator } from "../plugin-console";
-import type { RuntimeWorker } from "./runtime-worker";
+import type { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 
 export function createClusterForkWorker(
-    forkComponentPromise: Promise<ClusterForkService>,
-    zipHash: string,
-    getZip: () => Promise<Buffer>,
+    runtimeWorkerOptions: RuntimeWorkerOptions,
     options: Partial<ClusterFork>,
-    packageJson: any,
+    forkComponentPromise: Promise<ClusterForkService>,
+    getZip: () => Promise<Buffer>,
     connectRPCObject: (o: any) => Promise<any>) {
+
+    // these are specific to the cluster worker host
+    // and will be set there.
+    delete runtimeWorkerOptions.zipFile;
+    delete runtimeWorkerOptions.unzippedPath;
+
     const waitKilled = new Deferred<void>();
     waitKilled.promise.finally(() => events.emit('exit'));
     const events = new EventEmitter();
@@ -38,21 +43,22 @@ export function createClusterForkWorker(
     });
 
     const peerLiveness = new PeerLiveness(waitKilled.promise);
-    const clusterForkResultPromise = forkComponentPromise.then(forkComponent => forkComponent.fork(peerLiveness, {
+    const clusterForkResultPromise = forkComponentPromise.then(forkComponent => forkComponent.fork(runtimeWorkerOptions, {
         runtime: options.runtime || 'node',
         id: options.id,
         ...options,
-    }, packageJson, zipHash, getZip));
-    clusterForkResultPromise.catch(() => {});
+    }, peerLiveness,
+        getZip));
+    clusterForkResultPromise.catch(() => { });
 
     const clusterWorkerId = clusterForkResultPromise.then(clusterForkResult => clusterForkResult.clusterWorkerId);
-    clusterWorkerId.catch(() => {});
+    clusterWorkerId.catch(() => { });
 
     const forkPeer = (async () => {
         const clusterForkResult = await clusterForkResultPromise;
         waitKilled.promise.finally(() => {
             runtimeWorker.pid = undefined;
-            clusterForkResult.kill().catch(() => {});
+            clusterForkResult.kill().catch(() => { });
         });
         clusterForkResult.waitKilled().catch(() => { })
             .finally(() => {

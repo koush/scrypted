@@ -301,13 +301,10 @@ class AudioStreamOptions(TypedDict):
 
 class ClusterFork(TypedDict):
 
-    clusterWorkerId: str  # The id of the cluster worker id that will execute this fork.
-    filename: str  # The filename to execute in the fork. Not supported in all runtimes.
-    id: str  # The id of the device that is associated with this fork.
-    labels: Any  # The labels used to select the cluster worker that will execute this fork.
-    name: str  # The name of this fork. This will be used to set the thread name
-    nativeId: str  # The native id of the mixin that is associated with this fork.
-    runtime: str  # The runtime to use for this fork. If not specified, the current runtime will be used.
+    clusterWorkerId: str
+    id: str
+    labels: Any
+    runtime: str
 
 class HttpResponseOptions(TypedDict):
 
@@ -950,7 +947,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.79"
+TYPES_VERSION = "0.3.80"
 
 
 class AirPurifier:

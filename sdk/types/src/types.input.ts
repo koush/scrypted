@@ -2670,7 +2670,7 @@ export interface ForkOptions {
   };
 }
 
-export interface ClusterFork extends ForkOptions {
+export interface ClusterFork {
   runtime?: ForkOptions['runtime'];
   labels?: ForkOptions['labels'];
   id?: ForkOptions['id'];

@@ -654,7 +654,7 @@ class PluginRemote:
         forkMain = zipOptions and zipOptions.get("fork")
         debug = zipOptions.get("debug", None)
         plugin_volume = pv.ensure_plugin_volume(self.pluginId)
-        zipHash = zipOptions.get("zipHash")
+        zipHash: str = zipOptions.get("zipHash")
         plugin_zip_paths = pv.prep(plugin_volume, zipHash)
 
         if debug:
@@ -824,11 +824,24 @@ class PluginRemote:
                 if cluster_labels.needs_cluster_fork_worker(options):
                     peerLiveness = PeerLiveness(self.loop)
                     async def getClusterFork():
+                        runtimeWorkerOptions = {
+                            "packageJson": packageJson,
+                            "env": None,
+                            "pluginDebug": None,
+                            "zipFile": None,
+                            "unzippedPath": None,
+                            "zipHash": zipHash,
+                        }
+
                         forkComponent = await self.api.getComponent("cluster-fork")
                         sanitizedOptions = options.copy()
                         sanitizedOptions["runtime"] = sanitizedOptions.get("runtime", "python")
                         sanitizedOptions["zipHash"] = zipHash
-                        clusterForkResult = await forkComponent.fork(peerLiveness, sanitizedOptions, packageJson, zipHash, lambda: zipAPI.getZip())
+                        clusterForkResult = await forkComponent.fork(
+                            runtimeWorkerOptions,
+                            sanitizedOptions,
+                            peerLiveness, lambda: zipAPI.getZip()
+                        )
                         
                         async def waitPeerLiveness():
                             try:

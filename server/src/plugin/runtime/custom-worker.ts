@@ -11,8 +11,8 @@ export class CustomRuntimeWorker extends ChildProcessWorker {
     serializer: ReturnType<typeof createRpcDuplexSerializer>;
     fork: boolean;
 
-    constructor(pluginId: string, options: RuntimeWorkerOptions, runtime: ScryptedRuntime) {
-        super(pluginId, options);
+    constructor(options: RuntimeWorkerOptions, runtime: ScryptedRuntime) {
+        super(options);
 
         const pluginDevice = runtime.findPluginDevice(this.pluginId);
         const scryptedRuntimeArguments: ScryptedRuntimeArguments = pluginDevice.state.scryptedRuntimeArguments?.value;
@@ -27,7 +27,7 @@ export class CustomRuntimeWorker extends ChildProcessWorker {
             // stdin, stdout, stderr, peer in, peer out
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
             env: Object.assign({}, process.env, env, {
-                SCRYYPTED_PLUGIN_ID: pluginId,
+                SCRYYPTED_PLUGIN_ID: this.pluginId,
                 SCRYPTED_DEBUG_PORT: pluginDebug?.inspectPort?.toString(),
                 SCRYPTED_UNZIPPED_PATH: options.unzippedPath,
                 SCRYPTED_ZIP_FILE: options.zipFile,
