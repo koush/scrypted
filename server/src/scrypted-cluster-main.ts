@@ -106,6 +106,7 @@ export class ClusterForkResult extends PeerLiveness {
 export type ClusterForkParam = (runtime: string, options: RuntimeWorkerOptions, peerLiveness: PeerLiveness, getZip: () => Promise<Buffer>) => Promise<ClusterForkResult>;
 
 export function startClusterClient(mainFilename: string) {
+    console.log('Cluster client starting.');
     const originalClusterAddress = process.env.SCRYPTED_CLUSTER_ADDRESS;
     const labels = getClusterLabels();
 

@@ -100,6 +100,7 @@ app.use(bodyParser.raw({ type: 'application/*', limit: 100000000 }) as any)
 async function start(mainFilename: string, options?: {
     onRuntimeCreated?: (runtime: ScryptedRuntime) => Promise<void>,
 }) {
+    console.log('Cluster server starting.');
     const volumeDir = getScryptedVolume();
     await fs.promises.mkdir(volumeDir, {
         recursive: true
