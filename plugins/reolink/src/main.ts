@@ -818,8 +818,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         ];
     }
 
-    getOtherSettings(): Promise<Setting[]> {
-        return this.storageSettings.getSettings();
+    async getOtherSettings(): Promise<Setting[]> {
+        const ret = await super.getOtherSettings();
+        return [
+            ...await this.storageSettings.getSettings(),
+            ...ret,
+        ];
     }
 
     getRtmpAddress() {
