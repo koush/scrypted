@@ -5,7 +5,7 @@ import os
 import math
 import traceback
 import urllib.request
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Mapping
 
 import scrypted_sdk
 from PIL import Image
@@ -33,8 +33,11 @@ class Prediction:
 class PredictPlugin(DetectPlugin):
     labels: dict
 
-    def __init__(self, nativeId: str | None = None):
+    def __init__(self, nativeId: str | None = None, forked: bool = False, plugin: PredictPlugin = None):
         super().__init__(nativeId=nativeId)
+
+        self.plugin = plugin
+        # self.clusterIndex = 0
 
         # periodic restart of main plugin because there seems to be leaks in tflite or coral API.
         if not nativeId:
@@ -44,6 +47,13 @@ class PredictPlugin(DetectPlugin):
         self.batch: List[Tuple[Any, asyncio.Future]] = []
         self.batching = 0
         self.batch_flush = None
+
+        self.forked = forked
+        if not self.forked:
+            self.forks: Mapping[str, scrypted_sdk.PluginFork] = {}
+
+        if not self.plugin and not self.forked:
+            asyncio.ensure_future(self.startCluster(), loop=self.loop)
 
     def downloadFile(self, url: str, filename: str):
         try:
@@ -192,6 +202,32 @@ class PredictPlugin(DetectPlugin):
             self.requestRestart()
             raise
 
+
+    # async def detectObjects(
+    #     self, mediaObject: scrypted_sdk.MediaObject, session: ObjectDetectionSession = None
+    # ) -> ObjectsDetected:
+    #     # main plugin can dispatch
+    #     plugin: PredictPlugin = None
+    #     if scrypted_sdk.clusterManager and scrypted_sdk.clusterManager.getClusterMode() and not self.forked:
+    #         if session:
+    #             del session['batch']
+    #         if len(self.forks):
+    #             totalWorkers = len(self.forks)
+    #             if not self.forked:
+    #                 totalWorkers += 1
+
+    #             self.clusterIndex += 1
+    #             self.clusterIndex %= totalWorkers
+    #             if len(self.forks) != self.clusterIndex:
+    #                 fork = list(self.forks.values())[self.clusterIndex]
+    #                 result = await fork.result
+    #                 plugin = await result.getPlugin()
+
+    #     if not plugin:
+    #         return await super().detectObjects(mediaObject, session)
+        
+    #     return await plugin.detectObjects(mediaObject, session)
+
     async def run_detection_image(self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession) -> ObjectsDetected:
         settings = detection_session and detection_session.get('settings')
         batch = (detection_session and detection_session.get('batch')) or 0
@@ -246,3 +282,62 @@ class PredictPlugin(DetectPlugin):
             return ret
         finally:
             data.close()
+
+    async def forkInterfaceInternal(self, options: dict):
+        if self.plugin:
+            return await self.plugin.forkInterfaceInternal(options)
+        clusterWorkerId = options and options['clusterWorkerId']
+        if not clusterWorkerId:
+            raise Exception("clusterWorkerId required")
+
+        if self.forked:
+            raise Exception("cannot fork a fork")
+        
+        forked = self.forks.get(clusterWorkerId, None)
+        if not forked:
+            forked = scrypted_sdk.fork({
+                "labels": {
+                    "require": ["compute"]
+                },
+                **(options or {})
+            })
+            def clusterWorkerExit(result):
+                print("cluster worker exit", clusterWorkerId)
+                self.forks.pop(clusterWorkerId)
+            forked.exit.add_done_callback(clusterWorkerExit)
+            self.forks[clusterWorkerId] = forked
+
+        result = await forked.result
+        return result
+
+    async def forkInterface(self, forkInterface, options: dict=None):
+        if forkInterface != scrypted_sdk.ScryptedInterface.ObjectDetection.value:
+            raise Exception("unsupported fork interface")
+            
+        result = await self.forkInterfaceInternal(options)
+        ret = await result.getPlugin()
+        return ret
+
+    async def startCluster(self):
+        try:
+            clusterManager = scrypted_sdk.clusterManager
+            if not clusterManager:
+                return
+            workers = await clusterManager.getClusterWorkers()
+            thisClusterWorkerId = clusterManager.getClusterWorkerId()
+        except:
+            traceback.print_exc()
+            return
+
+        for cwid in workers:
+            if cwid == thisClusterWorkerId:
+                continue
+            async def startClusterWorker(clusterWorkerId=cwid):
+                print("starting cluster worker", clusterWorkerId)
+                try:
+                    await self.forkInterfaceInternal({
+                        "clusterWorkerId": clusterWorkerId
+                    })
+                except:
+                    traceback.print_exc()
+            asyncio.ensure_future(startClusterWorker(), loop=self.loop)

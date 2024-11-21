@@ -23,8 +23,8 @@ def cosine_similarity(vector_a, vector_b):
     return similarity
 
 class FaceRecognizeDetection(PredictPlugin):
-    def __init__(self, nativeId: str | None = None):
-        super().__init__(nativeId=nativeId)
+    def __init__(self, nativeId: str, plugin: PredictPlugin):
+        super().__init__(nativeId=nativeId, plugin=plugin)
 
         self.inputheight = 320
         self.inputwidth = 320

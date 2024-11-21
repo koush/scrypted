@@ -13,8 +13,8 @@ from predict.text_recognize import TextRecognition
 
 
 class CoreMLTextRecognition(TextRecognition):
-    def __init__(self, nativeId: str | None = None):
-        super().__init__(nativeId=nativeId)
+    def __init__(self, nativeId: str, plugin):
+        super().__init__(nativeId, plugin)
 
         self.detectExecutor = concurrent.futures.ThreadPoolExecutor(1, "detect-text")
         self.recogExecutor = concurrent.futures.ThreadPoolExecutor(1, "recog-text")
