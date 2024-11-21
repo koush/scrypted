@@ -9,12 +9,17 @@ from typing import Any, List, Tuple, Mapping
 
 import scrypted_sdk
 from PIL import Image
-from scrypted_sdk.types import (ObjectDetectionResult, ObjectDetectionSession,
-                                ObjectsDetected, Setting)
+from scrypted_sdk.types import (
+    ObjectDetectionResult,
+    ObjectDetectionSession,
+    ObjectsDetected,
+    Setting,
+)
 
 import common.colors
 from detect import DetectPlugin
 from predict.rectangle import Rectangle
+
 
 class Prediction:
     def __init__(self, id: int, score: float, bbox: Rectangle, embedding: str = None):
@@ -30,10 +35,16 @@ class Prediction:
         )
         self.embedding = embedding
 
+
 class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
     labels: dict
 
-    def __init__(self, plugin: PredictPlugin = None, nativeId: str | None = None, forked: bool = False):
+    def __init__(
+        self,
+        plugin: PredictPlugin = None,
+        nativeId: str | None = None,
+        forked: bool = False,
+    ):
         super().__init__(nativeId=nativeId)
 
         self.plugin = plugin
@@ -43,7 +54,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
         if not nativeId:
             loop = asyncio.get_event_loop()
             loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
-        
+
         self.batch: List[Tuple[Any, asyncio.Future]] = []
         self.batching = 0
         self.batch_flush = None
@@ -57,11 +68,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
 
     def downloadFile(self, url: str, filename: str):
         try:
-            filesPath = os.path.join(os.environ['SCRYPTED_PLUGIN_VOLUME'], 'files')
+            filesPath = os.path.join(os.environ["SCRYPTED_PLUGIN_VOLUME"], "files")
             fullpath = os.path.join(filesPath, filename)
             if os.path.isfile(fullpath):
                 return fullpath
-            tmp = fullpath + '.tmp'
+            tmp = fullpath + ".tmp"
             print("Creating directory for", tmp)
             os.makedirs(os.path.dirname(fullpath), exist_ok=True)
             print("Downloading", url)
@@ -82,6 +93,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
         except:
             print("Error downloading", url)
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -89,7 +101,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
         return list(self.labels.values())
 
     def getTriggerClasses(self) -> list[str]:
-        return ['motion']
+        return ["motion"]
 
     def requestRestart(self):
         asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
@@ -102,42 +114,47 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
         return []
 
     def get_input_format(self) -> str:
-        return 'rgb'
+        return "rgb"
 
-    def create_detection_result(self, objs: List[Prediction], size, convert_to_src_size=None) -> ObjectsDetected:
+    def create_detection_result(
+        self, objs: List[Prediction], size, convert_to_src_size=None
+    ) -> ObjectsDetected:
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
-        detection_result['detections'] = detections
-        detection_result['inputDimensions'] = size
+        detection_result["detections"] = detections
+        detection_result["inputDimensions"] = size
 
         for obj in objs:
             className = self.labels.get(obj.id, obj.id)
             detection: ObjectDetectionResult = {}
-            detection['boundingBox'] = (
-                obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
+            detection["boundingBox"] = (
+                obj.bbox.xmin,
+                obj.bbox.ymin,
+                obj.bbox.xmax - obj.bbox.xmin,
+                obj.bbox.ymax - obj.bbox.ymin,
+            )
             # check bounding box for nan
-            if any(map(lambda x: not math.isfinite(x), detection['boundingBox'])):
+            if any(map(lambda x: not math.isfinite(x), detection["boundingBox"])):
                 print("unexpected nan detected", obj.bbox)
                 continue
-            detection['className'] = className
-            detection['score'] = obj.score
-            if hasattr(obj, 'embedding') and obj.embedding is not None:
-                detection['embedding'] = obj.embedding
+            detection["className"] = className
+            detection["score"] = obj.score
+            if hasattr(obj, "embedding") and obj.embedding is not None:
+                detection["embedding"] = obj.embedding
             detections.append(detection)
 
         if convert_to_src_size:
-            detections = detection_result['detections']
-            detection_result['detections'] = []
+            detections = detection_result["detections"]
+            detection_result["detections"] = []
             for detection in detections:
-                bb = detection['boundingBox']
+                bb = detection["boundingBox"]
                 x, y = convert_to_src_size((bb[0], bb[1]))
-                x2, y2 = convert_to_src_size(
-                    (bb[0] + bb[2], bb[1] + bb[3]))
-                detection['boundingBox'] = (x, y, x2 - x + 1, y2 - y + 1)
-                if any(map(lambda x: not math.isfinite(x), detection['boundingBox'])):
+                x2, y2 = convert_to_src_size((bb[0] + bb[2], bb[1] + bb[3]))
+                detection["boundingBox"] = (x, y, x2 - x + 1, y2 - y + 1)
+                if any(map(lambda x: not math.isfinite(x), detection["boundingBox"])):
                     print("unexpected nan detected", obj.bbox)
                     continue
-                detection_result['detections'].append(detection)
+                detection_result["detections"].append(detection)
 
         # print(detection_result)
         return detection_result
@@ -152,7 +169,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
     def get_input_size(self) -> Tuple[int, int]:
         pass
 
-    async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
+    async def detect_once(
+        self, input: Image.Image, settings: Any, src_size, cvss
+    ) -> ObjectsDetected:
         pass
 
     async def detect_batch(self, inputs: List[Any]) -> List[Any]:
@@ -178,30 +197,31 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
         await self.run_batch()
 
     async def queue_batch(self, input: Any) -> List[Any]:
-        future = asyncio.Future(loop = asyncio.get_event_loop())
+        future = asyncio.Future(loop=asyncio.get_event_loop())
         self.batch.append((input, future))
         if self.batching:
             self.batching = self.batching - 1
             if self.batching:
                 # if there is any sort of error or backlog, .
                 if not self.batch_flush:
-                    self.batch_flush = self.loop.call_later(.5, lambda: asyncio.ensure_future(self.flush_batch()))
+                    self.batch_flush = self.loop.call_later(
+                        0.5, lambda: asyncio.ensure_future(self.flush_batch())
+                    )
                 return await future
         await self.run_batch()
         return await future
 
-    async def safe_detect_once(self, input: Image.Image, settings: Any, src_size, cvss) -> ObjectsDetected:
+    async def safe_detect_once(
+        self, input: Image.Image, settings: Any, src_size, cvss
+    ) -> ObjectsDetected:
         try:
             f = self.detect_once(input, settings, src_size, cvss)
             return await asyncio.wait_for(f, 60)
         except:
             traceback.print_exc()
-            print(
-                "encountered an error while detecting. requesting plugin restart."
-            )
+            print("encountered an error while detecting. requesting plugin restart.")
             self.requestRestart()
             raise
-
 
     # async def detectObjects(
     #     self, mediaObject: scrypted_sdk.MediaObject, session: ObjectDetectionSession = None
@@ -225,12 +245,14 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
 
     #     if not plugin:
     #         return await super().detectObjects(mediaObject, session)
-        
+
     #     return await plugin.detectObjects(mediaObject, session)
 
-    async def run_detection_image(self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession) -> ObjectsDetected:
-        settings = detection_session and detection_session.get('settings')
-        batch = (detection_session and detection_session.get('batch')) or 0
+    async def run_detection_image(
+        self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession
+    ) -> ObjectsDetected:
+        settings = detection_session and detection_session.get("settings")
+        batch = (detection_session and detection_session.get("batch")) or 0
         self.batching += batch
 
         iw, ih = image.width, image.height
@@ -240,39 +262,44 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
             resize = None
             w = image.width
             h = image.height
+
             def cvss(point):
                 return point
+
         else:
             resize = None
             xs = w / iw
             ys = h / ih
+
             def cvss(point):
                 return point[0] / xs, point[1] / ys
 
             if iw != w or ih != h:
                 resize = {
-                    'width': w,
-                    'height': h,
+                    "width": w,
+                    "height": h,
                 }
 
         format = image.format or self.get_input_format()
 
         # if the model requires yuvj444p, convert the image to yuvj444p directly
         # if possible, otherwise use whatever is available and convert in the detection plugin
-        if self.get_input_format() == 'yuvj444p':
+        if self.get_input_format() == "yuvj444p":
             if image.ffmpegFormats != True:
-                format = image.format or 'rgb'
+                format = image.format or "rgb"
 
-        b = await image.toBuffer({
-            'resize': resize,
-            'format': format,
-        })
+        b = await image.toBuffer(
+            {
+                "resize": resize,
+                "format": format,
+            }
+        )
 
-        if self.get_input_format() == 'rgb':
+        if self.get_input_format() == "rgb":
             data = await common.colors.ensureRGBData(b, (w, h), format)
-        elif self.get_input_format() == 'rgba':
+        elif self.get_input_format() == "rgba":
             data = await common.colors.ensureRGBAData(b, (w, h), format)
-        elif self.get_input_format() == 'yuvj444p':
+        elif self.get_input_format() == "yuvj444p":
             data = await common.colors.ensureYCbCrAData(b, (w, h), format)
         else:
             raise Exception("unsupported format")
@@ -286,11 +313,11 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
     async def forkInterfaceInternal(self, options: dict):
         if self.plugin:
             return await self.plugin.forkInterfaceInternal(options)
-        clusterWorkerId = options and options['clusterWorkerId']
+        clusterWorkerId = options and options["clusterWorkerId"]
 
         if self.forked:
             raise Exception("cannot fork a fork")
-        
+
         forked = self.forks.get(clusterWorkerId, None)
         if not forked:
             # a null cluster worker id is valid as that is the
@@ -302,25 +329,24 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
             # with the server.
             if not clusterWorkerId:
                 raise Exception("clusterWorkerId required")
-            forked = scrypted_sdk.fork({
-                "labels": {
-                    "require": ["compute"]
-                },
-                **(options or {})
-            })
+            forked = scrypted_sdk.fork(
+                {"labels": {"require": ["compute"]}, **(options or {})}
+            )
+
             def clusterWorkerExit(result):
                 print("cluster worker exit", clusterWorkerId)
                 self.forks.pop(clusterWorkerId)
+
             forked.exit.add_done_callback(clusterWorkerExit)
             self.forks[clusterWorkerId] = forked
 
         result = await forked.result
         return result
 
-    async def forkInterface(self, forkInterface, options: dict=None):
+    async def forkInterface(self, forkInterface, options: dict = None):
         if forkInterface != scrypted_sdk.ScryptedInterface.ObjectDetection.value:
             raise Exception("unsupported fork interface")
-            
+
         result = await self.forkInterfaceInternal(options)
         if not self.nativeId:
             ret = await result.getPlugin()
@@ -350,14 +376,16 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
         for cwid in workers:
             if cwid == thisClusterWorkerId:
                 continue
+
             async def startClusterWorker(clusterWorkerId=cwid):
                 print("starting cluster worker", clusterWorkerId)
                 try:
-                    await self.forkInterfaceInternal({
-                        "clusterWorkerId": clusterWorkerId
-                    })
+                    await self.forkInterfaceInternal(
+                        {"clusterWorkerId": clusterWorkerId}
+                    )
                 except:
                     traceback.print_exc()
+
             asyncio.ensure_future(startClusterWorker(), loop=self.loop)
 
 
@@ -370,9 +398,9 @@ class Fork:
 
     async def getPlugin(self):
         return self.plugin
-    
+
     async def getTextRecognition(self):
         return await self.plugin.getDevice("textrecognition")
-    
+
     async def getFaceRecognition(self):
         return await self.plugin.getDevice("facerecognition")
