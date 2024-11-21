@@ -235,7 +235,7 @@ class OpenVINOPlugin(
             "EXECUTION_DEVICES",
             self.compiled_model.get_property("EXECUTION_DEVICES"),
         )
-        print(f"model/mode/precision: {model}/{mode}/{precision}")
+        print(f"model/mode: {model}/{mode}")
 
         # mobilenet 1,300,300,3
         # yolov3/4 1,416,416,3

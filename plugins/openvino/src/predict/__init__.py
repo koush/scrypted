@@ -287,14 +287,21 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
         if self.plugin:
             return await self.plugin.forkInterfaceInternal(options)
         clusterWorkerId = options and options['clusterWorkerId']
-        if not clusterWorkerId:
-            raise Exception("clusterWorkerId required")
 
         if self.forked:
             raise Exception("cannot fork a fork")
         
         forked = self.forks.get(clusterWorkerId, None)
         if not forked:
+            # a null cluster worker id is valid as that is the
+            # id of the server. however, if the server label
+            # matches the plugin cluster requirements, the server
+            # would be the plugin host itself.
+            # so it would be impossible to be in this state
+            # as starting the cluster would populate self.forks
+            # with the server.
+            if not clusterWorkerId:
+                raise Exception("clusterWorkerId required")
             forked = scrypted_sdk.fork({
                 "labels": {
                     "require": ["compute"]
@@ -334,6 +341,12 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
             traceback.print_exc()
             return
 
+        # a null cluster worker id is valid as that is the
+        # id of the server.
+        fork = Fork(None)
+        fork.plugin = self
+        self.forks[thisClusterWorkerId] = fork
+
         for cwid in workers:
             if cwid == thisClusterWorkerId:
                 continue
@@ -350,7 +363,10 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
 
 class Fork:
     def __init__(self, PluginType: Any):
-        self.plugin = PluginType(forked=True)
+        if PluginType:
+            self.plugin = PluginType(forked=True)
+        else:
+            self.plugin = None
 
     async def getPlugin(self):
         return self.plugin
