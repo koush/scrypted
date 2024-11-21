@@ -47,5 +47,8 @@ def needs_cluster_fork_worker(options: ClusterForkOptions) -> bool:
     return (
         os.environ.get("SCRYPTED_CLUSTER_ADDRESS")
         and options
-        and (not matches_cluster_labels(options, get_cluster_labels()) or options.get("clusterWorkerId", None))
+        and (
+            not matches_cluster_labels(options, get_cluster_labels())
+            or options.get("clusterWorkerId", None)
+        )
     )

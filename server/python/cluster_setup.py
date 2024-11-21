@@ -12,6 +12,7 @@ import rpc
 import rpc_reader
 from typing import TypedDict
 
+
 class ClusterObject(TypedDict):
     id: str
     address: str
@@ -20,12 +21,16 @@ class ClusterObject(TypedDict):
     sourceKey: str
     sha256: str
 
+
 def isClusterAddress(address: str):
     return not address or address == os.environ.get("SCRYPTED_CLUSTER_ADDRESS", None)
 
+
 def getClusterPeerKey(address: str, port: int):
     return f"{address}:{port}"
-class ClusterSetup():
+
+
+class ClusterSetup:
     def __init__(self, loop: AbstractEventLoop, peer: rpc.RpcPeer):
         self.loop = loop
         self.peer = peer
@@ -50,9 +55,13 @@ class ClusterSetup():
         sha256 = self.computeClusterObjectHash(o)
         if sha256 != o["sha256"]:
             raise Exception("secret incorrect")
-        return await self.resolveObject(o.get('proxyId', None), o.get('sourceKey', None))
+        return await self.resolveObject(
+            o.get("proxyId", None), o.get("sourceKey", None)
+        )
 
-    def onProxySerialization(self, peer: rpc.RpcPeer, value: Any, sourceKey: str = None):
+    def onProxySerialization(
+        self, peer: rpc.RpcPeer, value: Any, sourceKey: str = None
+    ):
         properties: dict = rpc.RpcPeer.prepareProxyProperties(value) or {}
         clusterEntry = properties.get("__cluster", None)
         proxyId: str
@@ -126,7 +135,9 @@ class ClusterSetup():
             handleClusterClient, listenAddress, 0
         )
         self.clusterPort = clusterRpcServer.sockets[0].getsockname()[1]
-        self.peer.onProxySerialization = lambda value: self.onProxySerialization(self.peer, value, None)
+        self.peer.onProxySerialization = lambda value: self.onProxySerialization(
+            self.peer, value, None
+        )
         del self.peer.params["initializeCluster"]
 
     def computeClusterObjectHash(self, o: ClusterObject) -> str:
@@ -215,9 +226,7 @@ class ClusterSetup():
 
             peerConnectRPCObject = clusterPeer.tags.get("connectRPCObject")
             if not peerConnectRPCObject:
-                peerConnectRPCObject = await clusterPeer.getParam(
-                    "connectRPCObject"
-                )
+                peerConnectRPCObject = await clusterPeer.getParam("connectRPCObject")
                 clusterPeer.tags["connectRPCObject"] = peerConnectRPCObject
             newValue = await peerConnectRPCObject(clusterObject)
             if not newValue:

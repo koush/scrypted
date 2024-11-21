@@ -4,10 +4,12 @@ import sys
 from typing import Any
 import shutil
 
+
 def get_requirements_files(requirements: str):
-    want_requirements = requirements + '.txt'
-    installed_requirementstxt = requirements + '.installed.txt'
+    want_requirements = requirements + ".txt"
+    installed_requirementstxt = requirements + ".installed.txt"
     return want_requirements, installed_requirementstxt
+
 
 def need_requirements(requirements_basename: str, requirements_str: str):
     _, installed_requirementstxt = get_requirements_files(requirements_basename)
@@ -15,10 +17,11 @@ def need_requirements(requirements_basename: str, requirements_str: str):
         return True
     try:
         f = open(installed_requirementstxt, "rb")
-        installed_requirements = f.read().decode('utf8')
+        installed_requirements = f.read().decode("utf8")
         return requirements_str != installed_requirements
     except:
         return True
+
 
 def remove_pip_dirs(plugin_volume: str):
     try:
@@ -48,7 +51,9 @@ def install_with_pip(
     ignore_error: bool = False,
     site_packages: str = None,
 ):
-    requirementstxt, installed_requirementstxt = get_requirements_files(requirements_basename)
+    requirementstxt, installed_requirementstxt = get_requirements_files(
+        requirements_basename
+    )
 
     os.makedirs(python_prefix, exist_ok=True)
 
@@ -81,15 +86,16 @@ def install_with_pip(
         # force reinstall even if it exists in system packages.
         pipArgs.append("--force-reinstall")
 
-
     env = None
     if site_packages:
         env = dict(os.environ)
-        PYTHONPATH = env['PYTHONPATH'] or ''
-        PYTHONPATH += ':' + site_packages
+        PYTHONPATH = env["PYTHONPATH"] or ""
+        PYTHONPATH += ":" + site_packages
         env["PYTHONPATH"] = PYTHONPATH
         print("PYTHONPATH", env["PYTHONPATH"])
-    p = subprocess.Popen(pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+    p = subprocess.Popen(
+        pipArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env
+    )
 
     while True:
         line = p.stdout.readline()

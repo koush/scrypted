@@ -39,6 +39,8 @@ ColorDepth.default = lambda *args, **kwargs: ColorDepth.DEPTH_4_BIT
 # the library. The patches here allow us to scope a particular call stack
 # to a particular REPL, and to get the current Application from the stack.
 default_get_app = prompt_toolkit.application.current.get_app
+
+
 def get_app_patched() -> Application[Any]:
     stack = inspect.stack()
     for frame in stack:
@@ -46,6 +48,8 @@ def get_app_patched() -> Application[Any]:
         if self_var is not None and isinstance(self_var, Application):
             return self_var
     return default_get_app()
+
+
 prompt_toolkit.application.current.get_app = get_app_patched
 prompt_toolkit.key_binding.key_processor.get_app = get_app_patched
 prompt_toolkit.contrib.telnet.server.get_app = get_app_patched
@@ -141,7 +145,9 @@ async def eval_async_patched(self: PythonRepl, line: str) -> object:
 
     def eval_across_loops(code, *args, **kwargs):
         future = concurrent.futures.Future()
-        scrypted_loop.call_soon_threadsafe(partial(eval_in_scrypted, future), code, *args, **kwargs)
+        scrypted_loop.call_soon_threadsafe(
+            partial(eval_in_scrypted, future), code, *args, **kwargs
+        )
         return future.result()
 
     # WORKAROUND: Due to a bug in Jedi, the current directory is removed
@@ -192,7 +198,7 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.settimeout(None)
-    sock.bind(('localhost', 0))
+    sock.bind(("localhost", 0))
     sock.listen()
 
     scrypted_loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
@@ -222,7 +228,7 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
 
         # Select a free port for the telnet server
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('localhost', 0))
+        s.bind(("localhost", 0))
         telnet_port = s.getsockname()[1]
         s.close()
 
@@ -230,14 +236,19 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
             # repl_loop owns the print capabilities, but the prints will
             # be executed in scrypted_loop. We need to bridge the two here
             repl_print = partial(print_formatted_text, output=connection.vt100_output)
+
             def print_across_loops(*args, **kwargs):
                 repl_loop.call_soon_threadsafe(repl_print, *args, **kwargs)
 
             global_dict = {
                 **globals(),
                 "print": print_across_loops,
-                "help": lambda *args, **kwargs: print_across_loops("Help is not available in this environment"),
-                "input": lambda *args, **kwargs: print_across_loops("Input is not available in this environment"),
+                "help": lambda *args, **kwargs: print_across_loops(
+                    "Help is not available in this environment"
+                ),
+                "input": lambda *args, **kwargs: print_across_loops(
+                    "Input is not available in this environment"
+                ),
             }
             locals_dict = {
                 "device": device,
@@ -245,19 +256,32 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
                 "deviceManager": deviceManager,
                 "mediaManager": mediaManager,
                 "sdk": sdk,
-                "realDevice": realDevice
+                "realDevice": realDevice,
             }
-            vars_prompt = '\n'.join([f"  {k}" for k in locals_dict.keys()])
+            vars_prompt = "\n".join([f"  {k}" for k in locals_dict.keys()])
             banner = f"Python REPL variables:\n{vars_prompt}"
             print_formatted_text(banner)
-            await embed(return_asyncio_coroutine=True, globals=global_dict, locals=locals_dict, configure=partial(configure, scrypted_loop))
+            await embed(
+                return_asyncio_coroutine=True,
+                globals=global_dict,
+                locals=locals_dict,
+                configure=partial(configure, scrypted_loop),
+            )
 
         server_task: asyncio.Task = None
+
         def ready_cb():
-            future.set_result((telnet_port, lambda: repl_loop.call_soon_threadsafe(server_task.cancel)))
+            future.set_result(
+                (
+                    telnet_port,
+                    lambda: repl_loop.call_soon_threadsafe(server_task.cancel),
+                )
+            )
 
         # Start the REPL server
-        telnet_server = TelnetServer(interact=interact, port=telnet_port, enable_cpr=False)
+        telnet_server = TelnetServer(
+            interact=interact, port=telnet_port, enable_cpr=False
+        )
         server_task = asyncio.create_task(telnet_server.run(ready_cb=ready_cb))
         try:
             await server_task
@@ -277,16 +301,19 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
         def finish_setup():
             telnet_port, exit_server = server_started_future.result()
 
-            telnet_client = telnetlib.Telnet('localhost', telnet_port, timeout=None)
+            telnet_client = telnetlib.Telnet("localhost", telnet_port, timeout=None)
 
             def telnet_negotiation_cb(telnet_socket, command, option):
                 pass  # ignore telnet negotiation
+
             telnet_client.set_option_negotiation_callback(telnet_negotiation_cb)
 
             # initialize telnet terminal
             # this tells the telnet server we are a vt100 terminal
-            telnet_client.get_socket().sendall(b'\xff\xfb\x18\xff\xfa\x18\x00\x61\x6e\x73\x69\xff\xf0')
-            telnet_client.get_socket().sendall(b'\r\n')
+            telnet_client.get_socket().sendall(
+                b"\xff\xfb\x18\xff\xfa\x18\x00\x61\x6e\x73\x69\xff\xf0"
+            )
+            telnet_client.get_socket().sendall(b"\r\n")
 
             # Bridge the connection to the telnet server, two way
             def forward_to_telnet():
@@ -303,7 +330,7 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
                 while True:
                     data = telnet_client.read_some()
                     if not data:
-                        conn.sendall('REPL exited'.encode())
+                        conn.sendall("REPL exited".encode())
                         break
                     if b">>>" in data:
                         # This is an ugly hack - somewhere in ptpython, the
