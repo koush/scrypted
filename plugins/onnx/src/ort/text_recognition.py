@@ -14,11 +14,6 @@ from predict.text_recognize import TextRecognition
 
 
 class ONNXTextRecognition(TextRecognition):
-    def __init__(self, plugin, nativeId: str | None = None):
-        self.plugin = plugin
-
-        super().__init__(nativeId=nativeId)
-
     def downloadModel(self, model: str):
         onnxmodel = model
         model_version = "v4"

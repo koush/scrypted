@@ -35,6 +35,7 @@
       "interfaces": [
          "DeviceProvider",
          "Settings",
+         "ClusterForkInterface",
          "ObjectDetection",
          "ObjectDetectionPreview"
       ],

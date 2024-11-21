@@ -414,6 +414,7 @@ class OpenVINOPlugin(
                     "nativeId": "facerecognition",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                     "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
                         scrypted_sdk.ScryptedInterface.ObjectDetection.value,
                     ],
                     "name": "OpenVINO Face Recognition",
@@ -426,6 +427,7 @@ class OpenVINOPlugin(
                         "nativeId": "textrecognition",
                         "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                         "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
                             scrypted_sdk.ScryptedInterface.ObjectDetection.value,
                         ],
                         "name": "OpenVINO Text Recognition",

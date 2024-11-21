@@ -35,8 +35,8 @@
       "interfaces": [
          "Settings",
          "DeviceProvider",
-         "ObjectDetection",
          "ClusterForkInterface",
+         "ObjectDetection",
          "ObjectDetectionPreview"
       ],
       "labels": {

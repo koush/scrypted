@@ -50,8 +50,8 @@ def parse_labels(names):
 class ONNXPlugin(
     PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings, scrypted_sdk.DeviceProvider
 ):
-    def __init__(self, nativeId: str | None = None):
-        super().__init__(nativeId=nativeId)
+    def __init__(self, nativeId: str | None = None, forked: bool = False):
+        super().__init__(nativeId=nativeId, forked=forked)
 
         model = self.storage.getItem("model") or "Default"
         if model == "Default" or model not in availableModels:
@@ -147,7 +147,9 @@ class ONNXPlugin(
 
         self.faceDevice = None
         self.textDevice = None
-        asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
+
+        if not self.forked:
+            asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
 
     async def prepareRecognitionModels(self):
         try:
@@ -156,6 +158,7 @@ class ONNXPlugin(
                     "nativeId": "facerecognition",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                     "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
                         scrypted_sdk.ScryptedInterface.ObjectDetection.value,
                     ],
                     "name": "ONNX Face Recognition",
@@ -168,6 +171,7 @@ class ONNXPlugin(
                         "nativeId": "textrecognition",
                         "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                         "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
                             scrypted_sdk.ScryptedInterface.ObjectDetection.value,
                         ],
                         "name": "ONNX Text Recognition",

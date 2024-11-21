@@ -14,11 +14,6 @@ from predict.face_recognize import FaceRecognizeDetection
 
 
 class ONNXFaceRecognition(FaceRecognizeDetection):
-    def __init__(self, plugin, nativeId: str | None = None):
-        self.plugin = plugin
-
-        super().__init__(nativeId=nativeId)
-
     def downloadModel(self, model: str):
         onnxmodel = "best" if "scrypted" in model else model
         model_version = "v1"

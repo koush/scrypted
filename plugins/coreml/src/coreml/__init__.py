@@ -154,6 +154,7 @@ class CoreMLPlugin(
                     "nativeId": "facerecognition",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                     "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
                         scrypted_sdk.ScryptedInterface.ObjectDetection.value,
                     ],
                     "name": "CoreML Face Recognition",
@@ -166,6 +167,7 @@ class CoreMLPlugin(
                         "nativeId": "textrecognition",
                         "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                         "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
                             scrypted_sdk.ScryptedInterface.ObjectDetection.value,
                         ],
                         "name": "CoreML Text Recognition",
@@ -182,10 +184,10 @@ class CoreMLPlugin(
 
     async def getDevice(self, nativeId: str) -> Any:
         if nativeId == "facerecognition":
-            self.faceDevice = self.faceDevice or CoreMLFaceRecognition(nativeId, plugin=self)
+            self.faceDevice = self.faceDevice or CoreMLFaceRecognition(self, nativeId)
             return self.faceDevice
         if nativeId == "textrecognition":
-            self.textDevice = self.textDevice or CoreMLTextRecognition(nativeId, plugin=self)
+            self.textDevice = self.textDevice or CoreMLTextRecognition(self, nativeId)
             return self.textDevice
         raise Exception("unknown device")
 
