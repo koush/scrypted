@@ -95,8 +95,8 @@ class OpenVINOPlugin(
     scrypted_sdk.Settings,
     scrypted_sdk.DeviceProvider,
 ):
-    def __init__(self, nativeId: str | None = None):
-        super().__init__(nativeId=nativeId)
+    def __init__(self, nativeId: str | None = None, forked: bool = False):
+        super().__init__(nativeId=nativeId, forked=forked)
 
         self.core = ov.Core()
         dump_device_properties(self.core)
@@ -244,7 +244,9 @@ class OpenVINOPlugin(
 
         self.faceDevice = None
         self.textDevice = None
-        asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
+
+        if not self.forked:
+            asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
 
     async def getSettings(self) -> list[Setting]:
         mode = self.storage.getItem("mode") or "Default"

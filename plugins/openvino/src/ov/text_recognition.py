@@ -15,11 +15,6 @@ textRecognizePrepare, textRecognizePredict = async_infer.create_executors(
 
 
 class OpenVINOTextRecognition(TextRecognition):
-    def __init__(self, plugin, nativeId: str | None = None):
-        self.plugin = plugin
-
-        super().__init__(nativeId=nativeId)
-
     def downloadModel(self, model: str):
         ovmodel = "best"
         precision = self.plugin.precision

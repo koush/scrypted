@@ -23,8 +23,8 @@ predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "TextDetect")
 
 
 class TextRecognition(PredictPlugin):
-    def __init__(self, nativeId: str, plugin: PredictPlugin):
-        super().__init__(nativeId=nativeId, plugin=plugin)
+    def __init__(self, plugin: PredictPlugin, nativeId: str):
+        super().__init__(plugin=plugin, nativeId=nativeId)
 
         self.inputheight = 640
         self.inputwidth = 640

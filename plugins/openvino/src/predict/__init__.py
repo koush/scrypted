@@ -30,10 +30,10 @@ class Prediction:
         )
         self.embedding = embedding
 
-class PredictPlugin(DetectPlugin):
+class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
     labels: dict
 
-    def __init__(self, nativeId: str | None = None, forked: bool = False, plugin: PredictPlugin = None):
+    def __init__(self, plugin: PredictPlugin = None, nativeId: str | None = None, forked: bool = False):
         super().__init__(nativeId=nativeId)
 
         self.plugin = plugin
@@ -315,7 +315,12 @@ class PredictPlugin(DetectPlugin):
             raise Exception("unsupported fork interface")
             
         result = await self.forkInterfaceInternal(options)
-        ret = await result.getPlugin()
+        if not self.nativeId:
+            ret = await result.getPlugin()
+        elif self.nativeId == "textrecognition":
+            ret = await result.getTextRecognition()
+        elif self.nativeId == "facerecognition":
+            ret = await result.getFaceRecognition()
         return ret
 
     async def startCluster(self):
@@ -341,3 +346,17 @@ class PredictPlugin(DetectPlugin):
                 except:
                     traceback.print_exc()
             asyncio.ensure_future(startClusterWorker(), loop=self.loop)
+
+
+class Fork:
+    def __init__(self, PluginType: Any):
+        self.plugin = PluginType(forked=True)
+
+    async def getPlugin(self):
+        return self.plugin
+    
+    async def getTextRecognition(self):
+        return await self.plugin.getDevice("textrecognition")
+    
+    async def getFaceRecognition(self):
+        return await self.plugin.getDevice("facerecognition")

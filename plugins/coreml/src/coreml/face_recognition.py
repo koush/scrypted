@@ -29,8 +29,8 @@ def cosine_similarity(vector_a, vector_b):
 predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Vision-Predict")
 
 class CoreMLFaceRecognition(FaceRecognizeDetection):
-    def __init__(self, nativeId: str, plugin):
-        super().__init__(nativeId, plugin)
+    def __init__(self, plugin, nativeId: str):
+        super().__init__(plugin, nativeId)
         self.detectExecutor = concurrent.futures.ThreadPoolExecutor(1, "detect-face")
         self.recogExecutor = concurrent.futures.ThreadPoolExecutor(1, "recog-face")
 

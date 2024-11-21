@@ -73,7 +73,6 @@ class CoreMLPlugin(
     PredictPlugin,
     scrypted_sdk.Settings,
     scrypted_sdk.DeviceProvider,
-    scrypted_sdk.ClusterForkInterface,
 ):
     def __init__(self, nativeId: str | None = None, forked: bool = False):
         super().__init__(nativeId=nativeId, forked=forked)
