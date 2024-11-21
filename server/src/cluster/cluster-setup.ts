@@ -379,15 +379,15 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
 
     if (!mode) {
         if (process.env.SCRYPTED_CLUSTER_ADDRESS) {
-            console.warn('SCRYPTED_CLUSTER_ADDRESS, but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
+            console.warn('SCRYPTED_CLUSTER_ADDRESS is set but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
             delete process.env.SCRYPTED_CLUSTER_ADDRESS;
         }
         if (process.env.SCRPYTED_CLUSTER_SERVER) {
-            console.warn('SCRYPTED_CLUSTER_SERVER, but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
+            console.warn('SCRYPTED_CLUSTER_SERVER is set but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
             delete process.env.SCRPYTED_CLUSTER_SERVER
         }
         if (process.env.SCRYPTED_CLUSTER_SECRET) {
-            console.warn('SCRYPTED_CLUSTER_SECRET, but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
+            console.warn('SCRYPTED_CLUSTER_SECRET is set but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
             delete process.env.SCRYPTED_CLUSTER_SECRET;
         }
         return;
