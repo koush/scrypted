@@ -85,7 +85,7 @@ export function createClusterForkWorker(
             return peer;
         }
         catch (e) {
-            clusterForkResult.kill();
+            clusterForkResult.kill().catch(() => {});
             throw e;
         }
     })();

@@ -1,6 +1,6 @@
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
-import crypto from 'crypto';
+import crypto, { scrypt } from 'crypto';
 import { once } from 'events';
 import express, { Request } from 'express';
 import fs from 'fs';
@@ -45,10 +45,11 @@ installSourceMapSupport({
 });
 
 let workerInspectPort: number = undefined;
+let workerInspectAddress: string = undefined;
 
 async function doconnect(): Promise<net.Socket> {
     return new Promise((resolve, reject) => {
-        const target = net.connect(workerInspectPort, '127.0.0.1');
+        const target = net.connect(workerInspectPort, workerInspectAddress);
         target.once('error', reject)
         target.once('connect', () => resolve(target))
     })
@@ -465,11 +466,20 @@ async function start(mainFilename: string, options?: {
         waitDebug.catch(() => { });
 
         workerInspectPort = Math.round(Math.random() * 10000) + 30000;
+        workerInspectAddress = '127.0.0.1';
         try {
-            await scrypted.installPlugin(plugin, {
+            const host = await scrypted.installPlugin(plugin, {
                 waitDebug,
                 inspectPort: workerInspectPort,
             });
+
+            const clusterWorkerId = await host.clusterWorkerId;
+            if (clusterWorkerId) {
+                const clusterWorker = scrypted.clusterWorkers.get(clusterWorkerId);
+                if (clusterWorker) {
+                    workerInspectAddress = clusterWorker.address;
+                }
+            }
         }
         catch (e) {
             res.header('Content-Type', 'text/plain');
@@ -480,6 +490,7 @@ async function start(mainFilename: string, options?: {
 
         res.send({
             workerInspectPort,
+            workerInspectAddress,
         });
     });
 

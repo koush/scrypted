@@ -76,6 +76,7 @@ export interface RunningClusterWorker extends ClusterWorkerProperties {
     id: string;
     peer: RpcPeer;
     forks: Set<ClusterForkOptions>;
+    address: string;
 }
 
 export class PeerLiveness {
@@ -86,7 +87,7 @@ export class PeerLiveness {
     }
 }
 
-export class ClusterForkResult extends PeerLiveness {
+export class ClusterForkResult extends PeerLiveness implements ClusterForkResultInterface {
     [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = ['kill'];
     clusterWorkerId?: string;
 
@@ -103,7 +104,14 @@ export class ClusterForkResult extends PeerLiveness {
     }
 }
 
-export type ClusterForkParam = (runtime: string, options: RuntimeWorkerOptions, peerLiveness: PeerLiveness, getZip: () => Promise<Buffer>) => Promise<ClusterForkResult>;
+export interface ClusterForkResultInterface {
+    clusterWorkerId?: string;
+    getResult(): Promise<any>;
+    kill(): Promise<void>;
+    waitKilled(): Promise<void>;
+}
+
+export type ClusterForkParam = (runtime: string, options: RuntimeWorkerOptions, peerLiveness: PeerLiveness, getZip: () => Promise<Buffer>) => Promise<ClusterForkResultInterface>;
 
 export function startClusterClient(mainFilename: string) {
     console.log('Cluster client starting.');
@@ -308,6 +316,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
                     // generate a random uuid.
                     id,
                     peer,
+                    address: socket.remoteAddress,
                     forks: new Set(),
                 };
                 runtime.clusterWorkers.set(id, worker);

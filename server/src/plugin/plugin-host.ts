@@ -65,6 +65,7 @@ export class PluginHost {
     zipHash: string;
     zipFile: string;
     unzippedPath: string;
+    clusterWorkerId: Promise<string>;
 
     kill() {
         this.killed = true;
@@ -368,6 +369,7 @@ export class PluginHost {
 
             this.worker.stdout.on('data', data => console.log(data.toString()));
             this.worker.stderr.on('data', data => console.error(data.toString()));
+            this.clusterWorkerId = Promise.resolve(undefined);
         }
         else {
             this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
@@ -399,9 +401,13 @@ export class PluginHost {
                 this.peer = peer;
                 peer.killedSafe.finally(() => originalPeer.kill());
             }).catch(() => { });
+
+            this.clusterWorkerId = clusterWorkerId;
             clusterWorkerId.then(clusterWorkerId => {
                 console.log('cluster worker id', clusterWorkerId);
-            }).catch(() => { });
+            }).catch(() => {
+                console.warn("cluster worker id failed", clusterWorkerId);
+             });
 
             this.worker = runtimeWorker;
             peer = forkPeer;
