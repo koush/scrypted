@@ -132,6 +132,7 @@ export function startClusterClient(mainFilename: string) {
                 await once(rawSocket, 'connect');
             }
             catch (e) {
+                console.warn('Cluster server not available.', host, port, e);
                 continue;
             }
 
@@ -144,6 +145,7 @@ export function startClusterClient(mainFilename: string) {
                 await once(socket, 'secureConnect');
             }
             catch (e) {
+                console.warn('Cluster server tls failed.', host, port, e);
                 continue;
             }
 
