@@ -173,7 +173,11 @@ class OpenVINOPlugin(
         self.sigmoid = model == "yolo-v4-tiny-tf"
         self.modelName = model
 
-        ovmodel = "best-converted" if self.scrypted_yolov9 else "best" if self.scrypted_model else model
+        ovmodel = (
+            "best-converted"
+            if self.scrypted_yolov9
+            else "best" if self.scrypted_model else model
+        )
 
         model_version = "v7"
         xmlFile = self.downloadFile(
