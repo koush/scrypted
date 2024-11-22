@@ -365,7 +365,12 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
             if cwid == thisClusterWorkerId:
                 selfFork = Fork(None)
                 selfFork.plugin = self
-                self.forks[cwid] = selfFork
+
+                pf = scrypted_sdk.PluginFork()
+                pf.result = asyncio.Future(loop=self.loop)
+                pf.result.set_result(selfFork)
+
+                self.forks[cwid] = pf
                 continue
 
             async def startClusterWorker(clusterWorkerId=cwid):
