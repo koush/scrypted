@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.123.35",
+  "version": "0.123.36",
   "description": "",
   "dependencies": {
     "@scrypted/ffmpeg-static": "^6.1.0-build3",
