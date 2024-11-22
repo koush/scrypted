@@ -366,7 +366,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
 
 export class ClusterManagerImpl implements ClusterManager {
     private clusterServicePromise: Promise<ClusterForkService>;
-    private clusterMode = getScryptedClusterMode()[0];
+    private clusterMode = getScryptedClusterMode()?.[0];
 
     constructor(private api: PluginAPI) {
     }
