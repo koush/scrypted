@@ -14,7 +14,7 @@ class WrappedForkResult implements ClusterForkResultInterface {
     }
 
     async kill() {
-        const fr = await this.forkResult.catch(() => {});
+        const fr = await this.forkResult.catch(() => { });
         if (!fr)
             return;
         await fr.kill();
@@ -35,7 +35,7 @@ export class ClusterForkService {
     constructor(public runtime: ScryptedRuntime) { }
 
     async fork(runtimeWorkerOptions: RuntimeWorkerOptions, options: ClusterForkOptions, peerLiveness: PeerLiveness, getZip: () => Promise<Buffer>) {
-        const matchingWorkers = [...this.runtime.clusterWorkers.entries()].map(([id, worker]) => ({
+        let matchingWorkers = [...this.runtime.clusterWorkers.entries()].map(([id, worker]) => ({
             worker,
             matches: matchesClusterLabels(options, worker.labels),
         }))
@@ -44,7 +44,6 @@ export class ClusterForkService {
                 // and worker id must match if provided
                 return matches && (!options.clusterWorkerId || worker.id === options.clusterWorkerId);
             });
-        matchingWorkers.sort((a, b) => b.worker.labels.length - a.worker.labels.length);
 
         let worker: RunningClusterWorker;
 
@@ -53,16 +52,31 @@ export class ClusterForkService {
         if (options.id)
             worker = matchingWorkers.find(({ worker }) => [...worker.forks].find(f => f.id === options.id))?.worker;
 
-        // TODO: round robin?
-        worker ||= matchingWorkers[0]?.worker;
-
         if (!worker) {
-            if (options.clusterWorkerId)
-                throw new Error(`no worker found for cluster id ${options.clusterWorkerId}`);
-            throw new Error(`no worker found for cluster labels ${JSON.stringify(options.labels)}`);
+            // sort by number of matches, to find the best match.
+            matchingWorkers.sort((a, b) => b.matches - a.matches);
+
+            const bestMatch = matchingWorkers[0];
+
+            if (!bestMatch) {
+                if (options.clusterWorkerId)
+                    throw new Error(`no worker found for cluster id ${options.clusterWorkerId}`);
+                throw new Error(`no worker found for cluster labels ${JSON.stringify(options.labels)}`);
+            }
+
+            // filter out workers that are not equivalent to the best match.
+            // this enforces the "prefer" label.
+            matchingWorkers = matchingWorkers.filter(({ matches }) => matches === bestMatch.matches)
+                // sort by number of forks, to distribute load.
+                .sort((a, b) => a.worker.forks.size - b.worker.forks.size);
+
+            worker = matchingWorkers[0]?.worker;
         }
 
-        const fork: ClusterForkParam = await worker.peer.getParam('fork');
+        console.log('forking to worker', worker.id, options);
+
+        worker.fork ||= worker.peer.getParam('fork');
+        const fork: ClusterForkParam = await worker.fork;
         const forkResultPromise = fork(options.runtime, runtimeWorkerOptions, peerLiveness, getZip);
 
         options.id ||= this.runtime.findPluginDevice(runtimeWorkerOptions.packageJson.name)?._id;
@@ -83,7 +97,7 @@ export class ClusterForkService {
         const ret: any = {};
         for (const worker of this.runtime.clusterWorkers.values()) {
             ret[worker.id] = {
-                name: worker.peer.peerName,
+                name: worker.name,
                 labels: worker.labels,
                 forks: [...worker.forks],
             };

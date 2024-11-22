@@ -23,7 +23,7 @@ import { getNpmPackageInfo } from './services/plugin';
 import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
-import { createClusterServer } from './scrypted-cluster-main';
+import { createClusterServer, startClusterClient } from './scrypted-cluster-main';
 import { getScryptedClusterMode } from './cluster/cluster-setup';
 
 export type Runtime = ScryptedRuntime;
@@ -351,6 +351,14 @@ async function start(mainFilename: string, options?: {
 
     const scrypted = new ScryptedRuntime(mainFilename, db, insecure, secure, app);
     await options?.onRuntimeCreated?.(scrypted);
+
+    const clusterMode = getScryptedClusterMode();
+    if (clusterMode?.[0] === 'server') {
+        console.log('Cluster server starting.');
+        const clusterServer = createClusterServer(mainFilename, scrypted, keyPair);
+        await listenServerPort('SCRYPTED_CLUSTER_SERVER', clusterMode[2], clusterServer);
+    }
+
     await scrypted.start();
 
 
@@ -735,13 +743,6 @@ async function start(mainFilename: string, options?: {
 
     await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
     await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
-
-    const clusterMode = getScryptedClusterMode();
-    if (clusterMode?.[0] === 'server') {
-        console.log('Cluster server starting.');
-        const clusterServer = createClusterServer(scrypted, keyPair);
-        await listenServerPort('SCRYPTED_CLUSTER_SERVER', clusterMode[2], clusterServer);
-    }
 
     console.log('#######################################################');
     console.log(`Scrypted Volume           : ${volumeDir}`);

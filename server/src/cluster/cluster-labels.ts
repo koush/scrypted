@@ -9,13 +9,19 @@ export function matchesClusterLabels(options: ClusterForkOptions, labels: string
     }
 
     // if there is nothing in the any list, consider it matched
-    let foundAny = !options?.labels?.any?.length;
-    for (const label of options.labels?.any || []) {
-        if (labels.includes(label)) {
-            matched++;
-            foundAny = true;
+    let foundAny: boolean;
+    if (options?.labels?.any?.length) {
+        for (const label of options.labels.any) {
+            if (labels.includes(label)) {
+                foundAny = true;
+                break;
+            }
         }
     }
+    else {
+        foundAny = true;
+    }
+
     if (!foundAny)
         return 0;
 
@@ -39,4 +45,9 @@ export function needsClusterForkWorker(options: ClusterForkOptions) {
     return process.env.SCRYPTED_CLUSTER_ADDRESS
         && options
         && (!matchesClusterLabels(options, getClusterLabels()) || options.clusterWorkerId);
+}
+
+export function utilizesClusterForkWorker(options: ClusterForkOptions) {
+    return process.env.SCRYPTED_CLUSTER_ADDRESS
+        && (options?.labels || options?.clusterWorkerId);
 }

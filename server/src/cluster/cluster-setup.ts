@@ -249,8 +249,15 @@ export function setupCluster(peer: RpcPeer) {
         if (address === SCRYPTED_CLUSTER_ADDRESS && proxyId.startsWith('n-')) {
             const parts = proxyId.split('-');
             const pid = parseInt(parts[1]);
-            if (pid === process.pid)
-                return connectIPCObject(clusterObject, parseInt(parts[2]));
+            const tid = parseInt(parts[2]);
+            if (pid === process.pid) {
+                if (worker_threads.isMainThread && tid === worker_threads.threadId) {
+                    // main thread can't call itself, so this may be a different thread cluster.
+                }
+                else {
+                    return connectIPCObject(clusterObject, parseInt(parts[2]));
+                }
+            }
         }
 
         try {

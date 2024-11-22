@@ -63,6 +63,8 @@
                 "${workspaceFolder}/**/*.js"
             ],
             "env": {
+                "SCRYPTED_CLUSTER_WORKER_NAME": "server",
+                "SCRYPTED_CLUSTER_LABELS": "compute",
                 "SCRYPTED_DISABLE_CLUSTER_SERVER_TRUST": "true",
                 "SCRYPTED_CLUSTER_MODE": "server",
                 "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",
@@ -94,6 +96,7 @@
                 "${workspaceFolder}/**/*.js"
             ],
             "env": {
+                "SCRYPTED_CLUSTER_WORKER_NAME": "client",
                 "SCRYPTED_CLUSTER_LABELS": "compute",
                 "SCRYPTED_CLUSTER_MODE": "client",
                 "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",

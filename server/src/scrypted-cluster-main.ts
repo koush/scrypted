@@ -74,7 +74,9 @@ export interface ClusterWorkerProperties {
 
 export interface RunningClusterWorker extends ClusterWorkerProperties {
     id: string;
+    name: string;
     peer: RpcPeer;
+    fork: Promise<ClusterForkParam>;
     forks: Set<ClusterForkOptions>;
     address: string;
 }
@@ -112,6 +114,88 @@ export interface ClusterForkResultInterface {
 }
 
 export type ClusterForkParam = (runtime: string, options: RuntimeWorkerOptions, peerLiveness: PeerLiveness, getZip: () => Promise<Buffer>) => Promise<ClusterForkResultInterface>;
+
+function createClusterForkParam(mainFilename: string, clusterId: string, clusterSecret: string) {
+    const clusterForkParam: ClusterForkParam = async (runtime, runtimeWorkerOptions, peerLiveness, getZip) => {
+        let runtimeWorker: RuntimeWorker;
+
+        const builtins = getBuiltinRuntimeHosts();
+        const rt = builtins.get(runtime);
+        if (!rt)
+            throw new Error('unknown runtime ' + runtime);
+
+        const pluginId: string = runtimeWorkerOptions.packageJson.name;
+        const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), runtimeWorkerOptions.zipHash, getZip);
+
+        const volume = getScryptedVolume();
+        const pluginVolume = getPluginVolume(pluginId);
+
+        runtimeWorkerOptions.zipFile = zipFile;
+        runtimeWorkerOptions.unzippedPath = unzippedPath;
+
+        runtimeWorkerOptions.env = {
+            ...runtimeWorkerOptions.env,
+            SCRYPTED_VOLUME: volume,
+            SCRYPTED_PLUGIN_VOLUME: pluginVolume,
+        };
+
+        runtimeWorker = rt(mainFilename, runtimeWorkerOptions, undefined);
+        runtimeWorker.stdout.on('data', data => console.log(data.toString()));
+        runtimeWorker.stderr.on('data', data => console.error(data.toString()));
+
+        const threadPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
+        runtimeWorker.setupRpcPeer(threadPeer);
+        runtimeWorker.on('exit', () => {
+            threadPeer.kill('worker exited');
+        });
+        runtimeWorker.on('error', e => {
+            threadPeer.kill('worker error ' + e);
+        });
+        threadPeer.killedSafe.finally(() => {
+            runtimeWorker.kill();
+        });
+        peerLiveness.waitKilled().catch(() => { }).finally(() => {
+            threadPeer.kill('peer killed');
+        });
+        let getRemote: any;
+        let ping: any;
+        try {
+            const initializeCluster: InitializeCluster = await threadPeer.getParam('initializeCluster');
+            await initializeCluster({ clusterId, clusterSecret });
+            getRemote = await threadPeer.getParam('getRemote');
+            ping = await threadPeer.getParam('ping');
+        }
+        catch (e) {
+            threadPeer.kill('cluster fork failed');
+            throw e;
+        }
+
+        const readStream = async function* (stream: Readable) {
+            for await (const buffer of stream) {
+                yield buffer;
+            }
+        }
+
+        const timeout = setTimeout(() => {
+            threadPeer.kill('cluster fork timeout');
+        }, 10000);
+        const clusterGetRemote = (...args: any[]) => {
+            clearTimeout(timeout);
+            return {
+                [RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN]: true,
+                stdout: readStream(runtimeWorker.stdout),
+                stderr: readStream(runtimeWorker.stderr),
+                getRemote,
+                ping,
+            };
+        };
+
+        const result = new ClusterForkResult(threadPeer, threadPeer.killed, clusterGetRemote);
+        return result;
+    };
+
+    return clusterForkParam;
+}
 
 export function startClusterClient(mainFilename: string) {
     console.log('Cluster client starting.');
@@ -174,7 +258,7 @@ export function startClusterClient(mainFilename: string) {
                 const auth: ClusterObject = {
                     address: socket.localAddress,
                     port: socket.localPort,
-                    id: process.env.SCRYPTED_CLUSTER_CLIENT_NAME || os.hostname(),
+                    id: process.env.SCRYPTED_CLUSTER_WORKER_NAME || os.hostname(),
                     proxyId: undefined,
                     sourceKey: undefined,
                     sha256: undefined,
@@ -190,85 +274,7 @@ export function startClusterClient(mainFilename: string) {
                 const clusterPeerSetup = setupCluster(peer);
                 await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret });
 
-                const clusterForkParam: ClusterForkParam = async (runtime, runtimeWorkerOptions, peerLiveness, getZip) => {
-                    let runtimeWorker: RuntimeWorker;
-
-                    const builtins = getBuiltinRuntimeHosts();
-                    const rt = builtins.get(runtime);
-                    if (!rt)
-                        throw new Error('unknown runtime ' + runtime);
-
-                    const pluginId: string = runtimeWorkerOptions.packageJson.name;
-                    const { zipFile, unzippedPath } = await prepareZip(getPluginVolume(pluginId), runtimeWorkerOptions.zipHash, getZip);
-
-                    const volume = getScryptedVolume();
-                    const pluginVolume = getPluginVolume(pluginId);
-
-                    runtimeWorkerOptions.zipFile = zipFile;
-                    runtimeWorkerOptions.unzippedPath = unzippedPath;
-
-                    runtimeWorkerOptions.env = {
-                        ...runtimeWorkerOptions.env,
-                        SCRYPTED_VOLUME: volume,
-                        SCRYPTED_PLUGIN_VOLUME: pluginVolume,
-                    };
-
-                    runtimeWorker = rt(mainFilename, runtimeWorkerOptions, undefined);
-                    runtimeWorker.stdout.on('data', data => console.log(data.toString()));
-                    runtimeWorker.stderr.on('data', data => console.error(data.toString()));
-
-                    const threadPeer = new RpcPeer('main', 'thread', (message, reject, serializationContext) => runtimeWorker.send(message, reject, serializationContext));
-                    runtimeWorker.setupRpcPeer(threadPeer);
-                    runtimeWorker.on('exit', () => {
-                        threadPeer.kill('worker exited');
-                    });
-                    runtimeWorker.on('error', e => {
-                        threadPeer.kill('worker error ' + e);
-                    });
-                    threadPeer.killedSafe.finally(() => {
-                        runtimeWorker.kill();
-                    });
-                    peerLiveness.waitKilled().catch(() => { }).finally(() => {
-                        threadPeer.kill('peer killed');
-                    });
-                    let getRemote: any;
-                    let ping: any;
-                    try {
-                        const initializeCluster: InitializeCluster = await threadPeer.getParam('initializeCluster');
-                        await initializeCluster({ clusterId, clusterSecret });
-                        getRemote = await threadPeer.getParam('getRemote');
-                        ping = await threadPeer.getParam('ping');
-                    }
-                    catch (e) {
-                        threadPeer.kill('cluster fork failed');
-                        throw e;
-                    }
-
-                    const readStream = async function* (stream: Readable) {
-                        for await (const buffer of stream) {
-                            yield buffer;
-                        }
-                    }
-
-                    const timeout = setTimeout(() => {
-                        threadPeer.kill('cluster fork timeout');
-                    }, 10000);
-                    const clusterGetRemote = (...args: any[]) => {
-                        clearTimeout(timeout);
-                        return {
-                            [RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN]: true,
-                            stdout: readStream(runtimeWorker.stdout),
-                            stderr: readStream(runtimeWorker.stderr),
-                            getRemote,
-                            ping,
-                        };
-                    };
-
-                    const result = new ClusterForkResult(threadPeer, threadPeer.killed, clusterGetRemote);
-                    return result;
-                };
-
-                peer.params['fork'] = clusterForkParam;
+                peer.params['fork'] = createClusterForkParam(mainFilename, clusterId, clusterSecret);
 
                 await peer.killed;
             }
@@ -284,7 +290,20 @@ export function startClusterClient(mainFilename: string) {
     })();
 }
 
-export function createClusterServer(runtime: ScryptedRuntime, certificate: ReturnType<typeof createSelfSignedCertificate>) {
+export function createClusterServer(mainFilename: string, scryptedRuntime: ScryptedRuntime, certificate: ReturnType<typeof createSelfSignedCertificate>) {
+    const serverClusterWorkerId = crypto.randomUUID();
+    process.env.SCRYPTED_CLUSTER_WORKER_ID = serverClusterWorkerId;
+    const serverWorker: RunningClusterWorker = {
+        labels: getClusterLabels(),
+        id: serverClusterWorkerId,
+        peer: undefined,
+        fork: Promise.resolve(createClusterForkParam(mainFilename, scryptedRuntime.clusterId, scryptedRuntime.clusterSecret)),
+        name: process.env.SCRYPTED_CLUSTER_WORKER_NAME || os.hostname(),
+        address: process.env.SCRYPTED_CLUSTER_ADDRESS,
+        forks: new Set(),
+    };
+    scryptedRuntime.clusterWorkers.set(serverClusterWorkerId, serverWorker);
+
     const server = tls.createServer({
         key: certificate.serviceKey,
         cert: certificate.certificate,
@@ -299,7 +318,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
         const connectForkWorker: ConnectForkWorker = async (auth: ClusterObject, properties: ClusterWorkerProperties) => {
             const id = crypto.randomUUID();
             try {
-                const sha256 = computeClusterObjectHash(auth, runtime.clusterSecret);
+                const sha256 = computeClusterObjectHash(auth, scryptedRuntime.clusterSecret);
                 if (sha256 !== auth.sha256)
                     throw new Error('cluster object hash mismatch');
 
@@ -313,18 +332,19 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
                 }
                 const worker: RunningClusterWorker = {
                     ...properties,
-                    // generate a random uuid.
                     id,
                     peer,
+                    fork: undefined,
+                    name: auth.id,
                     address: socket.remoteAddress,
                     forks: new Set(),
                 };
-                runtime.clusterWorkers.set(id, worker);
+                scryptedRuntime.clusterWorkers.set(id, worker);
                 peer.killedSafe.finally(() => {
-                    runtime.clusterWorkers.delete(id);
+                    scryptedRuntime.clusterWorkers.delete(id);
                 });
                 socket.on('close', () => {
-                    runtime.clusterWorkers.delete(id);
+                    scryptedRuntime.clusterWorkers.delete(id);
                 });
                 console.log('Cluster client authenticated.', socket.remoteAddress, socket.remotePort, properties);
             }
@@ -334,7 +354,7 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
             }
 
             return {
-                clusterId: runtime.clusterId,
+                clusterId: scryptedRuntime.clusterId,
                 clusterWorkerId: id,
             }
         }
@@ -345,7 +365,8 @@ export function createClusterServer(runtime: ScryptedRuntime, certificate: Retur
 }
 
 export class ClusterManagerImpl implements ClusterManager {
-    private  clusterServicePromise: Promise<ClusterForkService>;
+    private clusterServicePromise: Promise<ClusterForkService>;
+    private clusterMode = getScryptedClusterMode()[0];
 
     constructor(private api: PluginAPI) {
     }
@@ -355,7 +376,7 @@ export class ClusterManagerImpl implements ClusterManager {
     }
 
     getClusterMode(): 'server' | 'client' | undefined {
-        return getScryptedClusterMode()[0];
+        return this.clusterMode;
     }
 
     async getClusterWorkers(): Promise<Record<string, ClusterWorker>> {

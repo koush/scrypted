@@ -4,10 +4,12 @@ import fs from 'fs';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import worker_threads from 'worker_threads';
-import { needsClusterForkWorker } from '../cluster/cluster-labels';
+import { utilizesClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
+import { ClusterManagerImpl } from '../scrypted-cluster-main';
+import type { PluginComponent } from '../services/plugin';
 import type { DeviceManagerImpl } from './device';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
@@ -22,9 +24,6 @@ import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
 import { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
-import type { ClusterForkService } from '../services/cluster-fork';
-import type { PluginComponent } from '../services/plugin';
-import { ClusterManagerImpl } from '../scrypted-cluster-main';
 
 const serverVersion = require('../../package.json').version;
 
@@ -226,7 +225,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 };
 
                 // if running in a cluster, fork to a matching cluster worker only if necessary.
-                if (needsClusterForkWorker(options)) {
+                if (utilizesClusterForkWorker(options)) {
                     ({ runtimeWorker, forkPeer, clusterWorkerId } = createClusterForkWorker(
                         runtimeWorkerOptions,
                         options,

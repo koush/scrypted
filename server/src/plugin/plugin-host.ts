@@ -4,7 +4,7 @@ import * as io from 'engine.io';
 import fs from 'fs';
 import os from 'os';
 import WebSocket from 'ws';
-import { needsClusterForkWorker } from '../cluster/cluster-labels';
+import { utilizesClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
 import { Plugin } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
@@ -351,7 +351,9 @@ export class PluginHost {
             zipFile: this.zipFile,
             zipHash: this.zipHash,
         };
-        if (!needsClusterForkWorker(this.packageJson.scrypted)) {
+
+        // if a plugin requests a cluster worker, and it can be fulfilled by the server, do it.
+        if (!utilizesClusterForkWorker(this.packageJson.scrypted)) {
             this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
                 if (connected) {
                     this.worker.send(message, reject, serializationContext);
