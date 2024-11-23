@@ -15,6 +15,9 @@ textRecognizePrepare, textRecognizePredict = async_infer.create_executors(
 
 
 class OpenVINOTextRecognition(TextRecognition):
+    def getClusterLabels(self):
+        return {"labels": {"require": ["compute", "x64"]}}
+
     def downloadModel(self, model: str):
         ovmodel = "best"
         precision = self.plugin.precision

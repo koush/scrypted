@@ -286,6 +286,9 @@ class OpenVINOPlugin(
             },
         ]
 
+    def getClusterLabels(self):
+        return {"labels": {"require": ["compute", "x64"]}}
+
     async def putSetting(self, key: str, value: SettingValue):
         self.storage.setItem(key, value)
         await self.onDeviceEvent(scrypted_sdk.ScryptedInterface.Settings.value, None)
