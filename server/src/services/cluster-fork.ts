@@ -77,16 +77,21 @@ export class ClusterForkService {
 
         worker.fork ||= worker.peer.getParam('fork');
         const fork: ClusterForkParam = await worker.fork;
+
         const forkResultPromise = fork(options.runtime, runtimeWorkerOptions, peerLiveness, getZip);
-
         options.id ||= this.runtime.findPluginDevice(runtimeWorkerOptions.packageJson.name)?._id;
-        worker.forks.add(options);
 
+        // the server is responsible for killing the forked process when the requestor is killed.
+        // minimizes lifecycle management duplication in python and node.
+        worker.forks.add(options);
+        peerLiveness.waitKilled().catch(() => {}).finally(() => {
+            forkResultPromise.then(forkResult => forkResult.kill().catch(() => {}));
+        });
         forkResultPromise.then(forkResult => {
             forkResult.clusterWorkerId = worker.id;
-            forkResult.waitKilled().catch(() => { }).finally(() => {
+            forkResult.waitKilled().catch(() => {}).finally(() => {
                 worker.forks.delete(options);
-            })
+            });
         });
 
         const ret: ClusterForkResultInterface = new WrappedForkResult(worker.id, forkResultPromise);

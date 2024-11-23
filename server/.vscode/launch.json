@@ -99,7 +99,7 @@
                 "SCRYPTED_CLUSTER_WORKER_NAME": "Macaroni 2",
                 "SCRYPTED_CLUSTER_LABELS": "compute",
                 "SCRYPTED_CLUSTER_MODE": "client",
-                "SCRYPTED_CLUSTER_SERVER": "192.168.2.130",
+                "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",
                 "SCRYPTED_CLUSTER_SECRET": "swordfish",
                 "SCRYPTED_CAN_RESTART": "true",
                 "SCRYPTED_VOLUME": "/Users/koush/.scrypted-cluster/volume-client",

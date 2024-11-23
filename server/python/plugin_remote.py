@@ -898,17 +898,6 @@ class PluginRemote:
                             lambda: zipAPI.getZip(),
                         )
 
-                        async def waitPeerLiveness():
-                            try:
-                                await peerLiveness.waitKilled()
-                            except:
-                                try:
-                                    await clusterForkResult.kill()
-                                except:
-                                    pass
-
-                        asyncio.ensure_future(waitPeerLiveness(), loop=self.loop)
-
                         async def waitClusterForkKilled():
                             try:
                                 await clusterForkResult.waitKilled()
@@ -944,9 +933,16 @@ class PluginRemote:
                             directGetRemote, rpc.RpcPeer.PROPERTY_PROXY_PEER
                         )
                         return await finishFork(forkPeer)
+                    
+                    async def getClusterForkWrapped():
+                        try:
+                            return await getClusterFork()
+                        except:
+                            safe_set_result(peerLiveness.killed, None)
+                            raise
 
                     pluginFork = PluginFork()
-                    pluginFork.result = asyncio.create_task(getClusterFork())
+                    pluginFork.result = asyncio.create_task(getClusterForkWrapped())
 
                     async def waitKilled():
                         await peerLiveness.killed

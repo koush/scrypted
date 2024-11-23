@@ -56,38 +56,28 @@ export function createClusterForkWorker(
 
     const forkPeer = (async () => {
         const clusterForkResult = await clusterForkResultPromise;
-        waitKilled.promise.finally(() => {
-            runtimeWorker.pid = undefined;
-            clusterForkResult.kill().catch(() => { });
-        });
         clusterForkResult.waitKilled().catch(() => { })
             .finally(() => {
                 waitKilled.resolve();
             });
 
-        try {
-            const clusterGetRemote = await connectRPCObject(await clusterForkResult.getResult());
-            const {
-                stdout: stdoutGen,
-                stderr: stderrGen,
-                getRemote
-            } = await clusterGetRemote();
+        const clusterGetRemote = await connectRPCObject(await clusterForkResult.getResult());
+        const {
+            stdout: stdoutGen,
+            stderr: stderrGen,
+            getRemote
+        } = await clusterGetRemote();
 
-            writeWorkerGenerator(stdoutGen, stdout).catch(() => { });
-            writeWorkerGenerator(stderrGen, stderr).catch(() => { });
+        writeWorkerGenerator(stdoutGen, stdout).catch(() => { });
+        writeWorkerGenerator(stderrGen, stderr).catch(() => { });
 
-            const directGetRemote = await connectRPCObject(getRemote);
-            if (directGetRemote === getRemote)
-                throw new Error('cluster fork peer not direct connected');
-            const peer: RpcPeer = directGetRemote[RpcPeer.PROPERTY_PROXY_PEER];
-            if (!peer)
-                throw new Error('cluster fork peer undefined?');
-            return peer;
-        }
-        catch (e) {
-            clusterForkResult.kill().catch(() => {});
-            throw e;
-        }
+        const directGetRemote = await connectRPCObject(getRemote);
+        if (directGetRemote === getRemote)
+            throw new Error('cluster fork peer not direct connected');
+        const peer: RpcPeer = directGetRemote[RpcPeer.PROPERTY_PROXY_PEER];
+        if (!peer)
+            throw new Error('cluster fork peer undefined?');
+        return peer;
     })();
 
     forkPeer.catch(() => {
