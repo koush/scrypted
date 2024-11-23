@@ -8,7 +8,7 @@ import { utilizesClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
 import { Plugin } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
-import { Logger } from '../logger';
+import type { LogEntry, Logger } from '../logger';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { createRpcSerializer } from '../rpc-serializer';
 import { ScryptedRuntime } from '../runtime';
@@ -26,6 +26,7 @@ import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { createClusterForkWorker } from './runtime/cluster-fork-worker';
 import { prepareZipSync } from './runtime/node-worker-common';
 import type { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
+import { PassThrough } from 'stream';
 
 const serverVersion = require('../../package.json').version;
 
@@ -409,7 +410,7 @@ export class PluginHost {
                 console.log('cluster worker id', clusterWorkerId);
             }).catch(() => {
                 console.warn("cluster worker id failed", clusterWorkerId);
-             });
+            });
 
             this.worker = runtimeWorker;
             peer = forkPeer;
@@ -418,7 +419,22 @@ export class PluginHost {
         let consoleHeader = `${os.platform()} ${os.arch()} ${os.version()}\nserver version: ${serverVersion}\nplugin version: ${this.pluginId} ${this.packageJson.version}\n`;
         if (process.env.SCRYPTED_DOCKER_FLAVOR)
             consoleHeader += `${process.env.SCRYPTED_DOCKER_FLAVOR}\n`;
-        this.consoleServer = createConsoleServer(this.worker.stdout, this.worker.stderr, consoleHeader);
+        const ptout = new PassThrough();
+        const pterr = new PassThrough();
+        this.worker.stdout.pipe(ptout);
+        this.worker.stderr.pipe(pterr);
+        this.consoleServer = createConsoleServer(ptout, pterr, consoleHeader);
+        logger.on('log', (entry: LogEntry) => {
+            switch (entry.level) {
+                case 'e':
+                case 'w':
+                    pterr.write(`${entry.title}: ${entry.message}\n`);
+                    break;
+                default:
+                    ptout.write(`${entry.title}: ${entry.message}\n`);
+                    break;
+            }
+        });
 
         const disconnect = () => {
             connected = false;
