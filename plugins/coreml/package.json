@@ -41,6 +41,7 @@
       ],
       "labels": {
          "require": [
+            "compute",
             "darwin"
          ]
       }

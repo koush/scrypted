@@ -19,6 +19,9 @@ class CoreMLTextRecognition(TextRecognition):
         self.detectExecutor = concurrent.futures.ThreadPoolExecutor(1, "detect-text")
         self.recogExecutor = concurrent.futures.ThreadPoolExecutor(1, "recog-text")
 
+    def getClusterLabels(self):
+        return {"labels": {"require": ["compute", "darwin"]}}
+
     def downloadModel(self, model: str):
         model_version = "v8"
         mlmodel = "model"
