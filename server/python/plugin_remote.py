@@ -959,8 +959,6 @@ class PluginRemote:
 
                     return pluginFork
 
-                t: asyncio.Task
-                t.cancel()
                 if options:
                     runtime = options.get("runtime", None)
                     if runtime and runtime != "python":
