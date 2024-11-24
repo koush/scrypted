@@ -147,9 +147,6 @@ class CoreMLPlugin(
         if not self.forked:
             asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
 
-    def getClusterLabels(self):
-        return {"labels": {"require": ["compute", "darwin"]}}
-
     async def prepareRecognitionModels(self):
         try:
             devices = [

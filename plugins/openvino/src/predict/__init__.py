@@ -310,9 +310,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
         finally:
             data.close()
 
-    def getClusterLabels(self):
-        return {"labels": {"require": ["compute"]}}
-
     async def forkInterfaceInternal(self, options: dict):
         if self.plugin:
             return await self.plugin.forkInterfaceInternal(options)
@@ -326,7 +323,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
 
         forked = self.forks.get(clusterWorkerId, None)
         if not forked:
-            forked = scrypted_sdk.fork({**self.getClusterLabels(), **(options or {})})
+            forked = scrypted_sdk.fork(
+                {"labels": {"require": [self.pluginId]}, **(options or {})}
+            )
 
             def clusterWorkerExit(result):
                 print("cluster worker exit", clusterWorkerId)

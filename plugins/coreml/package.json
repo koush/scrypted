@@ -41,13 +41,12 @@
       ],
       "labels": {
          "require": [
-            "compute",
-            "darwin"
+            "@scrypted/coreml"
          ]
       }
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.74"
+   "version": "0.1.75"
 }

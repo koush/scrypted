@@ -41,12 +41,12 @@
       ],
       "labels": {
          "require": [
-            "onnx"
+            "@scrypted/onnx"
          ]
       }
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.117"
+   "version": "0.1.118"
 }

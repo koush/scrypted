@@ -64,7 +64,7 @@
             ],
             "env": {
                 "SCRYPTED_CLUSTER_WORKER_NAME": "Macaroni 1",
-                "SCRYPTED_CLUSTER_LABELS": "compute",
+                "SCRYPTED_CLUSTER_LABELS": "@scrypted/coreml,compute",
                 "SCRYPTED_DISABLE_CLUSTER_SERVER_TRUST": "true",
                 "SCRYPTED_CLUSTER_MODE": "server",
                 "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",
@@ -97,7 +97,7 @@
             ],
             "env": {
                 "SCRYPTED_CLUSTER_WORKER_NAME": "Macaroni 2",
-                "SCRYPTED_CLUSTER_LABELS": "compute",
+                "SCRYPTED_CLUSTER_LABELS": "@scrypted/coreml,compute",
                 "SCRYPTED_CLUSTER_MODE": "client",
                 "SCRYPTED_CLUSTER_SERVER": "192.168.2.130",
                 "SCRYPTED_CLUSTER_SECRET": "swordfish",

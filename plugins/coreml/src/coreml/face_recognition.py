@@ -34,9 +34,6 @@ class CoreMLFaceRecognition(FaceRecognizeDetection):
         self.detectExecutor = concurrent.futures.ThreadPoolExecutor(1, "detect-face")
         self.recogExecutor = concurrent.futures.ThreadPoolExecutor(1, "recog-face")
 
-    def getClusterLabels(self):
-        return {"labels": {"require": ["compute", "darwin"]}}
-
     def downloadModel(self, model: str):
         model_version = "v7"
         mlmodel = "model"

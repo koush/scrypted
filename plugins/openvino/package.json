@@ -41,13 +41,12 @@
       ],
       "labels": {
          "require": [
-            "compute",
-            "x64"
+            "@scrypted/openvino"
          ]
       }
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.132"
+   "version": "0.1.136"
 }
