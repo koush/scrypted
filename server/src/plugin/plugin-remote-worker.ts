@@ -337,6 +337,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 result.catch(() => runtimeWorker.kill());
 
                 const worker: ForkWorker = {
+                    [Symbol.dispose]() {
+                        worker.terminate();
+                    },
                     on(event: string, listener: (...args: any[]) => void) {
                         return runtimeWorker.on(event as any, listener);
                     },
@@ -347,6 +350,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     nativeWorker,
                 };
                 return {
+                    [Symbol.dispose]() {
+                        worker.terminate();
+                    },
                     clusterWorkerId,
                     worker,
                     result,

@@ -2547,7 +2547,7 @@ export interface ClusterForkInterface {
   forkInterface<T>(forkInterface: ScryptedInterface, options?: ClusterForkInterfaceOptions): Promise<T>;
 }
 
-export interface ForkWorker {
+export interface ForkWorker extends Disposable {
   terminate(): void;
   on(event: 'exit', listener: () => void): void;
   removeListener(event: 'exit', listener: () => void): void;
@@ -2555,7 +2555,7 @@ export interface ForkWorker {
   removeListener(event: 'error', listener: (e: Error) => void): void;
   nativeWorker?: NodeChildProcess | NodeWorker;
 }
-export interface PluginFork<T> {
+export interface PluginFork<T> extends Disposable {
   /**
    * The id of the cluster worker that is executing this fork when in cluster mode.
    */

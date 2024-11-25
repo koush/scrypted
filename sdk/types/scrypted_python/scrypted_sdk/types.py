@@ -948,7 +948,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.80"
+TYPES_VERSION = "0.3.81"
 
 
 class AirPurifier:
