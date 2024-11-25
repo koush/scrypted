@@ -1683,6 +1683,7 @@ export interface VideoFrameGeneratorOptions extends ImageOptions {
   queue?: number;
   fps?: number;
   firstFrameOnly?: boolean;
+  clusterWorkerId: ForkOptions['clusterWorkerId'];
 }
 export interface VideoFrameGenerator {
   generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions): Promise<AsyncGenerator<VideoFrame, void>>;

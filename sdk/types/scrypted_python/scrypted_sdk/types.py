@@ -929,6 +929,7 @@ class VideoClipThumbnailOptions(TypedDict):
 
 class VideoFrameGeneratorOptions(TypedDict):
 
+    clusterWorkerId: str
     crop: Any
     firstFrameOnly: bool
     format: str
