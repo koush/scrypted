@@ -1603,6 +1603,7 @@ export interface ObjectDetectionGeneratorSession {
   zones?: ObjectDetectionZone[];
   settings?: { [key: string]: any };
   sourceId?: string;
+  clusterWorkerId?: ForkOptions['clusterWorkerId'];
 }
 export interface ObjectDetectionSession extends ObjectDetectionGeneratorSession {
   /**
@@ -1683,7 +1684,7 @@ export interface VideoFrameGeneratorOptions extends ImageOptions {
   queue?: number;
   fps?: number;
   firstFrameOnly?: boolean;
-  clusterWorkerId: ForkOptions['clusterWorkerId'];
+  clusterWorkerId?: ForkOptions['clusterWorkerId'];
 }
 export interface VideoFrameGenerator {
   generateVideoFrames(mediaObject: MediaObject, options?: VideoFrameGeneratorOptions): Promise<AsyncGenerator<VideoFrame, void>>;

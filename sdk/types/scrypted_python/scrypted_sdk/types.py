@@ -687,6 +687,7 @@ class ObjectDetectionGeneratorResult(TypedDict):
 
 class ObjectDetectionGeneratorSession(TypedDict):
 
+    clusterWorkerId: str
     settings: Any
     sourceId: str
     zones: list[ObjectDetectionZone]
@@ -705,6 +706,7 @@ class ObjectDetectionModel(TypedDict):
 class ObjectDetectionSession(TypedDict):
 
     batch: float  # Denotes that this is the first sample in a batch of samples.
+    clusterWorkerId: str
     settings: Any
     sourceId: str
     zones: list[ObjectDetectionZone]
