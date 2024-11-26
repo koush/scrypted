@@ -25,6 +25,7 @@ export interface DevInfo {
     serial: string;
     type: string;
     wifi: number;
+    isNvr?: boolean;
 }
 
 async function getDeviceInfo(host: string, username: string, password: string): Promise<DevInfo> {

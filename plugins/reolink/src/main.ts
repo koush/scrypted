@@ -703,9 +703,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // anecdotally, encoders of type h265 do not have a working RTMP main stream.
         const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[rtspChannel].mainEncType?.ver;
 
-        const isNvr = this.client.getIsNvr(deviceInfo);
 
-        if (isNvr) {
+        if (deviceInfo.isNvr) {
             // NVR connected cameras are very unstable on the RTMP stream, keep only the ext to have a 3th stream
             streams.push(rtspMain, rtspSub);
             if(mainEncType === 1) {
