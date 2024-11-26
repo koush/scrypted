@@ -219,6 +219,10 @@ export class ReolinkCameraClient {
         return response.body?.[0]?.value?.Enc;
     }
 
+    getIsNvr(deviceInfo: DevInfo) {
+        return ['HOMEHUB', 'NVR', 'NVR_WIFI'].includes(deviceInfo.exactType);
+    }
+
     async getDeviceInfo(): Promise<DevInfo> {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
@@ -236,7 +240,7 @@ export class ReolinkCameraClient {
         const deviceInfo: DevInfo = await response.body?.[0]?.value?.DevInfo;
 
         // Will need to check if it's valid for NVR and NVR_WIFI
-        if (!['HOMEHUB', 'NVR', 'NVR_WIFI'].includes(deviceInfo.exactType)) {
+        if (!this.getIsNvr(deviceInfo)) {
             return deviceInfo;
         }
 

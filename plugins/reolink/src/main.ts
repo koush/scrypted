@@ -703,21 +703,30 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // anecdotally, encoders of type h265 do not have a working RTMP main stream.
         const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[rtspChannel].mainEncType?.ver;
 
-        if (live === 2) {
-            if (mainEncType === 1) {
-                streams.push(rtmpSub, rtspMain, rtspSub);
+        const isNvr = this.client.getIsNvr(deviceInfo);
+
+        if (isNvr) {
+            // NVR connected cameras are very unstable on the RTMP stream, keep only the ext to have a 3th stream
+            streams.push(rtspMain, rtspSub);
+            if(mainEncType === 1) {
+                streams.push(rtmpExt);
+            }
+        } else {
+            if (live === 2) {
+                if (mainEncType === 1) {
+                    streams.push(rtmpSub, rtspMain, rtspSub);
+                }
+                else {
+                    streams.push(rtmpMain, rtmpSub, rtspMain, rtspSub);
+                }
+            }
+            else if (mainEncType === 1) {
+                streams.push(rtmpExt, rtmpSub, rtspMain, rtspSub);
             }
             else {
-                streams.push(rtmpMain, rtmpSub, rtspMain, rtspSub);
+                streams.push(rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub);
             }
         }
-        else if (mainEncType === 1) {
-            streams.push(rtmpExt, rtmpSub, rtspMain, rtspSub);
-        }
-        else {
-            streams.push(rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub);
-        }
-
 
         // https://github.com/starkillerOG/reolink_aio/blob/main/reolink_aio/api.py#L93C1-L97C2
         // single motion models have 2*2 RTSP channels
