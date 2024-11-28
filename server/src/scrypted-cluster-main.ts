@@ -21,13 +21,14 @@ import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
 import type { ClusterForkService } from './services/cluster-fork';
 import { sleep } from './sleep';
+import type { ServiceControl } from './services/service-control';
 
 installSourceMapSupport({
     environment: 'node',
 });
 
-async function start(mainFilename: string) {
-    startClusterClient(mainFilename);
+async function start(mainFilename: string, serviceControl?: ServiceControl) {
+    startClusterClient(mainFilename, serviceControl);
 }
 
 export default start;
@@ -197,7 +198,7 @@ function createClusterForkParam(mainFilename: string, clusterId: string, cluster
     return clusterForkParam;
 }
 
-export function startClusterClient(mainFilename: string) {
+export function startClusterClient(mainFilename: string, serviceControl?: ServiceControl) {
     console.log('Cluster client starting.');
     const originalClusterAddress = process.env.SCRYPTED_CLUSTER_ADDRESS;
     const labels = getClusterLabels();

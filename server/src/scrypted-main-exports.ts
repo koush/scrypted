@@ -12,8 +12,10 @@ import { isNodePluginWorkerProcess } from './plugin/runtime/node-fork-worker';
 import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
 import type { Runtime } from './scrypted-server-main';
 import { getScryptedClusterMode } from './cluster/cluster-setup';
+import type { ServiceControl } from './services/service-control';
 
 function start(mainFilename: string, options?: {
+    serviceControl?: ServiceControl,
     onRuntimeCreated?: (runtime: Runtime) => Promise<void>,
 }) {
     // Allow including a custom file path for platforms that require
@@ -70,7 +72,7 @@ function start(mainFilename: string, options?: {
     const clusterMode = getScryptedClusterMode();
     if (clusterMode?.[0] === 'client') {
         const start = require('./scrypted-cluster-main').default;
-        return start(mainFilename);
+        return start(mainFilename, options?.serviceControl);
     }
     else {
         const start = require('./scrypted-server-main').default;
