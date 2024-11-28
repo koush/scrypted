@@ -1,11 +1,7 @@
 import fs from 'fs';
 import { httpFetch } from "../fetch/http-fetch";
-import { ScryptedRuntime } from "../runtime";
 
 export class ServiceControl {
-    constructor(public scrypted: ScryptedRuntime) {
-    }
-
     async restart() {
         // legacy file necessary to exit the npx scrypted service,
         // and allow it to be restarted by launchd or systemd.

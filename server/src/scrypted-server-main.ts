@@ -1,6 +1,6 @@
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
-import crypto, { scrypt } from 'crypto';
+import crypto from 'crypto';
 import { once } from 'events';
 import express, { Request } from 'express';
 import fs from 'fs';
@@ -13,18 +13,19 @@ import path from 'path';
 import process from 'process';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
+import { getScryptedClusterMode } from './cluster/cluster-setup';
 import { Plugin, ScryptedUser, Settings } from './db-types';
 import { getUsableNetworkAddresses } from './ip';
 import Level from './level';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { ScryptedRuntime } from './runtime';
+import { createClusterServer } from './scrypted-cluster-main';
 import { SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { getNpmPackageInfo } from './services/plugin';
+import type { ServiceControl } from './services/service-control';
 import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
-import { createClusterServer, startClusterClient } from './scrypted-cluster-main';
-import { getScryptedClusterMode } from './cluster/cluster-setup';
 
 export type Runtime = ScryptedRuntime;
 
@@ -100,6 +101,7 @@ app.use(bodyParser.raw({ type: 'application/*', limit: 100000000 }) as any)
 
 async function start(mainFilename: string, options?: {
     onRuntimeCreated?: (runtime: ScryptedRuntime) => Promise<void>,
+    serviceControl?: ServiceControl;
 }) {
     console.log('Scrypted server starting.');
     const volumeDir = getScryptedVolume();
@@ -350,6 +352,8 @@ async function start(mainFilename: string, options?: {
     });
 
     const scrypted = new ScryptedRuntime(mainFilename, db, insecure, secure, app);
+    if (options?.serviceControl)
+        scrypted.serviceControl = options.serviceControl;
     await options?.onRuntimeCreated?.(scrypted);
 
     const clusterMode = getScryptedClusterMode();

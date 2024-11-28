@@ -84,7 +84,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         },
     });
     pluginComponent = new PluginComponent(this);
-    serviceControl = new ServiceControl(this);
+    serviceControl = new ServiceControl();
     alerts = new Alerts(this);
     corsControl = new CORSControl(this);
     addressSettings = new AddressSettings(this);
