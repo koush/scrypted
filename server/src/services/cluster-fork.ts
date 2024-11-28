@@ -109,4 +109,14 @@ export class ClusterForkService {
         }
         return ret;
     }
+
+    async getEnvControl(clusterWorkerId: string) {
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        return clusterWorker.peer.getParam('env-control');
+    }
+
+    async getServiceControl(clusterWorkerId: string) {
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        return clusterWorker.peer.getParam('service-control');
+    }
 }
