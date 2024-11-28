@@ -46,6 +46,7 @@ import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
 import { isClusterAddress } from './cluster/cluster-setup';
 import { RunningClusterWorker } from './scrypted-cluster-main';
+import { EnvControl } from './services/env';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -90,6 +91,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     addressSettings = new AddressSettings(this);
     usersService = new UsersService(this);
     clusterFork = new ClusterForkService(this);
+    envControl = new EnvControl();
     info = new Info();
     backup = new Backup(this);
     pluginHosts = getBuiltinRuntimeHosts();
@@ -125,7 +127,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 }
 
                 let address = clusterObject.address;
-                if (isClusterAddress(address)) 
+                if (isClusterAddress(address))
                     address = '127.0.0.1';
                 const socket = net.connect({
                     port: clusterObject.port,
@@ -376,6 +378,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 return this.backup;
             case 'cluster-fork':
                 return this.clusterFork;
+            case 'env-control':
+                return this.envControl;
         }
     }
 

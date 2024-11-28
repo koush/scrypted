@@ -22,6 +22,7 @@ import type { ScryptedRuntime } from './runtime';
 import type { ClusterForkService } from './services/cluster-fork';
 import { sleep } from './sleep';
 import type { ServiceControl } from './services/service-control';
+import { EnvControl } from './services/env';
 
 installSourceMapSupport({
     environment: 'node',
@@ -200,6 +201,9 @@ function createClusterForkParam(mainFilename: string, clusterId: string, cluster
 
 export function startClusterClient(mainFilename: string, serviceControl?: ServiceControl) {
     console.log('Cluster client starting.');
+
+    const envControl = new EnvControl();
+
     const originalClusterAddress = process.env.SCRYPTED_CLUSTER_ADDRESS;
     const labels = getClusterLabels();
 
@@ -248,6 +252,8 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
                 process.env.SCRYPTED_CLUSTER_ADDRESS = socket.localAddress;
 
             const peer = preparePeer(socket, 'client');
+            peer.params['service-control'] = serviceControl;
+            peer.params['env-control'] = envControl;
             const { localAddress, localPort } = socket;
             console.log('Cluster server connected.', localAddress, localPort);
             socket.on('close', () => {
