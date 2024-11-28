@@ -1,5 +1,6 @@
 {
    "name": "@scrypted/unifi-protect",
+   "type": "module",
    "version": "0.0.164",
    "description": "Unifi Protect Plugin for Scrypted",
    "author": "Scrypted",
@@ -28,20 +29,22 @@
          "DeviceProvider",
          "Settings"
       ],
-      "babel": true,
       "pluginDependencies": [
          "@scrypted/prebuffer-mixin"
       ]
    },
    "devDependencies": {
-      "@types/node": "^20.4.2",
-      "@types/ws": "^8.5.5"
+      "@types/node": "^22.9.4",
+      "@types/ws": "^8.5.13"
    },
    "dependencies": {
-      "@koush/unifi-protect": "file:../../external/unifi-protect",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "axios": "^1.4.0",
-      "ws": "^8.13.0"
+      "axios": "^1.7.8",
+      "unifi-protect": "^4.16.0",
+      "ws": "^8.18.0"
+   },
+   "optionalDependencies": {
+      "@adobe/fetch": "^4.1.9"
    }
 }

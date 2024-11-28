@@ -1,11 +1,6 @@
 
 export interface FeatureFlagsShim {
-    hasPackageCamera: boolean;
     hasFingerprintSensor: boolean;
-}
-
-export interface LastSeenShim {
-    lastSeen: number;
 }
 
 export interface PrivacyZone {

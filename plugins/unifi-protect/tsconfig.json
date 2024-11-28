@@ -1,9 +1,9 @@
 {
     "compilerOptions": {
-        "module": "Node16",
+        "module": "es2022",
         "target": "ES2021",
         "resolveJsonModule": true,
-        "moduleResolution": "Node16",
+        "moduleResolution": "bundler",
         "esModuleInterop": true,
         "sourceMap": true
     },
