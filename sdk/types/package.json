@@ -10,10 +10,10 @@
     "build": "tsc --project src && rimraf dist gen && typedoc && ts-node ./src/build.ts && tsc"
   },
   "devDependencies": {
-    "@types/node": "^22.1.0",
+    "@types/node": "^22.10.1",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.4"
+    "typescript": "^5.7.2"
   },
   "types": "dist/index.d.ts"
 }
