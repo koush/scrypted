@@ -23,6 +23,7 @@ import type { ClusterForkService } from './services/cluster-fork';
 import { sleep } from './sleep';
 import type { ServiceControl } from './services/service-control';
 import { EnvControl } from './services/env';
+import { Info } from './services/info';
 
 installSourceMapSupport({
     environment: 'node',
@@ -254,6 +255,8 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
             const peer = preparePeer(socket, 'client');
             peer.params['service-control'] = serviceControl;
             peer.params['env-control'] = envControl;
+            peer.params['info'] = new Info();
+
             const { localAddress, localPort } = socket;
             console.log('Cluster server connected.', localAddress, localPort);
             socket.on('close', () => {

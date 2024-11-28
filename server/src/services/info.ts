@@ -1,3 +1,5 @@
+export const serverVersion = require('../../package.json').version;
+
 export class Info {
     async getVersion() {
         return require('../../package.json').version;

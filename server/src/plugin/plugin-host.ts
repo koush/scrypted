@@ -27,9 +27,7 @@ import { createClusterForkWorker } from './runtime/cluster-fork-worker';
 import { prepareZipSync } from './runtime/node-worker-common';
 import type { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
 import { PassThrough } from 'stream';
-
-const serverVersion = require('../../package.json').version;
-
+import { serverVersion } from '../services/info';
 export class UnsupportedRuntimeError extends Error {
     constructor(runtime: string) {
         super(`Unsupported runtime: ${runtime}`);
