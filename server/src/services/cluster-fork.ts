@@ -119,4 +119,9 @@ export class ClusterForkService {
         const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
         return clusterWorker.peer.getParam('service-control');
     }
+
+    async getInfo(clusterWorkerId: string) {
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        return clusterWorker.peer.getParam('info');
+    }
 }
