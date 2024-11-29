@@ -283,7 +283,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     systemManager,
                     mediaManager,
                     endpointManager,
-                    log,
                     localStorage,
                     pluginHostAPI: api,
                     // TODO:
