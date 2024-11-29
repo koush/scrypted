@@ -211,7 +211,7 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
                 if (e.name === 'StopAsyncIteration') {
                     return {
                         done: true,
-                        value: undefined,
+                        value: undefined as any,
                     }
                 }
                 throw e;

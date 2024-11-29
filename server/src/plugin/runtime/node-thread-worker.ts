@@ -23,7 +23,10 @@ class BufferTransfer implements RpcSerializer {
 
         serializationContext.transferList ||= [];
         const transferList: worker_threads.TransferListItem[] = serializationContext.transferList;
-        transferList.push(value.buffer);
+        const { buffer } = value;
+        // shared array buffers doesn't need to be transferred.
+        if (!(buffer instanceof SharedArrayBuffer))
+            transferList.push(buffer);
         // can return the value directly, as the buffer is transferred.
         return value;
     }
