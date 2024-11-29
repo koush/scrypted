@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.3.89",
+  "version": "0.3.90",
   "description": "",
   "main": "dist/src/index.js",
   "exports": {
@@ -33,6 +33,7 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^15.3.0",
     "@rollup/plugin-typescript": "^12.1.1",
+    "@rollup/plugin-virtual": "^3.0.2",
     "adm-zip": "^0.5.16",
     "axios": "^1.7.8",
     "babel-loader": "^9.2.1",
