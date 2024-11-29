@@ -158,11 +158,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     return require(c);
                 }
             };
-            // const window: any = {};
-            const exports: any = {};
-            // window.exports = exports;
-            // params.window = window;
-            params.exports = exports;
+            params.module = {
+                exports: {},
+            };
+            params.exports = params.module.exports;
 
             const entry = pluginReader(`${mainNodejs}.map`)
             const map = entry?.toString();
@@ -363,6 +362,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const filename = zipOptions?.debug ? pluginMainNodeJs : pluginIdMainNodeJs;
                 evalLocal(peer, script, startPluginRemoteOptions?.sourceURL?.(filename) || filename, params);
 
+                const exports = params.module.exports;
                 if (zipOptions?.fork) {
                     // pluginConsole?.log('plugin forked');
                     const fork = exports.fork;
@@ -372,7 +372,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 }
 
                 pluginConsole?.log('plugin loaded');
-                let pluginInstance = exports.default;
+                let pluginInstance = exports.default || exports;
                 // support exporting a plugin class, plugin main function,
                 // or a plugin instance
                 if (pluginInstance.toString().startsWith('class '))
