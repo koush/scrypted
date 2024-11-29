@@ -29,25 +29,29 @@
   "license": "ISC",
   "dependencies": {
     "@babel/preset-typescript": "^7.26.0",
+    "@rollup/plugin-commonjs": "^28.0.1",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^15.3.0",
+    "@rollup/plugin-typescript": "^12.1.1",
     "adm-zip": "^0.5.16",
-    "axios": "^1.7.7",
+    "axios": "^1.7.8",
     "babel-loader": "^9.2.1",
     "babel-plugin-const-enum": "^1.2.0",
     "ncp": "^2.0.0",
     "raw-loader": "^4.0.2",
     "rimraf": "^6.0.1",
+    "rollup": "^4.27.4",
     "tmp": "^0.2.3",
     "ts-loader": "^9.5.1",
-    "typescript": "^5.5.4",
-    "webpack": "^5.95.0",
+    "tslib": "^2.8.1",
+    "typescript": "^5.7.2",
+    "webpack": "^5.96.1",
     "webpack-bundle-analyzer": "^4.10.2"
   },
   "devDependencies": {
-    "@types/node": "^22.8.1",
-    "@types/stringify-object": "^4.0.5",
-    "stringify-object": "^3.3.0",
+    "@types/node": "^22.10.1",
     "ts-node": "^10.9.2",
-    "typedoc": "^0.26.10"
+    "typedoc": "^0.27.1"
   },
   "types": "dist/src/index.d.ts"
 }

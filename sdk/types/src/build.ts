@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from 'path';
-import stringifyObject from 'stringify-object';
 import { DeclarationReflection, ProjectReflection, ReflectionKind } from 'typedoc';
 import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 
@@ -69,7 +68,7 @@ ${deviceStateContents}
 ${propertyContents}
 ${methodContents}
 
-export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = ${stringifyObject(ScryptedInterfaceDescriptors, { indent: '  ' })}
+export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = ${JSON.stringify(ScryptedInterfaceDescriptors, undefined, 2)};
 
 ${fs.readFileSync(path.join(__dirname, './types.input.ts'))}
 `;
