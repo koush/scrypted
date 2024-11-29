@@ -7,14 +7,14 @@ const fs = require('fs');
 let out;
 const cwd = process.cwd();
 
-if (process.env.NODE_ENV == 'production') {
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
     out = path.resolve(cwd, 'dist');
 }
 else {
     out = path.resolve(cwd, 'out');
 }
 
-const isProduction = process.env.NODE_ENV == 'production';
 
 function ensureAlias(name) {
     const sanitizedName = name.replace(/@/g, '').replace(/\//g, '').replace(/-/g, '');

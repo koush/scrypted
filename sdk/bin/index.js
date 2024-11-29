@@ -56,7 +56,7 @@ exports.deploy = function (debugHost, noRebind) {
 
     return new Promise((resolve, reject) => {
         var out;
-        if (process.env.NODE_ENV == 'production')
+        if (process.env.NODE_ENV === 'production')
             out = path.resolve(process.cwd(), 'dist');
         else
             out = path.resolve(process.cwd(), 'out');
