@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/types",
-  "version": "0.3.81",
+  "version": "0.3.82",
   "description": "",
   "main": "dist/index.js",
   "author": "",
@@ -8,12 +8,6 @@
   "scripts": {
     "prepublishOnly": "npm run build",
     "build": "tsc --project src && rimraf dist gen && typedoc && ts-node ./src/build.ts && tsc"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.1",
-    "rimraf": "^6.0.1",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
   },
   "types": "dist/index.d.ts"
 }

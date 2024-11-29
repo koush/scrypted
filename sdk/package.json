@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.3.88",
+  "version": "0.3.89",
   "description": "",
   "main": "dist/src/index.js",
   "exports": {
@@ -44,14 +44,14 @@
     "tmp": "^0.2.3",
     "ts-loader": "^9.5.1",
     "tslib": "^2.8.1",
-    "typescript": "^5.7.2",
+    "typescript": "^5.6.3",
     "webpack": "^5.96.1",
     "webpack-bundle-analyzer": "^4.10.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
     "ts-node": "^10.9.2",
-    "typedoc": "^0.27.1"
+    "typedoc": "^0.26.11"
   },
   "types": "dist/src/index.d.ts"
 }
