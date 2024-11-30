@@ -24,8 +24,7 @@ import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
 import { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
-// @ts-expect-error
-import { eseval } from '../../es-eval.js';
+import { eseval } from '../es/es-eval';
 
 const serverVersion = require('../../package.json').version;
 

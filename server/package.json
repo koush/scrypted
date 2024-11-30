@@ -56,7 +56,7 @@
     "serve": "node --expose-gc dist/scrypted-main.js",
     "serve-no-build": "node --expose-gc dist/scrypted-main.js",
     "prebuild": "rimraf dist",
-    "build": "tsc --outDir dist",
+    "build": "tsc --build tsconfig.json",
     "postbuild": "node test/check-build-output.js",
     "beta": "npm publish --tag beta",
     "postbeta": "npm version patch && git add package.json && npm run build && git commit -m postbeta",

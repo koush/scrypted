@@ -1,23 +1,19 @@
 {
     "compilerOptions": {
+        "composite": true,
         "declaration": true,
-        "module": "commonjs",
+        "module": "ESNext",
         "target": "esnext",
         "noImplicitAny": true,
-        "outDir": "./dist",
-        "esModuleInterop": true,
+        "outDir": "../../dist/es",
+        "esModuleInterop": false,
         // skip error: Interface 'WebGL2RenderingContext' incorrectly extends interface 'WebGL2RenderingContextBase'.
         // https://github.com/tensorflow/tfjs/issues/4201
         "skipLibCheck": true,
         "sourceMap": true,
     },
-    "references": [
-        { "path": "./src/es" },
-    ],
-    "exclude": [
-        "src/es/es-eval.ts"
-    ],
     "include": [
-        "src/**/*", 
-     ],
+        "./es-eval.ts",
+    ],
+    "exclude": []
 }
