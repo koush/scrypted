@@ -17,28 +17,28 @@ export class ScryptedDeviceBase extends DeviceBase {
 
   get storage() {
     if (!this._storage) {
-      this._storage = deviceManager.getDeviceStorage(this.nativeId);
+      this._storage = sdk.deviceManager.getDeviceStorage(this.nativeId);
     }
     return this._storage;
   }
 
   get log() {
     if (!this._log) {
-      this._log = deviceManager.getDeviceLogger(this.nativeId);
+      this._log = sdk.deviceManager.getDeviceLogger(this.nativeId);
     }
     return this._log;
   }
 
   get console() {
     if (!this._console) {
-      this._console = deviceManager.getDeviceConsole(this.nativeId);
+      this._console = sdk.deviceManager.getDeviceConsole(this.nativeId);
     }
 
     return this._console;
   }
 
   async createMediaObject(data: any, mimeType: string) {
-    return mediaManager.createMediaObject(data, mimeType, {
+    return sdk.mediaManager.createMediaObject(data, mimeType, {
       sourceId: this.id,
     });
   }
@@ -46,16 +46,16 @@ export class ScryptedDeviceBase extends DeviceBase {
   getMediaObjectConsole(mediaObject: MediaObject): Console | undefined {
     if (typeof mediaObject.sourceId !== 'string')
       return this.console;
-    return deviceManager.getMixinConsole(mediaObject.sourceId, this.nativeId);
+    return sdk.deviceManager.getMixinConsole(mediaObject.sourceId, this.nativeId);
   }
 
   _lazyLoadDeviceState() {
     if (!this._deviceState) {
       if (this.nativeId) {
-        this._deviceState = deviceManager.getDeviceState(this.nativeId);
+        this._deviceState = sdk.deviceManager.getDeviceState(this.nativeId);
       }
       else {
-        this._deviceState = deviceManager.getDeviceState();
+        this._deviceState = sdk.deviceManager.getDeviceState();
       }
     }
   }
@@ -64,7 +64,7 @@ export class ScryptedDeviceBase extends DeviceBase {
    * Fire an event for this device.
    */
   onDeviceEvent(eventInterface: string, eventData: any): Promise<void> {
-    return deviceManager.onDeviceEvent(this.nativeId, eventInterface, eventData);
+    return sdk.deviceManager.onDeviceEvent(this.nativeId, eventInterface, eventData);
   }
 }
 
@@ -100,14 +100,14 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
     this.mixinDeviceInterfaces = options.mixinDeviceInterfaces;
     this.mixinStorageSuffix = options.mixinStorageSuffix;
     this._deviceState = options.mixinDeviceState;
-    this.nativeId = systemManager.getDeviceById(this.id).nativeId;
+    this.nativeId = sdk.systemManager.getDeviceById(this.id).nativeId;
     this.mixinProviderNativeId = options.mixinProviderNativeId;
 
     // RpcProxy will trap all properties, and the following check/hack will determine
     // if the device state came from another node worker thread.
     // This should ultimately be discouraged and warned at some point in the future.
     if ((this._deviceState as any).__rpcproxy_traps_all_properties && typeof this._deviceState.id === 'string') {
-      this._deviceState = deviceManager.createDeviceState(this._deviceState.id, this._deviceState.setState);
+      this._deviceState = sdk.deviceManager.createDeviceState(this._deviceState.id, this._deviceState.setState);
     }
   }
 
@@ -115,24 +115,24 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
     if (!this._storage) {
       const mixinStorageSuffix = this.mixinStorageSuffix;
       const mixinStorageKey = this.id + (mixinStorageSuffix ? ':' + mixinStorageSuffix : '');
-      this._storage = deviceManager.getMixinStorage(mixinStorageKey, this.mixinProviderNativeId);
+      this._storage = sdk.deviceManager.getMixinStorage(mixinStorageKey, this.mixinProviderNativeId);
     }
     return this._storage;
   }
 
   get console() {
     if (!this._console) {
-      if (deviceManager.getMixinConsole)
-        this._console = deviceManager.getMixinConsole(this.id, this.mixinProviderNativeId);
+      if (sdk.deviceManager.getMixinConsole)
+        this._console = sdk.deviceManager.getMixinConsole(this.id, this.mixinProviderNativeId);
       else
-        this._console = deviceManager.getDeviceConsole(this.mixinProviderNativeId);
+        this._console = sdk.deviceManager.getDeviceConsole(this.mixinProviderNativeId);
     }
 
     return this._console;
   }
 
   async createMediaObject(data: any, mimeType: string) {
-    return mediaManager.createMediaObject(data, mimeType, {
+    return sdk.mediaManager.createMediaObject(data, mimeType, {
       sourceId: this.id,
     });
   }
@@ -140,14 +140,14 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   getMediaObjectConsole(mediaObject: MediaObject): Console {
     if (typeof mediaObject.sourceId !== 'string')
       return this.console;
-    return deviceManager.getMixinConsole(mediaObject.sourceId, this.mixinProviderNativeId);
+    return sdk.deviceManager.getMixinConsole(mediaObject.sourceId, this.mixinProviderNativeId);
   }
 
   /**
    * Fire an event for this device.
    */
   onDeviceEvent(eventInterface: string, eventData: any): Promise<void> {
-    return deviceManager.onMixinEvent(this.id, this, eventInterface, eventData);
+    return sdk.deviceManager.onMixinEvent(this.id, this, eventInterface, eventData);
   }
 
   _lazyLoadDeviceState() {
@@ -201,15 +201,16 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   }
 })();
 
-export const sdk: ScryptedStatic = {} as any;
 declare const deviceManager: DeviceManager;
 declare const endpointManager: EndpointManager;
 declare const mediaManager: MediaManager;
 declare const systemManager: SystemManager;
 declare const pluginHostAPI: any;
 declare const pluginRuntimeAPI: any;
+export const sdk: ScryptedStatic = {} as any;
 
 try {
+
   let runtimeAPI: any;
   try {
     runtimeAPI = pluginRuntimeAPI;
@@ -217,7 +218,7 @@ try {
   catch (e) {
   }
 
-  Object.assign(sdk, {
+  sdkInit({
     log: deviceManager.getDeviceLogger(undefined),
     deviceManager,
     endpointManager,
@@ -234,7 +235,29 @@ try {
   }
 }
 catch (e) {
-  console.error('sdk initialization error, import @scrypted/types or use @scrypted/client instead', e);
+  // console.error('sdk initialization error, import @scrypted/types or use @scrypted/client instead', e);
 }
 
 export default sdk;
+
+export function sdkInit(sdkInit: {
+  deviceManager: DeviceManager,
+  endpointManager: EndpointManager,
+  mediaManager: MediaManager,
+  systemManager: SystemManager,
+  pluginHostAPI: any,
+  pluginRuntimeAPI: any,
+}) {
+
+  const { deviceManager, endpointManager, mediaManager, systemManager, pluginHostAPI, pluginRuntimeAPI } = sdkInit;
+
+  Object.assign(sdk, {
+    log: deviceManager.getDeviceLogger(undefined),
+    deviceManager,
+    endpointManager,
+    mediaManager,
+    systemManager,
+    pluginHostAPI,
+    ...pluginRuntimeAPI,
+  });
+}

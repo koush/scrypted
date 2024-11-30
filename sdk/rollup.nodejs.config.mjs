@@ -10,8 +10,12 @@ const config = defineConfig({
     output: {
         sourcemap: true,
         file: `${process.env.NODE_ENV === 'production' ? 'dist' : 'out'}/main.nodejs.js`,
-        format: 'cjs',
+        format: 'module',
+        banner: `//# sourceURL=/plugin/main.nodejs.js`,
     },
+    external: [
+        'unifi-protect',
+    ],
 
     plugins: [
         virtual({

@@ -24,6 +24,8 @@ import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
 import { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
+// @ts-expect-error
+import { eseval } from '../../es-eval.js';
 
 const serverVersion = require('../../package.json').version;
 
@@ -360,9 +362,17 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             try {
                 const filename = zipOptions?.debug ? pluginMainNodeJs : pluginIdMainNodeJs;
-                evalLocal(peer, script, startPluginRemoteOptions?.sourceURL?.(filename) || filename, params);
+                if (packageJson.type === 'module') {
+                    const p = path.join(unzippedPath, mainNodejs);
+                    const module = await eseval(p);
+                    params.module.exports = module;
+            }
+                else {
+                    evalLocal(peer, script, startPluginRemoteOptions?.sourceURL?.(filename) || filename, params);
+                }
 
                 const exports = params.module.exports;
+                exports.sdkInit?.(params);
                 if (zipOptions?.fork) {
                     // pluginConsole?.log('plugin forked');
                     const fork = exports.fork;

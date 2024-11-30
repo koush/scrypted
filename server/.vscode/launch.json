@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "autoAttachChildProcesses": false,
+            "autoAttachChildProcesses": true,
             "type": "node",
             "request": "launch",
             "name": "Launch Program",
