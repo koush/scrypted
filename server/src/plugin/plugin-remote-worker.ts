@@ -365,7 +365,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     const p = path.join(unzippedPath, mainNodejs);
                     const module = await eseval(p);
                     params.module.exports = module;
-            }
+                }
                 else {
                     evalLocal(peer, script, startPluginRemoteOptions?.sourceURL?.(filename) || filename, params);
                 }
