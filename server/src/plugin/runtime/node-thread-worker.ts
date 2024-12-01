@@ -1,10 +1,9 @@
-import worker_threads from "worker_threads";
 import { EventEmitter } from "events";
+import worker_threads from "worker_threads";
 import { RpcMessage, RpcPeer, RpcSerializer } from "../../rpc";
-import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 import { BufferSerializer } from '../../rpc-buffer-serializer';
 import { NODE_PLUGIN_THREAD_PROCESS } from "./node-fork-worker";
-
+import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 
 class BufferTransfer implements RpcSerializer {
     bufferSerializer = new BufferSerializer();

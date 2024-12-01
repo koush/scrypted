@@ -1,10 +1,11 @@
 import child_process from 'child_process';
 import net from "net";
+import path from 'path';
+import { getScryptedClusterMode } from '../../cluster/cluster-setup';
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { SidebandSocketSerializer } from "../socket-serializer";
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
-import { getScryptedClusterMode } from '../../cluster/cluster-setup';
 
 export const NODE_PLUGIN_CHILD_PROCESS = 'child';
 export const NODE_PLUGIN_FORK_PROCESS = 'fork';
@@ -49,7 +50,9 @@ export class NodeForkWorker extends ChildProcessWorker {
 
         this.worker = child_process.fork(mainFilename, args, {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-            env: Object.assign({}, process.env, env),
+            env: Object.assign({}, process.env, env, {
+                NODE_PATH: path.resolve(__dirname, '..', '..', '..', 'node_modules'),
+            }),
             serialization: 'advanced',
             execArgv,
         });

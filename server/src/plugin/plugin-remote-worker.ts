@@ -1,11 +1,13 @@
 import { ForkWorker, ScryptedStatic, SystemManager } from '@scrypted/types';
 import child_process from 'child_process';
 import fs from 'fs';
+import { createRequire } from 'module';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import worker_threads from 'worker_threads';
 import { utilizesClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
+import { eseval } from '../es/es-eval';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
 import { ClusterManagerImpl } from '../scrypted-cluster-main';
@@ -24,7 +26,6 @@ import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
 import { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
-import { eseval } from '../es/es-eval';
 
 const serverVersion = require('../../package.json').version;
 
@@ -135,30 +136,12 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             const pluginConsole = getPluginConsole?.();
             params.console = pluginConsole;
+
             const pnp = getPluginNodePath(pluginId);
+            const pnpNodeModules = path.join(pnp, 'node_modules');
             pluginConsole?.log('node modules', pnp);
-            params.require = (name: string) => {
-                if (name === 'realfs') {
-                    return require('fs');
-                }
-                try {
-                    if (name.startsWith('.') && unzippedPath) {
-                        try {
-                            const c = path.join(unzippedPath, name);
-                            const module = require(c);
-                            return module;
-                        }
-                        catch (e) {
-                        }
-                    }
-                    const module = require(name);
-                    return module;
-                }
-                catch (e) {
-                    const c = path.join(pnp, 'node_modules', name);
-                    return require(c);
-                }
-            };
+            params.require = createRequire(pnpNodeModules);
+
             params.module = {
                 exports: {},
             };
@@ -360,8 +343,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             }
 
             try {
+                const isModule = packageJson.type === 'module';
                 const filename = zipOptions?.debug ? pluginMainNodeJs : pluginIdMainNodeJs;
-                if (packageJson.type === 'module') {
+                if (isModule) {
                     const p = path.join(unzippedPath, mainNodejs);
                     const module = await eseval(p);
                     params.module.exports = module;
