@@ -1,7 +1,6 @@
 import { ForkWorker, ScryptedStatic, SystemManager } from '@scrypted/types';
 import child_process from 'child_process';
 import fs from 'fs';
-import { createRequire } from 'module';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import worker_threads from 'worker_threads';
@@ -138,9 +137,32 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             params.console = pluginConsole;
 
             const pnp = getPluginNodePath(pluginId);
-            const pnpNodeModules = path.join(pnp, 'node_modules');
+            // const pnpNodeModules = path.join(pnp, 'node_modules');
             pluginConsole?.log('node modules', pnp);
-            params.require = createRequire(pnpNodeModules);
+            params.require = (name: string) => {
+                if (name === 'realfs') {
+                    return require('fs');
+                }
+                try {
+                    if (name.startsWith('.') && unzippedPath) {
+                        try {
+                            const c = path.join(unzippedPath, name);
+                            const module = require(c);
+                            return module;
+                        }
+                        catch (e) {
+                        }
+                    }
+                    const module = require(name);
+                    return module;
+                }
+                catch (e) {
+                    const c = path.join(pnp, 'node_modules', name);
+                    return require(c);
+                }
+            };
+            // this breaks relative imports, which currently arent in use i think.
+            // params.require = createRequire(pnpNodeModules);
 
             params.module = {
                 exports: {},
