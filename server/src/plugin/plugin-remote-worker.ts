@@ -6,7 +6,6 @@ import { install as installSourceMapSupport } from 'source-map-support';
 import worker_threads from 'worker_threads';
 import { utilizesClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
-import { eseval } from '../es/es-eval';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
 import { ClusterManagerImpl } from '../scrypted-cluster-main';
@@ -369,6 +368,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const filename = zipOptions?.debug ? pluginMainNodeJs : pluginIdMainNodeJs;
                 if (isModule) {
                     const p = path.join(unzippedPath, mainNodejs);
+                    const { eseval } = await import('../es/es-eval');
                     const module = await eseval(p);
                     params.module.exports = module;
                 }
