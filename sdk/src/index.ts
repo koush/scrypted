@@ -225,7 +225,7 @@ try {
     mediaManager,
     systemManager,
     pluginHostAPI,
-    ...runtimeAPI,
+    pluginRuntimeAPI: runtimeAPI,
   });
 
   try {
@@ -241,6 +241,7 @@ catch (e) {
 export default sdk;
 
 export function sdkInit(sdkInit: {
+  log: Logger,
   deviceManager: DeviceManager,
   endpointManager: EndpointManager,
   mediaManager: MediaManager,
