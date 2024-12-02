@@ -98,7 +98,7 @@ class ClusterSetup:
             return
         self.clusterId = options["clusterId"]
         self.clusterSecret = options["clusterSecret"]
-        self.clusterWorkerId = options["clusterWorkerId"]
+        self.clusterWorkerId = options.get("clusterWorkerId", None)
         self.SCRYPTED_CLUSTER_ADDRESS = os.environ.get("SCRYPTED_CLUSTER_ADDRESS", None)
 
         async def handleClusterClient(
