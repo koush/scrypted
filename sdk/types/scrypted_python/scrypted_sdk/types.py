@@ -950,7 +950,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.83"
+TYPES_VERSION = "0.3.85"
 
 
 class AirPurifier:
@@ -1842,6 +1842,9 @@ class ClusterManager:
         pass
 
     async def getClusterWorkers(self) -> Mapping[str, ClusterWorker]:
+        pass
+
+    async def getRPCObjectClusterWorkerId(self, object: Any) -> str:
         pass
 
 

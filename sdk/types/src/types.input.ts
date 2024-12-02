@@ -2694,6 +2694,7 @@ export interface ClusterManager {
   getClusterWorkerId(): string;
   getClusterMode(): 'server' | 'client' | undefined;
   getClusterWorkers(): Promise<Record<string, ClusterWorker>>;
+  getRPCObjectClusterWorkerId(object: any): Promise<string>;
 }
 
 export interface ScryptedStatic {
