@@ -17,6 +17,13 @@ export function isClusterAddress(address: string) {
     return !address || address === process.env.SCRYPTED_CLUSTER_ADDRESS;
 }
 
+export function getClusterObject(clusterId: string, value: any) {
+    const clusterObject: ClusterObject = value?.__cluster;
+    if (clusterObject?.id !== clusterId)
+        return;
+    return clusterObject;
+}
+
 async function peerConnectRPCObject(peer: RpcPeer, o: ClusterObject) {
     let peerConnectRPCObject: Promise<ConnectRPCObject> = peer.tags['connectRPCObject'];
     if (!peerConnectRPCObject) {
@@ -32,6 +39,7 @@ export function setupCluster(peer: RpcPeer) {
     let clusterId: string;
     let clusterSecret: string;
     let clusterPort: number;
+    let clusterWorkerId: string;
 
     // all cluster clients, incoming and outgoing, connect with random ports which can be used as peer ids
     // on the cluster server that is listening on the actual port.
@@ -236,8 +244,8 @@ export function setupCluster(peer: RpcPeer) {
     }
 
     const connectRPCObject = async (value: any) => {
-        const clusterObject: ClusterObject = value?.__cluster;
-        if (clusterObject?.id !== clusterId)
+        const clusterObject = getClusterObject(clusterId, value);
+        if (!clusterObject)
             return value;
         const { address, port, proxyId } = clusterObject;
         // handle the case when trying to connect to an object is on this cluster node,
@@ -315,12 +323,12 @@ export function setupCluster(peer: RpcPeer) {
     const initializeCluster: InitializeCluster = async (options: {
         clusterId: string;
         clusterSecret: string;
+        clusterWorkerId: string;
     }) => {
         if (clusterPort)
             return;
 
-        ({ clusterId, clusterSecret } = options);
-
+        ({ clusterId, clusterSecret, clusterWorkerId, } = options);
 
         const clients = new Set<net.Socket>();
 
@@ -379,7 +387,7 @@ export function setupCluster(peer: RpcPeer) {
     }
 }
 
-export type InitializeCluster = (cluster: { clusterId: string, clusterSecret: string }) => Promise<void>;
+export type InitializeCluster = (cluster: { clusterId: string, clusterSecret: string, clusterWorkerId: string, }) => Promise<void>;
 
 export function getScryptedClusterMode(): ['server' | 'client', string, number] {
     const mode = process.env.SCRYPTED_CLUSTER_MODE as 'server' | 'client';

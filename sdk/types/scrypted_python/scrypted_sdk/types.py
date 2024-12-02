@@ -468,6 +468,7 @@ class ClusterForkInterfaceOptions(TypedDict):
 
 class ClusterWorker(TypedDict):
 
+    cpuUsage: float
     forks: list[ClusterFork]
     id: str
     labels: list[str]
@@ -950,7 +951,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.85"
+TYPES_VERSION = "0.3.87"
 
 
 class AirPurifier:
@@ -1741,9 +1742,6 @@ class SystemManager:
     def getDeviceByName(self, name: str) -> ScryptedDevice:
         pass
 
-    def getDeviceState(self, id: str) -> Any:
-        pass
-
     def getSystemState(self) -> Any:
         pass
 
@@ -1842,9 +1840,6 @@ class ClusterManager:
         pass
 
     async def getClusterWorkers(self) -> Mapping[str, ClusterWorker]:
-        pass
-
-    async def getRPCObjectClusterWorkerId(self, object: Any) -> str:
         pass
 
 

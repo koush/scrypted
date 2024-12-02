@@ -115,7 +115,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             await initializeCluster(zipOptions);
 
             scrypted.connectRPCObject = connectRPCObject;
-            scrypted.clusterManager = new ClusterManagerImpl(api);
+            scrypted.clusterManager = new ClusterManagerImpl(api, zipOptions.clusterWorkerId);
 
             if (worker_threads.isMainThread) {
                 const fsDir = path.join(unzippedPath, 'fs')
@@ -332,6 +332,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     }
 
                     const forkOptions = Object.assign({}, zipOptions);
+                    forkOptions.clusterWorkerId = await clusterWorkerId || forkOptions.clusterWorkerId;
                     forkOptions.fork = true;
                     forkOptions.main = options?.filename;
                     const forkZipAPI = new PluginZipAPI(() => zipAPI.getZip());

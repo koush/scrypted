@@ -229,21 +229,21 @@ class EventRegistry(object):
 
 
 class ClusterManager(scrypted_python.scrypted_sdk.types.ClusterManager):
-    def __init__(self, api: Any):
-        self.api = api
+    def __init__(self, remote: PluginRemote):
+        self.remote = remote
         self.clusterService = None
 
     def getClusterMode(self) -> Any | Any:
         return os.getenv("SCRYPTED_CLUSTER_MODE", None)
 
     def getClusterWorkerId(self) -> str:
-        return os.getenv("SCRYPTED_CLUSTER_WORKER_ID", None)
+        return self.remote.clusterSetup.clusterWorkerId
 
     async def getClusterWorkers(
         self,
     ) -> Mapping[str, scrypted_python.scrypted_sdk.types.ClusterWorker]:
         self.clusterService = self.clusterService or asyncio.ensure_future(
-            self.api.getComponent("cluster-fork")
+            self.remote.api.getComponent("cluster-fork")
         )
         cs = await self.clusterService
         return await cs.getClusterWorkers()
@@ -839,7 +839,7 @@ class PluginRemote:
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
         self.mediaManager = MediaManager(await self.api.getMediaManager())
-        self.clusterManager = ClusterManager(self.api)
+        self.clusterManager = ClusterManager(self)
 
         try:
             sdk.systemManager = self.systemManager

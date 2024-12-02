@@ -1,4 +1,4 @@
-import type { ClusterManager, ClusterWorker, ForkOptions } from '@scrypted/types';
+import type { ClusterManager, ForkOptions } from '@scrypted/types';
 import crypto from 'crypto';
 import { once } from 'events';
 import net from 'net';
@@ -11,6 +11,7 @@ import { computeClusterObjectHash } from './cluster/cluster-hash';
 import { getClusterLabels, getClusterWorkerWeight } from './cluster/cluster-labels';
 import { getScryptedClusterMode, InitializeCluster, setupCluster } from './cluster/cluster-setup';
 import type { ClusterObject } from './cluster/connect-rpc-object';
+import { CpuTimer } from './cluster/cpu-timer';
 import type { PluginAPI } from './plugin/plugin-api';
 import { getPluginVolume, getScryptedVolume } from './plugin/plugin-volume';
 import { prepareZip } from './plugin/runtime/node-worker-common';
@@ -20,10 +21,10 @@ import { RpcPeer } from './rpc';
 import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
 import type { ClusterForkService } from './services/cluster-fork';
-import { sleep } from './sleep';
-import type { ServiceControl } from './services/service-control';
 import { EnvControl } from './services/env';
 import { Info } from './services/info';
+import type { ServiceControl } from './services/service-control';
+import { sleep } from './sleep';
 
 installSourceMapSupport({
     environment: 'node',
@@ -84,6 +85,7 @@ export interface RunningClusterWorker extends ClusterWorkerProperties {
     forks: Set<ClusterForkOptions>;
     address: string;
     weight: number;
+    cpuUsage: number;
 }
 
 export class PeerLiveness {
@@ -120,7 +122,7 @@ export interface ClusterForkResultInterface {
 
 export type ClusterForkParam = (runtime: string, options: RuntimeWorkerOptions, peerLiveness: PeerLiveness, getZip: () => Promise<Buffer>) => Promise<ClusterForkResultInterface>;
 
-function createClusterForkParam(mainFilename: string, clusterId: string, clusterSecret: string) {
+function createClusterForkParam(mainFilename: string, clusterId: string, clusterSecret: string, clusterWorkerId: string) {
     const clusterForkParam: ClusterForkParam = async (runtime, runtimeWorkerOptions, peerLiveness, getZip) => {
         let runtimeWorker: RuntimeWorker;
 
@@ -166,7 +168,7 @@ function createClusterForkParam(mainFilename: string, clusterId: string, cluster
         let ping: any;
         try {
             const initializeCluster: InitializeCluster = await threadPeer.getParam('initializeCluster');
-            await initializeCluster({ clusterId, clusterSecret });
+            await initializeCluster({ clusterId, clusterSecret, clusterWorkerId });
             getRemote = await threadPeer.getParam('getRemote');
             ping = await threadPeer.getParam('ping');
         }
@@ -206,6 +208,7 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
     console.log('Cluster client starting.');
 
     const envControl = new EnvControl();
+    const cpuTimer = new CpuTimer();
 
     const originalClusterAddress = process.env.SCRYPTED_CLUSTER_ADDRESS;
     const labels = getClusterLabels();
@@ -259,6 +262,7 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
             peer.params['service-control'] = serviceControl;
             peer.params['env-control'] = envControl;
             peer.params['info'] = new Info();
+            peer.params['cpu'] = async () => cpuTimer.sample();
 
             const { localAddress, localPort } = socket;
             console.log('Cluster server connected.', localAddress, localPort);
@@ -284,11 +288,10 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
                 };
 
                 const { clusterId, clusterWorkerId } = await connectForkWorker(auth, properties);
-                process.env.SCRYPTED_CLUSTER_WORKER_ID = clusterWorkerId;
                 const clusterPeerSetup = setupCluster(peer);
-                await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret });
+                await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret, clusterWorkerId });
 
-                peer.params['fork'] = createClusterForkParam(mainFilename, clusterId, clusterSecret);
+                peer.params['fork'] = createClusterForkParam(mainFilename, clusterId, clusterSecret, clusterWorkerId);
 
                 await peer.killed;
             }
@@ -305,19 +308,26 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
 }
 
 export function createClusterServer(mainFilename: string, scryptedRuntime: ScryptedRuntime, certificate: ReturnType<typeof createSelfSignedCertificate>) {
-    const serverClusterWorkerId = crypto.randomUUID();
-    process.env.SCRYPTED_CLUSTER_WORKER_ID = serverClusterWorkerId;
+    scryptedRuntime.serverClusterWorkerId = crypto.randomUUID();
     const serverWorker: RunningClusterWorker = {
         labels: getClusterLabels(),
-        id: serverClusterWorkerId,
+        id: scryptedRuntime.serverClusterWorkerId,
         peer: undefined,
-        fork: Promise.resolve(createClusterForkParam(mainFilename, scryptedRuntime.clusterId, scryptedRuntime.clusterSecret)),
+        fork: Promise.resolve(createClusterForkParam(mainFilename, scryptedRuntime.clusterId, scryptedRuntime.clusterSecret, scryptedRuntime.serverClusterWorkerId)),
         name: process.env.SCRYPTED_CLUSTER_WORKER_NAME || os.hostname(),
         address: process.env.SCRYPTED_CLUSTER_ADDRESS,
         weight: getClusterWorkerWeight(),
         forks: new Set(),
+        cpuUsage: 0,
     };
-    scryptedRuntime.clusterWorkers.set(serverClusterWorkerId, serverWorker);
+    scryptedRuntime.clusterWorkers.set(scryptedRuntime.serverClusterWorkerId, serverWorker);
+
+    {
+        const cpuTimer = new CpuTimer();
+        setInterval(() => {
+            serverWorker.cpuUsage = cpuTimer.sample();
+        }, 1000);
+    }
 
     const server = tls.createServer({
         key: certificate.serviceKey,
@@ -353,6 +363,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
                     name: auth.id,
                     address: socket.remoteAddress,
                     forks: new Set(),
+                    cpuUsage: 0,
                 };
                 scryptedRuntime.clusterWorkers.set(id, worker);
                 peer.killedSafe.finally(() => {
@@ -362,6 +373,16 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
                     scryptedRuntime.clusterWorkers.delete(id);
                 });
                 console.log('Cluster client authenticated.', socket.remoteAddress, socket.remotePort, properties);
+
+                let cpu: Promise<() => Promise<number>>;
+                const cpuTimer = setInterval(async () => {
+                    cpu ||= peer.getParam('cpu');
+                    const usage = await (await cpu)();
+                    worker.cpuUsage = usage;
+                }, 1000);
+                peer.killedSafe.finally(() => {
+                    clearInterval(cpuTimer);
+                });
             }
             catch (e) {
                 peer.kill(e);
@@ -383,18 +404,18 @@ export class ClusterManagerImpl implements ClusterManager {
     private clusterServicePromise: Promise<ClusterForkService>;
     private clusterMode = getScryptedClusterMode()?.[0];
 
-    constructor(private api: PluginAPI) {
+    constructor(private api: PluginAPI, private clusterWorkerId: string) {
     }
 
     getClusterWorkerId(): string {
-        return process.env.SCRYPTED_CLUSTER_WORKER_ID;
+        return this.clusterWorkerId;
     }
 
     getClusterMode(): 'server' | 'client' | undefined {
         return this.clusterMode;
     }
 
-    async getClusterWorkers(): Promise<Record<string, ClusterWorker>> {
+    async getClusterWorkers() {
         const clusterFork = await this.getClusterService();
         return clusterFork.getClusterWorkers();
     }

@@ -1,3 +1,4 @@
+import { ClusterFork, ClusterWorker } from "@scrypted/types";
 import { matchesClusterLabels } from "../cluster/cluster-labels";
 import type { RuntimeWorkerOptions } from "../plugin/runtime/runtime-worker";
 import { RpcPeer } from "../rpc";
@@ -98,13 +99,15 @@ export class ClusterForkService {
         return ret;
     };
 
-    async getClusterWorkers() {
-        const ret: any = {};
+    async getClusterWorkers(): Promise<Record<string, ClusterWorker>> {
+        const ret: Record<string, ClusterWorker> = {};
         for (const worker of this.runtime.clusterWorkers.values()) {
             ret[worker.id] = {
+                id: worker.id,
                 name: worker.name,
                 labels: worker.labels,
-                forks: [...worker.forks],
+                forks: [...worker.forks] as ClusterFork[],
+                cpuUsage: worker.cpuUsage,
             };
         }
         return ret;

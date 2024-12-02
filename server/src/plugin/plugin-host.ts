@@ -248,6 +248,7 @@ export class PluginHost {
             const loadZipOptions: PluginRemoteLoadZipOptions = {
                 clusterId: this.scrypted.clusterId,
                 clusterSecret: this.scrypted.clusterSecret,
+                clusterWorkerId: await this.clusterWorkerId,
                 // debug flag can be used to affect path resolution for sourcemaps etc.
                 debug: !!pluginDebug,
                 zipHash: this.zipHash,
@@ -390,6 +391,7 @@ export class PluginHost {
                     await clusterSetup.initializeCluster({
                         clusterId: this.scrypted.clusterId,
                         clusterSecret: this.scrypted.clusterSecret,
+                        clusterWorkerId: this.scrypted.serverClusterWorkerId,
                     });
                     return this.scrypted.clusterFork;
                 })(),

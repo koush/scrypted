@@ -164,6 +164,7 @@ export interface PluginRemoteLoadZipOptions {
     main?: string;
 
     clusterId: string;
+    clusterWorkerId: string;
     clusterSecret: string;
 }
 

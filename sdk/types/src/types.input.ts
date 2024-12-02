@@ -2072,12 +2072,6 @@ export interface SystemManager {
   getDeviceByName<T>(name: string): ScryptedDevice & T;
 
   /**
-   * Get the current state of a device.
-   * @deprecated
-   */
-  getDeviceState(id: string): { [property: string]: SystemDeviceState };
-
-  /**
    * Get the current state of every device.
    */
   getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } };
@@ -2684,6 +2678,7 @@ export interface ClusterWorker {
   id: string;
   labels: string[];
   forks: ClusterFork[];
+  cpuUsage: number;
 }
 
 export interface ClusterManager {
@@ -2694,7 +2689,6 @@ export interface ClusterManager {
   getClusterWorkerId(): string;
   getClusterMode(): 'server' | 'client' | undefined;
   getClusterWorkers(): Promise<Record<string, ClusterWorker>>;
-  getRPCObjectClusterWorkerId(object: any): Promise<string>;
 }
 
 export interface ScryptedStatic {
@@ -2709,7 +2703,7 @@ export interface ScryptedStatic {
   systemManager: SystemManager,
   clusterManager: ClusterManager;
 
-  serverVersion?: string;
+  serverVersion: string;
 
   pluginHostAPI: any;
   pluginRemoteAPI: any;

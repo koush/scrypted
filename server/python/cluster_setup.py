@@ -21,7 +21,6 @@ class ClusterObject(TypedDict):
     sourceKey: str
     sha256: str
 
-
 def isClusterAddress(address: str):
     return not address or address == os.environ.get("SCRYPTED_CLUSTER_ADDRESS", None)
 
@@ -99,6 +98,7 @@ class ClusterSetup:
             return
         self.clusterId = options["clusterId"]
         self.clusterSecret = options["clusterSecret"]
+        self.clusterWorkerId = options["clusterWorkerId"]
         self.SCRYPTED_CLUSTER_ADDRESS = os.environ.get("SCRYPTED_CLUSTER_ADDRESS", None)
 
         async def handleClusterClient(
@@ -144,7 +144,7 @@ class ClusterSetup:
         m = hashlib.sha256()
         m.update(
             bytes(
-                f"{o['id']}{o.get('address') or ''}{o['port']}{o.get('sourceKey', None) or ''}{o['proxyId']}{self.clusterSecret}",
+                f"{o['id']}{o.get('address', '')}{o['port']}{o.get('sourceKey', '')}{o['proxyId']}{self.clusterSecret}",
                 "utf8",
             )
         )

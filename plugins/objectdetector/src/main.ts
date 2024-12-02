@@ -5,7 +5,7 @@ import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import { CpuTimer } from './cpu-timer';
+import { CpuTimer } from '../../../server/src/cluster/cpu-timer';
 import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
 import { insidePolygon, normalizeBox, polygonOverlap } from './polygon';
 import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor, createObjectDetectorStorageSetting } from './smart-motionsensor';
