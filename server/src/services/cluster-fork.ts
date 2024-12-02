@@ -68,7 +68,7 @@ export class ClusterForkService {
             // this enforces the "prefer" label.
             matchingWorkers = matchingWorkers.filter(({ matches }) => matches === bestMatch.matches)
                 // sort by number of forks, to distribute load.
-                .sort((a, b) => a.worker.forks.size - b.worker.forks.size);
+                .sort((a, b) => a.worker.forks.size * a.worker.weight - b.worker.forks.size * b.worker.weight);
 
             worker = matchingWorkers[0]?.worker;
         }

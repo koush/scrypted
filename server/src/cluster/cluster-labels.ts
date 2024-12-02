@@ -41,6 +41,10 @@ export function getClusterLabels() {
     return labels;
 }
 
+export function getClusterWorkerWeight() {
+    return parseFloat(process.env.SCRYPTED_CLUSTER_WEIGHT) || 1;
+}
+
 export function needsClusterForkWorker(options: ClusterForkOptions) {
     return process.env.SCRYPTED_CLUSTER_ADDRESS
         && options

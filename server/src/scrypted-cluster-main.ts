@@ -8,7 +8,7 @@ import type { Readable } from 'stream';
 import tls from 'tls';
 import type { createSelfSignedCertificate } from './cert';
 import { computeClusterObjectHash } from './cluster/cluster-hash';
-import { getClusterLabels } from './cluster/cluster-labels';
+import { getClusterLabels, getClusterWorkerWeight } from './cluster/cluster-labels';
 import { getScryptedClusterMode, InitializeCluster, setupCluster } from './cluster/cluster-setup';
 import type { ClusterObject } from './cluster/connect-rpc-object';
 import type { PluginAPI } from './plugin/plugin-api';
@@ -73,6 +73,7 @@ type ConnectForkWorker = (auth: ClusterObject, properties: ClusterWorkerProperti
 
 export interface ClusterWorkerProperties {
     labels: string[];
+    weight: number;
 }
 
 export interface RunningClusterWorker extends ClusterWorkerProperties {
@@ -82,6 +83,7 @@ export interface RunningClusterWorker extends ClusterWorkerProperties {
     fork: Promise<ClusterForkParam>;
     forks: Set<ClusterForkOptions>;
     address: string;
+    weight: number;
 }
 
 export class PeerLiveness {
@@ -207,6 +209,7 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
 
     const originalClusterAddress = process.env.SCRYPTED_CLUSTER_ADDRESS;
     const labels = getClusterLabels();
+    const weight = getClusterWorkerWeight();
 
     const clusterSecret = process.env.SCRYPTED_CLUSTER_SECRET;
     const clusterMode = getScryptedClusterMode();
@@ -277,6 +280,7 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
 
                 const properties: ClusterWorkerProperties = {
                     labels,
+                    weight,
                 };
 
                 const { clusterId, clusterWorkerId } = await connectForkWorker(auth, properties);
@@ -310,6 +314,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
         fork: Promise.resolve(createClusterForkParam(mainFilename, scryptedRuntime.clusterId, scryptedRuntime.clusterSecret)),
         name: process.env.SCRYPTED_CLUSTER_WORKER_NAME || os.hostname(),
         address: process.env.SCRYPTED_CLUSTER_ADDRESS,
+        weight: getClusterWorkerWeight(),
         forks: new Set(),
     };
     scryptedRuntime.clusterWorkers.set(serverClusterWorkerId, serverWorker);
