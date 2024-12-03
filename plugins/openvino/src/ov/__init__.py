@@ -30,7 +30,12 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
 
 availableModels = [
     "Default",
+    "scrypted_yolov9c_int8_320",
+    "scrypted_yolov9m_int8_320",
+    "scrypted_yolov9s_int8_320",
+    "scrypted_yolov9t_int8_320",
     "scrypted_yolov9c_relu_int8_320",
+    "scrypted_yolov9s_relu_int8_320",
     "scrypted_yolov10m_320",
     "scrypted_yolov10s_320",
     "scrypted_yolov10n_320",
@@ -155,12 +160,16 @@ class OpenVINOPlugin(
 
         model = self.storage.getItem("model") or "Default"
         if model == "Default" or model not in availableModels:
+            # relu + int8 wins out by a mile on gpu and npu.
+            # observation is that silu + float is faster than silu + int8 on gpu.
+            # possibly due to quantization causing complexity at the activation function?
+            # however, silu + int8 is faster than silu + float on cpu. (tested on wyse 5070)
             if model != "Default":
                 self.storage.setItem("model", "Default")
             if arc or nvidia or npu:
-                model = "scrypted_yolov9c_320"
+                model = "scrypted_yolov9c_relu_int8_320"
             elif iris_xe:
-                model = "scrypted_yolov9s_320"
+                model = "scrypted_yolov9s_relu_int8_320"
             else:
                 model = "scrypted_yolov9t_320"
         self.yolo = "yolo" in model
