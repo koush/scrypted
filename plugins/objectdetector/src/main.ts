@@ -449,10 +449,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         break;
       }
 
-      this.sampleHistory.push(now);
       while (this.sampleHistory.length && now - this.sampleHistory[0] > 10000) {
         this.sampleHistory.shift();
       }
+      this.sampleHistory.push(now);
 
       if (!longObjectDetectionWarning && !this.hasMotionType && now - start > 5 * 60 * 1000) {
         longObjectDetectionWarning = true;
@@ -518,7 +518,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     const first = this.sampleHistory[0];
     const now = Date.now();
     // require at least 5 seconds of samples.
-    if (!first || (now - first) < 5000)
+    if (!first || (now - first) < 8000)
       return Infinity;
     return this.sampleHistory.length / ((now - first) / 1000);
   }
@@ -1109,7 +1109,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     // find any cameras struggling with a with low detection fps.
     const lowWatermark = runningDetections.filter(o => o.detectionFps < fpsLowWaterMark);
     if (lowWatermark.length) {
-      const [first] = runningDetections;
+      const [first] = lowWatermark;
       // if cameras have been detecting enough to catch the activity, kill it for new camera.
       if (Date.now() - first.detectionStartTime > 30000) {
         first.console.warn(`System at capacity with ${runningDetections.length} cameras (${first.detectionFps} dps). Ending object detection to process activity on ${mixin.name}.`);
