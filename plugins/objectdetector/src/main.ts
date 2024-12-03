@@ -449,9 +449,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         break;
       }
 
-      while (this.sampleHistory.length && now - this.sampleHistory[0] > 10000) {
-        this.sampleHistory.shift();
-      }
+      this.purgeSampleHistory(now);
       this.sampleHistory.push(now);
 
       if (!longObjectDetectionWarning && !this.hasMotionType && now - start > 5 * 60 * 1000) {
@@ -514,9 +512,16 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
+  purgeSampleHistory(now: number) {
+    while (this.sampleHistory.length && now - this.sampleHistory[0] > 10000) {
+      this.sampleHistory.shift();
+    }
+  }
+
   get detectionFps() {
-    const first = this.sampleHistory[0];
     const now = Date.now();
+    this.purgeSampleHistory(now);
+    const first = this.sampleHistory[0];
     // require at least 5 seconds of samples.
     if (!first || (now - first) < 8000)
       return Infinity;
