@@ -377,7 +377,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
                 let cpu: Promise<() => Promise<number>>;
                 const cpuTimer = setInterval(async () => {
                     cpu ||= peer.getParam('cpu');
-                    const usage = await (await cpu)();
+                    const usage = await (await cpu)?.();
                     worker.cpuUsage = usage;
                 }, 1000);
                 peer.killedSafe.finally(() => {
