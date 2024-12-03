@@ -75,7 +75,8 @@ services:
             # - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
 
             # Default volume for the Scrypted database. Typically should not be changed.
-            - ~/.scrypted/volume:/server/volume
+            # The volume will be placed relative to this docker-compose.yml.
+            - ./volume:/server/volume
 
             # LXC usage only
             # lxc - /var/run/docker.sock:/var/run/docker.sock
