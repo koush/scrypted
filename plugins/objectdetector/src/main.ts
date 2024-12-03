@@ -5,7 +5,6 @@ import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import { CpuTimer } from '../../../server/src/cluster/cpu-timer';
 import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
 import { insidePolygon, normalizeBox, polygonOverlap } from './polygon';
 import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor, createObjectDetectorStorageSetting } from './smart-motionsensor';
@@ -19,6 +18,13 @@ const defaultMotionDuration = 30;
 
 const BUILTIN_MOTION_SENSOR_ASSIST = 'Assist';
 const BUILTIN_MOTION_SENSOR_REPLACE = 'Replace';
+
+// at 5fps object detection speed, the camera is considered throttled.
+// throttling may be due to cpu, gpu, npu or whatever.
+// regardless, purging low fps object detection sessions will likely
+// restore performance.
+const fpsKillWaterMark = 5
+const fpsLowWaterMark = 7;
 
 const objectDetectionPrefix = `${ScryptedInterface.ObjectDetection}:`;
 
@@ -103,6 +109,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   analyzeStop: number;
   detectorSignal = new Deferred<void>().resolve();
   released = false;
+  sampleHistory: number[] = [];
   // settings: Setting[];
 
   get detectorRunning() {
@@ -434,13 +441,20 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         break;
       }
 
+      const now = Date.now();
+
       // stop when analyze period ends.
-      if (!this.hasMotionType && this.analyzeStop && Date.now() > this.analyzeStop) {
+      if (!this.hasMotionType && this.analyzeStop && now > this.analyzeStop) {
         this.analyzeStop = undefined;
         break;
       }
 
-      if (!longObjectDetectionWarning && !this.hasMotionType && Date.now() - start > 5 * 60 * 1000) {
+      this.sampleHistory.push(now);
+      while (this.sampleHistory.length && now - this.sampleHistory[0] > 10000) {
+        this.sampleHistory.shift();
+      }
+
+      if (!longObjectDetectionWarning && !this.hasMotionType && now - start > 5 * 60 * 1000) {
         longObjectDetectionWarning = true;
         this.console.warn('Camera has been performing object detection for 5 minutes due to persistent motion. This may adversely affect system performance. Read the Optimizing System Performance guide for tips and tricks. https://github.com/koush/nvr.scrypted.app/wiki/Optimizing-System-Performance')
       }
@@ -450,8 +464,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       const originalDetections = detected.detected.detections;
       const zonedDetections = this.applyZones(detected.detected);
       detected.detected.detections = zonedDetections;
-
-      // this.console.warn('dps', detections / (Date.now() - start) * 1000);
 
       if (!this.hasMotionType) {
         this.plugin.trackDetection();
@@ -465,7 +477,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           currentDetections.set(d.className, Math.max(currentDetections.get(d.className) || 0, d.score));
         }
 
-        const now = Date.now();
         if (now > lastReport + 10000) {
           const found = [...currentDetections.entries()].map(([className, score]) => `${className} (${score})`);
           if (!found.length)
@@ -478,23 +489,20 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
       if (detected.detected.detectionId) {
         updatePipelineStatus('creating jpeg');
-        // const start = Date.now();
         let { image } = detected.videoFrame;
         image = await sdk.connectRPCObject(image);
         const jpeg = await image.toBuffer({
           format: 'jpg',
         });
         const mo = await sdk.mediaManager.createMediaObject(jpeg, 'image/jpeg');
-        // this.console.log('retain took', Date.now() -start);
         this.setDetection(detected.detected, mo);
-        // this.console.log('image saved', detected.detected.detections);
       }
       const motionFound = this.reportObjectDetections(detected.detected);
       if (this.hasMotionType) {
         // if motion is detected, stop processing and exit loop allowing it to sleep.
         if (motionFound) {
           // however, when running in analyze mode, continue to allow viewing motion boxes for test purposes.
-          if (!this.analyzeStop || Date.now() > this.analyzeStop) {
+          if (!this.analyzeStop || now > this.analyzeStop) {
             this.analyzeStop = undefined;
             clearInterval(interval);
             return true;
@@ -503,8 +511,16 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         await sleep(250);
       }
       updatePipelineStatus('waiting result');
-      // this.handleDetectionEvent(detected.detected);
     }
+  }
+
+  get detectionFps() {
+    const first = this.sampleHistory[0];
+    const now = Date.now();
+    // require at least 5 seconds of samples.
+    if (!first || (now - first) < 5000)
+      return Infinity;
+    return this.sampleHistory.length / ((now - first) / 1000);
   }
 
   applyZones(detection: ObjectsDetected) {
@@ -1007,8 +1023,6 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     },
   });
   devices = new Map<string, any>();
-  cpuTimer = new CpuTimer();
-  cpuUsage = 0;
 
   constructor(nativeId?: ScryptedNativeId) {
     super(nativeId, 'v5');
@@ -1028,19 +1042,26 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
       })
     });
 
+    // on an interval check to see if system load allows squelched detectors to start up.
     setInterval(() => {
-      this.cpuUsage = this.cpuTimer.sample();
-      // this.console.log('cpu usage', Math.round(this.cpuUsage * 100));
-
       const runningDetections = this.runningObjectDetections;
 
       let allowStart = 2;
+
       // always allow 2 cameras to push past cpu throttling
       if (runningDetections.length > 2) {
-        const cpuPerDetector = this.cpuUsage / runningDetections.length;
-        allowStart = Math.ceil(1 / cpuPerDetector) - runningDetections.length;
-        if (allowStart <= 0)
+        // if anything is below the kill threshold, do not start
+        const killable = runningDetections.filter(o => o.detectionFps < fpsKillWaterMark && !o.analyzeStop);
+        if (killable.length) {
+          const first = killable[0];
+          first.console.warn(`System at capacity with ${runningDetections.length} cameras (${first.detectionFps} dps). Ending object detection.`);
+          first.endObjectDetection();
           return;
+        }
+
+        const lowWatermark = runningDetections.filter(o => o.detectionFps < fpsLowWaterMark);
+        if (lowWatermark.length)
+          allowStart = 1;
       }
 
       const idleDetectors = [...this.currentMixins.values()]
@@ -1054,7 +1075,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
             return;
         }
       }
-    }, 10000)
+    }, 5000)
   }
 
   checkHasEnabledMixin(device: ScryptedDevice): boolean {
@@ -1085,22 +1106,23 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     if (runningDetections.length < 2)
       return true;
 
-    const cpuPerDetector = this.cpuUsage / runningDetections.length;
-    const cpuPercent = Math.round(this.cpuUsage * 100);
-    if (cpuPerDetector * (runningDetections.length + 1) > .9) {
+    // find any cameras struggling with a with low detection fps.
+    const lowWatermark = runningDetections.filter(o => o.detectionFps < fpsLowWaterMark);
+    if (lowWatermark.length) {
       const [first] = runningDetections;
+      // if cameras have been detecting enough to catch the activity, kill it for new camera.
       if (Date.now() - first.detectionStartTime > 30000) {
-        first.console.warn(`CPU is at capacity: ${cpuPercent} with ${runningDetections.length} cameras. Ending object detection to process activity on ${mixin.name}.`);
+        first.console.warn(`System at capacity with ${runningDetections.length} cameras (${first.detectionFps} dps). Ending object detection to process activity on ${mixin.name}.`);
         first.endObjectDetection();
-        mixin.console.warn(`CPU is at capacity: ${cpuPercent} with ${runningDetections.length} cameras. Ending object detection on ${first.name} to process activity.`);
+        mixin.console.warn(`System at capacity with ${runningDetections.length} cameras. Ending object detection on ${first.name} to process activity (${first.detectionFps} dps).`);
         return true;
       }
 
-      mixin.console.warn(`CPU is at capacity: ${cpuPercent} with ${runningDetections.length} cameras. Not starting object detection to continue processing recent activity on ${first.name}.`);
+      mixin.console.warn(`System at capacity. Not starting object detection to continue processing recent activity on ${first.name} (${first.detectionFps} dps).`);
       return false;
     }
 
-    // CPU capacity is fine
+    // System capacity is fine. Start the detection.
     return true;
   }
 
