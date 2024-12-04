@@ -216,6 +216,11 @@ function finishZip() {
         console.log(js);
     }
 
+    const sdkVersion = require(path.join(__dirname, '../package.json')).version;
+    zip.addFile('sdk.json', Buffer.from(JSON.stringify({
+        version: sdkVersion,
+    })));
+
     const zipfs = path.join(cwd, 'fs');
     if (fs.existsSync(zipfs))
         zip.addLocalFolder(zipfs, 'fs');

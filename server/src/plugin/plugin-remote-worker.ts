@@ -130,11 +130,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 process.chdir(fsDir);
             }
 
-            const pluginReader = (name: string) => {
+            const pluginReader = async (name: string) => {
                 const filename = path.join(unzippedPath, name);
-                if (!fs.existsSync(filename))
-                    return;
-                return fs.readFileSync(filename);
+                return await fs.promises.readFile(filename).catch(() => { }) || undefined;
             };
 
             const pluginConsole = getPluginConsole?.();
@@ -173,7 +171,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             };
             params.exports = params.module.exports;
 
-            const entry = pluginReader(`${mainNodejs}.map`)
+            const entry = await pluginReader(`${mainNodejs}.map`)
             const map = entry?.toString();
 
             // plugins may install their own sourcemap support during startup, so
@@ -209,7 +207,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             await installOptionalDependencies(getPluginConsole(), packageJson);
 
-            const main = pluginReader(mainNodejs);
+            const main = await pluginReader(mainNodejs);
             const script = main.toString();
 
             scrypted.connect = (socket, options) => {
@@ -372,22 +370,21 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             try {
                 const isModule = packageJson.type === 'module';
                 const filename = zipOptions?.debug ? pluginMainNodeJs : pluginIdMainNodeJs;
-                if (isModule) {
+                const sdkVersion = await pluginReader('sdk.json').then(b => JSON.parse(b.toString()).version).catch(() => { });
+                const mainNodeJsOnFilesystem = path.join(unzippedPath, mainNodejs);
+                if (sdkVersion) {
                     process.env.SCRYPTED_SDK_MODULE = __filename;
                     scryptedStatic = scrypted;
+                    globalThis.localStorage = params.localStorage;
+                }
 
-                    const p = path.join(unzippedPath, mainNodejs);
+                if (isModule) {
                     const { eseval } = await import('../es/es-eval');
-                    const module = await eseval(p);
+                    const module = await eseval(mainNodeJsOnFilesystem);
                     params.module.exports = module;
                 }
-                // todo: better flag for this
-                else if (packageJson.scrypted.rollup) {
-                    process.env.SCRYPTED_SDK_MODULE = __filename;
-                    scryptedStatic = scrypted;
-
-                    const p = path.join(unzippedPath, mainNodejs);
-                    params.module.exports = require(p);
+                else if (sdkVersion) {
+                    params.module.exports = require(mainNodeJsOnFilesystem);
                 }
                 else {
                     evalLocal(peer, script, startPluginRemoteOptions?.sourceURL?.(filename) || filename, params);
