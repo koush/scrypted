@@ -1,4 +1,4 @@
-import { ForkWorker, ScryptedStatic, SystemManager } from '@scrypted/types';
+import type { ForkWorker, ScryptedStatic, SystemManager } from '@scrypted/types';
 import child_process from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -26,6 +26,11 @@ import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
 import { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
 
 const serverVersion = require('../../package.json').version;
+
+let scryptedStatic: ScryptedStatic;
+export function getScryptedStatic() {
+    return scryptedStatic;
+}
 
 export interface StartPluginRemoteOptions {
     sourceURL?(filename: string): string;
@@ -368,17 +373,28 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const isModule = packageJson.type === 'module';
                 const filename = zipOptions?.debug ? pluginMainNodeJs : pluginIdMainNodeJs;
                 if (isModule) {
+                    process.env.SCRYPTED_SDK_MODULE = __filename;
+                    scryptedStatic = scrypted;
+
                     const p = path.join(unzippedPath, mainNodejs);
                     const { eseval } = await import('../es/es-eval');
                     const module = await eseval(p);
                     params.module.exports = module;
+                }
+                // todo: better flag for this
+                else if (packageJson.scrypted.rollup) {
+                    process.env.SCRYPTED_SDK_MODULE = __filename;
+                    scryptedStatic = scrypted;
+
+                    const p = path.join(unzippedPath, mainNodejs);
+                    params.module.exports = require(p);
                 }
                 else {
                     evalLocal(peer, script, startPluginRemoteOptions?.sourceURL?.(filename) || filename, params);
                 }
 
                 const exports = params.module.exports;
-                exports.sdkInit?.(params);
+
                 if (zipOptions?.fork) {
                     // pluginConsole?.log('plugin forked');
                     const fork = exports.fork;

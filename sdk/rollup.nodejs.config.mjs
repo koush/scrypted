@@ -84,7 +84,6 @@ const config = defineConfig(
                 [`${entry.filename.slice(0, -3)}.nodejs.ts`]:
                     `
                     export * from '${entry.filename}';
-                    export { sdkInit } from '@scrypted/sdk';
                     ` +
                     (!entry.filename.endsWith('main.ts')
                         ? ''
@@ -99,6 +98,7 @@ const config = defineConfig(
                 // need ts extension so require calls in ts get resolved.
                 extensions: ['.js', '.ts'],
                 transformMixedEsModules: true,
+                ignoreDynamicRequires: true,
             }),
             resolve({
                 extensions: ['.js', '.ts'],

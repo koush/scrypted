@@ -1,6 +1,7 @@
 export * from '../types/gen/index';
 import type { DeviceManager, DeviceState, EndpointManager, EventListenerRegister, Logger, MediaManager, MediaObject, ScryptedInterface, ScryptedNativeId, ScryptedStatic, SystemManager, WritableDeviceState } from '../types/gen/index';
 import { DeviceBase, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, TYPES_VERSION } from '../types/gen/index';
+import { createRequire } from 'module';
 
 /**
  * @category Core Reference
@@ -210,23 +211,46 @@ declare const pluginRuntimeAPI: any;
 export const sdk: ScryptedStatic = {} as any;
 
 try {
-
-  let runtimeAPI: any;
-  try {
-    runtimeAPI = pluginRuntimeAPI;
+  let loaded = false;
+  if (process.env.SCRYPTED_SDK_MODULE) {
+    try {
+      // @ts-expect-error
+      if (typeof import.meta !== 'undefined') {
+        // @ts-expect-error
+        const require = createRequire(import.meta.url);
+        const sdkModule = require(process.env.SCRYPTED_SDK_MODULE);
+        Object.assign(sdk, sdkModule.getScryptedStatic());
+        loaded = true;
+      }
+      else {
+        const sdkModule = require(process.env.SCRYPTED_SDK_MODULE);
+        Object.assign(sdk, sdkModule.getScryptedStatic());
+        loaded = true;
+      }
+    }
+    catch (e) {
+      console.warn("failed to load sdk module", e);
+    }
   }
-  catch (e) {
-  }
 
-  sdkInit({
-    log: deviceManager.getDeviceLogger(undefined),
-    deviceManager,
-    endpointManager,
-    mediaManager,
-    systemManager,
-    pluginHostAPI,
-    pluginRuntimeAPI: runtimeAPI,
-  });
+  if (!loaded) {
+    let runtimeAPI: any;
+    try {
+      runtimeAPI = pluginRuntimeAPI;
+    }
+    catch (e) {
+    }
+
+    Object.assign(sdk, {
+      log: deviceManager.getDeviceLogger(undefined),
+      deviceManager,
+      endpointManager,
+      mediaManager,
+      systemManager,
+      pluginHostAPI,
+      ...runtimeAPI,
+    });
+  }
 
   try {
     (systemManager as any).setScryptedInterfaceDescriptors?.(TYPES_VERSION, ScryptedInterfaceDescriptors)?.catch(() => { });
@@ -235,30 +259,8 @@ try {
   }
 }
 catch (e) {
-  // console.error('sdk initialization error, import @scrypted/types or use @scrypted/client instead', e);
+  console.error('sdk initialization error, import @scrypted/types or use @scrypted/client instead', e);
 }
 
 export default sdk;
 
-export function sdkInit(sdkInit: {
-  log: Logger,
-  deviceManager: DeviceManager,
-  endpointManager: EndpointManager,
-  mediaManager: MediaManager,
-  systemManager: SystemManager,
-  pluginHostAPI: any,
-  pluginRuntimeAPI: any,
-}) {
-
-  const { deviceManager, endpointManager, mediaManager, systemManager, pluginHostAPI, pluginRuntimeAPI } = sdkInit;
-
-  Object.assign(sdk, {
-    log: deviceManager.getDeviceLogger(undefined),
-    deviceManager,
-    endpointManager,
-    mediaManager,
-    systemManager,
-    pluginHostAPI,
-    ...pluginRuntimeAPI,
-  });
-}
