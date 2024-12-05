@@ -19,7 +19,7 @@ function isPi(model: string) {
 export function isRaspberryPi() {
     let cpuInfo: string;
     try {
-        cpuInfo = require('realfs').readFileSync('/proc/cpuinfo', { encoding: 'utf8' });
+        cpuInfo = require('fs').readFileSync('/proc/cpuinfo', { encoding: 'utf8' });
     }
     catch (e) {
         // if this fails, this is probably not a pi
