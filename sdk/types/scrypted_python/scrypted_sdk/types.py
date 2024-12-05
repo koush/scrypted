@@ -471,6 +471,7 @@ class ClusterWorker(TypedDict):
     forks: list[ClusterFork]
     id: str
     labels: list[str]
+    mode: Any | Any
     name: str
 
 class ColorHsv(TypedDict):
@@ -950,7 +951,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.89"
+TYPES_VERSION = "0.3.90"
 
 
 class AirPurifier:

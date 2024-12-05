@@ -2678,6 +2678,7 @@ export interface ClusterWorker {
   id: string;
   labels: string[];
   forks: ClusterFork[];
+  mode: 'server' | 'client';
 }
 
 export interface ClusterManager {

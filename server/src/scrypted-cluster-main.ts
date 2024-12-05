@@ -84,6 +84,7 @@ export interface RunningClusterWorker extends ClusterWorkerProperties {
     forks: Set<ClusterForkOptions>;
     address: string;
     weight: number;
+    mode: 'server' | 'client';
 }
 
 export class PeerLiveness {
@@ -314,6 +315,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
         address: process.env.SCRYPTED_CLUSTER_ADDRESS,
         weight: getClusterWorkerWeight(),
         forks: new Set(),
+        mode: 'server',
     };
     scryptedRuntime.clusterWorkers.set(scryptedRuntime.serverClusterWorkerId, serverWorker);
 
@@ -351,6 +353,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
                     name: auth.id,
                     address: socket.remoteAddress,
                     forks: new Set(),
+                    mode: 'client',
                 };
                 scryptedRuntime.clusterWorkers.set(id, worker);
                 peer.killedSafe.finally(() => {
