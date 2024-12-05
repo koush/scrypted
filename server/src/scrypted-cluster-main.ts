@@ -22,7 +22,7 @@ import type { ScryptedRuntime } from './runtime';
 import type { ClusterForkService } from './services/cluster-fork';
 import { EnvControl } from './services/env';
 import { Info } from './services/info';
-import type { ServiceControl } from './services/service-control';
+import { ServiceControl } from './services/service-control';
 import { sleep } from './sleep';
 
 installSourceMapSupport({
@@ -30,6 +30,7 @@ installSourceMapSupport({
 });
 
 async function start(mainFilename: string, serviceControl?: ServiceControl) {
+    serviceControl ||= new ServiceControl();
     startClusterClient(mainFilename, serviceControl);
 }
 
