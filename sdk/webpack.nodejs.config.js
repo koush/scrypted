@@ -37,6 +37,13 @@ const plugins = [
     new webpack.optimize.LimitChunkCountPlugin({
         maxChunks: 1,
     }),
+    new webpack.BannerPlugin({
+        banner: (data) => {
+            return `\n//# sourceURL=/plugin/${path.basename(data.filename)}`;
+        },
+        raw: true,
+        footer: true,
+    }),
 ];
 
 if (process.env.WEBPACK_ANALYZER) {
