@@ -1,10 +1,7 @@
 import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, MediaStreamDestination, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import type { AggregateCore } from "./aggregate-core";
 const { systemManager, mediaManager, deviceManager } = sdk;
-
-export interface AggregateDevice extends ScryptedDeviceBase {
-    computeInterfaces(): string[];
-}
 
 interface Aggregator<T> {
     (values: T[]): T;
@@ -141,143 +138,144 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
     }
 }
 
-export function createAggregateDevice(nativeId: string): AggregateDevice {
-    class AggregateDeviceImpl extends ScryptedDeviceBase implements Settings {
-        listeners: EventListenerRegister[] = [];
-        storageSettings = new StorageSettings(this, {
-            deviceInterfaces: {
-                title: 'Selected Device Interfaces',
-                description: 'The components of other devices to combine into this device group.',
-                type: 'interface',
-                multiple: true,
-                deviceFilter: `id !== '${this.id}' && deviceInterface !== '${ScryptedInterface.Settings}'`,
+export class AggregateDevice extends ScryptedDeviceBase implements Settings {
+    listeners: EventListenerRegister[] = [];
+    storageSettings = new StorageSettings(this, {
+        deviceInterfaces: {
+            title: 'Selected Device Interfaces',
+            description: 'The components of other devices to combine into this device group.',
+            type: 'interface',
+            multiple: true,
+            deviceFilter: `id !== '${this.id}' && deviceInterface !== '${ScryptedInterface.Settings}'`,
+            onPut: () => {
+                this.core.reportAggregate(this.nativeId, this.computeInterfaces(), this.providedName);
             }
-        })
-
-        constructor() {
-            super(nativeId);
-
-            try {
-                const data = this.storage.getItem('data');
-                if (data) {
-                    const { deviceInterfaces } = JSON.parse(data);
-                    this.storageSettings.values.deviceInterfaces = deviceInterfaces;
-                }
-            }
-            catch (e) {
-            }
-           this.storage.removeItem('data');
         }
+    })
 
-        getSettings(): Promise<Setting[]> {
-            return this.storageSettings.getSettings();
+    constructor(public core: AggregateCore, nativeId: string) {
+        super(nativeId);
+
+        try {
+            const data = this.storage.getItem('data');
+            if (data) {
+                const { deviceInterfaces } = JSON.parse(data);
+                this.storageSettings.values.deviceInterfaces = deviceInterfaces;
+            }
         }
-        putSetting(key: string, value: SettingValue): Promise<void> {
-            return this.storageSettings.putSetting(key, value);
+        catch (e) {
         }
+       this.storage.removeItem('data');
+    }
 
-        makeListener(iface: string, devices: ScryptedDevice[]) {
-            const aggregator = aggregators.get(iface);
-            if (!aggregator) {
-                const ds = deviceManager.getDeviceState(this.nativeId);
-                // if this device can't be aggregated for whatever reason, pass property through.
-                for (const device of devices) {
-                    const register = device.listen({
-                        event: iface,
-                        watch: true,
-                    }, (source, details, data) => {
-                        if (details.property)
-                            ds[details.property] = data;
-                    });
-                    this.listeners.push(register);
-                }
-                return;
-            }
+    getSettings(): Promise<Setting[]> {
+        return this.storageSettings.getSettings();
+    }
+    putSetting(key: string, value: SettingValue): Promise<void> {
+        return this.storageSettings.putSetting(key, value);
+    }
 
-            const property = ScryptedInterfaceDescriptors[iface]?.properties?.[0];
-            if (!property) {
-                this.console.warn('aggregating interface with no property?', iface);
-                return;
-            }
-
-            const runAggregator = () => {
-                const values = devices.map(device => device[property]);
-                (this as any)[property] = aggregator(values);
-            }
-
-            const listener: EventListener = () => runAggregator();
-
+    makeListener(iface: string, devices: ScryptedDevice[]) {
+        const aggregator = aggregators.get(iface);
+        if (!aggregator) {
+            const ds = deviceManager.getDeviceState(this.nativeId);
+            // if this device can't be aggregated for whatever reason, pass property through.
             for (const device of devices) {
                 const register = device.listen({
                     event: iface,
                     watch: true,
-                }, listener);
+                }, (source, details, data) => {
+                    if (details.property)
+                        ds[details.property] = data;
+                });
                 this.listeners.push(register);
             }
-
-            return runAggregator;
+            return;
         }
 
-        computeInterfaces(): string[] {
-            this.listeners.forEach(listener => listener.removeListener());
-            this.listeners = [];
-
-            try {
-                const interfaces = new Map<string, string[]>();
-                for (const deviceInterface of this.storageSettings.values.deviceInterfaces as string[]) {
-                    const parts = deviceInterface.split('#');
-                    const id = parts[0];
-                    const iface = parts[1];
-                    if (!interfaces.has(iface))
-                        interfaces.set(iface, []);
-                    interfaces.get(iface).push(id);
-                }
-
-                for (const [iface, ids] of interfaces.entries()) {
-                    const devices = ids.map(id => systemManager.getDeviceById(id));
-                    const runAggregator = this.makeListener(iface, devices);
-                    runAggregator?.();
-                }
-
-                for (const [iface, ids] of interfaces.entries()) {
-                    const devices = ids.map(id => systemManager.getDeviceById(id));
-                    const descriptor = ScryptedInterfaceDescriptors[iface];
-                    if (!descriptor) {
-                        this.console.warn(`descriptor not found for ${iface}, skipping method generation`);
-                        continue;
-                    }
-
-                    if (iface === ScryptedInterface.VideoCamera) {
-                        const camera = createVideoCamera(devices as any, this.console);
-                        for (const method of descriptor.methods) {
-                            AggregateDeviceImpl.prototype[method] = (...args: any[]) => camera[method](...args);
-                        }
-                        continue;
-                    }
-
-                    for (const method of descriptor.methods) {
-                        AggregateDeviceImpl.prototype[method] = async function (...args: any[]) {
-                            const ret: Promise<any>[] = [];
-                            for (const device of devices) {
-                                ret.push(device[method](...args));
-                            }
-
-                            const results = await Promise.all(ret);
-                            return results[0];
-                        }
-                    }
-                }
-
-                return [...interfaces.keys()];
-            }
-            catch (e) {
-                // this.console.error('error loading aggregate device', e);
-                return [];
-            }
+        const property = ScryptedInterfaceDescriptors[iface]?.properties?.[0];
+        if (!property) {
+            this.console.warn('aggregating interface with no property?', iface);
+            return;
         }
+
+        const runAggregator = () => {
+            const values = devices.map(device => device[property]);
+            (this as any)[property] = aggregator(values);
+        }
+
+        const listener: EventListener = () => runAggregator();
+
+        for (const device of devices) {
+            const register = device.listen({
+                event: iface,
+                watch: true,
+            }, listener);
+            this.listeners.push(register);
+        }
+
+        return runAggregator;
     }
 
-    const ret = new AggregateDeviceImpl();
-    ret.computeInterfaces();
-    return new AggregateDeviceImpl();
+    release() {
+        this.listeners.forEach(listener => listener.removeListener());
+        this.listeners = [];
+    }
+
+    computeInterfaces(): string[] {
+        this.release();
+
+        try {
+            const interfaces = new Map<string, string[]>();
+            for (const deviceInterface of this.storageSettings.values.deviceInterfaces as string[]) {
+                const parts = deviceInterface.split('#');
+                const id = parts[0];
+                const iface = parts[1];
+                if (!interfaces.has(iface))
+                    interfaces.set(iface, []);
+                interfaces.get(iface).push(id);
+            }
+
+            for (const [iface, ids] of interfaces.entries()) {
+                const devices = ids.map(id => systemManager.getDeviceById(id));
+                const runAggregator = this.makeListener(iface, devices);
+                runAggregator?.();
+            }
+
+            for (const [iface, ids] of interfaces.entries()) {
+                const devices = ids.map(id => systemManager.getDeviceById(id));
+                const descriptor = ScryptedInterfaceDescriptors[iface];
+                if (!descriptor) {
+                    this.console.warn(`descriptor not found for ${iface}, skipping method generation`);
+                    continue;
+                }
+
+                if (iface === ScryptedInterface.VideoCamera) {
+                    const camera = createVideoCamera(devices as any, this.console);
+                    for (const method of descriptor.methods) {
+                        AggregateDevice.prototype[method] = (...args: any[]) => camera[method](...args);
+                    }
+                    continue;
+                }
+
+                for (const method of descriptor.methods) {
+                    AggregateDevice.prototype[method] = async function (...args: any[]) {
+                        const ret: Promise<any>[] = [];
+                        for (const device of devices) {
+                            ret.push(device[method](...args));
+                        }
+
+                        const results = await Promise.all(ret);
+                        return results[0];
+                    }
+                }
+            }
+
+            return [...interfaces.keys()];
+        }
+        catch (e) {
+            // this.console.error('error loading aggregate device', e);
+            return [];
+        }
+    }
 }
