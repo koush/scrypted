@@ -21,7 +21,7 @@ export function getMixinEventName(options: string | EventListenerOptions) {
 }
 
 // todo: storage should only go to host plugin
-const allowedEventInterfaces = new Set<string>([ScryptedInterface.ScryptedDevice, 'Logger', 'Storage'])
+const allowedEventInterfaces = new Set<string>([ScryptedInterface.ScryptedDevice, 'Logger'])
 
 export class EventRegistry {
     systemListeners = new Set<(id: string, eventDetails: EventDetails, eventData: any) => void>();

@@ -115,7 +115,7 @@ class EventRegistry(object):
     ]
 
     __allowedEventInterfaces = set(
-        [ScryptedInterface.ScryptedDevice.value, "Logger", "Storage"]
+        [ScryptedInterface.ScryptedDevice.value, "Logger"]
     )
 
     def __init__(self) -> None:

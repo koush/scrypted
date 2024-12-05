@@ -50,7 +50,6 @@ export class PluginComponent {
         await this.scrypted.datastore.upsert(pluginDevice);
         const host = this.scrypted.getPluginHostForDeviceId(id);
         await host?.remote?.setNativeId?.(pluginDevice.nativeId, pluginDevice._id, storage);
-        this.scrypted.stateManager.notifyInterfaceEvent(pluginDevice, 'Storage', undefined);
     }
     async setMixins(id: string, mixins: string[]) {
         mixins = mixins || [];
