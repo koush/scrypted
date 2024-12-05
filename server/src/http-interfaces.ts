@@ -16,6 +16,7 @@ export class HttpResponseImpl implements HttpResponse {
         'send',
         'sendFile',
         'sendSocket',
+        'sendStream',
     ];
     sent = false;
 
