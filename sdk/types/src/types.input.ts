@@ -2144,19 +2144,20 @@ export interface HttpRequest {
  * @category Webhook and Push Reference
  */
 export interface HttpResponse {
-  send(body: string): void;
+  send(body: string, options?: HttpResponseOptions): void;
 
-  send(body: string, options: HttpResponseOptions): void;
+  send(body: Buffer, options?: HttpResponseOptions): void;
 
-  send(body: Buffer): void;
+  sendFile(path: string, options?: HttpResponseOptions): void;
 
-  send(body: Buffer, options: HttpResponseOptions): void;
+  /**
+   * @deprecated
+   * @param socket 
+   * @param options 
+   */
+  sendSocket(socket: any, options?: HttpResponseOptions): void;
 
-  sendFile(path: string): void;
-
-  sendFile(path: string, options: HttpResponseOptions): void;
-
-  sendSocket(socket: any, options: HttpResponseOptions): void;
+  sendStream(stream: AsyncGenerator<Buffer, void>, options?: HttpResponseOptions): void;
 }
 /**
  * @category Webhook and Push Reference

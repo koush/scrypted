@@ -7,6 +7,9 @@ import { RpcPeer } from "./rpc";
 
 export class HttpResponseImpl implements HttpResponse {
     constructor(public res: Response, public unzippedDir: string, public filesPath: string) {
+        res.on('error', e => {
+            console.warn("Error while sending response from plugin", e);
+        });
     }
 
     [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = [
@@ -27,11 +30,7 @@ export class HttpResponseImpl implements HttpResponse {
         }
     }
 
-    send(body: string): void;
-    send(body: string, options: HttpResponseOptions): void;
-    send(body: Buffer): void;
-    send(body: Buffer, options: HttpResponseOptions): void;
-    send(body: any, options?: any) {
+    send(body: string|Buffer, options?: any) {
         this.sent = true;
         if (options?.code)
             this.res.status(options.code);
@@ -40,9 +39,7 @@ export class HttpResponseImpl implements HttpResponse {
         this.res.send(body);
     }
 
-    sendFile(path: string): void;
-    sendFile(path: string, options: HttpResponseOptions): void;
-    sendFile(path: any, options?: HttpResponseOptions) {
+    sendFile(path: string, options?: HttpResponseOptions) {
         this.sent = true;
         if (options?.code)
             this.res.status(options.code);
@@ -73,6 +70,24 @@ export class HttpResponseImpl implements HttpResponse {
             this.res.status(options.code);
         this.#setHeaders(options);
         socket.pipe(this.res);
+    }
+
+    sendStream(stream: AsyncGenerator<Buffer, void>, options?: HttpResponseOptions): void {
+        this.sent = true;
+        if (options?.code)
+            this.res.status(options.code);
+        this.#setHeaders(options);
+        (async() => {
+            try {
+                for await (const chunk of stream) {
+                    this.res.write(chunk);
+                }
+                this.res.end();
+            }
+            catch (e) {
+                this.res.destroy(e);
+            }
+        })();
     }
 }
 

@@ -951,7 +951,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.91"
+TYPES_VERSION = "0.3.92"
 
 
 class AirPurifier:
@@ -3273,13 +3273,16 @@ class EventListenerRegister:
 class HttpResponse:
     """Response object provided by the HttpRequestHandler."""
 
-    def send(self, body: str) -> None:
+    def send(self, body: str, options: HttpResponseOptions = None) -> None:
         pass
 
-    def sendFile(self, path: str) -> None:
+    def sendFile(self, path: str, options: HttpResponseOptions = None) -> None:
         pass
 
-    def sendSocket(self, socket: Any, options: HttpResponseOptions) -> None:
+    def sendSocket(self, socket: Any, options: HttpResponseOptions = None) -> None:
+        pass
+
+    def sendStream(self, stream: AsyncGenerator[bytearray, None], options: HttpResponseOptions = None) -> None:
         pass
 
 
