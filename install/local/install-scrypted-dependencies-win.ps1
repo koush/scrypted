@@ -1,3 +1,5 @@
+#Requires -RunAsAdministrator
+
 # Set-PSDebug -Trace 1
 
 # stop existing service if any
