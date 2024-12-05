@@ -47,6 +47,12 @@ export function setupCluster(peer: RpcPeer) {
     // outgoing connections: use the local random/unique port
     const clusterPeers = new Map<string, Promise<RpcPeer>>();
 
+    peer.killedSafe.finally(() => {
+        for (const cp of clusterPeers.values()) {
+            cp.then(c => c.kill()).catch(() => { });
+        }
+    });
+
     const resolveObject = async (id: string, sourceKey: string) => {
         const sourcePeer = sourceKey
             ? await clusterPeers.get(sourceKey)

@@ -459,7 +459,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
         const { pluginId } = pluginHost;
         const filesPath = path.join(getPluginVolume(pluginId), 'files');
-        const ri = createResponseInterface(res, pluginHost.unzippedPath, filesPath);
+        const ri = createResponseInterface(this, res, pluginHost.unzippedPath, filesPath);
         handler.onRequest(endpointRequest, ri)
             .catch(() => { })
             .finally(() => {
