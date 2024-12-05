@@ -25,6 +25,10 @@ const BUILTIN_MOTION_SENSOR_REPLACE = 'Replace';
 // restore performance.
 const fpsKillWaterMark = 5
 const fpsLowWaterMark = 7;
+// cameras may have low performance due to low framerate or intensive tasks such as
+// LPR and face recognition. if multiple cams are in low performance mode, then
+// the system may be struggling.
+const lowPerformanceMinThreshold = 2;
 
 const objectDetectionPrefix = `${ScryptedInterface.ObjectDetection}:`;
 
@@ -1051,21 +1055,23 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     setInterval(() => {
       const runningDetections = this.runningObjectDetections;
 
+      // don't allow too many cams to start up at once if resuming from a low performance state.
       let allowStart = 2;
 
-      // always allow 2 cameras to push past cpu throttling
-      if (runningDetections.length > 2) {
+      // allow minimum amount of concurrent cameras regardless of system specs
+      if (runningDetections.length > lowPerformanceMinThreshold) {
         // if anything is below the kill threshold, do not start
         const killable = runningDetections.filter(o => o.detectionFps < fpsKillWaterMark && !o.analyzeStop);
-        if (killable.length) {
+        if (killable.length > lowPerformanceMinThreshold) {
+          const cameraNames = runningDetections.map(o => `${o.name} ${o.detectionFps}`).join(', ');
           const first = killable[0];
-          first.console.warn(`System at capacity with ${runningDetections.length} cameras (${first.detectionFps} dps). Ending object detection.`);
+          first.console.warn(`System at capacity. Ending object detection.`, cameraNames);
           first.endObjectDetection();
           return;
         }
 
         const lowWatermark = runningDetections.filter(o => o.detectionFps < fpsLowWaterMark);
-        if (lowWatermark.length)
+        if (lowWatermark.length > lowPerformanceMinThreshold)
           allowStart = 1;
       }
 
@@ -1107,23 +1113,24 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     if (runningDetections.find(o => o.id === mixin.id))
       return false;
 
-    // always allow 2 cameras to push past cpu throttling
-    if (runningDetections.length < 2)
+    // allow minimum amount of concurrent cameras regardless of system specs
+    if (runningDetections.length < lowPerformanceMinThreshold)
       return true;
 
     // find any cameras struggling with a with low detection fps.
     const lowWatermark = runningDetections.filter(o => o.detectionFps < fpsLowWaterMark);
-    if (lowWatermark.length) {
+    if (lowWatermark.length > lowPerformanceMinThreshold) {
       const [first] = lowWatermark;
       // if cameras have been detecting enough to catch the activity, kill it for new camera.
+      const cameraNames = runningDetections.map(o => `${o.name} ${o.detectionFps}`).join(', ');
       if (Date.now() - first.detectionStartTime > 30000) {
-        first.console.warn(`System at capacity with ${runningDetections.length} cameras (${first.detectionFps} dps). Ending object detection to process activity on ${mixin.name}.`);
+        first.console.warn(`System at capacity. Ending object detection to process activity on ${mixin.name}.`, cameraNames);
         first.endObjectDetection();
-        mixin.console.warn(`System at capacity with ${runningDetections.length} cameras. Ending object detection on ${first.name} to process activity (${first.detectionFps} dps).`);
+        mixin.console.warn(`System at capacity. Ending object detection on ${first.name} to process activity.`, cameraNames);
         return true;
       }
 
-      mixin.console.warn(`System at capacity. Not starting object detection to continue processing recent activity on ${first.name} (${first.detectionFps} dps).`);
+      mixin.console.warn(`System at capacity. Not starting object detection to continue processing recent activity on ${first.name}.`, cameraNames);
       return false;
     }
 
