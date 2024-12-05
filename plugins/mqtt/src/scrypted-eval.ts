@@ -3,7 +3,7 @@ import { ScriptDeviceImpl, scryptedEval as scryptedEvalBase } from "@scrypted/co
 
 const util = require("!!raw-loader!./api/util.ts").default;
 const libs = {
-    util,
+    // util,
 };
 
 export async function scryptedEval(device: ScryptedDeviceBase, script: string, params: { [name: string]: any }) {
