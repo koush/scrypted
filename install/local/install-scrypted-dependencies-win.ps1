@@ -1,3 +1,5 @@
+#Requires -RunAsAdministrator
+
 # Set-PSDebug -Trace 1
 
 # stop existing service if any
@@ -22,6 +24,10 @@ $SCRYPTED_WINDOWS_PYTHON_VERSION="-3.9"
 # Refresh environment variables for py and npx to work
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
 
+# Workaround Windows Node no longer creating %APPDATA%\npm which causes npx to fail
+# Fixed in newer versions of NPM but not the one bundled with 20.11.1
+# https://github.com/nodejs/node/issues/53538
+npm i -g npm
 
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install --upgrade pip
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install debugpy typing_extensions typing opencv-python
