@@ -116,3 +116,14 @@ del $INSTALL_SERVICE_JS_PATH
 
 Write-Output "Scrypted is now running at: https://localhost:10443/"
 Write-Output "Note that it is https and that you'll be asked to approve/ignore the website certificate."
+
+Start-Sleep -Seconds 10
+
+Write-Output "scrypted.out.log"
+Get-Content "$SCRYPTED_HOME\daemon\scrypted.out.log" | Write-Output
+
+Write-Output "scrypted.wrapper.log"
+Get-Content "$SCRYPTED_HOME\daemon\scrypted.wrapper.log" | Write-Output
+
+Write-Output "scrypted.err.log"
+Get-Content "$SCRYPTED_HOME\daemon\scrypted.err.log" | Write-Output
