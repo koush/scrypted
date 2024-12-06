@@ -105,6 +105,9 @@ svc.on("install", () => {
 svc.on("start", () => {
   console.log("Service started");
 });
+svc.on("error", (err) => {
+  console.log("Service error", err);
+});
 svc.install();
 "@
 
@@ -119,15 +122,4 @@ Write-Output "Note that it is https and that you'll be asked to approve/ignore t
 
 Start-Sleep -Seconds 30
 
-Write-Output "scrypted.out.log"
-Get-Content "$SCRYPTED_HOME\daemon\scrypted.out.log" | Write-Output
-
-Write-Output "scrypted.wrapper.log"
-Get-Content "$SCRYPTED_HOME\daemon\scrypted.wrapper.log" | Write-Output
-
-Write-Output "scrypted.err.log"
-Get-Content "$SCRYPTED_HOME\daemon\scrypted.err.log" | Write-Output
-
-Write-Output $NPX_PATH
-
-& $NPX_PATH -y scrypted serve
+Get-EventLog -LogName Application -Newest 20 | Select-Object -Property *
