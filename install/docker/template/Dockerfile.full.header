@@ -48,7 +48,8 @@ RUN apt-get -y install \
 # allow pip to install to system
 RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
 
-RUN python3 -m pip install --upgrade pip
+# ERROR: Cannot uninstall pip 24.0, RECORD file not found. Hint: The package was installed by debian.
+# RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install debugpy typing_extensions psutil
 
 ################################################################
