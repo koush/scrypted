@@ -30,12 +30,13 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
 
 availableModels = [
     "Default",
+    "scrypted_yolov9c_relu_int8_320",
+    "scrypted_yolov9s_relu_int8_320",
+    "scrypted_yolov9t_relu_int8_320",
     "scrypted_yolov9c_int8_320",
     "scrypted_yolov9m_int8_320",
     "scrypted_yolov9s_int8_320",
     "scrypted_yolov9t_int8_320",
-    "scrypted_yolov9c_relu_int8_320",
-    "scrypted_yolov9s_relu_int8_320",
     "scrypted_yolov10m_320",
     "scrypted_yolov10s_320",
     "scrypted_yolov10n_320",
@@ -171,7 +172,7 @@ class OpenVINOPlugin(
             elif iris_xe:
                 model = "scrypted_yolov9s_relu_int8_320"
             else:
-                model = "scrypted_yolov9t_320"
+                model = "scrypted_yolov9t_relu_int8_320"
         self.yolo = "yolo" in model
         self.scrypted_yolov9 = "scrypted_yolov9" in model
         self.scrypted_yolov10 = "scrypted_yolov10" in model
