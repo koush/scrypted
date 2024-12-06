@@ -1,5 +1,7 @@
 #Requires -RunAsAdministrator
 
+node -v
+
 # Set-PSDebug -Trace 1
 
 # stop existing service if any
@@ -119,7 +121,3 @@ del $INSTALL_SERVICE_JS_PATH
 
 Write-Output "Scrypted is now running at: https://localhost:10443/"
 Write-Output "Note that it is https and that you'll be asked to approve/ignore the website certificate."
-
-Start-Sleep -Seconds 30
-
-Get-EventLog -LogName Application -Newest 20 | Select-Object -Property *
