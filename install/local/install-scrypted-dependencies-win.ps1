@@ -37,6 +37,8 @@ py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install --upgrade pip
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install debugpy typing_extensions typing opencv-python
 
 $SCRYPTED_INSTALL_VERSION=[System.Environment]::GetEnvironmentVariable("SCRYPTED_INSTALL_VERSION","User")
+Write-Output $SCRYPTED_INSTALL_VERSION
+
 if ($SCRYPTED_INSTALL_VERSION -eq $null) {
   npx -y scrypted@latest install-server
 } else {
@@ -66,6 +68,8 @@ child_process.spawn('$NPX_PATH_ESCAPED', ['-y', 'scrypted', 'serve'], {
     shell: true,
 });
 "@
+
+Write-Output $SERVICE_JS
 
 $SERVICE_JS_PATH = $SCRYPTED_HOME + '\service.js'
 $SERVICE_JS_ESCAPED_PATH = $SERVICE_JS_PATH.replace('\', '\\')
@@ -114,6 +118,8 @@ svc.on("error", (err) => {
 });
 svc.install();
 "@
+
+Write-Output $INSTALL_SERVICE_JS
 
 $INSTALL_SERVICE_JS_PATH = $SCRYPTED_HOME + '\install-service.js'
 $INSTALL_SERVICE_JS | Out-File -Encoding ASCII -FilePath $INSTALL_SERVICE_JS_PATH
