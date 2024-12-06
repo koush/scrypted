@@ -1,7 +1,5 @@
 #Requires -RunAsAdministrator
 
-node -v
-
 # Set-PSDebug -Trace 1
 
 # stop existing service if any
@@ -37,7 +35,6 @@ py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install --upgrade pip
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install debugpy typing_extensions typing opencv-python
 
 $SCRYPTED_INSTALL_VERSION=[System.Environment]::GetEnvironmentVariable("SCRYPTED_INSTALL_VERSION","User")
-Write-Output $SCRYPTED_INSTALL_VERSION
 
 if ($SCRYPTED_INSTALL_VERSION -eq $null) {
   npx -y scrypted@latest install-server
@@ -53,8 +50,7 @@ npm install --prefix $SCRYPTED_HOME @koush/node-windows --save
 $NPX_PATH = (Get-Command npx).Path
 # The path needs double quotes to handle spaces in the directory path
 $NPX_PATH_ESCAPED = '"' + $NPX_PATH.replace('\', '\\') + '"'
-# On newer versions of NPM, the NPX might be a .ps1 file which doesn't work with child_process.spawn
-# Change to .cmd
+# On newer versions of NPM, the NPX might be a .ps1 file which doesn't work with child_process.spawn, change to .cmd
 $NPX_PATH_ESCAPED = $NPX_PATH_ESCAPED.replace('.ps1', '.cmd')
 
 $SERVICE_JS = @"
@@ -71,8 +67,6 @@ child_process.spawn('$NPX_PATH_ESCAPED', ['-y', 'scrypted', 'serve'], {
     shell: true,
 });
 "@
-
-Write-Output $SERVICE_JS
 
 $SERVICE_JS_PATH = $SCRYPTED_HOME + '\service.js'
 $SERVICE_JS_ESCAPED_PATH = $SERVICE_JS_PATH.replace('\', '\\')
@@ -111,7 +105,7 @@ svc.on("install", () => {
    setTimeout(() => {
      console.log("Starting service");
      svc.start();
-   }, 10000);
+   }, 5000);
 });
 svc.on("start", () => {
   console.log("Service started");
@@ -121,8 +115,6 @@ svc.on("error", (err) => {
 });
 svc.install();
 "@
-
-Write-Output $INSTALL_SERVICE_JS
 
 $INSTALL_SERVICE_JS_PATH = $SCRYPTED_HOME + '\install-service.js'
 $INSTALL_SERVICE_JS | Out-File -Encoding ASCII -FilePath $INSTALL_SERVICE_JS_PATH
