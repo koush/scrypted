@@ -20,9 +20,9 @@ jobs:
     strategy:
       matrix:
         BASE: [
-          ["jammy-nvidia", ".s6"],
-          ["jammy-full", ".s6"],
-          ["jammy-lite", ""],
+          ["noble-nvidia", ".s6"],
+          ["noble-full", ".s6"],
+          ["noble-lite", ""],
         ]
     steps:
       - name: Check out the repo
