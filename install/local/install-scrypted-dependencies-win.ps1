@@ -127,3 +127,7 @@ Get-Content "$SCRYPTED_HOME\daemon\scrypted.wrapper.log" | Write-Output
 
 Write-Output "scrypted.err.log"
 Get-Content "$SCRYPTED_HOME\daemon\scrypted.err.log" | Write-Output
+
+Write-Output $NPX_PATH
+
+& $NPX_PATH_ESCAPED -y scrypted serve
