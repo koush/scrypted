@@ -137,6 +137,9 @@ class OpenVINOPlugin(
             except:
                 pass
 
+        # disabling since it is broken in 2024.5.0
+        npu = False
+
         mode = self.storage.getItem("mode") or "Default"
         if mode == "Default":
             mode = "AUTO"
