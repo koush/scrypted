@@ -117,7 +117,7 @@ del $INSTALL_SERVICE_JS_PATH
 Write-Output "Scrypted is now running at: https://localhost:10443/"
 Write-Output "Note that it is https and that you'll be asked to approve/ignore the website certificate."
 
-Start-Sleep -Seconds 10
+Start-Sleep -Seconds 30
 
 Write-Output "scrypted.out.log"
 Get-Content "$SCRYPTED_HOME\daemon\scrypted.out.log" | Write-Output
@@ -130,4 +130,4 @@ Get-Content "$SCRYPTED_HOME\daemon\scrypted.err.log" | Write-Output
 
 Write-Output $NPX_PATH
 
-& $NPX_PATH_ESCAPED -y scrypted serve
+& $NPX_PATH -y scrypted serve
