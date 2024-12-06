@@ -117,6 +117,12 @@ export function setupCluster(peer: RpcPeer) {
     const tidChannels = new Map<number, Deferred<worker_threads.MessagePort>>();
     const tidPeers = new Map<number, Promise<RpcPeer>>();
 
+    peer.killedSafe.finally(() => {
+        for (const cp of tidPeers.values()) {
+            cp.then(c => c.kill()).catch(() => { });
+        }
+    });
+
     function connectTidPeer(tid: number) {
         let peerPromise = tidPeers.get(tid);
         if (peerPromise)
