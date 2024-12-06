@@ -53,6 +53,9 @@ npm install --prefix $SCRYPTED_HOME @koush/node-windows --save
 $NPX_PATH = (Get-Command npx).Path
 # The path needs double quotes to handle spaces in the directory path
 $NPX_PATH_ESCAPED = '"' + $NPX_PATH.replace('\', '\\') + '"'
+# On newer versions of NPM, the NPX might be a .ps1 file which doesn't work with child_process.spawn
+# Change to .cmd
+$NPX_PATH_ESCAPED = $NPX_PATH_ESCAPED.replace('.ps1', '.cmd')
 
 $SERVICE_JS = @"
 const fs = require('fs');
