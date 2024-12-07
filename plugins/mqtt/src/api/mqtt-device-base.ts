@@ -1,7 +1,7 @@
 import { Settings, Setting, ScryptedDeviceBase, ScryptedInterface } from '@scrypted/sdk';
 import { connect, Client } from 'mqtt';
 import { ScriptableDeviceBase } from '../scrypted-eval';
-import type {MqttProvider} from '../main';
+import type { MqttProvider } from '../main';
 
 export class MqttDeviceBase extends ScriptableDeviceBase implements Settings {
     client: Client;
@@ -38,7 +38,7 @@ export class MqttDeviceBase extends ScriptableDeviceBase implements Settings {
     }
 
     async putSetting(key: string, value: string | number | boolean) {
-        if (key === 'url') {
+        if (key === 'url' && value !== '') {
             let url = value.toString();
             if (!url.endsWith('/'))
                 url += '/';
@@ -96,7 +96,7 @@ export class MqttDeviceBase extends ScriptableDeviceBase implements Settings {
         client.on('connect', packet => {
             this.console.log('connected to mqtt', packet);
         })
-        
+
         return this.client;
     }
 }
