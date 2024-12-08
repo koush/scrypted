@@ -183,6 +183,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     this.storageSettings.values.cloudflaredTunnelCredentials = undefined;
                 this.doCloudflaredLogin(nv);
             },
+            console: true,
         },
         cloudflaredTunnelLoginUrl: {
             group: 'Cloudflare',
@@ -1056,6 +1057,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                             if ((line.includes('Unregistered tunnel connection')
                                 || line.includes('Connection terminated error')
                                 || line.includes('Register tunnel error')
+                                || line.includes('Failed to serve tunnel')
                                 || line.includes('Failed to get tunnel'))
                                 && deferred.finished) {
                                 this.console.warn('Cloudflare registration failed after tunnel started. The old tunnel may be invalid. Terminating.');

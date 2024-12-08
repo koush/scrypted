@@ -11,7 +11,7 @@ jobs:
       NODE_VERSION: '20'
     strategy:
       matrix:
-        BASE: ["jammy"]
+        BASE: ["noble"]
         FLAVOR: ["full", "lite"]
     steps:
       - name: Check out the repo
@@ -83,7 +83,7 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        BASE: ["jammy"]
+        BASE: ["noble"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3

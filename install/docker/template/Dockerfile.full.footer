@@ -26,7 +26,7 @@ RUN add-apt-repository -y ppa:deadsnakes/ppa && \
 # allow pip to install to system
 RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
 
-RUN python3.9 -m pip install --upgrade pip
+# RUN python3.9 -m pip install --upgrade pip
 RUN python3.9 -m pip install debugpy typing_extensions psutil
 
 # Coral Edge TPU
@@ -40,11 +40,11 @@ ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
 
-RUN test -f "/usr/bin/ffmpeg" && test -f "/usr/bin/python3" && test -f "/usr/bin/python3.9" && test -f "/usr/bin/python3.10"
+RUN test -f "/usr/bin/ffmpeg" && test -f "/usr/bin/python3" && test -f "/usr/bin/python3.9" && test -f "/usr/bin/python3.12"
 ENV SCRYPTED_FFMPEG_PATH="/usr/bin/ffmpeg"
 ENV SCRYPTED_PYTHON_PATH="/usr/bin/python3"
 ENV SCRYPTED_PYTHON39_PATH="/usr/bin/python3.9"
-ENV SCRYPTED_PYTHON310_PATH="/usr/bin/python3.10"
+ENV SCRYPTED_PYTHON312_PATH="/usr/bin/python3.12"
 
 ENV SCRYPTED_DOCKER_FLAVOR="full"
 

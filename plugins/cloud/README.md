@@ -56,13 +56,13 @@ Scrypted Cloud automatically creates a login free tunnel for remote access.
 
 The following steps are only necessary if you want to associate the tunnel with your existing Cloudflare account to manage it remotely.
 
-1. Create the Tunnel in the [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com).
-2. Copy the token shown for the tunnel shown in the `install [token]` command. For example, if you see `cloudflared service install eyJhI344aA...`, then `eyJhI344aA...` is the token you need to copy.
-3. Paste the token into the Cloud Plugin Advanced Settings.
-4. Add a `Public Hostname` to the tunnel.
-    * Choose a (sub)domain.
-    * Service `Type` is `HTTPS` and `URL` is `localhost:port`. Replace the port with `Forward Port` from Cloud Plugin Settings.
-    * Expand `Additional Application Settings` -> `TLS` menus and enable `No TLS Verify`.
+1. Navigate to the Cloud Plugin's Cloudflare Settings.
+2. Enter the Cloudflare subdomain, e.g. `scrypted.example.org`.
+3. Open the authorization link printed in the Log in a browser.
+4. Log in to Cloudflare if prompted. Then open the authorization link again.
+5. Select the domain for the specified the subdomain.
+6. Authorization should now be complete.
 
-5. Reload Cloud Plugin.
-6. Verify Cloudflare successfully connected by observing the `Console` Logs.
+::: info
+Visiting the authorization link twice as directed in the above instructions may be necessary. Cloudflare will not prompt a with a list of domains unless the browser session is already logged in.
+:::

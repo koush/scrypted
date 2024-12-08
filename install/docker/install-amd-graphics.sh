@@ -23,7 +23,7 @@ fi
 
 # https://amdgpu-install.readthedocs.io/en/latest/install-prereq.html#installing-the-installer-package
 
-FILENAME="amdgpu-install_6.2.60204-1_all.deb"
+FILENAME="amdgpu-install_6.3.60300-1_all.deb"
 set -e
 mkdir -p /tmp/amd
 cd /tmp/amd
