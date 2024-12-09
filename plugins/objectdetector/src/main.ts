@@ -95,6 +95,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
         ];
         return {
+          hide: this.model?.decoder,
           choices,
         }
       },
