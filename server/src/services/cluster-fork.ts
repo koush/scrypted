@@ -85,12 +85,12 @@ export class ClusterForkService {
         // the server is responsible for killing the forked process when the requestor is killed.
         // minimizes lifecycle management duplication in python and node.
         worker.forks.add(options);
-        peerLiveness.waitKilled().catch(() => {}).finally(() => {
-            forkResultPromise.then(forkResult => forkResult.kill().catch(() => {}));
+        peerLiveness.waitKilled().catch(() => { }).finally(() => {
+            forkResultPromise.then(forkResult => forkResult.kill().catch(() => { }));
         });
         forkResultPromise.then(forkResult => {
             forkResult.clusterWorkerId = worker.id;
-            forkResult.waitKilled().catch(() => {}).finally(() => {
+            forkResult.waitKilled().catch(() => { }).finally(() => {
                 worker.forks.delete(options);
             });
         });
@@ -115,16 +115,22 @@ export class ClusterForkService {
 
     async getEnvControl(clusterWorkerId: string) {
         const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        if (clusterWorker.mode === 'server')
+            return this.runtime.envControl;
         return clusterWorker.peer.getParam('env-control');
     }
 
     async getServiceControl(clusterWorkerId: string) {
         const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        if (clusterWorker.mode === 'server')
+            return this.runtime.serviceControl;
         return clusterWorker.peer.getParam('service-control');
     }
 
     async getInfo(clusterWorkerId: string) {
         const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        if (clusterWorker.mode === 'server')
+            return this.runtime.info;
         return clusterWorker.peer.getParam('info');
     }
 }
