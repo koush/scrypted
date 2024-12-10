@@ -109,7 +109,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                 {
                     name: 'Cluster',
                     nativeId: ClusterCoreNativeId,
-                    interfaces: [ScryptedInterface.Settings, ScryptedInterface.Readme],
+                    interfaces: [ScryptedInterface.Settings, ScryptedInterface.Readme, ScryptedInterface.ScryptedSettings],
                     type: ScryptedDeviceType.Builtin,
                 },
             );
