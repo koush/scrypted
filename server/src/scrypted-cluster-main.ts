@@ -1,4 +1,4 @@
-import type { ClusterManager, ForkOptions } from '@scrypted/types';
+import type { ForkOptions } from '@scrypted/types';
 import crypto from 'crypto';
 import { once } from 'events';
 import net from 'net';
@@ -11,7 +11,6 @@ import { computeClusterObjectHash } from './cluster/cluster-hash';
 import { getClusterLabels, getClusterWorkerWeight } from './cluster/cluster-labels';
 import { getScryptedClusterMode, InitializeCluster, setupCluster } from './cluster/cluster-setup';
 import type { ClusterObject } from './cluster/connect-rpc-object';
-import type { PluginAPI } from './plugin/plugin-api';
 import { getPluginVolume, getScryptedVolume } from './plugin/plugin-volume';
 import { prepareZip } from './plugin/runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
@@ -19,7 +18,6 @@ import type { RuntimeWorker, RuntimeWorkerOptions } from './plugin/runtime/runti
 import { RpcPeer } from './rpc';
 import { createRpcDuplexSerializer } from './rpc-serializer';
 import type { ScryptedRuntime } from './runtime';
-import type { ClusterForkService } from './services/cluster-fork';
 import { EnvControl } from './services/env';
 import { Info } from './services/info';
 import { ServiceControl } from './services/service-control';
@@ -379,30 +377,4 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
     });
 
     return server;
-}
-
-export class ClusterManagerImpl implements ClusterManager {
-    private clusterServicePromise: Promise<ClusterForkService>;
-    private clusterMode = getScryptedClusterMode()?.[0];
-
-    constructor(private api: PluginAPI, private clusterWorkerId: string) {
-    }
-
-    getClusterWorkerId(): string {
-        return this.clusterWorkerId;
-    }
-
-    getClusterMode(): 'server' | 'client' | undefined {
-        return this.clusterMode;
-    }
-
-    async getClusterWorkers() {
-        const clusterFork = await this.getClusterService();
-        return clusterFork.getClusterWorkers();
-    }
-
-    private getClusterService() {
-        this.clusterServicePromise ||= this.api.getComponent('cluster-fork');
-        return this.clusterServicePromise;
-    }
 }

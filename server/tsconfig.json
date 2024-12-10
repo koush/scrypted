@@ -15,6 +15,7 @@
         { "path": "./src/es" },
     ],
     "exclude": [
+        "node_modules/**/*",
         "src/es/es-eval.ts"
     ],
     "include": [

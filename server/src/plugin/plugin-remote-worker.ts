@@ -5,11 +5,11 @@ import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import worker_threads from 'worker_threads';
 import { utilizesClusterForkWorker } from '../cluster/cluster-labels';
-import { setupCluster } from '../cluster/cluster-setup';
+import { getScryptedClusterMode, setupCluster } from '../cluster/cluster-setup';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { evalLocal } from '../rpc-peer-eval';
-import { ClusterManagerImpl } from '../scrypted-cluster-main';
 import type { PluginComponent } from '../services/plugin';
+import { ClusterManagerImpl } from './cluster';
 import type { DeviceManagerImpl } from './device';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
@@ -120,7 +120,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             await initializeCluster(zipOptions);
 
             scrypted.connectRPCObject = connectRPCObject;
-            scrypted.clusterManager = new ClusterManagerImpl(api, zipOptions.clusterWorkerId);
+            scrypted.clusterManager = new ClusterManagerImpl(getScryptedClusterMode()?.[0], api, zipOptions.clusterWorkerId);
 
             if (worker_threads.isMainThread) {
                 const fsDir = path.join(unzippedPath, 'fs')

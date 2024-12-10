@@ -7,6 +7,7 @@ import { EndpointManagerImpl } from './endpoint';
 import { PluginAPI, PluginHostInfo, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketConnection, WebSocketMethods, WebSocketSerializer } from './plugin-remote-websocket';
 import { SystemManagerImpl } from './system';
+import { ClusterManagerImpl } from './cluster';
 
 
 export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string, hostInfo: PluginHostInfo, getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } }): Promise<PluginRemote> {
@@ -141,6 +142,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         const systemManager = new SystemManagerImpl();
         const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole, getMixinConsole);
         const endpointManager = new EndpointManagerImpl();
+        const clusterManager = new ClusterManagerImpl(undefined, api, undefined);
         const hostMediaManager = await api.getMediaManager();
         if (!hostMediaManager) {
             peer.params['createMediaManager'] = async () => createMediaManager(systemManager, deviceManager);
