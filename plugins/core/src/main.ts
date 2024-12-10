@@ -15,6 +15,7 @@ import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
+import { ClusterCore, ClusterCoreNativeId } from './cluster';
 
 const { deviceManager, endpointManager } = sdk;
 
@@ -27,6 +28,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
     publicRouter: any = Router();
     mediaCore: MediaCore;
     scriptCore: ScriptCore;
+    clusterCore: ClusterCore;
     aggregateCore: AggregateCore;
     automationCore: AutomationCore;
     users: UsersCore;
@@ -102,6 +104,16 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
 
         this.indexHtml = readFileAsString('dist/index.html');
 
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Cluster',
+                    nativeId: ClusterCoreNativeId,
+                    interfaces: [ScryptedInterface.Settings, ScryptedInterface.Readme],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+        })();
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {
@@ -214,6 +226,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
     }
 
     async getDevice(nativeId: string) {
+        if (nativeId === ClusterCoreNativeId)
+            return this.clusterCore ||= new ClusterCore(ClusterCoreNativeId);
         if (nativeId === 'launcher')
             return new LauncherMixin('launcher');
         if (nativeId === 'mediacore')
