@@ -700,6 +700,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             deviceManager,
             endpointManager,
             mediaManager,
+            clusterManager,
         } = scrypted;
         console.log('api attached', Date.now() - start);
 
@@ -859,6 +860,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             connectionType,
             admin,
             systemManager,
+            clusterManager,
             deviceManager,
             endpointManager,
             mediaManager,
