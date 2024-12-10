@@ -103,11 +103,9 @@ then
             exit 1
         fi
 
-        exit 1
+        SCRYPTED_RESTORE=true
+        prepareScryptedRestore
     fi
-
-    SCRYPTED_RESTORE=true
-    prepareScryptedRestore
 fi
 
 if [[ ! "$@" =~ "--storage" ]]
