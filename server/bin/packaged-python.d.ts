@@ -1,2 +1,2 @@
-export declare declare const version: string;
-export declare async function installScryptedServerRequirements(version?: string, dest?: string, options?: any): Promise<string>;
+export declare const version: string;
+export declare function installScryptedServerRequirements(version?: string, dest?: string, options?: any): Promise<string>;
