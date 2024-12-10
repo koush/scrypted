@@ -136,19 +136,15 @@ class OpenVINOPlugin(
                     gpu = True
             except:
                 pass
-
-        # disabling since it is broken in 2024.5.0
-        npu = False
-
+    
+        # AUTO mode can cause conflicts or hide errors with NPU and GPU
+        # so try to be explicit and fall back accordingly.
         mode = self.storage.getItem("mode") or "Default"
         if mode == "Default":
             mode = "AUTO"
 
             if npu:
-                if gpu:
-                    mode = f"AUTO:NPU,GPU,CPU"
-                else:
-                    mode = f"AUTO:NPU,CPU"
+                mode = 'NPU'
             elif len(dgpus):
                 mode = f"AUTO:{','.join(dgpus)},CPU"
             # forcing GPU can cause crashes on older GPU.
