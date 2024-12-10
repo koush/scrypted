@@ -94,8 +94,23 @@ then
     fi
 fi
 
+if [[ ! "$@" =~ "--storage" ]]
+then
+    HAS_LOCAL_LVM=$(pvesm status | grep local-lvm | grep active)
+    HAS_LOCAL_ZFS=$(pvesm status | grep local-zfs | grep active)
+    if [ ! -z "$HAS_LOCAL_LVM" ]
+    then
+        RESTORE_STORAGE="--storage local-lvm"
+    elif [ ! -z "$HAS_LOCAL_ZFS" ]
+    then
+        RESTORE_STORAGE="--storage local-zfs"
+    else
+        echo "Could not determine a valid storage device. One may need to be specified manually."
+    fi
+fi
+
 pct stop $VMID 2>&1 > /dev/null
-pct restore $VMID $SCRYPTED_TAR_ZST $@
+pct restore $VMID $SCRYPTED_TAR_ZST $@ $RESTORE_STORAGE
 
 if [ "$?" != "0" ]
 then
