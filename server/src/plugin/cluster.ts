@@ -1,9 +1,12 @@
-import type { ClusterManager } from "@scrypted/types";
+import type { ClusterManager, ClusterWorker } from "@scrypted/types";
 import type { PluginAPI } from "./plugin-api";
-import type { ClusterForkService } from "../services/cluster-fork";
+
+export interface ClusterForkServiceInterface {
+    getClusterWorkers(): Promise<Record<string, ClusterWorker>>;
+}
 
 export class ClusterManagerImpl implements ClusterManager {
-    private clusterServicePromise: Promise<ClusterForkService>;
+    private clusterServicePromise: Promise<ClusterForkServiceInterface>;
     
     constructor(public clusterMode: undefined | 'client' | 'server', private api: PluginAPI, private clusterWorkerId: string) {
     }

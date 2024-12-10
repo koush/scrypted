@@ -1,4 +1,4 @@
-import { EventDetails, EventListenerOptions, EventListenerRegister, Refresh, ScryptedInterface, ScryptedInterfaceProperty, ScryptedNativeId, SystemDeviceState } from "@scrypted/types";
+import { EventDetails, EventListenerOptions, EventListenerRegister, Refresh, ScryptedInterface, ScryptedInterfaceProperty, SystemDeviceState } from "@scrypted/types";
 import throttle from 'lodash/throttle';
 import { PluginDevice } from "./db-types";
 import { EventListenerRegisterImpl, EventRegistry, getMixinEventName } from "./event-registry";

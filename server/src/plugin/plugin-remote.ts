@@ -160,7 +160,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             deviceManager,
             endpointManager,
             mediaManager,
-            clusterManager: undefined,
+            clusterManager,
             log,
             pluginHostAPI: api,
             pluginRemoteAPI: undefined,
