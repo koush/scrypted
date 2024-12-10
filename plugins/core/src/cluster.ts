@@ -120,9 +120,9 @@ export class ClusterCore extends ScryptedDeviceBase implements Settings, Readme,
 
             const clusterFork = await sdk.systemManager.getComponent('cluster-fork');
             const envControl = await clusterFork.getEnvControl(worker.id);
-            const dotEnv: string = await envControl.getDotEnv() || '';
+            const dotEnv: string = await envControl.getDotEnv().catch(() => {});
 
-            const dotEnvLines = dotEnv.split('\n');
+            const dotEnvLines = dotEnv?.split('\n') || worker.labels;
             const dotEnvParsed = dotEnvLines.map(line => {
                 const trimmed = line.trim();
                 if (trimmed.startsWith('#')) {
