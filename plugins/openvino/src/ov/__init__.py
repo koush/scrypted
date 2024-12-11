@@ -151,6 +151,11 @@ class OpenVINOPlugin(
             elif gpu:
                 mode = f"GPU"
 
+        # recognition models are not supported on NPU.
+        self.recognition_mode = mode
+        if mode == "NPU":
+            self.recognition_mode = "AUTO"
+
         mode = mode or "AUTO"
         self.mode = mode
 

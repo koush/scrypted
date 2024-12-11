@@ -28,7 +28,7 @@ class OpenVINOTextRecognition(TextRecognition):
             f"{model_version}/{model}/{precision}/{ovmodel}.bin",
         )
         print(xmlFile, binFile)
-        return self.plugin.core.compile_model(xmlFile, self.plugin.mode)
+        return self.plugin.core.compile_model(xmlFile, self.plugin.recognition_mode)
 
     async def predictDetectModel(self, input: np.ndarray):
         def predict():
