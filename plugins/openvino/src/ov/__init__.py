@@ -153,7 +153,7 @@ class OpenVINOPlugin(
 
         # recognition models are not supported on NPU.
         self.recognition_mode = mode
-        if mode == "NPU":
+        if "NPU" in mode:
             self.recognition_mode = "AUTO"
 
         mode = mode or "AUTO"
