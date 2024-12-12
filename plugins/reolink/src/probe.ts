@@ -27,12 +27,13 @@ export interface DevInfo {
     wifi: number;
 }
 
-async function getDeviceInfo(host: string, username: string, password: string): Promise<DevInfo> {
+async function getDeviceInfoInternal(host: string, parameters: Record<string, string>): Promise<DevInfo> {
     const url = new URL(`http://${host}/api.cgi`);
     const params = url.searchParams;
     params.set('cmd', 'GetDevInfo');
-    params.set('user', username);
-    params.set('password', password);
+    for (const [key, value] of Object.entries(parameters)) {
+        params.set(key, value);
+    }
 
     const response = await httpFetch({
         url,
@@ -49,10 +50,18 @@ async function getDeviceInfo(host: string, username: string, password: string): 
     return ret;
 }
 
+export async function getDeviceInfo(host: string, username: string, password: string): Promise<DevInfo> {
+    const parameters = await getLoginParameters(host, username, password);
+    return getDeviceInfoInternal(host, parameters.parameters);
+}
+
 export async function getLoginParameters(host: string, username: string, password: string, forceToken?: boolean) {
     if (!forceToken) {
         try {
-            await getDeviceInfo(host, username, password);
+            await getDeviceInfoInternal(host, {
+                user: username,
+                password,
+            });
             return {
                 parameters: {
                     user: username,
