@@ -124,7 +124,7 @@ then
 fi
 
 pct stop $VMID 2>&1 > /dev/null
-pct restore $VMID $SCRYPTED_TAR_ZST $@ $RESTORE_STORAGE
+pct restore $VMID $SCRYPTED_TAR_ZST $RESTORE_STORAGE $@
 
 if [ "$?" != "0" ]
 then
@@ -249,7 +249,7 @@ then
 
     VMID=$RESTORE_VMID
     echo "Restoring with reset image..."
-    pct restore --force 1 $VMID *.tar $@
+    pct restore --force 1 $VMID *.tar $RESTORE_STORAGE $@
 
     echo "Restoring volumes..."
     move_volume $SCRYPTED_BACKUP_VMID $VMID mp0 hide-warning
