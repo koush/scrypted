@@ -1,8 +1,9 @@
 import { Device, EngineIOHandler, ScryptedInterface } from '@scrypted/types';
-import crypto from 'crypto';
+import crypto, { scrypt } from 'crypto';
 import * as io from 'engine.io';
 import fs from 'fs';
 import os from 'os';
+import { PassThrough } from 'stream';
 import WebSocket from 'ws';
 import { utilizesClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
@@ -12,6 +13,7 @@ import type { LogEntry, Logger } from '../logger';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { createRpcSerializer } from '../rpc-serializer';
 import { ScryptedRuntime } from '../runtime';
+import { serverVersion } from '../services/info';
 import { sleep } from '../sleep';
 import { AccessControls } from './acl';
 import { MediaManagerHostImpl } from './media';
@@ -26,8 +28,7 @@ import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { createClusterForkWorker } from './runtime/cluster-fork-worker';
 import { prepareZipSync } from './runtime/node-worker-common';
 import type { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
-import { PassThrough } from 'stream';
-import { serverVersion } from '../services/info';
+import { ClusterForkOptions } from '../scrypted-cluster-main';
 export class UnsupportedRuntimeError extends Error {
     constructor(runtime: string) {
         super(`Unsupported runtime: ${runtime}`);
@@ -352,8 +353,11 @@ export class PluginHost {
             zipHash: this.zipHash,
         };
 
-        // if a plugin requests a cluster worker, and it can be fulfilled by the server, do it.
-        if (!utilizesClusterForkWorker(this.packageJson.scrypted)) {
+        if (
+            // check if the plugin requests a cluster worker in the package json
+            !utilizesClusterForkWorker(this.packageJson.scrypted) &&
+            // check if there is a cluster worker that is specifically labelled for a non cluster-aware plugin
+            ![...this.scrypted.clusterWorkers.values()].find(cw => cw.labels.includes(this.pluginId))) {
             this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
                 if (connected) {
                     this.worker.send(message, reject, serializationContext);
@@ -374,6 +378,11 @@ export class PluginHost {
             this.clusterWorkerId = Promise.resolve(undefined);
         }
         else {
+            const scrypted: ClusterForkOptions = JSON.parse(JSON.stringify(this.packageJson.scrypted));
+            scrypted.labels ||= {};
+            scrypted.labels.prefer ||= [];
+            scrypted.labels.prefer.push(this.pluginId);
+
             this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
                 if (connected) {
                     console.warn('unexpected message to cluster fork worker', message);
@@ -386,7 +395,7 @@ export class PluginHost {
             const clusterSetup = setupCluster(this.peer);
             const { runtimeWorker, forkPeer, clusterWorkerId } = createClusterForkWorker(
                 runtimeWorkerOptions,
-                this.packageJson.scrypted,
+                scrypted,
                 (async () => {
                     await clusterSetup.initializeCluster({
                         clusterId: this.scrypted.clusterId,
