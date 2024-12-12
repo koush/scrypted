@@ -43,7 +43,10 @@ async function getDeviceInfo(host: string, username: string, password: string): 
     if (error)
         throw new Error('error during call to getDeviceInfo');
 
-    return response.body?.[0]?.value?.DevInfo;
+    const ret: DevInfo = response.body?.[0]?.value?.DevInfo;
+    if (!ret?.type && !ret?.model && !ret?.exactType)
+        throw new Error('device info return unexpected data');
+    return ret;
 }
 
 export async function getLoginParameters(host: string, username: string, password: string, forceToken?: boolean) {
