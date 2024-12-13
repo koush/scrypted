@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/tapo",
-   "version": "0.0.19",
+   "version": "0.0.20",
    "description": "Tapo Camera Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
