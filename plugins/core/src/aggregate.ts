@@ -253,13 +253,13 @@ export class AggregateDevice extends ScryptedDeviceBase implements Settings {
                 if (iface === ScryptedInterface.VideoCamera) {
                     const camera = createVideoCamera(devices as any, this.console);
                     for (const method of descriptor.methods) {
-                        AggregateDevice.prototype[method] = (...args: any[]) => camera[method](...args);
+                        this[method] = (...args: any[]) => camera[method](...args);
                     }
                     continue;
                 }
 
                 for (const method of descriptor.methods) {
-                    AggregateDevice.prototype[method] = async function (...args: any[]) {
+                    this[method] = async function (...args: any[]) {
                         const ret: Promise<any>[] = [];
                         for (const device of devices) {
                             ret.push(device[method](...args));
