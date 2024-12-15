@@ -50,9 +50,11 @@ export class NodeForkWorker extends ChildProcessWorker {
 
         this.worker = child_process.fork(mainFilename, args, {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-            env: Object.assign({}, process.env, env, {
+            env: Object.assign({}, process.env, {
+                // allow NODE_PATH to be overriden only by env that is passed in programatically.
+                // but ignore NODE_PATH from cli env.
                 NODE_PATH: path.resolve(__dirname, '..', '..', '..', 'node_modules'),
-            }),
+            }, env),
             serialization: 'advanced',
             execArgv,
         });
