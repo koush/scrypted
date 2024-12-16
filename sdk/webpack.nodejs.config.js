@@ -56,7 +56,6 @@ if (process.env.WEBPACK_ANALYZER) {
 
 const alias = {};
 const polyfills = [
-    'node-pty-prebuilt-multiarch',
     '@scrypted/node-pty',
     'node-forge',
     'sharp',
