@@ -206,14 +206,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                             if (parsed.interactive) {
                                 let spawn: typeof ptySpawn;
                                 try {
-                                    try {
-                                        spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
-                                        if (!spawn)
-                                            throw new Error();
-                                    }
-                                    catch (e) {
-                                        spawn = require('@scrypted/node-pty').spawn as typeof ptySpawn;
-                                    }
+                                    spawn = require('@scrypted/node-pty').spawn as typeof ptySpawn;
                                     cp = new InteractiveTerminal(cmd, extraPaths, spawn);
                                 }
                                 catch (e) {
