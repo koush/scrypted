@@ -16,6 +16,10 @@ faceRecognizePrepare, faceRecognizePredict = async_infer.create_executors(
 
 
 class OpenVINOFaceRecognition(FaceRecognizeDetection):
+    def __init__(self, plugin, nativeId: str):
+        super().__init__(plugin=plugin, nativeId=nativeId)
+        self.prefer_relu = True
+
     def downloadModel(self, model: str):
         scrypted_yolov9 = "scrypted_yolov9" in model
         ovmodel = "best-converted" if scrypted_yolov9 else "best"
