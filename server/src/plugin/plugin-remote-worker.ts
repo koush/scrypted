@@ -373,17 +373,20 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 const sdkVersion = await pluginReader('sdk.json').then(b => JSON.parse(b.toString()).version).catch(() => { });
                 const mainNodeJsOnFilesystem = path.join(unzippedPath, mainNodejs);
                 if (sdkVersion) {
+                    // todo: remove this, only existed in prerelease versions
                     process.env.SCRYPTED_SDK_MODULE = __filename;
                     scryptedStatic = scrypted;
                     globalThis.localStorage = params.localStorage;
                 }
 
                 if (isModule) {
+                    process.env.SCRYPTED_SDK_ES_MODULE = __filename;
                     const { eseval } = await import('../es/es-eval');
                     const module = await eseval(mainNodeJsOnFilesystem);
                     params.module.exports = module;
                 }
                 else if (sdkVersion) {
+                    process.env.SCRYPTED_SDK_CJS_MODULE = __filename;
                     params.module.exports = require(mainNodeJsOnFilesystem);
                 }
                 else {

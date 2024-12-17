@@ -212,25 +212,38 @@ export const sdk: ScryptedStatic = {} as any;
 
 try {
   let loaded = false;
-  if (process.env.SCRYPTED_SDK_MODULE) {
-    try {
+  try {
+    // todo: remove usage of process.env.SCRYPTED_SDK_MODULE, only existed in prerelease builds.
+    // import.meta is not a reliable way to detect es module support in webpack since webpack
+    // evaluates that to true at runtime.
+    const esModule = process.env.SCRYPTED_SDK_ES_MODULE || process.env.SCRYPTED_SDK_MODULE;
+    const cjsModule = process.env.SCRYPTED_SDK_CJS_MODULE || process.env.SCRYPTED_SDK_MODULE;
+    // @ts-expect-error
+    if (esModule && typeof import.meta !== 'undefined') {
       // @ts-expect-error
-      if (typeof import.meta !== 'undefined') {
+      const require = createRequire(import.meta.url);
+      const sdkModule = require(esModule);
+      Object.assign(sdk, sdkModule.getScryptedStatic());
+      loaded = true;
+    }
+    else if (cjsModule) {
+      // @ts-expect-error
+      if (typeof __non_webpack_require__ !== 'undefined') {
         // @ts-expect-error
-        const require = createRequire(import.meta.url);
-        const sdkModule = require(process.env.SCRYPTED_SDK_MODULE);
+        const sdkModule = __non_webpack_require__(process.env.SCRYPTED_SDK_MODULE);
         Object.assign(sdk, sdkModule.getScryptedStatic());
         loaded = true;
       }
       else {
-        const sdkModule = require(process.env.SCRYPTED_SDK_MODULE);
+        const sdkModule = require(cjsModule);
         Object.assign(sdk, sdkModule.getScryptedStatic());
         loaded = true;
       }
     }
-    catch (e) {
-      console.warn("failed to load sdk module", e);
-    }
+  }
+  catch (e) {
+    console.warn("failed to load sdk module", e);
+    throw e;
   }
 
   if (!loaded) {
