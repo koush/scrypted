@@ -80,7 +80,7 @@ class TensorFlowLitePlugin(
             edge_tpus = None
             pass
 
-        model_version = "v13"
+        model_version = "v14"
         model = self.storage.getItem("model") or "Default"
         if model not in availableModels:
             self.storage.setItem("model", "Default")
@@ -251,21 +251,20 @@ class TensorFlowLitePlugin(
                 input_scale = self.get_input_details()[0]
                 if x.dtype == np.int8:
                     scale, zero_point = output["quantization"]
-                    threshold = yolo.defaultThreshold / scale + zero_point
                     combined_scale = scale * input_scale
                     if self.scrypted_yolov10:
                         objs = yolo.parse_yolov10(
                             x[0],
-                            threshold,
                             scale=lambda v: (v - zero_point) * combined_scale,
                             confidence_scale=lambda v: (v - zero_point) * scale,
+                            threshold_scale=lambda v: (v - zero_point) * scale,
                         )
                     else:
                         objs = yolo.parse_yolov9(
                             x[0],
-                            threshold,
                             scale=lambda v: (v - zero_point) * combined_scale,
                             confidence_scale=lambda v: (v - zero_point) * scale,
+                            threshold_scale=lambda v: (v - zero_point) * scale,
                         )
                 else:
                     # this code path is unused.
