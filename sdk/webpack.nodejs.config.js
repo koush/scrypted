@@ -32,6 +32,9 @@ function ensureAlias(name) {
 
 const plugins = [
     new webpack.DefinePlugin({
+        'import.meta': undefined,
+    }),
+    new webpack.DefinePlugin({
         'process.env.SSDP_COV': false,
     }),
     new webpack.optimize.LimitChunkCountPlugin({
