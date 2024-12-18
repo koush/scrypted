@@ -6,9 +6,12 @@ from predict.rectangle import Rectangle
 
 defaultThreshold = .2
 
-def parse_yolov10(results, threshold = defaultThreshold, scale = None, confidence_scale  = None):
+def parse_yolov10(results, threshold = defaultThreshold, scale = None, confidence_scale  = None, threshold_scale = None):
     objs: list[Prediction] = []
-    keep = np.argwhere(results[4:] > threshold)
+    if not threshold_scale:
+        keep = np.argwhere(results[4:] > threshold)
+    else:
+        keep = np.argwhere(results[4:] > threshold_scale(results[4:]))
     for indices in keep:
         class_id = indices[0]
         index = indices[1]
@@ -52,9 +55,12 @@ def parse_yolo_nas(predictions):
             objs.append(obj)
     return objs
 
-def parse_yolov9(results, threshold = defaultThreshold, scale = None, confidence_scale  = None):
+def parse_yolov9(results, threshold = defaultThreshold, scale = None, confidence_scale  = None, threshold_scale = None):
     objs: list[Prediction] = []
-    keep = np.argwhere(results[4:] > threshold)
+    if not threshold_scale:
+        keep = np.argwhere(results[4:] > threshold)
+    else:
+        keep = np.argwhere(threshold_scale(results[4:]) > threshold)
     for indices in keep:
         class_id = indices[0]
         index = indices[1]
