@@ -49,7 +49,7 @@ export class NodeForkWorker extends ChildProcessWorker {
         ];
 
         const nodePaths: string[] = [path.resolve(__dirname, '..', '..', '..', 'node_modules')];
-        if (env.NODE_PATH)
+        if (env?.NODE_PATH)
             nodePaths.push(env.NODE_PATH);
         if (process.env.NODE_PATH)
             nodePaths.push(process.env.NODE_PATH);

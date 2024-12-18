@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "autoAttachChildProcesses": true,
+            "autoAttachChildProcesses": false,
             "type": "node",
             "request": "launch",
             "name": "Launch Program",
@@ -28,11 +28,12 @@
             ],
             "env": {
                 "SCRYPTED_CAN_RESTART": "true",
+                "DYLD_LIBRARY_PATH": "/usr/local/lib",
                 // "SCRYPTED_DEFAULT_AUTHENTICATION": "demo",
                 // force usage of system python because brew python is 3.11
                 // which has no wheels for coreml tools or tflite-runtime
                 // "SCRYPTED_PYTHON_PATH": "/opt/homebrew/bin/python3.11",
-                // "SCRYPTED_PYTHON310_PATH": "/opt/homebrew/bin/python3.10",
+                "SCRYPTED_PYTHON310_PATH": "/opt/homebrew/bin/python3.10",
                 // "SCRYPTED_PORTABLE_PYTHON": "true",
                 // "SCRYPTED_SHARED_WORKER": "true",
                 // "SCRYPTED_DISABLE_AUTHENTICATION": "true",
