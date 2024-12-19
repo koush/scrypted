@@ -25,7 +25,7 @@ $SCRYPTED_WINDOWS_PYTHON_VERSION="-3.9"
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
 
 # Workaround Windows Node no longer creating %APPDATA%\npm which causes npx to fail
-# Fixed in newer versions of NPM but not the one bundled with 20.11.1
+# Fixed in newer versions of NPM but not the one bundled with Node 20
 # https://github.com/nodejs/node/issues/53538
 npm i -g npm
 
