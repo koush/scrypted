@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/snapshot",
-   "version": "0.2.55",
+   "version": "0.2.56",
    "description": "Snapshot Plugin for Scrypted",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
@@ -34,8 +34,8 @@
       ]
    },
    "dependencies": {
-      "@types/node": "^20.10.6",
-      "sharp": "^0.33.1",
+      "@types/node": "^22.10.2",
+      "sharp": "^0.33.5",
       "whatwg-mimetype": "^4.0.0"
    },
    "devDependencies": {

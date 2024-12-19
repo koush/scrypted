@@ -117,7 +117,7 @@ export class VipsImage implements Image {
     }
 
     async toImage(options: ImageOptions) {
-        if (options.format)
+        if (options?.format)
             throw new Error('format can only be used with toBuffer');
         const newVipsImage = await this.toVipsImage(options);
         return createVipsMediaObject(newVipsImage);
