@@ -10,7 +10,7 @@ sc.exe stop scrypted.exe
 iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
 # Install node.js
-choco upgrade -y nodejs-lts --version=20.11.1
+choco upgrade -y nodejs-lts --version=20.18.0
 
 # Install VC Redist, which is necessary for portable python
 choco install -y vcredist140
