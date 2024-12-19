@@ -187,6 +187,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       }
       else {
         value = this.storage.getItem(setting.key);
+        if (setting.type === 'number')
+          value = parseFloat(value);
       }
       value ||= setting.value;
 
@@ -601,7 +603,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       // use a default inclusion zone that crops the top and bottom to
       // prevents errant motion from the on screen time changing every second.
       if (this.hasMotionType && included === undefined) {
-        const defaultInclusionZone: ClipPath = [[0, 10], [100, 10], [100, 90], [0, 90]];
+        const defaultInclusionZone: ClipPath = [[0, .1], [1, .1], [1, .9], [0, .9]];
         included = polygonOverlap(box, defaultInclusionZone);
       }
 
