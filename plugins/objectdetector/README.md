@@ -13,4 +13,8 @@ benefits to HomeKit, which does its own detection processing.
 
 ## Smart Motion Sensors
 
-This plugin can be used to create smart motion sensors that trigger when a specific type of object (car, person, dog, etc) triggers movement on a camera. Created sensors can then be synced to other platforms such as HomeKit, Google Home, Alexa, or Home Assistant for use in automations. This feature requires cameras with hardware or software object detection capability.
+This plugin can be used to create smart motion sensors that trigger when a specific type of object (vehicle, person, animal, etc) triggers movement on a camera. Created sensors can then be synced to other platforms such as HomeKit, Google Home, Alexa, or Home Assistant for use in automations. This Sensor requires cameras with hardware or software object detection capability.
+
+## Smart Occupancy Sensors
+
+This plugin can be used to create smart occupancy sensors remains triggered when a specific type of object (vehicle, person, animal, etc) is detected on a camera. Created sensors can then be synced to other platforms such as HomeKit, Google Home, Alexa, or Home Assistant for use in automations. This Sensor requires an object detector plugin such as Scrypted NVR, OpenVINO, CoreML, ONNX, or Tensorflow-lite.

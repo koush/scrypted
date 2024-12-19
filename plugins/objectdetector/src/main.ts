@@ -6,8 +6,9 @@ import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
-import { insidePolygon, normalizeBox, polygonOverlap } from './polygon';
-import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor, createObjectDetectorStorageSetting } from './smart-motionsensor';
+import { fixLegacyClipPath, insidePolygon, normalizeBoxToClipPath, polygonOverlap } from './polygon';
+import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor } from './smart-motionsensor';
+import { SMART_OCCUPANCYSENSOR_PREFIX, SmartOccupancySensor } from './smart-occupancy-sensor';
 import { getAllDevices, safeParseJson } from './util';
 
 
@@ -542,7 +543,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!o.boundingBox)
         continue;
 
-      const box = normalizeBox(o.boundingBox, detection.inputDimensions);
+      const box = normalizeBoxToClipPath(o.boundingBox, detection.inputDimensions);
 
       let included: boolean;
       // need a way to explicitly include package zone.
@@ -550,7 +551,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         included = true;
       else
         o.zones = [];
-      for (const [zone, zoneValue] of Object.entries(this.zones)) {
+      for (let [zone, zoneValue] of Object.entries(this.zones)) {
+        zoneValue = fixLegacyClipPath(zoneValue);
         if (zoneValue.length < 3) {
           // this.console.warn(zone, 'Zone is unconfigured, skipping.');
           continue;
@@ -1042,7 +1044,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     super(nativeId, 'v5');
 
     this.systemDevice = {
-      deviceCreator: 'Smart Motion Sensor',
+      deviceCreator: 'Smart Sensor',
     };
 
     process.nextTick(() => {
@@ -1194,6 +1196,8 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
       ret = this.devices.get(nativeId) || new FFmpegVideoFrameGenerator('ffmpeg');
     if (nativeId?.startsWith(SMART_MOTIONSENSOR_PREFIX))
       ret = this.devices.get(nativeId) || new SmartMotionSensor(this, nativeId);
+    if (nativeId?.startsWith(SMART_OCCUPANCYSENSOR_PREFIX))
+      ret = this.devices.get(nativeId) || new SmartOccupancySensor(this, nativeId);
 
     if (ret)
       this.devices.set(nativeId, ret);
@@ -1204,6 +1208,13 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     if (nativeId?.startsWith(SMART_MOTIONSENSOR_PREFIX)) {
       const smart = this.devices.get(nativeId) as SmartMotionSensor;
       smart?.detectionListener?.removeListener();
+      smart?.resetMotionTimeout();
+    }
+    if (nativeId?.startsWith(SMART_OCCUPANCYSENSOR_PREFIX)) {
+      const smart = this.devices.get(nativeId) as SmartOccupancySensor;
+      smart?.detectionListener?.removeListener();
+      smart?.resetOccupiedTimeout();
+      smart?.clearOccupancyInterval();
     }
   }
 
@@ -1239,32 +1250,71 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
 
   async getCreateDeviceSettings(): Promise<Setting[]> {
     return [
-      createObjectDetectorStorageSetting(),
+      {
+        key: 'sensorType',
+        title: 'Sensor Type',
+        description: 'Select the type of sensor to create.',
+        choices: [
+          'Smart Motion Sensor',
+          'Smart Occupancy Sensor',
+        ],
+      },
+      {
+        key: 'camera',
+        title: 'Camera',
+        description: 'Select a camera or doorbell.',
+        type: 'device',
+        deviceFilter: `type === '${ScryptedDeviceType.Doorbell}' || type === '${ScryptedDeviceType.Camera}'`,
+      },
     ];
   }
 
   async createDevice(settings: DeviceCreatorSettings): Promise<string> {
-    const nativeId = SMART_MOTIONSENSOR_PREFIX + crypto.randomBytes(8).toString('hex');
-    const objectDetector = sdk.systemManager.getDeviceById(settings.objectDetector as string);
-    let name = objectDetector.name || 'New';
-    name += ' Smart Motion Sensor'
+    const sensorType = settings.sensorType;
+    const camera = sdk.systemManager.getDeviceById(settings.camera as string);
+    if (sensorType === 'Smart Motion Sensor') {
+      const nativeId = SMART_MOTIONSENSOR_PREFIX + crypto.randomBytes(8).toString('hex');
+      let name = camera.name || 'New';
+      name += ' Smart Motion Sensor'
 
-    const id = await sdk.deviceManager.onDeviceDiscovered({
-      nativeId,
-      name,
-      type: ScryptedDeviceType.Sensor,
-      interfaces: [
-        ScryptedInterface.Camera,
-        ScryptedInterface.MotionSensor,
-        ScryptedInterface.Settings,
-        ScryptedInterface.Readme,
-      ]
-    });
+      const id = await sdk.deviceManager.onDeviceDiscovered({
+        nativeId,
+        name,
+        type: ScryptedDeviceType.Sensor,
+        interfaces: [
+          ScryptedInterface.Camera,
+          ScryptedInterface.MotionSensor,
+          ScryptedInterface.Settings,
+          ScryptedInterface.Readme,
+        ]
+      });
 
-    const sensor = new SmartMotionSensor(this, nativeId);
-    sensor.storageSettings.values.objectDetector = objectDetector?.id;
+      const sensor = new SmartMotionSensor(this, nativeId);
+      sensor.storageSettings.values.objectDetector = camera?.id;
 
-    return id;
+      return id;
+    }
+    else if (sensorType === 'Smart Occupancy Sensor') {
+      const nativeId = SMART_OCCUPANCYSENSOR_PREFIX + crypto.randomBytes(8).toString('hex');
+      let name = camera.name || 'New';
+      name += ' Smart Occupancy Sensor'
+
+      const id = await sdk.deviceManager.onDeviceDiscovered({
+        nativeId,
+        name,
+        type: ScryptedDeviceType.Sensor,
+        interfaces: [
+          ScryptedInterface.OccupancySensor,
+          ScryptedInterface.Settings,
+          ScryptedInterface.Readme,
+        ]
+      });
+
+      const sensor = new SmartOccupancySensor(this, nativeId);
+      sensor.storageSettings.values.camera = camera?.id;
+
+      return id;
+    }
   }
 }
 
