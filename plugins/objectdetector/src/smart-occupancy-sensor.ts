@@ -15,12 +15,14 @@ export class SmartOccupancySensor extends ScryptedDeviceBase implements Settings
             description: 'Select the camera or doorbell image to analyze periodically.',
             type: 'device',
             deviceFilter: `(type === '${ScryptedDeviceType.Doorbell}' || type === '${ScryptedDeviceType.Camera}') && interfaces.includes('${ScryptedInterface.Camera}')`,
+            immediate: true,
         },
         objectDetection: {
             title: 'Object Detector',
             description: 'Select the object detection plugin to use for detecting objects.',
             type: 'device',
             deviceFilter: `interfaces.includes('ObjectDetectionPreview') && id !== '${nvrAcceleratedMotionSensorId}'`,
+            immediate: true,
         },
         detections: {
             title: 'Detections',
