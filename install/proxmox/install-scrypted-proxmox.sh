@@ -262,6 +262,9 @@ then
     pct destroy $SCRYPTED_BACKUP_VMID
 fi
 
+echo "Enabling startup on boot..."
+pct set $VMID -onboot 1
+
 readyn "Add udev rule for hardware acceleration? This may conflict with existing rules."
 if [ "$yn" == "y" ]
 then
