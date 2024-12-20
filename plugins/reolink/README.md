@@ -5,10 +5,13 @@ Reolink Cameras offer both RTMP and RTSP streams. RTMP streams are more reliable
 ## Feature Support
 
     * Reolink Cameras
-        * Two Way Audio - Reolink Two Way Audio is not supported. It is a proprietary and undocumented protocol.
+        * PTZ - Supported for most of the reolink cameras in the Advanced section. ONVIF PTZ plugin won't work correctly 
+        * Two Way Audio - Reolink Two Way Audio is not supported. It is a proprietary and undocumented protocol. For a few cameras it is available through the Advanced section (confirmed working on E1 zoom, E1 outdoor, E1 POE, RLC-540A)
     * Reolink Doorbells
         * Enable the Doorbell checkbox in the Scrypted settings for the Reolink device.
         * The Reolink Doorbell supports two way audio via ONVIF. Reolink Cameras do not support this feature.
+    * Reolink Trackmix
+        * All the RTSP streams are provided within the same camera. The camera should be added only with the channel 0 twice and select the appropriate streams
 
 Some Reolink cameras support the ONVIF protocol. It may be worth experimenting with the ONVIF plugin instead. Using the Reolink Plugin is generally recommended due to the additional stream that is made available.
 
