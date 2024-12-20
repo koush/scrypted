@@ -42,8 +42,13 @@ export class SmartOccupancySensor extends ScryptedDeviceBase implements Settings
             },
         },
         zone: {
-            title: 'Open Zone Editor',
-            description: 'Optional: Configure the zone for the occupancy check.',
+            title: 'Edit Intersect Zone',
+            description: 'Optional: Configure the intersect zone for the occupancy check. Objects intersecting this zone will trigger the occupancy sensor.',
+            type: 'clippath',
+        },
+        captureZone: {
+            title: 'Edit Crop Zone',
+            description: 'Optional: Configure the capture zone for the occupancy check. The image will be cropped to this zone before detection. Cropping to desired location will improve detection performance.',
             type: 'clippath',
         },
         minScore: {
@@ -89,6 +94,12 @@ export class SmartOccupancySensor extends ScryptedDeviceBase implements Settings
             }
         };
 
+        this.storageSettings.settings.captureZone.onGet = async () => {
+            return {
+                deviceFilter: this.storageSettings.values.camera?.id,
+            }
+        };
+
         this.storageSettings.settings.detections.onGet = async () => {
             const objectDetection: ObjectDetection = this.storageSettings.values.objectDetection;
             const choices = (await objectDetection?.getDetectionModel())?.classes || [];
@@ -101,6 +112,7 @@ export class SmartOccupancySensor extends ScryptedDeviceBase implements Settings
         this.storageSettings.settings.detections.onPut = () => this.rebind();
         this.storageSettings.settings.objectDetection.onPut = () => this.rebind();
         this.storageSettings.settings.zone.onPut = () => this.rebind();
+        this.storageSettings.settings.captureZone.onPut = () => this.rebind();
 
         this.rebind();
     }
@@ -195,7 +207,7 @@ export class SmartOccupancySensor extends ScryptedDeviceBase implements Settings
             const picture = await camera.takePicture({
                 reason: 'event',
             });
-            const zone: ClipPath = this.storageSettings.values.zone;
+            const zone: ClipPath = this.storageSettings.values.captureZone;
             let detected: ObjectsDetected;
             if (zone?.length >= 3) {
                 const image = await sdk.mediaManager.convertMediaObject<Image>(picture, ScryptedMimeTypes.Image);
@@ -215,12 +227,25 @@ export class SmartOccupancySensor extends ScryptedDeviceBase implements Settings
                 right = right * image.width;
                 bottom = bottom * image.height;
 
+                let width = right - left;
+                let height = bottom - top;
+                // square it for standard detection
+                width = height = Math.max(width, height);
+                // recenter it
+                left = left + (right - left - width) / 2;
+                top = top + (bottom - top - height) / 2;
+                // ensure bounds are within image.
+                left = Math.max(0, left);
+                top = Math.max(0, top);
+                width = Math.min(width, image.width - left);
+                height = Math.min(height, image.height - top);
+
                 const cropped = await image.toImage({
                     crop: {
                         left,
                         top,
-                        width: right - left,
-                        height: bottom - top,
+                        width,
+                        height,
                     },
                 });
                 detected = await objectDetection.detectObjects(cropped);
