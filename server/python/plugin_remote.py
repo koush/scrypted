@@ -833,8 +833,8 @@ class PluginRemote:
                 print("requirements.txt (up to date)")
                 print(str_requirements)
 
-            sys.path.insert(0, plugin_zip_paths.get("unzipped_path"))
-            sys.path.insert(0, pip_target)
+            sys.path.append(plugin_zip_paths.get("unzipped_path"))
+            sys.path.append(pip_target)
 
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)

@@ -46,7 +46,10 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
 
         const { env, pluginDebug } = options;
         const args: string[] = [
+            // unbuffered stdout/stderr
             '-u',
+            // prevent any global packages from being used
+            '-S',
         ];
 
         if (pluginDebug) {
