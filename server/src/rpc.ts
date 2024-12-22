@@ -396,7 +396,7 @@ export class RpcPeer {
         this.killed = new Promise<string>((resolve, reject) => {
             this.killedDeferred = { resolve, reject, method: undefined };
         }).catch(e => e.message || 'Unknown Error');
-        this.killedSafe = this.killed.then(() => {}).catch(() => { });
+        this.killedSafe = this.killed.then(() => { }).catch(() => { });
     }
 
     static isTransportSafe(value: any) {
@@ -497,6 +497,14 @@ export class RpcPeer {
 
         const copySerializeChildren = value[RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN];
         if (copySerializeChildren) {
+            if (Array.isArray(copySerializeChildren)) {
+                const array = [];
+                for (const val of copySerializeChildren) {
+                    array.push(this.deserialize(val, deserializationContext));
+                }
+                return array;
+            }
+
             const ret: any = {};
             for (const [key, val] of Object.entries(value)) {
                 ret[key] = this.deserialize(val, deserializationContext);
@@ -561,6 +569,17 @@ export class RpcPeer {
 
     serialize(value: any, serializationContext: any): any {
         if (value?.[RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN] === true) {
+            if (Array.isArray(value)) {
+                const array = [];
+                for (const val of value) {
+                    array.push(this.serialize(val, serializationContext));
+                }
+
+                return {
+                    [RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN]: array,
+                };
+            }
+
             const ret: any = {};
             for (const [key, val] of Object.entries(value)) {
                 ret[key] = this.serialize(val, serializationContext);

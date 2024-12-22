@@ -292,6 +292,14 @@ class RpcPeer:
                 ret[key] = self.serialize(val, serializationContext)
             return ret
 
+        if getattr(value, RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN, None) == True:
+            array = []
+            for key, val in value.items():
+                array[key] = self.serialize(val, serializationContext)
+            return {
+                RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN: array
+            }
+
         if RpcPeer.isTransportSafe(value):
             return value
 
@@ -427,6 +435,12 @@ class RpcPeer:
             RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN, None
         )
         if copySerializeChildren:
+            if type(copySerializeChildren) == list:
+                array = []
+                for val in copySerializeChildren:
+                    array.append(self.deserialize(val, deserializationContext))
+                return array
+
             ret = {}
             for key, val in value.items():
                 ret[key] = self.deserialize(val, deserializationContext)
