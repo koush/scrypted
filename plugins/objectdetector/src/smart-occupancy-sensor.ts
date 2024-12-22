@@ -57,7 +57,7 @@ export class SmartOccupancySensor extends ScryptedDeviceBase implements Settings
             title: 'Minimum Score',
             description: 'The minimum score required for a detection to trigger the occupancy sensor.',
             type: 'number',
-            defaultValue: 0.7,
+            defaultValue: 0.4,
         },
         labels: {
             group: 'Recognition',
