@@ -157,6 +157,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
     let rtspSdp: string;
     const sdpDeferred = new Deferred<string>();
+    killDeferred.promise.finally(() => {
+        if (!sdpDeferred.finished)
+            sdpDeferred.reject(new Error('killed'));
+    });
     const videoSectionDeferred = new Deferred<MSection>();
     const audioSectionDeferred = new Deferred<MSection>();
     videoSectionDeferred.promise.then(s => video?.onMSection?.(s));
@@ -279,6 +283,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                                         ffmpegLogInitialOutput(console, cp);
                                         killDeferred.promise.finally(() => safeKillFFmpeg(cp));
                                         cp.on('exit', () => killDeferred.resolve(undefined));
+                                        cp.on('error', () => killDeferred.resolve(undefined));
 
                                         audioPipe = cp.stdio[3] as Writable;
                                     }
@@ -486,6 +491,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         });
         killDeferred.promise.finally(() => safeKillFFmpeg(cp));
         cp.on('exit', () => {
+            if (!allowAudioTranscoderExit)
+                killDeferred.resolve(undefined);
+        });
+        cp.on('error', () => {
             if (!allowAudioTranscoderExit)
                 killDeferred.resolve(undefined);
         });
