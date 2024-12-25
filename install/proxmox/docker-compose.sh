@@ -4,7 +4,7 @@ cd /root/.scrypted
 # always immediately upgrade everything in case there's a broken update.
 # this will also be preferable for troubleshooting via lxc reboot.
 export DEBIAN_FRONTEND=noninteractive
-(apt -y --fix-broken install && (yes | dpkg --configure -a) && apt -y update && apt -y dist-upgrade) &
+((yes | dpkg --configure -a) && apt -y --fix-broken install && apt -y update && apt -y dist-upgrade) &
 
 # foreground pull if requested.
 if [ -e "volume/.pull" ]
