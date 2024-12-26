@@ -32,7 +32,8 @@ from predict import PredictPlugin
 
 availableModels = [
     "Default",
-    "scrypted_yolov9t_320",
+    "scrypted_yolov9t_relu_320",
+    "scrypted_yolov9s_relu_320",
     "ssd_mobilenet_v2_coco_quant_postprocess",
     "tf2_ssd_mobilenet_v2_coco17_ptq",
     "ssdlite_mobiledet_coco_qat_postprocess",
@@ -95,7 +96,7 @@ class TensorFlowLitePlugin(
             nonlocal model
 
             if defaultModel:
-                model = "scrypted_yolov9t_320"
+                model = "scrypted_yolov9t_relu_320"
                 # if edge_tpus and next(
                 #     (obj for obj in edge_tpus if obj["type"] == "usb"), None
                 # ):
