@@ -295,8 +295,20 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
         const console = deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
 
+        if (fromMimeType !== ScryptedMimeTypes.FFmpegInput && fromMimeType !== ScryptedMimeTypes.RequestMediaStream) {
+            try {
+                const mo = await mediaManager.createMediaObject(data, fromMimeType);
+                data = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
+            }
+            catch (e) {
+                console.error('failed to create media object:', e);
+                throw new Error(`@scrypted/webrtc is unable to convert ${fromMimeType} to ${ScryptedMimeTypes.RTCSignalingChannel}`);
+            }
+            fromMimeType = ScryptedMimeTypes.FFmpegInput;
+        }
+
         if (fromMimeType === ScryptedMimeTypes.FFmpegInput) {
-            const ffmpegInput: FFmpegInput = JSON.parse(data.toString());
+            const ffmpegInput: FFmpegInput = typeof data === 'object' ? data : JSON.parse(data.toString());
             const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput);
 
             class OnDemandSignalingChannel implements RTCSignalingChannel {
@@ -314,27 +326,23 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
             return new OnDemandSignalingChannel();
         }
-        else if (fromMimeType === ScryptedMimeTypes.RequestMediaStream) {
-            const rms = data as RequestMediaStream;
-            const mo = await mediaManager.createMediaObject(rms, ScryptedMimeTypes.RequestMediaStream);
-            class OnDemandSignalingChannel implements RTCSignalingChannel {
-                async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
-                    return createRTCPeerConnectionSink(session, console,
-                        undefined,
-                        mo,
-                        plugin.storageSettings.values.requireOpus,
-                        plugin.storageSettings.values.maximumCompatibilityMode,
-                        plugin.getRTCConfiguration(),
-                        await plugin.getWeriftConfiguration(),
-                    );
-                }
-            }
 
-            return new OnDemandSignalingChannel();
+        const rms = data as RequestMediaStream;
+        const mo = await mediaManager.createMediaObject(rms, ScryptedMimeTypes.RequestMediaStream);
+        class OnDemandSignalingChannel implements RTCSignalingChannel {
+            async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
+                return createRTCPeerConnectionSink(session, console,
+                    undefined,
+                    mo,
+                    plugin.storageSettings.values.requireOpus,
+                    plugin.storageSettings.values.maximumCompatibilityMode,
+                    plugin.getRTCConfiguration(),
+                    await plugin.getWeriftConfiguration(),
+                );
+            }
         }
-        else {
-            throw new Error(`@scrypted/webrtc is unable to convert ${fromMimeType} to ${ScryptedMimeTypes.RTCSignalingChannel}`);
-        }
+
+        return new OnDemandSignalingChannel();
     }
 
     async convertToRTCConnectionManagement(result: ReturnType<typeof zygote>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
