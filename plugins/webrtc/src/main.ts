@@ -308,7 +308,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         }
 
         if (fromMimeType === ScryptedMimeTypes.FFmpegInput) {
-            const ffmpegInput: FFmpegInput = typeof data === 'object' ? data : JSON.parse(data.toString());
+            const ffmpegInput: FFmpegInput = typeof data === 'object' && !Buffer.isBuffer(data) ? data : JSON.parse(data.toString());
             const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput);
 
             class OnDemandSignalingChannel implements RTCSignalingChannel {
