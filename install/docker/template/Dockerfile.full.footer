@@ -34,6 +34,7 @@ RUN apt-get -y update && apt-get -y install libedgetpu1-std
 
 # set default shell to bash
 RUN chsh -s /bin/bash
+ENV SHELL="/bin/bash"
 
 ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
