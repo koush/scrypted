@@ -23,7 +23,13 @@ fi
 
 # https://amdgpu-install.readthedocs.io/en/latest/install-prereq.html#installing-the-installer-package
 
-FILENAME="amdgpu-install_6.3.60300-1_all.deb"
+FILENAME=$(curl -s -L https://repo.radeon.com/amdgpu-install/latest/ubuntu/$distro/ | grep -o 'amdgpu-install_[^ ]*' | cut -d'"' -f1)
+if [ -z "$FILENAME" ]
+then
+    echo "AMD graphics package can not be installed. Could not find the package name."
+    exit 1
+fi
+
 set -e
 mkdir -p /tmp/amd
 cd /tmp/amd
