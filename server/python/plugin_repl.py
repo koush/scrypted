@@ -19,7 +19,6 @@ import ptpython.history_browser
 import ptpython.layout
 import socket
 import sys
-import telnetlib
 import threading
 import traceback
 import types
@@ -28,6 +27,7 @@ from typing import List, Dict, Any
 from scrypted_python.scrypted_sdk import ScryptedStatic, ScryptedDevice
 
 from rpc import maybe_await
+import plugin_telnetlib as telnetlib
 
 
 # Our client is xtermjs, so no need to perform any color depth detection
