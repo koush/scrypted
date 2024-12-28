@@ -19,12 +19,12 @@ except Exception as e:
     pass
 import asyncio
 import concurrent.futures
-import queue
 import re
 from typing import Any, Tuple
 
 import scrypted_sdk
 import tflite_runtime.interpreter as tflite
+from .yolo_separate_outputs import *
 from scrypted_sdk.types import Setting, SettingValue
 
 from common import yolo
@@ -32,6 +32,7 @@ from predict import PredictPlugin
 
 availableModels = [
     "Default",
+    "scrypted_yolov9s_relu_sep_320",
     "scrypted_yolov9t_relu_320",
     "scrypted_yolov9s_relu_320",
     "ssd_mobilenet_v2_coco_quant_postprocess",
@@ -50,6 +51,7 @@ availableModels = [
     "efficientdet_lite3_512_ptq",
     "efficientdet_lite3x_640_ptq",
 ]
+
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -96,17 +98,12 @@ class TensorFlowLitePlugin(
             nonlocal model
 
             if defaultModel:
-                model = "scrypted_yolov9t_relu_320"
-                # if edge_tpus and next(
-                #     (obj for obj in edge_tpus if obj["type"] == "usb"), None
-                # ):
-                #     model = "ssdlite_mobiledet_coco_qat_postprocess"
-                # else:
-                #     model = "efficientdet_lite0_320_ptq"
+                model = "scrypted_yolov9s_relu_sep_320"
             self.yolo = "yolo" in model
             self.yolov9 = "yolov9" in model
             self.scrypted_model = "scrypted" in model
             self.scrypted_yolov10 = "scrypted_yolov10" in model
+            self.scrypted_yolo_sep = "_sep" in model
             self.modelName = model
 
             print(f"model: {model}")
@@ -184,8 +181,7 @@ class TensorFlowLitePlugin(
             thread_name = threading.current_thread().name
             interpreter = available_interpreters.pop()
             self.interpreters[thread_name] = interpreter
-            print('Interpreter initialized on thread {}'.format(thread_name))
-
+            print("Interpreter initialized on thread {}".format(thread_name))
 
         self.executor = concurrent.futures.ThreadPoolExecutor(
             initializer=executor_initializer,
@@ -247,29 +243,41 @@ class TensorFlowLitePlugin(
                 interpreter.set_tensor(tensor_index, im)
                 interpreter.invoke()
                 output_details = interpreter.get_output_details()
-                output = output_details[0]
-                x = interpreter.get_tensor(output["index"])
                 input_scale = self.get_input_details()[0]
-                if x.dtype == np.int8:
-                    scale, zero_point = output["quantization"]
-                    combined_scale = scale * input_scale
-                    if self.scrypted_yolov10:
-                        objs = yolo.parse_yolov10(
-                            x[0],
-                            scale=lambda v: (v - zero_point) * combined_scale,
-                            confidence_scale=lambda v: (v - zero_point) * scale,
-                            threshold_scale=lambda v: (v - zero_point) * scale,
-                        )
-                    else:
-                        objs = yolo.parse_yolov9(
-                            x[0],
-                            scale=lambda v: (v - zero_point) * combined_scale,
-                            confidence_scale=lambda v: (v - zero_point) * scale,
-                            threshold_scale=lambda v: (v - zero_point) * scale,
-                        )
+                if self.scrypted_yolo_sep:
+                    outputs = []
+                    for index, output in enumerate(output_details):
+                        o = interpreter.get_tensor(output["index"]).astype(np.float32)
+                        scale, zero_point = output["quantization"]
+                        o -= zero_point
+                        o *= scale
+                        outputs.append(o)
+
+                    output = yolo_separate_outputs.decode_bbox(outputs, [input.width, input.height])
+                    objs = yolo.parse_yolov9(output[0])
                 else:
-                    # this code path is unused.
-                    objs = yolo.parse_yolov9(x[0], scale=lambda v: v * input_scale)
+                    output = output_details[0]
+                    x = interpreter.get_tensor(output["index"])
+                    if x.dtype == np.int8:
+                        scale, zero_point = output["quantization"]
+                        combined_scale = scale * input_scale
+                        if self.scrypted_yolov10:
+                            objs = yolo.parse_yolov10(
+                                x[0],
+                                scale=lambda v: (v - zero_point) * combined_scale,
+                                confidence_scale=lambda v: (v - zero_point) * scale,
+                                threshold_scale=lambda v: (v - zero_point) * scale,
+                            )
+                        else:
+                            objs = yolo.parse_yolov9(
+                                x[0],
+                                scale=lambda v: (v - zero_point) * combined_scale,
+                                confidence_scale=lambda v: (v - zero_point) * scale,
+                                threshold_scale=lambda v: (v - zero_point) * scale,
+                            )
+                    else:
+                        # this code path is unused.
+                        objs = yolo.parse_yolov9(x[0], scale=lambda v: v * input_scale)
             else:
                 tflite_common.set_input(interpreter, input)
                 interpreter.invoke()
