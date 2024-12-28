@@ -30,6 +30,9 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";"
 npm i -g npm
 
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install --upgrade pip
+# besides debugpy, none of these dependencies are needed anymore?
+# portable python includes typing and does not need typing_extensions.
+# opencv-python-headless has wheels for windows.
 py $SCRYPTED_WINDOWS_PYTHON_VERSION -m pip install debugpy typing_extensions typing opencv-python
 
 $SCRYPTED_INSTALL_VERSION=[System.Environment]::GetEnvironmentVariable("SCRYPTED_INSTALL_VERSION","User")

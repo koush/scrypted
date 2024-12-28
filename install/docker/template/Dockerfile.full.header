@@ -50,7 +50,7 @@ RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
 
 # ERROR: Cannot uninstall pip 24.0, RECORD file not found. Hint: The package was installed by debian.
 # RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install debugpy typing_extensions psutil
+RUN python3 -m pip install debugpy
 
 ################################################################
 # End section generated from template/Dockerfile.full.header
