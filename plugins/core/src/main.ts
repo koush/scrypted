@@ -10,7 +10,7 @@ import { AggregateCore, AggregateCoreNativeId } from './aggregate-core';
 import { AutomationCore, AutomationCoreNativeId } from './automations-core';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
-import { checkLegacyLxc } from './platform/lxc';
+import { checkLegacyLxc, checkLxc } from './platform/lxc';
 import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId } from './terminal-service';
@@ -99,6 +99,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
         }
 
         checkLegacyLxc();
+        checkLxc();
 
         this.storageSettings.settings.releaseChannel.hide = process.env.SCRYPTED_INSTALL_ENVIRONMENT !== 'lxc-docker';
 
