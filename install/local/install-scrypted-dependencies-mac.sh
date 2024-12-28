@@ -69,11 +69,14 @@ then
 fi
 
 RUN python$PYTHON_VERSION -m pip install --upgrade pip
+# besides debugpy, none of these dependencies are needed anymore?
+# newer macos installs python3.9 which includings typing and does not need typing_extensions.
+# opencv-python-headless has wheels for macos.
 if [ "$PYTHON_VERSION" != "3.10" ]
 then
     RUN python$PYTHON_VERSION -m pip install typing
 fi
-RUN python$PYTHON_VERSION -m pip install debugpy typing_extensions opencv-python psutil
+RUN python$PYTHON_VERSION -m pip install debugpy typing_extensions opencv-python
 
 echo "Installing Scrypted Launch Agent..."
 
