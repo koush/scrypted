@@ -49,7 +49,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             // unbuffered stdout/stderr
             '-u',
             // prevent any global packages from being used
-            '-S',
+            // '-S',
         ];
 
         if (pluginDebug) {

@@ -40,7 +40,6 @@ from scrypted_python.scrypted_sdk.types import (
 SCRYPTED_REQUIREMENTS = """
 ptpython
 wheel
-debugpy
 """.strip()
 
 
