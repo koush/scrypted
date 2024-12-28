@@ -223,66 +223,80 @@ class TensorFlowLitePlugin(
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         def predict():
             interpreter = self.interpreters[threading.current_thread().name]
-            if self.yolo:
-                tensor_index = input_details(interpreter, "index")
-
-                im = np.stack([input])
-                i = interpreter.get_input_details()[0]
-                if i["dtype"] == np.int8:
-                    scale, zero_point = i["quantization"]
-                    if scale == 0.003986024297773838 and zero_point == -128:
-                        # fast path for quantization 1/255 = 0.003986024297773838
-                        im = im.view(np.int8)
-                        im -= 128
-                    else:
-                        im = im.astype(np.float32) / (255.0 * scale)
-                        im = (im + zero_point).astype(np.int8)  # de-scale
-                else:
-                    # this code path is unused.
-                    im = im.astype(np.float32) / 255.0
-                interpreter.set_tensor(tensor_index, im)
-                interpreter.invoke()
-                output_details = interpreter.get_output_details()
-                input_scale = self.get_input_details()[0]
-                if self.scrypted_yolo_sep:
-                    outputs = []
-                    for index, output in enumerate(output_details):
-                        o = interpreter.get_tensor(output["index"]).astype(np.float32)
-                        scale, zero_point = output["quantization"]
-                        o -= zero_point
-                        o *= scale
-                        outputs.append(o)
-
-                    output = yolo_separate_outputs.decode_bbox(outputs, [input.width, input.height])
-                    objs = yolo.parse_yolov9(output[0])
-                else:
-                    output = output_details[0]
-                    x = interpreter.get_tensor(output["index"])
-                    if x.dtype == np.int8:
-                        scale, zero_point = output["quantization"]
-                        combined_scale = scale * input_scale
-                        if self.scrypted_yolov10:
-                            objs = yolo.parse_yolov10(
-                                x[0],
-                                scale=lambda v: (v - zero_point) * combined_scale,
-                                confidence_scale=lambda v: (v - zero_point) * scale,
-                                threshold_scale=lambda v: (v - zero_point) * scale,
-                            )
-                        else:
-                            objs = yolo.parse_yolov9(
-                                x[0],
-                                scale=lambda v: (v - zero_point) * combined_scale,
-                                confidence_scale=lambda v: (v - zero_point) * scale,
-                                threshold_scale=lambda v: (v - zero_point) * scale,
-                            )
-                    else:
-                        # this code path is unused.
-                        objs = yolo.parse_yolov9(x[0], scale=lambda v: v * input_scale)
-            else:
+            if not self.yolo:
                 tflite_common.set_input(interpreter, input)
                 interpreter.invoke()
                 objs = detect.get_objects(
                     interpreter, score_threshold=0.2, image_scale=(1, 1)
+                )
+                return objs
+
+            tensor_index = input_details(interpreter, "index")
+
+            im = np.stack([input])
+            i = interpreter.get_input_details()[0]
+            if i["dtype"] == np.int8:
+                scale, zero_point = i["quantization"]
+                if scale == 0.003986024297773838 and zero_point == -128:
+                    # fast path for quantization 1/255 = 0.003986024297773838
+                    im = im.view(np.int8)
+                    im -= 128
+                else:
+                    im = im.astype(np.float32) / (255.0 * scale)
+                    im = (im + zero_point).astype(np.int8)  # de-scale
+            else:
+                # this code path is unused.
+                im = im.astype(np.float32) / 255.0
+            interpreter.set_tensor(tensor_index, im)
+            interpreter.invoke()
+            output_details = interpreter.get_output_details()
+
+            # handle sseparate outputs for quantization accuracy
+            if self.scrypted_yolo_sep:
+                outputs = []
+                for output in output_details:
+                    o = interpreter.get_tensor(output["index"]).astype(np.float32)
+                    scale, zero_point = output["quantization"]
+                    o -= zero_point
+                    o *= scale
+                    outputs.append(o)
+
+                output = yolo_separate_outputs.decode_bbox(outputs, [input.width, input.height])
+                if self.scrypted_yolov10:
+                    objs = yolo.parse_yolov10(output[0])
+                else:
+                    objs = yolo.parse_yolov9(output[0])
+                return objs
+
+            # this scale stuff can probably be optimized to dequantize ahead of time...
+            output = output_details[0]
+            x = interpreter.get_tensor(output["index"])
+            input_scale = self.get_input_details()[0]
+
+            # this non-quantized code path is unused but here for reference.
+            if x.dtype != np.int8 and x.dtype != np.int16:
+                if self.scrypted_yolov10:
+                    objs = yolo.parse_yolov10(x[0], scale=lambda v: v * input_scale)
+                else:
+                    objs = yolo.parse_yolov9(x[0], scale=lambda v: v * input_scale)
+                return objs
+
+            # this scale stuff can probably be optimized to dequantize ahead of time...
+            scale, zero_point = output["quantization"]
+            combined_scale = scale * input_scale
+            if self.scrypted_yolov10:
+                objs = yolo.parse_yolov10(
+                    x[0],
+                    scale=lambda v: (v - zero_point) * combined_scale,
+                    confidence_scale=lambda v: (v - zero_point) * scale,
+                    threshold_scale=lambda v: (v - zero_point) * scale,
+                )
+            else:
+                objs = yolo.parse_yolov9(
+                    x[0],
+                    scale=lambda v: (v - zero_point) * combined_scale,
+                    confidence_scale=lambda v: (v - zero_point) * scale,
+                    threshold_scale=lambda v: (v - zero_point) * scale,
                 )
             return objs
 

@@ -1,5 +1,5 @@
 import numpy as np
-
+from common.softmax import softmax
 class DFL:
     def __init__(self, c1=16):
         self.c1 = c1
@@ -11,10 +11,6 @@ class DFL:
         x = softmax(x, axis=1)
         x = np.sum(self.conv_weights * x, axis=1)
         return x.reshape(b, 4, a)
-
-def softmax(x, axis=-1):
-    e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
-    return e_x / np.sum(e_x, axis=axis, keepdims=True)
 
 def make_anchors(feats, strides, grid_cell_offset=0.5):
     anchor_points, stride_tensor = [], []
@@ -59,7 +55,7 @@ def decode_bbox(preds, img_shape):
         int(np.sqrt(img_shape[-2] * img_shape[-1] / preds[p].shape[1])) for p in pos if preds[p].shape[2] != 64]
     dims = [(img_h // s, img_w // s) for s in strides]
     fake_feats = [np.zeros((1, 1, h, w), dtype=preds[0].dtype) for h, w in dims]
-    anchors, strides = [x.transpose(0, 1) for x in make_anchors(fake_feats, strides, 0.5)]  # generate anchors and strides
+    anchors, strides = make_anchors(fake_feats, strides, 0.5)
 
     strides_tensor = strides.transpose(1, 0)
     strides_tensor = np.expand_dims(strides_tensor, 0)
