@@ -41,6 +41,12 @@ SCRYPTED_REQUIREMENTS = """
 ptpython
 wheel
 """.strip()
+if sys.version_info.minor >= 13:
+    # telnetlib was removed in Python 3.13
+    SCRYPTED_REQUIREMENTS = f"""
+{SCRYPTED_REQUIREMENTS}
+standard-telnetlib
+""".strip()
 
 
 class SystemDeviceState(TypedDict):
@@ -797,7 +803,7 @@ class PluginRemote:
             )
 
             need_pip = False
-            # pip is needed if there's a requiremnts.txt file that has changed.
+            # pip is needed if there's a requirements.txt file that has changed.
             if str_requirements:
                 need_pip = need_requirements(requirements_basename, str_requirements)
             # pip is needed if the base scrypted requirements have changed.
@@ -933,7 +939,7 @@ class PluginRemote:
                             directGetRemote, rpc.RpcPeer.PROPERTY_PROXY_PEER
                         )
                         return await finishFork(forkPeer)
-                    
+
                     async def getClusterForkWrapped():
                         try:
                             return await getClusterFork()
