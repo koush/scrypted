@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import traceback
+import socket
 import urllib
 import urllib.request
 from ctypes import c_int
@@ -189,9 +190,10 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         ffmpeg = await scrypted_sdk.mediaManager.getFFmpegPath()
         loop = asyncio.get_event_loop()
 
-        class RFC4571Writer:
+        class RFC4571Writer(asyncio.DatagramProtocol):
             def connection_made(self, transport):
-                pass
+                sock = transport.get_extra_info('socket')
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4 * 1024 * 1024)
 
             def datagram_received(self, data, addr):
                 l = len(data)
@@ -221,7 +223,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             "rtp",
             "-payload_type",
             "96",
-            f"rtp://127.0.0.1:{vport}?pkt_size=1300",
+            f"rtp://127.0.0.1:{vport}?pkt_size=64000",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
@@ -258,7 +260,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 "rtp",
                 "-payload_type",
                 "97",
-                f"rtp://127.0.0.1:{aport}?pkt_size=1300",
+                f"rtp://127.0.0.1:{aport}?pkt_size=64000",
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
