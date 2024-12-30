@@ -1,5 +1,5 @@
-import fs from 'fs';
 import { ClusterFork, ClusterWorker } from "@scrypted/types";
+import fs from 'fs';
 import { matchesClusterLabels } from "../cluster/cluster-labels";
 import type { RuntimeWorkerOptions } from "../plugin/runtime/runtime-worker";
 import { RpcPeer } from "../rpc";
@@ -121,8 +121,12 @@ export class ClusterForkService {
 
     async getFsPromises(clusterWorkerId: string) {
         const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
-        if (clusterWorker.mode === 'server')
-            return fs.promises;
+        if (clusterWorker.mode === 'server') {
+            return {
+                [RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN]: true,
+                ...fs.promises,
+            };
+        }
         return clusterWorker.peer.getParam('fs.promises');
     }
 

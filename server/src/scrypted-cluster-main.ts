@@ -1,7 +1,7 @@
-import fs from 'fs';
 import type { ForkOptions } from '@scrypted/types';
 import crypto from 'crypto';
 import { once } from 'events';
+import fs from 'fs';
 import net from 'net';
 import os from 'os';
 import { install as installSourceMapSupport } from 'source-map-support';
@@ -260,7 +260,10 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
             peer.params['service-control'] = serviceControl;
             peer.params['env-control'] = envControl;
             peer.params['info'] = new Info();
-            peer.params['fs.promises'] = fs.promises;
+            peer.params['fs.promises'] = {
+                [RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN]: true,
+                ...fs.promises,
+            };
 
             const { localAddress, localPort } = socket;
             console.log('Cluster server connected.', localAddress, localPort);
