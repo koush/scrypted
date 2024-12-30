@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { ClusterFork, ClusterWorker } from "@scrypted/types";
 import { matchesClusterLabels } from "../cluster/cluster-labels";
 import type { RuntimeWorkerOptions } from "../plugin/runtime/runtime-worker";
@@ -111,6 +112,18 @@ export class ClusterForkService {
             };
         }
         return ret;
+    }
+
+    async getParam(clusterWorkerId: string, key: string) {
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        return clusterWorker.peer.getParam(key);
+    }
+
+    async getFsPromises(clusterWorkerId: string) {
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        if (clusterWorker.mode === 'server')
+            return fs.promises;
+        return clusterWorker.peer.getParam('fs.promises');
     }
 
     async getEnvControl(clusterWorkerId: string) {
