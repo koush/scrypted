@@ -25,8 +25,8 @@ try:
 except:
     OpenVINOTextRecognition = None
 
-predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Predict")
-prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "OpenVINO-Prepare")
+predictExecutor = concurrent.futures.ThreadPoolExecutor(thread_name_prefix="OpenVINO-Predict")
+prepareExecutor = concurrent.futures.ThreadPoolExecutor(thread_name_prefix="OpenVINO-Prepare")
 
 availableModels = [
     "Default",
@@ -48,10 +48,6 @@ availableModels = [
     "scrypted_yolov9s_320",
     "scrypted_yolov9t_320",
     "scrypted_yolov8n_320",
-    "ssd_mobilenet_v1_coco",
-    "ssdlite_mobilenet_v2",
-    "yolo-v3-tiny-tf",
-    "yolo-v4-tiny-tf",
 ]
 
 
@@ -245,6 +241,15 @@ class OpenVINOPlugin(
                     self.storage.removeItem("precision")
                     self.requestRestart()
 
+        self.infer_queue = ov.AsyncInferQueue(self.compiled_model)
+        def callback(infer_request, future: asyncio.Future):
+            try:
+                output = infer_request.get_output_tensor(0)
+                self.loop.call_soon_threadsafe(future.set_result, output)
+            except Exception as e:
+                self.loop.call_soon_threadsafe(future.set_exception, e)
+        self.infer_queue.set_callback(callback)
+
         print(
             "EXECUTION_DEVICES",
             self.compiled_model.get_property("EXECUTION_DEVICES"),
@@ -318,68 +323,38 @@ class OpenVINOPlugin(
         return super().get_input_format()
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        def predict(input_tensor):
-            infer_request = self.compiled_model.create_infer_request()
-            infer_request.set_input_tensor(input_tensor)
-            output_tensors = infer_request.infer()
+        async def predict(input_tensor):
+            f = asyncio.Future(loop = self.loop)
+            self.infer_queue.start_async(input_tensor, f)
 
-            objs = []
+            output_tensors = await f
 
-            if self.scrypted_yolo:
-                if self.scrypted_yolov10:
-                    return yolo.parse_yolov10(output_tensors[0][0])
-                if self.scrypted_yolo_nas:
-                    return yolo.parse_yolo_nas([output_tensors[1], output_tensors[0]])
-                return yolo.parse_yolov9(output_tensors[0][0])
+            if not self.yolo:
+                output = output_tensors
+                for values in output.data[0][0]:
+                    valid, index, confidence, l, t, r, b = values
+                    if valid == -1:
+                        break
 
-            if self.yolo:
-                # index 2 will always either be 13 or 26
-                # index 1 may be 13/26 or 255 depending on yolo 3 vs 4
-                if infer_request.outputs[0].data.shape[2] == 13:
-                    out_blob = infer_request.outputs[0]
-                else:
-                    out_blob = infer_request.outputs[1]
+                    def torelative(value: float):
+                        return value * self.model_dim
 
-                # 13 13
-                objects = yolo.parse_yolo_region(
-                    out_blob.data,
-                    (input.width, input.height),
-                    (81, 82, 135, 169, 344, 319),
-                    self.sigmoid,
-                )
+                    l = torelative(l)
+                    t = torelative(t)
+                    r = torelative(r)
+                    b = torelative(b)
 
-                for r in objects:
-                    obj = Prediction(
-                        r["classId"],
-                        r["confidence"],
-                        Rectangle(r["xmin"], r["ymin"], r["xmax"], r["ymax"]),
-                    )
+                    obj = Prediction(index - 1, confidence, Rectangle(l, t, r, b))
                     objs.append(obj)
-
-                # what about output[1]?
-                # 26 26
-                # objects = yolo.parse_yolo_region(out_blob, (input.width, input.height), (,27, 37,58, 81,82))
 
                 return objs
 
-            output = infer_request.get_output_tensor(0)
-            for values in output.data[0][0]:
-                valid, index, confidence, l, t, r, b = values
-                if valid == -1:
-                    break
-
-                def torelative(value: float):
-                    return value * self.model_dim
-
-                l = torelative(l)
-                t = torelative(t)
-                r = torelative(r)
-                b = torelative(b)
-
-                obj = Prediction(index - 1, confidence, Rectangle(l, t, r, b))
-                objs.append(obj)
-
-            return objs
+            output = output_tensors.data
+            if self.scrypted_yolov10:
+                return yolo.parse_yolov10(output[0])
+            if self.scrypted_yolo_nas:
+                return yolo.parse_yolo_nas([output[1], output[0]])
+            return yolo.parse_yolov9(output[0])
 
         def prepare():
             # the input_tensor can be created with the shared_memory=True parameter,
@@ -414,9 +389,7 @@ class OpenVINOPlugin(
             input_tensor = await asyncio.get_event_loop().run_in_executor(
                 prepareExecutor, lambda: prepare()
             )
-            objs = await asyncio.get_event_loop().run_in_executor(
-                predictExecutor, lambda: predict(input_tensor)
-            )
+            objs = await predict(input_tensor)
 
         except:
             traceback.print_exc()
