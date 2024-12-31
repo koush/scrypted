@@ -25,8 +25,12 @@ try:
 except:
     OpenVINOTextRecognition = None
 
-predictExecutor = concurrent.futures.ThreadPoolExecutor(thread_name_prefix="OpenVINO-Predict")
-prepareExecutor = concurrent.futures.ThreadPoolExecutor(thread_name_prefix="OpenVINO-Prepare")
+predictExecutor = concurrent.futures.ThreadPoolExecutor(
+    thread_name_prefix="OpenVINO-Predict"
+)
+prepareExecutor = concurrent.futures.ThreadPoolExecutor(
+    thread_name_prefix="OpenVINO-Prepare"
+)
 
 availableModels = [
     "Default",
@@ -132,7 +136,7 @@ class OpenVINOPlugin(
                     gpu = True
             except:
                 pass
-    
+
         # AUTO mode can cause conflicts or hide errors with NPU and GPU
         # so try to be explicit and fall back accordingly.
         mode = self.storage.getItem("mode") or "Default"
@@ -140,7 +144,7 @@ class OpenVINOPlugin(
             mode = "AUTO"
 
             if npu:
-                mode = 'NPU'
+                mode = "NPU"
             elif len(dgpus):
                 mode = f"AUTO:{','.join(dgpus)},CPU"
             # forcing GPU can cause crashes on older GPU.
@@ -242,12 +246,14 @@ class OpenVINOPlugin(
                     self.requestRestart()
 
         self.infer_queue = ov.AsyncInferQueue(self.compiled_model)
+
         def callback(infer_request, future: asyncio.Future):
             try:
-                output = infer_request.get_output_tensor(0)
+                output = infer_request.get_output_tensor(0).data
                 self.loop.call_soon_threadsafe(future.set_result, output)
             except Exception as e:
                 self.loop.call_soon_threadsafe(future.set_exception, e)
+
         self.infer_queue.set_callback(callback)
 
         print(
@@ -323,15 +329,9 @@ class OpenVINOPlugin(
         return super().get_input_format()
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        async def predict(input_tensor):
-            f = asyncio.Future(loop = self.loop)
-            self.infer_queue.start_async(input_tensor, f)
-
-            output_tensors = await f
-
+        def predict(output):
             if not self.yolo:
-                output = output_tensors
-                for values in output.data[0][0]:
+                for values in output[0][0]:
                     valid, index, confidence, l, t, r, b = values
                     if valid == -1:
                         break
@@ -349,7 +349,6 @@ class OpenVINOPlugin(
 
                 return objs
 
-            output = output_tensors.data
             if self.scrypted_yolov10:
                 return yolo.parse_yolov10(output[0])
             if self.scrypted_yolo_nas:
@@ -389,7 +388,12 @@ class OpenVINOPlugin(
             input_tensor = await asyncio.get_event_loop().run_in_executor(
                 prepareExecutor, lambda: prepare()
             )
-            objs = await predict(input_tensor)
+            f = asyncio.Future(loop=self.loop)
+            self.infer_queue.start_async(input_tensor, f)
+            output = await f
+            objs = await asyncio.get_event_loop().run_in_executor(
+                prepareExecutor, lambda: predict(output)
+            )
 
         except:
             traceback.print_exc()
