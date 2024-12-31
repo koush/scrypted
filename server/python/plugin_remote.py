@@ -473,7 +473,7 @@ class MediaManager:
     ) -> scrypted_python.scrypted_sdk.types.MediaObject:
         return await self.mediaManager.createMediaObjectFromUrl(data, options)
 
-    async def get_ffmpeg_path(self):
+    async def getFFmpegPath(self):
         # try to get the ffmpeg path as a value of another variable
         # ie, in docker builds:
         # export SCRYPTED_FFMPEG_PATH_ENV_VARIABLE=SCRYPTED_RASPBIAN_FFMPEG_PATH
@@ -492,7 +492,7 @@ class MediaManager:
 
         return await self.mediaManager.getFFmpegPath()
 
-    async def get_files_path(self):
+    async def getFilesPath(self):
         # Get the value of the SCRYPTED_PLUGIN_VOLUME environment variable
         files_path = os.getenv('SCRYPTED_PLUGIN_VOLUME')
         if not files_path:
