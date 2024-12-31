@@ -375,14 +375,11 @@ class OpenVINOPlugin(
                         im = im.reshape((1, 3, self.model_dim, self.model_dim))
                 im = im.astype(np.float32) / 255.0
                 im = np.ascontiguousarray(im)  # contiguous
-                input_tensor = ov.Tensor(array=im)
             elif self.yolo:
-                input_tensor = ov.Tensor(
-                    array=np.expand_dims(np.array(input), axis=0).astype(np.float32)
-                )
+                im = np.expand_dims(np.array(input), axis=0).astype(np.float32)
             else:
-                input_tensor = ov.Tensor(array=np.expand_dims(np.array(input), axis=0))
-            return input_tensor
+                im = np.expand_dims(np.array(input), axis=0)
+            return im
 
         try:
             input_tensor = await asyncio.get_event_loop().run_in_executor(
