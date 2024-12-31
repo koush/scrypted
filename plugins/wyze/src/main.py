@@ -305,11 +305,12 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 pkill(aprocess)
 
     async def ensureServer(self, cb) -> int:
-        server = await asyncio.start_server(cb, "127.0.0.1", 0)
+        host = os.environ.get("SCRYPTED_CLUSTER_ADDRESS", None) or "127.0.0.1"
+        server = await asyncio.start_server(cb, host, 0)
         sock = server.sockets[0]
         host, port = sock.getsockname()
         asyncio.ensure_future(server.serve_forever())
-        return port
+        return host, port
 
     async def probeCodec(self, substream: bool):
         sps: bytes = None
@@ -414,7 +415,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             print_exception(self.print, e)
             raise
 
-        rfcPort = await self.rfcSubServer if substream else await self.rfcServer
+        rfcHost, rfcPort = await self.rfcSubServer if substream else await self.rfcServer
 
         msos = self.getVideoStreamOptionsInternal()
         mso = msos[1] if substream else msos[0]
@@ -441,7 +442,7 @@ b=AS:128
 a=rtpmap:97 {audioCodecName}/{info.audioSampleRate}/1
 """
         rfc = {
-            "url": f"tcp://127.0.0.1:{rfcPort}",
+            "url": f"tcp://{rfcHost}:{rfcPort}",
             "sdp": sdp,
             "mediaStreamOptions": mso,
         }
