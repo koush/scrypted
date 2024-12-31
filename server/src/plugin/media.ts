@@ -1,12 +1,11 @@
-import { getFfmpegPath } from '@scrypted/ffmpeg-static';
 import { BufferConverter, DeviceManager, FFmpegInput, MediaConverter, MediaManager, MediaObjectCreateOptions, MediaObject as MediaObjectInterface, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import fs from 'fs';
 import https from 'https';
 import Graph from 'node-dijkstra';
-import os from 'os';
 import path from 'path';
 import send from 'send';
 import MimeType from 'whatwg-mimetype';
+import { getScryptedFFmpegPath } from './ffmpeg-path';
 import { MediaObject } from "./mediaobject";
 import { MediaObjectRemote } from "./plugin-api";
 
@@ -174,25 +173,7 @@ export abstract class MediaManagerBase implements MediaManager {
     abstract getMixinConsole(mixinId: string, nativeId: ScryptedNativeId): Console;
 
     async getFFmpegPath(): Promise<string> {
-        // try to get the ffmpeg path as a value of another variable
-        // ie, in docker builds:
-        //     export SCRYPTED_FFMPEG_PATH_ENV_VARIABLE=SCRYPTED_RASPBIAN_FFMPEG_PATH
-        const v = process.env.SCRYPTED_FFMPEG_PATH_ENV_VARIABLE;
-        if (v) {
-            const f = process.env[v];
-            if (f && fs.existsSync(f))
-                return f;
-        }
-
-        // try to get the ffmpeg path from a variable
-        // ie:
-        //     export SCRYPTED_FFMPEG_PATH=/usr/local/bin/ffmpeg
-        const f = process.env.SCRYPTED_FFMPEG_PATH;
-        if (f && fs.existsSync(f))
-            return f;
-
-        const defaultPath = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-        return getFfmpegPath() || defaultPath;
+        return getScryptedFFmpegPath();
     }
 
     async getFilesPath(): Promise<string> {

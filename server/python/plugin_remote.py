@@ -6,6 +6,7 @@ import inspect
 import multiprocessing
 import multiprocessing.connection
 import os
+from pathlib import Path
 import platform
 import random
 import sys
@@ -472,11 +473,39 @@ class MediaManager:
     ) -> scrypted_python.scrypted_sdk.types.MediaObject:
         return await self.mediaManager.createMediaObjectFromUrl(data, options)
 
-    async def getFFmpegPath(self) -> str:
+    async def get_ffmpeg_path(self):
+        # try to get the ffmpeg path as a value of another variable
+        # ie, in docker builds:
+        # export SCRYPTED_FFMPEG_PATH_ENV_VARIABLE=SCRYPTED_RASPBIAN_FFMPEG_PATH
+        v = os.getenv('SCRYPTED_FFMPEG_PATH_ENV_VARIABLE')
+        if v:
+            f = os.getenv(v)
+            if f and Path(f).exists():
+                return f
+
+        # try to get the ffmpeg path from a variable
+        # ie:
+        # export SCRYPTED_FFMPEG_PATH=/usr/local/bin/ffmpeg
+        f = os.getenv('SCRYPTED_FFMPEG_PATH')
+        if f and Path(f).exists():
+            return f
+
         return await self.mediaManager.getFFmpegPath()
 
-    async def getFilesPath(self) -> str:
-        return await self.mediaManager.getFilesPath()
+    async def get_files_path(self):
+        # Get the value of the SCRYPTED_PLUGIN_VOLUME environment variable
+        files_path = os.getenv('SCRYPTED_PLUGIN_VOLUME')
+        if not files_path:
+            raise ValueError('SCRYPTED_PLUGIN_VOLUME env variable not set?')
+        
+        # Construct the path for the 'files' directory
+        ret = Path(files_path) / 'files'
+        
+        # Ensure the directory exists
+        await asyncio.to_thread(ret.mkdir, parents=True, exist_ok=True)
+        
+        # Return the constructed directory path as a string
+        return str(ret)
 
 
 class DeviceState(scrypted_python.scrypted_sdk.types.DeviceState):

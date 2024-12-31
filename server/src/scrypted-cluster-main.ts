@@ -23,6 +23,7 @@ import { EnvControl } from './services/env';
 import { Info } from './services/info';
 import { ServiceControl } from './services/service-control';
 import { sleep } from './sleep';
+import { getScryptedFFmpegPath } from './plugin/ffmpeg-path';
 
 installSourceMapSupport({
     environment: 'node',
@@ -143,6 +144,7 @@ function createClusterForkParam(mainFilename: string, clusterId: string, cluster
             ...runtimeWorkerOptions.env,
             SCRYPTED_VOLUME: volume,
             SCRYPTED_PLUGIN_VOLUME: pluginVolume,
+            SCRYPTED_FFMPEG_PATH: process.env.SCRYPTED_FFMPEG_PATH || await getScryptedFFmpegPath(),
         };
 
         runtimeWorker = rt(mainFilename, runtimeWorkerOptions, undefined);
