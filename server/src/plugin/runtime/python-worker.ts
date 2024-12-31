@@ -132,7 +132,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
 
         const strippedPythonVersion = pluginPythonVersion.replace('.', '');
         const envPython = !process.env.SCRYPTED_PORTABLE_PYTHON && process.env[`SCRYPTED_PYTHON${strippedPythonVersion}_PATH`];
-        if (envPython) {
+        if (envPython && fs.existsSync(envPython)) {
             pythonPath = envPython;
             setup();
             this.peerin = this.worker.stdio[3] as Writable;
