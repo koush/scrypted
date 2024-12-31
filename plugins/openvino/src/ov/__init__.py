@@ -250,6 +250,7 @@ class OpenVINOPlugin(
         def callback(infer_request, future: asyncio.Future):
             try:
                 output = infer_request.get_output_tensor(0).data
+                output = np.copy(output)
                 self.loop.call_soon_threadsafe(future.set_result, output)
             except Exception as e:
                 self.loop.call_soon_threadsafe(future.set_exception, e)
