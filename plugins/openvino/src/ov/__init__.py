@@ -247,11 +247,38 @@ class OpenVINOPlugin(
 
         self.infer_queue = ov.AsyncInferQueue(self.compiled_model)
 
+        def predict(output):
+            if not self.yolo:
+                objs = []
+                for values in output[0][0]:
+                    valid, index, confidence, l, t, r, b = values
+                    if valid == -1:
+                        break
+
+                    def torelative(value: float):
+                        return value * self.model_dim
+
+                    l = torelative(l)
+                    t = torelative(t)
+                    r = torelative(r)
+                    b = torelative(b)
+
+                    obj = Prediction(index - 1, confidence, Rectangle(l, t, r, b))
+                    objs.append(obj)
+
+                return objs
+
+            if self.scrypted_yolov10:
+                return yolo.parse_yolov10(output[0])
+            if self.scrypted_yolo_nas:
+                return yolo.parse_yolo_nas([output[1], output[0]])
+            return yolo.parse_yolov9(output[0])
+
         def callback(infer_request, future: asyncio.Future):
             try:
                 output = infer_request.get_output_tensor(0).data
-                output = np.copy(output)
-                self.loop.call_soon_threadsafe(future.set_result, output)
+                objs = predict(output)
+                self.loop.call_soon_threadsafe(future.set_result, objs)
             except Exception as e:
                 self.loop.call_soon_threadsafe(future.set_exception, e)
 
@@ -330,32 +357,6 @@ class OpenVINOPlugin(
         return super().get_input_format()
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        def predict(output):
-            if not self.yolo:
-                for values in output[0][0]:
-                    valid, index, confidence, l, t, r, b = values
-                    if valid == -1:
-                        break
-
-                    def torelative(value: float):
-                        return value * self.model_dim
-
-                    l = torelative(l)
-                    t = torelative(t)
-                    r = torelative(r)
-                    b = torelative(b)
-
-                    obj = Prediction(index - 1, confidence, Rectangle(l, t, r, b))
-                    objs.append(obj)
-
-                return objs
-
-            if self.scrypted_yolov10:
-                return yolo.parse_yolov10(output[0])
-            if self.scrypted_yolo_nas:
-                return yolo.parse_yolo_nas([output[1], output[0]])
-            return yolo.parse_yolov9(output[0])
-
         def prepare():
             # the input_tensor can be created with the shared_memory=True parameter,
             # but that seems to cause issues on some platforms.
@@ -388,11 +389,7 @@ class OpenVINOPlugin(
             )
             f = asyncio.Future(loop=self.loop)
             self.infer_queue.start_async(input_tensor, f)
-            output = await f
-            objs = await asyncio.get_event_loop().run_in_executor(
-                prepareExecutor, lambda: predict(output)
-            )
-
+            objs = await f
         except:
             traceback.print_exc()
             raise
