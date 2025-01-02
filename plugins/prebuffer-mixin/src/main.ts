@@ -230,12 +230,17 @@ class PrebufferSession {
 
   getParser(mediaStreamOptions: MediaStreamOptions) {
     let parser: string;
-    const rtspParser = this.storage.getItem(this.rtspParserKey);
+    let rtspParser = this.storage.getItem(this.rtspParserKey);
 
     if (!this.canUseRtspParser(mediaStreamOptions)) {
       parser = STRING_DEFAULT;
+      rtspParser = undefined;
     }
     else {
+      if (!rtspParser || rtspParser === STRING_DEFAULT) {
+        // use the plugin default
+        rtspParser = localStorage.getItem('defaultRtspParser');
+      }
       switch (rtspParser) {
         case FFMPEG_PARSER_TCP:
         case FFMPEG_PARSER_UDP:
@@ -364,11 +369,6 @@ class PrebufferSession {
       const parser = this.getParser(this.advertisedMediaStreamOptions);
       const defaultValue = parser.parser;
 
-      const scryptedOptions = [
-        SCRYPTED_PARSER_TCP,
-        SCRYPTED_PARSER_UDP,
-      ];
-
       const currentParser = parser.isDefault ? STRING_DEFAULT : parser.parser;
 
       settings.push(
@@ -381,7 +381,8 @@ class PrebufferSession {
           value: currentParser,
           choices: [
             STRING_DEFAULT,
-            ...scryptedOptions,
+            SCRYPTED_PARSER_TCP,
+            SCRYPTED_PARSER_UDP,
             FFMPEG_PARSER_TCP,
             FFMPEG_PARSER_UDP,
           ],
@@ -1617,9 +1618,27 @@ function millisUntilMidnight() {
   return (midnight.getTime() - new Date().getTime());
 }
 
-export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider {
+export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider, Settings {
   // no longer in use, but kept for future use.
-  storageSettings = new StorageSettings(this, {});
+  storageSettings = new StorageSettings(this, {
+    defaultRtspParser: {
+      group: 'Advanced',
+      title: 'Default RTSP Parser',
+      description: `Experimental: The Default parser used to read RTSP streams. The default is "${SCRYPTED_PARSER_TCP}".`,
+      defaultValue: STRING_DEFAULT,
+      choices: [
+        STRING_DEFAULT,
+        SCRYPTED_PARSER_TCP,
+        SCRYPTED_PARSER_UDP,
+        FFMPEG_PARSER_TCP,
+        FFMPEG_PARSER_UDP,
+      ],
+      onPut: () => {
+        this.log.a('Rebroadcast Plugin will restart momentarily.');
+        sdk.deviceManager.requestRestart();
+      }
+    }
+  });
   transcodeStorageSettings = new StorageSettings(this, {
     remoteStreamingBitrate: {
       title: 'Remote Streaming Bitrate',
@@ -1649,6 +1668,8 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
 
   constructor(nativeId?: string) {
     super(nativeId);
+
+    this.log.clearAlerts();
 
     this.fromMimeType = 'x-scrypted/x-rfc4571';
     this.toMimeType = ScryptedMimeTypes.FFmpegInput;
