@@ -247,6 +247,7 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             'tcp',
             ...(options?.vcodec || []),
             ...(options?.acodec || []),
+            '-pkt_size', '64000',
             '-f', 'rtsp',
         ],
         findSyncFrame(streamChunks: StreamChunk[]) {
