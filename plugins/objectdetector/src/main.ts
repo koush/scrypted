@@ -868,8 +868,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       return this.storageSettings.putSetting(key, value);
     }
 
-    if (value && this.model.settings?.find(s => s.key === key)?.multiple) {
-      vs = JSON.stringify(value);
+    if (value) {
+      const found = this.model.settings?.find(s => s.key === key);
+      if (found?.multiple || found?.type === 'clippath')
+        vs = JSON.stringify(value);
     }
 
     if (key === 'analyzeButton') {
