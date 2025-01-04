@@ -135,7 +135,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         except:
             if default:
                 return "Default"
-            return 120 if self.camera.is_2k else 60
+            return 240 if self.camera.is_2k else 160
 
     async def getSettings(self):
         ret: List[Setting] = []
@@ -152,8 +152,9 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                     "500",
                     "750",
                     "1000",
-                    "1200",
                     "1400",
+                    "1800",
+                    "2000",
                 ],
             }
         )
