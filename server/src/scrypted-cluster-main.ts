@@ -371,6 +371,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
                 console.log('Cluster client authenticated.', socket.remoteAddress, socket.remotePort, properties);
             }
             catch (e) {
+                console.error('Cluster client authentication failed.', socket.remoteAddress, socket.remotePort, e);
                 peer.kill(e);
                 socket.destroy();
             }
