@@ -101,6 +101,16 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             type: 'number',
             hide: false,
         },
+        synthenticStreams: {
+            subgroup,
+            title: 'Synthetic Streams',
+            description: 'Create additional streams by transcoding the existing streams. This can be useful for creating streams with different resolutions or bitrates.',
+            immediate: true,
+            multiple: true,
+            combobox: true,
+            choices: [],
+            defaultValue: [],
+        }
     });
 
     function getDefaultPrebufferedStreams(msos: ResponseMediaStreamOptions[]) {
@@ -137,10 +147,18 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         const v: StreamStorageSetting = storageSettings.settings[key];
         const value = storageSettings.values[key];
         let isDefault = value === 'Default';
+
         let stream = msos?.find(mso => mso.name === value);
-        if (isDefault || !stream) {
-            isDefault = true;
-            stream = getDefaultMediaStream(v, msos);
+        if (storageSettings.values.synthenticStreams.includes(value)) {
+            stream = {
+                id: `synthetic:${value}`,
+            };
+        }
+        else {
+            if (isDefault || !stream) {
+                isDefault = true;
+                stream = getDefaultMediaStream(v, msos);
+            }
         }
         return {
             title: streamTypes[key].title,
@@ -153,6 +171,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         const choices = [
             'Default',
             ...msos.map(mso => mso.name),
+            ...storageSettings.values.synthenticStreams,
         ];
         const defaultValue = getDefaultMediaStream(v, msos).name;
 

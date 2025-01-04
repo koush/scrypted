@@ -17,7 +17,3 @@ Medium: 720p (500 Kbps)
 Low (if available): 320p (100 Kbps)
 
 The `Key Frame (IDR) Interval` should be set to `4` seconds. This setting is usually configured in frames. So if the camera frame rate is `30`, the interval would be `120`. If the camera frame rate is `15` the interval would be `60`. The value can be calculated as `IDR Interval = FPS * 4`.
-
-## Transcoding
-
-Some cameras may not allow configuration of the video codec (h264) or IDR Interval. The camera may also only have a single high bitrate stream which will fail to stream when viewing on low bandwidth remote connections. In this case, Transcoding should be enabled for `Remote Stream` and `Remote Recording Stream` to ensure there isn't a bandwidth issue.

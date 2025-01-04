@@ -1,5 +1,4 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
-import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { ListenZeroSingleClientTimeoutError, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
@@ -72,7 +71,7 @@ class PrebufferSession {
 
   activeClients = 0;
   inactivityTimeout: NodeJS.Timeout;
-  audioConfigurationKey: string;
+  syntheticInputIdKey: string;
   ffmpegInputArgumentsKey: string;
   ffmpegOutputArgumentsKey: string;
   lastDetectedAudioCodecKey: string;
@@ -88,7 +87,7 @@ class PrebufferSession {
     this.storage = mixin.storage;
     this.console = mixin.console;
     this.mixinDevice = mixin.mixinDevice;
-    this.audioConfigurationKey = 'audioConfiguration-' + this.streamId;
+    this.syntheticInputIdKey = 'syntheticInputIdKey-' + this.streamId;
     this.ffmpegInputArgumentsKey = 'ffmpegInputArguments-' + this.streamId;
     this.ffmpegOutputArgumentsKey = 'ffmpegOutputArguments-' + this.streamId;
     this.lastDetectedAudioCodecKey = 'lastDetectedAudioCodec-' + this.streamId;
@@ -227,12 +226,15 @@ class PrebufferSession {
     let parser: string;
     let rtspParser = this.storage.getItem(this.rtspParserKey);
 
+    let isDefault = !rtspParser || rtspParser === 'Default';
+
     if (!this.canUseRtspParser(mediaStreamOptions)) {
       parser = STRING_DEFAULT;
+      isDefault = true;
       rtspParser = undefined;
     }
     else {
-      if (!rtspParser || rtspParser === STRING_DEFAULT) {
+      if (isDefault) {
         // use the plugin default
         rtspParser = localStorage.getItem('defaultRtspParser');
       }
@@ -251,7 +253,7 @@ class PrebufferSession {
 
     return {
       parser,
-      isDefault: !rtspParser || rtspParser === 'Default',
+      isDefault,
     }
   }
 
@@ -325,6 +327,19 @@ class PrebufferSession {
 
     const group = "Streams";
     const subgroup = `Stream: ${this.streamName}`;
+
+    if (this.mixin.streamSettings.storageSettings.values.synthenticStreams.includes(this.streamId)) {
+      const nonSynthetic = [...this.mixin.sessions.keys()].filter(s => s && !s.startsWith('synthetic:'));
+      settings.push({
+        group,
+        subgroup,
+        key: this.syntheticInputIdKey,
+        title: 'Synthetic Stream Source',
+        description: 'The source stream to transcode.',
+        choices: nonSynthetic,
+        value: this.storage.getItem(this.syntheticInputIdKey),
+      });
+    }
 
     const addFFmpegInputSettings = () => {
       settings.push(
@@ -514,7 +529,19 @@ class PrebufferSession {
     };
     this.parsers = rbo.parsers;
 
-    const mo = await this.mixinDevice.getVideoStream(mso);
+    let mo: MediaObject;
+    if (this.mixin.streamSettings.storageSettings.values.synthenticStreams.includes(this.streamId)) {
+      const syntheticInputId = this.storage.getItem(this.syntheticInputIdKey);
+      if (!syntheticInputId)
+        throw new Error('synthetic stream has not been configured with an input');
+      const realDevice = systemManager.getDeviceById<VideoCamera>(this.mixin.id);
+      mo = await realDevice.getVideoStream({
+        id: syntheticInputId,
+      });
+    }
+    else {
+      mo = await this.mixinDevice.getVideoStream(mso);
+    }
     const isRfc4571 = mo.mimeType === 'x-scrypted/x-rfc4571';
 
     let session: ParserSession<PrebufferParsers>;
@@ -1445,6 +1472,22 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       })();
     }
 
+    for (const synthetic of this.streamSettings.storageSettings.values.synthenticStreams) {
+      const id = `synthetic:${synthetic}`;
+      toRemove.delete(id);
+
+      let session = this.sessions.get(id);
+
+      if (session)
+        continue;
+
+      session = new PrebufferSession(this, {
+        id: synthetic,
+      }, false, false);
+      this.sessions.set(id, session);
+      this.console.log('stream', synthetic, 'is synthetic and will be rebroadcast on demand.');
+    }
+
     if (!this.sessions.has(undefined)) {
       const defaultStreamName = this.streamSettings.storageSettings.values.defaultStream;
       let defaultSession = this.sessions.get(msos?.find(mso => mso.name === defaultStreamName)?.id);
@@ -1594,27 +1637,18 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       }
     }
   });
+
   transcodeStorageSettings = new StorageSettings(this, {
     remoteStreamingBitrate: {
+      group: 'Advanced',
       title: 'Remote Streaming Bitrate',
       type: 'number',
-      defaultValue: 1000000,
+      defaultValue: 500000,
       description: 'The bitrate to use when remote streaming. This setting will only be used when transcoding or adaptive bitrate is enabled on a camera.',
       onPut() {
         sdk.deviceManager.onDeviceEvent('transcode', ScryptedInterface.Settings, undefined);
       },
     },
-    h264EncoderArguments: {
-      title: 'H264 Encoder Arguments',
-      description: 'FFmpeg arguments used to encode h264 video. This is not camera specific and is used to setup the hardware accelerated encoder on your Scrypted server. This setting will only be used when transcoding is enabled on a camera.',
-      choices: Object.keys(getH264EncoderArgs()),
-      defaultValue: getDebugModeH264EncoderArgs().join(' '),
-      combobox: true,
-      mapPut: (oldValue, newValue) => getH264EncoderArgs()[newValue]?.join(' ') || newValue || getDebugModeH264EncoderArgs().join(' '),
-      onPut() {
-        sdk.deviceManager.onDeviceEvent('transcode', ScryptedInterface.Settings, undefined);
-      },
-    }
   });
   currentMixins = new Map<PrebufferMixin, {
     worker: ForkWorker,
@@ -1646,16 +1680,23 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     });
 
     // legacy transcode extension that needs to be removed.
-    process.nextTick(() => {
-      deviceManager.onDeviceRemoved('transcode');
-    });
+    if (sdk.deviceManager.getNativeIds().includes('transcode')) {
+      process.nextTick(() => {
+        deviceManager.onDeviceRemoved('transcode');
+      });
+    }
   }
 
-  getSettings(): Promise<Setting[]> {
-    return this.storageSettings.getSettings();
+  async getSettings(): Promise<Setting[]> {
+    return [
+      ...await this.storageSettings.getSettings(),
+      ...await this.transcodeStorageSettings.getSettings(),
+    ];
   }
 
   putSetting(key: string, value: SettingValue): Promise<void> {
+    if (this.transcodeStorageSettings.keys[key])
+      return this.transcodeStorageSettings.putSetting(key, value);
     return this.storageSettings.putSetting(key, value);
   }
 
