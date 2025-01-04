@@ -1,7 +1,6 @@
 import { getH264DecoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
-import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
 import { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
-import { getTranscodeMixinProviderId } from "./transcode-settings";
+import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
 
 export type StreamStorageSetting = StorageSetting & {
     prefersPrebuffer: boolean,
@@ -102,45 +101,6 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             type: 'number',
             hide: false,
         },
-        transcodeStreams: {
-            group: 'Transcoding',
-            title: 'Transcode Streams',
-            description: 'The media streams to transcode. Transcoding audio and video is not recommended and should only be used when necessary. The Rebroadcast Plugin manages the system-wide Transcode settings. See the Rebroadcast Readme for optimal configuration.',
-            multiple: true,
-            choices: Object.values(streamTypes).map(st => st.title),
-            hide: true,
-        },
-        videoDecoderArguments: {
-            group: 'Transcoding',
-            title: 'Video Decoder Arguments',
-            description: 'FFmpeg arguments used to decode input video when transcoding a stream.',
-            placeholder: '-hwaccel auto',
-            choices: Object.keys(getH264DecoderArgs()),
-            combobox: true,
-            mapPut: (oldValue, newValue) => getH264DecoderArgs()[newValue]?.join(' ') || newValue || '',
-            hide: true,
-        },
-        videoFilterArguments: {
-            group: 'Transcoding',
-            title: 'Video Filter Arguments',
-            description: 'FFmpeg arguments used to filter input video when transcoding a stream. This can be used to crops, scale, rotates, etc.',
-            placeholder: 'transpose=1',
-            hide: true,
-        },
-        // 3/6/2022
-        // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
-        // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
-        // unless this flag is used.
-        // 3/7/2022
-        // This flag was enabled by default, but I believe this is causing issues with some users.
-        // Make it a setting.
-        missingCodecParameters: {
-            group: 'Transcoding',
-            title: 'Out of Band Codec Parameters',
-            description: 'Some cameras do not include H264 codec parameters in the stream and this causes live streaming to always fail (but recordings may be working). This is a inexpensive video filter and does not perform a transcode. Enable this setting only as necessary.',
-            type: 'boolean',
-            hide: true,
-        },
     });
 
     function getDefaultPrebufferedStreams(msos: ResponseMediaStreamOptions[]) {
@@ -209,16 +169,6 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         onGet: async () => {
             let enabledStreams: StorageSetting;
 
-            const hideTranscode = device.mixins?.includes(getTranscodeMixinProviderId()) ? {
-                hide: false,
-            } : {};
-            const hideTranscodes = {
-                transcodeStreams: hideTranscode,
-                missingCodecParameters: hideTranscode,
-                videoDecoderArguments: hideTranscode,
-                videoFilterArguments: hideTranscode,
-            };
-
             try {
                 const msos = await device.mixinDevice.getVideoStreamOptions();
 
@@ -236,13 +186,11 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
                         lowResolutionStream: createStreamOptions(streamTypes.lowResolutionStream, msos),
                         recordingStream: createStreamOptions(streamTypes.recordingStream, msos),
                         remoteRecordingStream: createStreamOptions(streamTypes.remoteRecordingStream, msos),
-                        ...hideTranscodes,
                     }
                 }
                 else {
                     return {
                         enabledStreams,
-                        ...hideTranscodes,
                     }
                 }
             }
@@ -251,7 +199,6 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             }
 
             return {
-                ...hideTranscodes,
             }
         }
     }

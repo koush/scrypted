@@ -8,7 +8,7 @@ import { addTrackControls, getSpsPps, parseSdp } from '@scrypted/common/src/sdp-
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
 import { StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, ChargeState, DeviceProvider, EventListenerRegister, FFmpegInput, ForkWorker, H264Info, MediaObject, MediaStreamDestination, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, VideoCameraConfiguration, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { BufferConverter, ChargeState, EventListenerRegister, FFmpegInput, ForkWorker, H264Info, MediaObject, MediaStreamDestination, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, VideoCameraConfiguration, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { once } from 'events';
@@ -24,7 +24,6 @@ import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { getSpsResolution } from './sps-resolution';
 import { createStreamSettings } from './stream-settings';
-import { TRANSCODE_MIXIN_PROVIDER_NATIVE_ID, TranscodeMixinProvider, getTranscodeMixinProviderId } from './transcode-settings';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -115,10 +114,6 @@ class PrebufferSession {
 
   get stopInactive() {
     return !this.enabled || this.shouldDisableBatteryPrebuffer();
-  }
-
-  get canPrebuffer() {
-    return (this.advertisedMediaStreamOptions.container !== 'rawvideo' && this.advertisedMediaStreamOptions.container !== 'ffmpeg') || this.storage.getItem(this.ffmpegOutputArgumentsKey);
   }
 
   getLastH264Probe(): H264Info {
@@ -1283,9 +1278,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
-    if (options?.route === 'direct')
-      return this.mixinDevice.getVideoStream(options);
-
     await this.ensurePrebufferSessions();
 
     let id = options?.id;
@@ -1294,8 +1286,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     let h264EncoderArguments: string[];
     let videoFilterArguments: string;
     let destinationVideoBitrate: number;
-
-    const transcodingEnabled = this.mixins?.includes(getTranscodeMixinProviderId());
 
     const msos = await this.mixinDevice.getVideoStreamOptions();
     let result: {
@@ -1356,58 +1346,23 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       }
 
       id = result.stream.id;
-      // this.console.log('Selected stream', result.stream.name);
-      // transcoding video should never happen transparently since it is CPU intensive.
-      // encourage users at every step to configure proper codecs.
-      // for this reason, do not automatically supply h264 encoder arguments
-      // even if h264 is requested, to force a visible failure.
-      if (transcodingEnabled && this.streamSettings.storageSettings.values.transcodeStreams?.includes(result.title)) {
-        h264EncoderArguments = transcodeStorageSettings.h264EncoderArguments?.split(' ');
-        if (this.streamSettings.storageSettings.values.videoFilterArguments)
-          videoFilterArguments = this.streamSettings.storageSettings.values.videoFilterArguments;
-      }
     }
 
     let session = this.sessions.get(id);
     let ffmpegInput: FFmpegInput;
-    if (!session.canPrebuffer) {
-      this.console.log('Source container can not be prebuffered. Using a direct media stream.');
-      session = undefined;
-    }
-    if (!session) {
-      const mo = await this.mixinDevice.getVideoStream(options);
-      if (!transcodingEnabled)
-        return mo;
-      ffmpegInput = await mediaManager.convertMediaObjectToJSON(mo, ScryptedMimeTypes.FFmpegInput);
-    }
-    else {
-      // ffmpeg probing works better if the stream does NOT start on a sync frame. the pre-sps/pps data is used
-      // as part of the stream analysis, and sync frame is immediately used. otherwise the sync frame is
-      // read and tossed during rtsp analysis.
-      // if ffmpeg is not in used (ie, not transcoding or implicitly rtsp),
-      // trust that downstream is not using ffmpeg and start with a sync frame.
-      const findSyncFrame = !transcodingEnabled
-        && (!options?.container || options?.container === 'rtsp')
-        && options?.tool !== 'ffmpeg';
-      ffmpegInput = await session.getVideoStream(findSyncFrame, options);
-    }
+    if (!session)
+      throw new Error('stream not found');
+
+    ffmpegInput = await session.getVideoStream(true, options);
 
     ffmpegInput.h264EncoderArguments = h264EncoderArguments;
     ffmpegInput.destinationVideoBitrate = destinationVideoBitrate;
-
-    if (transcodingEnabled && this.streamSettings.storageSettings.values.missingCodecParameters) {
-      if (!ffmpegInput.mediaStreamOptions)
-        ffmpegInput.mediaStreamOptions = { id };
-      ffmpegInput.mediaStreamOptions.oobCodecParameters = true;
-    }
 
     if (ffmpegInput.h264FilterArguments && videoFilterArguments)
       addVideoFilterArguments(ffmpegInput.h264FilterArguments, videoFilterArguments)
     else if (videoFilterArguments)
       ffmpegInput.h264FilterArguments = ['-filter_complex', videoFilterArguments];
 
-    if (transcodingEnabled)
-      ffmpegInput.videoDecoderArguments = this.streamSettings.storageSettings.values.videoDecoderArguments?.split(' ');
     return mediaManager.createFFmpegMediaObject(ffmpegInput, {
       sourceId: this.id,
     });
@@ -1618,7 +1573,7 @@ function millisUntilMidnight() {
   return (midnight.getTime() - new Date().getTime());
 }
 
-export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider, Settings {
+export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, Settings {
   // no longer in use, but kept for future use.
   storageSettings = new StorageSettings(this, {
     defaultRtspParser: {
@@ -1690,33 +1645,10 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       }
     });
 
-    // schedule restarts at 2am
-    // removed as the mp4 containerization leak used way back when is defunct.
-    // const midnight = millisUntilMidnight();
-    // const twoAM = midnight + 2 * 60 * 60 * 1000;
-    // this.log.i(`Rebroadcaster scheduled for restart at 2AM: ${Math.round(twoAM / 1000 / 60)} minutes`)
-    // setTimeout(() => deviceManager.requestRestart(), twoAM);
-
+    // legacy transcode extension that needs to be removed.
     process.nextTick(() => {
-      deviceManager.onDeviceDiscovered({
-        nativeId: TRANSCODE_MIXIN_PROVIDER_NATIVE_ID,
-        name: 'Transcoding',
-        interfaces: [
-          "SystemSettings",
-          ScryptedInterface.Settings,
-          ScryptedInterface.MixinProvider,
-        ],
-        type: ScryptedDeviceType.API,
-      });
+      deviceManager.onDeviceRemoved('transcode');
     });
-  }
-
-  async releaseDevice(id: string, nativeId: string): Promise<void> {
-  }
-
-  async getDevice(nativeId: string) {
-    if (nativeId === TRANSCODE_MIXIN_PROVIDER_NATIVE_ID)
-      return new TranscodeMixinProvider(this);
   }
 
   getSettings(): Promise<Setting[]> {
