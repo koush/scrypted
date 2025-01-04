@@ -70,11 +70,7 @@ export function getH264DecoderArgs(): CodecArgs {
         ],
     };
 
-    if (isRaspberryPi()) {
-        ret['Raspberry Pi'] = ['-c:v', 'h264_mmal'];
-        ret[V4L2] = ['-c:v', 'h264_v4l2m2m'];
-    }
-    else if (os.platform() === 'linux') {
+    if (os.platform() === 'linux') {
         ret[V4L2] = ['-c:v', 'h264_v4l2m2m'];
     }
     else if (os.platform() === 'win32') {
