@@ -523,7 +523,7 @@ export class H264Repacketizer {
                         // nal delimiter or something. usually empty.
                     }
                     else {
-                        this.console.warn('Skipped a stapa type. Please report this to @koush on Discord.', nalType)
+                        this.console.warn('Skipped a stapa type.', nalType)
                     }
                 });
 
