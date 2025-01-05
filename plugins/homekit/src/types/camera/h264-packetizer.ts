@@ -519,6 +519,10 @@ export class H264Repacketizer {
                         // after the codec information. so codec information can be changed between
                         // idr and non-idr? maybe it is not applied until next idr?
                     }
+                    else if (nalType === NAL_TYPE_IDR) {
+                        // this is uncommon but has been seen on tapo.
+                        // i have no clue how they can fit an idr frame into a single packet stapa.
+                    }
                     else if (nalType === 0) {
                         // nal delimiter or something. usually empty.
                     }
