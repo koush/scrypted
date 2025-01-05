@@ -667,7 +667,6 @@ class NotifierOptions(TypedDict):
     badge: str
     body: str
     bodyWithSubtitle: str
-    collapseId: str
     data: Any
     dir: NotificationDirection
     image: str
@@ -677,7 +676,7 @@ class NotifierOptions(TypedDict):
     requireInteraction: bool
     silent: bool
     subtitle: str
-    tag: str
+    tag: str  # Collapse key/id.
     timestamp: float
     vibrate: VibratePattern
 
@@ -952,7 +951,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.97"
+TYPES_VERSION = "0.3.98"
 
 
 class AirPurifier:

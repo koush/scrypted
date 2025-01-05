@@ -234,11 +234,13 @@ export interface NotifierOptions {
   renotify?: boolean;
   requireInteraction?: boolean;
   silent?: boolean;
+  /**
+   * Collapse key/id.
+   */
   tag?: string;
   timestamp?: number;
   vibrate?: VibratePattern;
   recordedEvent?: RecordedEvent & { id: string };
-  collapseId?: string;
 
   // removed from typescript dom?
   actions?: NotificationAction[];
