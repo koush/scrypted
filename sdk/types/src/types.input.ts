@@ -238,6 +238,7 @@ export interface NotifierOptions {
   timestamp?: number;
   vibrate?: VibratePattern;
   recordedEvent?: RecordedEvent & { id: string };
+  collapseId?: string;
 
   // removed from typescript dom?
   actions?: NotificationAction[];

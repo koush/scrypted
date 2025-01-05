@@ -667,6 +667,7 @@ class NotifierOptions(TypedDict):
     badge: str
     body: str
     bodyWithSubtitle: str
+    collapseId: str
     data: Any
     dir: NotificationDirection
     image: str
@@ -951,7 +952,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.96"
+TYPES_VERSION = "0.3.97"
 
 
 class AirPurifier:
