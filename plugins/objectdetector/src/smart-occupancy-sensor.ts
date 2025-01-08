@@ -2,7 +2,7 @@ import sdk, { Camera, ClipPath, EventListenerRegister, Image, ObjectDetection, O
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { levenshteinDistance } from "./edit-distance";
 import type { ObjectDetectionPlugin } from "./main";
-import { normalizeBoxToClipPath, polygonOverlap } from "./polygon";
+import { normalizeBox, polygonIntersectsBoundingBox } from "./polygon";
 
 export const SMART_OCCUPANCYSENSOR_PREFIX = 'smart-occupancysensor-';
 
@@ -150,8 +150,8 @@ export class SmartOccupancySensor extends ScryptedDeviceBase implements Settings
             if (zone?.length >= 3) {
                 if (!d.boundingBox)
                     return false;
-                const detectionBoxPath = normalizeBoxToClipPath(d.boundingBox, detected.inputDimensions);
-                if (!polygonOverlap(detectionBoxPath, zone))
+                const detectionBox = normalizeBox(d.boundingBox, detected.inputDimensions);
+                if (!polygonIntersectsBoundingBox(zone, detectionBox))
                     return false;
             }
 

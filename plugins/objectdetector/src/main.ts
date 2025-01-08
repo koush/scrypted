@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
-import { fixLegacyClipPath, insidePolygon, normalizeBoxToClipPath, polygonOverlap } from './polygon';
+import { fixLegacyClipPath, normalizeBox, polygonContainsBoundingBox, polygonIntersectsBoundingBox } from './polygon';
 import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor } from './smart-motionsensor';
 import { SMART_OCCUPANCYSENSOR_PREFIX, SmartOccupancySensor } from './smart-occupancy-sensor';
 import { getAllDevices, safeParseJson } from './util';
@@ -545,7 +545,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!o.boundingBox)
         continue;
 
-      const box = normalizeBoxToClipPath(o.boundingBox, detection.inputDimensions);
+      const box = normalizeBox(o.boundingBox, detection.inputDimensions);
 
       let included: boolean;
       // need a way to explicitly include package zone.
@@ -572,13 +572,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
         let match = false;
         if (zoneInfo?.type === 'Contain') {
-          match = insidePolygon(box[0] as Point, zoneValue) &&
-            insidePolygon(box[1], zoneValue) &&
-            insidePolygon(box[2], zoneValue) &&
-            insidePolygon(box[3], zoneValue);
+          match = polygonContainsBoundingBox(zoneValue, box);
         }
         else {
-          match = polygonOverlap(box, zoneValue);
+          match = polygonIntersectsBoundingBox(zoneValue, box);
         }
 
         const classes = zoneInfo?.classes?.length ? zoneInfo?.classes : this.model?.classes || [];
@@ -604,7 +601,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       // prevents errant motion from the on screen time changing every second.
       if (this.hasMotionType && included === undefined) {
         const defaultInclusionZone: ClipPath = [[0, .1], [1, .1], [1, .9], [0, .9]];
-        included = polygonOverlap(box, defaultInclusionZone);
+        included = polygonIntersectsBoundingBox(defaultInclusionZone, box);
       }
 
       // if there are inclusion zones and this object
