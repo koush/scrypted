@@ -82,16 +82,8 @@ export function polygonContainsBoundingBox(polygon: ClipPath, boundingBox: Bound
     return corners.every(corner => pointInPolygon(corner, polygon));
 }
 
-export function normalizeBox(boundingBox: [number, number, number, number], inputDimensions: [number, number]): BoundingBox {
-    let [x, y, width, height] = boundingBox;
-    let x2 = x + width;
-    let y2 = y + height;
-    // the zones are point paths in percentage format
-    x = x  / inputDimensions[0];
-    y = y  / inputDimensions[1];
-    x2 = x2  / inputDimensions[0];
-    y2 = y2  / inputDimensions[1];
-    return [x, y, x2 - x, y2 - y];
+export function normalizeBox(box: BoundingBox, dims: Point): BoundingBox {
+    return [box[0] / dims[0], box[1] / dims[1], box[2] / dims[0], box[3] / dims[1]];
 }
 
 export function fixLegacyClipPath(clipPath: ClipPath): ClipPath {
