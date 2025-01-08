@@ -1,86 +1,96 @@
 import type { ClipPath, Point } from '@scrypted/sdk';
 
+// x y w h
 export type BoundingBox = [number, number, number, number];
+/**
+ * Checks if a line segment intersects with another line segment
+ */
+function lineIntersects(
+    [x1, y1]: Point,
+    [x2, y2]: Point,
+    [x3, y3]: Point,
+    [x4, y4]: Point
+): boolean {
+    // Calculate the denominators for intersection check
+    const denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+    if (denom === 0) return false; // Lines are parallel
 
-// Helper function to determine if a point is inside a polygon using the ray-casting algorithm
-function pointInPolygon(point: Point, polygon: ClipPath): boolean {
+    const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom;
+    const ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom;
+
+    // Check if intersection point lies within both line segments
+    return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1;
+}
+
+/**
+ * Checks if a point is inside a polygon using ray casting algorithm
+ */
+function pointInPolygon([x, y]: Point, polygon: ClipPath): boolean {
     let inside = false;
-    const x = point[0], y = point[1];
-
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i][0], yi = polygon[i][1];
-        const xj = polygon[j][0], yj = polygon[j][1];
+        const [xi, yi] = polygon[i];
+        const [xj, yj] = polygon[j];
 
-        const intersect = yi > y !== yj > y && x < (xj - xi) * (y - yi) / (yj - yi) + xi;
+        const intersect = ((yi > y) !== (yj > y)) &&
+            (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+
         if (intersect) inside = !inside;
     }
-
     return inside;
 }
 
-// Check if the polygon intersects the bounding box
-export function polygonIntersectsBoundingBox(polygon: ClipPath, boundingBox: BoundingBox): boolean {
-    const [bx, by, bw, bh] = boundingBox;
-
-    // Check if any of the bounding box corners is inside the polygon
-    const corners: Point[] = [
-        [bx, by], [bx + bw, by], [bx, by + bh], [bx + bw, by + bh]
+/**
+ * Converts a bounding box to an array of its corner points
+ */
+function boundingBoxToPoints([x, y, w, h]: BoundingBox): Point[] {
+    return [
+        [x, y],         // top-left
+        [x + w, y],     // top-right
+        [x + w, y + h], // bottom-right
+        [x, y + h]      // bottom-left
     ];
+}
 
-    for (const corner of corners) {
-        if (pointInPolygon(corner, polygon)) {
-            return true;
-        }
-    }
+/**
+ * Checks if a polygon intersects with a bounding box
+ */
+export function polygonIntersectsBoundingBox(polygon: ClipPath, boundingBox: BoundingBox): boolean {
+    // Get bounding box corners
+    const boxPoints = boundingBoxToPoints(boundingBox);
 
-    // Check if the polygon edges intersect with the bounding box edges
+    // Check if any polygon edge intersects with any bounding box edge
     for (let i = 0; i < polygon.length; i++) {
-        const p1 = polygon[i];
-        const p2 = polygon[(i + 1) % polygon.length];
+        const nextI = (i + 1) % polygon.length;
+        const polygonPoint1 = polygon[i];
+        const polygonPoint2 = polygon[nextI];
 
-        if (lineIntersectsBoundingBox(p1, p2, boundingBox)) {
-            return true;
+        // Check against all bounding box edges
+        for (let j = 0; j < boxPoints.length; j++) {
+            const nextJ = (j + 1) % boxPoints.length;
+            const boxPoint1 = boxPoints[j];
+            const boxPoint2 = boxPoints[nextJ];
+
+            if (lineIntersects(polygonPoint1, polygonPoint2, boxPoint1, boxPoint2)) {
+                return true;
+            }
         }
     }
 
+    // If no edges intersect, check if either shape contains a point from the other
+    if (pointInPolygon(polygon[0], boxPoints) || pointInPolygon(boxPoints[0], polygon))
+        return true;
     return false;
 }
 
-// Helper function to check if a line segment intersects the bounding box
-function lineIntersectsBoundingBox(p1: Point, p2: Point, boundingBox: BoundingBox): boolean {
-    const [bx, by, bw, bh] = boundingBox;
-
-    const clip = (p: Point) => p[0] >= bx && p[0] <= bx + bw && p[1] >= by && p[1] <= by + bh;
-
-    return clip(p1) || clip(p2) ||
-        lineIntersectsLine(p1, p2, [bx, by], [bx + bw, by]) || // Top edge
-        lineIntersectsLine(p1, p2, [bx + bw, by], [bx + bw, by + bh]) || // Right edge
-        lineIntersectsLine(p1, p2, [bx + bw, by + bh], [bx, by + bh]) || // Bottom edge
-        lineIntersectsLine(p1, p2, [bx, by + bh], [bx, by]); // Left edge
-}
-
-// Helper function to check if two line segments intersect
-function lineIntersectsLine(p1: Point, p2: Point, q1: Point, q2: Point): boolean {
-    const det = (p1[0] - p2[0]) * (q1[1] - q2[1]) - (p1[1] - p2[1]) * (q1[0] - q2[0]);
-    if (det === 0) return false;
-
-    const lambda = ((q1[1] - q2[1]) * (q1[0] - p1[0]) + (q2[0] - q1[0]) * (q1[1] - p1[1])) / det;
-    const gamma = ((p1[1] - p2[1]) * (q1[0] - p1[0]) + (p2[0] - p1[0]) * (q1[1] - p1[1])) / det;
-
-    return (lambda >= 0 && lambda <= 1) && (gamma >= 0 && gamma <= 1);
-}
-
-// Check if the polygon fully contains the bounding box
+/**
+ * Checks if a polygon completely contains a bounding box
+ */
 export function polygonContainsBoundingBox(polygon: ClipPath, boundingBox: BoundingBox): boolean {
-    const [bx, by, bw, bh] = boundingBox;
-
-    // Check if all four corners of the bounding box are inside the polygon
-    const corners: Point[] = [
-        [bx, by], [bx + bw, by], [bx, by + bh], [bx + bw, by + bh]
-    ];
-
-    return corners.every(corner => pointInPolygon(corner, polygon));
+    // Check if all corners of the bounding box are inside the polygon
+    const boxPoints = boundingBoxToPoints(boundingBox);
+    return boxPoints.every(point => pointInPolygon(point, polygon));
 }
+
 
 export function normalizeBox(box: BoundingBox, dims: Point): BoundingBox {
     return [box[0] / dims[0], box[1] / dims[1], box[2] / dims[0], box[3] / dims[1]];
