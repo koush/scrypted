@@ -395,7 +395,7 @@ export class RtspClient extends RtspBase {
     hasGetParameter = true;
     contentBase: string;
 
-    constructor(public url: string) {
+    constructor(public readonly url: string) {
         super();
         const u = new URL(url);
         const port = parseInt(u.port) || 554;
@@ -650,7 +650,8 @@ export class RtspClient extends RtspBase {
         const { parseHTTPHeadersQuotedKeyValueSet } = await import('http-auth-utils/dist/utils');
 
         if (this.wwwAuthenticate.includes('Basic')) {
-            const hash = BASIC.computeHash(url);
+            const parsedUrl = new URL(this.url);
+            const hash = BASIC.computeHash({ username: parsedUrl.username, password: parsedUrl.password });
             return `Basic ${hash}`;
         }
 
