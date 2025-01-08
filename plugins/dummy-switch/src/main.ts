@@ -2,11 +2,60 @@ import { BinarySensor, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Loc
 import sdk from '@scrypted/sdk';
 import { ReplaceMotionSensor, ReplaceMotionSensorNativeId } from './replace-motion-sensor';
 import { ReplaceBinarySensor, ReplaceBinarySensorNativeId } from './replace-binary-sensor';
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
 
 const { log, deviceManager } = sdk;
 
 class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, OccupancySensor, MotionSensor, BinarySensor, Settings {
     timeout: NodeJS.Timeout;
+    storageSettings = new StorageSettings(this, {
+        reset: {
+            title: 'Reset Sensor',
+            description: 'Reset the motion sensor and binary sensor after the given seconds. Enter 0 to never reset.',
+            defaultValue: 10,
+            type: 'number',
+            placeholder: '10',
+            onPut: () => {
+                clearTimeout(this.timeout);
+            }
+        },
+        actionTypes: {
+            title: 'Action Types',
+            description: 'Select the action types to expose.',
+            defaultValue: [
+                ScryptedInterface.OnOff,
+                ScryptedInterface.StartStop,
+                ScryptedInterface.Lock,
+            ],
+            multiple: true,
+            choices: [
+                ScryptedInterface.OnOff,
+                ScryptedInterface.StartStop,
+                ScryptedInterface.Lock,
+            ],
+            onPut: () => {
+                this.reportInterfaces();
+            },
+        },
+        sensorTypes: {
+            title: 'Sensor Types',
+            description: 'Select the sensor types to expose.',
+            defaultValue: [
+                ScryptedInterface.MotionSensor,
+                ScryptedInterface.BinarySensor,
+                ScryptedInterface.OccupancySensor,
+            ],
+            multiple: true,
+            choices: [
+                ScryptedInterface.MotionSensor,
+                ScryptedInterface.BinarySensor,
+                ScryptedInterface.OccupancySensor,
+            ],
+            onPut: () => {
+                this.reportInterfaces();
+            },
+        }
+    });
 
     constructor(nativeId: string) {
         super(nativeId);
@@ -17,6 +66,22 @@ class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, 
         this.motionDetected = false;
         this.binaryState = false;
         this.occupied = false;
+    }
+
+    async reportInterfaces() {
+        const interfaces: ScryptedInterface[] = this.storageSettings.values.sensorTypes || [];
+        if (!interfaces.length) 
+            interfaces.push(ScryptedInterface.MotionSensor, ScryptedInterface.BinarySensor, ScryptedInterface.OccupancySensor);
+        const actionTyoes = this.storageSettings.values.actionTypes || [];
+        if (!actionTyoes.length)
+            actionTyoes.push(ScryptedInterface.OnOff, ScryptedInterface.StartStop, ScryptedInterface.Lock);
+
+        await sdk.deviceManager.onDeviceDiscovered({
+            nativeId: this.nativeId,
+            interfaces: [...interfaces, ...actionTyoes, ScryptedInterface.Settings],
+            type: ScryptedDeviceType.Switch,
+            name: this.providedName,
+        });
     }
 
     lock(): Promise<void> {
@@ -31,20 +96,12 @@ class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, 
     stop(): Promise<void> {
         return this.turnOff();
     }
+
     async getSettings(): Promise<Setting[]> {
-        return [
-            {
-                key: 'reset',
-                title: 'Reset Sensor',
-                description: 'Reset the motion sensor and binary sensor after the given seconds. Enter 0 to never reset.',
-                value: this.storage.getItem('reset') || '10',
-                placeholder: '10',
-            }
-        ]
+        return this.storageSettings.getSettings();
     }
     async putSetting(key: string, value: SettingValue): Promise<void> {
-        this.storage.setItem(key, value.toString());
-        clearTimeout(this.timeout);
+        return this.storageSettings.putSetting(key, value);
     }
 
     // note that turnOff locks the lock
@@ -131,12 +188,6 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
         const nativeId = 'shell:' + Math.random().toString();
         const name = settings.name?.toString();
 
-        await this.onDiscovered(nativeId, name);
-
-        return nativeId;
-    }
-
-    async onDiscovered(nativeId: string, name: string) {
         await deviceManager.onDeviceDiscovered({
             nativeId,
             name,
@@ -151,6 +202,8 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
             ],
             type: ScryptedDeviceType.Switch,
         });
+        
+        return nativeId;
     }
 
     async getDevice(nativeId: string) {
@@ -162,11 +215,6 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
         let ret = this.devices.get(nativeId);
         if (!ret) {
             ret = new DummyDevice(nativeId);
-
-            // remove legacy scriptable interface
-            if (ret.interfaces.includes(ScryptedInterface.Scriptable)) {
-                setTimeout(() => this.onDiscovered(ret.nativeId, ret.providedName), 2000);
-            }
 
             if (ret)
                 this.devices.set(nativeId, ret);
