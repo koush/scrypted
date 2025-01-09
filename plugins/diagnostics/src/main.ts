@@ -37,26 +37,42 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             type: 'button',
             onPut: () => this.validateSystem(),
         },
+        loggedMotion: {
+            json: true,
+            hide: true,
+        },
+        loggedButton: {
+            json: true,
+            hide: true,
+        },
     });
 
-    loggedMotion = new Map<string, number>();
-    loggedButton = new Map<string, number>();
+    lastMotionMaxHours = 8;
+    lastPressMaxHours = 8;
+
+    loggedMotion: Record<string, number> = {};
+    loggedButton: Record<string, number> = {};
 
     constructor(nativeId?: string) {
         super(nativeId);
         this.on = this.on || false;
 
-        sdk.systemManager.listen((eventSource, eventDetails, eventData) => {
+        this.loggedMotion = this.storageSettings.values.loggedMotion ?? {};
+        this.loggedButton = this.storageSettings.values.loggedButton ?? {};
+
+        sdk.systemManager.listen(async (eventSource, eventDetails, eventData) => {
             if (!eventData || !eventSource?.id)
                 return;
 
             if (eventDetails.eventInterface === ScryptedInterface.MotionSensor) {
-                this.loggedMotion.set(eventSource.id, Date.now());
+                this.loggedMotion[eventSource.id] = Date.now();
+                await this.storageSettings.putSetting('loggedMotion', JSON.stringify(this.loggedMotion));
                 return;
             }
 
             if (eventDetails.eventInterface === ScryptedInterface.BinarySensor) {
-                this.loggedButton.set(eventSource.id, Date.now());
+                this.loggedButton[eventSource.id] = Date.now();
+                await this.storageSettings.putSetting('loggedButton', JSON.stringify(this.loggedButton));
                 return;
             }
         });
@@ -161,22 +177,22 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
             await this.validate(console, 'Recent Motion', async () => {
 
-                const lastMotion = this.loggedMotion.get(device.id);
+                const lastMotion = this.loggedMotion[device.id];
                 if (!lastMotion)
                     throw new Error('No recent motion detected. Go wave your hand in front of the camera.');
-                if (Date.now() - lastMotion > 8 * 60 * 60 * 1000)
-                    throw new Error('Last motion was over 8 hours ago.');
+                if (Date.now() - lastMotion > this.lastMotionMaxHours * 60 * 60 * 1000)
+                    throw new Error(`Last motion was over ${this.lastMotionMaxHours} hours ago.`);
             });
         }
 
 
         if (device.type === ScryptedDeviceType.Doorbell) {
             await this.validate(console, 'Recent Button Press', async () => {
-                const lastButton = this.loggedButton.get(device.id);
+                const lastButton = this.loggedButton[device.id];
                 if (!lastButton)
                     throw new Error('No recent button press detected. Go press the doorbell button.');
-                if (Date.now() - lastButton > 8 * 60 * 60 * 1000)
-                    throw new Error('Last button press was over 8 hours ago.');
+                if (Date.now() - lastButton > this.lastPressMaxHours * 60 * 60 * 1000)
+                    throw new Error(`Last button press was over ${this.lastPressMaxHours} hours ago.`);
             });
         }
 
