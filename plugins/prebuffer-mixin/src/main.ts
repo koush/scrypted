@@ -366,7 +366,7 @@ class PrebufferSession {
           key: this.ffmpegOutputArgumentsKey,
           value: this.storage.getItem(this.ffmpegOutputArgumentsKey),
           choices: [
-            '-c:v libx264 -pix_fmt yuvj420p -preset ultrafast -bf 0'
+            '-c:v libx264 -pix_fmt yuvj420p -preset ultrafast -bf 0 -g 60 -r 15 -b:v 500000 -bufsize 1000000 -maxrate 500000'
           ],
           combobox: true,
         },
