@@ -13,6 +13,15 @@ export async function getScryptedFFmpegPath(): Promise<string> {
             return f;
     }
 
+    // strange behavior on synology and possibly unraid
+    // where environment variables are not necessarily kept
+    // in their container manager thing.
+    // so even if the Dockerfile sets SCRYPTED_FFMPEG_PATH,
+    // it is not gauranteed to be present in the environment.
+    // this causes issues with @scrypted/ffmpeg-static,
+    // which looks at that environment variable at build time
+    // to determine whether to install ffmpeg.
+
     // try to get the ffmpeg path from a variable
     // ie:
     //     export SCRYPTED_FFMPEG_PATH=/usr/local/bin/ffmpeg
@@ -21,5 +30,8 @@ export async function getScryptedFFmpegPath(): Promise<string> {
         return f;
 
     const defaultPath = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-    return getFfmpegPath() || defaultPath;
+    const scryptedFfmpegStatic = getFfmpegPath();
+    if (scryptedFfmpegStatic && fs.existsSync(scryptedFfmpegStatic))
+        return scryptedFfmpegStatic;
+    return defaultPath;
 }
