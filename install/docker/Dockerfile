@@ -16,6 +16,6 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 
 # changing this forces pip and npm to perform reinstalls.
 # if this base image changes, this version must be updated.
-ENV SCRYPTED_BASE_VERSION="20240321"
+ENV SCRYPTED_BASE_VERSION="20250101"
 
 CMD ["/bin/sh", "-c", "ulimit -c 0; exec npm --prefix /server exec scrypted-serve"]
