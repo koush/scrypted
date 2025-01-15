@@ -55,7 +55,7 @@ services:
             # Scrypted NVR Storage (Part 3 of 3)
 
             # Modify to add the additional volume for Scrypted NVR.
-            # The following example would mount the /mnt/sda/video path on the host
+            # The following example would mount the /mnt/media/video path on the host
             # to the /nvr path inside the docker container.
             # - /mnt/media/video:/nvr
 
