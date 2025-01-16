@@ -43,6 +43,9 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
+**Logs**
+Include a `Log` from the device/camera in the management console (and if applicable, the affacted plugin, like HomeKit).
+
 **Server (please complete the following information):**
  - OS: [e.g. Ubuntu]
  - Installation Method: [e.g. Desktop App, Docker, Local]
