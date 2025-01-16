@@ -4,7 +4,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import process from 'process';
-import semver from 'semver';
 import { ensurePluginVolume } from "./plugin-volume";
 
 export function defaultNpmExec(args: string[], options: child_process.SpawnOptions) {
@@ -26,8 +25,16 @@ export function setNpmExecFunction(f: typeof npmExecFunction) {
 
 export function getPluginNodePath(name: string) {
     const pluginVolume = ensurePluginVolume(name);
-    const nodeMajorVersion = semver.parse(process.version).major;
-    let nodeVersionedDirectory = `node${nodeMajorVersion}-${process.platform}-${process.arch}`;
+
+    const abi = process.versions.modules;
+    let runtime = process.env.npm_config_runtime;
+    if (!runtime && process.versions.electron)
+        runtime = 'electron';
+    if (!runtime)
+        runtime = 'node';
+    const { platform, arch } = process;
+    let nodeVersionedDirectory = `n-${runtime}-v${abi}-${platform}-${arch}`;
+
     const scryptedBase = process.env.SCRYPTED_BASE_VERSION;
     if (scryptedBase)
         nodeVersionedDirectory += '-' + scryptedBase;
@@ -98,7 +105,7 @@ export async function installOptionalDependencies(console: Console, packageJson:
             if (!de.isDirectory())
                 return;
             if (de.name.startsWith('linux') || de.name.startsWith('darwin') || de.name.startsWith('win32')
-                || de.name.startsWith('python') || de.name.startsWith('node')) {
+                || de.name.startsWith('python') || de.name.startsWith('node') || de.name.startsWith('n-')) {
                 console.log('Removing old dependencies:', filePath);
                 try {
                     await fs.promises.rm(filePath, {
