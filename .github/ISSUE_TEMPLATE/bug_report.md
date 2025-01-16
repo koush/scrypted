@@ -22,6 +22,11 @@ Before opening an issue, view the device's Console logs in the Scrypted Manageme
 However, if something **was working**, and is now **no longer working**, you may create a Github issue.
 Created issues that do not meet these requirements or are improperly filled out will be immediately closed.
 
+# Before You Submit
+
+- [ ] I checked that my issue isn't already filed: [Search open issues](https://github.com/koush/scrypted/issues).
+- [ ] I checked the relevant camera/device and/or plugin `Log` in the `Management Console` for errors or warnings that may help identify and resolve the issue myself.
+
 # New Issue Instructions
 
 1. Delete this section and everything above it.
