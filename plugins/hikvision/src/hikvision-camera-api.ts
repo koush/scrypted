@@ -116,11 +116,15 @@ export class HikvisionCameraAPI implements HikvisionAPI {
     }
 
     async checkIsOldModel() {
-        // The old Hikvision DS-7608NI-E2 doesn't support channel capability checks, and the requests cause errors
+        // The old Hikvision NVRs don't support channel capability checks, and the requests cause errors
+        const oldModels = [
+            /DS-76098NI-E2/,
+            /ERI-K104-P4/
+        ];
         const model = await this.checkDeviceModel();
         if (!model)
             return;
-        return !!model?.match(/DS-7608NI-E2/);
+        return !!oldModels.find(oldModel => model?.match(oldModel));
     }
 
     async checkStreamSetup(channel: string, isOld: boolean): Promise<HikvisionCameraStreamSetup> {
