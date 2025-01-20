@@ -1,7 +1,7 @@
-import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM10Sensor, PM25Sensor, VOCSensor, NOXSensor, CO2Sensor } from '@scrypted/sdk';
+import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM10Sensor, PM25Sensor, VOCSensor, NOXSensor, CO2Sensor, HumiditySettingStatus } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice, } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
-import { addAirQualitySensor, addCarbonDioxideSensor, addFan, makeAccessory } from './common';
+import { addAirQualitySensor, addCarbonDioxideSensor, addFan, addHumiditySetting, makeAccessory } from './common';
 import type { HomeKitPlugin } from "../main";
 
 addSupportedType({
@@ -178,72 +178,60 @@ addSupportedType({
                 () => device.humidity || 0);
         }
 
-        if (device.interfaces.includes(ScryptedInterface.HumiditySetting) && device.interfaces.includes(ScryptedInterface.HumiditySensor)) {
-            const humidityService = accessory.addService(Service.HumidifierDehumidifier);
+        // add fan state to thermostat service even though it is not required or optional, 
+        // in order to expose to Home Assistant HomeKit Controller under their climate entity
+        if (device.interfaces.includes(ScryptedInterface.Fan)) {
+            bindCharacteristic(device, ScryptedInterface.Fan, service, Characteristic.TargetFanState,
+                () => device.fan?.mode === FanMode.Manual
+                    ? Characteristic.TargetFanState.MANUAL
+                    : Characteristic.TargetFanState.AUTO);
 
-            bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.Active,
-                () => {
-                    if (!device.humiditySetting?.mode)
-                        return false;
-                    if (device.humiditySetting.mode === HumidityMode.Off)
-                        return false;
-                    return true;
-                });
-            humidityService.getCharacteristic(Characteristic.Active).on(CharacteristicEventTypes.SET, (value, callback) => {
+            service.getCharacteristic(Characteristic.TargetFanState).on(CharacteristicEventTypes.SET, (value, callback) => {
                 callback();
-                device.setHumidity({
-                    mode: value ? HumidityMode.Auto : HumidityMode.Off
+                device.setFan({
+                    mode: value === Characteristic.TargetFanState.MANUAL ? FanMode.Manual : FanMode.Auto,
                 });
             });
 
-            bindCharacteristic(device, ScryptedInterface.HumiditySensor, humidityService, Characteristic.CurrentRelativeHumidity,
-                () => device.humidity || 0);
-
-            bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.CurrentHumidifierDehumidifierState,
-                () => !device.humiditySetting?.activeMode
-                    ? Characteristic.CurrentHumidifierDehumidifierState.INACTIVE
-                    : device.humiditySetting.activeMode === HumidityMode.Dehumidify
-                        ? Characteristic.CurrentHumidifierDehumidifierState.DEHUMIDIFYING
-                        : device.humiditySetting.activeMode === HumidityMode.Humidify
-                            ? Characteristic.CurrentHumidifierDehumidifierState.HUMIDIFYING
-                            : Characteristic.CurrentHumidifierDehumidifierState.IDLE);
-
-            bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.TargetHumidifierDehumidifierState,
-                () => !device.humiditySetting?.mode || device.humiditySetting?.mode === HumidityMode.Auto
-                    ? Characteristic.TargetHumidifierDehumidifierState.HUMIDIFIER_OR_DEHUMIDIFIER
-                    : device.humiditySetting?.mode === HumidityMode.Dehumidify
-                        ? Characteristic.TargetHumidifierDehumidifierState.DEHUMIDIFIER
-                        : Characteristic.TargetHumidifierDehumidifierState.HUMIDIFIER);
-            humidityService.getCharacteristic(Characteristic.TargetHumidifierDehumidifierState).on(CharacteristicEventTypes.SET, (value, callback) => {
-                callback();
-                device.setHumidity({
-                    mode: value === Characteristic.TargetHumidifierDehumidifierState.HUMIDIFIER
-                        ? HumidityMode.Humidify
-                        : value === Characteristic.TargetHumidifierDehumidifierState.DEHUMIDIFIER
-                            ? HumidityMode.Dehumidify
-                            : HumidityMode.Auto
-                });
-            });
-
-            bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.RelativeHumidityHumidifierThreshold,
-                () => device.humiditySetting?.humidifierSetpoint || 0);
-            humidityService.getCharacteristic(Characteristic.RelativeHumidityHumidifierThreshold).on(CharacteristicEventTypes.SET, (value, callback) => {
-                callback();
-                device.setHumidity({
-                    humidifierSetpoint: value as number,
-                });
-            });
-
-            bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.RelativeHumidityDehumidifierThreshold,
-                () => device.humiditySetting?.dehumidifierSetpoint || 0);
-            humidityService.getCharacteristic(Characteristic.RelativeHumidityDehumidifierThreshold).on(CharacteristicEventTypes.SET, (value, callback) => {
-                callback();
-                device.setHumidity({
-                    dehumidifierSetpoint: value as number,
-                });
-            });
+            bindCharacteristic(device, ScryptedInterface.Fan, service, Characteristic.CurrentFanState,
+                () => !device.fan?.active
+                    ? Characteristic.CurrentFanState.INACTIVE
+                    : !device.fan.speed
+                        ? Characteristic.CurrentFanState.IDLE
+                        : Characteristic.CurrentFanState.BLOWING_AIR);
         }
 
+        // add relataive target humidity to thermostat service even though it is not required or optional, 
+        // in order to expose to Home Assistant HomeKit Controller under their climate entity
+        if (device.interfaces.includes(ScryptedInterface.HumiditySetting)) {
+            function targetHumidity(setting: HumiditySettingStatus) {
+                if (!setting)
+                    return 0;
+
+                if (setting?.availableModes.includes(HumidityMode.Humidify) 
+                    && setting?.availableModes.includes(HumidityMode.Dehumidify)) {
+                    if (setting?.activeMode === HumidityMode.Humidify)
+                        return setting?.humidifierSetpoint;
+                    if (setting?.activeMode === HumidityMode.Dehumidify)
+                        return setting?.dehumidifierSetpoint;
+
+                    return 0;
+                }
+
+                if (setting?.availableModes.includes(HumidityMode.Humidify))
+                    return setting?.humidifierSetpoint;
+
+                if (setting?.availableModes.includes(HumidityMode.Dehumidify))
+                    return setting?.dehumidifierSetpoint;
+
+                return 0;
+            }
+
+            bindCharacteristic(device, ScryptedInterface.HumiditySetting, service, Characteristic.TargetRelativeHumidity,
+                () => targetHumidity(device.humiditySetting));
+        }
+
+        addHumiditySetting(device, accessory);
         addFan(device, accessory);
         addAirQualitySensor(device, accessory);
         addCarbonDioxideSensor(device, accessory);
