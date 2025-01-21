@@ -247,7 +247,8 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             'tcp',
             ...(options?.vcodec || []),
             ...(options?.acodec || []),
-            '-pkt_size', '64000',
+            // linux and windows seem to support 64000 but darwin is 32000?
+            '-pkt_size', '32000',
             '-f', 'rtsp',
         ],
         findSyncFrame(streamChunks: StreamChunk[]) {
