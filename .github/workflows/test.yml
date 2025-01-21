@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, macos-14, macos-13, windows-latest]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-14, macos-13, windows-latest]
     
     steps:
       - name: Checkout repository

@@ -36,9 +36,8 @@ curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --yes --dea
     tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 apt -y update
 # is there a way to get a versioned package automatically?
-apt -y install nvidia-utils-560
+apt -y install cuda-drivers
 apt -y install nvidia-container-toolkit
 
 nvidia-ctk runtime configure --runtime=docker
-nvidia-ctk config --set nvidia-container-cli.no-cgroups --in-place
 systemctl restart docker
