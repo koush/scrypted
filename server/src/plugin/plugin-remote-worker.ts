@@ -24,6 +24,7 @@ import { NodeThreadWorker } from './runtime/node-thread-worker';
 import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
 import { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
+import { Deferred } from '../deferred';
 
 const serverVersion = require('../../package.json').version;
 
@@ -291,6 +292,14 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     forkPeer = Promise.resolve(localPeer);
                 }
 
+                const exitDeferred = new Deferred<string>();
+                runtimeWorker.on('exit', () => {
+                    exitDeferred.resolve('worker exited');
+                });
+                runtimeWorker.on('error', e => {
+                    exitDeferred.resolve('worker error' + e);
+                });
+
                 // thread workers inherit main console. pipe anything else.
                 if (!(runtimeWorker instanceof NodeThreadWorker)) {
                     const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
@@ -299,6 +308,9 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                 const result = (async () => {
                     const threadPeer = await forkPeer;
+                    exitDeferred.promise.then(reason => {
+                        threadPeer.kill(reason);
+                    });
 
                     // todo: handle nested forks and skip wrap. this is probably buggy.
                     class PluginForkAPI extends PluginAPIProxy {
@@ -319,13 +331,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                     const remote = await setupPluginRemote(threadPeer, forkApi, pluginId, { serverVersion }, () => systemManager.getSystemState());
                     forks.add(remote);
-                    runtimeWorker.on('exit', () => {
-                        threadPeer.kill('worker exited');
-                        forkApi.removeListeners();
-                        forks.delete(remote);
-                    });
-                    runtimeWorker.on('error', e => {
-                        threadPeer.kill('worker error ' + e);
+                    exitDeferred.promise.then(reason => {
                         forkApi.removeListeners();
                         forks.delete(remote);
                     });
