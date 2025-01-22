@@ -117,6 +117,7 @@ class ScryptedInterface(str, Enum):
     BinarySensor = "BinarySensor"
     Brightness = "Brightness"
     BufferConverter = "BufferConverter"
+    Buttons = "Buttons"
     Camera = "Camera"
     Charger = "Charger"
     ClusterForkInterface = "ClusterForkInterface"
@@ -951,7 +952,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.98"
+TYPES_VERSION = "0.3.99"
 
 
 class AirPurifier:
@@ -1005,6 +1006,10 @@ class BufferConverter:
     async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: MediaObjectOptions = None) -> Any:
         pass
 
+
+class Buttons:
+
+    buttons: list[str]
 
 class Camera:
     """Camera devices can take still photos."""
@@ -1864,6 +1869,7 @@ class ScryptedInterfaceProperty(str, Enum):
     colorTemperature = "colorTemperature"
     rgb = "rgb"
     hsv = "hsv"
+    buttons = "buttons"
     running = "running"
     paused = "paused"
     docked = "docked"
@@ -2177,6 +2183,14 @@ class DeviceState:
     @hsv.setter
     def hsv(self, value: ColorHsv):
         self.setScryptedProperty("hsv", value)
+
+    @property
+    def buttons(self) -> list[str]:
+        return self.getScryptedProperty("buttons")
+
+    @buttons.setter
+    def buttons(self, value: list[str]):
+        self.setScryptedProperty("buttons", value)
 
     @property
     def running(self) -> bool:
@@ -2610,6 +2624,13 @@ ScryptedInterfaceDescriptors = {
     ],
     "properties": [
       "hsv"
+    ]
+  },
+  "Buttons": {
+    "name": "Buttons",
+    "methods": [],
+    "properties": [
+      "buttons"
     ]
   },
   "Notifier": {

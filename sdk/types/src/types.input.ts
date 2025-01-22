@@ -214,6 +214,10 @@ export interface ColorHsv {
   v?: number;
 }
 
+export interface Buttons {
+  buttons?: ('doorbell' | string)[];
+}
+
 export interface NotificationAction {
   action: string;
   icon?: string;
@@ -2255,6 +2259,7 @@ export enum ScryptedInterface {
   ColorSettingTemperature = "ColorSettingTemperature",
   ColorSettingRgb = "ColorSettingRgb",
   ColorSettingHsv = "ColorSettingHsv",
+  Buttons = "Buttons",
   Notifier = "Notifier",
   StartStop = "StartStop",
   Pause = "Pause",
