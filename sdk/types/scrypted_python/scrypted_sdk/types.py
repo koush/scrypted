@@ -167,6 +167,7 @@ class ScryptedInterface(str, Enum):
     PM25Sensor = "PM25Sensor"
     PositionSensor = "PositionSensor"
     PowerSensor = "PowerSensor"
+    PressButtons = "PressButtons"
     Program = "Program"
     PushHandler = "PushHandler"
     Readme = "Readme"
@@ -952,7 +953,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.99"
+TYPES_VERSION = "0.3.100"
 
 
 class AirPurifier:
@@ -1380,6 +1381,12 @@ class PositionSensor:
 class PowerSensor:
 
     powerDetected: bool
+
+class PressButtons:
+
+    async def pressButton(self, button: str) -> None:
+        pass
+
 
 class Program:
 
@@ -1930,6 +1937,7 @@ class ScryptedInterfaceMethods(str, Enum):
     setColorTemperature = "setColorTemperature"
     setRgb = "setRgb"
     setHsv = "setHsv"
+    pressButton = "pressButton"
     sendNotification = "sendNotification"
     start = "start"
     stop = "stop"
@@ -2632,6 +2640,13 @@ ScryptedInterfaceDescriptors = {
     "properties": [
       "buttons"
     ]
+  },
+  "PressButtons": {
+    "name": "PressButtons",
+    "methods": [
+      "pressButton"
+    ],
+    "properties": []
   },
   "Notifier": {
     "name": "Notifier",
