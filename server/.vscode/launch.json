@@ -99,11 +99,6 @@
             "env": {
                 "SCRYPTED_PYTHON310_PATH": "/opt/homebrew/bin/python3.10",
                 "DYLD_LIBRARY_PATH": "/usr/local/lib",
-                "SCRYPTED_CLUSTER_WORKER_NAME": "Macaroni 2",
-                "SCRYPTED_CLUSTER_LABELS": "@scrypted/coreml,@scrypted/tensorflow-lite,compute,compute.preferred",
-                "SCRYPTED_CLUSTER_MODE": "client",
-                "SCRYPTED_CLUSTER_SERVER": "192.168.2.130",
-                "SCRYPTED_CLUSTER_SECRET": "swordfish",
                 "SCRYPTED_CAN_RESTART": "true",
                 "SCRYPTED_VOLUME": "/Users/koush/.scrypted-cluster/volume-client",
             }
