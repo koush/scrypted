@@ -1,13 +1,13 @@
-import { listenZero } from '@scrypted/common/src/listen-cluster';
-import sdk, { BinarySensor, Camera, DeviceProvider, DeviceCreator, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, MotionSensor } from '@scrypted/sdk';
-import child_process, { ChildProcess } from 'child_process';
-import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
-import net from 'net';
-import { randomBytes } from 'crypto';
-import { PassThrough, Readable } from "stream";
-import { readLength } from "@scrypted/common/src/read-stream";
 import { authHttpFetch } from "@scrypted/common/src/http-auth-fetch";
-import { ApiRingEvent, ApiMotionEvent, DoorbirdAPI } from "./doorbird-api";
+import { listenZero } from '@scrypted/common/src/listen-cluster';
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
+import { readLength } from "@scrypted/common/src/read-stream";
+import sdk, { BinarySensor, Camera, DeviceCreator, DeviceCreatorSettings, DeviceInformation, DeviceProvider, FFmpegInput, Intercom, MediaObject, MotionSensor, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import child_process, { ChildProcess } from 'child_process';
+import { randomBytes } from 'crypto';
+import net from 'net';
+import { PassThrough, Readable } from "stream";
+import { ApiMotionEvent, ApiRingEvent, DoorbirdAPI } from "./doorbird-api";
 
 const { deviceManager, mediaManager } = sdk;
 
@@ -384,7 +384,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
             this.console.log('Doorbird: timed out waiting for tcp client from ffmpeg');
             server.close();
         }, 30000);
-        const port = await listenZero(server);
+        const port = await listenZero(server, '127.0.0.1');
 
         return port;
     }
