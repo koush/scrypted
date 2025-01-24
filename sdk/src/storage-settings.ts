@@ -1,4 +1,4 @@
-import sdk, { ScryptedInterface, Setting, Settings, SettingValue } from ".";
+import sdk, { ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from ".";
 
 const { systemManager } = sdk;
 
@@ -57,9 +57,9 @@ function parseValue(value: string | null | undefined, setting: StorageSetting, r
     return value || readDefaultValue();
 }
 
-export type HideFunction = (device: any) => boolean;
+export interface StorageSetting extends Omit<Setting, 'deviceFilter'> {
+    deviceFilter?: string | ((test: { id: string, deviceInterface: string, interfaces: string[], type: ScryptedDeviceType, ScryptedDeviceType: typeof ScryptedDeviceType, ScryptedInterface: typeof ScryptedInterface }) => boolean);
 
-export interface StorageSetting extends Setting {
     defaultValue?: any;
     persistedDefaultValue?: any;
     onPut?: (oldValue: any, newValue: any) => void;
@@ -140,7 +140,9 @@ export class StorageSettings<T extends string> implements Settings {
                 continue;
             s.key = key;
             s.value = this.getItemInternal(key as T, s, true);
-            ret.push(s);
+            if (typeof s.deviceFilter === 'function')
+                s.deviceFilter = s.deviceFilter.toString();
+            ret.push(s as Setting);
             delete s.onPut;
             delete s.onGet;
             delete s.mapPut;
