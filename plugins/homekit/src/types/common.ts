@@ -189,7 +189,7 @@ function commonHumidifierDehumidifier(mode: HumidityMode, subtype: string, name:
     return service;
 }
 
-export function addHumidifier(device: ScryptedDevice & HumiditySetting & HumiditySensor, accessory: Accessory): Service {
+function addHumidifier(device: ScryptedDevice & HumiditySetting & HumiditySensor, accessory: Accessory): Service {
     var service = commonHumidifierDehumidifier(HumidityMode.Humidify, "humidifier", device.name + " Humidifier", device, accessory);
 
     bindCharacteristic(device, ScryptedInterface.HumiditySetting, service, Characteristic.RelativeHumidityHumidifierThreshold,
@@ -204,7 +204,7 @@ export function addHumidifier(device: ScryptedDevice & HumiditySetting & Humidit
     return service;
 }
 
-export function addDehumidifer(device: ScryptedDevice & HumiditySetting & HumiditySensor, accessory: Accessory): Service {
+function addDehumidifer(device: ScryptedDevice & HumiditySetting & HumiditySensor, accessory: Accessory): Service {
     var service = commonHumidifierDehumidifier(HumidityMode.Dehumidify, "dehumidifier", device.name + " Dehumidifier", device, accessory);
 
     bindCharacteristic(device, ScryptedInterface.HumiditySetting, service, Characteristic.RelativeHumidityDehumidifierThreshold,
