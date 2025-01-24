@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/doorbird",
-   "version": "0.0.2",
+   "version": "0.0.3",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -33,7 +33,7 @@
       ]
    },
    "dependencies": {
-      "doorbird": "^2.1.2"
+      "doorbird": "2.6.0"
    },
    "devDependencies": {
       "@scrypted/common": "file:../../common",
