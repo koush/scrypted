@@ -48,7 +48,12 @@ export class NodeForkWorker extends ChildProcessWorker {
             this.pluginId
         ];
 
-        const nodePaths: string[] = [path.resolve(__dirname, '..', '..', '..', 'node_modules')];
+        const nodePaths: string[] = [
+            // /server/node_modules/@scrypted/server/node_modules
+            path.resolve(__dirname, '..', '..', '..', 'node_modules'),
+            // /server/node_modules
+            path.resolve(process.cwd(), 'node_modules'),
+        ];
         if (env?.NODE_PATH)
             nodePaths.push(env.NODE_PATH);
         if (process.env.NODE_PATH)
