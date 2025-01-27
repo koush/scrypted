@@ -725,7 +725,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             [
                 "Reolink TrackMix PoE",
                 "Reolink TrackMix WiFi",
-                "RLC-81MA"
+                "RLC-81MA",
+                "Trackmix Series W760"
             ].includes(deviceInfo?.model)) {
             streams.push({
                 name: '',
