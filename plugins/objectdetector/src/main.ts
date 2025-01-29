@@ -10,6 +10,7 @@ import { fixLegacyClipPath, normalizeBox, polygonContainsBoundingBox, polygonInt
 import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor } from './smart-motionsensor';
 import { SMART_OCCUPANCYSENSOR_PREFIX, SmartOccupancySensor } from './smart-occupancy-sensor';
 import { getAllDevices, safeParseJson } from './util';
+import { FFmpegAudioDetectionMixinProvider } from './ffmpeg-audiosensor';
 
 
 const { systemManager } = sdk;
@@ -1056,7 +1057,16 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
           ScryptedInterface.VideoFrameGenerator,
         ],
         nativeId: 'ffmpeg',
-      })
+      });
+
+      sdk.deviceManager.onDeviceDiscovered({
+        name: 'FFmpeg Audio Detection',
+        type: ScryptedDeviceType.Builtin,
+        interfaces: [
+          ScryptedInterface.MixinProvider,
+        ],
+        nativeId: 'ffmpeg-audio-detection',
+      });
     });
 
     // on an interval check to see if system load allows squelched detectors to start up.
@@ -1195,6 +1205,8 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     let ret: any;
     if (nativeId === 'ffmpeg')
       ret = this.devices.get(nativeId) || new FFmpegVideoFrameGenerator('ffmpeg');
+    if (nativeId === 'ffmpeg-audio-detection')
+      ret = this.devices.get(nativeId) || new FFmpegAudioDetectionMixinProvider('ffmpeg-audio-detection');
     if (nativeId?.startsWith(SMART_MOTIONSENSOR_PREFIX))
       ret = this.devices.get(nativeId) || new SmartMotionSensor(this, nativeId);
     if (nativeId?.startsWith(SMART_OCCUPANCYSENSOR_PREFIX))
