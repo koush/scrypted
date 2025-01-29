@@ -3,6 +3,7 @@ import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/s
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { RtpPacket } from "../../../external/werift/packages/rtp/src/rtp/rtp";
+import { sleep } from "@scrypted/common/src/sleep";
 
 function pcmU8ToDb(payload: Uint8Array): number {
     let sum = 0;
@@ -41,7 +42,7 @@ class FFmpegAudioDetectionMixin extends SettingsMixinDeviceBase<AudioSensor> imp
     });
     ensureInterval: NodeJS.Timeout;
     forwarder: ReturnType<typeof startRtpForwarderProcess>;
-    audioTimeout: NodeJS.Timeout;
+    audioResetInterval: NodeJS.Timeout;
 
     constructor(options: SettingsMixinDeviceOptions<AudioSensor>) {
         super(options);
@@ -57,11 +58,16 @@ class FFmpegAudioDetectionMixin extends SettingsMixinDeviceBase<AudioSensor> imp
             return;
 
         this.audioDetected = false;
-        clearTimeout(this.audioTimeout);
-        this.audioTimeout = undefined;
+        clearInterval(this.audioResetInterval);
+        this.audioResetInterval = undefined;
 
         const fp = this.ensureAudioSensorInternal();
         this.forwarder = fp;
+
+        fp.catch(() => {
+            if (this.forwarder === fp)
+                this.forwarder = undefined;
+        });
 
         this.forwarder.then(f => {
             f.killPromise.then(() => {
@@ -72,12 +78,18 @@ class FFmpegAudioDetectionMixin extends SettingsMixinDeviceBase<AudioSensor> imp
     }
 
     async ensureAudioSensorInternal() {
+        await sleep(5000);
+        if (!this.forwarder)
+            throw new Error('released/killed');
         const realDevice = sdk.systemManager.getDeviceById<VideoCamera>(this.id);
         const mo = await realDevice.getVideoStream({
             video: null,
             audio: {},
         });
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
+
+        let lastAudio = 0;
+
         const forwarder = await startRtpForwarderProcess(this.console, ffmpegInput, {
             video: null,
             audio: {
@@ -88,20 +100,29 @@ class FFmpegAudioDetectionMixin extends SettingsMixinDeviceBase<AudioSensor> imp
                     '-ar', '8000',
                 ],
                 onRtp: rtp => {
-                    if (this.audioDetected)
+                    const now = Date.now();
+                    // if this.audioDetected is true skip the processing unless the lastAudio time is halfway through the interval
+                    if (this.audioDetected && now - lastAudio < this.storageSettings.values.audioTimeout * 500)
                         return;
+
                     const packet = RtpPacket.deSerialize(rtp);
                     const decibels = pcmU8ToDb(packet.payload);
                     if (decibels < this.storageSettings.values.decibelThreshold)
                         return;
 
                     this.audioDetected = true;
-                    this.audioTimeout = setTimeout(() => {
-                        this.audioDetected = false;
-                    }, this.storageSettings.values.audioTimeout * 1000);
+                    lastAudio = now;
                 },
             }
         });
+
+        this.audioResetInterval = setInterval(() => {
+            if (!this.audioDetected)
+                return;
+            if (Date.now() - lastAudio < this.storageSettings.values.audioTimeout * 1000)
+                return;
+            this.audioDetected = false;
+        }, this.storageSettings.values.audioTimeout * 1000);
 
         return forwarder;
     }
@@ -121,8 +142,8 @@ class FFmpegAudioDetectionMixin extends SettingsMixinDeviceBase<AudioSensor> imp
         clearInterval(this.ensureInterval);
         this.ensureInterval = undefined;
 
-        clearTimeout(this.audioTimeout);
-        this.audioTimeout = undefined;
+        clearTimeout(this.audioResetInterval);
+        this.audioResetInterval = undefined;
     }
 }
 
