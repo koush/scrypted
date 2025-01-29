@@ -63,8 +63,6 @@ class PrebufferSession {
   usingScryptedParser = false;
   usingScryptedUdpParser = false;
 
-  audioDisabled = false;
-
   mixinDevice: VideoCamera;
   console: Console;
   storage: Storage;
@@ -507,19 +505,14 @@ class PrebufferSession {
     catch (e) {
     }
 
-    // audio codecs are determined by probing the camera to see what it reports.
-    // if the camera does not specify a codec, rebroadcast will force audio off
-    // to determine the codec without causing a parse failure.
     // camera may explicity request that its audio stream be muted via a null.
     // respect that setting.
     const audioSoftMuted = mso?.audio === null;
-    const advertisedAudioCodec = mso?.audio?.codec;
+    const advertisedAudioCodec = !audioSoftMuted && mso?.audio?.codec;
 
     let detectedAudioCodec = this.storage.getItem(this.lastDetectedAudioCodecKey) || undefined;
     if (detectedAudioCodec === 'null')
       detectedAudioCodec = null;
-
-    this.audioDisabled = false;
 
     const rbo: ParserOptions<PrebufferParsers> = {
       console: this.console,
@@ -604,7 +597,6 @@ class PrebufferSession {
         if (audioSoftMuted) {
           // no audio? explicitly disable it.
           acodec = ['-an'];
-          this.audioDisabled = true;
         }
         else {
           acodec = [
@@ -628,9 +620,6 @@ class PrebufferSession {
         const extraInputArguments = userInputArguments || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
         const extraOutputArguments = this.storage.getItem(this.ffmpegOutputArgumentsKey) || '';
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
-        // ehh this seems to cause issues with frames being updated in the webassembly decoder..?
-        // if (!userInputArguments && (ffmpegInput.container === 'rtmp' || ffmpegInput.url?.startsWith('rtmp:')))
-        //   ffmpegInput.inputArguments.unshift('-use_wallclock_as_timestamps', '1');
 
         if (ffmpegInput.h264EncoderArguments?.length) {
           vcodec = [...ffmpegInput.h264EncoderArguments];
@@ -1024,6 +1013,9 @@ class PrebufferSession {
       mediaStreamOptions.video.h264Info = this.getLastH264Probe();
     }
 
+    if (this.mixin.streamSettings.storageSettings.values.noAudio)
+      mediaStreamOptions.audio = null;
+
     let socketPromise: Promise<Duplex>;
     let url: string;
     let urls: string[];
@@ -1134,10 +1126,7 @@ class PrebufferSession {
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
-    if (this.audioDisabled) {
-      mediaStreamOptions.audio = null;
-    }
-    else if (audioSection) {
+    if (audioSection) {
       mediaStreamOptions.audio ||= {};
       mediaStreamOptions.audio.codec ||= audioSection.rtpmap.codec;
       mediaStreamOptions.audio.sampleRate ||= audioSection.rtpmap.clock;
