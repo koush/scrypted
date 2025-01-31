@@ -405,7 +405,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             catch (e) {
                 this.console.log('Error in getting battery info', e);
             }
-        }, 1000 * 60 * 30);
+        }, 1000 * 15);
     }
 
     async reboot() {
