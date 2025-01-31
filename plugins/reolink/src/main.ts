@@ -88,12 +88,21 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     siren: ReolinkCameraSiren;
     floodlight: ReolinkCameraFloodlight;
     batteryTimeout: NodeJS.Timeout;
+    lastSnapshot?: Promise<MediaObject>;
+    lastSnapshotTaken?: number;
 
     storageSettings = new StorageSettings(this, {
         doorbell: {
             title: 'Doorbell',
             description: 'This camera is a Reolink Doorbell.',
             type: 'boolean',
+        },
+        forceSnapshotMinutes: {
+            title: 'Force snapshot in minutes',
+            description: 'Force a snapshot on regular interval if the camera did not get events for a long time',
+            defaultValue: 60,
+            type: 'number',
+            hide: true
         },
         rtmpPort: {
             subgroup: 'Advanced',
@@ -369,6 +378,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         await this.provider.updateDevice(this.nativeId, this.name ?? name, interfaces, type);
     }
 
+    canSnap(minutes?: number) {
+        const { forceSnapshotMinutes } = this.storageSettings.values;
+        return !this.lastSnapshotTaken || (Date.now() - this.lastSnapshotTaken) >= (1000 * 60 * (minutes ?? forceSnapshotMinutes))
+    }
+
     startBatteryCheckInterval() {
         if (this.batteryTimeout) {
             clearInterval(this.batteryTimeout);
@@ -381,6 +395,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 const { batteryPercent, sleep } = await api.getBatteryInfo();
                 this.batteryLevel = batteryPercent;
                 this.online = !sleep;
+
+                if (sleep === false && this.canSnap(5)) {
+                    this.lastSnapshotTaken = Date.now();
+                    this.console.log('Camera is not sleeping, snapping');
+                    this.lastSnapshot = this.createMediaObject(await api.jpegSnapshot(), 'image/jpeg');
+                }
             }
             catch (e) {
                 this.console.log('Error in getting battery info', e);
@@ -573,7 +593,19 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     async takeSmartCameraPicture(options?: RequestPictureOptions): Promise<MediaObject> {
-        return this.createMediaObject(await this.getClient().jpegSnapshot(options?.timeout), 'image/jpeg');
+        const client = this.getClientWithToken();
+        if (this.hasBattery()) {
+            const { forceSnapshotMinutes } = this.storageSettings.values;
+            // Wake up the camera to trigger a new snapshot if last was long back
+            if (forceSnapshotMinutes && this.canSnap()) {
+                this.console.log('Waking up the camera to force a snapshot')
+                await client.getWhiteLed();
+            }
+
+            return this.lastSnapshot;
+        } else {
+            return this.createMediaObject(await client.jpegSnapshot(options?.timeout), 'image/jpeg');
+        }
     }
 
     async getUrlSettings(): Promise<Setting[]> {
@@ -821,6 +853,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
     async getOtherSettings(): Promise<Setting[]> {
         const ret = await super.getOtherSettings();
+        this.storageSettings.settings.forceSnapshotMinutes.hide = !this.hasBattery();
+
         return [
             ...await this.storageSettings.getSettings(),
             ...ret,
