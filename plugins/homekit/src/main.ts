@@ -216,16 +216,19 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             throw Error(`error in device reordering, expected ${uniqueDeviceIds.size} unique devices but only got ${uniqueReorderedIds.size} entries!`);
         }
 
+        const autoAdd = this.storageSettings.values.autoAdd ?? true;
+
         for (const id of reorderedDeviceIds) {
             const device = systemManager.getDeviceById<Online>(id);
             const supportedType = supportedTypes[device.type];
             if (!supportedType?.probe(device))
                 continue;
+            
+            const mixins = (device.mixins || []).slice();
+            let isMixinEnabled = mixins.includes(this.id);
 
             try {
-                const mixins = (device.mixins || []).slice();
-                const autoAdd = this.storageSettings.values.autoAdd ?? true;
-                if (!mixins.includes(this.id) && autoAdd) {
+                if (!isMixinEnabled && autoAdd) {
                     // don't sync this by default, as it's solely for automations
                     if (device.type === ScryptedDeviceType.Notifier)
                         continue;
@@ -238,11 +241,17 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     mixins.push(this.id);
                     await device.setMixins(mixins);
                     defaultIncluded[device.id] = includeToken;
+                    isMixinEnabled = true;
                 }
             }
             catch (e) {
                 console.error('error while checking device if syncable', e);
                 this.log.a('Error while checking device if syncable. See Console.');
+                continue;
+            }
+
+            if(!isMixinEnabled) {
+                // Skip the publish flow if the mixins is not enabled
                 continue;
             }
 
