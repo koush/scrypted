@@ -2,7 +2,7 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
+import sdk, { Battery, BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, Online, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import https from 'https';
 import os from 'os';
@@ -117,9 +117,23 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     static lastGeneratedErrorImageTime = 0;
     lastAvailablePicture: Buffer;
     psos: ResponsePictureOptions[];
+    isBattery: boolean;
+    currentPictureOptions: RequestPictureOptions;
+    batteryCheckInterval: NodeJS.Timeout;
 
     constructor(public plugin: SnapshotPlugin, options: SettingsMixinDeviceOptions<Camera>) {
         super(options);
+
+        this.isBattery = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
+
+        if (this.isBattery) {
+            this.storageSettings.settings.snapshotsFromPrebuffer.value = 'Disabled';
+            this.storageSettings.settings.snapshotsFromPrebuffer.hide = true;
+
+            this.batteryCheckInterval = setInterval(async () => {
+                this.takePictureRaw(this.currentPictureOptions, true);
+            }, 15 * 1000);
+        }
     }
 
     get debugConsole() {
@@ -127,25 +141,34 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return this.console;
     }
 
+    async release(): Promise<void> {
+        this.batteryCheckInterval && clearInterval(this.batteryCheckInterval);
+        this.batteryCheckInterval = undefined;
+    }
+
     async takePictureInternal(options?: RequestPictureOptions): Promise<Buffer> {
         this.debugConsole?.log("Picture requested from camera", options);
         const eventSnapshot = options?.reason === 'event';
         const { snapshotsFromPrebuffer } = this.storageSettings.values;
         let usePrebufferSnapshots: boolean;
-        switch (snapshotsFromPrebuffer) {
-            case 'true':
-            case 'Enabled':
-                usePrebufferSnapshots = true;
-                break;
-            case 'Disabled':
-                usePrebufferSnapshots = false;
-                break;
-            default:
-                // default behavior is to use a prebuffer snapshot if there's no camera interface and
-                // no explicit snapshot url.
-                if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera) && !this.storageSettings.values.snapshotUrl)
+        if (this.isBattery) {
+            usePrebufferSnapshots = false;
+        } else {
+            switch (snapshotsFromPrebuffer) {
+                case 'true':
+                case 'Enabled':
                     usePrebufferSnapshots = true;
-                break;
+                    break;
+                case 'Disabled':
+                    usePrebufferSnapshots = false;
+                    break;
+                default:
+                    // default behavior is to use a prebuffer snapshot if there's no camera interface and
+                    // no explicit snapshot url.
+                    if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera) && !this.storageSettings.values.snapshotUrl)
+                        usePrebufferSnapshots = true;
+                    break;
+            }
         }
 
         // unifi cameras send stale snapshots which are unusable for events,
@@ -272,7 +295,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         throw new Error('Snapshot Unavailable (Snapshot URL empty)');
     }
 
-    async takePictureRaw(options?: RequestPictureOptions): Promise<Buffer> {
+    async takePictureRaw(options?: RequestPictureOptions, ignoreDebounce?: boolean): Promise<Buffer> {
+        this.currentPictureOptions = options;
         const eventSnapshot = options?.reason === 'event';
         const periodicSnapshot = options?.reason === 'periodic';
 
@@ -283,11 +307,21 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         // always grab/debounce a snapshot
         // event snapshot are special and should immediately expire.
         // other snapshots may be debounced for 4s.
+        const debounce = ignoreDebounce ? 0 : this.isBattery ? 20000 : eventSnapshot ? 0 : 4000;
         const debounced = this.snapshotDebouncer({
             id: options?.id,
             type: 'source',
             event: options?.reason === 'event',
-        }, eventSnapshot ? 0 : 4000, async () => {
+        }, debounce, async () => {
+            // If battery cam and not online, skip otherwise will wake up'
+            const realDevice = systemManager.getDeviceById<Online>(this.id);
+            if (this.isBattery && !realDevice.online) {
+                return {
+                    picture: null,
+                    pictureTime: null
+                };
+            }
+
             const snapshotTimer = Date.now();
             let picture = await this.takePictureInternal();
             picture = await this.cropAndScale(picture);
