@@ -117,12 +117,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     static lastGeneratedErrorImageTime = 0;
     lastAvailablePicture: Buffer;
     psos: ResponsePictureOptions[];
-    isBattery: boolean;
 
     constructor(public plugin: SnapshotPlugin, options: SettingsMixinDeviceOptions<Camera>) {
         super(options);
-
-        this.isBattery = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
     }
 
     get debugConsole() {
@@ -146,13 +143,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             default:
                 // default behavior is to use a prebuffer snapshot if there's no camera interface and
                 // no explicit snapshot url. If battery disable
-                if (this.isBattery) {
+                if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery)) {
                     usePrebufferSnapshots = false;
-                } else {
-                    if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera) && !this.storageSettings.values.snapshotUrl)
-                        usePrebufferSnapshots = true;
-                    break;
+                } else if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera) && !this.storageSettings.values.snapshotUrl) {
+                    usePrebufferSnapshots = true;
                 }
+                break;
         }
 
         // unifi cameras send stale snapshots which are unusable for events,
