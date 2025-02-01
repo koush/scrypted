@@ -290,12 +290,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         // always grab/debounce a snapshot
         // event snapshot are special and should immediately expire.
         // other snapshots may be debounced for 4s.
-        const debounce = this.isBattery ? 20000 : eventSnapshot ? 0 : 4000;
         const debounced = this.snapshotDebouncer({
             id: options?.id,
             type: 'source',
             event: options?.reason === 'event',
-        }, debounce, async () => {
+        }, eventSnapshot ? 0 : 4000, async () => {
             // If battery cam and not online, skip otherwise will wake up'
             const realDevice = systemManager.getDeviceById<Online>(this.id);
             if (this.isBattery && !realDevice.online) {
