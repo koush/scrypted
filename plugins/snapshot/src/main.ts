@@ -127,9 +127,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return this.console;
     }
 
-    async takePictureInternal(options?: RequestPictureOptions): Promise<Buffer> {
-        this.debugConsole?.log("Picture requested from camera", options);
-        const eventSnapshot = options?.reason === 'event';
+    async takePictureInternal(id: string, eventSnapshot: boolean): Promise<Buffer> {
+        this.debugConsole?.log("Picture requested from camera", { id, eventSnapshot });
         const { snapshotsFromPrebuffer } = this.storageSettings.values;
         let usePrebufferSnapshots: boolean;
         switch (snapshotsFromPrebuffer) {
@@ -162,11 +161,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
         }
 
+        const realDevice = systemManager.getDeviceById<VideoCamera & Online>(this.id);
+
         let takePrebufferPicture: () => Promise<Buffer>;
         const preparePrebufferSnapshot = async () => {
             if (takePrebufferPicture)
                 return takePrebufferPicture;
-            const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
             const msos = await realDevice.getVideoStreamOptions();
             let prebufferChannel = msos?.find(mso => mso.prebuffer);
             if (prebufferChannel || !this.lastAvailablePicture) {
@@ -250,7 +250,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
             let takePictureOptions: RequestPictureOptions;
-            if (!options?.id && this.storageSettings.values.defaultSnapshotChannel !== 'Camera Default') {
+            if (!id && this.storageSettings.values.defaultSnapshotChannel !== 'Camera Default') {
                 try {
                     const psos = await this.getPictureOptions();
                     const pso = psos.find(pso => pso.name === this.storageSettings.values.defaultSnapshotChannel);
@@ -262,6 +262,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 }
             }
             try {
+                // consider waking the camera if 
+                if (!eventSnapshot && this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery) && !realDevice.online)
+                    throw new Error('Not waking sleeping camera for periodic snapshot.');
                 return await this.mixinDevice.takePicture(takePictureOptions).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
             }
             catch (e) {
@@ -288,17 +291,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             type: 'source',
             event: options?.reason === 'event',
         }, eventSnapshot ? 0 : 4000, async () => {
-            // If battery cam and not online, skip otherwise will wake up'
-            const realDevice = systemManager.getDeviceById<Online>(this.id);
-            if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery) && !realDevice.online) {
-                return {
-                    picture: null,
-                    pictureTime: null
-                };
-            }
-
             const snapshotTimer = Date.now();
-            let picture = await this.takePictureInternal();
+            let picture = await this.takePictureInternal(undefined, eventSnapshot);
             picture = await this.cropAndScale(picture);
             this.clearCachedPictures();
             const pictureTime = Date.now();
