@@ -131,6 +131,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             this.storageSettings.settings.snapshotsFromPrebuffer.hide = true;
 
             this.batteryCheckInterval = setInterval(async () => {
+                if (Date.now() - this.currentPictureTime < 60 * 1000)
+                    this.currentPicture = undefined;
                 this.takePictureRaw(this.currentPictureOptions, true);
             }, 15 * 1000);
         }
