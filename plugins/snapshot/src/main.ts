@@ -293,7 +293,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         }, eventSnapshot ? 0 : 4000, async () => {
             // If battery cam and not online, skip otherwise will wake up'
             const realDevice = systemManager.getDeviceById<Online>(this.id);
-            if (this.isBattery && !realDevice.online) {
+            if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery) && !realDevice.online) {
                 return {
                     picture: null,
                     pictureTime: null
