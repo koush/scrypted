@@ -495,4 +495,32 @@ export class ReolinkCameraClient {
             sleep: channelStatusEntry?.sleep === 1,
         }
     }
+
+    async getPidActive() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [
+            {
+                cmd: "GetEvents",
+                action: 0,
+                param: { channel: this.channelId }
+            },
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, this.createReadable(body));
+
+        const error = response.body?.find(elem => elem.error)?.error;
+        if (error) {
+            this.console.error('error during call to getEvents', error);
+        }
+
+        return {
+            value: !!response.body?.[0]?.value?.ai?.other?.alarm_state,
+            data: response.body,
+        };
+    }
 }
