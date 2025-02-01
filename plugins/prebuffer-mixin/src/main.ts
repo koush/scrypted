@@ -1755,7 +1755,9 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return;
     const ret = [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, REBROADCAST_MIXIN_INTERFACE_TOKEN];
-    if (!interfaces.includes(ScryptedInterface.Online))
+
+    // If the extending camera does not implement both Battery and Online, implement Online on this mixin 
+    if (!interfaces.includes(ScryptedInterface.Online) || !interfaces.includes(ScryptedInterface.Battery))
       ret.push(ScryptedInterface.Online)
     return ret;
   }
