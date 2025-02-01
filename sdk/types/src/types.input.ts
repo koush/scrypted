@@ -242,6 +242,7 @@ export interface NotifierOptions {
   renotify?: boolean;
   requireInteraction?: boolean;
   silent?: boolean;
+  critical?: boolean;
   /**
    * Collapse key/id.
    */
