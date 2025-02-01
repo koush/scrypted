@@ -118,7 +118,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     lastAvailablePicture: Buffer;
     psos: ResponsePictureOptions[];
     isBattery: boolean;
-    batteryCheckInterval: NodeJS.Timeout;
 
     constructor(public plugin: SnapshotPlugin, options: SettingsMixinDeviceOptions<Camera>) {
         super(options);
@@ -129,11 +128,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     get debugConsole() {
         if (this.plugin.debugConsole)
             return this.console;
-    }
-
-    async release(): Promise<void> {
-        this.batteryCheckInterval && clearInterval(this.batteryCheckInterval);
-        this.batteryCheckInterval = undefined;
     }
 
     async takePictureInternal(options?: RequestPictureOptions): Promise<Buffer> {
