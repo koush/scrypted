@@ -118,24 +118,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     lastAvailablePicture: Buffer;
     psos: ResponsePictureOptions[];
     isBattery: boolean;
-    currentPictureOptions: RequestPictureOptions;
     batteryCheckInterval: NodeJS.Timeout;
 
     constructor(public plugin: SnapshotPlugin, options: SettingsMixinDeviceOptions<Camera>) {
         super(options);
 
         this.isBattery = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
-
-        if (this.isBattery) {
-            this.storageSettings.settings.snapshotsFromPrebuffer.value = 'Disabled';
-            this.storageSettings.settings.snapshotsFromPrebuffer.hide = true;
-
-            this.batteryCheckInterval = setInterval(async () => {
-                if (Date.now() - this.currentPictureTime < 60 * 1000)
-                    this.currentPicture = undefined;
-                this.takePictureRaw(this.currentPictureOptions, true);
-            }, 15 * 1000);
-        }
     }
 
     get debugConsole() {
@@ -153,24 +141,24 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const eventSnapshot = options?.reason === 'event';
         const { snapshotsFromPrebuffer } = this.storageSettings.values;
         let usePrebufferSnapshots: boolean;
-        if (this.isBattery) {
-            usePrebufferSnapshots = false;
-        } else {
-            switch (snapshotsFromPrebuffer) {
-                case 'true':
-                case 'Enabled':
-                    usePrebufferSnapshots = true;
-                    break;
-                case 'Disabled':
+        switch (snapshotsFromPrebuffer) {
+            case 'true':
+            case 'Enabled':
+                usePrebufferSnapshots = true;
+                break;
+            case 'Disabled':
+                usePrebufferSnapshots = false;
+                break;
+            default:
+                // default behavior is to use a prebuffer snapshot if there's no camera interface and
+                // no explicit snapshot url. If battery disable
+                if (this.isBattery) {
                     usePrebufferSnapshots = false;
-                    break;
-                default:
-                    // default behavior is to use a prebuffer snapshot if there's no camera interface and
-                    // no explicit snapshot url.
+                } else {
                     if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera) && !this.storageSettings.values.snapshotUrl)
                         usePrebufferSnapshots = true;
                     break;
-            }
+                }
         }
 
         // unifi cameras send stale snapshots which are unusable for events,
@@ -297,8 +285,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         throw new Error('Snapshot Unavailable (Snapshot URL empty)');
     }
 
-    async takePictureRaw(options?: RequestPictureOptions, ignoreDebounce?: boolean): Promise<Buffer> {
-        this.currentPictureOptions = options;
+    async takePictureRaw(options?: RequestPictureOptions): Promise<Buffer> {
         const eventSnapshot = options?.reason === 'event';
         const periodicSnapshot = options?.reason === 'periodic';
 
@@ -309,7 +296,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         // always grab/debounce a snapshot
         // event snapshot are special and should immediately expire.
         // other snapshots may be debounced for 4s.
-        const debounce = ignoreDebounce ? 0 : this.isBattery ? 20000 : eventSnapshot ? 0 : 4000;
+        const debounce = this.isBattery ? 20000 : eventSnapshot ? 0 : 4000;
         const debounced = this.snapshotDebouncer({
             id: options?.id,
             type: 'source',
