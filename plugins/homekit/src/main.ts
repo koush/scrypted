@@ -216,6 +216,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             throw Error(`error in device reordering, expected ${uniqueDeviceIds.size} unique devices but only got ${uniqueReorderedIds.size} entries!`);
         }
 
+        const autoAdd = this.storageSettings.values.autoAdd ?? true;
         for (const id of reorderedDeviceIds) {
             const device = systemManager.getDeviceById<Online>(id);
             const supportedType = supportedTypes[device.type];
@@ -224,8 +225,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
             try {
                 const mixins = (device.mixins || []).slice();
-                const autoAdd = this.storageSettings.values.autoAdd ?? true;
-                if (!mixins.includes(this.id) && autoAdd) {
+                if (!mixins.includes(this.id)) {
                     // don't sync this by default, as it's solely for automations
                     if (device.type === ScryptedDeviceType.Notifier)
                         continue;
@@ -234,6 +234,8 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     if (device.type === ScryptedDeviceType.Siren)
                         continue;
                     if (defaultIncluded[device.id] === includeToken)
+                        continue;
+                    if (!autoAdd)
                         continue;
                     mixins.push(this.id);
                     await device.setMixins(mixins);
