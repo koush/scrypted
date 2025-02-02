@@ -145,6 +145,17 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
      *   EOF: { "eof": true }
      */
     async connectStream(input: AsyncGenerator<Buffer | string, void>, options?: any): Promise<AsyncGenerator<Buffer, void>> {
+        if (options?.clusterWorkerId) {
+            const clusterWorkerId = options.clusterWorkerId;
+            delete options.clusterWorkerId;
+
+            const fork = sdk.fork<{
+                connectTTYStream: typeof connectTTYStream,
+            }>({ clusterWorkerId });
+            const result = await fork.result;
+            return result.connectTTYStream(input, options);
+        }
+
         let cp: InteractiveTerminal | NoninteractiveTerminal = null;
         const queue = createAsyncQueue<Buffer>();
         const extraPaths = await this.getExtraPaths();
@@ -232,4 +243,9 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
 
         return generator();
     }
+}
+
+export async function connectTTYStream(input: AsyncGenerator<Buffer | string, void>, options?: any): Promise<AsyncGenerator<Buffer, void>> {
+    const terminalService = new TerminalService();
+    return terminalService.connectStream(input, options);
 }

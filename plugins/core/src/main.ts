@@ -13,7 +13,7 @@ import { MediaCore } from './media-core';
 import { checkLegacyLxc, checkLxc } from './platform/lxc';
 import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
-import { TerminalService, TerminalServiceNativeId } from './terminal-service';
+import { TerminalService, TerminalServiceNativeId, connectTTYStream } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
 import { ClusterCore, ClusterCoreNativeId } from './cluster';
 
@@ -331,5 +331,6 @@ export async function fork() {
     return {
         tsCompile,
         newScript,
+        connectTTYStream,
     }
 }
