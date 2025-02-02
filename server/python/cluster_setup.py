@@ -144,7 +144,11 @@ class ClusterSetup:
         m = hashlib.sha256()
         m.update(
             bytes(
-                f"{o['id']}{o.get('address', '')}{o['port']}{o.get('sourceKey', '')}{o['proxyId']}{self.clusterSecret}",
+                # The use of ` o.get(key, None) or '' ` is to ensure that optional fields
+                # are omitted from the hash, matching the JS implementation. Otherwise, since
+                # the dict may contain the keys initialized to None, ` o.get(key, '') ` would
+                # return None instead of ''.
+                f"{o['id']}{o.get('address', None) or ''}{o['port']}{o.get('sourceKey', None) or ''}{o['proxyId']}{self.clusterSecret}",
                 "utf8",
             )
         )
