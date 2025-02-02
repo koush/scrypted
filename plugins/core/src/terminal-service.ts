@@ -287,5 +287,5 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
 }
 
 export async function newTerminalService(): Promise<TerminalService> {
-    return new TerminalService(null, true);
+    return new TerminalService(TerminalServiceNativeId, true);
 }
