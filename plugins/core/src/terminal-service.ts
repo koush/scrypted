@@ -153,8 +153,13 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
             const fork = sdk.fork<{
                 connectTTYStream: typeof connectTTYStream,
             }>({ clusterWorkerId });
-            const result = await fork.result;
-            return result.connectTTYStream(input, options);
+            try {
+                const result = await fork.result;
+                return result.connectTTYStream(input, options);
+            } catch (e) {
+                fork.worker.terminate();
+                throw e;
+            }
         }
 
         let cp: InteractiveTerminal | NoninteractiveTerminal = null;
