@@ -148,6 +148,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
         if (options?.clusterWorkerId) {
             const clusterWorkerId = options.clusterWorkerId;
             delete options.clusterWorkerId;
+            options.isClusterFork = true;
 
             const fork = sdk.fork<{
                 connectTTYStream: typeof connectTTYStream,
@@ -159,6 +160,12 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
         let cp: InteractiveTerminal | NoninteractiveTerminal = null;
         const queue = createAsyncQueue<Buffer>();
         const extraPaths = await this.getExtraPaths();
+
+        queue.endPromise.then(() => {
+            if (options?.isClusterFork) {
+                process.exit();
+            }
+        });
 
         function registerChildListeners() {
             cp.onExit(() => queue.end());
