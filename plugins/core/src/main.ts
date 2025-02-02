@@ -13,7 +13,7 @@ import { MediaCore } from './media-core';
 import { checkLegacyLxc, checkLxc } from './platform/lxc';
 import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
-import { TerminalService, TerminalServiceNativeId } from './terminal-service';
+import { TerminalService, TerminalServiceNativeId, newTerminalService } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
 import { ClusterCore, ClusterCoreNativeId } from './cluster';
 
@@ -140,7 +140,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                 {
                     name: 'Terminal Service',
                     nativeId: TerminalServiceNativeId,
-                    interfaces: [ScryptedInterface.StreamService, ScryptedInterface.TTY],
+                    interfaces: [ScryptedInterface.StreamService, ScryptedInterface.TTY, ScryptedInterface.ClusterForkInterface],
                     type: ScryptedDeviceType.Builtin,
                 },
             );
@@ -242,7 +242,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
         if (nativeId === UsersNativeId)
             return this.users ||= new UsersCore();
         if (nativeId === TerminalServiceNativeId)
-            return this.terminalService ||= new TerminalService();
+            return this.terminalService ||= new TerminalService(TerminalServiceNativeId, false);
         if (nativeId === ReplServiceNativeId)
             return this.replService ||= new PluginSocketService(ReplServiceNativeId, 'repl');
         if (nativeId === ConsoleServiceNativeId)
@@ -331,5 +331,6 @@ export async function fork() {
     return {
         tsCompile,
         newScript,
+        newTerminalService,
     }
 }
