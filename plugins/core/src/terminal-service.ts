@@ -112,7 +112,7 @@ class NoninteractiveTerminal {
 
 
 export class TerminalService extends ScryptedDeviceBase implements StreamService<Buffer | string, Buffer> {
-    constructor(nativeId?: ScryptedNativeId) {
+    constructor(nativeId?: ScryptedNativeId, private isClusterFork: boolean = false) {
         super(nativeId);
     }
 
@@ -148,7 +148,6 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
         if (options?.clusterWorkerId) {
             const clusterWorkerId = options.clusterWorkerId;
             delete options.clusterWorkerId;
-            options.isClusterFork = true;
 
             const fork = sdk.fork<{
                 connectTTYStream: typeof connectTTYStream,
@@ -167,7 +166,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
         const extraPaths = await this.getExtraPaths();
 
         queue.endPromise.then(() => {
-            if (options?.isClusterFork) {
+            if (this.isClusterFork) {
                 process.exit();
             }
         });
@@ -258,6 +257,6 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
 }
 
 export async function connectTTYStream(input: AsyncGenerator<Buffer | string, void>, options?: any): Promise<AsyncGenerator<Buffer, void>> {
-    const terminalService = new TerminalService();
+    const terminalService = new TerminalService(null, true);
     return terminalService.connectStream(input, options);
 }
