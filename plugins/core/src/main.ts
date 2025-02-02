@@ -242,7 +242,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
         if (nativeId === UsersNativeId)
             return this.users ||= new UsersCore();
         if (nativeId === TerminalServiceNativeId)
-            return this.terminalService ||= new TerminalService();
+            return this.terminalService ||= new TerminalService(TerminalServiceNativeId, false);
         if (nativeId === ReplServiceNativeId)
             return this.replService ||= new PluginSocketService(ReplServiceNativeId, 'repl');
         if (nativeId === ConsoleServiceNativeId)
