@@ -1,5 +1,5 @@
 import { getH264DecoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
-import { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
+import { MixinDeviceBase, ResponseMediaStreamOptions, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
 
 export type StreamStorageSetting = StorageSetting & {
@@ -116,6 +116,10 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
     function getDefaultPrebufferedStreams(msos: ResponseMediaStreamOptions[]) {
         if (!msos)
             return;
+
+        if (device.mixinDeviceInterfaces.includes(ScryptedInterface.Sleep)) {
+            return [];
+        }
 
         const local = getMediaStream(storageSettings.keys.defaultStream, msos);
         const remoteRecording = getMediaStream(storageSettings.keys.remoteRecordingStream, msos);
