@@ -492,7 +492,7 @@ export class ReolinkCameraClient {
 
         return {
             batteryPercent: batteryInfoEntry?.batteryPercent,
-            sleep: channelStatusEntry?.sleep === 1,
+            sleeping: channelStatusEntry?.sleep === 1,
         }
     }
 
