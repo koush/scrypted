@@ -117,10 +117,6 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         if (!msos)
             return;
 
-        if (device.mixinDeviceInterfaces.includes(ScryptedInterface.Sleep)) {
-            return [];
-        }
-
         const local = getMediaStream(storageSettings.keys.defaultStream, msos);
         const remoteRecording = getMediaStream(storageSettings.keys.remoteRecordingStream, msos);
 
