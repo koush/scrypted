@@ -2,7 +2,7 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, Online, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import https from 'https';
 import os from 'os';
@@ -127,9 +127,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return this.console;
     }
 
-    async takePictureInternal(options?: RequestPictureOptions): Promise<Buffer> {
-        this.debugConsole?.log("Picture requested from camera", options);
-        const eventSnapshot = options?.reason === 'event';
+    async takePictureInternal(id: string, eventSnapshot: boolean): Promise<Buffer> {
+        this.debugConsole?.log("Picture requested from camera", { id, eventSnapshot });
         const { snapshotsFromPrebuffer } = this.storageSettings.values;
         let usePrebufferSnapshots: boolean;
         switch (snapshotsFromPrebuffer) {
@@ -162,11 +161,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
         }
 
+        const realDevice = systemManager.getDeviceById<VideoCamera & Online>(this.id);
+
         let takePrebufferPicture: () => Promise<Buffer>;
         const preparePrebufferSnapshot = async () => {
             if (takePrebufferPicture)
                 return takePrebufferPicture;
-            const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
             const msos = await realDevice.getVideoStreamOptions();
             let prebufferChannel = msos?.find(mso => mso.prebuffer);
             if (prebufferChannel || !this.lastAvailablePicture) {
@@ -250,7 +250,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
             let takePictureOptions: RequestPictureOptions;
-            if (!options?.id && this.storageSettings.values.defaultSnapshotChannel !== 'Camera Default') {
+            if (!id && this.storageSettings.values.defaultSnapshotChannel !== 'Camera Default') {
                 try {
                     const psos = await this.getPictureOptions();
                     const pso = psos.find(pso => pso.name === this.storageSettings.values.defaultSnapshotChannel);
@@ -262,6 +262,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 }
             }
             try {
+                // consider waking the camera if 
+                if (!eventSnapshot && this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery) && !realDevice.online)
+                    throw new Error('Not waking sleeping camera for periodic snapshot.');
                 return await this.mixinDevice.takePicture(takePictureOptions).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
             }
             catch (e) {
@@ -289,7 +292,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             event: options?.reason === 'event',
         }, eventSnapshot ? 0 : 4000, async () => {
             const snapshotTimer = Date.now();
-            let picture = await this.takePictureInternal();
+            let picture = await this.takePictureInternal(undefined, eventSnapshot);
             picture = await this.cropAndScale(picture);
             this.clearCachedPictures();
             const pictureTime = Date.now();

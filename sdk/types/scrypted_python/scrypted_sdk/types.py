@@ -186,6 +186,7 @@ class ScryptedInterface(str, Enum):
     ScryptedUser = "ScryptedUser"
     SecuritySystem = "SecuritySystem"
     Settings = "Settings"
+    Sleep = "Sleep"
     StartStop = "StartStop"
     StreamService = "StreamService"
     TamperSensor = "TamperSensor"
@@ -201,6 +202,7 @@ class ScryptedInterface(str, Enum):
     VideoFrameGenerator = "VideoFrameGenerator"
     VideoRecorder = "VideoRecorder"
     VideoRecorderManagement = "VideoRecorderManagement"
+    VideoTextOverlay = "VideoTextOverlay"
     VOCSensor = "VOCSensor"
 
 class ScryptedMimeTypes(str, Enum):
@@ -284,11 +286,6 @@ class Resource(TypedDict):
     href: str
 
 class ClipPath(TypedDict):
-
-    pass
-
-
-class Point(TypedDict):
 
     pass
 
@@ -669,6 +666,7 @@ class NotifierOptions(TypedDict):
     badge: str
     body: str
     bodyWithSubtitle: str
+    critical: bool
     data: Any
     dir: NotificationDirection
     image: str
@@ -948,12 +946,17 @@ class MediaConverterTypes(TypedDict):
     pass
 
 
+class Point(TypedDict):
+
+    pass
+
+
 class TamperState(TypedDict):
 
     pass
 
 
-TYPES_VERSION = "0.3.100"
+TYPES_VERSION = "0.3.102"
 
 
 class AirPurifier:
@@ -1535,6 +1538,10 @@ class Settings:
         pass
 
 
+class Sleep:
+
+    sleeping: bool
+
 class StartStop:
     """StartStop represents a device that can be started, stopped, and possibly paused and resumed. Typically vacuum cleaners or washers."""
 
@@ -1660,6 +1667,12 @@ class VideoRecorderManagement:
     async def setRecordingActive(self, recordingActive: bool) -> None:
         pass
 
+
+class VideoTextOverlay:
+
+    fontSize: float
+    origin: Point  # The top left position of the overlay in the image, normalized to 0-1.
+    text: str
 
 class VOCSensor:
 
@@ -1885,6 +1898,9 @@ class ScryptedInterfaceProperty(str, Enum):
     temperatureUnit = "temperatureUnit"
     humidity = "humidity"
     audioVolumes = "audioVolumes"
+    fontSize = "fontSize"
+    origin = "origin"
+    text = "text"
     recordingActive = "recordingActive"
     ptzCapabilities = "ptzCapabilities"
     lockState = "lockState"
@@ -1897,6 +1913,7 @@ class ScryptedInterfaceProperty(str, Enum):
     converters = "converters"
     binaryState = "binaryState"
     tampered = "tampered"
+    sleeping = "sleeping"
     powerDetected = "powerDetected"
     audioDetected = "audioDetected"
     motionDetected = "motionDetected"
@@ -2265,6 +2282,30 @@ class DeviceState:
         self.setScryptedProperty("audioVolumes", value)
 
     @property
+    def fontSize(self) -> float:
+        return self.getScryptedProperty("fontSize")
+
+    @fontSize.setter
+    def fontSize(self, value: float):
+        self.setScryptedProperty("fontSize", value)
+
+    @property
+    def origin(self) -> Point:
+        return self.getScryptedProperty("origin")
+
+    @origin.setter
+    def origin(self, value: Point):
+        self.setScryptedProperty("origin", value)
+
+    @property
+    def text(self) -> str:
+        return self.getScryptedProperty("text")
+
+    @text.setter
+    def text(self, value: str):
+        self.setScryptedProperty("text", value)
+
+    @property
     def recordingActive(self) -> bool:
         return self.getScryptedProperty("recordingActive")
 
@@ -2359,6 +2400,14 @@ class DeviceState:
     @tampered.setter
     def tampered(self, value: TamperState):
         self.setScryptedProperty("tampered", value)
+
+    @property
+    def sleeping(self) -> bool:
+        return self.getScryptedProperty("sleeping")
+
+    @sleeping.setter
+    def sleeping(self, value: bool):
+        self.setScryptedProperty("sleeping", value)
 
     @property
     def powerDetected(self) -> bool:
@@ -2758,6 +2807,15 @@ ScryptedInterfaceDescriptors = {
     ],
     "properties": []
   },
+  "VideoTextOverlay": {
+    "name": "VideoTextOverlay",
+    "methods": [],
+    "properties": [
+      "fontSize",
+      "origin",
+      "text"
+    ]
+  },
   "VideoRecorder": {
     "name": "VideoRecorder",
     "methods": [
@@ -2972,6 +3030,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "tampered"
+    ]
+  },
+  "Sleep": {
+    "name": "Sleep",
+    "methods": [],
+    "properties": [
+      "sleeping"
     ]
   },
   "PowerSensor": {
