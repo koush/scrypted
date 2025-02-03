@@ -962,6 +962,20 @@ export interface VideoCameraMask {
   setPrivacyMasks(masks: PrivacyMasks): Promise<void>;
 }
 
+export interface VideoTextOverlay {
+  /**
+   * The top left position of the overlay in the image, normalized to 0-1.
+   */
+  origin?: Point;
+  fontSize?: number;
+  text?: string;
+}
+
+export interface VideoTextOverlays {
+  getVideoTextOverlays(): Promise<Record<string, string>>;
+  setVideoTextOverlay(id: string, value: VideoTextOverlay): Promise<void>;
+}
+
 export enum PanTiltZoomMovement {
   Absolute = "Absolute",
   Relative = "Relative",
@@ -1266,6 +1280,10 @@ export enum ChargeState {
  */
 export interface Charger {
   chargeState?: ChargeState;
+}
+
+export interface Sleep {
+  sleeping?: boolean;
 }
 
 export interface Reboot {
@@ -2279,6 +2297,7 @@ export enum ScryptedInterface {
   Display = "Display",
   VideoCamera = "VideoCamera",
   VideoCameraMask = "VideoCameraMask",
+  VideoTextOverlay = "VideoTextOverlay",
   VideoRecorder = "VideoRecorder",
   VideoRecorderManagement = "VideoRecorderManagement",
   PanTiltZoom = "PanTiltZoom",
@@ -2305,6 +2324,7 @@ export enum ScryptedInterface {
   Settings = "Settings",
   BinarySensor = "BinarySensor",
   TamperSensor = "TamperSensor",
+  Sleep = "Sleep",
   PowerSensor = "PowerSensor",
   AudioSensor = "AudioSensor",
   MotionSensor = "MotionSensor",

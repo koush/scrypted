@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, ScryptedInterface, ScryptedNativeId, StreamService, TTYSettings } from "@scrypted/sdk";
+import sdk, { ClusterForkInterface, ClusterForkInterfaceOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedNativeId, StreamService, TTYSettings } from "@scrypted/sdk";
 import type { IPty, spawn as ptySpawn } from 'node-pty';
 import { createAsyncQueue } from '@scrypted/common/src/async-queue'
 import { ChildProcess, spawn as childSpawn } from "child_process";
@@ -111,8 +111,11 @@ class NoninteractiveTerminal {
 }
 
 
-export class TerminalService extends ScryptedDeviceBase implements StreamService<Buffer | string, Buffer> {
-    constructor(nativeId?: ScryptedNativeId) {
+export class TerminalService extends ScryptedDeviceBase implements StreamService<Buffer | string, Buffer>, ClusterForkInterface {
+    private forks: { [clusterWorkerId: string]: TerminalService } = {};
+    private forkClients: 0;
+
+    constructor(nativeId?: ScryptedNativeId, private isFork: boolean = false) {
         super(nativeId);
     }
 
@@ -134,6 +137,42 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
         return extraPaths;
     }
 
+    async forkInterface<StreamService>(forkInterface: ScryptedInterface, options?: ClusterForkInterfaceOptions): Promise<StreamService> {
+        if (forkInterface !== ScryptedInterface.StreamService) {
+            throw new Error('can only fork StreamService');
+        }
+
+        if (!options?.clusterWorkerId) {
+            throw new Error('clusterWorkerId required');
+        }
+
+        if (this.isFork) {
+            throw new Error('cannot fork a fork');
+        }
+
+        const clusterWorkerId = options.clusterWorkerId;
+        if (this.forks[clusterWorkerId]) {
+            return this.forks[clusterWorkerId] as StreamService;
+        }
+
+        const fork = sdk.fork<{
+            newTerminalService: typeof newTerminalService,
+        }>({ clusterWorkerId });
+        try {
+            const result = await fork.result;
+            const terminalService = await result.newTerminalService();
+            this.forks[clusterWorkerId] = terminalService;
+            fork.worker.on('exit', () => {
+                delete this.forks[clusterWorkerId];
+            });
+            return terminalService as StreamService;
+        }
+        catch (e) {
+            fork.worker.terminate();
+            throw e;
+        }
+    }
+
     /*
      * The input to this stream can send buffers for normal terminal data and strings
      * for control messages. Control messages are JSON-formatted.
@@ -148,6 +187,19 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
         let cp: InteractiveTerminal | NoninteractiveTerminal = null;
         const queue = createAsyncQueue<Buffer>();
         const extraPaths = await this.getExtraPaths();
+
+        if (this.isFork) {
+            this.forkClients++;
+        }
+
+        queue.endPromise.then(() => {
+            if (this.isFork) {
+                this.forkClients--;
+                if (this.forkClients === 0) {
+                    process.exit();
+                }
+            }
+        });
 
         function registerChildListeners() {
             cp.onExit(() => queue.end());
@@ -232,4 +284,8 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
 
         return generator();
     }
+}
+
+export async function newTerminalService(): Promise<TerminalService> {
+    return new TerminalService(TerminalServiceNativeId, true);
 }
