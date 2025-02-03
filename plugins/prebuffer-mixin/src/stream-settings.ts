@@ -1,5 +1,5 @@
 import { getH264DecoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
-import { MixinDeviceBase, ResponseMediaStreamOptions, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
+import { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
 import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
 
 export type StreamStorageSetting = StorageSetting & {
