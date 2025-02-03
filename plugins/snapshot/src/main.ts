@@ -2,7 +2,7 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, Online, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, Sleep, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import https from 'https';
 import os from 'os';
@@ -161,7 +161,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
         }
 
-        const realDevice = systemManager.getDeviceById<VideoCamera & Online>(this.id);
+        const realDevice = systemManager.getDeviceById<VideoCamera & Sleep>(this.id);
 
         let takePrebufferPicture: () => Promise<Buffer>;
         const preparePrebufferSnapshot = async () => {
@@ -263,7 +263,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
             try {
                 // consider waking the camera if 
-                if (!eventSnapshot && this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery) && !realDevice.online)
+                if (!eventSnapshot && this.mixinDeviceInterfaces.includes(ScryptedInterface.Sleep) && realDevice.sleeping)
                     throw new Error('Not waking sleeping camera for periodic snapshot.');
                 return await this.mixinDevice.takePicture(takePictureOptions).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
             }
