@@ -161,14 +161,9 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
             const now = Date.now();
             let detections: ObjectDetectionResult[] = xml.EventNotificationAlert?.DetectionRegionList?.map(region => {
-                const { DetectionRegionEntry } = region;
-                const dre = DetectionRegionEntry[0];
-                if (!DetectionRegionEntry)
+                const name = region?.DetectionRegionEntry?.[0]?.detectionTarget?.name;
+                if (!name)
                     return;
-                const { detectionTarget } = dre;
-                // const { TargetRect } = dre;
-                // const { X, Y, width, height } = TargetRect[0];
-                const [name] = detectionTarget;
                 return {
                     score: 1,
                     className: detectionMap[name] || name,
