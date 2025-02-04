@@ -1,5 +1,5 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Brightness, Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import sdk, { Sleep, Brightness, Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { createRtspMediaStreamOptions, Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -78,7 +78,7 @@ class ReolinkCameraFloodlight extends ScryptedDeviceBase implements OnOff, Brigh
     }
 }
 
-class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, Reboot, Intercom, ObjectDetector, PanTiltZoom {
+class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, Reboot, Intercom, ObjectDetector, PanTiltZoom, Sleep {
     client: ReolinkCameraClient;
     clientWithToken: ReolinkCameraClient;
     onvifClient: OnvifCameraAPI;
@@ -362,7 +362,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (this.hasSiren() || this.hasFloodlight())
             interfaces.push(ScryptedInterface.DeviceProvider);
         if (this.hasBattery()) {
-            interfaces.push(ScryptedInterface.Battery, ScryptedInterface.Online);
+            interfaces.push(ScryptedInterface.Battery, ScryptedInterface.Sleep);
             this.startBatteryCheckInterval();
         }
 
@@ -378,14 +378,20 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             const api = this.getClientWithToken();
 
             try {
-                const { batteryPercent, sleep } = await api.getBatteryInfo();
+                const { batteryPercent, sleeping } = await api.getBatteryInfo();
                 this.batteryLevel = batteryPercent;
-                this.online = !sleep;
+
+                if (sleeping !== this.sleeping) {
+                    this.sleeping = sleeping;
+                }
+                if (batteryPercent !== this.batteryLevel) {
+                    this.batteryLevel = batteryPercent;
+                }
             }
             catch (e) {
                 this.console.log('Error in getting battery info', e);
             }
-        }, 1000 * 60 * 30);
+        }, 1000 * 10);
     }
 
     async reboot() {
@@ -557,10 +563,19 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         (async () => {
             while (!killed) {
                 try {
-                    const { value, data } = await client.getMotionState();
-                    if (value)
-                        triggerMotion();
-                    ret.emit('data', JSON.stringify(data));
+                    // Battey cameras do not have AI state, they just send events in case of PIR sensor triggered
+                    // which equals a motion detected
+                    if (this.hasBattery()) {
+                        const { value, data } = await client.getPidActive();
+                        if (value)
+                            triggerMotion();
+                        ret.emit('data', JSON.stringify(data));
+                    } else {
+                        const { value, data } = await client.getMotionState();
+                        if (value)
+                            triggerMotion();
+                        ret.emit('data', JSON.stringify(data));
+                    }
                 }
                 catch (e) {
                     ret.emit('error', e);
