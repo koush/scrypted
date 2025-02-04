@@ -321,8 +321,8 @@ class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]  # x, y, width, height
     className: str  # The detection class of the object.
     clipPaths: list[ClipPath]  # The detection clip paths that outlines various features or segments, like traced facial features.
+    clipped: bool  # Flag that indicates whether the detection was clipped by the detection input and may not be a full bounding box.
     cost: float  # The certainty that this is correct tracked object.
-    descriptor: str  # A base64 encoded Float32Array that represents the vector descriptor of the detection. Can be used to compute euclidian distance to determine similarity.
     embedding: str  # Base64 encoded embedding float32 vector.
     history: ObjectDetectionHistory
     id: str  # The id of the tracked object.
@@ -956,7 +956,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.102"
+TYPES_VERSION = "0.3.103"
 
 
 class AirPurifier:

@@ -1559,6 +1559,10 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
    */
   cost?: number;
   /**
+   * Flag that indicates whether the detection was clipped by the detection input and may not be a full bounding box.
+   */
+  clipped?: boolean;
+  /**
    * The detection class of the object.
    */
   className: ObjectDetectionClass;
@@ -1574,11 +1578,6 @@ export interface ObjectDetectionResult extends BoundingBoxResult {
    * The score of the label.
    */
   labelScore?: number;
-  /**
-   * A base64 encoded Float32Array that represents the vector descriptor of the detection.
-   * Can be used to compute euclidian distance to determine similarity.
-   */
-  descriptor?: string;
   /**
    * The detection landmarks, like key points in a face landmarks.
    */
