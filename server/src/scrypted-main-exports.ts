@@ -75,7 +75,7 @@ function start(mainFilename: string, options?: {
     const clusterMode = getScryptedClusterMode();
     if (clusterMode?.[0] === 'client') {
         const start = require('./scrypted-cluster-main').default;
-        return start(mainFilename, options?.serviceControl);
+        return start(mainFilename, options);
     }
     else {
         const start = require('./scrypted-server-main').default;
