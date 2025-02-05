@@ -109,6 +109,7 @@ export class ClusterForkService {
                 labels: worker.labels,
                 forks: [...worker.forks] as ClusterFork[],
                 mode: worker.mode,
+                address: worker.address,
             };
         }
         return ret;
