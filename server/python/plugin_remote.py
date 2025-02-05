@@ -243,6 +243,9 @@ class ClusterManager(scrypted_python.scrypted_sdk.types.ClusterManager):
     def getClusterMode(self) -> Any | Any:
         return os.getenv("SCRYPTED_CLUSTER_MODE", None)
 
+    def getClusterAddress(self) -> str:
+        return os.getenv("SCRYPTED_CLUSTER_ADDRESS", None)
+
     def getClusterWorkerId(self) -> str:
         return self.remote.clusterSetup.clusterWorkerId
 

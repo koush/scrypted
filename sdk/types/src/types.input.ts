@@ -2722,6 +2722,7 @@ export interface ClusterManager {
    * Returns undefined if this is not a cluster worker.
    */
   getClusterWorkerId(): string;
+  getClusterAddress(): string;
   getClusterMode(): 'server' | 'client' | undefined;
   getClusterWorkers(): Promise<Record<string, ClusterWorker>>;
 }

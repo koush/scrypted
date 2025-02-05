@@ -957,7 +957,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.104"
+TYPES_VERSION = "0.3.105"
 
 
 class AirPurifier:
@@ -1858,6 +1858,9 @@ class EndpointManager:
 
 
 class ClusterManager:
+
+    def getClusterAddress(self) -> str:
+        pass
 
     def getClusterMode(self) -> Any | Any:
         pass

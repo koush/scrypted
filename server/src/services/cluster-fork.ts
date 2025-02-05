@@ -5,6 +5,7 @@ import type { RuntimeWorkerOptions } from "../plugin/runtime/runtime-worker";
 import { RpcPeer } from "../rpc";
 import type { ScryptedRuntime } from "../runtime";
 import type { ClusterForkOptions, ClusterForkParam, ClusterForkResultInterface, PeerLiveness, RunningClusterWorker } from "../scrypted-cluster-main";
+import { removeIPv4EmbeddedIPv6 } from "../ip";
 
 class WrappedForkResult implements ClusterForkResultInterface {
     [RpcPeer.PROPERTY_PROXY_PROPERTIES] = {
@@ -109,7 +110,7 @@ export class ClusterForkService {
                 labels: worker.labels,
                 forks: [...worker.forks] as ClusterFork[],
                 mode: worker.mode,
-                address: worker.address,
+                address: removeIPv4EmbeddedIPv6(worker.address),
             };
         }
         return ret;
