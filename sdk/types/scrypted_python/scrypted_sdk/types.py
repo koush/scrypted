@@ -467,6 +467,7 @@ class ClusterForkInterfaceOptions(TypedDict):
 
 class ClusterWorker(TypedDict):
 
+    address: str
     forks: list[ClusterFork]
     id: str
     labels: list[str]
@@ -956,7 +957,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.103"
+TYPES_VERSION = "0.3.104"
 
 
 class AirPurifier:

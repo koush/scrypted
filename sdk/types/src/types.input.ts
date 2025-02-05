@@ -2713,6 +2713,7 @@ export interface ClusterWorker {
   labels: string[];
   forks: ClusterFork[];
   mode: 'server' | 'client';
+  address: string;
 }
 
 export interface ClusterManager {
