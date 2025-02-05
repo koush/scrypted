@@ -718,6 +718,9 @@ class HttpResponseLoggingImpl implements AlexaHttpResponse {
     sendSocket(socket: any, options: HttpResponseOptions): void {
         this.response.sendSocket(socket, options);
     }
+    sendStream(stream: AsyncGenerator<Buffer, void>, options?: HttpResponseOptions): void {
+        this.response.sendStream(stream, options);
+    }
 }
 
 export default AlexaPlugin;

@@ -1,6 +1,16 @@
 <details>
 <summary>Changelog</summary>
 
+### 0.3.4
+
+Alexa: add option to not auto enable devices (#1615)
+
+
+### 0.3.3
+
+google-home/alexa: republish with new sdk for media converter
+
+
 ### 0.3.2
 
 alexa: fix syncedDevices being undefined

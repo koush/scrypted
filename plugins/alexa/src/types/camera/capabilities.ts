@@ -126,68 +126,69 @@ export async function getCameraCapabilities(device: ScryptedDevice): Promise<Dis
     ];
 
     if (device.interfaces.includes(ScryptedInterface.ObjectDetector)) {
-        const detectionTypes = await (device as any as ObjectDetector).getObjectTypes();
-        const classNames = detectionTypes.classes.filter(t => t !== 'ring' && t !== 'motion').map(type => type.toLowerCase());
-
-        capabilities.push(
-            {
-                "type": "AlexaInterface",
-                "interface": "Alexa.SmartVision.ObjectDetectionSensor",
-                "version": "1.0",
-                "properties": {
-                    "supported": [{
-                        "name": "objectDetectionClasses"
-                    }],
-                    "proactivelyReported": true,
-                    "retrievable": true
-                },
-                "configuration": {
-                    "objectDetectionConfiguration": classNames.map(type => ({
-                        "imageNetClass": type
-                    }))
-                }
-            } as DiscoveryCapability
-        );
-
-        capabilities.push(
-            {
-                "type": "AlexaInterface",
-                "interface": "Alexa.DataController",
-                "instance": "Camera.SmartVisionData",
-                "version": "1.0",
-                "properties": undefined,
-                "configuration": {
-                    "targetCapability": {
-                        "name": "Alexa.SmartVision.ObjectDetectionSensor",
-                        "version": "1.0"
+        const detectionTypes = await (device as any as ObjectDetector).getObjectTypes().catch(() => {}) || undefined;
+        const classNames = detectionTypes?.classes?.filter(t => t !== 'ring' && t !== 'motion').map(type => type.toLowerCase()).filter(c => !!c);
+        if (classNames?.length) {
+            capabilities.push(
+                {
+                    "type": "AlexaInterface",
+                    "interface": "Alexa.SmartVision.ObjectDetectionSensor",
+                    "version": "1.0",
+                    "properties": {
+                        "supported": [{
+                            "name": "objectDetectionClasses"
+                        }],
+                        "proactivelyReported": true,
+                        "retrievable": true
                     },
-                    "dataRetrievalSchema": {
-                        "type": "JSON",
-                        "schema": "SmartVisionData"
-                    },
-                    "supportedAccess": ["BY_IDENTIFIER", "BY_TIMESTAMP_RANGE"]
-                }
-            } as DiscoveryCapability
-        );
-    }
-
-    if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
-        capabilities.push(
-            {
-                "type": "AlexaInterface",
-                "interface": "Alexa.MotionSensor",
-                "version": "3",
-                "properties": {
-                    "supported": [
-                        {
-                            "name": "detectionState"
-                        }
-                    ],
-                    "proactivelyReported": true,
-                    "retrievable": true
-                }
-            } as DiscoveryCapability
-        );
+                    "configuration": {
+                        "objectDetectionConfiguration": classNames.map(type => ({
+                            "imageNetClass": type
+                        }))
+                    }
+                } as DiscoveryCapability
+            );
+    
+            capabilities.push(
+                {
+                    "type": "AlexaInterface",
+                    "interface": "Alexa.DataController",
+                    "instance": "Camera.SmartVisionData",
+                    "version": "1.0",
+                    "properties": undefined,
+                    "configuration": {
+                        "targetCapability": {
+                            "name": "Alexa.SmartVision.ObjectDetectionSensor",
+                            "version": "1.0"
+                        },
+                        "dataRetrievalSchema": {
+                            "type": "JSON",
+                            "schema": "SmartVisionData"
+                        },
+                        "supportedAccess": ["BY_IDENTIFIER", "BY_TIMESTAMP_RANGE"]
+                    }
+                } as DiscoveryCapability
+            );
+        }
+    
+        if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
+            capabilities.push(
+                {
+                    "type": "AlexaInterface",
+                    "interface": "Alexa.MotionSensor",
+                    "version": "3",
+                    "properties": {
+                        "supported": [
+                            {
+                                "name": "detectionState"
+                            }
+                        ],
+                        "proactivelyReported": true,
+                        "retrievable": true
+                    }
+                } as DiscoveryCapability
+            );
+        }
     }
 
     return capabilities;
