@@ -8,6 +8,7 @@ import vm from 'vm';
 import { getScryptedClusterMode } from './cluster/cluster-setup';
 import { PluginError } from './plugin/plugin-error';
 import { isNodePluginWorkerProcess } from './plugin/runtime/node-fork-worker';
+import type { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
 import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
 import type { Runtime } from './scrypted-server-main';
 import { getDotEnvPath } from './services/env';
@@ -16,6 +17,9 @@ import type { ServiceControl } from './services/service-control';
 function start(mainFilename: string, options?: {
     serviceControl?: ServiceControl,
     onRuntimeCreated?: (runtime: Runtime) => Promise<void>,
+    onClusterWorkerCreated?: (options?: {
+        clusterPluginHosts?: ReturnType<typeof getBuiltinRuntimeHosts>,
+    }) => Promise<void>,
 }) {
     // Allow including a custom file path for platforms that require
     // compatibility hacks. For example, Android may need to patch

@@ -12,6 +12,7 @@ import { computeClusterObjectHash } from './cluster/cluster-hash';
 import { getClusterLabels, getClusterWorkerWeight } from './cluster/cluster-labels';
 import { getScryptedClusterMode, InitializeCluster, setupCluster } from './cluster/cluster-setup';
 import type { ClusterObject } from './cluster/connect-rpc-object';
+import { getScryptedFFmpegPath } from './plugin/ffmpeg-path';
 import { getPluginVolume, getScryptedVolume } from './plugin/plugin-volume';
 import { prepareZip } from './plugin/runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './plugin/runtime/runtime-host';
@@ -23,15 +24,20 @@ import { EnvControl } from './services/env';
 import { Info } from './services/info';
 import { ServiceControl } from './services/service-control';
 import { sleep } from './sleep';
-import { getScryptedFFmpegPath } from './plugin/ffmpeg-path';
 
 installSourceMapSupport({
     environment: 'node',
 });
 
-async function start(mainFilename: string, serviceControl?: ServiceControl) {
-    serviceControl ||= new ServiceControl();
-    startClusterClient(mainFilename, serviceControl);
+async function start(mainFilename: string, options?: {
+    onClusterWorkerCreated?: (options?: {
+        clusterPluginHosts?: ReturnType<typeof getBuiltinRuntimeHosts>,
+    }) => Promise<void>,
+    serviceControl?: ServiceControl;
+}) {
+    options ||= {};
+    options.serviceControl ||= new ServiceControl();
+    startClusterClient(mainFilename, options);
 }
 
 export default start;
@@ -122,12 +128,11 @@ export interface ClusterForkResultInterface {
 
 export type ClusterForkParam = (runtime: string, options: RuntimeWorkerOptions, peerLiveness: PeerLiveness, getZip: () => Promise<Buffer>) => Promise<ClusterForkResultInterface>;
 
-function createClusterForkParam(mainFilename: string, clusterId: string, clusterSecret: string, clusterWorkerId: string) {
+function createClusterForkParam(mainFilename: string, clusterId: string, clusterSecret: string, clusterWorkerId: string, clusterPluginHosts: ReturnType<typeof getBuiltinRuntimeHosts>) {
     const clusterForkParam: ClusterForkParam = async (runtime, runtimeWorkerOptions, peerLiveness, getZip) => {
         let runtimeWorker: RuntimeWorker;
 
-        const builtins = getBuiltinRuntimeHosts();
-        const rt = builtins.get(runtime);
+        const rt = clusterPluginHosts.get(runtime);
         if (!rt)
             throw new Error('unknown runtime ' + runtime);
 
@@ -205,7 +210,12 @@ function createClusterForkParam(mainFilename: string, clusterId: string, cluster
     return clusterForkParam;
 }
 
-export function startClusterClient(mainFilename: string, serviceControl?: ServiceControl) {
+export function startClusterClient(mainFilename: string, options?: {
+    onClusterWorkerCreated?: (options?: {
+        clusterPluginHosts?: ReturnType<typeof getBuiltinRuntimeHosts>,
+    }) => Promise<void>,
+    serviceControl?: ServiceControl;
+}) {
     console.log('Cluster client starting.');
 
     const envControl = new EnvControl();
@@ -217,6 +227,10 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
     const clusterSecret = process.env.SCRYPTED_CLUSTER_SECRET;
     const clusterMode = getScryptedClusterMode();
     const [, host, port] = clusterMode;
+
+    const clusterPluginHosts = getBuiltinRuntimeHosts();
+    options?.onClusterWorkerCreated?.({ clusterPluginHosts });
+
     (async () => {
         while (true) {
             // this sleep is here to prevent a tight loop if the server is down.
@@ -259,7 +273,7 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
                 process.env.SCRYPTED_CLUSTER_ADDRESS = socket.localAddress;
 
             const peer = preparePeer(socket, 'client');
-            peer.params['service-control'] = serviceControl;
+            peer.params['service-control'] = options?.serviceControl;
             peer.params['env-control'] = envControl;
             peer.params['info'] = new Info();
             peer.params['fs.promises'] = {
@@ -294,7 +308,7 @@ export function startClusterClient(mainFilename: string, serviceControl?: Servic
                 const clusterPeerSetup = setupCluster(peer);
                 await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret, clusterWorkerId });
 
-                peer.params['fork'] = createClusterForkParam(mainFilename, clusterId, clusterSecret, clusterWorkerId);
+                peer.params['fork'] = createClusterForkParam(mainFilename, clusterId, clusterSecret, clusterWorkerId, clusterPluginHosts);
 
                 await peer.killed;
             }
@@ -316,7 +330,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
         labels: getClusterLabels(),
         id: scryptedRuntime.serverClusterWorkerId,
         peer: undefined,
-        fork: Promise.resolve(createClusterForkParam(mainFilename, scryptedRuntime.clusterId, scryptedRuntime.clusterSecret, scryptedRuntime.serverClusterWorkerId)),
+        fork: Promise.resolve(createClusterForkParam(mainFilename, scryptedRuntime.clusterId, scryptedRuntime.clusterSecret, scryptedRuntime.serverClusterWorkerId, scryptedRuntime.pluginHosts)),
         name: process.env.SCRYPTED_CLUSTER_WORKER_NAME || os.hostname(),
         address: process.env.SCRYPTED_CLUSTER_ADDRESS,
         weight: getClusterWorkerWeight(),
