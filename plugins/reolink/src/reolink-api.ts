@@ -24,6 +24,37 @@ export interface Stream {
     width: number;
 }
 
+export interface PurpleOsdChannel {
+    enable: number;
+    name: string;
+    pos: string;
+}
+
+export interface PurpleOsdTime {
+    enable: number;
+    pos: string;
+}
+export interface InitialOsd {
+    bgcolor: number;
+    channel: number;
+    osdChannel: PurpleOsdChannel;
+    osdTime: PurpleOsdTime;
+    watermark: number;
+}
+
+export interface Initial {
+    Osd: InitialOsd;
+}
+
+export interface Osd {
+    cmd: string;
+    code: number;
+    initial: Initial;
+    range: Range;
+    value: Initial;
+}
+
+
 export interface AIDetectionState {
     alarm_state: number;
     support: number;
@@ -131,6 +162,59 @@ export class ReolinkCameraClient {
             value: !!response.body?.[0]?.value?.state,
             data: response.body,
         };
+    }
+
+    async getOsd(): Promise<Osd> {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [
+            {
+                cmd: "GetOsd",
+                action: 1,
+                param: { channel: this.channelId }
+            },
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, this.createReadable(body));
+
+        const error = response.body?.find(elem => elem.error)?.error;
+        if (error) {
+            this.console.error('error during call to getOsd', error);
+        }
+
+        return response.body?.[0] as Osd;
+    }
+
+    async setOsd(osd: Osd) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [
+            {
+                cmd: "SetOsd",
+                param: {
+                    Osd: {
+                        channel: this.channelId,
+                        osdChannel: osd.value.Osd.osdChannel,
+                        osdTime: osd.value.Osd.osdTime,
+                    }
+                }
+            }
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, this.createReadable(body));
+
+        const error = response.body?.find(elem => elem.error)?.error;
+        if (error) {
+            this.console.error('error during call to getOsd', error);
+        }
     }
 
     async getAiState() {
