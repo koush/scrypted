@@ -1,5 +1,5 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Sleep, Brightness, Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting } from "@scrypted/sdk";
+import sdk, { Sleep, Brightness, Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, Reboot, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, VideoTextOverlays, VideoTextOverlay } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { EventEmitter } from "stream";
 import { createRtspMediaStreamOptions, Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -78,7 +78,7 @@ class ReolinkCameraFloodlight extends ScryptedDeviceBase implements OnOff, Brigh
     }
 }
 
-class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, Reboot, Intercom, ObjectDetector, PanTiltZoom, Sleep {
+class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, Reboot, Intercom, ObjectDetector, PanTiltZoom, Sleep, VideoTextOverlays {
     client: ReolinkCameraClient;
     clientWithToken: ReolinkCameraClient;
     onvifClient: OnvifCameraAPI;
@@ -220,6 +220,34 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             .catch(e => {
                 this.console.log('device refresh failed', e);
             });
+    }
+
+    async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
+        const client = this.getClient();
+        const deviceName = await client.getDeviceName();
+
+        const config: Record<string, VideoTextOverlay> = {};
+        config['deviceName'] = {
+            readonly: false,
+            text: deviceName
+        };
+
+        return config;
+    }
+
+    async setVideoTextOverlay(id: string, value: VideoTextOverlay): Promise<void> {
+        const client = this.getClient();
+
+        if (id === 'deviceName') {
+            if (typeof value.text === 'string') {
+                await client.setDeviceName(value.text);
+            } else if (typeof value.text === 'boolean') {
+                const osd = await client.getOsd();
+
+                osd.value.Osd.osdChannel.enable = 1;
+                await client.setOsd(osd);
+            }
+        }
     }
 
     updatePtzCaps() {
@@ -926,6 +954,7 @@ class ReolinkProvider extends RtspProvider {
             ScryptedInterface.Camera,
             ScryptedInterface.AudioSensor,
             ScryptedInterface.MotionSensor,
+            ScryptedInterface.VideoTextOverlays,
         ];
     }
 

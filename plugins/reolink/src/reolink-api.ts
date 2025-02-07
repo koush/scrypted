@@ -44,6 +44,19 @@ export interface PtzPreset {
     name: string;
 }
 
+export interface Osd {
+    value: {
+        Osd: {
+            osdChannel: {
+                enable: number;
+            },
+            osdTime: {
+                enable: number;
+            }
+        }
+    }
+}
+
 export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
     parameters: Record<string, string>;
@@ -522,5 +535,111 @@ export class ReolinkCameraClient {
             value: !!response.body?.[0]?.value?.ai?.other?.alarm_state,
             data: response.body,
         };
+    }
+
+    async getDeviceName() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [
+            {
+                cmd: "GetDevName",
+                param: { channel: this.channelId }
+            },
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, this.createReadable(body));
+
+        const error = response.body?.find(elem => elem.error)?.error;
+        if (error) {
+            this.console.error('error during call to getDeviceName', error);
+        }
+
+        return response.body?.[0]?.value?.DevName?.name;
+
+    }
+
+    async setDeviceName(name: string) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const parsedName = name.replace(/[^a-zA-Z0-9 ]/g, '');
+
+        const body = [
+            {
+                cmd: "SetDevName",
+                param: {
+                    channel: this.channelId,
+                    DevName: {
+                        name: parsedName
+                    }
+                }
+            },
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, this.createReadable(body));
+
+        const error = response.body?.find(elem => elem.error)?.error;
+        if (error) {
+            this.console.error('error during call to setDeviceName', error);
+        }
+    }
+
+    async getOsd() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [
+            {
+                cmd: "GetOsd",
+                action: 1,
+                param: { channel: this.channelId }
+            },
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, this.createReadable(body));
+
+        const error = response.body?.find(elem => elem.error)?.error;
+        if (error) {
+            this.console.error('error during call to getOsd', error);
+        }
+
+        return response.body?.[0] as Osd;
+    }
+
+    async setOsd(osd: Osd) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [
+            {
+                cmd: "SetOsd",
+                param: {
+                    Osd: {
+                        channel: this.channelId,
+                        osdChannel: osd.value.Osd.osdChannel,
+                        osdTime: osd.value.Osd.osdTime,
+                    }
+                }
+            }
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            responseType: 'json',
+            method: 'POST',
+        }, this.createReadable(body));
+
+        const error = response.body?.find(elem => elem.error)?.error;
+        if (error) {
+            this.console.error('error during call to getOsd', error);
+        }
     }
 }
