@@ -1,14 +1,13 @@
 import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoRecorder, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { createRtspMediaStreamOptions, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { AmcrestCameraClient, AmcrestEvent, AmcrestEventData } from "./amcrest-api";
 import { amcrestAutoConfigureSettings, autoconfigureSettings } from "./amcrest-configure";
-import { group } from "console";
 
 const { mediaManager } = sdk;
 
@@ -23,7 +22,7 @@ const rtspChannelSetting: Setting = {
     placeholder: '1',
 };
 
-class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, Lock, VideoRecorder, Reboot, ObjectDetector {
+class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, Lock, VideoRecorder, Reboot, ObjectDetector, VideoTextOverlays {
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
@@ -41,6 +40,92 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
+    }
+
+    async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
+        const client = this.getClient();
+        const response = await client.request({
+            method: "GET",
+            url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=getConfig&name=VideoWidget`,
+            responseType: "text",
+            headers: {
+                "Content-Type": "application/xml",
+            },
+        });
+        const body: string = response.body;
+        if (!body.startsWith("<")) {
+            const encodeBlend = '.EncodeBlend';
+            const config: Record<string, VideoTextOverlay> = {};
+
+            for (const line of body.split(/\r?\n/).filter(l => l.includes(encodeBlend + '='))) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                const splitIndex = trimmed.indexOf("=");
+                if (splitIndex === -1) continue;
+                // remove encodeBlend
+                let key = trimmed.substring(0, splitIndex);
+                key = key.substring(0, key.length - encodeBlend.length);
+                config[key] = {
+                    readonly: true,
+                };
+            }
+
+            const textValue = '.Text';
+
+            for (const line of body.split(/\r?\n/).filter(l => l.includes(textValue + '='))) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                const splitIndex = trimmed.indexOf("=");
+                if (splitIndex === -1) continue;
+                // remove encodeBlend
+                let key = trimmed.substring(0, splitIndex);
+                key = key.substring(0, key.length - textValue.length);
+                const text = trimmed.substring(splitIndex + 1).trim();
+                const c = config[key];
+                if (!c)
+                    continue;
+                delete c.readonly;
+                c.text = text;
+            }
+
+            return config;
+        } else {
+            throw new Error('invalid response');
+            // const json = await xml2js.parseStringPromise(body);
+            // return { json, xml: body };
+        }
+    }
+
+    async setVideoTextOverlay(id: string, value: VideoTextOverlay): Promise<void> {
+        // trim the table. off id
+        if (id.startsWith('table.'))
+            id = id.substring('table.'.length);
+        const client = this.getClient();
+        if (value.text) {
+            const enableUrl = `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&${id}.EncodeBlend=true&${id}.PreviewBlend=true`;
+            await client.request({
+                method: "GET",
+                url: enableUrl,
+                responseType: "text",
+            });
+
+            const textUrl = `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&${id}.Text=${encodeURIComponent(
+                value.text
+            )}`;
+            await client.request({
+                method: "GET",
+                url: textUrl,
+                responseType: "text",
+            });
+        }
+        else {
+            const disableUrl = `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&${id}.EncodeBlend=false&${id}.PreviewBlend=false`;
+            await client.request({
+                method: "GET",
+                url: disableUrl,
+                responseType: "text",
+            });
+        }
     }
 
     async reboot() {
@@ -631,6 +716,7 @@ class AmcrestProvider extends RtspProvider {
             ScryptedInterface.Camera,
             ScryptedInterface.AudioSensor,
             ScryptedInterface.MotionSensor,
+            ScryptedInterface.VideoTextOverlays,
         ];
     }
 

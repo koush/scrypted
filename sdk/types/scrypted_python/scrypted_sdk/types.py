@@ -202,7 +202,7 @@ class ScryptedInterface(str, Enum):
     VideoFrameGenerator = "VideoFrameGenerator"
     VideoRecorder = "VideoRecorder"
     VideoRecorderManagement = "VideoRecorderManagement"
-    VideoTextOverlay = "VideoTextOverlay"
+    VideoTextOverlays = "VideoTextOverlays"
     VOCSensor = "VOCSensor"
 
 class ScryptedMimeTypes(str, Enum):
@@ -438,6 +438,11 @@ class MediaStreamSource(TypedDict):
 
 
 class MediaStreamTool(TypedDict):
+
+    pass
+
+
+class Point(TypedDict):
 
     pass
 
@@ -941,13 +946,15 @@ class VideoFrameGeneratorOptions(TypedDict):
     queue: float
     resize: Any
 
+class VideoTextOverlay(TypedDict):
+
+    fontSize: float
+    origin: Point  # The top left position of the overlay in the image, normalized to 0-1.
+    readonly: bool
+    text: str | bool  # The text value to set the overlay to, if it is not readonly. True or false otherwise to enable/disable.
+
 class MediaConverterTypes(TypedDict):
     """[fromMimeType, toMimeType]"""
-
-    pass
-
-
-class Point(TypedDict):
 
     pass
 
@@ -957,7 +964,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.105"
+TYPES_VERSION = "0.3.108"
 
 
 class AirPurifier:
@@ -1669,11 +1676,14 @@ class VideoRecorderManagement:
         pass
 
 
-class VideoTextOverlay:
+class VideoTextOverlays:
 
-    fontSize: float
-    origin: Point  # The top left position of the overlay in the image, normalized to 0-1.
-    text: str
+    async def getVideoTextOverlays(self) -> Mapping[str, VideoTextOverlay]:
+        pass
+
+    async def setVideoTextOverlay(self, id: str, value: VideoTextOverlay) -> None:
+        pass
+
 
 class VOCSensor:
 
@@ -1902,9 +1912,6 @@ class ScryptedInterfaceProperty(str, Enum):
     temperatureUnit = "temperatureUnit"
     humidity = "humidity"
     audioVolumes = "audioVolumes"
-    fontSize = "fontSize"
-    origin = "origin"
-    text = "text"
     recordingActive = "recordingActive"
     ptzCapabilities = "ptzCapabilities"
     lockState = "lockState"
@@ -1977,6 +1984,8 @@ class ScryptedInterfaceMethods(str, Enum):
     getVideoStreamOptions = "getVideoStreamOptions"
     getPrivacyMasks = "getPrivacyMasks"
     setPrivacyMasks = "setPrivacyMasks"
+    getVideoTextOverlays = "getVideoTextOverlays"
+    setVideoTextOverlay = "setVideoTextOverlay"
     getRecordingStream = "getRecordingStream"
     getRecordingStreamCurrentTime = "getRecordingStreamCurrentTime"
     getRecordingStreamOptions = "getRecordingStreamOptions"
@@ -2284,30 +2293,6 @@ class DeviceState:
     @audioVolumes.setter
     def audioVolumes(self, value: AudioVolumes):
         self.setScryptedProperty("audioVolumes", value)
-
-    @property
-    def fontSize(self) -> float:
-        return self.getScryptedProperty("fontSize")
-
-    @fontSize.setter
-    def fontSize(self, value: float):
-        self.setScryptedProperty("fontSize", value)
-
-    @property
-    def origin(self) -> Point:
-        return self.getScryptedProperty("origin")
-
-    @origin.setter
-    def origin(self, value: Point):
-        self.setScryptedProperty("origin", value)
-
-    @property
-    def text(self) -> str:
-        return self.getScryptedProperty("text")
-
-    @text.setter
-    def text(self, value: str):
-        self.setScryptedProperty("text", value)
 
     @property
     def recordingActive(self) -> bool:
@@ -2811,14 +2796,13 @@ ScryptedInterfaceDescriptors = {
     ],
     "properties": []
   },
-  "VideoTextOverlay": {
-    "name": "VideoTextOverlay",
-    "methods": [],
-    "properties": [
-      "fontSize",
-      "origin",
-      "text"
-    ]
+  "VideoTextOverlays": {
+    "name": "VideoTextOverlays",
+    "methods": [
+      "getVideoTextOverlays",
+      "setVideoTextOverlay"
+    ],
+    "properties": []
   },
   "VideoRecorder": {
     "name": "VideoRecorder",

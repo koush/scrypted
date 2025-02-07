@@ -968,11 +968,15 @@ export interface VideoTextOverlay {
    */
   origin?: Point;
   fontSize?: number;
-  text?: string;
+  /**
+   * The text value to set the overlay to, if it is not readonly. True or false otherwise to enable/disable.
+   */
+  text?: string | boolean;
+  readonly?: boolean;
 }
 
 export interface VideoTextOverlays {
-  getVideoTextOverlays(): Promise<Record<string, string>>;
+  getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>>;
   setVideoTextOverlay(id: string, value: VideoTextOverlay): Promise<void>;
 }
 
@@ -2296,7 +2300,7 @@ export enum ScryptedInterface {
   Display = "Display",
   VideoCamera = "VideoCamera",
   VideoCameraMask = "VideoCameraMask",
-  VideoTextOverlay = "VideoTextOverlay",
+  VideoTextOverlays = "VideoTextOverlays",
   VideoRecorder = "VideoRecorder",
   VideoRecorderManagement = "VideoRecorderManagement",
   PanTiltZoom = "PanTiltZoom",
