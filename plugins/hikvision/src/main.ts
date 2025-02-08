@@ -48,8 +48,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         const overlays = await client.getOverlay();
         const ret: Record<string, VideoTextOverlay> = {};
 
-        for (const overlay of overlays.json.VideoOverlay.TextOverlayList) {
-            const to = overlay.TextOverlay[0];
+        for (const to of overlays.json.VideoOverlay.TextOverlayList?.[0]?.TextOverlay) {
             ret[to.id[0]] = {
                 text: to.displayText[0],
             }
@@ -61,12 +60,12 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         const client = this.getClient();
         const overlays = await client.getOverlay();
         // find the overlay by id
-        const overlay = overlays.json.VideoOverlay.TextOverlayList.find(o => o.TextOverlay[0].id[0] === id);
-        overlay.TextOverlay[0].enabled[0] = value.text ? 'true' : 'false';
+        const overlay = overlays.json.VideoOverlay.TextOverlayList?.[0]?.TextOverlay.find(o => o.id[0] === id);
+        overlay.enabled[0] = value.text ? 'true' : 'false';
         if (typeof value.text === 'string')
-            overlay.TextOverlay[0].displayText = [value.text];
+            overlay.displayText = [value.text];
         client.updateOverlayText(id, {
-            TextOverlay: overlay.TextOverlay[0],
+            TextOverlay: overlay,
         });
     }
 
