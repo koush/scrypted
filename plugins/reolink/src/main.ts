@@ -373,8 +373,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     hasSiren() {
-        return this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm?.ver
-            && this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm?.ver !== 0;
+        const channel = this.getRtspChannel();
+        const mainAbility = this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm
+        const channelAbility = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel]?.supportAudioAlarm
+
+        return (mainAbility && mainAbility?.ver !== 0) || (channelAbility && channelAbility?.ver !== 0);
+
     }
 
     hasFloodlight() {
