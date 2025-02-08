@@ -607,4 +607,61 @@ export class ReolinkCameraClient {
             data: response.body,
         };
     }
+
+    async getPirState(on?: boolean) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [{
+            cmd: 'GetPirInfo',
+            action: 0,
+            param: { channel: this.channelId }
+        }];
+
+        const response = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json',
+        }, this.createReadable(body));
+
+        const error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to setWhiteLedState', JSON.stringify(body), error);
+        }
+
+        return response.body?.[0]?.value?.pirInfo;
+    }
+
+    async setPirState(on: boolean) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const currentPir = await this.getPirState();
+        const newState = on ? 1 : 0;
+
+        if (!currentPir || currentPir.enable === newState) {
+            return;
+        }
+
+        const pirInfo = {
+            ...currentPir,
+            channel: this.channelId,
+            enable: newState
+        }
+
+        const body = [{
+            cmd: 'SetPirInfo',
+            action: 0,
+            param: { pirInfo }
+        }];
+
+        const response = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json',
+        }, this.createReadable(body));
+
+        const error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to setPirState', JSON.stringify(body), error);
+        }
+    }
 }

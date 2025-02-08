@@ -78,6 +78,29 @@ class ReolinkCameraFloodlight extends ScryptedDeviceBase implements OnOff, Brigh
     }
 }
 
+class ReolinkCameraPirSensor extends ScryptedDeviceBase implements OnOff {
+    constructor(public camera: ReolinkCamera, nativeId: string) {
+        super(nativeId);
+        this.on = false;
+    }
+
+    async turnOff() {
+        this.on = false;
+        await this.setPir(false);
+    }
+
+    async turnOn() {
+        this.on = true;
+        await this.setPir(true);
+    }
+
+    private async setPir(on: boolean) {
+        const api = this.camera.getClientWithToken();
+
+        await api.setPirState(on);
+    }
+}
+
 class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, Reboot, Intercom, ObjectDetector, PanTiltZoom, Sleep, VideoTextOverlays {
     client: ReolinkCameraClient;
     clientWithToken: ReolinkCameraClient;
@@ -87,6 +110,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     motionTimeout: NodeJS.Timeout;
     siren: ReolinkCameraSiren;
     floodlight: ReolinkCameraFloodlight;
+    pirSensor: ReolinkCameraPirSensor;
     batteryTimeout: NodeJS.Timeout;
 
     storageSettings = new StorageSettings(this, {
@@ -373,6 +397,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         return batteryConfigVer > 0;
     }
 
+    hasPirSensor() {
+        const batteryConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
+        return batteryConfigVer > 0;
+    }
+
     async updateDevice() {
         const interfaces = this.provider.getInterfaces();
         let type = ScryptedDeviceType.Camera;
@@ -396,7 +425,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (this.storageSettings.values.hasObjectDetector) {
             interfaces.push(ScryptedInterface.ObjectDetector);
         }
-        if (this.hasSiren() || this.hasFloodlight())
+        if (this.hasSiren() || this.hasFloodlight() || this.hasPirSensor())
             interfaces.push(ScryptedInterface.DeviceProvider);
         if (this.hasBattery()) {
             interfaces.push(ScryptedInterface.Battery, ScryptedInterface.Sleep);
@@ -886,6 +915,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     async reportDevices() {
         const hasSiren = this.hasSiren();
         const hasFloodlight = this.hasFloodlight();
+        const hasPirSensor = this.hasPirSensor();
 
         const devices: Device[] = [];
 
@@ -925,6 +955,24 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             devices.push(floodlightDevice);
         }
 
+        if (hasPirSensor) {
+            const pirNativeId = `${this.nativeId}-pir`;
+            const pirDevice: Device = {
+                providerNativeId: this.nativeId,
+                name: `${this.name} PIR sensor`,
+                nativeId: pirNativeId,
+                info: {
+                    ...this.info,
+                },
+                interfaces: [
+                    ScryptedInterface.OnOff
+                ],
+                type: ScryptedDeviceType.Switch,
+            };
+
+            devices.push(pirDevice);
+        }
+
         sdk.deviceManager.onDevicesChanged({
             providerNativeId: this.nativeId,
             devices
@@ -938,16 +986,20 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         } else if (nativeId.endsWith('-floodlight')) {
             this.floodlight ||= new ReolinkCameraFloodlight(this, nativeId);
             return this.floodlight;
+        } else if (nativeId.endsWith('-pir')) {
+            this.pirSensor ||= new ReolinkCameraPirSensor(this, nativeId);
+            return this.pirSensor;
         }
     }
 
     async releaseDevice(id: string, nativeId: string) {
         if (nativeId.endsWith('-siren')) {
             delete this.siren;
-        } else
-            if (nativeId.endsWith('-floodlight')) {
-                delete this.floodlight;
-            }
+        } else if (nativeId.endsWith('-floodlight')) {
+            delete this.floodlight;
+        } else if (nativeId.endsWith('-pir')) {
+            delete this.pirSensor;
+        }
     }
 }
 
