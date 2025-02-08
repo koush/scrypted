@@ -2,6 +2,7 @@ import { HttpFetchOptions } from '@scrypted/common/src/http-auth-fetch';
 import { MediaStreamConfiguration, MediaStreamOptions } from '@scrypted/sdk';
 import { Readable } from 'stream';
 import { Destroyable } from '../../rtsp/src/rtsp';
+import { TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
 
 export interface HikvisionCameraStreamSetup {
     videoCodecType: string;
@@ -22,4 +23,14 @@ export interface HikvisionAPI {
     putVcaResource(channel: string, resource: 'smart' | 'facesnap' | 'close'): Promise<boolean>;
     getCodecs(camNumber: string): Promise<MediaStreamOptions[]>;
     configureCodecs(camNumber: string, channelNumber: string, options: MediaStreamOptions): Promise<MediaStreamConfiguration>;
+
+    getOverlay(): Promise<{
+        json: VideoOverlayRoot;
+        xml: any;
+    }>;
+    getOverlayText(overlayId: string): Promise<{
+        json: TextOverlayRoot;
+        xml: any;
+    }>;
+    updateOverlayText(overlayId: string, entry: TextOverlayRoot): Promise<void>;
 }

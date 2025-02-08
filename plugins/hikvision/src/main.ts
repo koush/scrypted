@@ -1,5 +1,5 @@
 import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
 import crypto from 'crypto';
 import { PassThrough } from "stream";
 import xml2js from 'xml2js';
@@ -27,7 +27,7 @@ function channelToCameraNumber(channel: string) {
     return channel.substring(0, channel.length - 2);
 }
 
-export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, ObjectDetector, VideoCameraConfiguration {
+export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, ObjectDetector, VideoCameraConfiguration, VideoTextOverlays {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
@@ -41,6 +41,33 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
+    }
+
+    async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
+        const client = this.getClient();
+        const overlays = await client.getOverlay();
+        const ret: Record<string, VideoTextOverlay> = {};
+
+        for (const overlay of overlays.json.VideoOverlay.TextOverlayList) {
+            const to = overlay.TextOverlay[0];
+            ret[to.id[0]] = {
+                text: to.displayText[0],
+            }
+        }
+        return ret;
+    }
+
+    async setVideoTextOverlay(id: string, value: VideoTextOverlay): Promise<void> {
+        const client = this.getClient();
+        const overlays = await client.getOverlay();
+        // find the overlay by id
+        const overlay = overlays.json.VideoOverlay.TextOverlayList.find(o => o.TextOverlay[0].id[0] === id);
+        overlay.TextOverlay[0].enabled[0] = value.text ? 'true' : 'false';
+        if (typeof value.text === 'string')
+            overlay.TextOverlay[0].displayText = [value.text];
+        client.updateOverlayText(id, {
+            TextOverlay: overlay.TextOverlay[0],
+        });
     }
 
     async reboot() {
@@ -626,6 +653,7 @@ class HikvisionProvider extends RtspProvider {
             ScryptedInterface.Reboot,
             ScryptedInterface.Camera,
             ScryptedInterface.MotionSensor,
+            ScryptedInterface.VideoTextOverlays,
         ];
     }
 

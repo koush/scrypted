@@ -11,6 +11,7 @@ import { CapabiltiesResponse } from './hikvision-api-capabilities';
 import { HikvisionAPI, HikvisionCameraStreamSetup } from "./hikvision-api-channels";
 import { ChannelResponse, ChannelsResponse } from './hikvision-xml-types';
 import { getDeviceInfo } from './probe';
+import { TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
 
 export const detectionMap = {
     human: 'person',
@@ -481,5 +482,48 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             this.console.error('error retrieving channel ids', e);
             return [...defaultMap.values()];
         }
+    }
+
+    async getOverlay() {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/System/Video/inputs/channels/1/overlays`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+        });
+        const json = await xml2js.parseStringPromise(response.body) as VideoOverlayRoot;
+
+        return { json, xml: response.body };
+    }
+
+    async getOverlayText(overlayId: string) {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}//ISAPI/System/Video/inputs/channels/1/overlays/text/${overlayId}`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+        });
+        const json = await xml2js.parseStringPromise(response.body) as TextOverlayRoot;
+
+        return { json, xml: response.body };
+    }
+
+    async updateOverlayText(overlayId: string, entry: TextOverlayRoot) {
+        const builder = new xml2js.Builder();
+        const xml = builder.buildObject(entry);
+
+        await this.request({
+            method: 'PUT',
+            url: `http://${this.ip}//ISAPI/System/Video/inputs/channels/1/overlays/text/${overlayId}`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+            body: xml
+        });
     }
 }
