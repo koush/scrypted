@@ -1,4 +1,4 @@
-import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, VideoCamera, VideoCameraConfiguration, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
 import { AddressInfo } from "net";
 import onvif from 'onvif';
 import { Stream } from "stream";
@@ -13,7 +13,7 @@ import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure, onvifAut
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
-class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, VideoCameraConfiguration, Reboot {
+class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, VideoCameraConfiguration, Reboot, VideoTextOverlays {
     eventStream: Stream;
     client: OnvifCameraAPI;
     rtspMediaStreamOptions: Promise<UrlMediaStreamOptions[]>;
@@ -62,6 +62,42 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         }
 
         this.info = info;
+    }
+
+    async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
+        const client = await this.getClient();
+        const osds = await client.getOSDs();
+        const ret: Record<string, VideoTextOverlay> = {};
+        for (const osd of osds.getOSDsResponse.OSDs) {
+            const id = osd.$.token;
+            const readonly = osd.textString.type !== 'Plain' ? true : undefined;
+            // readonly toggling not supported
+            if (readonly)
+                continue;
+            ret[id] = {
+                text: !readonly ? osd.textString.plainText : osd.textString.type,
+                readonly,
+            }
+        }
+        return ret;
+    }
+
+    async setVideoTextOverlay(id: string, value: VideoTextOverlay): Promise<void> {
+        const client = await this.getClient();
+        const osds = await client.getOSDs();
+        const osd = osds.getOSDsResponse.OSDs.find(osd => osd.$.token === id);
+        if (!osd)
+            throw new Error('osd not found');
+        osd.textString.plainText = value.text;
+        await client.setOSD({
+            OSDToken: osd.$.token,
+            plaintext: value.text,
+            position: osd.position.type === 'Custom'
+                ? {
+                    ...osd.position.pos.$,
+                }
+                : osd.position,
+        });
     }
 
     getDetectionInput(detectionId: any, eventId?: any): Promise<MediaObject> {
@@ -418,6 +454,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
             ScryptedInterface.AudioSensor,
             ScryptedInterface.MotionSensor,
             ScryptedInterface.VideoCameraConfiguration,
+            ScryptedInterface.VideoTextOverlays,
         ];
     }
 

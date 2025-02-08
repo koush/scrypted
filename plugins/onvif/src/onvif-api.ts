@@ -368,6 +368,19 @@ export class OnvifCameraAPI {
             this.cam.getDeviceInformation(cb);
         })
     }
+
+    async getOSDs(): Promise<any> {
+        // this function accept video token but why?
+        return promisify(cb => {
+            this.cam.getOSDs(cb);
+        });
+    }
+
+    async setOSD(osd: any) {
+        return promisify(cb => {
+            this.cam.setOSD(osd, cb);
+        });
+    }
 }
 
 export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console, binaryStateEvent: string) {
