@@ -1,4 +1,4 @@
-import { MixinProvider, PanTiltZoom, PanTiltZoomCommand, PanTiltZoomMovement, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, WritableDeviceState } from "@scrypted/sdk";
+import sdk, { MixinProvider, PanTiltZoom, PanTiltZoomCommand, PanTiltZoomMovement, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '../../../common/src/settings-mixin';
 import { connectCameraAPI } from "./onvif-api";
@@ -203,7 +203,8 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
     }
 
     async getCredentials() {
-        const settings = await this.mixinDevice.getSettings();
+        const realDevice = sdk.systemManager.getDeviceById<Settings>(this.id);
+        const settings = await realDevice.getSettings();
         const username = settings.find(s => s.key === 'username')?.value?.toString();
         const password = settings.find(s => s.key === 'password')?.value?.toString();
         const ip = settings.find(s => s.key === 'ip')?.value?.toString();
