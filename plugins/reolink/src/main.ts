@@ -401,6 +401,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         return batteryConfigVer > 0;
     }
 
+    hasPirEvents() {
+        const pirEvents = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
+        return pirEvents > 0;
+    }
+
     hasPirSensor() {
         const batteryConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
         return batteryConfigVer > 0;
@@ -573,7 +578,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 try {
                     const ai = await client.getEvents();
                     ret.emit('data', JSON.stringify(ai));
-                    this.console.log(JSON.stringify(ai));
 
                     const classes: string[] = [];
 
@@ -691,7 +695,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 try {
                     // Battey cameras do not have AI state, they just send events in case of PIR sensor triggered
                     // which equals a motion detected
-                    if (this.hasBattery()) {
+                    if (this.hasPirEvents()) {
                         const value = await client.getEvents();
                         if (!!value?.other?.alarm_state)
                             triggerMotion();
@@ -710,7 +714,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
         })();
 
-        if (this.hasBattery()) {
+        if (this.hasPirEvents()) {
             startEventsAi(ret, triggerMotion);
         } else {
             startAI(ret, triggerMotion);
