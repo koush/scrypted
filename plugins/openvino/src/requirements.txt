@@ -2,6 +2,6 @@
 # openvino 2024.4.0 crashes legacy systems.
 # openvino 2024.3.0 crashes on older CPU (J4105 and older) if level-zero is installed via apt.
 # openvino 2024.2.0 and older crashes on arc dGPU.
-openvino==2024.5.0
+openvino==2025.0.0
 Pillow==10.3.0
 opencv-python-headless==4.10.0.84
