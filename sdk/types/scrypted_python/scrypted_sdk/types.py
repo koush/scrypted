@@ -185,6 +185,7 @@ class ScryptedInterface(str, Enum):
     ScryptedSystemDevice = "ScryptedSystemDevice"
     ScryptedUser = "ScryptedUser"
     SecuritySystem = "SecuritySystem"
+    Sensors = "Sensors"
     Settings = "Settings"
     Sleep = "Sleep"
     StartStop = "StartStop"
@@ -231,6 +232,10 @@ class SecuritySystemMode(str, Enum):
     Disarmed = "Disarmed"
     HomeArmed = "HomeArmed"
     NightArmed = "NightArmed"
+
+class Sensors:
+
+    sensors: list[str]
 
 class SecuritySystemObstruction(str, Enum):
 
@@ -964,7 +969,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.108"
+TYPES_VERSION = "0.3.109"
 
 
 class AirPurifier:
@@ -2677,6 +2682,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "buttons"
+    ]
+  },
+  "Sensors": {
+    "name": "Sensors",
+    "methods": [],
+    "properties": [
+      "sensors"
     ]
   },
   "PressButtons": {

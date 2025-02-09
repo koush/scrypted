@@ -218,6 +218,10 @@ export interface Buttons {
   buttons?: ('doorbell' | string)[];
 }
 
+export interface Sensors {
+  sensors?: string[];
+}
+
 export interface PressButtons {
   pressButton(button: string): Promise<void>;
 }
@@ -2287,6 +2291,7 @@ export enum ScryptedInterface {
   ColorSettingHsv = "ColorSettingHsv",
   Buttons = "Buttons",
   PressButtons = "PressButtons",
+  Sensors = "Sensors",
   Notifier = "Notifier",
   StartStop = "StartStop",
   Pause = "Pause",
