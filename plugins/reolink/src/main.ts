@@ -608,10 +608,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                             });
                         }
                     }
-                    this.console.log(JSON.stringify({
-                        det: od.detections,
-                        ai
-                    }))
                     if (od.detections.length) {
                         triggerMotion();
                         sdk.deviceManager.onDeviceEvent(this.nativeId, ScryptedInterface.ObjectDetector, od);
