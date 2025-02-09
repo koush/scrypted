@@ -55,12 +55,13 @@ rm -f *.deb
 
 # https://github.com/intel/compute-runtime/releases/tag/24.45.31740.9
 # note that at time of commit, IGC supports ubuntu 24.04 only possibly due to their builder being on 24.04.
-IGC_VERSION=2_2.5.6+18417_amd64
+IGC_BASE_VERSION=2.5.6
+IGC_VERSION=2_$IGC_BASE_VERSION+18417_amd64
 COMPUTE_VERSION=24.52.32224.5
 ZERO_GPU_VERSION=1.6.32224.5_amd64
 LIBIGDGMM_VERSION=22.5.5_amd64
-curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v2.1.12/intel-igc-core-$IGC_VERSION.deb
-curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v2.1.12/intel-igc-opencl-$IGC_VERSION.deb
+curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v$IGC_BASE_VERSION/intel-igc-core-$IGC_VERSION.deb
+curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v$IGC_BASE_VERSION/intel-igc-opencl-$IGC_VERSION.deb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-level-zero-gpu-dbgsym_$ZERO_GPU_VERSION.ddeb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-level-zero-gpu_$ZERO_GPU_VERSION.deb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-opencl-icd-dbgsym_"$COMPUTE_VERSION"_amd64.ddeb
