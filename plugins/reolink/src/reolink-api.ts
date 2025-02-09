@@ -580,7 +580,7 @@ export class ReolinkCameraClient {
         }
     }
 
-    async getPidActive() {
+    async getEvents() {
         const url = new URL(`http://${this.host}/api.cgi`);
 
         const body = [
@@ -602,10 +602,7 @@ export class ReolinkCameraClient {
             this.console.error('error during call to getEvents', error);
         }
 
-        return {
-            value: !!response.body?.[0]?.value?.ai?.other?.alarm_state,
-            data: response.body,
-        };
+        return response.body?.[0]?.value?.ai;
     }
 
     async getPirState(on?: boolean) {

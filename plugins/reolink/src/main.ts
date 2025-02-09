@@ -566,6 +566,62 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             }
         }
 
+        const startEventsAi = async (ret: Destroyable, triggerMotion: () => void) => {
+            let hasSucceeded = false;
+            let hasSet = false;
+            while (!killed) {
+                try {
+                    const ai = await client.getEvents();
+                    ret.emit('data', JSON.stringify(ai));
+                    this.console.log(JSON.stringify(ai));
+
+                    const classes: string[] = [];
+
+                    for (const key of Object.keys(ai.value)) {
+                        if (key === 'channel')
+                            continue;
+                        const { support } = ai.value[key];
+                        if (support)
+                            classes.push(key);
+                    }
+
+                    if (!classes.length)
+                        return;
+
+
+                    if (!hasSet) {
+                        hasSet = true;
+                        this.storageSettings.values.hasObjectDetector = ai;
+                    }
+
+                    hasSucceeded = true;
+                    const od: ObjectsDetected = {
+                        timestamp: Date.now(),
+                        detections: [],
+                    };
+                    for (const c of classes) {
+                        const { alarm_state } = ai.value[c];
+                        if (alarm_state) {
+                            od.detections.push({
+                                className: c,
+                                score: 1,
+                            });
+                        }
+                    }
+                    if (od.detections.length) {
+                        triggerMotion();
+                        sdk.deviceManager.onDeviceEvent(this.nativeId, ScryptedInterface.ObjectDetector, od);
+                    }
+                }
+                catch (e) {
+                    if (!hasSucceeded)
+                        return;
+                    ret.emit('error', e);
+                }
+                await sleep(1000);
+            }
+        }
+
         const useOnvifDetections: boolean = (this.storageSettings.values.useOnvifDetections === 'Default'
             && (this.supportsOnvifDetections() || this.storageSettings.values.doorbell))
             || this.storageSettings.values.useOnvifDetections === 'Enabled';
@@ -636,10 +692,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                     // Battey cameras do not have AI state, they just send events in case of PIR sensor triggered
                     // which equals a motion detected
                     if (this.hasBattery()) {
-                        const { value, data } = await client.getPidActive();
-                        if (value)
+                        const value = await client.getEvents();
+                        if (!!value?.other?.alarm_state)
                             triggerMotion();
-                        ret.emit('data', JSON.stringify(data));
+                        ret.emit('data', JSON.stringify(value));
                     } else {
                         const { value, data } = await client.getMotionState();
                         if (value)
@@ -653,7 +709,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 await sleep(1000);
             }
         })();
-        startAI(ret, triggerMotion);
+
+        if (this.hasBattery()) {
+            startEventsAi(ret, triggerMotion);
+        } else {
+            startAI(ret, triggerMotion);
+        }
         return ret;
     }
 
