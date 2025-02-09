@@ -577,10 +577,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
                     const classes: string[] = [];
 
-                    for (const key of Object.keys(ai.value)) {
+                    for (const key of Object.keys(ai)) {
                         if (key === 'channel')
                             continue;
-                        const { support } = ai.value[key];
+                        const { support } = ai[key];
                         if (support)
                             classes.push(key);
                     }
@@ -600,7 +600,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                         detections: [],
                     };
                     for (const c of classes) {
-                        const { alarm_state } = ai.value[c];
+                        const { alarm_state } = ai[c];
                         if (alarm_state) {
                             od.detections.push({
                                 className: c,
@@ -608,6 +608,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                             });
                         }
                     }
+                    this.console.log(JSON.stringify({
+                        det: od.detections,
+                        ai
+                    }))
                     if (od.detections.length) {
                         triggerMotion();
                         sdk.deviceManager.onDeviceEvent(this.nativeId, ScryptedInterface.ObjectDetector, od);
