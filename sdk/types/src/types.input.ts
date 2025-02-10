@@ -218,8 +218,14 @@ export interface Buttons {
   buttons?: ('doorbell' | string)[];
 }
 
+export interface Sensor {
+  name: string;
+  value?: string | number;
+  unit?: string;
+}
+
 export interface Sensors {
-  sensors?: string[];
+  sensors: Record<string, Sensor>;
 }
 
 export interface PressButtons {

@@ -233,9 +233,15 @@ class SecuritySystemMode(str, Enum):
     HomeArmed = "HomeArmed"
     NightArmed = "NightArmed"
 
+class Sensor(TypedDict):
+
+    name: str
+    value: str | float
+    unit: str
+
 class Sensors:
 
-    sensors: list[str]
+    sensors:  Mapping[str, Sensor]
 
 class SecuritySystemObstruction(str, Enum):
 
