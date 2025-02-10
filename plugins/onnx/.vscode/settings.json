@@ -1,7 +1,7 @@
 
 {
     // docker installation
-    "scrypted.debugHost": "koushik-winvm",
+    "scrypted.debugHost": "scrypted-nvr",
     "scrypted.serverRoot": "/server",
  
     // pi local installation

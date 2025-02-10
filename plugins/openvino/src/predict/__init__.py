@@ -1,25 +1,34 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import math
+import os
+import socket
 import traceback
 import urllib.request
-from typing import Any, List, Tuple, Mapping
+from typing import Any, List, Mapping, Tuple
 
 import scrypted_sdk
 from PIL import Image
-from scrypted_sdk.types import (
-    ObjectDetectionResult,
-    ObjectDetectionSession,
-    ObjectsDetected,
-    Setting,
-)
+from scrypted_sdk.types import (ObjectDetectionResult, ObjectDetectionSession,
+                                ObjectsDetected, Setting)
 
 import common.colors
 from detect import DetectPlugin
 from predict.rectangle import Rectangle
 
+original_getaddrinfo = socket.getaddrinfo
+
+# Sort the results to put IPv4 addresses first
+# downloadFile uses socket.getaddrinfo to resolve the hostname
+# which returns ipv6 first, causing issues on systems/networks with broken ipv6
+# since it hangs forever.
+# change the sort policy to use ipv4 first.
+def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    results = original_getaddrinfo(host, port, family, type, proto, flags)
+    sorted_results = sorted(results, key=lambda x: (x[0] != socket.AF_INET, x[1]))
+    return sorted_results
+socket.getaddrinfo = custom_getaddrinfo
 
 class Prediction:
     def __init__(self, id: int, score: float, bbox: Rectangle, embedding: str = None):
@@ -71,6 +80,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
             filesPath = os.path.join(os.environ["SCRYPTED_PLUGIN_VOLUME"], "files")
             fullpath = os.path.join(filesPath, filename)
             if os.path.isfile(fullpath):
+                print("File already exists", fullpath)
                 return fullpath
             tmp = fullpath + ".tmp"
             print("Creating directory for", tmp)
@@ -78,7 +88,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
             print("Downloading", url)
             response = urllib.request.urlopen(url)
             if response.getcode() < 200 or response.getcode() >= 300:
-                raise Exception(f"Error downloading")
+                raise Exception(f"non-2xx response code")
             read = 0
             with open(tmp, "wb") as f:
                 while True:
@@ -86,15 +96,13 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
                     if not data:
                         break
                     read += len(data)
-                    print("Downloaded", read, "bytes")
                     f.write(data)
             os.rename(tmp, fullpath)
+            print("Downloaded", fullpath, read, "bytes")
             return fullpath
         except:
-            print("Error downloading", url)
-            import traceback
-
             traceback.print_exc()
+            print("Error downloading", url)
             raise
 
     def getClasses(self) -> list[str]:

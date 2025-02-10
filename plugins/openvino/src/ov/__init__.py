@@ -198,7 +198,7 @@ class OpenVINOPlugin(
             f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
             f"{model_version}/{model}/{precision}/{ovmodel}.xml",
         )
-        binFile = self.downloadFile(
+        self.downloadFile(
             f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.bin",
             f"{model_version}/{model}/{precision}/{ovmodel}.bin",
         )
@@ -222,8 +222,6 @@ class OpenVINOPlugin(
                 "https://github.com/koush/openvino-models/raw/main/coco_labels.txt",
                 "coco_labels.txt",
             )
-
-        print(xmlFile, binFile, labelsFile)
 
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
