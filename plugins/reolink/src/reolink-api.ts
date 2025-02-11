@@ -60,9 +60,9 @@ export interface AIDetectionState {
     support: number;
 }
 
-export type AIState = {
-    [key: string]: AIDetectionState;
-} & {
+type AiKey = 'dog_cat' | 'face' | 'other' | 'package' | 'people';
+
+export type AIState = Partial<Record<AiKey, AIDetectionState>> & {
     channel: number;
 };
 
@@ -602,7 +602,10 @@ export class ReolinkCameraClient {
             this.console.error('error during call to getEvents', error);
         }
 
-        return response.body?.[0]?.value?.ai;
+        return {
+            value: (response.body?.[0]?.value?.ai || response.body?.value?.ai) as AIState,
+            data: response.body,
+        };
     }
 
     async getPirState(on?: boolean) {
