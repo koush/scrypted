@@ -60,9 +60,9 @@ export interface AIDetectionState {
     support: number;
 }
 
-export type AIState = {
-    [key: string]: AIDetectionState;
-} & {
+type AiKey = 'dog_cat' | 'face' | 'other' | 'package' | 'people';
+
+export type AIState = Partial<Record<AiKey, AIDetectionState>> & {
     channel: number;
 };
 
@@ -580,7 +580,7 @@ export class ReolinkCameraClient {
         }
     }
 
-    async getPidActive() {
+    async getEvents() {
         const url = new URL(`http://${this.host}/api.cgi`);
 
         const body = [
@@ -603,7 +603,7 @@ export class ReolinkCameraClient {
         }
 
         return {
-            value: !!response.body?.[0]?.value?.ai?.other?.alarm_state,
+            value: (response.body?.[0]?.value?.ai || response.body?.value?.ai) as AIState,
             data: response.body,
         };
     }
