@@ -100,6 +100,14 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             info.firmware = deviceInfo.firmwareVersion;
             info.serialNumber = deviceInfo.serialNumber;
         }
+        try {
+            await client.getSupplementLight();
+            this.console.log('Supplemental light detected.');
+            this.storage.setItem('hasSupplementalLight', 'true');
+        } catch (error) {
+            this.console.warn('Supplemental light not supported on this device.', error);
+            this.storage.setItem('hasSupplementalLight', 'false');
+        }   
         this.info = info;
     }
 
@@ -401,6 +409,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     updateDevice() {
         const doorbellType = this.storage.getItem('doorbellType');
         const isDoorbell = doorbellType === 'true';
+        const hasSupplementalLight = this.storage.getItem('hasSupplementalLight') === 'true';
 
         const twoWayAudio = this.storage.getItem('twoWayAudio') === 'true'
             || this.storage.getItem('twoWayAudio') === 'ONVIF'
@@ -419,6 +428,10 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         if (this.hasSmartDetection)
             interfaces.push(ScryptedInterface.ObjectDetector);
 
+        if (hasSupplementalLight) {
+            interfaces.push(ScryptedInterface.OnOff);
+        }
+    
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
@@ -631,6 +644,51 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             url: `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/close`,
             method: 'PUT',
         });
+    }
+
+    async turnOn(): Promise<void> {
+        const client = this.getClient();
+    
+        try {
+            const { json } = await client.getSupplementLight();
+    
+            json.SupplementLight.mixedLightBrightnessRegulatMode = ['manual'];
+            json.SupplementLight.supplementLightMode = ['colorVuWhiteLight'];
+            json.SupplementLight.whiteLightBrightness = [{ _: '100', $: { min: '0', max: '100' } }];
+    
+            await client.updateSupplementLight(json);
+            this.on = true;
+    
+            this.console.log('Supplemental light turned ON successfully.');
+        } catch (error) {
+            this.console.error('Failed to turn on the supplemental light:', error);
+        }
+    }
+    
+    async turnOff(): Promise<void> {
+        const client = this.getClient();
+    
+        try {
+            const { json } = await client.getSupplementLight();
+    
+            json.SupplementLight.supplementLightMode = ['close'];
+    
+            await client.updateSupplementLight(json);
+            this.on = false;
+    
+            this.console.log('Supplemental light turned OFF successfully.');
+        } catch (error) {
+            this.console.error('Failed to turn off the supplemental light:', error);
+        }
+    }
+    
+    get supplementalLightOn(): boolean {
+        return this.storage.getItem('supplementalLightOn') === 'true';
+    }
+    
+    set supplementalLightOn(value: boolean) {
+        this.storage.setItem('supplementalLightOn', value.toString());
+        this.onDeviceEvent(ScryptedInterface.OnOff, value);
     }
 }
 

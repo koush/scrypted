@@ -12,6 +12,7 @@ import { HikvisionAPI, HikvisionCameraStreamSetup } from "./hikvision-api-channe
 import { ChannelResponse, ChannelsResponse } from './hikvision-xml-types';
 import { getDeviceInfo } from './probe';
 import { TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
+import { SupplementLightRoot } from './hikvision-api-supplemental-light';
 
 export const detectionMap = {
     human: 'person',
@@ -526,4 +527,33 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             body: xml
         });
     }
+
+    async getSupplementLight(): Promise<{ json: SupplementLightRoot; xml: any }> {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+        });
+    
+        const json = await xml2js.parseStringPromise(response.body) as SupplementLightRoot;
+        return { json, xml: response.body };
+    }    
+
+    async updateSupplementLight(supplementLight: SupplementLightRoot): Promise<void> {
+        const builder = new xml2js.Builder();
+        const xml = builder.buildObject(supplementLight);
+        await this.request({
+            method: 'PUT',
+            url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+            body: xml,
+        });
+    }
+
 }

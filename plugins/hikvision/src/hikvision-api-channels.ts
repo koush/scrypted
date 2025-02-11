@@ -3,6 +3,7 @@ import { MediaStreamConfiguration, MediaStreamOptions } from '@scrypted/sdk';
 import { Readable } from 'stream';
 import { Destroyable } from '../../rtsp/src/rtsp';
 import { TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
+import { SupplementLightRoot } from './hikvision-api-supplemental-light';
 
 export interface HikvisionCameraStreamSetup {
     videoCodecType: string;
@@ -33,4 +34,10 @@ export interface HikvisionAPI {
         xml: any;
     }>;
     updateOverlayText(overlayId: string, entry: TextOverlayRoot): Promise<void>;
+
+    getSupplementLight(): Promise<{
+        json: SupplementLightRoot; 
+        xml: any 
+    }>;
+    updateSupplementLight(supplementLight: SupplementLightRoot): Promise<void>;
 }
