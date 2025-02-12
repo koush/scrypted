@@ -174,6 +174,14 @@ export interface ChannelResponse {
 //     ],
 //   }
 
+export interface ValueWithRange {
+    _: string;
+    $: {
+        min: string;
+        max: string;
+    };
+}
+
 export interface SupplementLightRoot {
     SupplementLight: SupplementLight;
 }
@@ -181,15 +189,9 @@ export interface SupplementLightRoot {
 export interface SupplementLight {
     mode: string[];
     Schedule?: Schedule[];
-    brightnessLimit: BrightnessLimit[];
+    brightnessLimit: ValueWithRange[];
     supplementLightMode: string[];
-    irLightBrightness?: LightBrightness[];
-    mixedLightBrightnessRegulatMode?: string[];
-    highIrLightBrightness?: LightBrightness[];
-    highWhiteLightBrightness?: LightBrightness[];
-    lowIrLightBrightness?: LightBrightness[];
-    lowWhiteLightBrightness?: LightBrightness[];
-    whiteLightBrightness?: LightBrightness[];
+    whiteLightBrightness?: ValueWithRange[];
 }
 
 export interface Schedule {
@@ -215,4 +217,10 @@ export interface LightBrightness {
         min: string;
         max: string;
     };
+}
+
+export interface AlarmTriggerConfig {
+    audioAlarmSupported: boolean;
+    whiteLightAlarmSupported: boolean;
+    ioSupported: boolean;
 }

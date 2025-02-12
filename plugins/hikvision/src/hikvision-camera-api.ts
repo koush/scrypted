@@ -9,7 +9,7 @@ import xml2js from 'xml2js';
 import { Destroyable } from '../../rtsp/src/rtsp';
 import { CapabiltiesResponse } from './hikvision-api-capabilities';
 import { HikvisionAPI, HikvisionCameraStreamSetup } from "./hikvision-api-channels";
-import { ChannelResponse, ChannelsResponse, SupplementLightRoot } from './hikvision-xml-types';
+import { AlarmTriggerConfig, ChannelResponse, ChannelsResponse, SupplementLightRoot } from './hikvision-xml-types';
 import { getDeviceInfo } from './probe';
 import { TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
 
@@ -586,7 +586,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             body: newXml,
         });
     }
-    async getAlarm(): Promise<{ json: any; xml: string }> {
+    async getAudioAlarm(): Promise<{ json: any; xml: string }> {
         const response = await this.request({
             method: 'GET',
             url: `http://${this.ip}/ISAPI/Event/triggers/notifications/AudioAlarm?format=json`,
@@ -626,9 +626,8 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         return { json, xml: responseText };
     }
     
-
-    async setAudioAlarmConfig(audioID: string, audioVolume: string, alarmTimes: string): Promise<{ json: any; xml: string }> {
-        const { json } = await this.getAlarm();
+    async setAudioAlarm(audioID: string, audioVolume: string, alarmTimes: string): Promise<{ json: any; xml: string }> {
+        const { json } = await this.getAudioAlarm();
         if (!json?.AudioAlarm) {
             throw new Error("Audio alarm configuration not available.");
         }
@@ -660,6 +659,113 @@ export class HikvisionCameraAPI implements HikvisionAPI {
     
         return { json, xml: response.body };
     }
+
+    async getAlarmTriggerConfig(): Promise<AlarmTriggerConfig & { current?: any }> {
+        const config: AlarmTriggerConfig & { current?: any } = {
+            audioAlarmSupported: false,
+            whiteLightAlarmSupported: false,
+            ioSupported: false,
+        };
+
+        let ioSupported = false;
+        try {
+            const ioResponse = await this.request({
+                url: `http://${this.ip}/ISAPI/System/IO/inputs/capabilities`,
+                responseType: 'text',
+            });
+            const ioXml = ioResponse.body;
+            const ioParsed = await xml2js.parseStringPromise(ioXml);
+            if (ioParsed && ioParsed.IOInputPortList && ioParsed.IOInputPortList.IOInputPort) {
+                ioSupported = true;
+                config.ioSupported = true;
+            }
+        } catch (err) {
+            this.console.warn('IO inputs capabilities not supported');
+            config.ioSupported = false;
+        }
+    
+        if (!ioSupported) {
+            if (typeof (this as any).storage !== 'undefined' && (this as any).storage.setItem) {
+                (this as any).storage.setItem('alarmTriggerConfig', JSON.stringify(config));
+            }
+            return config;
+        }
+    
+        try {
+            const triggersResponse = await this.request({
+                url: `http://${this.ip}/ISAPI/Event/triggersCap`,
+                responseType: 'text',
+            });
+            const triggersXml = triggersResponse.body;
+            const triggersParsed = await xml2js.parseStringPromise(triggersXml);
+            const cap = triggersParsed.EventTriggersCap;
+            if (cap) {
+                if (
+                    cap.isSupportAudioAction &&
+                    cap.isSupportAudioAction[0] &&
+                    cap.isSupportAudioAction[0].toLowerCase() === 'true'
+                ) {
+                    config.audioAlarmSupported = true;
+                }
+                if (
+                    cap.isSupportWhiteLightAction &&
+                    cap.isSupportWhiteLightAction[0] &&
+                    cap.isSupportWhiteLightAction[0].toLowerCase() === 'true'
+                ) {
+                    config.whiteLightAlarmSupported = true;
+                }
+            }
+        } catch (err) {
+            // this.console.error('Error fetching event triggers capabilities', err);
+        }
+    
+        try {
+            const currentResponse = await this.request({
+                url: `http://${this.ip}/ISAPI/Event/triggers/IO-1`,
+                responseType: 'text',
+            });
+            // this.console.log('Current IO trigger configuration:', currentResponse.body);
+            const currentXml = currentResponse.body;
+            const currentParsed = await xml2js.parseStringPromise(currentXml);
+            const eventTrigger = currentParsed.EventTrigger;
+    
+            let notifications: any[] = [];
+            if (
+                eventTrigger.EventTriggerNotificationList &&
+                eventTrigger.EventTriggerNotificationList[0] &&
+                eventTrigger.EventTriggerNotificationList[0].EventTriggerNotification
+            ) {
+                notifications = eventTrigger.EventTriggerNotificationList[0].EventTriggerNotification;
+            }
+    
+            let audioOn = false;
+            let whiteLightOn = false;
+    
+            notifications.forEach((notif: any) => {
+                const id = notif.id && notif.id[0];
+                if (id === 'beep') {
+                    audioOn = true;
+                }
+                if (id === 'whiteLight') {
+                    whiteLightOn = true;
+                }
+            });
+    
+            config.current = {
+                audioOn,
+                whiteLightOn,
+                raw: eventTrigger,
+            };
+        } catch (err) {
+            this.console.error('Error fetching current IO trigger configuration', err);
+        }
+    
+        if (typeof (this as any).storage !== 'undefined' && (this as any).storage.setItem) {
+            (this as any).storage.setItem('alarmTriggerConfig', JSON.stringify(config));
+        }
+    
+        return config;
+    }    
     
     async setAlarmTriggerConfig(alarmTriggerItems: string[]): Promise<{ json: any; xml: string }> {
         const selectedItems = alarmTriggerItems || [];
@@ -715,7 +821,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         return { json: respJson, xml: respXml };
     }
     
-    async setAlarmInput(isOn: boolean): Promise<{ json: any; xml: string }> {
+    async setAlarm(isOn: boolean): Promise<{ json: any; xml: string }> {
         const data = `<IOPortData>
             <enabled>${isOn ? 'true' : 'false'}</enabled>
             <triggering>${isOn ? 'low' : 'high'}</triggering>
@@ -740,7 +846,27 @@ export class HikvisionCameraAPI implements HikvisionAPI {
     
         return { json, xml };
     }
+
+    async getWhiteLightAlarmCapabilities(): Promise<{ json: any; xml: string }> {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/Event/triggers/notifications/whiteLightAlarm/capabilities?format=json`,
+            responseType: 'text',
+            headers: { 'Content-Type': 'application/json' },
+        });
     
+        const responseText = response.body;
+        let json = {};
+    
+        try {
+            json = JSON.parse(responseText);
+        } catch (error) {
+            console.error("Failed to parse JSON response for getWhiteLightAlarmCapabilities:", error);
+        }
+    
+        return { json, xml: responseText };
+    }
+
     async getWhiteLightAlarm(): Promise<{ json: any; xml: string }> {
         const response = await this.request({
             method: 'GET',
@@ -785,23 +911,4 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         return { json: config, xml: response.body };
     }
     
-    async getWhiteLightAlarmCapabilities(): Promise<{ json: any; xml: string }> {
-        const response = await this.request({
-            method: 'GET',
-            url: `http://${this.ip}/ISAPI/Event/triggers/notifications/whiteLightAlarm/capabilities?format=json`,
-            responseType: 'text',
-            headers: { 'Content-Type': 'application/json' },
-        });
-    
-        const responseText = response.body;
-        let json = {};
-    
-        try {
-            json = JSON.parse(responseText);
-        } catch (error) {
-            console.error("Failed to parse JSON response for getWhiteLightAlarmCapabilities:", error);
-        }
-    
-        return { json, xml: responseText };
-    }
 }
