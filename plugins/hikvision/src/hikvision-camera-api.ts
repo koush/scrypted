@@ -9,10 +9,9 @@ import xml2js from 'xml2js';
 import { Destroyable } from '../../rtsp/src/rtsp';
 import { CapabiltiesResponse } from './hikvision-api-capabilities';
 import { HikvisionAPI, HikvisionCameraStreamSetup } from "./hikvision-api-channels";
-import { ChannelResponse, ChannelsResponse } from './hikvision-xml-types';
+import { ChannelResponse, ChannelsResponse, SupplementLightRoot } from './hikvision-xml-types';
 import { getDeviceInfo } from './probe';
 import { TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
-import { SupplementLightRoot } from './hikvision-api-supplemental-light';
 
 export const detectionMap = {
     human: 'person',
@@ -528,7 +527,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         });
     }
 
-    async getSupplementLight(): Promise<{ json: SupplementLightRoot; xml: any }> {
+    async getSupplementLight(): Promise<{ json: SupplementLightRoot | any; xml: any }> {
         const response = await this.request({
             method: 'GET',
             url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight`,
@@ -537,14 +536,46 @@ export class HikvisionCameraAPI implements HikvisionAPI {
                 'Content-Type': 'application/xml',
             },
         });
-    
-        const json = await xml2js.parseStringPromise(response.body) as SupplementLightRoot;
-        return { json, xml: response.body };
-    }    
+        const xml = response.body;
+        const json = await xml2js.parseStringPromise(xml);
+        if (json.ResponseStatus) {
+            return { json, xml };
+        }
+        return { json, xml };
+    }
 
-    async updateSupplementLight(supplementLight: SupplementLightRoot): Promise<void> {
+    async setSupplementLight(params: { on?: boolean, brightness?: number, mode?: 'auto' | 'manual' }): Promise<void> {
+        const { json } = await this.getSupplementLight();
+
+        if (json.ResponseStatus) {
+            throw new Error("Supplemental light is not supported on this device.");
+        }
+
+        const supp: any = json.SupplementLight;
+        if (!supp) {
+            throw new Error("Supplemental light configuration not available.");
+        }
+
+        if (params.on !== undefined) {
+            supp.supplementLightMode = [params.on ? "colorVuWhiteLight" : "close"];
+        }
+        if (params.mode) {
+            supp.mixedLightBrightnessRegulatMode = [params.mode];
+        } else if (params.on !== undefined) {
+            supp.mixedLightBrightnessRegulatMode = [params.on ? "manual" : "auto"];
+        }
+        if (params.brightness !== undefined) {
+            let brightness = params.brightness;
+            if (brightness < 0) brightness = 0;
+            if (brightness > 100) brightness = 100;
+            supp.whiteLightBrightness = [brightness.toString()];
+        }
+        if (params.on === false) {
+            supp.whiteLightBrightness = ["0"];
+        }
+
         const builder = new xml2js.Builder();
-        const xml = builder.buildObject(supplementLight);
+        const newXml = builder.buildObject(json);
         await this.request({
             method: 'PUT',
             url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight`,
@@ -552,8 +583,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             headers: {
                 'Content-Type': 'application/xml',
             },
-            body: xml,
+            body: newXml,
         });
     }
-
 }
