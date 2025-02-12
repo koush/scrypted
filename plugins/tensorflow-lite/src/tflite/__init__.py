@@ -71,8 +71,8 @@ def parse_label_contents(contents: str):
 class TensorFlowLitePlugin(
     PredictPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings
 ):
-    def __init__(self, nativeId: str | None = None):
-        super().__init__(nativeId=nativeId)
+    def __init__(self, nativeId: str | None = None, forked: bool = False):
+        super().__init__(nativeId=nativeId, forked=forked)
 
         edge_tpus = None
         try:
