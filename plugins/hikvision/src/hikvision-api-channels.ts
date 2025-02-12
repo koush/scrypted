@@ -41,4 +41,13 @@ export interface HikvisionAPI {
     }>;
 
     setSupplementLight(params: { on?: boolean, brightness?: number, mode?: 'auto' | 'manual' }): Promise<void>;
+    
+    getAlarm(): Promise<{ json: any; xml: string }>;
+    getAudioAlarmCapabilities(): Promise<{ json: any; xml: string }>;
+    setAudioAlarmConfig(audioID: string, audioVolume: string, alarmTimes: string): Promise<{ json: any; xml: string }>;
+    setAlarmTriggerConfig(alarmTriggerItems: string[]): Promise<{ json: any; xml: string }>;
+    setAlarmInput(isOn: boolean): Promise<{ json: any; xml: string }>;
+    getWhiteLightAlarm(): Promise<{ json: any; xml: string }>;
+    setWhiteLightAlarm(params: { durationTime: number, frequency: string, TimeRangeList?: Array<{ week: number, TimeRange: Array<{ id: number, beginTime: string, endTime: string }> }> }): Promise<{ json: any; xml: string }>;
+    getWhiteLightAlarmCapabilities(): Promise<{ json: any; xml: string }>;
 }

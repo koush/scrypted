@@ -586,4 +586,222 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             body: newXml,
         });
     }
+    async getAlarm(): Promise<{ json: any; xml: string }> {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/Event/triggers/notifications/AudioAlarm?format=json`,
+            responseType: 'text',
+            headers: { 'Content-Type': 'application/json' },
+        });
+    
+        const responseText = response.body;
+        let json: any;
+    
+        try {
+            json = JSON.parse(responseText);
+        } catch (error) {
+            throw new Error("Invalid JSON response from API");
+        }
+    
+        return { json, xml: responseText };
+    }
+
+    async getAudioAlarmCapabilities(): Promise<{ json: any; xml: string }> {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/Event/triggers/notifications/AudioAlarm/capabilities?format=json`,
+            responseType: 'text',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        const responseText = response.body;
+        let json = {};
+
+        try {
+            json = JSON.parse(responseText);
+        } catch (error) {
+            console.error("Failed to parse JSON response for getAudioAlarmCapabilities:", error);
+        }
+
+        return { json, xml: responseText };
+    }
+    
+
+    async setAudioAlarmConfig(audioID: string, audioVolume: string, alarmTimes: string): Promise<{ json: any; xml: string }> {
+        const { json } = await this.getAlarm();
+        if (!json?.AudioAlarm) {
+            throw new Error("Audio alarm configuration not available.");
+        }
+    
+        json.AudioAlarm.TimeRangeList = Array.from({ length: 7 }, (_, week) => ({
+            week: week + 1,
+            TimeRange: [{ id: 1, beginTime: "00:00", endTime: "24:00" }]
+        }));
+    
+        json.AudioAlarm = {
+            ...json.AudioAlarm,
+            audioID: Number(audioID),
+            audioVolume: Number(audioVolume),
+            alarmTimes: Number(alarmTimes),
+            audioClass: "alertAudio",
+            alertAudioID: Number(audioID),
+            customAudioID: 1
+        };
+    
+        const newJsonPayload = JSON.stringify(json);
+    
+        const response = await this.request({
+            method: 'PUT',
+            url: `http://${this.ip}/ISAPI/Event/triggers/notifications/AudioAlarm?format=json`,
+            responseType: 'text',
+            headers: { 'Content-Type': 'application/json' },
+            body: newJsonPayload
+        });
+    
+        return { json, xml: response.body };
+    }
+    
+    async setAlarmTriggerConfig(alarmTriggerItems: string[]): Promise<{ json: any; xml: string }> {
+        const selectedItems = alarmTriggerItems || [];
+    
+        let notifications = [];
+        if (selectedItems.includes('audioAlarm')) {
+            notifications.push({ id: "beep", notificationMethod: "beep", notificationRecurrence: "beginning" });
+            notifications.push({ id: "center", notificationMethod: "center", notificationRecurrence: "beginning" });
+        }
+        if (selectedItems.includes('whiteLight')) {
+            notifications.push({
+                id: "whiteLight",
+                notificationMethod: "whiteLight",
+                notificationRecurrence: "beginning",
+                WhiteLightAction: { whiteLightDurationTime: "0" }
+            });
+        }
+    
+        const payload = {
+            EventTrigger: {
+                id: "IO-1",
+                eventType: "IO",
+                eventDescription: "IO Event trigger Information",
+                inputIOPortID: "1",
+                videoInputChannelID: "1",
+                dynVideoInputChannelID: "1",
+                EventTriggerNotificationList: {
+                    EventTriggerNotification: notifications
+                }
+            }
+        };
+    
+        const builder = new xml2js.Builder();
+        const newXml = builder.buildObject(payload);
+    
+        const response = await this.request({
+            method: 'PUT',
+            url: `http://${this.ip}/ISAPI/Event/triggers/IO-1`,
+            responseType: 'text',
+            headers: { 'Content-Type': 'application/xml' },
+            body: newXml
+        });
+    
+        const respXml = response.body;
+        let respJson = {};
+    
+        try {
+            respJson = await xml2js.parseStringPromise(respXml);
+        } catch (error) {
+            this.console.error("Failed to parse XML response for setAlarmTriggerConfig:", error);
+        }
+    
+        return { json: respJson, xml: respXml };
+    }
+    
+    async setAlarmInput(isOn: boolean): Promise<{ json: any; xml: string }> {
+        const data = `<IOPortData>
+            <enabled>${isOn ? 'true' : 'false'}</enabled>
+            <triggering>${isOn ? 'low' : 'high'}</triggering>
+        </IOPortData>`;
+    
+        const response = await this.request({
+            method: 'PUT',
+            url: `http://${this.ip}/ISAPI/System/IO/inputs/1`,
+            responseType: 'text',
+            headers: { 'Content-Type': 'application/xml' },
+            body: data
+        });
+    
+        const xml = response.body;
+        let json = {};
+    
+        try {
+            json = await xml2js.parseStringPromise(xml);
+        } catch (error) {
+            console.error("Failed to parse XML response for setAlarmInput:", error);
+        }
+    
+        return { json, xml };
+    }
+    
+    async getWhiteLightAlarm(): Promise<{ json: any; xml: string }> {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/Event/triggers/notifications/whiteLightAlarm?format=json`,
+            responseType: 'text',
+            headers: { 'Content-Type': 'application/json' },
+        });
+    
+        const responseText = response.body;
+        let json = {};
+    
+        try {
+            json = JSON.parse(responseText);
+        } catch (error) {
+            console.error("Failed to parse JSON response for getWhiteLightAlarm:", error);
+        }
+    
+        return { json, xml: responseText };
+    }
+    
+    async setWhiteLightAlarm(params: { durationTime: number, frequency: string, TimeRangeList?: Array<{ week: number, TimeRange: Array<{ id: number, beginTime: string, endTime: string }> }> }): Promise<{ json: any; xml: string }> {
+        const config = {
+            WhiteLightAlarm: {
+                durationTime: params.durationTime,
+                frequency: params.frequency,
+                TimeRangeList: params.TimeRangeList ?? Array.from({ length: 7 }, (_, week) => ({
+                    week: week + 1,
+                    TimeRange: [{ id: 1, beginTime: "00:00", endTime: "24:00" }]
+                }))
+            }
+        };
+    
+        const newJsonPayload = JSON.stringify(config);
+    
+        const response = await this.request({
+            method: 'PUT',
+            url: `http://${this.ip}/ISAPI/Event/triggers/notifications/whiteLightAlarm?format=json`,
+            responseType: 'text',
+            headers: { 'Content-Type': 'application/json' },
+            body: newJsonPayload
+        });
+        return { json: config, xml: response.body };
+    }
+    
+    async getWhiteLightAlarmCapabilities(): Promise<{ json: any; xml: string }> {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/Event/triggers/notifications/whiteLightAlarm/capabilities?format=json`,
+            responseType: 'text',
+            headers: { 'Content-Type': 'application/json' },
+        });
+    
+        const responseText = response.body;
+        let json = {};
+    
+        try {
+            json = JSON.parse(responseText);
+        } catch (error) {
+            console.error("Failed to parse JSON response for getWhiteLightAlarmCapabilities:", error);
+        }
+    
+        return { json, xml: responseText };
+    }
 }
