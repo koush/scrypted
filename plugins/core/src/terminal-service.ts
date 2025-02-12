@@ -278,6 +278,8 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
             }
             catch (e) {
                 this.console.log(e);
+            }
+            finally {
                 cp?.kill();
             }
         })();

@@ -401,6 +401,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         return batteryConfigVer > 0;
     }
 
+    hasPirEvents() {
+        const pirEvents = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
+        return pirEvents > 0;
+    }
+
     hasPirSensor() {
         const batteryConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
         return batteryConfigVer > 0;
@@ -516,7 +521,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             let hasSet = false;
             while (!killed) {
                 try {
-                    const ai = await client.getAiState();
+                    const ai = this.hasPirEvents() ? await client.getEvents() : await client.getAiState();
                     ret.emit('data', JSON.stringify(ai.data));
 
                     const classes: string[] = [];
@@ -524,7 +529,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                     for (const key of Object.keys(ai.value)) {
                         if (key === 'channel')
                             continue;
-                        const { alarm_state, support } = ai.value[key];
+                        const { support } = ai.value[key];
                         if (support)
                             classes.push(key);
                     }
@@ -635,9 +640,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 try {
                     // Battey cameras do not have AI state, they just send events in case of PIR sensor triggered
                     // which equals a motion detected
-                    if (this.hasBattery()) {
-                        const { value, data } = await client.getPidActive();
-                        if (value)
+                    if (this.hasPirEvents()) {
+                        const { value, data } = await client.getEvents();
+                        if (!!value?.other?.alarm_state)
                             triggerMotion();
                         ret.emit('data', JSON.stringify(data));
                     } else {
@@ -653,6 +658,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 await sleep(1000);
             }
         })();
+
         startAI(ret, triggerMotion);
         return ret;
     }
