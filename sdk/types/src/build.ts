@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from 'path';
-import { DeclarationReflection, ProjectReflection, ReflectionKind } from 'typedoc';
+import { ArrayType, DeclarationReflection, InferredType, LiteralType, ProjectReflection, ReferenceType, ReflectionKind, SomeType, Type } from 'typedoc';
 import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 
 const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../gen/schema.json')).toString()) as ProjectReflection;
@@ -10,14 +10,19 @@ const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInter
 
 const allProperties: { [property: string]: DeclarationReflection } = {};
 
-function toTypescriptType(type: any): string {
+function toTypescriptType(type: SomeType ): string {
     if (type.type === 'literal')
         return `'${type.value}'`;
     if (type.type === 'array')
         return `${toTypescriptType(type.elementType)}[]`;
     if (type.type === 'union')
         return type.types.map((type: any) => toTypescriptType(type)).join(' | ')
-    return type.name;
+    if (type.type === 'reference') {
+        if (type.typeArguments)
+            return `${type.name}<${type.typeArguments.map((t: any) => toTypescriptType(t)).join(', ')}>`;
+        return type.name;
+    }
+    return (type as any).name;
 }
 
 for (const name of Object.values(ScryptedInterface)) {
@@ -41,11 +46,11 @@ const methods = Object.values(ScryptedInterfaceDescriptors).map(d => d.methods).
 
 const deviceStateContents = `
 export interface DeviceState {
-${Object.entries(allProperties).map(([property, { type, flags }]) => `  ${property}${flags.isOptional ? '?' : ''}: ${toTypescriptType(type)}`).join('\n')};
+${Object.entries(allProperties).map(([property, { type, flags }]) => `  ${property}${flags.isOptional ? '?' : ''}: ${toTypescriptType(type!)}`).join('\n')};
 }
 
 export class DeviceBase implements DeviceState {
-${Object.entries(allProperties).map(([property, { type, flags }]) => `  ${property}${flags.isOptional ? '?' : '!'}: ${toTypescriptType(type)}`).join('\n')};
+${Object.entries(allProperties).map(([property, { type, flags }]) => `  ${property}${flags.isOptional ? '?' : '!'}: ${toTypescriptType(type!)}`).join('\n')};
 }
 `;
 

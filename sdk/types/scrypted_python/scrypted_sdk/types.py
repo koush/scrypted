@@ -233,16 +233,6 @@ class SecuritySystemMode(str, Enum):
     HomeArmed = "HomeArmed"
     NightArmed = "NightArmed"
 
-class Sensor(TypedDict):
-
-    name: str
-    value: str | float
-    unit: str
-
-class Sensors:
-
-    sensors:  Mapping[str, Sensor]
-
 class SecuritySystemObstruction(str, Enum):
 
     Error = "Error"
@@ -892,6 +882,12 @@ class SecuritySystemState(TypedDict):
     obstruction: SecuritySystemObstruction
     supportedModes: list[SecuritySystemMode]
     triggered: bool
+
+class Sensor(TypedDict):
+
+    name: str
+    unit: str
+    value: str | float
 
 class Setting(TypedDict):
 
@@ -1547,6 +1543,10 @@ class SecuritySystem:
         pass
 
 
+class Sensors:
+
+    sensors: Mapping[str, Sensor]
+
 class Settings:
     """Settings viewing and editing of device configurations that describe or modify behavior."""
 
@@ -1915,6 +1915,7 @@ class ScryptedInterfaceProperty(str, Enum):
     rgb = "rgb"
     hsv = "hsv"
     buttons = "buttons"
+    sensors = "sensors"
     running = "running"
     paused = "paused"
     docked = "docked"
@@ -2240,6 +2241,14 @@ class DeviceState:
     @buttons.setter
     def buttons(self, value: list[str]):
         self.setScryptedProperty("buttons", value)
+
+    @property
+    def sensors(self) -> Mapping[str, Sensor]:
+        return self.getScryptedProperty("sensors")
+
+    @sensors.setter
+    def sensors(self, value: Mapping[str, Sensor]):
+        self.setScryptedProperty("sensors", value)
 
     @property
     def running(self) -> bool:
@@ -2690,19 +2699,19 @@ ScryptedInterfaceDescriptors = {
       "buttons"
     ]
   },
-  "Sensors": {
-    "name": "Sensors",
-    "methods": [],
-    "properties": [
-      "sensors"
-    ]
-  },
   "PressButtons": {
     "name": "PressButtons",
     "methods": [
       "pressButton"
     ],
     "properties": []
+  },
+  "Sensors": {
+    "name": "Sensors",
+    "methods": [],
+    "properties": [
+      "sensors"
+    ]
   },
   "Notifier": {
     "name": "Notifier",
