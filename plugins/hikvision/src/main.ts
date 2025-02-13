@@ -199,19 +199,6 @@ export class HikvisionAlarmSwitch extends ScryptedDeviceBase implements OnOff, S
         } catch (e) {
             this.console.error('[AlarmSwitch] Error fetching current white light alarm configuration:', e);
         }
-
-        const triggerItems: string[] = this.storageSettings.values.alarmTriggerItems || [];
-        if (!triggerItems.includes('audioAlarm')) {
-            settings = settings.filter(s =>
-                !['audioAlarmType', 'audioAlarmVolume', 'alarmTimes', 'audioClass', 'customAudioID'].includes(s.key)
-            );
-        }
-        if (!triggerItems.includes('whiteLight')) {
-            settings = settings.filter(s =>
-                !['whiteLightDuration', 'whiteLightFrequency'].includes(s.key)
-            );
-        }
-
         return settings;
     }
     
@@ -220,27 +207,24 @@ export class HikvisionAlarmSwitch extends ScryptedDeviceBase implements OnOff, S
 
         const selectedItems: string[] = this.storageSettings.values.alarmTriggerItems || [];
         try {
-            if (selectedItems.includes('audioAlarm')) {
-                const { audioAlarmType, audioAlarmVolume, alarmTimes } = this.storageSettings.values;
-                await this.camera.getClient().setAudioAlarm(
-                    audioAlarmType,
-                    audioAlarmVolume.toString(),
-                    alarmTimes.toString()
-                );
-            }
-            if (selectedItems.includes('whiteLight')) {
-                const { whiteLightDuration, whiteLightFrequency } = this.storageSettings.values;
-                await this.camera.getClient().setWhiteLightAlarm({
-                    durationTime: Number(whiteLightDuration),
-                    frequency: whiteLightFrequency
-                });
-            }
+            const { audioAlarmType, audioAlarmVolume, alarmTimes } = this.storageSettings.values;
+            await this.camera.getClient().setAudioAlarm(
+                audioAlarmType,
+                audioAlarmVolume.toString(),
+                alarmTimes.toString()
+            );
+        
+            const { whiteLightDuration, whiteLightFrequency } = this.storageSettings.values;
+            await this.camera.getClient().setWhiteLightAlarm({
+                durationTime: Number(whiteLightDuration),
+                frequency: whiteLightFrequency
+            });
+        
             await this.camera.getClient().setAlarmTriggerConfig(selectedItems);
         } catch (e) {
             this.console.error('[AlarmSwitch] Error updating alarm configuration:', e);
         }
     }
-
 
     async turnOn(): Promise<void> {
         this.on = true;
