@@ -173,3 +173,54 @@ export interface ChannelResponse {
 //       },
 //     ],
 //   }
+
+export interface ValueWithRange {
+    _: string;
+    $: {
+        min: string;
+        max: string;
+    };
+}
+
+export interface SupplementLightRoot {
+    SupplementLight: SupplementLight;
+}
+
+export interface SupplementLight {
+    mode: string[];
+    Schedule?: Schedule[];
+    brightnessLimit: ValueWithRange[];
+    supplementLightMode: string[];
+    whiteLightBrightness?: ValueWithRange[];
+}
+
+export interface Schedule {
+    TimeRange: TimeRange[];
+}
+
+export interface TimeRange {
+    beginTime: string[];
+    endTime: string[];
+}
+
+export interface BrightnessLimit {
+    _: string;
+    $: {
+        min: string;
+        max: string;
+    };
+}
+
+export interface LightBrightness { 
+    _: string;
+    $: {
+        min: string;
+        max: string;
+    };
+}
+
+export interface AlarmTriggerConfig {
+    audioAlarmSupported: boolean;
+    whiteLightAlarmSupported: boolean;
+    ioSupported: boolean;
+}

@@ -1,5 +1,5 @@
 import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoTextOverlay, VideoTextOverlays, ScryptedDeviceBase, OnOff, Device, Brightness, Settings, SettingValue } from "@scrypted/sdk";
 import crypto from 'crypto';
 import { PassThrough } from "stream";
 import xml2js from 'xml2js';
@@ -10,6 +10,7 @@ import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionAPI } from "./hikvision-api-channels";
 import { autoconfigureSettings, hikvisionAutoConfigureSettings } from "./hikvision-autoconfigure";
 import { detectionMap, HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 
 const rtspChannelSetting: Setting = {
     subgroup: 'Advanced',
@@ -27,11 +28,319 @@ function channelToCameraNumber(channel: string) {
     return channel.substring(0, channel.length - 2);
 }
 
+export class HikvisionAlarmSwitch extends ScryptedDeviceBase implements OnOff, Settings {
+    storageSettings = new StorageSettings(this, {
+        alarmTriggerItems: {
+            title: 'Alarm Trigger Items',
+            description: 'Select the action types to activate with the alarm.',
+            defaultValue: ['audioAlarm', 'whiteLight'],
+            multiple: true,
+            choices: [
+                'audioAlarm',
+                'whiteLight'
+            ],
+        },
+        audioAlarmType: {
+            title: 'Audio Alarm Type',
+            description: 'Select the audio alarm sound clip.',
+            type: 'string',
+            choices: [],
+            defaultValue: '1',
+        },
+        audioAlarmVolume: {
+            title: 'Audio Alarm Volume',
+            description: 'Set the audio alarm volume.',
+            type: 'number',
+            defaultValue: 100,
+        },
+        alarmTimes: {
+            title: 'Alarm Times',
+            description: 'Number of repetitions for the audio alarm.',
+            type: 'number',
+            defaultValue: 5,
+        },
+        // audioClass: {
+        //     title: 'Audio Alarm Class',
+        //     description: 'Select the audio alarm class if supported.',
+        //     type: 'string',
+        //     choices: ['alertAudio', 'promptAudio', 'customAudio'],
+        //     defaultValue: 'alertAudio',
+        // },
+        // customAudioID: {
+        //     title: 'Custom Audio ID',
+        //     description: 'If custom audio is used, select its ID.',
+        //     type: 'number',
+        //     // defaultValue: 1,
+        // },
+        whiteLightDuration: {
+            title: 'White Light Duration (s)',
+            description: 'Duration (in seconds) for which the white light is enabled (1–60).',
+            type: 'number',
+            defaultValue: 15,
+        },
+        whiteLightFrequency: {
+            title: 'White Light Frequency',
+            description: 'Flashing frequency (e.g., high, medium, low, normallyOn).',
+            type: 'string',
+            choices: [],
+            defaultValue: 'normallyOn',
+        },
+    });
+
+    on: boolean;
+
+    constructor(public camera: HikvisionCamera, nativeId: string) {
+        super(nativeId);
+        this.on = false;
+    }
+
+    async getSettings(): Promise<Setting[]> {
+        let settings = await this.storageSettings.getSettings();
+
+        try {
+            const { json } = await this.camera.getClient().getAudioAlarmCapabilities();
+            if (json && json.AudioAlarmCap && json.AudioAlarmCap.audioTypeListCap) {
+                const choices = json.AudioAlarmCap.audioTypeListCap.map((item: any) => ({
+                    title: item.audioDescription,
+                    value: item.audioID.toString()
+                }));
+                const audioAlarmTypeSetting = settings.find(s => s.key === 'audioAlarmType');
+                if (audioAlarmTypeSetting) {
+                    audioAlarmTypeSetting.choices = choices;
+                    if (!audioAlarmTypeSetting.value && choices.length > 0) {
+                        audioAlarmTypeSetting.value = choices[0].value;
+                    }
+                }
+
+                const volCap = json.AudioAlarmCap.audioVolume;
+                const timesCap = json.AudioAlarmCap.alarmTimes;
+                const audioAlarmVolumeSetting = settings.find(s => s.key === 'audioAlarmVolume');
+                if (audioAlarmVolumeSetting && volCap) {
+                    audioAlarmVolumeSetting.range = [Number(volCap["@min"]), Number(volCap["@max"])];
+                    if (!audioAlarmVolumeSetting.value) {
+                        audioAlarmVolumeSetting.value = volCap["@def"];
+                    }
+                }
+
+                const alarmTimesSetting = settings.find(s => s.key === 'alarmTimes');
+                if (alarmTimesSetting && timesCap) {
+                    alarmTimesSetting.range = [Number(timesCap["@min"]), Number(timesCap["@max"])];
+                    if (!alarmTimesSetting.value) {
+                        alarmTimesSetting.value = timesCap["@def"];
+                    }
+                }
+            }
+        } catch (e) {
+            this.console.error('[AlarmSwitch] Error fetching audio alarm capabilities:', e);
+        }
+
+        try {
+            const { json: currentConfig } = await this.camera.getClient().getAudioAlarm();
+            if (currentConfig && currentConfig.AudioAlarm) {
+                const currentAudioID = currentConfig.AudioAlarm.audioID;
+                const audioAlarmTypeSetting = settings.find(s => s.key === 'audioAlarmType');
+                if (audioAlarmTypeSetting) {
+                    audioAlarmTypeSetting.value = currentAudioID.toString();
+                }
+                const currentAudioVolume = currentConfig.AudioAlarm.audioVolume;
+                const audioAlarmVolumeSetting = settings.find(s => s.key === 'audioAlarmVolume');
+                if (audioAlarmVolumeSetting && currentAudioVolume !== undefined) {
+                    audioAlarmVolumeSetting.value = currentAudioVolume.toString();
+                }
+                const currentAlarmTimes = currentConfig.AudioAlarm.alarmTimes;
+                const alarmTimesSetting = settings.find(s => s.key === 'alarmTimes');
+                if (alarmTimesSetting && currentAlarmTimes !== undefined) {
+                    alarmTimesSetting.value = currentAlarmTimes.toString();
+                }
+            }
+        } catch (e) {
+            this.console.error('[AlarmSwitch] Error fetching current audio alarm configuration:', e);
+        }
+
+        try {
+            const { json } = await this.camera.getClient().getWhiteLightAlarmCapabilities();
+            if (json && json.WhiteLightAlarmCap) {
+                const durationCap = json.WhiteLightAlarmCap.durationTime;
+                const whiteLightDurationSetting = settings.find(s => s.key === 'whiteLightDuration');
+                if (whiteLightDurationSetting && durationCap) {
+                    whiteLightDurationSetting.range = [Number(durationCap["@min"]), Number(durationCap["@max"])];
+                    if (!whiteLightDurationSetting.value) {
+                        whiteLightDurationSetting.value = durationCap["@def"];
+                    }
+                }
+                const frequencyCap = json.WhiteLightAlarmCap.frequency;
+                const whiteLightFrequencySetting = settings.find(s => s.key === 'whiteLightFrequency');
+                if (whiteLightFrequencySetting && frequencyCap) {
+                    whiteLightFrequencySetting.choices = frequencyCap["@opt"].split(',');
+                    if (!whiteLightFrequencySetting.value) {
+                        whiteLightFrequencySetting.value = frequencyCap["@def"];
+                    }
+                }
+            }
+        } catch (e) {
+            this.console.error('[AlarmSwitch] Error fetching white light alarm capabilities:', e);
+        }
+
+        try {
+            const { json: currentWhiteLightConfig } = await this.camera.getClient().getWhiteLightAlarm();
+            if (currentWhiteLightConfig && currentWhiteLightConfig.WhiteLightAlarm) {
+                const whiteLightAlarm = currentWhiteLightConfig.WhiteLightAlarm;
+
+                const whiteLightDurationSetting = settings.find(s => s.key === 'whiteLightDuration');
+                if (whiteLightDurationSetting && whiteLightAlarm.durationTime !== undefined) {
+                    whiteLightDurationSetting.value = whiteLightAlarm.durationTime.toString();
+                }
+
+                const whiteLightFrequencySetting = settings.find(s => s.key === 'whiteLightFrequency');
+                if (whiteLightFrequencySetting && whiteLightAlarm.frequency) {
+                    whiteLightFrequencySetting.value = whiteLightAlarm.frequency;
+                }
+            }
+        } catch (e) {
+            this.console.error('[AlarmSwitch] Error fetching current white light alarm configuration:', e);
+        }
+        return settings;
+    }
+    
+    async putSetting(key: string, value: SettingValue): Promise<void> {
+        await this.storageSettings.putSetting(key, value);
+
+        const selectedItems: string[] = this.storageSettings.values.alarmTriggerItems || [];
+        try {
+            const { audioAlarmType, audioAlarmVolume, alarmTimes } = this.storageSettings.values;
+            await this.camera.getClient().setAudioAlarm(
+                audioAlarmType,
+                audioAlarmVolume.toString(),
+                alarmTimes.toString()
+            );
+        
+            const { whiteLightDuration, whiteLightFrequency } = this.storageSettings.values;
+            await this.camera.getClient().setWhiteLightAlarm({
+                durationTime: Number(whiteLightDuration),
+                frequency: whiteLightFrequency
+            });
+        
+            await this.camera.getClient().setAlarmTriggerConfig(selectedItems);
+        } catch (e) {
+            this.console.error('[AlarmSwitch] Error updating alarm configuration:', e);
+        }
+    }
+
+    async turnOn(): Promise<void> {
+        this.on = true;
+        try {
+            await this.camera.getClient().setAlarm(true);
+        } catch (e) {
+            this.console.error('[AlarmSwitch] Error triggering alarm input:', e);
+            throw e;
+        }
+    }
+
+    async turnOff(): Promise<void> {
+        this.on = false;
+        try {
+            await this.camera.getClient().setAlarm(false);
+        } catch (e) {
+            this.console.error('[AlarmSwitch] Error resetting alarm input:', e);
+        }
+    }
+}
+
+export class HikvisionSupplementalLight extends ScryptedDeviceBase implements OnOff, Brightness, Settings {
+    storageSettings = new StorageSettings(this, {
+        mode: {
+            title: 'Mode',
+            description: 'Choose "auto" for automatic brightness control or "manual" for custom brightness.',
+            defaultValue: 'auto',
+            type: 'string',
+            choices: ['auto', 'manual'],
+            onPut: () => {
+                this.setFloodlight(this.on, this.brightness)
+                    .catch(err => this.console.error('Error updating mode', err));
+            },
+        },
+        brightness: {
+            title: 'Manual Brightness',
+            description: 'Set brightness when in manual mode (0 to 100)',
+            defaultValue: 0,
+            type: 'number',
+            placeholder: '0-100',
+            onPut: () => {
+                const brightness = parseInt(this.storage.getItem('brightness') || '0');
+                this.brightness = brightness;
+                if (this.on) {
+                    this.setFloodlight(this.on, brightness)
+                        .catch(err => this.console.error('Error updating brightness', err));
+                }
+            },
+            onGet: async () => {
+                const mode = this.storageSettings.values.mode;
+                if (mode === 'manual') {
+                    const stored = this.storage.getItem('manualBrightness');
+                    return { value: stored && stored !== '' ? stored : '100', range: [0, 100] };
+                }
+                return { value: '', hide: true };
+            }
+        },
+    });
+
+    brightness: number;
+    on: boolean;
+
+    constructor(public camera: HikvisionCamera, nativeId: string) {
+        super(nativeId);
+        this.on = false;
+        this.brightness = 0;
+    }
+
+    async setBrightness(brightness: number): Promise<void> {
+        this.brightness = brightness;
+        const on = brightness > 0;
+        await this.setFloodlight(on, brightness);
+    }
+
+    async turnOff(): Promise<void> {
+        this.on = false;
+        this.brightness = 0;
+        await this.setFloodlight(false, 0);
+    }
+
+    async turnOn(): Promise<void> {
+        this.on = true;
+        if (this.brightness === 0) {
+            this.brightness = 100;
+        }
+        await this.setFloodlight(true, this.brightness);
+    }
+
+    private async setFloodlight(on: boolean, brightness: number): Promise<void> {
+        const api = this.camera.getClient();
+        let mode: 'auto' | 'manual';
+        const storedMode = this.storage.getItem('mode');
+        if (storedMode === 'auto' || storedMode === 'manual') {
+            mode = storedMode;
+        } else {
+            mode = on ? 'manual' : 'auto';
+        }
+        await api.setSupplementLight({ on, brightness, mode });
+    }
+
+    async getSettings(): Promise<Setting[]> {
+        return this.storageSettings.getSettings();
+    }
+
+    async putSetting(key: string, value: SettingValue): Promise<void> {
+        await this.storageSettings.putSetting(key, value);
+    }
+}
+
 export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom, Reboot, ObjectDetector, VideoCameraConfiguration, VideoTextOverlays {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
     hasSmartDetection: boolean;
+    floodlight: HikvisionSupplementalLight;
+    alarm: HikvisionAlarmSwitch;
 
     client: HikvisionAPI;
 
@@ -41,6 +350,9 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
+        (async () => {
+            await this.reportDevices();
+        })();
     }
 
     async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
@@ -67,6 +379,38 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         client.updateOverlayText(id, {
             TextOverlay: overlay,
         });
+    }
+
+    async hasFloodlight(): Promise<boolean> {
+        try {
+            const client = this.getClient();
+            const { json } = await client.getSupplementLight();
+            return !!(json && json.SupplementLight);
+        }
+        catch (e) {
+            if ((e.statusCode && e.statusCode === 403) ||
+                (typeof e.message === 'string' && e.message.includes('403'))) {
+                return false;
+            }
+            this.console.error('Error checking supplemental light', e);
+            return false;
+        }
+    }
+
+    async hasAlarm(): Promise<boolean> {
+        try {
+            const client = this.getClient();
+            const config = await client.getAlarmTriggerConfig();
+            return config.audioAlarmSupported || config.whiteLightAlarmSupported || config.ioSupported;
+        }
+        catch (e) {
+            if ((e.statusCode && e.statusCode === 403) ||
+                (typeof e.message === 'string' && e.message.includes('403'))) {
+                return false;
+            }
+            this.console.error('Error checking alarm', e);
+            return false;
+        }
     }
 
     async reboot() {
@@ -419,6 +763,10 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         if (this.hasSmartDetection)
             interfaces.push(ScryptedInterface.ObjectDetector);
 
+        if (this.hasFloodlight || this.hasAlarm) {
+            interfaces.push(ScryptedInterface.DeviceProvider);
+        }
+
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
@@ -498,6 +846,61 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         return ret;
     }
 
+    async reportDevices() {
+        const devices: Device[] = [];
+
+        if (await this.hasAlarm()) {
+            const alarmNativeId = `${this.nativeId}-alarm`;
+            const alarmDevice: Device = {
+                providerNativeId: this.nativeId,
+                name: `${this.name} Alarm`,
+                nativeId: alarmNativeId,
+                info: {
+                    ...this.info,
+                },
+                interfaces: [
+                    ScryptedInterface.OnOff,
+                    ScryptedInterface.Settings,
+                ],
+                type: ScryptedDeviceType.Switch,
+            };
+            devices.push(alarmDevice);
+        }
+
+        if (await this.hasFloodlight()) {
+            const floodlightNativeId = `${this.nativeId}-floodlight`;
+            const floodlightDevice: Device = {
+                providerNativeId: this.nativeId,
+                name: `${this.name} Floodlight`,
+                nativeId: floodlightNativeId,
+                info: {
+                    ...this.info,
+                },
+                interfaces: [
+                    ScryptedInterface.OnOff,
+                    ScryptedInterface.Brightness,
+                    ScryptedInterface.Settings,
+                ],
+                type: ScryptedDeviceType.Light,
+            };
+            devices.push(floodlightDevice);
+        }
+        sdk.deviceManager.onDevicesChanged({
+            providerNativeId: this.nativeId,
+            devices
+        });
+    }
+
+    async getDevice(nativeId: string): Promise<any> {
+        if (nativeId.endsWith('-floodlight')) {
+            this.floodlight ||= new HikvisionSupplementalLight(this, nativeId);
+            return this.floodlight;
+        }
+        if (nativeId.endsWith('-alarm')) {
+            this.alarm ||= new HikvisionAlarmSwitch(this, nativeId);
+            return this.alarm;
+        }
+    }
 
     async startIntercom(media: MediaObject): Promise<void> {
         if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
