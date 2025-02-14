@@ -855,7 +855,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       return;
     }
     if (key.startsWith('zoneinfo-')) {
-      const [zkey, zoneName] = key.substring('zoneinfo-'.length).split('-');
+      const [zkey, ...zoneNameParts] = key.substring('zoneinfo-'.length).split('-');
+      const zoneName = zoneNameParts.join('-');
       this.zoneInfos[zoneName] ||= {};
       this.zoneInfos[zoneName][zkey] = value;
       this.storage.setItem('zoneInfos', JSON.stringify(this.zoneInfos));
