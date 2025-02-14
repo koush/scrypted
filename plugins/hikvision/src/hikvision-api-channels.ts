@@ -18,7 +18,6 @@ export interface HikvisionAPI {
     checkTwoWayAudio(): Promise<boolean>;
     checkDeviceModel(): Promise<string>;
     checkIsOldModel(): Promise<boolean>;
-    checkStreamSetup(channel: string, isOld: boolean): Promise<HikvisionCameraStreamSetup>;
     jpegSnapshot(channel: string, timeout: number): Promise<Buffer>;
     listenEvents(): Promise<Destroyable>;
     putVcaResource(channel: string, resource: 'smart' | 'facesnap' | 'close'): Promise<boolean>;

@@ -128,31 +128,6 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         return !!oldModels.find(oldModel => model?.match(oldModel));
     }
 
-    async checkStreamSetup(channel: string, isOld: boolean): Promise<HikvisionCameraStreamSetup> {
-        if (isOld) {
-            this.console.error('NVR is old version.  Defaulting camera capabilities to H.264/AAC');
-            return {
-                videoCodecType: "H.264",
-                audioCodecType: "AAC",
-            }
-        }
-
-        const response = await this.request({
-            url: `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/capabilities`,
-            responseType: 'text',
-        });
-
-        // this is bad:
-        // <videoCodecType opt="H.264,H.265">H.265</videoCodecType>
-        const vcodec = response.body.match(/>(.*?)<\/videoCodecType>/);
-        const acodec = response.body.match(/>(.*?)<\/audioCompressionType>/);
-
-        return {
-            videoCodecType: vcodec?.[1],
-            audioCodecType: acodec?.[1],
-        }
-    }
-
     async jpegSnapshot(channel: string, timeout = 10000): Promise<Buffer> {
         const url = `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/picture?snapShotImageType=JPEG`
 
