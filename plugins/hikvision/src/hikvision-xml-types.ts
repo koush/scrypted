@@ -216,11 +216,5 @@ export interface LightBrightness {
     $: {
         min: string;
         max: string;
-    };
-}
-
-export interface AlarmTriggerConfig {
-    audioAlarmSupported: boolean;
-    whiteLightAlarmSupported: boolean;
-    ioSupported: boolean;
+    }
 }

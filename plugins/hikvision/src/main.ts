@@ -34,7 +34,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
     hasSmartDetection: boolean;
-    floodlight: HikvisionSupplementalLight;
+    supplementLight: HikvisionSupplementalLight;
     alarm: HikvisionAlarmSwitch;
 
     client: HikvisionAPI;
@@ -45,9 +45,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
-        (async () => {
-            await this.reportDevices();
-        })();
+        this.reportDevices();
     }
 
     async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
@@ -76,7 +74,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         });
     }
 
-    async hasFloodlight(): Promise<boolean> {
+    async hasSupplementLight(): Promise<boolean> {
         try {
             const client = this.getClient();
             const { json } = await client.getSupplementLight();
@@ -95,10 +93,26 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     async hasAlarm(): Promise<boolean> {
         try {
             const client = this.getClient();
-            const config = await client.getAlarmTriggerConfig();
-            return config.audioAlarmSupported || config.whiteLightAlarmSupported || config.ioSupported;
-        }
-        catch (e) {
+            const { json: capabilitiesJson } = await client.getAlarmCapabilities();
+            let ports = capabilitiesJson.IOInputPortList?.IOInputPort;
+            if (!ports) return false;
+            if (!Array.isArray(ports)) {
+                ports = [ports];
+            }
+    
+            for (const port of ports) {
+                const portId = port.id[0];
+                try {
+                    const alarm = await client.getAlarm(portId);
+                    if (alarm.json && alarm.json.eventType && alarm.json.eventType[0] === 'IO') {
+                        return true;
+                    }
+                } catch (ex) {
+                    continue;
+                }
+            }
+            return false;
+        } catch (e) {
             if ((e.statusCode && e.statusCode === 403) ||
                 (typeof e.message === 'string' && e.message.includes('403'))) {
                 return false;
@@ -458,10 +472,6 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         if (this.hasSmartDetection)
             interfaces.push(ScryptedInterface.ObjectDetector);
 
-        if (this.hasFloodlight || this.hasAlarm) {
-            interfaces.push(ScryptedInterface.DeviceProvider);
-        }
-
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
@@ -543,7 +553,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
     async reportDevices() {
         const devices: Device[] = [];
-
+    
         if (await this.hasAlarm()) {
             const alarmNativeId = `${this.nativeId}-alarm`;
             const alarmDevice: Device = {
@@ -555,19 +565,18 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 },
                 interfaces: [
                     ScryptedInterface.OnOff,
-                    ScryptedInterface.Settings,
                 ],
                 type: ScryptedDeviceType.Switch,
             };
             devices.push(alarmDevice);
         }
-
-        if (await this.hasFloodlight()) {
-            const floodlightNativeId = `${this.nativeId}-floodlight`;
-            const floodlightDevice: Device = {
+    
+        if (await this.hasSupplementLight()) {
+            const supplementLightNativeId = `${this.nativeId}-supplementlight`;
+            const supplementLightDevice: Device = {
                 providerNativeId: this.nativeId,
-                name: `${this.name} Floodlight`,
-                nativeId: floodlightNativeId,
+                name: `${this.name} Supplemental Light`,
+                nativeId: supplementLightNativeId,
                 info: {
                     ...this.info,
                 },
@@ -578,18 +587,22 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 ],
                 type: ScryptedDeviceType.Light,
             };
-            devices.push(floodlightDevice);
+            devices.push(supplementLightDevice);
         }
-        sdk.deviceManager.onDevicesChanged({
-            providerNativeId: this.nativeId,
-            devices
-        });
-    }
 
+        if (devices.length > 0) {
+            sdk.deviceManager.onDevicesChanged({
+                providerNativeId: this.nativeId,
+                devices,
+            });
+        }
+    
+    }
+    
     async getDevice(nativeId: string): Promise<any> {
-        if (nativeId.endsWith('-floodlight')) {
-            this.floodlight ||= new HikvisionSupplementalLight(this, nativeId);
-            return this.floodlight;
+        if (nativeId.endsWith('-supplementlight')) {
+            this.supplementLight ||= new HikvisionSupplementalLight(this, nativeId);
+            return this.supplementLight;
         }
         if (nativeId.endsWith('-alarm')) {
             this.alarm ||= new HikvisionAlarmSwitch(this, nativeId);
