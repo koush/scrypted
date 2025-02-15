@@ -472,7 +472,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         if (this.hasSmartDetection)
             interfaces.push(ScryptedInterface.ObjectDetector);
 
-        if (this.hasAlarm || this.hasSupplementLight)
+        if (this.hasAlarm || this.hasSupplementLight) 
             interfaces.push(ScryptedInterface.DeviceProvider);
 
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
@@ -568,6 +568,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 },
                 interfaces: [
                     ScryptedInterface.OnOff,
+                    ScryptedInterface.Readme,
                 ],
                 type: ScryptedDeviceType.Switch,
             };
