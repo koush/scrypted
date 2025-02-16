@@ -22,6 +22,7 @@ class OpenVINOFaceRecognition(FaceRecognizeDetection):
 
     def downloadModel(self, model: str):
         scrypted_yolov9 = "scrypted_yolov9" in model
+        inception = "inception" in model
         ovmodel = "best-converted" if scrypted_yolov9 else "best"
         precision = self.plugin.precision
         model_version = "v8"
@@ -33,7 +34,12 @@ class OpenVINOFaceRecognition(FaceRecognizeDetection):
             f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.bin",
             f"{model_version}/{model}/{precision}/{ovmodel}.bin",
         )
-        return self.plugin.core.compile_model(xmlFile, self.plugin.mode if scrypted_yolov9 else self.plugin.face_recognition_mode)
+        if inception:
+            model = self.plugin.core.read_model(xmlFile)
+            model.reshape([1, 3, 160, 160])
+            return self.plugin.core.compile_model(model, self.plugin.mode)
+        else:
+            return self.plugin.core.compile_model(xmlFile, self.plugin.mode)
 
     async def predictDetectModel(self, input: Image.Image):
         def predict():

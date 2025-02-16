@@ -154,13 +154,6 @@ class OpenVINOPlugin(
             elif gpu:
                 mode = f"GPU"
 
-        # recognition models are not supported on NPU.
-        self.face_recognition_mode = mode
-        self.text_recognition_mode = mode
-        if "NPU" in mode:
-            # vgg fails if using AUTO:NPU,GPU,CPU or plain NPU
-            self.text_recognition_mode = "AUTO"
-
         mode = mode or "AUTO"
         self.mode = mode
 
