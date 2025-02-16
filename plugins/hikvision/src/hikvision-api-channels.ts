@@ -34,23 +34,10 @@ export interface HikvisionAPI {
     }>;
     updateOverlayText(overlayId: string, entry: TextOverlayRoot): Promise<void>;
 
-    getSupplementLight(): Promise<{
-        json: SupplementLightRoot; 
-        xml: any 
-    }>;
-
+    getSupplementLight(): Promise<{json: SupplementLightRoot; xml: any }>;
     setSupplementLight(params: { on?: boolean, brightness?: number, mode?: 'auto' | 'manual' }): Promise<void>;
-    
 
-    getAlarmTriggerConfig(): Promise<any>;
-    setAlarmTriggerConfig(alarmTriggerItems: string[]): Promise<{ json: any; xml: string }>;
+    getAlarmCapabilities(): Promise<{ json: any; xml: string }>;
+    getAlarm(port: string): Promise<{ json: any; xml: string }>;
     setAlarm(isOn: boolean): Promise<{ json: any; xml: string }>;
-
-    getAudioAlarmCapabilities(): Promise<{ json: any; xml: string }>;
-    getAudioAlarm(): Promise<{ json: any; xml: string }>;
-    setAudioAlarm(audioID: string, audioVolume: string, alarmTimes: string): Promise<{ json: any; xml: string }>;
-
-    getWhiteLightAlarmCapabilities(): Promise<{ json: any; xml: string }>;
-    getWhiteLightAlarm(): Promise<{ json: any; xml: string }>;
-    setWhiteLightAlarm(params: { durationTime: number, frequency: string, TimeRangeList?: Array<{ week: number, TimeRange: Array<{ id: number, beginTime: string, endTime: string }> }> }): Promise<{ json: any; xml: string }>;
 }
