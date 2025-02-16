@@ -76,6 +76,9 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
     async hasSupplementLight(): Promise<boolean> {
         try {
+            if (!this.storage.getItem('ip')) 
+                return false;
+
             const client = this.getClient();
             const { json } = await client.getSupplementLight();
             return !!(json && json.SupplementLight);
@@ -85,13 +88,16 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 (typeof e.message === 'string' && e.message.includes('403'))) {
                 return false;
             }
-            this.console.error('Error checking supplemental light', e);
+            // this.console.error('Error checking supplemental light', e);
             return false;
         }
     }
 
     async hasAlarm(): Promise<boolean> {
         try {
+            if (!this.storage.getItem('ip'))
+                return false;
+
             const client = this.getClient();
             const { json: capabilitiesJson } = await client.getAlarmCapabilities();
             let ports = capabilitiesJson.IOInputPortList?.IOInputPort;
@@ -117,7 +123,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 (typeof e.message === 'string' && e.message.includes('403'))) {
                 return false;
             }
-            this.console.error('Error checking alarm', e);
+            // this.console.error('Error checking alarm', e);
             return false;
         }
     }
@@ -472,7 +478,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         if (this.hasSmartDetection)
             interfaces.push(ScryptedInterface.ObjectDetector);
 
-        if (this.hasAlarm() || this.hasSupplementLight() ) 
+        if (this.hasAlarm() || this.hasSupplementLight()) 
             interfaces.push(ScryptedInterface.DeviceProvider);
 
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
