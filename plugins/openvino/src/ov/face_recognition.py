@@ -24,7 +24,7 @@ class OpenVINOFaceRecognition(FaceRecognizeDetection):
         scrypted_yolov9 = "scrypted_yolov9" in model
         ovmodel = "best-converted" if scrypted_yolov9 else "best"
         precision = self.plugin.precision
-        model_version = "v7"
+        model_version = "v8"
         xmlFile = self.downloadFile(
             f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
             f"{model_version}/{model}/{precision}/{ovmodel}.xml",
