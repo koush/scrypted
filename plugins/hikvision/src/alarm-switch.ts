@@ -11,12 +11,17 @@ export class HikvisionAlarmSwitch extends ScryptedDeviceBase implements OnOff, R
 
     async turnOn() {
         this.on = true;
-        await this.camera.getClient().setAlarm(true);
+        await this.setAlarm(true);
     }
 
     async turnOff() {
         this.on = false;
-        await this.camera.getClient().setAlarm(false);
+        await this.setAlarm(false);
+    }
+    
+    private async setAlarm(state: boolean): Promise<void> {
+        const api = this.camera.getClient();
+        await api.setAlarm(state);
     }
 
     async getReadmeMarkdown(): Promise<string> {
