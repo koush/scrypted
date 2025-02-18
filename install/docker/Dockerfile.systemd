@@ -1,0 +1,17 @@
+ARG BASE="noble-lite"
+FROM ghcr.io/koush/scrypted-common:${BASE}
+
+RUN apt -y update && apt -y install nano net-tools dnsutils dnsmasq
+
+WORKDIR /
+# cache bust
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+ARG SCRYPTED_INSTALL_VERSION="latest"
+RUN test -n "$SCRYPTED_INSTALL_VERSION"
+RUN npx -y scrypted@latest install-server ${SCRYPTED_INSTALL_VERSION}
+
+COPY scrypted.service /etc/systemd/system/scrypted.service
+RUN ln -s /etc/systemd/system/scrypted.service /etc/systemd/system/multi-user.target.wants/scrypted.service
+
+WORKDIR /
+CMD ["/sbin/init"]
