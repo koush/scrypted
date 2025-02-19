@@ -98,7 +98,14 @@ export interface EventListenerRegister {
  * @category Core Reference
  */
 export enum ScryptedDeviceType {
+  /**
+   * @deprecated
+   */
   Builtin = "Builtin",
+  /**
+   * Internal devices will not show up in device lists unless explicitly searched.
+   */
+  Internal = "Internal",
   Camera = "Camera",
   Fan = "Fan",
   Light = "Light",

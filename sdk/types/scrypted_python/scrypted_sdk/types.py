@@ -84,6 +84,7 @@ class ScryptedDeviceType(str, Enum):
     Event = "Event"
     Fan = "Fan"
     Garage = "Garage"
+    Internal = "Internal"
     Irrigation = "Irrigation"
     Light = "Light"
     Lock = "Lock"
@@ -971,7 +972,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.109"
+TYPES_VERSION = "0.3.110"
 
 
 class AirPurifier:
