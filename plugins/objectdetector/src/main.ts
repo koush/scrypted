@@ -1053,7 +1053,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
     process.nextTick(() => {
       sdk.deviceManager.onDeviceDiscovered({
         name: 'FFmpeg Frame Generator',
-        type: ScryptedDeviceType.Builtin,
+        type: ScryptedDeviceType.Internal,
         interfaces: [
           ScryptedInterface.VideoFrameGenerator,
         ],
@@ -1062,7 +1062,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
 
       sdk.deviceManager.onDeviceDiscovered({
         name: 'FFmpeg Audio Detection',
-        type: ScryptedDeviceType.Builtin,
+        type: ScryptedDeviceType.Internal,
         interfaces: [
           ScryptedInterface.MixinProvider,
         ],

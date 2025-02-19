@@ -347,7 +347,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         process.nextTick(() => {
             deviceManager.onDeviceDiscovered({
                 name: 'ONVIF PTZ',
-                type: ScryptedDeviceType.Builtin,
+                type: ScryptedDeviceType.Internal,
                 nativeId: 'ptz',
                 interfaces: [
                     ScryptedInterface.MixinProvider,

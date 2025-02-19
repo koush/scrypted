@@ -622,7 +622,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
                     interfaces: [
                         ScryptedInterface.BufferConverter,
                     ],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                     nativeId: ImageWriterNativeId,
                 },
                 {
@@ -630,7 +630,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
                     interfaces: [
                         ScryptedInterface.BufferConverter,
                     ],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                     nativeId: ImageConverterNativeId,
                 }
             ],
@@ -643,7 +643,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
                     interfaces: [
                         ScryptedInterface.BufferConverter,
                     ],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                     nativeId: ImageReaderNativeId,
                 }
             );
