@@ -902,11 +902,12 @@ class Setting(TypedDict):
     key: str
     multiple: bool
     placeholder: str
-    range: tuple[float, float]  # The range of allowed numbers, if any, when the type is 'number'.
+    radioGroups: list[str]
+    range: tuple[float, float]  # The range of allowed numbers or dates/times, if any, when the type is number, timerange, or daterange, or datetimerange.
     readonly: bool
     subgroup: str
     title: str
-    type: Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any
+    type: Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
 
 class TemperatureCommand(TypedDict):

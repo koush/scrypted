@@ -2257,13 +2257,34 @@ export interface Setting {
   subgroup?: string;
   description?: string;
   placeholder?: string;
-  type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath' | 'interface' | 'html' | 'textarea' | 'date' | 'time' | 'datetime' | 'day' | 'script';
+  type?:
+  'string' |
+  'password' |
+  'number' |
+  'boolean' |
+  'device' |
+  'integer' |
+  'button' |
+  'clippath' |
+  'interface' |
+  'html' |
+  'textarea' |
+  'date' |
+  'time' |
+  'datetime' |
+  'day' |
+  'timerange' |
+  'daterange' |
+  'datetimerange' |
+  'radiobutton' |
+  'script';
   /**
-   * The range of allowed numbers, if any, when the type is 'number'.
+   * The range of allowed numbers or dates/times, if any, when the type is number, timerange, or daterange, or datetimerange.
    */
   range?: [number, number];
   readonly?: boolean;
   choices?: string[];
+  radioGroups?: string[];
   combobox?: boolean;
   deviceFilter?: string;
   multiple?: boolean;
