@@ -21,6 +21,7 @@ ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
+ENV SHELL="/bin/bash"
 
 RUN test -f "/usr/bin/python3" && test -f "/usr/bin/python3.12"
 ENV SCRYPTED_PYTHON_PATH="/usr/bin/python3"

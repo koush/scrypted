@@ -18,6 +18,7 @@ Environment="SCRYPTED_DOCKER_FLAVOR=lite"
 Environment="DEBIAN_FRONTEND=noninteractive"
 Environment="NODE_OPTIONS=--dns-result-order=ipv4first"
 Environment="SCRYPTED_BASE_VERSION=20250101"
+Environment="SHELL=/bin/bash"
 
 [Install]
 WantedBy=multi-user.target
