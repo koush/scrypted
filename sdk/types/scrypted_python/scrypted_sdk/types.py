@@ -907,7 +907,7 @@ class Setting(TypedDict):
     readonly: bool
     subgroup: str
     title: str
-    type: Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any
+    type: Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
 
 class TemperatureCommand(TypedDict):
@@ -973,7 +973,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.110"
+TYPES_VERSION = "0.3.111"
 
 
 class AirPurifier:

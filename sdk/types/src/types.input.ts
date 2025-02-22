@@ -2277,6 +2277,7 @@ export interface Setting {
   'daterange' |
   'datetimerange' |
   'radiobutton' |
+  'radiopanel' |
   'script';
   /**
    * The range of allowed numbers or dates/times, if any, when the type is number, timerange, or daterange, or datetimerange.
