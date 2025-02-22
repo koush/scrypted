@@ -16,16 +16,16 @@ class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: ReolinkCamera, nativeId: string) {
         super(nativeId);
 
-        this.sirenCheckInterval = setInterval(async () => {
-            if (!this.camera.sleeping) {
+        if (!this.camera.interfaces.includes(ScryptedInterface.Sleep)) {
+            this.sirenCheckInterval = setInterval(async () => {
                 const api = this.camera.getClient();
                 const { enabled } = await api.getSiren();
 
                 if (enabled !== this.on) {
                     this.on = enabled;
                 }
-            }
-        }, 2000);
+            }, 2000);
+        }
     }
 
     async turnOff() {
@@ -67,16 +67,16 @@ class ReolinkCameraFloodlight extends ScryptedDeviceBase implements OnOff, Brigh
     constructor(public camera: ReolinkCamera, nativeId: string) {
         super(nativeId);
 
-        this.floodlightCheckInterval = setInterval(async () => {
-            if (!this.camera.sleeping) {
+        if (!this.camera.interfaces.includes(ScryptedInterface.Sleep)) {
+            this.floodlightCheckInterval = setInterval(async () => {
                 const api = this.camera.getClient();
                 const { enabled } = await api.getWhiteLedState();
 
                 if (enabled !== this.on) {
                     this.on = enabled;
                 }
-            }
-        }, 2000);
+            }, 2000);
+        }
     }
 
     async setBrightness(brightness: number): Promise<void> {
@@ -107,16 +107,16 @@ class ReolinkCameraPirSensor extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: ReolinkCamera, nativeId: string) {
         super(nativeId);
 
-        this.pirCheckInterval = setInterval(async () => {
-            if (!this.camera.sleeping) {
+        if (!this.camera.interfaces.includes(ScryptedInterface.Sleep)) {
+            this.pirCheckInterval = setInterval(async () => {
                 const api = this.camera.getClient();
                 const { enabled } = await api.getPirState();
 
                 if (enabled !== this.on) {
                     this.on = enabled;
                 }
-            }
-        }, 2000);
+            }, 2000);
+        }
     }
 
     async turnOff() {
