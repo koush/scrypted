@@ -898,6 +898,8 @@ class Setting(TypedDict):
     description: str
     deviceFilter: str
     group: str
+    icon: str
+    icons: list[str]
     immediate: bool  # Flag that the UI should immediately apply this setting.
     key: str
     multiple: bool
@@ -973,7 +975,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.112"
+TYPES_VERSION = "0.3.113"
 
 
 class AirPurifier:

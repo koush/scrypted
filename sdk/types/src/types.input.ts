@@ -2285,6 +2285,8 @@ export interface Setting {
   range?: [number, number];
   readonly?: boolean;
   choices?: string[];
+  icon?: string;
+  icons?: string[];
   radioGroups?: string[];
   combobox?: boolean;
   deviceFilter?: string;
