@@ -108,7 +108,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {
-                    name: 'Cluster',
+                    name: 'Cluster Manager',
                     nativeId: ClusterCoreNativeId,
                     interfaces: [ScryptedInterface.Settings, ScryptedInterface.Readme, ScryptedInterface.ScryptedSettings],
                     type: ScryptedDeviceType.Builtin,
@@ -121,7 +121,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                     name: 'Media Core',
                     nativeId: 'mediacore',
                     interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.BufferConverter, ScryptedInterface.HttpRequestHandler],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                 },
             );
         })();
@@ -131,7 +131,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                     name: 'Scripts',
                     nativeId: ScriptCoreNativeId,
                     interfaces: [ScryptedInterface.ScryptedSystemDevice, ScryptedInterface.ScryptedDeviceCreator, ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                 },
             );
         })();
@@ -141,7 +141,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                     name: 'Terminal Service',
                     nativeId: TerminalServiceNativeId,
                     interfaces: [ScryptedInterface.StreamService, ScryptedInterface.TTY, ScryptedInterface.ClusterForkInterface],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                 },
             );
         })();
@@ -151,7 +151,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                     name: 'REPL Service',
                     nativeId: ReplServiceNativeId,
                     interfaces: [ScryptedInterface.StreamService],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                 },
             );
         })();
@@ -161,7 +161,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                     name: 'Console Service',
                     nativeId: ConsoleServiceNativeId,
                     interfaces: [ScryptedInterface.StreamService],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                 },
             );
         })();
@@ -172,7 +172,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                     name: 'Automations',
                     nativeId: AutomationCoreNativeId,
                     interfaces: [ScryptedInterface.ScryptedSystemDevice, ScryptedInterface.ScryptedDeviceCreator, ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                 },
             );
         })();
@@ -185,7 +185,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                 ScryptedInterface.MixinProvider,
                 ScryptedInterface.Readme,
             ],
-            type: ScryptedDeviceType.Builtin,
+            type: ScryptedDeviceType.Internal,
         });
 
         (async () => {
@@ -206,7 +206,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                     name: 'Scrypted Users',
                     nativeId: UsersNativeId,
                     interfaces: [ScryptedInterface.ScryptedSystemDevice, ScryptedInterface.ScryptedDeviceCreator, ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
-                    type: ScryptedDeviceType.Builtin,
+                    type: ScryptedDeviceType.Internal,
                 },
             );
         })();

@@ -155,6 +155,8 @@ export class ClusterCore extends ScryptedDeviceBase implements Settings, Readme,
     }
 
     async getReadmeMarkdown(): Promise<string> {
-        return `Manage Scrypted's cluster mode. Run storage devices and compute services on separate servers.`;
+        return `Manage Scrypted's cluster mode. Run storage devices and compute services on separate servers.
+        
+[Read Documentation](https://docs.scrypted.app/maintenance/cluster.html).`;
     }
 }
