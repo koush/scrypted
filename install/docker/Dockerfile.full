@@ -81,7 +81,8 @@ RUN add-apt-repository -y ppa:deadsnakes/ppa && \
     apt-get -y install \
     python3.9 \
     python3.9-dev \
-    python3.9-distutils
+    python3.9-distutils \
+    python3.12
 
 # allow pip to install to system
 RUN rm -f /usr/lib/python**/EXTERNALLY-MANAGED
