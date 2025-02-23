@@ -777,7 +777,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // 1: support main/extern/sub stream
         // 2: support main/sub stream
 
-        const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[rtspChannel].live?.ver;
+        const live = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[rtspChannel]?.live?.ver;
         const [rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub] = streams;
         streams.splice(0, streams.length);
 
