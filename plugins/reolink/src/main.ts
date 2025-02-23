@@ -237,47 +237,53 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             await this.updateAbilities();
             await this.updateDevice();
             await this.reportDevices();
-            // this.pollDevicesState();
+            this.startDevicesStatesPolling();
         })()
             .catch(e => {
                 this.console.log('device refresh failed', e);
             });
     }
 
-    async pollDevicesState() {
-        const secondsToWait = this.hasBattery() ? 90 : 5;
+    async pollDeviceStates() {
+        try {
+            const api = this.getClient();
 
-        if (this.hasFloodlight() || this.hasSiren() || this.hasPirSensor()) {
-            while (true) {
-                if (!this.sleeping) {
-                    const api = this.getClient();
+            if (this.hasFloodlight() && this.floodlight) {
+                const { enabled } = await api.getWhiteLedState();
 
-                    if (this.hasFloodlight() && this.floodlight) {
-                        const { enabled } = await api.getWhiteLedState();
-
-                        if (enabled !== this.floodlight.on) {
-                            this.floodlight.on = enabled;
-                        }
-                    }
-
-                    if (this.hasSiren() && this.siren) {
-                        const { enabled } = await api.getSiren();
-
-                        if (enabled !== this.siren.on) {
-                            this.siren.on = enabled;
-                        }
-                    }
-
-                    if (this.hasPirSensor() && this.pirSensor) {
-                        const { enabled } = await api.getPirState();
-
-                        if (enabled !== this.pirSensor.on) {
-                            this.pirSensor.on = enabled;
-                        }
-                    }
+                if (enabled !== this.floodlight.on) {
+                    this.floodlight.on = enabled;
                 }
+            }
 
-                await sleep(1000 * secondsToWait);
+            if (this.hasSiren() && this.siren) {
+                const { enabled } = await api.getSiren();
+
+                if (enabled !== this.siren.on) {
+                    this.siren.on = enabled;
+                }
+            }
+
+            if (this.hasPirSensor() && this.pirSensor) {
+                const { enabled } = await api.getPirState();
+
+                if (enabled !== this.pirSensor.on) {
+                    this.pirSensor.on = enabled;
+                }
+            }
+        } catch (e) {
+            this.console.error('Error in pollDeviceStates', e);
+        }
+    }
+
+    async startDevicesStatesPolling() {
+        if (
+            !this.hasBattery() &&
+            (this.hasFloodlight() || this.hasSiren() || this.hasPirSensor())
+        ) {
+            while (true) {
+                await this.pollDeviceStates();
+                await sleep(1000 * 5);
             }
         }
     }
@@ -489,6 +495,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
                 if (sleeping !== this.sleeping) {
                     this.sleeping = sleeping;
+                    if (!sleeping) {
+                        await this.pollDeviceStates();
+                    }
                 }
                 if (batteryPercent !== this.batteryLevel) {
                     this.batteryLevel = batteryPercent;
