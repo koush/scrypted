@@ -248,29 +248,35 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         try {
             const api = this.getClient();
 
-            if (this.hasFloodlight() && this.floodlight) {
-                const { enabled } = await api.getWhiteLedState();
+            try {
+                if (this.hasFloodlight() && this.floodlight) {
+                    const { enabled } = await api.getWhiteLedState();
 
-                if (enabled !== this.floodlight.on) {
-                    this.floodlight.on = enabled;
+                    if (enabled !== this.floodlight.on) {
+                        this.floodlight.on = enabled;
+                    }
                 }
-            }
+            } catch { }
 
-            if (this.hasSiren() && this.siren) {
-                const { enabled } = await api.getSiren();
+            try {
+                if (this.hasSiren() && this.siren) {
+                    const { enabled } = await api.getSiren();
 
-                if (enabled !== this.siren.on) {
-                    this.siren.on = enabled;
+                    if (enabled !== this.siren.on) {
+                        this.siren.on = enabled;
+                    }
                 }
-            }
+            } catch { }
 
-            if (this.hasPirSensor() && this.pirSensor) {
-                const { enabled } = await api.getPirState();
+            try {
+                if (this.hasPirSensor() && this.pirSensor) {
+                    const { enabled } = await api.getPirState();
 
-                if (enabled !== this.pirSensor.on) {
-                    this.pirSensor.on = enabled;
+                    if (enabled !== this.pirSensor.on) {
+                        this.pirSensor.on = enabled;
+                    }
                 }
-            }
+            } catch { }
         } catch (e) {
             this.console.error('Error in pollDeviceStates', e);
         }
