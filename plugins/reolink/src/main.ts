@@ -11,21 +11,9 @@ import { AIState, Enc, ReolinkCameraClient } from './reolink-api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     sirenTimeout: NodeJS.Timeout;
-    sirenCheckInterval: NodeJS.Timeout;
 
     constructor(public camera: ReolinkCamera, nativeId: string) {
         super(nativeId);
-
-        if (!this.camera.interfaces.includes(ScryptedInterface.Sleep)) {
-            this.sirenCheckInterval = setInterval(async () => {
-                const api = this.camera.getClient();
-                const { enabled } = await api.getSiren();
-
-                if (enabled !== this.on) {
-                    this.on = enabled;
-                }
-            }, 2000);
-        }
     }
 
     async turnOff() {
@@ -62,21 +50,8 @@ class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
 }
 
 class ReolinkCameraFloodlight extends ScryptedDeviceBase implements OnOff, Brightness {
-    floodlightCheckInterval: NodeJS.Timeout;
-
     constructor(public camera: ReolinkCamera, nativeId: string) {
         super(nativeId);
-
-        if (!this.camera.interfaces.includes(ScryptedInterface.Sleep)) {
-            this.floodlightCheckInterval = setInterval(async () => {
-                const api = this.camera.getClient();
-                const { enabled } = await api.getWhiteLedState();
-
-                if (enabled !== this.on) {
-                    this.on = enabled;
-                }
-            }, 2000);
-        }
     }
 
     async setBrightness(brightness: number): Promise<void> {
@@ -102,21 +77,8 @@ class ReolinkCameraFloodlight extends ScryptedDeviceBase implements OnOff, Brigh
 }
 
 class ReolinkCameraPirSensor extends ScryptedDeviceBase implements OnOff {
-    pirCheckInterval: NodeJS.Timeout;
-
     constructor(public camera: ReolinkCamera, nativeId: string) {
         super(nativeId);
-
-        if (!this.camera.interfaces.includes(ScryptedInterface.Sleep)) {
-            this.pirCheckInterval = setInterval(async () => {
-                const api = this.camera.getClient();
-                const { enabled } = await api.getPirState();
-
-                if (enabled !== this.on) {
-                    this.on = enabled;
-                }
-            }, 2000);
-        }
     }
 
     async turnOff() {
@@ -275,10 +237,49 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             await this.updateAbilities();
             await this.updateDevice();
             await this.reportDevices();
+            // this.pollDevicesState();
         })()
             .catch(e => {
                 this.console.log('device refresh failed', e);
             });
+    }
+
+    async pollDevicesState() {
+        const secondsToWait = this.hasBattery() ? 90 : 5;
+
+        if (this.hasFloodlight() || this.hasSiren() || this.hasPirSensor()) {
+            while (true) {
+                if (!this.sleeping) {
+                    const api = this.getClient();
+
+                    if (this.hasFloodlight() && this.floodlight) {
+                        const { enabled } = await api.getWhiteLedState();
+
+                        if (enabled !== this.floodlight.on) {
+                            this.floodlight.on = enabled;
+                        }
+                    }
+
+                    if (this.hasSiren() && this.siren) {
+                        const { enabled } = await api.getSiren();
+
+                        if (enabled !== this.siren.on) {
+                            this.siren.on = enabled;
+                        }
+                    }
+
+                    if (this.hasPirSensor() && this.pirSensor) {
+                        const { enabled } = await api.getPirState();
+
+                        if (enabled !== this.pirSensor.on) {
+                            this.pirSensor.on = enabled;
+                        }
+                    }
+                }
+
+                await sleep(1000 * secondsToWait);
+            }
+        }
     }
 
     async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
