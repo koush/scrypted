@@ -6,7 +6,7 @@
 # This common file will be used by both Docker and the linux
 # install script.
 ################################################################
-ARG BASE="jammy"
+ARG BASE="noble"
 FROM ubuntu:${BASE} as header
 
 ENV DEBIAN_FRONTEND=noninteractive
