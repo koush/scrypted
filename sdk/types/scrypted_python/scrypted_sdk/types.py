@@ -520,6 +520,8 @@ class DeviceCreatorSettings(TypedDict):
 
 class DeviceInformation(TypedDict):
 
+    col1: str
+    col2: str
     deeplink: Any
     firmware: str
     ip: str
@@ -975,7 +977,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.114"
+TYPES_VERSION = "0.3.115"
 
 
 class AirPurifier:

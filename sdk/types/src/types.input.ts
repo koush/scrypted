@@ -1953,6 +1953,8 @@ export interface DeviceInformation {
     apple?: string;
     android?: string;
   };
+  col1?: string;
+  col2?: string;
 }
 /**
  * Device objects are created by DeviceProviders when new devices are discover and synced to Scrypted via the DeviceManager.
