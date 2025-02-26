@@ -1,13 +1,15 @@
 ARG BASE="noble-lite"
 FROM ghcr.io/koush/scrypted-common:${BASE}
 
-RUN apt -y update && apt -y install nano net-tools dnsutils dnsmasq ifupdown vlan bridge-utils iptables netplan.io nftables
+RUN apt -y update && apt -y install nano net-tools dnsutils dnsmasq ifupdown vlan bridge-utils netplan.io nftables
 RUN rm -f /etc/systemd/system/multi-user.target.wants/dnsmasq.service
 RUN rm -f /etc/systemd/system/sysinit.target.wants/systemd-resolved.service
 
-RUN bash -c 'echo include "/etc/nftables.d/*.conf"\; >> /etc/nftables.conf'
+COPY scrypted-nftables.service /etc/systemd/system
+RUN systemctl enable scrypted-nftables
+RUN bash -c 'echo include \"/etc/nftables.d/*.conf\"\; >> /etc/nftables.conf'
 RUN mkdir -p /etc/nftables.d
-RUN systemctl enable nftables
+COPY 01-scrypted.conf /etc/nftables.d
 
 WORKDIR /
 # cache bust

@@ -1,0 +1,22 @@
+[Unit]
+Description=nftables
+Documentation=man:nft(8) http://wiki.nftables.org
+#Wants=network-online.target
+#Before=network-online.target shutdown.target
+After=network.target
+Conflicts=shutdown.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+StandardInput=null
+ProtectSystem=full
+ProtectHome=true
+ExecStart=/usr/sbin/nft -f /etc/nftables.conf
+ExecReload=/usr/sbin/nft -f /etc/nftables.conf
+ExecStop=/usr/sbin/nft flush ruleset
+
+[Install]
+#WantedBy=network-online.target
+WantedBy=multi-user.target
