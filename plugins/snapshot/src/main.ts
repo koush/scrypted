@@ -263,8 +263,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
             try {
                 // consider waking the camera if 
-                if (!eventSnapshot && this.mixinDeviceInterfaces.includes(ScryptedInterface.Sleep) && realDevice.sleeping)
-                    throw new Error('Not waking sleeping camera for periodic snapshot.');
+                if (!eventSnapshot && this.mixinDeviceInterfaces.includes(ScryptedInterface.Sleep) && realDevice.sleeping) {
+                    this.console.log('Not waking sleeping camera for periodic snapshot.');
+                    return this.lastAvailablePicture;
+                }
+
                 return await this.mixinDevice.takePicture(takePictureOptions).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
             }
             catch (e) {
@@ -278,9 +281,10 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     async takePictureRaw(options?: RequestPictureOptions): Promise<Buffer> {
         const eventSnapshot = options?.reason === 'event';
         const periodicSnapshot = options?.reason === 'periodic';
+        const hoursDuration = this.mixinDeviceInterfaces.includes(ScryptedInterface.Sleep) ? 5 : 1;
 
         // clear out snapshots that are too old.
-        if (this.currentPictureTime < Date.now() - 1 * 60 * 60 * 1000)
+        if (this.currentPictureTime < Date.now() - hoursDuration * 60 * 60 * 1000)
             this.currentPicture = undefined;
 
         // always grab/debounce a snapshot
