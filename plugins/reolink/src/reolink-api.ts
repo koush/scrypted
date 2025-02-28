@@ -476,6 +476,31 @@ export class ReolinkCameraClient {
         }
     }
 
+    async getSiren() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [{
+            cmd: 'GetAudioAlarmV20',
+            action: 0,
+            param: { channel: this.channelId }
+        }];
+
+        const response = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json',
+        }, this.createReadable(body));
+
+        const error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to getSiren', JSON.stringify(body), error);
+        }
+
+        return {
+            enabled: response.body?.[0]?.value?.Audio?.enable === 1
+        };
+    }
+
     async setSiren(on: boolean, duration?: number) {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
@@ -512,6 +537,31 @@ export class ReolinkCameraClient {
         return {
             value: (response.body?.[0]?.value || response.body?.value) as SirenResponse,
             data: response.body,
+        };
+    }
+
+    async getWhiteLedState() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [{
+            cmd: 'GetWhiteLed',
+            action: 0,
+            param: { channel: this.channelId }
+        }];
+
+        const response = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json',
+        }, this.createReadable(body));
+
+        const error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to getWhiteLedState', JSON.stringify(body), error);
+        }
+
+        return {
+            enabled: response.body?.[0]?.value?.WhiteLed?.state === 1
         };
     }
 
@@ -608,7 +658,7 @@ export class ReolinkCameraClient {
         };
     }
 
-    async getPirState(on?: boolean) {
+    async getPirState() {
         const url = new URL(`http://${this.host}/api.cgi`);
 
         const body = [{
@@ -625,10 +675,13 @@ export class ReolinkCameraClient {
 
         const error = response.body?.[0]?.error;
         if (error) {
-            this.console.error('error during call to setWhiteLedState', JSON.stringify(body), error);
+            this.console.error('error during call to getPirState', JSON.stringify(body), error);
         }
 
-        return response.body?.[0]?.value?.pirInfo;
+        return {
+            enabled: response.body?.[0]?.value?.pirInfo?.enable === 1,
+            state: response.body?.[0]?.value?.pirInfo
+        };
     }
 
     async setPirState(on: boolean) {
@@ -637,7 +690,7 @@ export class ReolinkCameraClient {
         const currentPir = await this.getPirState();
         const newState = on ? 1 : 0;
 
-        if (!currentPir || currentPir.enable === newState) {
+        if (!currentPir || currentPir.state?.enable === newState) {
             return;
         }
 
