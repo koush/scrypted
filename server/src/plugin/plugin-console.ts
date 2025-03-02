@@ -1,10 +1,9 @@
 import { DeviceManager, ScryptedNativeId, SystemManager } from '@scrypted/types';
 import { Console } from 'console';
 import { once } from 'events';
-import net, { Server } from 'net';
+import net from 'net';
 import { PassThrough, Readable, Writable } from 'stream';
-import { listenZero } from '../listen-zero';
-import { isClusterAddress } from '../cluster/cluster-setup';
+import { clusterListenZero } from '../cluster/cluster-setup';
 
 export interface ConsoleServer {
     pluginConsole: Console;
@@ -77,7 +76,7 @@ export function prepareConsoles(getConsoleName: () => string, systemManager: () 
         ret = getConsole(async (stdout, stderr) => {
             const connect = async () => {
                 const plugins = await getPlugins();
-                const [port,host] = await plugins.getRemoteServicePort(getConsoleName(), 'console-writer');
+                const [port, host] = await plugins.getRemoteServicePort(getConsoleName(), 'console-writer');
                 const socket = net.connect({
                     port,
                     host,
@@ -243,7 +242,7 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
 
     const sockets = new Set<net.Socket>();
 
-    const readServer = new Server(async (socket) => {
+    const { server: readServer, port: readPort } = await clusterListenZero(async (socket) => {
         sockets.add(socket);
 
         let [filter] = await once(socket, 'data');
@@ -277,7 +276,7 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
         socket.on('end', cleanup);
     });
 
-    const writeServer = new Server(async (socket) => {
+    const { server: writeServer, port: writePort } = await clusterListenZero(async (socket) => {
         sockets.add(socket);
         const [data] = await once(socket, 'data');
         let filter: string = data.toString();
@@ -303,12 +302,6 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
         socket.once('error', cleanup);
         socket.once('end', cleanup);
     });
-
-    let address = '0.0.0.0';
-    if (isClusterAddress(address))
-        address = '127.0.0.1';
-    const readPort = await listenZero(readServer, address);
-    const writePort = await listenZero(writeServer, address);
 
     return {
         clear(nativeId: ScryptedNativeId) {

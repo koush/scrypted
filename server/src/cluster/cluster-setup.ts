@@ -344,7 +344,8 @@ export function setupCluster(peer: RpcPeer) {
 
         const clients = new Set<net.Socket>();
 
-        const clusterRpcServer = net.createServer(client => {
+
+        const { server: clusterRpcServer, port } = await clusterListenZero(client => {
             const clusterPeerAddress = client.remoteAddress;
             const clusterPeerPort = client.remotePort;
             const clusterPeerKey = getClusterPeerKey(clusterPeerAddress, clusterPeerPort);
@@ -364,11 +365,8 @@ export function setupCluster(peer: RpcPeer) {
             clients.add(client);
         });
 
-        const listenAddress = SCRYPTED_CLUSTER_ADDRESS
-            ? '0.0.0.0'
-            : '127.0.0.1';
+        clusterPort = port;
 
-        clusterPort = await listenZero(clusterRpcServer, listenAddress);
         peer.onProxySerialization = value => onProxySerialization(peer, value, undefined);
         delete peer.params.initializeCluster;
 
@@ -452,4 +450,39 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
     }
 
     return [mode, server, port];
+}
+
+export async function clusterListenZero(callback: (socket: net.Socket) => void) {
+    const SCRYPTED_CLUSTER_ADDRESS = process.env.SCRYPTED_CLUSTER_ADDRESS;
+    if (!SCRYPTED_CLUSTER_ADDRESS) {
+        const server = new net.Server(callback);
+        const port = await listenZero(server, '127.0.0.1');
+        return {
+            server,
+            port,
+        }
+    }
+
+    // need to listen on the cluster address and 127.0.0.1 on the same port.
+    let retries = 5;
+    while (retries--) {
+        const server = new net.Server(callback);
+        const port = await listenZero(server, SCRYPTED_CLUSTER_ADDRESS);
+        try {
+            const localServer = new net.Server(callback);
+            localServer.listen(port, '127.0.0.1');
+            await once(localServer, 'listening');
+            server.on('close', () => localServer.close());
+            return {
+                server,
+                port,
+            }
+        }
+        catch (e) {
+            // port may be in use, keep trying.
+            server.close();
+        }
+    }
+
+    throw new Error('failed to bind to cluster address.');
 }

@@ -1,12 +1,11 @@
-import { listenZero } from '../listen-zero';
-import { Server } from 'net';
+import { ScryptedStatic } from '@scrypted/types';
 import { once } from 'events';
 import repl from 'repl';
-import { ScryptedStatic } from '@scrypted/types';
+import { clusterListenZero } from '../cluster/cluster-setup';
 
 export async function createREPLServer(scrypted: ScryptedStatic, params: any, plugin: any): Promise<number> {
     const { deviceManager, systemManager } = scrypted;
-    const server = new Server(async (socket) => {
+    const { server, port } = await clusterListenZero(async (socket) => {
         let [filter] = await once(socket, 'data');
         filter = filter.toString().trim();
         if (filter === 'undefined')
@@ -75,6 +74,6 @@ export async function createREPLServer(scrypted: ScryptedStatic, params: any, pl
         socket.on('error', cleanup);
         socket.on('end', cleanup);
     });
-    const address = process.env.SCRYPTED_CLUSTER_ADDRESS ? '0.0.0.0' : '127.0.0.1';
-    return listenZero(server, address);
+
+    return port;
 }
