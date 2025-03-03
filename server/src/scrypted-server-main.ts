@@ -29,15 +29,29 @@ import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 
 export type Runtime = ScryptedRuntime;
 
-async function listenServerPort(env: string, port: number, server: http.Server | https.Server | net.Server, hostname?: string) {
-    server.listen(port, hostname);
-    try {
-        await once(server, 'listening');
+const listenSet = new Set<string>();
+const { SCRYPTED_SERVER_LISTEN_HOSTNAMES } = process.env;
+if (SCRYPTED_SERVER_LISTEN_HOSTNAMES) {
+    listenSet.add('127.0.0.1');
+    for (const hostname of SCRYPTED_SERVER_LISTEN_HOSTNAMES.split(',')) {
+        listenSet.add(hostname);
     }
-    catch (e) {
-        console.error(`Failed to listen on port ${port}. It may be in use.`);
-        console.error(`Use the environment variable ${env} to change the port.`);
-        throw e;
+}
+else {
+    listenSet.add(undefined);
+}
+
+async function listenServerPort(env: string, port: number, server: http.Server | https.Server | net.Server) {
+    for (const hostname of listenSet) {
+        server.listen(port, hostname);
+        try {
+            await once(server, 'listening');
+        }
+        catch (e) {
+            console.error(`Failed to listen on port ${port}. It may be in use.`);
+            console.error(`Use the environment variable ${env} to change the port.`);
+            throw e;
+        }
     }
 }
 
@@ -751,7 +765,7 @@ async function start(mainFilename: string, options?: {
     console.log('#######################################################');
     console.log(`Scrypted Volume           : ${volumeDir}`);
     console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
-    for (const address of getUsableNetworkAddresses()) {
+    for (const address of SCRYPTED_SERVER_LISTEN_HOSTNAMES ? listenSet : getUsableNetworkAddresses()) {
         console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
     }
     console.log(`Version:       : ${await scrypted.info.getVersion()}`);
