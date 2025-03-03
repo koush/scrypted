@@ -2,7 +2,7 @@ ARG BASE="noble-lite"
 FROM ghcr.io/koush/scrypted-common:${BASE}
 
 # tools
-RUN apt -y update && apt -y install nano net-tools dnsutils dnsmasq ifupdown vlan bridge-utils netplan.io nftables
+RUN apt -y update && apt -y install nano net-tools dnsutils dnsmasq vlan bridge-utils netplan.io nftables isc-dhcp-client
 RUN rm -f /etc/systemd/system/multi-user.target.wants/dnsmasq.service
 RUN rm -f /etc/systemd/system/sysinit.target.wants/systemd-resolved.service
 
