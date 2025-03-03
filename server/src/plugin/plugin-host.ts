@@ -450,10 +450,6 @@ export class PluginHost {
             this.peer.kill('plugin disconnected');
         };
 
-        this.worker.on('close', () => {
-            logger.log('e', `${this.pluginName} close`);
-            disconnect();
-        });
         this.worker.on('exit', async (code, signal) => {
             logger.log('e', `${this.pluginName} exited ${code} ${signal}`);
             disconnect();

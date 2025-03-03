@@ -17,7 +17,7 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
     }
 
     setupWorker() {
-        this.worker.on('close', (code: number | null, signal: NodeJS.Signals | null) => this.emit('close', code, signal));
+        this.worker.on('close', () => this.emit('error', new Error('close')));
         this.worker.on('disconnect', () => this.emit('error', new Error('disconnect')));
         this.worker.on('exit', (code, signal) => this.emit('exit', code, signal));
         this.worker.on('error', e => this.emit('error', e));

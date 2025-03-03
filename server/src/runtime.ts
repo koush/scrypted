@@ -691,7 +691,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         if (pluginHost) {
             pluginHost.worker.once('error', restart);
             pluginHost.worker.once('exit', restart);
-            pluginHost.worker.once('close', restart);
         }
         else {
             restart();
