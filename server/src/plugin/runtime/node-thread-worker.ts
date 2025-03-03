@@ -1,4 +1,4 @@
-import { EventEmitter } from "events";
+import { EventEmitter, once } from "events";
 import worker_threads from "worker_threads";
 import { RpcMessage, RpcPeer, RpcSerializer } from "../../rpc";
 import { BufferSerializer } from '../../rpc-buffer-serializer';
@@ -47,6 +47,7 @@ interface PortMessage {
 export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
     worker: worker_threads.Worker;
     port: worker_threads.MessagePort;
+    killPromise: Promise<void>;
 
     constructor(mainFilename: string, public pluginId: string, options: RuntimeWorkerOptions, workerOptions?: worker_threads.WorkerOptions, workerData?: any, transferList: Array<worker_threads.TransferListItem> = []) {
         super();
@@ -82,6 +83,8 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
         this.port.on('close', () => {
             this.emit('error', new Error('port closed'));
         });
+
+        this.killPromise = once(this.worker, 'exit').then(() => {}).catch(() => {});
     }
 
     get pid() {

@@ -75,7 +75,7 @@ export class PluginComponent {
     }
     async reload(pluginId: string) {
         const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
-        this.scrypted.runPlugin(plugin);
+        await this.scrypted.runPlugin(plugin);
     }
     async kill(pluginId: string) {
         return this.scrypted.plugins[pluginId]?.kill();

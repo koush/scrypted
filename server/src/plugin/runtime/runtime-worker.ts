@@ -1,7 +1,7 @@
+import net from "net";
+import { Readable } from "stream";
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { PluginDebug } from "../plugin-debug";
-import { Readable } from "stream";
-import net from "net";
 
 export interface RuntimeWorkerOptions {
     packageJson: any;
@@ -16,6 +16,7 @@ export interface RuntimeWorker {
     pid: number;
     stdout: Readable;
     stderr: Readable;
+    killPromise: Promise<any>;
 
     kill(): void;
 

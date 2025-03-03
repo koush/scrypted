@@ -38,7 +38,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
             logger.log('w', 'plugin restart was requested, but a different instance was found. restart cancelled.');
             return;
         }
-        this.scrypted.runPlugin(plugin);
+        await this.scrypted.runPlugin(plugin);
     }, 15000);
 
     constructor(public scrypted: ScryptedRuntime, pluginId: string, public pluginHost: PluginHost, public mediaManager: MediaManager) {

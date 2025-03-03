@@ -1,4 +1,5 @@
 import child_process from 'child_process';
+import { once } from 'events';
 import { EventEmitter } from "ws";
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
@@ -6,6 +7,7 @@ import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 export abstract class ChildProcessWorker extends EventEmitter implements RuntimeWorker {
     public pluginId: string;
     protected worker: child_process.ChildProcess;
+    killPromise: Promise<void>;
 
     get childProcess() {
         return this.worker;
@@ -14,6 +16,7 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
     constructor(options: RuntimeWorkerOptions) {
         super();
         this.pluginId = options.packageJson.name;
+
     }
 
     setupWorker() {
@@ -27,6 +30,8 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
             if (stdio)
                 stdio.on('error', e => this.emit('error', e));
         }
+
+        this.killPromise = once(this.worker, 'exit').then(() => {}).catch(() => {});
     }
 
     get pid() {
