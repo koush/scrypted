@@ -29,7 +29,7 @@ ARG SCRYPTED_INSTALL_VERSION="latest"
 RUN test -n "$SCRYPTED_INSTALL_VERSION"
 RUN npx -y scrypted@latest install-server ${SCRYPTED_INSTALL_VERSION}
 
-COPY scrypted-dhcp-watch.service /etc/systemd/system/scrypted-dhcp-watcher.service
+COPY scrypted-dhcp-watcher.service /etc/systemd/system/scrypted-dhcp-watcher.service
 RUN systemctl enable scrypted-dhcp-watcher
 
 COPY scrypted.service /etc/systemd/system/scrypted.service
