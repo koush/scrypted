@@ -139,7 +139,12 @@ then
     echo "#############################################################################"
     echo -e "\033[32mPaste the following command into this shell to install to local-lvm instead:\033[0m"
     echo ""
-    echo "bash $0 --storage local-lvm"
+    if [ -n "$SCRYPTED_RESTORE" ]
+    then
+        echo "bash $0 --storage local-lvm"
+    else
+        echo "SCRYPTED_RESTORE=true bash $0 --storage local-lvm"
+    fi
     echo "#############################################################################"
     echo ""
     echo ""
