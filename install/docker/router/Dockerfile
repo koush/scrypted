@@ -18,7 +18,7 @@ RUN xcaddy build --with github.com/caddy-dns/cloudflare --output /usr/local/bin/
 # nftables
 COPY scrypted-nftables.service /etc/systemd/system
 RUN systemctl enable scrypted-nftables
-RUN bash -c 'echo include \"/etc/nftables.d/*.conf\"\; >> /etc/nftables.conf'
+RUN bash -c 'echo include \"/etc/nftables.d/*.conf\"\; > /etc/nftables.conf'
 RUN mkdir -p /etc/nftables.d
 COPY 01-scrypted.conf /etc/nftables.d
 
