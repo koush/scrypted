@@ -147,6 +147,9 @@ export enum ScryptedDeviceType {
   WindowCovering = "WindowCovering",
   Siren = "Siren",
   AirPurifier = "AirPurifier",
+  Internet = "Internet",
+  Network = "Network",
+  Bridge = "Bridge",
   Unknown = "Unknown",
 }
 /**

@@ -74,6 +74,7 @@ class ScryptedDeviceType(str, Enum):
     AirPurifier = "AirPurifier"
     API = "API"
     Automation = "Automation"
+    Bridge = "Bridge"
     Builtin = "Builtin"
     Camera = "Camera"
     DataSource = "DataSource"
@@ -85,9 +86,11 @@ class ScryptedDeviceType(str, Enum):
     Fan = "Fan"
     Garage = "Garage"
     Internal = "Internal"
+    Internet = "Internet"
     Irrigation = "Irrigation"
     Light = "Light"
     Lock = "Lock"
+    Network = "Network"
     Notifier = "Notifier"
     Outlet = "Outlet"
     PasswordControl = "PasswordControl"
@@ -977,7 +980,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.115"
+TYPES_VERSION = "0.3.116"
 
 
 class AirPurifier:
