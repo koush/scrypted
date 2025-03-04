@@ -1260,7 +1260,7 @@ export interface DiscoveredDevice {
    */
   description: string;
   nativeId: ScryptedNativeId;
-  type: ScryptedDeviceType;
+  type: ScryptedDeviceType | string;
   interfaces?: string[];
   info?: DeviceInformation;
   settings?: Setting[];
@@ -1426,6 +1426,7 @@ export interface ScryptedSystemDeviceInfo {
    * For example: Example Corp Camera or ACME Light Switch.
    */
   deviceCreator?: string;
+  deviceDiscovery?: string;
 }
 
 export interface ScryptedSettings {
@@ -1956,8 +1957,7 @@ export interface DeviceInformation {
     apple?: string;
     android?: string;
   };
-  col1?: string;
-  col2?: string;
+  description?: string;
 }
 /**
  * Device objects are created by DeviceProviders when new devices are discover and synced to Scrypted via the DeviceManager.
@@ -1970,7 +1970,7 @@ export interface Device {
    * The native id that is used by the DeviceProvider used to internally identify provided devices.
    */
   nativeId: ScryptedNativeId;
-  type: ScryptedDeviceType;
+  type: ScryptedDeviceType | string;
   interfaces: string[];
   info?: DeviceInformation;
   /**
@@ -2156,7 +2156,7 @@ export interface MixinProvider {
   /**
    * Called by the system to determine if this provider can create a mixin for the supplied device. Returns null if a mixin can not be created, otherwise returns a list of new interfaces (which may be an empty list) that are provided by the mixin.
    */
-  canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[] | null | undefined | void>;
+  canMixin(type: ScryptedDeviceType | string, interfaces: string[]): Promise<string[] | null | undefined | void>;
 
   /**
    * Create a mixin that can be applied to the supplied device.
