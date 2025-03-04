@@ -33,7 +33,7 @@ ColorDepth.default = lambda *args, **kwargs: ColorDepth.DEPTH_4_BIT
 # that there is only one global Application, so multiple REPLs will confuse
 # the library. The patches here allow us to scope a particular call stack
 # to a particular REPL, and to get the current Application from the stack.
-if True:
+def patch_prompt_toolkit():
     default_get_app = prompt_toolkit.application.current.get_app
 
     def get_app_patched() -> Application[Any]:
@@ -50,6 +50,7 @@ if True:
     ptpython.key_bindings.get_app = get_app_patched
     ptpython.history_browser.get_app = get_app_patched
     ptpython.layout.get_app = get_app_patched
+patch_prompt_toolkit()
 
 
 def configure(repl: PythonRepl) -> None:
