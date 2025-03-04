@@ -1,4 +1,5 @@
-empty_globals = globals().copy()
+# Copy this here before it gets populated with the rest of this file's code
+base_globals = globals().copy()
 
 import asyncio
 import inspect
@@ -136,7 +137,7 @@ async def createREPLServer(sdk: ScryptedStatic, plugin: ScryptedDevice) -> int:
 
             with create_app_session(input=vt100_input, output=vt100_output):
                 global_dict = {
-                    **empty_globals.copy(),
+                    **base_globals.copy(),
                     "print": print_formatted_text,
                     "help": lambda *args, **kwargs: print_formatted_text(
                         "Help is not available in this environment"
