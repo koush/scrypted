@@ -42,12 +42,6 @@ SCRYPTED_REQUIREMENTS = """
 ptpython
 wheel
 """.strip()
-if sys.version_info.minor >= 13:
-    # telnetlib was removed in Python 3.13
-    SCRYPTED_REQUIREMENTS = f"""
-{SCRYPTED_REQUIREMENTS}
-standard-telnetlib
-""".strip()
 
 
 class SystemDeviceState(TypedDict):
@@ -500,13 +494,13 @@ class MediaManager:
         files_path = os.getenv('SCRYPTED_PLUGIN_VOLUME')
         if not files_path:
             raise ValueError('SCRYPTED_PLUGIN_VOLUME env variable not set?')
-        
+
         # Construct the path for the 'files' directory
         ret = Path(files_path) / 'files'
-        
+
         # Ensure the directory exists
         await asyncio.to_thread(ret.mkdir, parents=True, exist_ok=True)
-        
+
         # Return the constructed directory path as a string
         return str(ret)
 
