@@ -535,7 +535,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
             check.on('message', data => {
                 if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
-                    serializer.onMessageBuffer(Buffer.from(data));
+                    serializer.onMessageBuffer(Buffer.from(data as string));
                 }
                 else {
                     serializer.onMessageFinish(JSON.parse(data as string));
@@ -683,7 +683,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             });
             socket.on('message', data => {
                 if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
-                    serializer.onMessageBuffer(Buffer.from(data));
+                    serializer.onMessageBuffer(Buffer.from(data as string));
                 }
                 else {
                     serializer.onMessageFinish(JSON.parse(data as string));
