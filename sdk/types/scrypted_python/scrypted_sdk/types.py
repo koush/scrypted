@@ -980,7 +980,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.3.116"
+TYPES_VERSION = "0.5.1"
 
 
 class AirPurifier:
@@ -1485,12 +1485,12 @@ class ScryptedDevice:
     nativeId: str
     pluginId: str
     providedInterfaces: list[str]
-    providedName: ScryptedDeviceType
+    providedName: str
     providedRoom: str
-    providedType: ScryptedDeviceType
+    providedType: str
     providerId: str
     room: str
-    type: ScryptedDeviceType
+    type: str
     def listen(self, event: str | EventListenerOptions, callback: EventListener) -> EventListenerRegister:
         pass
 
@@ -2148,11 +2148,11 @@ class DeviceState:
         self.setScryptedProperty("providedInterfaces", value)
 
     @property
-    def providedName(self) -> ScryptedDeviceType:
+    def providedName(self) -> str:
         return self.getScryptedProperty("providedName")
 
     @providedName.setter
-    def providedName(self, value: ScryptedDeviceType):
+    def providedName(self, value: str):
         self.setScryptedProperty("providedName", value)
 
     @property
@@ -2164,11 +2164,11 @@ class DeviceState:
         self.setScryptedProperty("providedRoom", value)
 
     @property
-    def providedType(self) -> ScryptedDeviceType:
+    def providedType(self) -> str:
         return self.getScryptedProperty("providedType")
 
     @providedType.setter
-    def providedType(self, value: ScryptedDeviceType):
+    def providedType(self, value: str):
         self.setScryptedProperty("providedType", value)
 
     @property
@@ -2188,11 +2188,11 @@ class DeviceState:
         self.setScryptedProperty("room", value)
 
     @property
-    def type(self) -> ScryptedDeviceType:
+    def type(self) -> str:
         return self.getScryptedProperty("type")
 
     @type.setter
-    def type(self, value: ScryptedDeviceType):
+    def type(self, value: str):
         self.setScryptedProperty("type", value)
 
     @property

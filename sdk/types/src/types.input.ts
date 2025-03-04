@@ -31,17 +31,17 @@ export interface ScryptedDevice {
   id: string;
   nativeId?: ScryptedNativeId;
   pluginId: string;
-  interfaces: string[];
+  interfaces: (ScryptedInterface | string)[];
   mixins: string[];
   name?: string;
   info?: DeviceInformation;
-  providedInterfaces: string[];
-  providedName?: ScryptedDeviceType;
+  providedInterfaces: (ScryptedInterface | string)[];
+  providedName?: string;
   providedRoom?: string;
-  providedType?: ScryptedDeviceType;
+  providedType?: ScryptedDeviceType | string;
   providerId?: string;
   room?: string;
-  type?: ScryptedDeviceType;
+  type?: ScryptedDeviceType | string;
 }
 export interface ScryptedPlugin {
   getPluginJson(): Promise<any>;
