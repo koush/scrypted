@@ -593,7 +593,6 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
         await this.updateDevice();
         this.updateDeviceInfo();
-        await this.fetchPresets();
     }
 
     async getOtherSettings(): Promise<Setting[]> {
