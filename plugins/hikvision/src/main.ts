@@ -600,7 +600,6 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         const isDoorbell = doorbellType === 'true';
 
         let twoWayAudio = this.storage.getItem('twoWayAudio');
-        const ptzPresets = JSON.parse(this.storage.getItem('ptzPresets') || '[]');
 
         const choices = [
             'Hikvision',
@@ -635,6 +634,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         );
 
         if (this.interfaces.includes(ScryptedInterface.PanTiltZoom)) {
+            const ptzPresets = JSON.parse(this.storage.getItem('ptzPresets') || '[]');
             const choices = Object.entries(this.ptzCapabilities?.presets ?? {}).map(([id, name]) => `${id}=${name}`);
             ret.push(
                 {
