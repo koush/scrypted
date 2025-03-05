@@ -4,6 +4,7 @@ import { Readable } from 'stream';
 import { Destroyable } from '../../rtsp/src/rtsp';
 import { PtzPresetsRoot, TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
 import { SupplementLightRoot } from './hikvision-xml-types';
+import { PtzCapabilitiesRoot } from './hikvision-api-capabilities';
 
 export interface HikvisionCameraStreamSetup {
     videoCodecType: string;
@@ -41,7 +42,7 @@ export interface HikvisionAPI {
     getAlarm(port: string): Promise<{ json: any; xml: string }>;
     setAlarm(isOn: boolean): Promise<{ json: any; xml: string }>;
 
-    getPtzCapabilities(): Promise<{ json: any; xml: string }>;
+    getPtzCapabilities(): Promise<{ json: PtzCapabilitiesRoot; xml: string }>;
     ptzCommand(command: PanTiltZoomCommand): Promise<any>;
     getPresets(): Promise<{
         json: PtzPresetsRoot;

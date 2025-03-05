@@ -7,7 +7,7 @@ import { IncomingMessage } from 'http';
 import { EventEmitter, Readable } from 'stream';
 import xml2js from 'xml2js';
 import { Destroyable } from '../../rtsp/src/rtsp';
-import { CapabiltiesResponse } from './hikvision-api-capabilities';
+import { CapabiltiesResponse, PtzCapabilitiesRoot } from './hikvision-api-capabilities';
 import { HikvisionAPI, HikvisionCameraStreamSetup } from "./hikvision-api-channels";
 import { ChannelResponse, ChannelsResponse, SupplementLightRoot } from './hikvision-xml-types';
 import { getDeviceInfo } from './probe';
@@ -624,7 +624,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         return { json, xml };
     }
 
-    async getPtzCapabilities(): Promise<{ json: any; xml: string }> {
+    async getPtzCapabilities(): Promise<{ json: PtzCapabilitiesRoot; xml: string }> {
         const response = await this.request({
             method: 'GET',
             url: `http://${this.ip}/ISAPI/PTZCtrl/channels/1/capabilities`,

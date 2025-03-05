@@ -399,3 +399,140 @@ export interface AudioCompressionType {
 export interface GeneratedType35 {
     opt: string
 }
+
+export interface PtzCapabilitiesRoot {
+    PTZChanelCap: PTZChanelCap;
+}
+
+export interface PTZChanelCap {
+    AbsolutePanTiltPositionSpace: AbsolutePanTiltPositionSpaceClass;
+    AbsoluteZoomPositionSpace: AbsoluteZoomPositionSpaceClass;
+    ContinuousPanTiltSpace: AbsolutePanTiltPositionSpaceClass;
+    ContinuousZoomSpace: AbsoluteZoomPositionSpaceClass;
+    maxPresetNum: string;
+    maxPatrolNum: string;
+    maxPatternNum: string;
+    maxLimitesNum: string;
+    maxTimeTaskNum: string;
+    controlProtocol: ControlProtocol;
+    controlAddress: string;
+    PTZRs485Para: PTZRs485Para;
+    PresetNameCap: PresetNameCap;
+    wiperStatusSupport: string;
+    isSupportPosition3D: string;
+    manualControlSpeed: ManualControlSpeed;
+    isSpportPtzlimiteds: string;
+    oneKeyParkAction: string;
+    oneKeyMenu: string;
+    ParkAction: ParkAction;
+    TimeTaskList: TimeTaskList;
+    TrackInitPosition: TrackInitPosition;
+    LockPT: string;
+    LFPositionCap: LFPositionCap;
+    isSupportManualWiper: string;
+    _xmlns: string;
+    _version: string;
+}
+
+export interface AbsolutePanTiltPositionSpaceClass {
+    XRange: Range;
+    YRange: Range;
+}
+
+export interface Range {
+    Min: string;
+    Max: string;
+}
+
+export interface AbsoluteZoomPositionSpaceClass {
+    ZRange: Range;
+}
+
+export interface LFPositionCap {
+    elevation: AbsoluteZoom;
+    azimuth: AbsoluteZoom;
+    absoluteZoom: AbsoluteZoom;
+}
+
+export interface AbsoluteZoom {
+    _min: string;
+    _max: string;
+    __text: string;
+}
+
+export interface PTZRs485Para {
+    baudRate: ControlProtocol;
+    dataBits: ControlProtocol;
+    parityType: ControlProtocol;
+    stopBits: ControlProtocol;
+    flowCtrl: ControlProtocol;
+    _xmlns: string;
+    _version: string;
+}
+
+export interface ControlProtocol {
+    _opt: string;
+    __text: string;
+}
+
+export interface ParkAction {
+    enabled: ControlProtocol;
+    Parktime: AbsoluteZoom;
+    Action: Action;
+    _xmlns: string;
+    _version: string;
+}
+
+export interface Action {
+    ActionType: ControlProtocol;
+    ActionNum: AbsoluteZoom;
+}
+
+export interface PresetNameCap {
+    presetNameSupport: string;
+    maxPresetNameLen: MaxPresetNameLen;
+    specialNo: ManualControlSpeed;
+    _xmlns: string;
+    _version: string;
+}
+
+export interface MaxPresetNameLen {
+    _max: string;
+}
+
+export interface ManualControlSpeed {
+    _opt: string;
+}
+
+export interface TimeTaskList {
+    enabled: ControlProtocol;
+    TimeTaskBlock: TimeTaskBlock[];
+    _xmlns: string;
+    _version: string;
+}
+
+export interface TimeTaskBlock {
+    dayOfWeek: AbsoluteZoom;
+    TimeTaskRange: TimeTaskRange[];
+    _xmlns: string;
+    _version: string;
+}
+
+export interface TimeTaskRange {
+    TaskID: AbsoluteZoom;
+    Task: Task;
+}
+
+export interface Task {
+    TaskType: ControlProtocol;
+    presetTaskNum: AbsoluteZoom;
+}
+
+export interface TrackInitPosition {
+    slaveCameraID: SlaveCameraID;
+}
+
+export interface SlaveCameraID {
+    _min: string;
+    _max: string;
+}
