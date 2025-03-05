@@ -72,7 +72,6 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         const presets = await client.getPresets();
         const ret: string[] = [];
 
-        this.console.log(JSON.stringify(presets));
         for (const to of presets.json.PTZPresetList?.PTZPreset) {
             if (to.enabled) {
                 ret.push(`${to.id}=${to.presetName}`)
@@ -521,7 +520,6 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         try {
             const client = this.getClient();
             const { json: capabilitiesJson } = await client.getPtzCapabilities();
-            this.console.log(`PTZ capabilities found: ${JSON.stringify(capabilitiesJson)}`);
 
             if (capabilitiesJson?.PTZChanelCap?.ContinuousPanTiltSpace) {
                 ptzCapabilities.push('Pan', 'Tilt');
