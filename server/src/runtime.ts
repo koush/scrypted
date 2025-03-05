@@ -98,7 +98,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     backup = new Backup(this);
     pluginHosts = getBuiltinRuntimeHosts();
 
-    constructor(public mainFilename: string, public datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
+    constructor(public mainFilename: string, public datastore: Level, app: express.Application) {
         super(app);
         // ensure that all the users are loaded from the db.
         this.usersService.getAllUsers();
@@ -152,22 +152,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 connection.close();
             }
         });
-
-        insecure.on('upgrade', (req, socket, upgradeHead) => {
-            (req as any).upgradeHead = upgradeHead;
-            (app as any).handle(req, {
-                socket,
-                upgradeHead
-            })
-        });
-
-        secure.on('upgrade', (req, socket, upgradeHead) => {
-            (req as any).upgradeHead = upgradeHead;
-            (app as any).handle(req, {
-                socket,
-                upgradeHead
-            })
-        })
 
         this.logger.on('log', (logEntry: LogEntry) => {
             if (logEntry.level !== 'a')

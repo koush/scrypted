@@ -11,6 +11,7 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 import process from 'process';
+import tls from 'tls';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { getScryptedClusterMode } from './cluster/cluster-setup';
@@ -26,6 +27,7 @@ import type { ServiceControl } from './services/service-control';
 import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
+import { EventEmitter } from 'stream';
 
 export type Runtime = ScryptedRuntime;
 
@@ -41,8 +43,9 @@ else {
     listenSet.add(undefined);
 }
 
-async function listenServerPort(env: string, port: number, server: http.Server | https.Server | net.Server) {
+async function listenServerPort(env: string, port: number, createServer: () => http.Server | https.Server | net.Server) {
     for (const hostname of listenSet) {
+        const server = createServer();
         server.listen(port, hostname);
         try {
             await once(server, 'listening');
@@ -70,7 +73,10 @@ async function doconnect(): Promise<net.Socket> {
     })
 }
 
-const debugServer = net.createServer(async (socket) => {
+const debugServerEvents = new EventEmitter();
+listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, () => net.createServer(async (socket) => {
+    debugServerEvents.emit('connection', socket);
+
     if (!workerInspectPort) {
         socket.destroy();
         return;
@@ -96,8 +102,7 @@ const debugServer = net.createServer(async (socket) => {
     }
     console.warn('debugger connect timed out');
     socket.destroy();
-})
-listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, debugServer)
+}))
     .catch(() => { });
 
 const app = express();
@@ -184,8 +189,6 @@ async function start(mainFilename: string, options?: {
         key: keyPair.serviceKey,
         cert: keyPair.certificate
     }, httpsServerOptions);
-    const secure = https.createServer(mergedHttpsServerOptions, app);
-    const insecure = http.createServer(app);
 
     // use a hash of the private key as the cookie secret.
     app.use(cookieParser(crypto.createHash('sha256').update(certSetting.value.serviceKey).digest().toString('hex')));
@@ -365,7 +368,7 @@ async function start(mainFilename: string, options?: {
         next();
     });
 
-    const scrypted = new ScryptedRuntime(mainFilename, db, insecure, secure, app);
+    const scrypted = new ScryptedRuntime(mainFilename, db, app);
     if (options?.serviceControl)
         scrypted.serviceControl = options.serviceControl;
     await options?.onRuntimeCreated?.(scrypted);
@@ -373,8 +376,7 @@ async function start(mainFilename: string, options?: {
     const clusterMode = getScryptedClusterMode();
     if (clusterMode?.[0] === 'server') {
         console.log('Cluster server starting.');
-        const clusterServer = createClusterServer(mainFilename, scrypted, keyPair);
-        await listenServerPort('SCRYPTED_CLUSTER_SERVER', clusterMode[2], clusterServer);
+        await listenServerPort('SCRYPTED_CLUSTER_SERVER', clusterMode[2], () => createClusterServer(mainFilename, scrypted, keyPair));
     }
 
     await scrypted.start();
@@ -486,7 +488,7 @@ async function start(mainFilename: string, options?: {
 
         const waitDebug = new Promise<void>((resolve, reject) => {
             setTimeout(() => reject(new Error('timed out waiting for debug session')), 30000);
-            debugServer.on('connection', resolve);
+            debugServerEvents.on('connection', resolve);
         });
 
         waitDebug.catch(() => { });
@@ -759,8 +761,23 @@ async function start(mainFilename: string, options?: {
 
     app.get('/', (_req, res) => res.redirect('./endpoint/@scrypted/core/public/'));
 
-    await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
-    await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
+    const hookUpgrade = (server: net.Server | tls.Server) => {
+        server.on('upgrade', (req, socket, upgradeHead) => {
+            (req as any).upgradeHead = upgradeHead;
+            (app as any).handle(req, {
+                socket,
+                upgradeHead
+            })
+        });
+        return server;
+    }
+
+    await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, () => {
+        return hookUpgrade(https.createServer(mergedHttpsServerOptions, app));
+    });
+    await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, () => {
+        return hookUpgrade(http.createServer(app));
+    });
 
     console.log('#######################################################');
     console.log(`Scrypted Volume           : ${volumeDir}`);
