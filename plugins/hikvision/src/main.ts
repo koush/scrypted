@@ -36,6 +36,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     hasSmartDetection: boolean;
     supplementLight: HikvisionSupplementalLight;
     alarm: HikvisionAlarmSwitch;
+    presets: string[] = [];
 
     client: HikvisionAPI;
 
@@ -46,6 +47,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         this.updateDevice();
         this.updateDeviceInfo();
         this.reportDevices();
+        this.fetchPresets().catch(this.console.error);
     }
 
     async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
@@ -59,6 +61,22 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             }
         }
         return ret;
+    }
+
+    async fetchPresets(): Promise<void> {
+        if (this.interfaces.includes(ScryptedInterface.PanTiltZoom)) {
+            const client = this.getClient();
+            const presets = await client.getPresets();
+            const ret: string[] = [];
+
+            for (const to of presets.json.PTZPresetList?.PTZPreset) {
+                if (to.enabled) {
+                    ret.push(`${to.id}=${to.presetName}`)
+                }
+            }
+
+            this.presets = ret;
+        }
     }
 
     async setVideoTextOverlay(id: string, value: VideoTextOverlay): Promise<void> {
@@ -540,6 +558,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
         this.updateDevice();
         this.updateDeviceInfo();
+        await this.fetchPresets();
     }
 
     async getOtherSettings(): Promise<Setting[]> {
@@ -605,7 +624,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 description: 'PTZ Presets in the format "id=name". Where id is the PTZ Preset identifier and name is a friendly name.',
                 multiple: true,
                 combobox: true,
-                choices: [],
+                choices: this.presets,
             }
         )
 

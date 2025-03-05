@@ -11,7 +11,7 @@ import { CapabiltiesResponse } from './hikvision-api-capabilities';
 import { HikvisionAPI, HikvisionCameraStreamSetup } from "./hikvision-api-channels";
 import { ChannelResponse, ChannelsResponse, SupplementLightRoot } from './hikvision-xml-types';
 import { getDeviceInfo } from './probe';
-import { TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
+import { PtzPresetsRoot, TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
 import { sleep } from '@scrypted/common/src/sleep';
 
 export const detectionMap = {
@@ -624,6 +624,23 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         return { json, xml };
     }
 
+    async getPtzCapabilities(): Promise<{ json: any; xml: string }> {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/PTZCtrl/channels/1/capabilities`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+        });
+        const xml = response.body;
+        const json = await xml2js.parseStringPromise(xml, {
+            explicitArray: false,
+            mergeAttrs: true,
+        });
+        return { json, xml };
+    }
+
     async setPtzPreset(presetId: string) {
         try {
             await this.request({
@@ -680,5 +697,19 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         } catch (e) {
             this.console.error('Error during PTZ command', e);
         }
+    }
+
+    async getPresets() {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/PTZCtrl/channels/1/presets`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+        });
+        const json = await xml2js.parseStringPromise(response.body) as PtzPresetsRoot;
+
+        return { json, xml: response.body };
     }
 }
