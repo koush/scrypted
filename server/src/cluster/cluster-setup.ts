@@ -1,5 +1,6 @@
 import { once } from 'events';
 import net from 'net';
+import os from 'os';
 import worker_threads from 'worker_threads';
 import { Deferred } from '../deferred';
 import { listenZero } from '../listen-zero';
@@ -442,9 +443,17 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
         if (address && server && server !== address)
             throw new Error('SCRYPTED_CLUSTER_ADDRESS and SCRYPTED_CLUSTER_SERVER must not both be used.');
 
-        const serverAddress = address || server;
-        if (!net.isIP(serverAddress))
-            throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set.');
+        let serverAddress = address || server;
+        if (!net.isIP(serverAddress)) {
+            // due to dhcp changes allowing an interface name for the server address is also valid,
+            // resolve using network interfaces.
+            const interfaces = os.networkInterfaces();
+            const iface = interfaces[serverAddress];
+            const ipv4 = iface?.find(i => i.family === 'IPv4');
+            if (!ipv4)
+                throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set.');
+            serverAddress = ipv4.address;
+        }
         process.env.SCRYPTED_CLUSTER_ADDRESS = serverAddress;
         delete process.env.SCRYPTED_CLUSTER_SERVER;
     }
