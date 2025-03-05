@@ -7,7 +7,7 @@ import { ScriptCoreNativeId } from "./script-core";
 const { deviceManager } = sdk;
 
 export class Script extends ScryptedDeviceBase implements Scriptable, Program, ScriptDeviceImpl {
-    constructor(nativeId: string, public triggerDeviceDiscover?: (name: string, type: ScryptedDeviceType, interfaces: string[]) => Promise<string>) {
+    constructor(nativeId: string, public triggerDeviceDiscover?: (name: string, type: ScryptedDeviceType | string, interfaces: string[]) => Promise<string>) {
         super(nativeId);
     }
 

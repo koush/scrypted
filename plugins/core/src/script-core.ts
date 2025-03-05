@@ -93,7 +93,7 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
         let script = new Script(nativeId);
         let worker: ForkWorker;
 
-        const triggerDeviceDiscover = async (name: string, type: ScryptedDeviceType, interfaces: string[]) => {
+        const triggerDeviceDiscover = async (name: string, type: ScryptedDeviceType | string, interfaces: string[]) => {
             const e = this.scripts.get(nativeId);
             if (e?.script == script)
                 e.script = undefined;
