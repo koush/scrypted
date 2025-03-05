@@ -1,7 +1,7 @@
 import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { readLine } from '@scrypted/common/src/read-stream';
 import { parseHeaders, readBody, readMessage } from '@scrypted/common/src/rtsp-server';
-import { MediaStreamConfiguration, MediaStreamOptions } from "@scrypted/sdk";
+import { MediaStreamConfiguration, MediaStreamOptions, PanTiltZoomCommand } from "@scrypted/sdk";
 import contentType from 'content-type';
 import { IncomingMessage } from 'http';
 import { EventEmitter, Readable } from 'stream';
@@ -12,6 +12,7 @@ import { HikvisionAPI, HikvisionCameraStreamSetup } from "./hikvision-api-channe
 import { ChannelResponse, ChannelsResponse, SupplementLightRoot } from './hikvision-xml-types';
 import { getDeviceInfo } from './probe';
 import { TextOverlayRoot, VideoOverlayRoot } from './hikvision-overlay';
+import { sleep } from '@scrypted/common/src/sleep';
 
 export const detectionMap = {
     human: 'person',
@@ -504,41 +505,41 @@ export class HikvisionCameraAPI implements HikvisionAPI {
 
     async getSupplementLight(): Promise<{ json: SupplementLightRoot | any; xml: string }> {
         const response = await this.request({
-          method: 'GET',
-          url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight/capabilities`,
-          responseType: 'text',
-          headers: {
-            'Content-Type': 'application/xml',
-          },
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight/capabilities`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
         });
         const xml = response.body;
         const json = await xml2js.parseStringPromise(xml, {
-          explicitArray: false,
-          mergeAttrs: true,   
+            explicitArray: false,
+            mergeAttrs: true,
         });
         return { json, xml };
-    } 
+    }
 
     async setSupplementLight(params: { on?: boolean, brightness?: number, mode?: 'auto' | 'manual' }): Promise<void> {
         const { json } = await this.getSupplementLight();
-    
+
         if (json.ResponseStatus) {
             throw new Error("Supplemental light is not supported on this device.");
         }
-    
+
         const supp: any = json.SupplementLight;
         if (!supp) {
             throw new Error("Supplemental light configuration not available.");
         }
-    
+
         if (supp.supplementLightMode && supp.supplementLightMode.opt) {
             const availableModes = supp.supplementLightMode.opt.split(',').map(s => s.trim());
-            const selectedMode = params.on 
+            const selectedMode = params.on
                 ? (availableModes.find(mode => mode.toLowerCase() !== 'close') || 'close')
                 : 'close';
             supp.supplementLightMode = [selectedMode];
         }
-    
+
         if (params.mode) {
             supp.mixedLightBrightnessRegulatMode = [params.mode];
         } else if (params.on !== undefined) {
@@ -548,13 +549,13 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             let brightness = Math.max(0, Math.min(100, params.brightness));
             supp.whiteLightBrightness = [brightness.toString()];
         }
-    
+
         const builder = new xml2js.Builder({
             headless: true,
             renderOpts: { pretty: false },
         });
         const newXml = builder.buildObject({ SupplementLight: supp });
-        
+
         await this.request({
             method: 'PUT',
             url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight`,
@@ -578,11 +579,11 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         const xml = response.body;
         const json = await xml2js.parseStringPromise(xml, {
             explicitArray: false,
-            mergeAttrs: true,   
-          });        
-          return { json, xml };
+            mergeAttrs: true,
+        });
+        return { json, xml };
     }
-    
+
     async getAlarm(port: string): Promise<{ json: any; xml: string }> {
         const response = await this.request({
             method: 'GET',
@@ -596,13 +597,13 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         const parsed = await xml2js.parseStringPromise(xml, { explicitArray: true });
         return { json: parsed.EventTrigger, xml };
     }
-    
+
     async setAlarm(isOn: boolean): Promise<{ json: any; xml: string }> {
         const data = `<IOPortData>
             <enabled>${isOn ? 'true' : 'false'}</enabled>
             <triggering>${isOn ? 'low' : 'high'}</triggering>
         </IOPortData>`;
-    
+
         const response = await this.request({
             method: 'PUT',
             url: `http://${this.ip}/ISAPI/System/IO/inputs/1`,
@@ -610,16 +611,73 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             headers: { 'Content-Type': 'application/xml' },
             body: data
         });
-    
+
         const xml = response.body;
         let json = {};
-    
+
         try {
             json = await xml2js.parseStringPromise(xml);
         } catch (error) {
             console.error("Failed to parse XML response for setAlarmInput:", error);
         }
-    
+
         return { json, xml };
-    }    
+    }
+
+    async setPtzPreset(presetId: string) {
+        try {
+            await this.request({
+                method: 'PUT',
+                url: `http://${this.ip}/ISAPI/PTZCtrl/channels/1/presets/${presetId}/goto`,
+                responseType: 'text',
+                headers: { 'Content-Type': 'application/xml' },
+            });
+        } catch (e) {
+            this.console.error('Error during setPtzPreset', e);
+        }
+    }
+
+    async ptzCommand(command: PanTiltZoomCommand) {
+        let startCommandData: string;
+        let endCommandData: string;
+
+        if (command.preset) {
+            await this.setPtzPreset(command.preset);
+        } else if (command.pan < 0 || command.pan > 0) {
+            startCommandData = `<?xml version: "1.0" encoding="UTF-8"?><PTZData><pan>${command.pan > 0 ? 60 : -60}</pan><tilt>0</tilt></PTZData>`;
+            endCommandData = `<?xml version: "1.0" encoding="UTF-8"?><PTZData><pan>0</pan><tilt>0</tilt></PTZData>`;
+        } else if (command.tilt < 0 || command.tilt > 0) {
+            startCommandData = `<?xml version: "1.0" encoding="UTF-8"?><PTZData><pan>0</pan><tilt>${command.tilt > 0 ? 60 : -60}</tilt></PTZData>`;
+            endCommandData = `<?xml version: "1.0" encoding="UTF-8"?><PTZData><pan>0</pan><tilt>0</tilt></PTZData>`;
+        } else if (command.zoom < 0 || command.zoom > 0) {
+            startCommandData = `<?xml version: "1.0" encoding="UTF-8"?><PTZData><zoom>${command.zoom > 0 ? 60 : -60}</zoom></PTZData>`;
+            endCommandData = `<?xml version: "1.0" encoding="UTF-8"?><PTZData><zoom>0</zoom></PTZData>`;
+        }
+
+        if (!startCommandData || !endCommandData) {
+            return;
+        }
+
+        try {
+            await this.request({
+                method: 'PUT',
+                url: `http://${this.ip}/ISAPI/PTZCtrl/channels/1/continuous`,
+                responseType: 'text',
+                headers: { 'Content-Type': 'application/xml' },
+                body: startCommandData
+            });
+
+            sleep(1000);
+
+            await this.request({
+                method: 'PUT',
+                url: `http://${this.ip}/ISAPI/PTZCtrl/channels/1/continuous`,
+                responseType: 'text',
+                headers: { 'Content-Type': 'application/xml' },
+                body: endCommandData
+            });
+        } catch (e) {
+            this.console.error('Error during PTZ command', e);
+        }
+    }
 }
