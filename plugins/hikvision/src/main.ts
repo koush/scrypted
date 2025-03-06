@@ -595,8 +595,6 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                     this.console.error('error autoconfiguring', e);
                 });
             return;
-        } else if (key === 'ptzPresets') {
-            this.console.log(value, typeof value);
         }
 
         this.client = undefined;
