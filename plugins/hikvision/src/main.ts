@@ -45,6 +45,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         super(nativeId, provider);
 
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
+        this.hasPtz = this.storage.getItem('hasPtz') === 'true';
 
         this.updateDevice();
         this.updateDeviceInfo();
@@ -508,6 +509,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
             if (capabilitiesJson?.PTZChanelCap?.ContinuousPanTiltSpace) {
                 this.hasPtz = true;
+                this.storage.setItem('hasPtz', 'true');
                 ptzCapabilities.push('Pan', 'Tilt');
             }
             if (capabilitiesJson?.PTZChanelCap?.ContinuousZoomSpace) {
