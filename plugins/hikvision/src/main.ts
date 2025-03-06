@@ -12,6 +12,7 @@ import { autoconfigureSettings, hikvisionAutoConfigureSettings } from "./hikvisi
 import { detectionMap, HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 import { HikvisionSupplementalLight } from "./supplemental-light";
 import { HikvisionAlarmSwitch } from "./alarm-switch";
+import { PtzCapabilitiesRoot } from "./hikvision-api-capabilities";
 
 const rtspChannelSetting: Setting = {
     subgroup: 'Advanced',
@@ -34,6 +35,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
     hasSmartDetection: boolean;
+    hasPtz: boolean;
     supplementLight: HikvisionSupplementalLight;
     alarm: HikvisionAlarmSwitch;
 
@@ -44,14 +46,11 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
 
-        (async () => {
-            await this.updateDevice();
-            this.updateDeviceInfo();
-            this.reportDevices();
-        })()
-            .catch(e => {
-                this.console.log('Init device failed', e);
-            });
+        this.updateDevice();
+        this.updateDeviceInfo();
+        this.reportDevices();
+
+        this.getPtzCapabilities().catch(this.console.error);
     }
 
     async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
@@ -64,20 +63,6 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 text: to.displayText[0],
             }
         }
-        return ret;
-    }
-
-    async fetchPresets(): Promise<string[]> {
-        const client = this.getClient();
-        const presets = await client.getPresets();
-        const ret: string[] = [];
-
-        for (const to of presets.json.PTZPresetList?.PTZPreset) {
-            if (to.enabled) {
-                ret.push(`${to.id}=${to.presetName}`)
-            }
-        }
-
         return ret;
     }
 
@@ -482,7 +467,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         return false;
     }
 
-    async updateDevice() {
+    updateDevice() {
         const doorbellType = this.storage.getItem('doorbellType');
         const isDoorbell = doorbellType === 'true';
 
@@ -506,48 +491,56 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         if (this.hasAlarm() || this.hasSupplementLight())
             interfaces.push(ScryptedInterface.DeviceProvider);
 
-        const ptzCapabilities = await this.getPtzCapabilities();
-        if (ptzCapabilities?.length) {
+        if (this.hasPtz) {
             interfaces.push(ScryptedInterface.PanTiltZoom);
-            await this.updatePtzCaps(ptzCapabilities);
         }
 
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
-    async getPtzCapabilities(): Promise<string[]> {
+    async getPtzCapabilities(): Promise<void> {
         const ptzCapabilities: string[] = [];
+        const cameraPresets: string[] = [];
+
         try {
             const client = this.getClient();
             const { json: capabilitiesJson } = await client.getPtzCapabilities();
 
             if (capabilitiesJson?.PTZChanelCap?.ContinuousPanTiltSpace) {
+                this.hasPtz = true;
                 ptzCapabilities.push('Pan', 'Tilt');
             }
             if (capabilitiesJson?.PTZChanelCap?.ContinuousZoomSpace) {
+                this.hasPtz = true;
                 ptzCapabilities.push('Zoom');
             }
             if (capabilitiesJson?.PTZChanelCap?.PresetNameCap?.presetNameSupport === 'true') {
                 ptzCapabilities.push('Presets');
+
+                const presets = await client.getPresets();
+
+                for (const to of presets.json.PTZPresetList?.PTZPreset) {
+                    if (to.enabled) {
+                        cameraPresets.push(`${to.id}=${to.presetName}`)
+                    }
+                }
             }
 
-            return ptzCapabilities;
+            this.updatePtzCaps(ptzCapabilities, cameraPresets);
+            this.updateDevice();
         } catch (e) {
             if ((e.statusCode && e.statusCode === 403) ||
                 (typeof e.message === 'string' && e.message.includes('403'))) {
-                return [];
             } else {
                 this.console.error('Error in getPtzCapabilities', e);
             }
-            return []
         }
     }
 
-    async updatePtzCaps(ptzCaps: string[]) {
+    updatePtzCaps(cameraPtzCapabilities: string[], cameraPresets: string[]) {
         const presets: Record<string, string> = {};
 
-        if (ptzCaps.includes('Presets')) {
-            const cameraPresets = await this.fetchPresets();
+        if (cameraPtzCapabilities.includes('Presets')) {
             cameraPresets.forEach(preset => {
                 const parts = preset.split('=');
                 if (parts.length === 2) {
@@ -558,9 +551,9 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
         this.ptzCapabilities = {
             ...this.ptzCapabilities,
-            pan: ptzCaps?.includes('Pan'),
-            tilt: ptzCaps?.includes('Tilt'),
-            zoom: ptzCaps?.includes('Zoom'),
+            pan: cameraPtzCapabilities?.includes('Pan'),
+            tilt: cameraPtzCapabilities?.includes('Tilt'),
+            zoom: cameraPtzCapabilities?.includes('Zoom'),
             presets,
         }
     }
@@ -589,7 +582,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             super.putSetting(key, value);
         }
 
-        await this.updateDevice();
+        this.updateDevice();
         this.updateDeviceInfo();
     }
 
