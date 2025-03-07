@@ -12,7 +12,6 @@ import { autoconfigureSettings, hikvisionAutoConfigureSettings } from "./hikvisi
 import { detectionMap, HikvisionCameraAPI, HikvisionCameraEvent } from "./hikvision-camera-api";
 import { HikvisionSupplementalLight } from "./supplemental-light";
 import { HikvisionAlarmSwitch } from "./alarm-switch";
-import { PtzCapabilitiesRoot } from "./hikvision-api-capabilities";
 
 const rtspChannelSetting: Setting = {
     subgroup: 'Advanced',
@@ -35,9 +34,6 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     onvifIntercom = new OnvifIntercom(this);
     activeIntercom: Awaited<ReturnType<typeof startRtpForwarderProcess>>;
     hasSmartDetection: boolean;
-    hasPtz: boolean;
-    hasAlarm: boolean;
-    hasSupplementLight: boolean;
     supplementLight: HikvisionSupplementalLight;
     alarm: HikvisionAlarmSwitch;
     ptzPresets: string[];
@@ -48,14 +44,16 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         super(nativeId, provider);
 
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
-        this.hasPtz = this.storage.getItem('hasPtz') === 'true';
-        this.hasAlarm = this.storage.getItem('hasAlarm') === 'true';
-        this.hasSupplementLight = this.storage.getItem('hasSupplementLight') === 'true';
+        this.ptzPresets = JSON.parse(this.storage.getItem('storedPtzPresets') ?? '[]');
 
         this.updateDevice();
         this.updateDeviceInfo();
 
-        this.checkCapabilities().catch(this.console.error);
+        if (this.interfaces.includes(ScryptedInterface.PanTiltZoom)) {
+            const ptzCapabilities = JSON.parse(this.storage.getItem('ptzCapabilities') ?? '[]');
+            this.fetchPtzPresets().catch(this.console.error);
+            this.updatePtzCaps(ptzCapabilities);
+        }
     }
 
     async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
@@ -82,71 +80,6 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         client.updateOverlayText(id, {
             TextOverlay: overlay,
         });
-    }
-
-    async checkSupplementLightCapabilities(): Promise<void> {
-        let hasSupplementLight = false;
-        try {
-            if (!this.storage.getItem('ip'))
-                hasSupplementLight = false;
-
-            const client = this.getClient();
-            const { json } = await client.getSupplementLight();
-            hasSupplementLight = !!(json && json.SupplementLight);
-        }
-        catch (e) {
-            if ((e.statusCode && e.statusCode === 403) ||
-                (typeof e.message === 'string' && e.message.includes('403'))) {
-                hasSupplementLight = false;
-            }
-            // this.console.error('Error checking supplemental light', e);
-            hasSupplementLight = false;
-        } finally {
-            this.hasSupplementLight = hasSupplementLight;
-            this.storage.setItem('hasSupplementLight', hasSupplementLight ? 'true' : 'false');
-        }
-    }
-
-    async checkAlarmCapabilities(): Promise<void> {
-        let hasAlarm = false;
-        try {
-            if (!this.storage.getItem('ip'))
-                hasAlarm = false;
-
-            const client = this.getClient();
-            const { json: capabilitiesJson } = await client.getAlarmCapabilities();
-            let ports = capabilitiesJson.IOInputPortList?.IOInputPort;
-            if (!ports) {
-                hasAlarm = false;
-            }
-            if (!Array.isArray(ports)) {
-                ports = [ports];
-            }
-
-            for (const port of ports) {
-                const portId = port.id[0];
-                try {
-                    const alarm = await client.getAlarm(portId);
-                    if (alarm.json && alarm.json.eventType && alarm.json.eventType[0] === 'IO') {
-                        hasAlarm = true;
-                    }
-                } catch (ex) {
-                    continue;
-                }
-            }
-            hasAlarm = false;
-        } catch (e) {
-            if ((e.statusCode && e.statusCode === 403) ||
-                (typeof e.message === 'string' && e.message.includes('403'))) {
-                hasAlarm = false;
-            }
-            // this.console.error('Error checking alarm', e);
-            hasAlarm = false;
-        } finally {
-            this.hasAlarm = hasAlarm;
-            this.storage.setItem('hasAlarm', hasAlarm ? 'true' : 'false');
-
-        }
     }
 
     async reboot() {
@@ -491,6 +424,9 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             || this.storage.getItem('twoWayAudio') === 'ONVIF'
             || this.storage.getItem('twoWayAudio') === 'Hikvision';
 
+        const providedDevices = JSON.parse(this.storage.getItem('providedDevices') || '[]') as string[];
+        const ptzCapabilities = JSON.parse(this.storage.getItem('ptzCapabilities') || '[]') as string[];
+
         const interfaces = this.provider.getInterfaces();
         let type: ScryptedDeviceType = undefined;
         if (isDoorbell) {
@@ -504,80 +440,49 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         if (this.hasSmartDetection)
             interfaces.push(ScryptedInterface.ObjectDetector);
 
-        if (this.hasAlarm || this.hasSupplementLight)
+        if (!!providedDevices?.length) {
             interfaces.push(ScryptedInterface.DeviceProvider);
+        }
 
-        if (this.hasPtz) {
+        if (!!ptzCapabilities?.length) {
             interfaces.push(ScryptedInterface.PanTiltZoom);
         }
 
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
-    async checkCapabilities(): Promise<void> {
-        await this.checkPtzCapabilities();
-        await this.checkAlarmCapabilities();
-        await this.checkSupplementLightCapabilities();
-
-        this.updateDevice();
-        this.reportDevices();
-    }
-
-    async checkPtzCapabilities(): Promise<void> {
-        const ptzCapabilities: string[] = [];
-        const cameraPresets: string[] = [];
-
+    async fetchPtzPresets() {
         try {
             const client = this.getClient();
-            const { json: capabilitiesJson } = await client.getPtzCapabilities();
+            const cameraPresets: string[] = [];
+            const presets = await client.getPresets();
 
-            if (capabilitiesJson?.PTZChanelCap?.ContinuousPanTiltSpace) {
-                ptzCapabilities.push('Pan', 'Tilt');
-            }
-            if (capabilitiesJson?.PTZChanelCap?.ContinuousZoomSpace) {
-                ptzCapabilities.push('Zoom');
-            }
-            if (capabilitiesJson?.PTZChanelCap?.PresetNameCap?.presetNameSupport === 'true') {
-                ptzCapabilities.push('Presets');
-
-                const presets = await client.getPresets();
-
-                for (const to of presets.json.PTZPresetList?.PTZPreset) {
-                    if (to.enabled?.[0] === 'true') {
-                        cameraPresets.push(`${to.id?.[0]}=${to.presetName?.[0]}`);
-                    }
+            for (const to of presets.json.PTZPresetList?.PTZPreset) {
+                if (to.enabled?.[0] === 'true') {
+                    cameraPresets.push(`${to.id?.[0]}=${to.presetName?.[0]}`);
                 }
             }
 
-            this.updatePtzCaps(ptzCapabilities);
+            this.storage.setItem('storedPtzPresets', JSON.stringify(cameraPresets));
             this.ptzPresets = cameraPresets;
         } catch (e) {
-            if ((e.statusCode && e.statusCode === 403) ||
-                (typeof e.message === 'string' && e.message.includes('403'))) {
-            } else {
-                this.console.error('Error in getPtzCapabilities', e);
-            }
-        } finally {
-            if (!!ptzCapabilities.length) {
-                this.hasPtz = true;
-                this.storage.setItem('hasPtz', 'true');
-            }
+            this.console.error('Error in fetchPtzPresets', e);
         }
     }
 
-    updatePtzCaps(cameraPtzCapabilities: string[]) {
+    async updatePtzCaps(cameraPtzCapabilities: string[]) {
         this.ptzCapabilities = {
             ...this.ptzCapabilities,
-            pan: this.ptzCapabilities?.pan || cameraPtzCapabilities?.includes('Pan'),
-            tilt: this.ptzCapabilities?.tilt || cameraPtzCapabilities?.includes('Tilt'),
-            zoom: this.ptzCapabilities?.zoom || cameraPtzCapabilities?.includes('Zoom'),
+            pan: cameraPtzCapabilities?.includes('Pan'),
+            tilt: cameraPtzCapabilities?.includes('Tilt'),
+            zoom: cameraPtzCapabilities?.includes('Zoom'),
         }
     }
 
-    updatePtzPresets(cameraPresets: string[]) {
+    async updatePtzPresets(ptzPresets: string[]) {
         const presets: Record<string, string> = {};
 
-        cameraPresets.forEach(preset => {
+        ptzPresets.forEach(preset => {
             const parts = preset.split('=');
             if (parts.length === 2) {
                 presets[parts[0]] = parts[1];
@@ -603,19 +508,19 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 });
             return;
         } else if (key === 'ptzPresets') {
-            this.updatePtzPresets(value as string[]);
+            await this.updatePtzPresets(value as string[]);
+        } else if (key === 'ptzCapabilities' && !!value?.length) {
+            await this.fetchPtzPresets();
+            this.updatePtzCaps(value as string[]);
         }
 
         this.client = undefined;
         this.detectedChannels = undefined;
-        if (typeof value === "object") {
-            super.putSetting(key, JSON.stringify(value));
-        } else {
-            super.putSetting(key, value);
-        }
+        super.putSetting(key, typeof value === 'string' ? value : JSON.stringify(value));
 
         this.updateDevice();
         this.updateDeviceInfo();
+        this.reportDevices();
     }
 
     async getOtherSettings(): Promise<Setting[]> {
@@ -639,6 +544,9 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         if (!twoWayAudio)
             twoWayAudio = isDoorbell ? 'Hikvision' : 'None';
 
+        const providedDevices = JSON.parse(this.storage.getItem('providedDevices') || '[]') as string[];
+        const ptzCapabilities = JSON.parse(this.storage.getItem('ptzCapabilities') || '[]') as string[];
+
         ret.push(
             {
                 subgroup: 'Advanced',
@@ -655,6 +563,29 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 key: 'twoWayAudio',
                 description: 'Hikvision cameras may support both Hikvision and ONVIF two way audio protocols. ONVIF generally performs better when supported.',
                 choices,
+            },
+            {
+                key: 'providedDevices',
+                subgroup: 'Advanced',
+                title: 'Provided devices',
+                value: providedDevices,
+                choices: [
+                    'Alarm',
+                    'SupplementLight',
+                ],
+                multiple: true,
+            },
+            {
+                key: 'ptzCapabilities',
+                subgroup: 'Advanced',
+                value: ptzCapabilities,
+                title: 'PTZ Capabilities',
+                choices: [
+                    'Pan',
+                    'Tilt',
+                    'Zoom',
+                ],
+                multiple: true,
             },
         );
 
@@ -689,9 +620,10 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     }
 
     reportDevices() {
+        const providedDevices = JSON.parse(this.storage.getItem('providedDevices') || '[]') as string[];
         const devices: Device[] = [];
 
-        if (this.hasAlarm) {
+        if (providedDevices?.includes('Alarm')) {
             const alarmNativeId = `${this.nativeId}-alarm`;
             const alarmDevice: Device = {
                 providerNativeId: this.nativeId,
@@ -709,7 +641,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             devices.push(alarmDevice);
         }
 
-        if (this.hasSupplementLight) {
+        if (providedDevices?.includes('SupplementLight')) {
             const supplementLightNativeId = `${this.nativeId}-supplementlight`;
             const supplementLightDevice: Device = {
                 providerNativeId: this.nativeId,
@@ -728,12 +660,10 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             devices.push(supplementLightDevice);
         }
 
-        if (devices.length > 0) {
-            sdk.deviceManager.onDevicesChanged({
-                providerNativeId: this.nativeId,
-                devices,
-            });
-        }
+        sdk.deviceManager.onDevicesChanged({
+            providerNativeId: this.nativeId,
+            devices,
+        });
     }
 
     async getDevice(nativeId: string): Promise<any> {
