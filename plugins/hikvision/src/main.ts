@@ -457,7 +457,8 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             const cameraPresets: string[] = [];
             const presets = await client.getPresets();
 
-            for (const to of presets.json.PTZPresetList?.PTZPreset) {
+            const allPresets = presets.json?.PTZPresetList?.PTZPreset ?? [];
+            for (const to of allPresets) {
                 if (to.enabled?.[0] === 'true') {
                     cameraPresets.push(`${to.id?.[0]}=${to.presetName?.[0]}`);
                 }
@@ -467,6 +468,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             this.ptzPresets = cameraPresets;
         } catch (e) {
             this.console.error('Error in fetchPtzPresets', e);
+            this.ptzPresets = [];
         }
     }
 
