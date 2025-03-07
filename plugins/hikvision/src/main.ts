@@ -558,18 +558,19 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 this.console.error('Error in getPtzCapabilities', e);
             }
         } finally {
-            const hasPtz = !!ptzCapabilities.length;
-            this.hasPtz = hasPtz;
-            this.storage.setItem('hasPtz', hasPtz ? 'true' : 'false');
+            if (!!ptzCapabilities.length) {
+                this.hasPtz = true;
+                this.storage.setItem('hasPtz', 'true');
+            }
         }
     }
 
     updatePtzCaps(cameraPtzCapabilities: string[]) {
         this.ptzCapabilities = {
             ...this.ptzCapabilities,
-            pan: cameraPtzCapabilities?.includes('Pan'),
-            tilt: cameraPtzCapabilities?.includes('Tilt'),
-            zoom: cameraPtzCapabilities?.includes('Zoom'),
+            pan: this.ptzCapabilities?.pan || cameraPtzCapabilities?.includes('Pan'),
+            tilt: this.ptzCapabilities?.tilt || cameraPtzCapabilities?.includes('Tilt'),
+            zoom: this.ptzCapabilities?.zoom || cameraPtzCapabilities?.includes('Zoom'),
         }
     }
 
