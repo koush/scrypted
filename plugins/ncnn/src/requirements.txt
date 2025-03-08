@@ -1,0 +1,3 @@
+ncnn==1.0.20241226
+Pillow==11.1.0
+opencv-python-headless==4.10.0.84

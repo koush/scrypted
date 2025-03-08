@@ -1,0 +1,48 @@
+{
+   "name": "@scrypted/ncnn",
+   "description": "Scrypted NCNN Object Detection",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "ncnn",
+      "neural",
+      "object",
+      "detect",
+      "detection",
+      "people",
+      "person"
+   ],
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "scrypted": {
+      "name": "NCNN Object Detection",
+      "pluginDependencies": [
+         "@scrypted/objectdetector"
+      ],
+      "runtime": "python",
+      "type": "API",
+      "interfaces": [
+         "Settings",
+         "DeviceProvider",
+         "ClusterForkInterface",
+         "ObjectDetection",
+         "ObjectDetectionPreview"
+      ]
+
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "version": "0.1.77"
+}
