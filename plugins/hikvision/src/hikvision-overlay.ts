@@ -86,3 +86,27 @@ export interface Empty {
     version: string;
     xmlns:   string;
 }
+
+export interface PtzPresetsRoot {
+    PTZPresetList: PTZPresetList;
+}
+
+export interface PTZPresetList {
+    PTZPreset: PTZPreset[];
+    _xmlns:    string;
+    _version:  string;
+}
+
+export interface PTZPreset {
+    enabled:      string;
+    id:           string;
+    presetName:   string;
+    AbsoluteHigh: AbsoluteHigh;
+}
+
+export interface AbsoluteHigh {
+    elevation:    string;
+    azimuth:      string;
+    absoluteZoom: string;
+}
+
