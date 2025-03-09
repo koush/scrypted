@@ -74,7 +74,7 @@ async function doconnect(): Promise<net.Socket> {
 }
 
 const debugServer = net.createServer(async (socket) => {
-    if (listenSet.rules.length && !listenSet.check(socket.remoteAddress)) {
+    if (listenSet.rules.length && !listenSet.check(socket.localAddress)) {
         socket.destroy();
         return;
     }
@@ -124,7 +124,7 @@ app.use(bodyParser.raw({ type: 'application/*', limit: 100000000 }) as any);
 
 if (listenSet.rules.length) {
     app.use((req, res, next) => {
-        if (!listenSet.check(req.socket.remoteAddress)) {
+        if (!listenSet.check(req.socket.localAddress)) {
             res.status(403).send('Access denied on this address');
             return;
         }
