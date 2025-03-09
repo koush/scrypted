@@ -125,7 +125,7 @@ app.use(bodyParser.raw({ type: 'application/*', limit: 100000000 }) as any);
 if (listenSet.rules.length) {
     app.use((req, res, next) => {
         if (!listenSet.check(req.socket.localAddress)) {
-            res.status(403).send('Access denied on this address');
+            res.status(403).send('Access denied on this address: ' + req.socket.localAddress);
             return;
         }
         next();
