@@ -16,11 +16,11 @@ RUN apt -y install xcaddy
 RUN xcaddy build --with github.com/caddy-dns/cloudflare --output /usr/local/bin/caddy
 
 # nftables
-COPY scrypted-nftables.service /etc/systemd/system
+COPY ./router/scrypted-nftables.service /etc/systemd/system
 RUN systemctl enable scrypted-nftables
 RUN bash -c 'echo include \"/etc/nftables.d/*.conf\"\; > /etc/nftables.conf'
 RUN mkdir -p /etc/nftables.d
-COPY 01-scrypted.conf /etc/nftables.d
+COPY ./router/01-scrypted.conf /etc/nftables.d
 
 WORKDIR /
 # cache bust
@@ -29,10 +29,10 @@ ARG SCRYPTED_INSTALL_VERSION="latest"
 RUN test -n "$SCRYPTED_INSTALL_VERSION"
 RUN npx -y scrypted@latest install-server ${SCRYPTED_INSTALL_VERSION}
 
-COPY scrypted-dhcp-watcher.service /etc/systemd/system/scrypted-dhcp-watcher.service
+COPY ./router/scrypted-dhcp-watcher.service /etc/systemd/system/scrypted-dhcp-watcher.service
 RUN systemctl enable scrypted-dhcp-watcher
 
-COPY scrypted.service /etc/systemd/system/scrypted.service
+COPY ./router/scrypted.service /etc/systemd/system/scrypted.service
 RUN systemctl enable scrypted
 
 WORKDIR /
