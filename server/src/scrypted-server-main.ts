@@ -11,8 +11,8 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 import process from 'process';
-import tls from 'tls';
 import { install as installSourceMapSupport } from 'source-map-support';
+import tls from 'tls';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { getScryptedClusterMode } from './cluster/cluster-setup';
 import { Plugin, ScryptedUser, Settings } from './db-types';
@@ -27,34 +27,34 @@ import type { ServiceControl } from './services/service-control';
 import { setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
-import { EventEmitter } from 'stream';
 
 export type Runtime = ScryptedRuntime;
 
-const listenSet = new Set<string>();
+const listenSet = new net.BlockList();
 const { SCRYPTED_SERVER_LISTEN_HOSTNAMES } = process.env;
 if (SCRYPTED_SERVER_LISTEN_HOSTNAMES) {
-    listenSet.add('127.0.0.1');
+    // add ipv4 and ipv6 loopback
+    listenSet.addAddress('127.0.0.1');
+    listenSet.addAddress('::1', 'ipv6');
     for (const hostname of SCRYPTED_SERVER_LISTEN_HOSTNAMES.split(',')) {
-        listenSet.add(hostname);
+        if (net.isIPv4(hostname))
+            listenSet.addAddress(hostname);
+        else if (net.isIPv6(hostname))
+            listenSet.addAddress(hostname, 'ipv6');
+        else
+            throw new Error('Invalid SCRYPTED_SERVER_LISTEN_HOSTNAME: ' + hostname);
     }
 }
-else {
-    listenSet.add(undefined);
-}
 
-async function listenServerPort(env: string, port: number, createServer: () => http.Server | https.Server | net.Server) {
-    for (const hostname of listenSet) {
-        const server = createServer();
-        server.listen(port, hostname);
-        try {
-            await once(server, 'listening');
-        }
-        catch (e) {
-            console.error(`Failed to listen on port ${port}. It may be in use.`);
-            console.error(`Use the environment variable ${env} to change the port.`);
-            throw e;
-        }
+async function listenServerPort(env: string, port: number, server: http.Server | https.Server | net.Server) {
+    server.listen(port);
+    try {
+        await once(server, 'listening');
+    }
+    catch (e) {
+        console.error(`Failed to listen on port ${port}. It may be in use.`);
+        console.error(`Use the environment variable ${env} to change the port.`);
+        throw e;
     }
 }
 
@@ -73,9 +73,11 @@ async function doconnect(): Promise<net.Socket> {
     })
 }
 
-const debugServerEvents = new EventEmitter();
-listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, () => net.createServer(async (socket) => {
-    debugServerEvents.emit('connection', socket);
+const debugServer = net.createServer(async (socket) => {
+    if (listenSet.rules.length && !listenSet.check(socket.remoteAddress)) {
+        socket.destroy();
+        return;
+    }
 
     if (!workerInspectPort) {
         socket.destroy();
@@ -102,7 +104,9 @@ listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, () => net.createSer
     }
     console.warn('debugger connect timed out');
     socket.destroy();
-}))
+});
+
+listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, debugServer)
     .catch(() => { });
 
 const app = express();
@@ -110,13 +114,23 @@ const app = express();
 app.set('trust proxy', 'loopback');
 
 // parse application/x-www-form-urlencoded
-app.use(bodyParser.urlencoded({ extended: false }) as any)
+app.use(bodyParser.urlencoded({ extended: false }) as any);
 
 // parse application/json
-app.use(bodyParser.json())
+app.use(bodyParser.json());
 
 // parse some custom thing into a Buffer
-app.use(bodyParser.raw({ type: 'application/*', limit: 100000000 }) as any)
+app.use(bodyParser.raw({ type: 'application/*', limit: 100000000 }) as any);
+
+if (listenSet.rules.length) {
+    app.use((req, res, next) => {
+        if (!listenSet.check(req.socket.remoteAddress)) {
+            res.status(403).send('Access denied on this address');
+            return;
+        }
+        next();
+    });
+}
 
 async function start(mainFilename: string, options?: {
     onRuntimeCreated?: (runtime: ScryptedRuntime) => Promise<void>,
@@ -376,7 +390,7 @@ async function start(mainFilename: string, options?: {
     const clusterMode = getScryptedClusterMode();
     if (clusterMode?.[0] === 'server') {
         console.log('Cluster server starting.');
-        await listenServerPort('SCRYPTED_CLUSTER_SERVER', clusterMode[2], () => createClusterServer(mainFilename, scrypted, keyPair));
+        await listenServerPort('SCRYPTED_CLUSTER_SERVER', clusterMode[2], createClusterServer(mainFilename, scrypted, keyPair));
     }
 
     await scrypted.start();
@@ -488,7 +502,7 @@ async function start(mainFilename: string, options?: {
 
         const waitDebug = new Promise<void>((resolve, reject) => {
             setTimeout(() => reject(new Error('timed out waiting for debug session')), 30000);
-            debugServerEvents.on('connection', resolve);
+            debugServer.on('connection', resolve);
         });
 
         waitDebug.catch(() => { });
@@ -772,17 +786,13 @@ async function start(mainFilename: string, options?: {
         return server;
     }
 
-    await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, () => {
-        return hookUpgrade(https.createServer(mergedHttpsServerOptions, app));
-    });
-    await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, () => {
-        return hookUpgrade(http.createServer(app));
-    });
+    await listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, hookUpgrade(https.createServer(mergedHttpsServerOptions, app)));
+    await listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, hookUpgrade(http.createServer(app)));
 
     console.log('#######################################################');
     console.log(`Scrypted Volume           : ${volumeDir}`);
     console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
-    for (const address of SCRYPTED_SERVER_LISTEN_HOSTNAMES ? listenSet : getUsableNetworkAddresses()) {
+    for (const address of SCRYPTED_SERVER_LISTEN_HOSTNAMES ? SCRYPTED_SERVER_LISTEN_HOSTNAMES.split(',') : getUsableNetworkAddresses()) {
         console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
     }
     console.log(`Version:       : ${await scrypted.info.getVersion()}`);
