@@ -22,6 +22,10 @@ RUN bash -c 'echo include \"/etc/nftables.d/*.conf\"\; > /etc/nftables.conf'
 RUN mkdir -p /etc/nftables.d
 COPY ./router/01-scrypted.conf /etc/nftables.d
 
+# ipv6 forwarding
+COPY ./router/scrypted-ipv6-forwarding.service /etc/systemd/system
+RUN systemctl enable scrypted-ipv6-forwarding
+
 WORKDIR /
 # cache bust
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
