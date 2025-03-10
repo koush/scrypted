@@ -23,8 +23,13 @@ RUN mkdir -p /etc/nftables.d
 COPY ./router/01-scrypted.conf /etc/nftables.d
 
 # ipv6 forwarding
-COPY ./router/scrypted-ipv6-forwarding.service /etc/systemd/system
-RUN systemctl enable scrypted-ipv6-forwarding
+COPY ./router/scrypted-ip-forwarding.service /etc/systemd/system
+RUN systemctl enable scrypted-ip-forwarding
+
+# install turn server, but disable it too set it up on a per interface basis.
+RUN apt install coturn
+RUN systemctl disable coturn
+RUN rm /usr/lib/systemd/system/coturn.service
 
 WORKDIR /
 # cache bust
