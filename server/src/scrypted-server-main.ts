@@ -16,7 +16,7 @@ import tls from 'tls';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { getScryptedClusterMode } from './cluster/cluster-setup';
 import { Plugin, ScryptedUser, Settings } from './db-types';
-import { getUsableNetworkAddresses } from './ip';
+import { getUsableNetworkAddresses, removeIPv4EmbeddedIPv6 } from './ip';
 import Level from './level';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { ScryptedRuntime } from './runtime';
@@ -74,7 +74,7 @@ async function doconnect(): Promise<net.Socket> {
 }
 
 const debugServer = net.createServer(async (socket) => {
-    if (listenSet.rules.length && !listenSet.check(socket.localAddress)) {
+    if (listenSet.rules.length && !checkListenSet(socket)) {
         socket.destroy();
         return;
     }
@@ -122,9 +122,13 @@ app.use(bodyParser.json());
 // parse some custom thing into a Buffer
 app.use(bodyParser.raw({ type: 'application/*', limit: 100000000 }) as any);
 
+function checkListenSet(socket: net.Socket) {
+    return listenSet.check(socket.localAddress, net.isIPv4(socket.localAddress) ? 'ipv4' : 'ipv6');
+}
+
 if (listenSet.rules.length) {
     app.use((req, res, next) => {
-        if (!listenSet.check(req.socket.localAddress)) {
+        if (!checkListenSet(req.socket)) {
             res.status(403).send('Access denied on this address: ' + req.socket.localAddress);
             return;
         }
