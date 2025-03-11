@@ -1186,6 +1186,17 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   constructor(public getTranscodeStorageSettings: () => Promise<any>, options: SettingsMixinDeviceOptions<VideoCamera & VideoCameraConfiguration>) {
     super(options);
 
+    const pluginId = systemManager.getDeviceById('@scrypted/prebuffer-mixin').id;
+    if (this.providedInterfaces.includes(ScryptedInterface.VideoCamera) && this.mixins[0] !== pluginId) {
+      this.console.warn('rebroadcast mixin is not the first mixin, rebroadcast may flap on interface changes.');
+      setTimeout(() => {
+        const currentMixins = this.mixins.filter(mixin => mixin !== pluginId);
+        currentMixins.unshift(pluginId);
+        const realDevice = systemManager.getDeviceById(this.id);
+        realDevice.setMixins(currentMixins);
+      }, 1000);
+    }
+
     this.delayStart();
 
     (async () => {
@@ -1747,6 +1758,10 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
 
   async shouldEnableMixin(device: ScryptedDevice): Promise<boolean> {
     return device.type === ScryptedDeviceType.Camera || device.type === ScryptedDeviceType.Doorbell;
+  }
+
+  shouldUnshiftMixin(device: ScryptedDevice): boolean {
+    return device.providedInterfaces.includes(ScryptedInterface.VideoCamera);
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {

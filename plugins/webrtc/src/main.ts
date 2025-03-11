@@ -4,7 +4,7 @@ import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { createZygote } from '@scrypted/common/src/zygote';
-import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, ForkWorker, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, ForkWorker, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import ip from 'ip';
@@ -274,7 +274,6 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
     constructor() {
         super();
-        this.unshiftMixin = true;
 
         // never want this on, should only be used for debugging.
         this.storageSettings.values.maximumCompatibilityMode = false;
@@ -286,6 +285,11 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         ]
 
         deviceManager.onDevicesChanged({ devices: [] });
+    }
+
+    shouldUnshiftMixin(): boolean {
+        // it shouldn't matter where this mixin is in the chain, i don't think?
+        return true;
     }
 
     getSettings(): Promise<Setting[]> {

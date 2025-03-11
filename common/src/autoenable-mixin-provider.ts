@@ -7,7 +7,6 @@ const { systemManager } = sdk;
 export abstract class AutoenableMixinProvider extends ScryptedDeviceBase {
     hasEnabledMixin: { [id: string]: string } = {};
     pluginsComponent: Promise<any>;
-    unshiftMixin = false;
 
     constructor(nativeId?: string, public autoIncludeToken = 'v4') {
         super(nativeId);
@@ -45,6 +44,10 @@ export abstract class AutoenableMixinProvider extends ScryptedDeviceBase {
         return this.hasEnabledMixin[device.id] === this.autoIncludeToken;
     }
 
+    shouldUnshiftMixin(device: ScryptedDevice) {
+        return false;
+    }
+
     async maybeEnableMixin(device: ScryptedDevice) {
         if (!device || device.mixins?.includes(this.id))
             return;
@@ -61,7 +64,7 @@ export abstract class AutoenableMixinProvider extends ScryptedDeviceBase {
 
         this.log.i('auto enabling mixin for ' + device.name)
         const mixins = (device.mixins || []).slice();
-        if (this.unshiftMixin)
+        if (this.shouldUnshiftMixin(device))
             mixins.unshift(this.id);
         else
             mixins.push(this.id);
