@@ -77,5 +77,5 @@ export abstract class AutoenableMixinProvider extends ScryptedDeviceBase {
         this.storage.setItem('hasEnabledMixin', JSON.stringify(this.hasEnabledMixin));
     }
 
-    abstract canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[] | null | undefined | void>;
+    abstract canMixin(type: ScryptedDeviceType | string, interfaces: string[]): Promise<string[] | null | undefined | void>;
 }

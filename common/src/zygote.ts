@@ -23,7 +23,9 @@ export function createService<T, V>(options: ForkOptions, create: (t: Promise<T>
             currentFork = sdk.fork<T>(options);
             currentFork.worker.on('exit', () => currentResult = undefined);
             currentResult = create(currentFork.result);
-            currentResult.catch(() => currentResult = undefined);
+            currentResult.catch(() => {
+                currentResult = undefined;
+            });
             return currentResult;
         },
 
