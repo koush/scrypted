@@ -162,24 +162,29 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
         const result = this.plugin.createTrackedFork();
 
         const fork = await result.result;
+        try {
+            const { getIntercom, mediaObject, pcClose } = await fork.createRTCPeerConnectionSource({
+                __json_copy_serialize_children: true,
+                nativeId: this.nativeId,
+                mixinId: this.id,
+                mediaStreamOptions: this.createVideoStreamOptions(),
+                startRTCSignalingSession: (session) => this.mixinDevice.startRTCSignalingSession(session),
+                maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
+            });
 
-        const { getIntercom, mediaObject, pcClose } = await fork.createRTCPeerConnectionSource({
-            __json_copy_serialize_children: true,
-            nativeId: this.nativeId,
-            mixinId: this.id,
-            mediaStreamOptions: this.createVideoStreamOptions(),
-            startRTCSignalingSession: (session) => this.mixinDevice.startRTCSignalingSession(session),
-            maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
-        });
+            this.webrtcIntercom = getIntercom();
+            const pcc = pcClose();
+            pcc.finally(() => {
+                this.webrtcIntercom = undefined;
+                delayWorkerExit(result.worker);
+            });
 
-        this.webrtcIntercom = getIntercom();
-        const pcc = pcClose();
-        pcc.finally(() => {
-            this.webrtcIntercom = undefined;
+            return mediaObject;
+        }
+        catch (e) {
             delayWorkerExit(result.worker);
-        });
-
-        return mediaObject;
+            throw e;
+        }
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
