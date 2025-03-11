@@ -4,7 +4,7 @@ import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { createZygote } from '@scrypted/common/src/zygote';
-import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, ForkWorker, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import ip from 'ip';
@@ -28,7 +28,11 @@ defaultPeerConfig.headerExtensions = {
     audio: [],
 };
 
-const zygote = worker_threads.isMainThread ? createZygote<ReturnType<typeof fork>>() : undefined;
+function delayWorkerExit(worker: ForkWorker) {
+    setTimeout(() => {
+        worker.terminate();
+    }, 10000);
+}
 
 class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
     storageSettings = new StorageSettings(this, {});
@@ -155,11 +159,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
             return this.mixinDevice.getVideoStream(options);
         }
 
-        const result = zygote();
-        this.plugin.activeConnections++;
-        result.worker.on('exit', () => {
-            this.plugin.activeConnections--;
-        });
+        const result = this.plugin.createTrackedFork();
 
         const fork = await result.result;
 
@@ -176,7 +176,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
         const pcc = pcClose();
         pcc.finally(() => {
             this.webrtcIntercom = undefined;
-            result.worker.terminate();
+            delayWorkerExit(result.worker);
         });
 
         return mediaObject;
@@ -265,6 +265,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         },
     });
     activeConnections = 0;
+    zygote = createZygote<ReturnType<typeof fork>>();
 
     constructor() {
         super();
@@ -345,7 +346,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return new OnDemandSignalingChannel();
     }
 
-    async convertToRTCConnectionManagement(result: ReturnType<typeof zygote>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
+    async convertToRTCConnectionManagement(result: ReturnType<typeof this.zygote>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
         const weriftConfiguration = await this.getWeriftConfiguration();
         const session = data as RTCSignalingSession;
         const maximumCompatibilityMode = !!this.storageSettings.values.maximumCompatibilityMode;
@@ -366,7 +367,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             );
         }
         catch (e) {
-            result.worker.terminate();
+            delayWorkerExit(result.worker);
             throw e;
         }
         await connection.negotiateRTCSignalingSession();
@@ -375,7 +376,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return connection;
     }
 
-    async convertToFFmpegInput(result: ReturnType<typeof zygote>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
+    async convertToFFmpegInput(result: ReturnType<typeof this.zygote>, data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
         const channel = data as RTCSignalingChannel;
         try {
             const { createRTCPeerConnectionSource } = await result.result;
@@ -395,41 +396,41 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const mediaStreamUrl = rtcSource.mediaObject;
             return await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaStreamUrl, ScryptedMimeTypes.FFmpegInput);
         } catch (e) {
-            result.worker.terminate();
+            delayWorkerExit(result.worker);
             throw e;
         }
     }
 
-    async convertMedia(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
-        const createTrackedFork = () => {
-            const result = zygote();
-            this.activeConnections++;
-            result.worker.on('exit', () => {
-                this.activeConnections--;
-            });
-            return result;
-        }
+    createTrackedFork() {
+        const result = this.zygote();
+        this.activeConnections++;
+        result.worker.on('exit', () => {
+            this.activeConnections--;
+        });
+        return result;
+    }
 
+    async convertMedia(data: any, fromMimeType: string, toMimeType: string, options?: MediaObjectOptions) {
         if (fromMimeType === ScryptedMimeTypes.RTCSignalingSession && toMimeType === ScryptedMimeTypes.RTCConnectionManagement) {
-            const result = createTrackedFork();
+            const result = this.createTrackedFork();
             try {
                 const connection = await timeoutPromise(2 * 60 * 1000, this.convertToRTCConnectionManagement(result, data, fromMimeType, toMimeType, options));
                 // wait a bit to allow ffmpegs to get terminated by the thread.
-                connection.waitClosed().finally(() => setTimeout(() => result.worker.terminate(), 30000));
+                connection.waitClosed().finally(() => delayWorkerExit(result.worker));
                 return connection;
             }
             catch (e) {
-                result.worker.terminate();
+                delayWorkerExit(result.worker);
                 throw e;
             }
         }
         else if (fromMimeType === ScryptedMimeTypes.RTCSignalingChannel && toMimeType === ScryptedMimeTypes.FFmpegInput) {
-            const result = createTrackedFork();
+            const result = this.createTrackedFork();
             try {
                 return await timeoutPromise(2 * 60 * 1000, this.convertToFFmpegInput(result, data, fromMimeType, toMimeType, options));
             }
             catch (e) {
-                result.worker.terminate();
+                delayWorkerExit(result.worker);
                 throw e;
             }
         }
@@ -611,6 +612,99 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
     }
 }
 
+function delayProcessExit() {
+    setTimeout(() => {
+        process.exit(0);
+    }, 1000);
+}
+
+async function createConnection(message: any,
+    port: number,
+    clientSession: RTCSignalingSession,
+    requireOpus: boolean,
+    maximumCompatibilityMode: boolean,
+    clientOptions: RTCSignalingOptions,
+    options: {
+        disableIntercom?: boolean;
+        configuration: RTCConfiguration;
+        weriftConfiguration: Partial<PeerConfig>;
+        ipv4Ban?: string[];
+    }) {
+
+    // T-Mobile has a bad 6to4 gateway. When 192.0.0.4 is detected, all ipv4 addresses, besides relay addresses for ipv6 addresses, should be ignored.
+    // thus, the candidate should only be configured if the remote host or relatedAddress is IPv6.
+
+    // a=candidate:2099470302 1 udp 2113937151 192.0.0.4 54018 typ host generation 0 network-cost 999
+    // a=candidate:2171408532 1 udp 2113939711 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 43501 typ host generation 0 network-cost 999
+    // a=candidate:1759977254 1 udp 1677729535 172.59.218.164 24868 typ srflx raddr 192.0.0.4 rport 54018 generation 0 network-cost 999
+    // a=candidate:1759256926 1 udp 1677732095 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 43501 typ srflx raddr 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 rport 43501 generation 0 network-cost 999
+    // a=candidate:821872401 1 udp 33565183 2604:2dc0:200:26d:: 62773 typ relay raddr 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 rport 43501 generation 0 network-cost 999
+    // a=candidate:3452552806 1 udp 33562623 147.135.36.109 61385 typ relay raddr 172.59.218.164 rport 24868 generation 0 network-cost 999
+
+    let banned = false;
+    options.weriftConfiguration.iceFilterCandidatePair = (pair) => {
+        // console.log('pair', pair.protocol.type, pair.localCandidate.host, pair.remoteCandidate.host, pair.remoteCandidate.relatedAddress);
+
+        const wasBanned = banned;
+        banned ||= options.ipv4Ban?.includes(pair.remoteCandidate.host);
+        banned ||= options.ipv4Ban?.includes(pair.remoteCandidate.relatedAddress);
+
+        if (!wasBanned && banned) {
+            console.warn('Banned 6to4 gateway detected, forcing IPv6.', pair.remoteCandidate.host, pair.remoteCandidate.relatedAddress);
+        }
+
+        if (!banned)
+            return true;
+
+        if (!ip.isV4Format(pair.remoteCandidate.host))
+            return true;
+        if (!ip.isV4Format(pair.remoteCandidate.relatedAddress))
+            return true;
+        return false;
+    }
+
+    const cleanup = new Deferred<string>();
+    cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
+
+    const connection = new WebRTCConnectionManagement(console, clientSession, requireOpus, maximumCompatibilityMode, clientOptions, options);
+    cleanup.promise.finally(() => connection.close().catch(() => { }));
+    const { pc } = connection;
+    waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
+
+    const { connectionManagementId, updateSessionId } = message;
+    if (connectionManagementId || updateSessionId) {
+        const plugins = await systemManager.getComponent('plugins');
+        if (connectionManagementId) {
+            plugins.setHostParam('@scrypted/webrtc', connectionManagementId, connection);
+        }
+        if (updateSessionId) {
+            await plugins.setHostParam('@scrypted/webrtc', updateSessionId, (session: RTCSignalingSession) => connection.clientSession = session);
+        }
+    }
+
+    if (port) {
+        const socket = net.connect(port, '127.0.0.1');
+        cleanup.promise.finally(() => socket.destroy());
+
+        const dc = pc.createDataChannel('rpc');
+        dc.onMessage.subscribe(message => socket.write(message));
+
+        const debouncer = new DataChannelDebouncer({
+            send: u8 => dc.send(Buffer.from(u8)),
+        }, e => {
+            this.console.error('datachannel send error', e);
+            socket.destroy();
+        });
+        socket.on('data', data => debouncer.send(data));
+        socket.on('close', () => cleanup.resolve('socket closed'));
+        socket.on('error', () => cleanup.resolve('socket error'));
+    }
+    else {
+        pc.createDataChannel('dummy');
+    }
+
+    return connection;
+}
 export async function fork() {
     return {
         async createRTCPeerConnectionSource(options: {
@@ -621,19 +715,25 @@ export async function fork() {
             startRTCSignalingSession: (session: RTCSignalingSession) => Promise<RTCSessionControl | undefined>,
             maximumCompatibilityMode: boolean,
         }): Promise<RTCPeerConnectionPipe> {
-            return createRTCPeerConnectionSource({
-                nativeId: this.nativeId,
-                mixinId: options.mixinId,
-                mediaStreamOptions: options.mediaStreamOptions,
-                startRTCSignalingSession: (session) => options.startRTCSignalingSession(session),
-                maximumCompatibilityMode: options.maximumCompatibilityMode,
-            });
+            try {
+                return await createRTCPeerConnectionSource({
+                    nativeId: this.nativeId,
+                    mixinId: options.mixinId,
+                    mediaStreamOptions: options.mediaStreamOptions,
+                    startRTCSignalingSession: (session) => options.startRTCSignalingSession(session),
+                    maximumCompatibilityMode: options.maximumCompatibilityMode,
+                });
+            }
+            catch (e) {
+                delayProcessExit();
+                throw e;
+            }
         },
 
         async createConnection(message: any,
             port: number,
             clientSession: RTCSignalingSession,
-            requireOpus,
+            requireOpus: boolean,
             maximumCompatibilityMode: boolean,
             clientOptions: RTCSignalingOptions,
             options: {
@@ -642,80 +742,13 @@ export async function fork() {
                 weriftConfiguration: Partial<PeerConfig>;
                 ipv4Ban?: string[];
             }) {
-
-            // T-Mobile has a bad 6to4 gateway. When 192.0.0.4 is detected, all ipv4 addresses, besides relay addresses for ipv6 addresses, should be ignored.
-            // thus, the candidate should only be configured if the remote host or relatedAddress is IPv6.
-
-            // a=candidate:2099470302 1 udp 2113937151 192.0.0.4 54018 typ host generation 0 network-cost 999
-            // a=candidate:2171408532 1 udp 2113939711 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 43501 typ host generation 0 network-cost 999
-            // a=candidate:1759977254 1 udp 1677729535 172.59.218.164 24868 typ srflx raddr 192.0.0.4 rport 54018 generation 0 network-cost 999
-            // a=candidate:1759256926 1 udp 1677732095 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 43501 typ srflx raddr 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 rport 43501 generation 0 network-cost 999
-            // a=candidate:821872401 1 udp 33565183 2604:2dc0:200:26d:: 62773 typ relay raddr 2607:fb90:eef3:16d9:ad3:fa57:997f:e9e2 rport 43501 generation 0 network-cost 999
-            // a=candidate:3452552806 1 udp 33562623 147.135.36.109 61385 typ relay raddr 172.59.218.164 rport 24868 generation 0 network-cost 999
-
-            let banned = false;
-            options.weriftConfiguration.iceFilterCandidatePair = (pair) => {
-                // console.log('pair', pair.protocol.type, pair.localCandidate.host, pair.remoteCandidate.host, pair.remoteCandidate.relatedAddress);
-
-                const wasBanned = banned;
-                banned ||= options.ipv4Ban?.includes(pair.remoteCandidate.host);
-                banned ||= options.ipv4Ban?.includes(pair.remoteCandidate.relatedAddress);
-
-                if (!wasBanned && banned) {
-                    console.warn('Banned 6to4 gateway detected, forcing IPv6.', pair.remoteCandidate.host, pair.remoteCandidate.relatedAddress);
-                }
-
-                if (!banned)
-                    return true;
-
-                if (!ip.isV4Format(pair.remoteCandidate.host))
-                    return true;
-                if (!ip.isV4Format(pair.remoteCandidate.relatedAddress))
-                    return true;
-                return false;
+            try {
+                return await createConnection(message, port, clientSession, requireOpus, maximumCompatibilityMode, clientOptions, options);
             }
-
-            const cleanup = new Deferred<string>();
-            cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
-
-            const connection = new WebRTCConnectionManagement(console, clientSession, requireOpus, maximumCompatibilityMode, clientOptions, options);
-            cleanup.promise.finally(() => connection.close().catch(() => { }));
-            const { pc } = connection;
-            waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
-
-            const { connectionManagementId, updateSessionId } = message;
-            if (connectionManagementId || updateSessionId) {
-                const plugins = await systemManager.getComponent('plugins');
-                if (connectionManagementId) {
-                    plugins.setHostParam('@scrypted/webrtc', connectionManagementId, connection);
-                }
-                if (updateSessionId) {
-                    await plugins.setHostParam('@scrypted/webrtc', updateSessionId, (session: RTCSignalingSession) => connection.clientSession = session);
-                }
+            catch (e) {
+                delayProcessExit();
+                throw e;
             }
-
-            if (port) {
-                const socket = net.connect(port, '127.0.0.1');
-                cleanup.promise.finally(() => socket.destroy());
-
-                const dc = pc.createDataChannel('rpc');
-                dc.onMessage.subscribe(message => socket.write(message));
-
-                const debouncer = new DataChannelDebouncer({
-                    send: u8 => dc.send(Buffer.from(u8)),
-                }, e => {
-                    this.console.error('datachannel send error', e);
-                    socket.destroy();
-                });
-                socket.on('data', data => debouncer.send(data));
-                socket.on('close', () => cleanup.resolve('socket closed'));
-                socket.on('error', () => cleanup.resolve('socket error'));
-            }
-            else {
-                pc.createDataChannel('dummy');
-            }
-
-            return connection;
         }
     }
 }
