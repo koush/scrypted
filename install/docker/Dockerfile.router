@@ -27,9 +27,10 @@ COPY ./router/scrypted-ip-forwarding.service /etc/systemd/system
 RUN systemctl enable scrypted-ip-forwarding
 
 # install turn server, but disable it too set it up on a per interface basis.
-RUN apt -y update && apt -y install coturn
-RUN systemctl disable coturn
-RUN rm /usr/lib/systemd/system/coturn.service
+RUN apt -y update && apt -y install coturn && systemctl disable coturn && rm /usr/lib/systemd/system/coturn.service
+
+# install usbmuxd for iphone tethering
+RUN apt -y update && apt -y install usbmuxd && rm /usr/lib/systemd/system/usbmuxd.service;
 
 WORKDIR /
 # cache bust
