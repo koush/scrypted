@@ -15,7 +15,7 @@
         { "path": "./src/es" },
     ],
     "exclude": [
-        "src/es/es-eval.ts"
+        "src/es/es-eval.mts"
     ],
     "include": [
         "src/**/*", 

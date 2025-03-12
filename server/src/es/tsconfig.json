@@ -13,7 +13,7 @@
         "sourceMap": true,
     },
     "include": [
-        "./es-eval.ts",
+        "es-eval.mts",
     ],
     "exclude": []
 }
