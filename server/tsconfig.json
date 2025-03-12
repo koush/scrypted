@@ -12,12 +12,6 @@
         "skipLibCheck": true,
         "sourceMap": true,
     },
-    "references": [
-        { "path": "./src/es" },
-    ],
-    "exclude": [
-        "src/es/es-eval.ts"
-    ],
     "include": [
         "src/**/*", 
      ],

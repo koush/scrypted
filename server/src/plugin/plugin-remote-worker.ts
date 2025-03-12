@@ -387,8 +387,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                 if (isModule) {
                     process.env.SCRYPTED_SDK_ES_MODULE = __filename;
-                    const { eseval } = await import('../es/es-eval.js');
-                    const module = await eseval(mainNodeJsOnFilesystem);
+                    const module = await import(mainNodeJsOnFilesystem);
                     params.module.exports = module;
                 }
                 else if (sdkVersion) {
