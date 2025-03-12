@@ -30,7 +30,8 @@ RUN systemctl enable scrypted-ip-forwarding
 RUN apt -y update && apt -y install coturn && systemctl disable coturn && rm /usr/lib/systemd/system/coturn.service
 
 # install usbmuxd for iphone tethering
-RUN apt -y update && apt -y install usbmuxd && rm /usr/lib/systemd/system/usbmuxd.service;
+# ensure the pairing info stays in persistent storage
+RUN apt -y update && apt -y install usbmuxd && rm /usr/lib/systemd/system/usbmuxd.service && ln -sf /server/volume/plugins/\@scrypted/router/usbmuxd /var/lib/lockdown
 
 WORKDIR /
 # cache bust
