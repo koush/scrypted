@@ -97,6 +97,7 @@ class ScryptedDeviceType(str, Enum):
     Person = "Person"
     Program = "Program"
     Scene = "Scene"
+    ScreenCapture = "ScreenCapture"
     SecuritySystem = "SecuritySystem"
     Sensor = "Sensor"
     Siren = "Siren"
@@ -980,7 +981,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.4"
+TYPES_VERSION = "0.5.5"
 
 
 class AirPurifier:
