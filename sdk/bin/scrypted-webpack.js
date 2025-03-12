@@ -221,6 +221,12 @@ function finishZip() {
         version: sdkVersion,
     })));
 
+    if (packageJson.type === 'module') {
+        zip.addFile('package.json', Buffer.from(JSON.stringify({
+            type: 'module'
+        })));
+    }
+
     const zipfs = path.join(cwd, 'fs');
     if (fs.existsSync(zipfs))
         zip.addLocalFolder(zipfs, 'fs');
