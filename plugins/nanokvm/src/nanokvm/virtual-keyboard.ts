@@ -16,15 +16,10 @@ export class VirtualKeyboard {
         this.activeModifierKeys = keys;
     }
 
-
     onKeyPress(key: string) {
         if (modifierKeys.includes(key)) {
-            if (this.activeModifierKeys.includes(key)) {
-                this.sendModifierKeyDown();
-                this.sendModifierKeyUp();
-            } else {
-                this.setActiveModifierKeys([...this.activeModifierKeys, key]);
-            }
+            this.setActiveModifierKeys(this.activeModifierKeys.filter((activeKey) => activeKey !== key));
+            this.setActiveModifierKeys([...this.activeModifierKeys, key]);
             return;
         }
 
@@ -33,6 +28,8 @@ export class VirtualKeyboard {
 
     onKeyReleased(key: string) {
         if (modifierKeys.includes(key)) {
+            this.setActiveModifierKeys(this.activeModifierKeys.filter((activeKey) => activeKey !== key));
+            this.sendModifierKeyUp();
             return;
         }
 
@@ -47,12 +44,13 @@ export class VirtualKeyboard {
             return;
         }
 
+        // key ups and downs are sent with active modifiers per key
         const modifiers = this.sendModifierKeyDown();
-
         this.clientSend([1, code, ...modifiers]);
     }
 
     sendKeyup() {
+        // key ups and downs are sent with active modifiers per key
         this.sendModifierKeyUp();
         this.clientSend([1, 0, 0, 0, 0, 0]);
     }
@@ -91,7 +89,5 @@ export class VirtualKeyboard {
         this.activeModifierKeys.forEach(() => {
             this.clientSend([1, 0, 0, 0, 0, 0]);
         });
-
-        this.setActiveModifierKeys([]);
     }
 }
