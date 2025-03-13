@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/nanokvm",
-   "version": "0.0.3",
+   "version": "0.0.4",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -25,6 +25,7 @@
    },
    "keywords": [
       "scrypted",
+      "plugin",
       "kvm",
       "nanokvm",
       "sipeed"
