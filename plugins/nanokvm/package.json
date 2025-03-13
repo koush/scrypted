@@ -1,5 +1,6 @@
 {
    "name": "@scrypted/nanokvm",
+   "version": "0.0.2",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -22,6 +23,12 @@
          "DeviceCreator"
       ]
    },
+   "keywords": [
+      "scrypted",
+      "kvm",
+      "nanokvm",
+      "sipeed"
+   ],
    "dependencies": {
       "@scrypted/common": "../../common",
       "@scrypted/sdk": "../../sdk",
