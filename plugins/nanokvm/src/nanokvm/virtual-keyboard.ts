@@ -9,7 +9,6 @@ export class VirtualKeyboard {
     }
 
     clientSend(data: number[]) {
-        this.console.log(data);
         this.client.send(JSON.stringify(data));
     }
 
