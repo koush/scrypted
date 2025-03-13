@@ -34,6 +34,13 @@ class NanoKVMDevice extends ScryptedDeviceBase implements Settings, RTCSignaling
         host: {
             title: 'Host',
             type: 'string',
+            placeholder: '192.168.2.222',
+            onPut: () => {
+                this.info = {
+                    ...this.info,
+                    ip: this.storageSettings.values.host,
+                };
+            }
         },
         username: {
             title: 'Username',
@@ -306,6 +313,11 @@ class NanoKVMPlugin extends ScryptedDeviceBase implements DeviceProvider, Device
                 ScryptedInterface.StreamService,
             ],
             type: ScryptedDeviceType.RemoteDesktop,
+            info: {
+                manufacturer: 'SiPEED',
+                model: 'NanoKVM',
+                ip: settings.host as string,
+            }
         });
 
         const device = await this.getDevice(nativeId) as NanoKVMDevice;
