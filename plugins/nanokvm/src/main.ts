@@ -322,6 +322,8 @@ class NanoKVMPlugin extends ScryptedDeviceBase implements DeviceProvider, Device
 
         const device = await this.getDevice(nativeId) as NanoKVMDevice;
         device.storageSettings.values.host = settings.host as string;
+        device.storageSettings.values.username = settings.username as string || 'admin';
+        device.storageSettings.values.password = settings.password as string;
         return id;
     }
 
