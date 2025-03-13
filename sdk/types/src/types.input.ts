@@ -133,7 +133,7 @@ export enum ScryptedDeviceType {
    * Smart Speakers have two way audio.
    */
   SmartSpeaker = "SmartSpeaker",
-  ScreenCapture = "ScreenCapture",
+  RemoteDesktop = "RemoteDesktop",
   Event = "Event",
   Entry = "Entry",
   Garage = "Garage",
@@ -2582,8 +2582,9 @@ export interface RTCAVSignalingSetup {
 }
 
 export interface KvmKeyEvent {
-  event: 'keydown' | 'keyup';
+  event: 'keydown' | 'keyup' | 'keypress';
   key: string;
+  code: string;
 }
 export interface KvmMouseEvent {
   event: 'mousedown' | 'mouseup' | 'mousemove';
