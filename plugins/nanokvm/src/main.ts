@@ -106,6 +106,10 @@ class NanoKVMDevice extends ScryptedDeviceBase implements Settings, RTCSignaling
             },
         });
         await once(ws, 'open');
+        const heartbeatTimer = setInterval(() => {
+            ws.send(JSON.stringify({ event: 'heartbeat', data: '' }));
+        }, 60 * 1000);
+        ws.on('close', () => clearInterval(heartbeatTimer));
 
         const virtualKeyboard = new VirtualKeyboard(this.console, ws);
 
