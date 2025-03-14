@@ -48,6 +48,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
         this.updateDevice();
         this.updateDeviceInfo();
+        this.reportDevices();
 
         if (this.interfaces.includes(ScryptedInterface.PanTiltZoom)) {
             const ptzCapabilities = JSON.parse(this.storage.getItem('ptzCapabilities') ?? '[]');
