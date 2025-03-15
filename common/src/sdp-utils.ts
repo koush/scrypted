@@ -359,3 +359,41 @@ export function getSpsPps(
         pps: Buffer.from(pps, 'base64'),
     }
 }
+
+export function getSpsPpsVps(
+    section: {
+        fmtp: {
+            payloadType: number;
+            parameters: {
+                [key: string]: string;
+            };
+        }[]
+    }
+) {
+    const parameters = section?.fmtp?.[0]?.parameters;
+    if (!parameters) {
+        return {
+            sps: undefined,
+            pps: undefined,
+            vps: undefined,
+        };
+    }
+
+    const sps = parameters['sprop-sps'];
+    const pps = parameters['sprop-pps'];
+    const vps = parameters['sprop-vps'];
+
+    if (!sps || !pps || !vps) {
+        return {
+            sps: undefined,
+            pps: undefined,
+            vps: undefined,
+        };
+    }
+
+    return {
+        vps: Buffer.from(vps, 'base64'),
+        sps: Buffer.from(sps, 'base64'),
+        pps: Buffer.from(pps, 'base64'),
+    }
+}
