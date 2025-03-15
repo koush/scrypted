@@ -1186,12 +1186,26 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   constructor(public getTranscodeStorageSettings: () => Promise<any>, options: SettingsMixinDeviceOptions<VideoCamera & VideoCameraConfiguration>) {
     super(options);
 
-    const pluginId = systemManager.getDeviceById('@scrypted/prebuffer-mixin').id;
-    if (this.providedInterfaces.includes(ScryptedInterface.VideoCamera) && this.mixins[0] !== pluginId) {
-      this.console.warn('rebroadcast mixin is not the first mixin, rebroadcast may flap on interface changes.');
+    const rebroadcast = systemManager.getDeviceById('@scrypted/prebuffer-mixin').id;
+    const expected: string[] = [rebroadcast];
+
+    const webrtc = systemManager.getDeviceById('@scrypted/webrtc');
+    if (webrtc && this.providedInterfaces.includes(ScryptedInterface.RTCSignalingChannel))
+      expected.unshift(webrtc.id);
+
+    let matched = true;
+    for (let i = 0; i < expected.length; i++) {
+      if (this.mixins[i] !== expected[i]) {
+        matched = false;
+        break;
+      }
+    }
+
+    if (!matched) {
+      this.console.warn('rebroadcast/webrtc order not matched. this may cause flapping on interface changes. fixing.');
       setTimeout(() => {
-        const currentMixins = this.mixins.filter(mixin => mixin !== pluginId);
-        currentMixins.unshift(pluginId);
+        const currentMixins = this.mixins.filter(mixin => !expected.includes(mixin));
+        currentMixins.unshift(...expected);
         const realDevice = systemManager.getDeviceById(this.id);
         realDevice.setMixins(currentMixins);
       }, 1000);
