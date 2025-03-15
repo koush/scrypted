@@ -141,6 +141,9 @@ export function ffmpegFilterImage(inputArguments: string[], options: FFmpegImage
     }
     else {
         outputArguments = [
+            // ensure it is an iframe. decoding h265 can result in corrupt p frames being decoded.
+            // which is weird, why doesnt ffmpeg skip it?
+            '-vf', "select='eq(pict_type\,I)'",
             '-frames:v', '1',
             '-f', 'image2',
             'pipe:3',
