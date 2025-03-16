@@ -217,7 +217,7 @@ export function getNaluTypesInH265Nalu(nalu: Buffer, fuaRequireStart = false, fu
     const naluType = parseH265NaluType(nalu[0]);
     if (naluType === H265_NAL_TYPE_AGG) {
         ret.add(H265_NAL_TYPE_AGG);
-        let pos = 1;
+        let pos = 2;
         while (pos < nalu.length) {
             const naluLength = nalu.readUInt16BE(pos);
             pos += 2;
