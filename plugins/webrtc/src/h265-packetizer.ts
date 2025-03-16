@@ -50,8 +50,9 @@ const NAL_TYPE_RSV_NVCL44 = 44;
 const NAL_TYPE_RSV_NVCL45 = 45;
 const NAL_TYPE_RSV_NVCL46 = 46;
 const NAL_TYPE_RSV_NVCL47 = 47;
-const NAL_TYPE_UNSPEC48 = 48;
-const NAL_TYPE_UNSPEC49 = 49;
+// RTP payload format for H.265 defines these special types
+const NAL_TYPE_AP = 48;  // Aggregation Packet
+const NAL_TYPE_FU = 49;  // Fragmentation Unit
 const NAL_TYPE_UNSPEC50 = 50;
 const NAL_TYPE_UNSPEC51 = 51;
 const NAL_TYPE_UNSPEC52 = 52;
@@ -66,9 +67,7 @@ const NAL_TYPE_UNSPEC60 = 60;
 const NAL_TYPE_UNSPEC61 = 61;
 const NAL_TYPE_UNSPEC62 = 62;
 const NAL_TYPE_UNSPEC63 = 63;
-// RTP payload format for H.265 defines these special types
-export const NAL_TYPE_AP = 48;  // Aggregation Packet
-export const NAL_TYPE_FU = 49;  // Fragmentation Unit
+
 
 const NAL_HEADER_SIZE = 2;  // H265 has 2-byte NAL header
 const FU_HEADER_SIZE = 3;   // 2-byte NAL header + 1-byte FU header

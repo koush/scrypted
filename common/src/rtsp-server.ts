@@ -95,6 +95,7 @@ export const H265_NAL_TYPE_SPS = 33;
 export const H265_NAL_TYPE_PPS = 34;
 export const H265_NAL_TYPE_IDR_N = 19;
 export const H265_NAL_TYPE_IDR_W = 20;
+export const H265_NAL_TYPE_FU = 49;
 
 export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h264')
@@ -223,6 +224,23 @@ export function getNaluTypesInH265Nalu(nalu: Buffer, fuaRequireStart = false, fu
             const stapaType = parseH265NaluType(nalu[pos]);
             ret.add(stapaType);
             pos += naluLength;
+        }
+    }
+    else if (naluType === H265_NAL_TYPE_FU) {
+        ret.add(H265_NAL_TYPE_FU);
+        const fuaType = nalu[2] & 0x3F;  // 6 bits
+        if (fuaRequireStart) {
+            const isFuStart = !!(nalu[2] & 0x80);
+            if (isFuStart)
+                ret.add(fuaType);
+        }
+        else if (fuaRequireEnd) {
+            const isFuEnd = !!(nalu[2] & 0x40);
+            if (isFuEnd)
+                ret.add(fuaType);
+        }
+        else {
+            ret.add(fuaType);
         }
     }
     else {
