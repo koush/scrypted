@@ -69,9 +69,12 @@ export async function createTrackForwarder(options: {
         requestDestination = 'remote';
     }
 
+    const h265TransceiverCodec = videoTransceiver.codecs.find(codec => codec.mimeType === 'video/H265');
+
     const mo = await requestMediaStream({
         video: {
-            codec: 'h264',
+            // prefer h265 if client supports it, but stream may end up being h264.
+            codec: h265TransceiverCodec ? 'h265' : 'h264',
             width,
             height,
         },
@@ -140,7 +143,6 @@ export async function createTrackForwarder(options: {
             audioTransceiver.sender.codec = found;
 
         if (mediaStreamOptions?.video?.codec === 'h265') {
-            const h265TransceiverCodec = videoTransceiver.codecs.find(codec => codec.mimeType === 'video/H265');
             if (h265TransceiverCodec) {
                 videoTransceiver.sender.codec = h265TransceiverCodec;
                 willNeedTranscode = false;
