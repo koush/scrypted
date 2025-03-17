@@ -8,7 +8,7 @@ const { systemManager, deviceManager, log } = sdk;
 
 export const defaultObjectDetectionContactSensorTimeout = 60;
 
-export function canCameraMixin(type: ScryptedDeviceType, interfaces: string[]) {
+export function canCameraMixin(type: ScryptedDeviceType | string, interfaces: string[]) {
     return (type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell)
         && interfaces.includes(ScryptedInterface.VideoCamera);
 }

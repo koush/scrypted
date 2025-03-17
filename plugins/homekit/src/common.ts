@@ -5,7 +5,7 @@ import type { HomeKitPlugin } from "./main";
 
 export interface DummyDevice {
     interfaces?: string[];
-    type?: ScryptedDeviceType;
+    type?: ScryptedDeviceType | string;
 }
 
 export interface SnapshotThrottle {

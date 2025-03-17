@@ -407,7 +407,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         });
     }
 
-    async canMixin(type: ScryptedDeviceType, interfaces: string[]) {
+    async canMixin(type: ScryptedDeviceType | string, interfaces: string[]) {
         const supportedType = supportedTypes[type];
         if (!supportedType?.probe({
             interfaces,

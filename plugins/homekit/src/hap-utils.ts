@@ -24,7 +24,7 @@ export function getHAPUUID(storage: Storage) {
     return uuid;
 }
 
-export function typeToCategory(type: ScryptedDeviceType): Categories {
+export function typeToCategory(type: ScryptedDeviceType | string): Categories {
     switch (type) {
         case ScryptedDeviceType.Camera:
             return Categories.CAMERA;
