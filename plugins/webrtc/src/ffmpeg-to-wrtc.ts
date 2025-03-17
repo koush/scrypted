@@ -73,8 +73,12 @@ export async function createTrackForwarder(options: {
 
     const mo = await requestMediaStream({
         video: {
-            // prefer h265 if client supports it, but stream may end up being h264.
-            codec: h265TransceiverCodec ? 'h265' : 'h264',
+            // prefer h264 if available
+            // todo: change this to h265 primary after some time to allow plugins to update to new
+            // alternateCodecs property.
+            codec: 'h264',
+            // allow h265 if supported
+            alternateCodecs: h265TransceiverCodec ? ['h265', 'h264'] : undefined,
             width,
             height,
         },
