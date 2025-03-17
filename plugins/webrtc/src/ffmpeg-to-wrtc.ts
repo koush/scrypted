@@ -161,7 +161,7 @@ export async function createTrackForwarder(options: {
     const transcode = transcodeBaseline
         || willNeedTranscode;
 
-        // let videoCodecCopy: RtpCodecCopy = transcode ? undefined : 'h264';
+    // let videoCodecCopy: RtpCodecCopy = transcode ? undefined : 'h264';
     const compatibleH264 = !mediaStreamOptions?.video?.h264Info?.reserved30 && !mediaStreamOptions?.video?.h264Info?.reserved31;
     let videoCodecCopy: RtpCodecCopy;
     if (!transcode && compatibleH264) {
