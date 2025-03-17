@@ -367,6 +367,7 @@ class RequestMediaStreamAdaptiveOptions(TypedDict):
 
 class RequestVideoStreamOptions(TypedDict):
 
+    alternateCodecs: list[str]
     bitrate: float
     bitrateControl: Any | Any
     clientHeight: float
@@ -592,16 +593,12 @@ class FanStatus(TypedDict):
 class FFmpegInput(TypedDict):
 
     container: str
-    destinationVideoBitrate: float
     env: Any  # Environment variables to set when launching FFmpeg.
     ffmpegPath: str  # Path to a custom FFmpeg binary.
-    h264EncoderArguments: list[str]
-    h264FilterArguments: list[str]
     inputArguments: list[str]
     mediaStreamOptions: ResponseMediaStreamOptions
     url: str  # The media url for this FFmpegInput.
     urls: list[str]  # Alternate media urls for this FFmpegInput.
-    videoDecoderArguments: list[str]
 
 class HttpRequest(TypedDict):
 
@@ -981,7 +978,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.8"
+TYPES_VERSION = "0.5.9"
 
 
 class AirPurifier:

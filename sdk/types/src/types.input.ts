@@ -500,6 +500,7 @@ export interface VideoStreamOptions {
 }
 
 export interface RequestVideoStreamOptions extends VideoStreamOptions {
+  alternateCodecs?: string[];
   clientWidth?: number;
   clientHeight?: number;
 }
@@ -1931,10 +1932,6 @@ export interface FFmpegInput extends MediaContainer {
    */
   urls?: string[];
   inputArguments?: string[];
-  destinationVideoBitrate?: number;
-  h264EncoderArguments?: string[];
-  videoDecoderArguments?: string[];
-  h264FilterArguments?: string[];
   /**
    * Environment variables to set when launching FFmpeg.
    */
