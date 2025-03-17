@@ -7,7 +7,7 @@ export async function connectShell(sdk: ScryptedStatic, ...cmd: string[]) {
         throw Error("@scrypted/core does not provide a Terminal Service");
     }
 
-    const termSvcDirect = await sdk.connectRPCObject<StreamService>(termSvc);
+    const termSvcDirect = await sdk.connectRPCObject<StreamService<Buffer|string, Buffer>>(termSvc);
     const dataQueue = createAsyncQueue<Buffer>();
     const ctrlQueue = createAsyncQueue<any>();
 

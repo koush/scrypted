@@ -29,7 +29,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
     const mso = ffmpegInput.mediaStreamOptions;
-    const videoArgs = ffmpegInput.h264FilterArguments?.slice() || [];
+    const videoArgs: string[] = [];
     const audioArgs: string[] = [];
 
     const debugMode = getDebugMode(storage);
@@ -37,27 +37,21 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         transcodingDebugModeWarning();
 
     const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
-    const transcodeStreaming = !!ffmpegInput.h264EncoderArguments?.length
-        || !!ffmpegInput.h264FilterArguments?.length;
     const needsFFmpeg = debugMode.video
-        || transcodeStreaming
         || ffmpegInput.container !== 'rtsp';
 
     if (ffmpegInput.mediaStreamOptions?.oobCodecParameters)
         videoArgs.push("-bsf:v", "dump_extra");
 
     // encoder args
-    if (debugMode.video || transcodeStreaming) {
-        if (debugMode.video || !ffmpegInput.h264EncoderArguments) {
+    if (debugMode.video) {
+        if (debugMode.video) {
             videoArgs.push(...getDebugModeH264EncoderArgs());
-        }
-        else {
-            videoArgs.push(...ffmpegInput.h264EncoderArguments);
         }
         const videoRecordingFilter = `scale=w='min(${request.video.width},iw)':h=-2`;
         addVideoFilterArguments(videoArgs, videoRecordingFilter);
 
-        const bitrate = ffmpegInput.destinationVideoBitrate || (request.video.max_bit_rate * 1000);
+        const bitrate = request.video.max_bit_rate * 1000;
         videoArgs.push(
             "-b:v", bitrate.toString(),
             "-bufsize", (2 * bitrate).toString(),

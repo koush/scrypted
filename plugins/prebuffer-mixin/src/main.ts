@@ -621,15 +621,10 @@ class PrebufferSession {
         const extraOutputArguments = this.storage.getItem(this.ffmpegOutputArgumentsKey) || '';
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
 
-        if (ffmpegInput.h264EncoderArguments?.length) {
-          vcodec = [...ffmpegInput.h264EncoderArguments];
-        }
         // extraOutputArguments must contain full codec information
         if (extraOutputArguments) {
           vcodec = [...extraOutputArguments.split(' ').filter(d => !!d)];
         }
-        if (ffmpegInput.h264FilterArguments)
-          vcodec.push(...ffmpegInput.h264FilterArguments)
 
         const rtspParser = createRtspParser({
           vcodec,
@@ -1395,14 +1390,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       throw new Error('stream not found');
 
     ffmpegInput = await session.getVideoStream(true, options);
-
-    ffmpegInput.h264EncoderArguments = h264EncoderArguments;
-    ffmpegInput.destinationVideoBitrate = destinationVideoBitrate;
-
-    if (ffmpegInput.h264FilterArguments && videoFilterArguments)
-      addVideoFilterArguments(ffmpegInput.h264FilterArguments, videoFilterArguments)
-    else if (videoFilterArguments)
-      ffmpegInput.h264FilterArguments = ['-filter_complex', videoFilterArguments];
 
     return mediaManager.createFFmpegMediaObject(ffmpegInput, {
       sourceId: this.id,

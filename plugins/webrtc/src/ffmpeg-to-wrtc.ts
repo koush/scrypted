@@ -155,11 +155,9 @@ export async function createTrackForwarder(options: {
 
     const videoTranscodeArguments: string[] = [];
     const transcode = transcodeBaseline
-        || willNeedTranscode
-        || ffmpegInput.h264EncoderArguments?.length
-        || ffmpegInput.h264FilterArguments?.length;
+        || willNeedTranscode;
 
-    // let videoCodecCopy: RtpCodecCopy = transcode ? undefined : 'h264';
+        // let videoCodecCopy: RtpCodecCopy = transcode ? undefined : 'h264';
     const compatibleH264 = !mediaStreamOptions?.video?.h264Info?.reserved30 && !mediaStreamOptions?.video?.h264Info?.reserved31;
     let videoCodecCopy: RtpCodecCopy;
     if (!transcode && compatibleH264) {
@@ -171,11 +169,10 @@ export async function createTrackForwarder(options: {
 
     if (ffmpegInput.mediaStreamOptions?.oobCodecParameters)
         videoTranscodeArguments.push("-bsf:v", "dump_extra");
-    videoTranscodeArguments.push(...(ffmpegInput.h264FilterArguments || []));
 
     if (transcode) {
         const conservativeDefaultBitrate = isLocalNetwork ? 1000000 : 500000;
-        const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
+        const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : conservativeDefaultBitrate;
         videoTranscodeArguments.push(
             // this seems to cause issues with presets i think.
             // '-level:v', '4.0',
@@ -202,7 +199,7 @@ export async function createTrackForwarder(options: {
             // videoArgs.push('-tune', 'zerolatency');
         }
         else {
-            videoTranscodeArguments.push(...(ffmpegInput.h264EncoderArguments || getDebugModeH264EncoderArgs()));
+            videoTranscodeArguments.push(...getDebugModeH264EncoderArgs());
         }
     }
     else {
@@ -216,7 +213,6 @@ export async function createTrackForwarder(options: {
         try {
             const transcodeStream: FFmpegTranscodeStream = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.FFmpegTranscodeStream);
             await transcodeStream({
-                videoDecoderArguments: ffmpegInput.videoDecoderArguments,
                 videoTranscodeArguments,
                 audioTranscodeArguments,
             });

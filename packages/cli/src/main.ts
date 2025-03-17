@@ -166,8 +166,6 @@ async function main() {
             }
         }
         const args = ffmpegInput.inputArguments ? [...ffmpegInput.inputArguments] : [];
-        if (ffmpegInput.h264FilterArguments)
-            args.push(...ffmpegInput.h264FilterArguments);
         console.log('ffplay', ...args);
         child_process.spawn('ffplay', args, {
             stdio: 'inherit',

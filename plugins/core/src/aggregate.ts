@@ -72,7 +72,6 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             container: 'rawvideo',
             mediaStreamOptions: (await createVideoStreamOptions())?.[0],
             inputArguments: [],
-            h264FilterArguments: [],
         };
 
         for (let i = 0; i < inputs.length; i++) {
@@ -102,7 +101,7 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
         let i = dim * dim - 1;
         filter.push(`[${prev}][pos${i}] overlay=shortest=1:x=${curx % 1920}:y=${cury % 1080}`);
 
-        ffmpegInput.h264FilterArguments.push(
+        ffmpegInput.inputArguments.push(
             '-filter_complex',
             filter.join(' '),
         );

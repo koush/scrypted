@@ -140,7 +140,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     killGuard(rtpTracks.video);
     killGuard(rtpTracks.audio);
 
-    let { inputArguments, videoDecoderArguments } = ffmpegInput;
+    let { inputArguments } = ffmpegInput;
     let rtspClient: RtspClient;
     killDeferred.promise.finally(() => rtspClient?.safeTeardown());
     let pipeSdp: string;
@@ -408,7 +408,6 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         const args = [
             '-hide_banner',
 
-            ...(videoDecoderArguments || []),
             ...inputArguments,
             ...outputArguments,
         ];

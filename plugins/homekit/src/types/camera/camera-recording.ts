@@ -149,10 +149,8 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
     const audioCodec = ffmpegInput.mediaStreamOptions?.audio?.codec;
     const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
     const isDefinitelyNotAAC = !audioCodec || audioCodec.toLowerCase().indexOf('aac') === -1;
-    const transcodeRecording = !!ffmpegInput.h264EncoderArguments?.length || !!ffmpegInput.h264FilterArguments?.length;
     const needsFFmpeg = debugMode.video || debugMode.video
         || !ffmpegInput.url.startsWith('tcp://')
-        || transcodeRecording
         || ffmpegInput.container !== 'mp4'
         || noAudio;
 
@@ -182,9 +180,6 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
             }
         }
 
-        if (ffmpegInput.videoDecoderArguments?.length)
-            inputArguments.push(...ffmpegInput.videoDecoderArguments);
-
         inputArguments.push(...ffmpegInput.inputArguments);
 
         if (noAudio) {
@@ -194,8 +189,8 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         }
 
         let audioArgs: string[];
-        if (!noAudio && (transcodeRecording || isDefinitelyNotAAC || debugMode.audio)) {
-            if (!(transcodeRecording || debugMode.audio))
+        if (!noAudio && (isDefinitelyNotAAC || debugMode.audio)) {
+            if (!debugMode.audio)
                 console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
 
             let aacLowEncoder = 'aac';
@@ -224,13 +219,10 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
             ];
         }
 
-        const videoArgs = ffmpegInput.h264FilterArguments?.slice() || [];
-        if (debugMode.video || transcodeRecording) {
-            if (debugMode.video || !ffmpegInput.h264EncoderArguments) {
+        const videoArgs: string[] = [];
+        if (debugMode.video) {
+            if (debugMode.video) {
                 videoArgs.push(...getDebugModeH264EncoderArgs());
-            }
-            else {
-                videoArgs.push(...ffmpegInput.h264EncoderArguments);
             }
             const videoRecordingFilter = `scale=w='min(${configuration.videoCodec.resolution[0]},iw)':h=-2`;
             addVideoFilterArguments(videoArgs, videoRecordingFilter);
