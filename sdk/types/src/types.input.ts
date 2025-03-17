@@ -1933,6 +1933,10 @@ export interface FFmpegInput extends MediaContainer {
   urls?: string[];
   inputArguments?: string[];
   /**
+   * @deprecated Rebroadast use only.
+   */
+  h264EncoderArguments?: string[];
+  /**
    * Environment variables to set when launching FFmpeg.
    */
   env?: { [key: string]: string };

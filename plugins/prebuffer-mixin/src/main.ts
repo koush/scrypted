@@ -1,5 +1,4 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
-import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { ListenZeroSingleClientTimeoutError, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
 import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_SPS, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack, createRtspParser, findH264NaluType, getNaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
@@ -621,6 +620,9 @@ class PrebufferSession {
         const extraOutputArguments = this.storage.getItem(this.ffmpegOutputArgumentsKey) || '';
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
 
+        if (ffmpegInput.h264EncoderArguments?.length) {
+          vcodec = [...ffmpegInput.h264EncoderArguments];
+        }
         // extraOutputArguments must contain full codec information
         if (extraOutputArguments) {
           vcodec = [...extraOutputArguments.split(' ').filter(d => !!d)];
@@ -1320,7 +1322,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     if (!this.sessions.has(id))
       id = undefined;
     let h264EncoderArguments: string[];
-    let videoFilterArguments: string;
     let destinationVideoBitrate: number;
 
     const msos = await this.mixinDevice.getVideoStreamOptions();
@@ -1390,6 +1391,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       throw new Error('stream not found');
 
     ffmpegInput = await session.getVideoStream(true, options);
+
+    ffmpegInput.h264EncoderArguments = h264EncoderArguments;
+
 
     return mediaManager.createFFmpegMediaObject(ffmpegInput, {
       sourceId: this.id,

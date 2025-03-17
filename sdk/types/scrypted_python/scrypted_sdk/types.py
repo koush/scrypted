@@ -595,6 +595,7 @@ class FFmpegInput(TypedDict):
     container: str
     env: Any  # Environment variables to set when launching FFmpeg.
     ffmpegPath: str  # Path to a custom FFmpeg binary.
+    h264EncoderArguments: list[str]
     inputArguments: list[str]
     mediaStreamOptions: ResponseMediaStreamOptions
     url: str  # The media url for this FFmpegInput.
@@ -978,7 +979,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.9"
+TYPES_VERSION = "0.5.10"
 
 
 class AirPurifier:
