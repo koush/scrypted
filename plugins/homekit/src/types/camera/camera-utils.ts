@@ -60,9 +60,22 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     // AAC-ELD (Remote): 60
     const isLowBandwidth = request.audio.packet_time >= 60;
 
-    // watch is 448x368 and requests 320x240, everything else is > ~1280...
+    // Apple Watch Series 1 to 3
+    // 38mm: 320 x 360 pixels
+    // 42mm: 378 x 448 pixels
+    // Apple Watch Series 4 to 6
+    // 40mm: 360 x 448 pixels
+    // 44mm: 408 x 496 pixels
+    // Apple Watch Series 7 and 8
+    // 41mm: 396 x 484 pixels
+    // 45mm: 428 x 528 pixels
+    // Apple Watch SE
+    // 40mm: 360 x 448 pixels
+    // 44mm: 408 x 496 pixels
+    // Apple Watch Ultra
+    // 49mm: 484 x 568 pixels
     // future proof-ish for higher resolution watch.
-    const isWatch = request.video.width <= 640;
+    const isWatch = request.video.width < 640;
 
     const destination: MediaStreamDestination = isWatch
         ? 'low-resolution'

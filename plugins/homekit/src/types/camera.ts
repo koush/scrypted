@@ -66,6 +66,9 @@ addSupportedType({
                     profiles: [H264Profile.MAIN],
                 },
 
+                // HomeKit will request a resolution from this list, but it seems to do it
+                // stupidly. For example, local network macOS on a 6k monitor requests the 480p stream?
+                // so using the resolution for device fingerprinting can't be trusted.
                 resolutions: [
                     // 3840x2160@30 (4k).
                     [3840, 2160, 30],
