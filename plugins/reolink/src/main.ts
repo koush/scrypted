@@ -258,15 +258,15 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                 }
             } catch { }
 
-            try {
-                if (this.hasSiren() && this.siren) {
-                    const { enabled } = await api.getSiren();
+            // try {
+            //     if (this.hasSiren() && this.siren) {
+            //         const { enabled } = await api.getSiren();
 
-                    if (enabled !== this.siren.on) {
-                        this.siren.on = enabled;
-                    }
-                }
-            } catch { }
+            //         if (enabled !== this.siren.on) {
+            //             this.siren.on = enabled;
+            //         }
+            //     }
+            // } catch { }
 
             try {
                 if (this.hasPirSensor() && this.pirSensor) {
