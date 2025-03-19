@@ -123,6 +123,9 @@ export function createAsyncQueue<T>() {
     }
 
     return {
+        [Symbol.dispose]() {
+            end(new Error('async queue disposed'));
+        },
         get ended() {
             return ended;
         },
