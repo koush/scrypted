@@ -34,14 +34,14 @@
       ]
    },
    "devDependencies": {
-      "@types/node": "^20.4.2",
-      "@types/ws": "^8.5.5"
+      "@types/node": "^22.13.2",
+      "@types/ws": "^8.5.14"
    },
    "dependencies": {
       "@koush/unifi-protect": "file:../../external/unifi-protect",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "axios": "^1.4.0",
-      "ws": "^8.13.0"
+      "axios": "^1.7.9",
+      "ws": "^8.18.0"
    }
 }

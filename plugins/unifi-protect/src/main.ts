@@ -31,7 +31,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     authorization: string | undefined;
     accessKey: string | undefined;
     cameras = new Map<string, UnifiCamera>()
-    sensors = new Map<string, UnifiSensor>();
+    unifiSensors = new Map<string, UnifiSensor>();
     lights = new Map<string, UnifiLight>();
     locks = new Map<string, UnifiLock>();
     api: ProtectApi;
@@ -67,7 +67,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
         const nativeId = this.getNativeId(device, false);
 
-        const ret = this.sensors.get(nativeId) ||
+        const ret = this.unifiSensors.get(nativeId) ||
             this.locks.get(nativeId) ||
             this.cameras.get(nativeId) ||
             this.lights.get(nativeId);
@@ -561,8 +561,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         await this.startup;
         if (this.cameras.has(nativeId))
             return this.cameras.get(nativeId);
-        if (this.sensors.has(nativeId))
-            return this.sensors.get(nativeId);
+        if (this.unifiSensors.has(nativeId))
+            return this.unifiSensors.get(nativeId);
         if (this.lights.has(nativeId))
             return this.lights.get(nativeId);
         if (this.locks.has(nativeId))
@@ -578,7 +578,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         const sensor = this.api.sensors.find(sensor => sensor.id === id);
         if (sensor) {
             const ret = new UnifiSensor(this, nativeId, sensor);
-            this.sensors.set(nativeId, ret);
+            this.unifiSensors.set(nativeId, ret);
             return ret;
         }
         const light = this.api.lights.find(light => light.id === id);
