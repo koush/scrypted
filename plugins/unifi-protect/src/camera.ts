@@ -391,17 +391,17 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const data = Buffer.from(JSON.stringify({
             url: u,
             container: 'rtsp',
-            mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
+            mediaStreamOptions: this.createMediaStreamOptions(rtspChannel, (camera as any).videoCodec),
         } as MediaStreamUrl));
         return this.createMediaObject(data, ScryptedMimeTypes.MediaStreamUrl);
     }
 
-    createMediaStreamOptions(channel: ProtectCameraChannelConfig) {
+    createMediaStreamOptions(channel: ProtectCameraChannelConfig, cameraVideoCodec: string) {
         const ret: ResponseMediaStreamOptions = {
             id: channel.id.toString(),
             name: channel.name,
             video: {
-                codec: 'h264',
+                codec: cameraVideoCodec || 'h264',
                 width: channel.width,
                 height: channel.height,
                 bitrate: channel.maxBitrate,
@@ -425,7 +425,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         const camera = this.findCamera();
         const vsos = camera.channels
-            .map(channel => this.createMediaStreamOptions(channel));
+            .map(channel => this.createMediaStreamOptions(channel, (camera as any).videoCodec));
 
         return vsos;
     }
