@@ -124,6 +124,14 @@ class NCNNPlugin(
 
         self.net = ncnn.Net()
         # self.net.opt.use_vulkan_compute = True
+        # self.net.opt.use_winograd_convolution = False
+        # self.net.opt.use_sgemm_convolution = False
+        # self.net.opt.use_fp16_packed = False
+        # self.net.opt.use_fp16_storage = False
+        # self.net.opt.use_fp16_arithmetic = False
+        # self.net.opt.use_int8_storage = False
+        # self.net.opt.use_int8_arithmetic = False
+
         self.net.load_param(paramFile)
         self.net.load_model(binFile)
 
