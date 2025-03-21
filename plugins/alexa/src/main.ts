@@ -660,17 +660,26 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
 
         const deviceHandler = alexaDeviceHandlers.get(mapName);
 
-        if (deviceHandler) {
+        const getDevice = () => {
             const device = systemManager.getDeviceById(directive.endpoint.endpointId);
-            if (!device) {
-                response.send(deviceErrorResponse("NO_SUCH_ENDPOINT", "The device doesn't exist in Scrypted", directive));
+            if (!device || !device.mixins.includes(this.id)) {
+                response.send(deviceErrorResponse("NO_SUCH_ENDPOINT", "The device doesn't exist in Scrypted or was removed from the Alexa Plugin", directive));
+                this.deleteEndpoints(directive.endpoint.endpointId).catch(() => { });
                 return;
             }
+            return device;
+        }
 
+        if (deviceHandler) {
+            const device = getDevice();
+            if (!device)
+                return;
             await deviceHandler.apply(this, [request, response, directive, device]);
             return;
         } else {
             this.console.error(`no handler for: ${mapName}`);
+            if (!getDevice())
+                return;
         }
 
         // it is better to send a non-specific response than an error, as the API might get rate throttled

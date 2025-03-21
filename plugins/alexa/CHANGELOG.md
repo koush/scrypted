@@ -1,6 +1,11 @@
 <details>
 <summary>Changelog</summary>
 
+### 0.3.6
+
+alexa: maybe fix alexa when no detection types are available
+
+
 ### 0.3.4
 
 Alexa: add option to not auto enable devices (#1615)

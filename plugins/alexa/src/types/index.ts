@@ -8,7 +8,7 @@ export interface SupportedType {
     setState?(device: ScryptedDevice, payload: any): Promise<Partial<Report>>;
 }
 
-export const supportedTypes = new Map<ScryptedDeviceType, SupportedType>();
+export const supportedTypes = new Map<ScryptedDeviceType | string, SupportedType>();
 
 import '../handlers';
 import './camera';

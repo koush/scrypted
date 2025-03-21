@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/alexa",
-   "version": "0.3.6",
+   "version": "0.3.7",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -42,6 +42,6 @@
       "@scrypted/common": "../../common",
       "@scrypted/sdk": "../../sdk",
       "@types/debug": "^4.1.12",
-      "@types/node": "^18.4.2"
+      "@types/node": "^22.13.11"
    }
 }
