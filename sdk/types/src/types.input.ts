@@ -499,10 +499,16 @@ export interface VideoStreamOptions {
   h264Info?: H264Info;
 }
 
-export interface RequestVideoStreamOptions extends VideoStreamOptions {
+export interface RequestStreamOptions {
   alternateCodecs?: string[];
+}
+
+export interface RequestVideoStreamOptions extends RequestStreamOptions, VideoStreamOptions {
   clientWidth?: number;
   clientHeight?: number;
+}
+
+export interface RequestAudioStreamOptions extends RequestStreamOptions, AudioStreamOptions {
 }
 
 export interface AudioStreamOptions {
@@ -639,6 +645,7 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
   adaptive?: boolean | RequestMediaStreamAdaptiveOptions;
 
   video?: RequestVideoStreamOptions;
+  audio?: RequestAudioStreamOptions;
 }
 
 export interface MediaStreamPacketLoss {

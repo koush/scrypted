@@ -357,6 +357,15 @@ class PrivacyMask(TypedDict):
     name: str
     points: list[Point]
 
+class RequestAudioStreamOptions(TypedDict):
+
+    alternateCodecs: list[str]
+    bitrate: float
+    codec: str
+    encoder: str
+    profile: str
+    sampleRate: float
+
 class RequestMediaStreamAdaptiveOptions(TypedDict):
 
     keyframe: bool
@@ -783,7 +792,7 @@ class RequestMediaStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""
 
     adaptive: bool | RequestMediaStreamAdaptiveOptions  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
-    audio: AudioStreamOptions
+    audio: RequestAudioStreamOptions
     container: str  # The container type of this stream, ie: mp4, mpegts, rtsp.
     destination: MediaStreamDestination  # The intended destination for this media stream. May be used as a hint to determine which main/substream to send if no id is explicitly provided.
     destinationId: str  # The destination id for this media stream. This should generally be the IP address of the destination, if known. May be used by to determine stream selection and track dynamic bitrate history.
@@ -811,7 +820,7 @@ class RequestRecordingStreamOptions(TypedDict):
     """Options passed to VideoCamera.getVideoStream to request specific media formats. The audio/video properties may be omitted to indicate no audio/video is available when calling getVideoStreamOptions or no audio/video is requested when calling getVideoStream."""
 
     adaptive: bool | RequestMediaStreamAdaptiveOptions  # Request an adaptive bitrate stream, if available. The destination will need to report packet loss indication.
-    audio: AudioStreamOptions
+    audio: RequestAudioStreamOptions
     container: str  # The container type of this stream, ie: mp4, mpegts, rtsp.
     destination: MediaStreamDestination  # The intended destination for this media stream. May be used as a hint to determine which main/substream to send if no id is explicitly provided.
     destinationId: str  # The destination id for this media stream. This should generally be the IP address of the destination, if known. May be used by to determine stream selection and track dynamic bitrate history.
@@ -979,7 +988,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.10"
+TYPES_VERSION = "0.5.11"
 
 
 class AirPurifier:
