@@ -7,7 +7,7 @@ const { systemManager } = sdk;
 
 export interface DummyDevice {
     interfaces?: string[];
-    type?: ScryptedDeviceType;
+    type?: ScryptedDeviceType | string;
 }
 
 interface SupportedType {
