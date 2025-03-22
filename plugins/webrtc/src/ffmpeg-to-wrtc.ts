@@ -84,6 +84,7 @@ export async function createTrackForwarder(options: {
         },
         audio: {
             codec: 'opus',
+            alternateCodecs: ['opus', 'pcm_mulaw', 'pcm_alaw'],
         },
         adaptive: handlesHighResolution,
         destination: requestDestination,
