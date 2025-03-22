@@ -96,6 +96,8 @@ export const H265_NAL_TYPE_PPS = 34;
 export const H265_NAL_TYPE_IDR_N = 19;
 export const H265_NAL_TYPE_IDR_W = 20;
 export const H265_NAL_TYPE_FU = 49;
+export const H265_NAL_TYPE_SEI_PREFIX = 39;
+export const H265_NAL_TYPE_SEI_SUFFIX = 40;
 
 export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h264')

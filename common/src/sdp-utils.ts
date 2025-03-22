@@ -383,17 +383,9 @@ export function getSpsPpsVps(
     const pps = parameters['sprop-pps'];
     const vps = parameters['sprop-vps'];
 
-    if (!sps || !pps || !vps) {
-        return {
-            sps: undefined,
-            pps: undefined,
-            vps: undefined,
-        };
-    }
-
     return {
-        vps: Buffer.from(vps, 'base64'),
-        sps: Buffer.from(sps, 'base64'),
-        pps: Buffer.from(pps, 'base64'),
+        sps: sps ? Buffer.from(sps, 'base64') : undefined,
+        pps: pps ? Buffer.from(pps, 'base64') : undefined,
+        vps: vps ? Buffer.from(vps, 'base64') : undefined,
     }
 }

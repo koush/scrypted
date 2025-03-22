@@ -430,10 +430,13 @@ export class H265Repacketizer {
             return;
         }
 
-        if (!this.codecInfo?.vps || !this.codecInfo?.sps || !this.codecInfo?.pps)
+        // vps is not required.
+        if (!this.codecInfo?.sps || !this.codecInfo?.pps)
             return;
 
-        const agg = [this.codecInfo.vps, this.codecInfo.sps, this.codecInfo.pps];
+        const agg = [this.codecInfo.sps, this.codecInfo.pps];
+        if (this.codecInfo.vps)
+            agg.unshift(this.codecInfo.vps);
         if (this.codecInfo?.sei)
             agg.push(this.codecInfo.sei);
 
