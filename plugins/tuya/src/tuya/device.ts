@@ -51,7 +51,7 @@ export namespace TuyaDevice {
     return false;
   }
 
-  export function getDoorbellRing(camera: TuyaDeviceConfig): TuyaDeviceStatus {
+  export function getDoorbellRing(camera: TuyaDeviceConfig): TuyaDeviceStatus | undefined {
     const ring = ["alarm_message", "doorbell_pic"];
     return getStatus(camera, ring);
   }
@@ -76,8 +76,9 @@ export namespace TuyaDevice {
     camera: TuyaDeviceConfig,
     cloud: TuyaCloud
   ) {
-    const webRTConfig = await cloud.getDeviceWebRTConfig(camera);
-    return webRTConfig.success && webRTConfig.result.supports_webrtc;
+    return false;
+    // const webRTConfig = await cloud.getDeviceWebRTConfig(camera);
+    // return webRTConfig.success && webRTConfig.result.supports_webrtc;
   }
 
   // Device Status

@@ -12,8 +12,8 @@ export type TuyaCloudConfig = {
 }
 
 export class TuyaManager {
-  cloud: TuyaCloud;
-  pulsar: TuyaPulsar;
+  cloud?: TuyaCloud;
+  pulsar?: TuyaPulsar;
   devices: Map<string, TuyaCamera> = new Map();
 
   constructor(
@@ -22,7 +22,7 @@ export class TuyaManager {
     this.console = console;
   }
   
-  private handlePulsarMessage(message: TuyaPulsarMessage) {
+  private onMessage(message: TuyaPulsarMessage) {
     const data = message.payload.data;
     const { devId, productKey } = data;
     let refreshDevice = false;
@@ -91,7 +91,7 @@ export class TuyaManager {
     }
   }
 
-  async discoverDevices(config: TuyaCloudConfig): Promise<DiscoveredDevice[]> {
+  async discoverDevices(config: TuyaCloudConfig) {
     if (!this.cloud) {
       this.cloud = new TuyaCloud(
         config.userId, 
@@ -105,7 +105,7 @@ export class TuyaManager {
     // For some reason, when generating a token does not validate authorization.
     if (!(await this.cloud.fetchDevices())) {
       // this.log.a("Failed to log in with credentials. Please try again.");
-      this.cloud = null;
+      this.cloud = undefined;
       return;
     }
 
@@ -129,7 +129,7 @@ export class TuyaManager {
 
     this.pulsar.message((ws, message) => {
       this.pulsar?.ackMessage(message.messageId);
-      const tuyaDevice = this.handlePulsarMessage(message);
+      const tuyaDevice = this.onMessage(message);
       if (!tuyaDevice) return;
       tuyaDevice.updateState();
     });
@@ -153,115 +153,6 @@ export class TuyaManager {
     });
 
     this.pulsar.start();
-
-    // Find devices
-
-    // const devices: Device[] = [];
-
-    // // Camera Setup
-
-    // for (const camera of this.cloud.cameras || []) {
-    //   const nativeId = camera.id;
-
-    //   const device: Device = {
-    //     providerNativeId: this.nativeId,
-    //     name: camera.name,
-    //     nativeId,
-    //     info: {
-    //       manufacturer: "Tuya",
-    //       model: camera.model,
-    //       serialNumber: nativeId,
-    //     },
-    //     type: TuyaDevice.isDoorbell(camera)
-    //       ? ScryptedDeviceType.Doorbell
-    //       : ScryptedDeviceType.Camera,
-    //     interfaces: [ScryptedInterface.VideoCamera, ScryptedInterface.Online],
-    //   };
-
-    //   let deviceInfo: string[] = [
-    //     `Creating camera device for: \n- ${camera.name}`,
-    //   ];
-
-    //   if (TuyaDevice.isDoorbell(camera)) {
-    //     deviceInfo.push(`- Detected as a Doorbell`);
-    //     device.interfaces.push(ScryptedInterface.BinarySensor);
-    //   }
-
-    //   if (TuyaDevice.hasStatusIndicator(camera)) {
-    //     deviceInfo.push(`- Has Status Indicator`);
-    //     device.interfaces.push(ScryptedInterface.OnOff);
-    //   }
-
-    //   if (TuyaDevice.hasMotionDetection(camera)) {
-    //     deviceInfo.push(`- Motion Detection Supported`);
-    //     device.interfaces.push(ScryptedInterface.MotionSensor);
-    //   }
-
-    //   // TODO: Wait until Tuya implements better security auth
-    //   // if (await TuyaDevice.supportsWebRTC(camera, this.cloud)) {
-    //   //     deviceInfo.push(`- WebRTC Supported with Intercom`);
-    //   //     device.interfaces.push(ScryptedInterface.RTCSignalingChannel);
-    //   // }
-
-    //   // Device Provider
-
-    //   if (TuyaDevice.hasLightSwitch(camera)) {
-    //     deviceInfo.push(`- Has Light Switch`);
-    //     device.interfaces.push(ScryptedInterface.DeviceProvider);
-    //   }
-
-    //   deviceInfo.push(`- Status:`);
-    //   for (let status of camera.status) {
-    //     deviceInfo.push(`\t${status.code}: ${status.value}`);
-    //   }
-
-    //   deviceInfo.push(`- Functions:`);
-    //   for (let func of camera.functions) {
-    //     deviceInfo.push(`\t${func.code}`);
-    //   }
-
-    //   deviceInfo.push(``);
-    //   this.log.i(deviceInfo.join("\n\t"));
-
-    //   devices.push(device);
-    // }
-
-    // await deviceManager.onDevicesChanged({
-    //   providerNativeId: this.nativeId,
-    //   devices,
-    // });
-
-    // // Handle any camera device that have a light switch
-
-    // for (const camera of this.cloud.cameras || []) {
-    //   if (!TuyaDevice.hasLightSwitch(camera)) continue;
-    //   const nativeId = camera.id + "-light";
-    //   const device: Device = {
-    //     providerNativeId: camera.id,
-    //     name: camera.name + " Light",
-    //     nativeId,
-    //     info: {
-    //       manufacturer: "Tuya",
-    //       model: camera.model,
-    //       serialNumber: camera.id,
-    //     },
-    //     interfaces: [ScryptedInterface.OnOff, ScryptedInterface.Online],
-    //     type: ScryptedDeviceType.Light,
-    //   };
-
-    //   await deviceManager.onDevicesChanged({
-    //     providerNativeId: camera.id,
-    //     devices: [device],
-    //   });
-    // }
-
-    // // Update devices with new state
-
-    // for (const device of devices) {
-    //   await this.getDevice(device.nativeId).then((device) =>
-    //     device?.updateState()
-    //   );
-    // }
   }
 
   async getDevice(nativeId: string) {

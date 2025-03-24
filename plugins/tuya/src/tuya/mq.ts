@@ -1,7 +1,7 @@
 import Event from "events";
-import * as mqtt from "mqtt";
-import { IClientPublishOptions } from "mqtt";
-import { IPublishPacket } from "mqtt-packet";
+// import * as mqtt from "mqtt";
+// import { IClientPublishOptions } from "mqtt";
+// import { IPublishPacket } from "mqtt-packet";
 import { MQTTConfig } from "./const";
 
 export class TuyaMQ {

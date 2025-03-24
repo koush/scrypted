@@ -1,15 +1,13 @@
 import { Axios, Method } from "axios";
-import { HmacSHA256, SHA256, lib } from "crypto-js";
 import { getTuyaCloudEndpoint, TuyaSupportedCountry } from "./utils";
 import {
   TuyaDeviceStatus,
   RTSPToken,
   TuyaDeviceConfig,
   TuyaResponse,
-  MQTTConfig,
-  DeviceWebRTConfig as DeviceWebRTConfig,
+  MQTTConfig
 } from "./const";
-import { randomBytes } from "crypto";
+import { randomBytes, createHmac, hash } from "node:crypto";
 
 interface Session {
   accessToken: string;
@@ -36,7 +34,7 @@ export class TuyaCloud {
     this.userId = userId;
     this.clientId = clientId;
     this.secret = secret;
-    this.nonce = lib.WordArray.random(16).toString();
+    this.nonce = randomBytes(16).toString('hex');
     this.country = country;
     this.client = new Axios({
       baseURL: getTuyaCloudEndpoint(this.country),
@@ -131,39 +129,39 @@ export class TuyaCloud {
     }
   }
 
-  public async getDeviceWebRTConfig(
-    camera: TuyaDeviceConfig
-  ): Promise<TuyaResponse<DeviceWebRTConfig>> {
-    const response = await this.get<DeviceWebRTConfig>(
-      `/v1.0/users/${this.userId}/devices/${camera.id}/webrtc-configs`
-    );
+  // public async getDeviceWebRTConfig(
+  //   camera: TuyaDeviceConfig
+  // ): Promise<TuyaResponse<DeviceWebRTConfig>> {
+  //   const response = await this.get<DeviceWebRTConfig>(
+  //     `/v1.0/users/${this.userId}/devices/${camera.id}/webrtc-configs`
+  //   );
 
-    return response;
-  }
+  //   return response;
+  // }
 
-  public async getWebRTCMQConfig(
-    webRTCDeviceConfig: DeviceWebRTConfig
-  ): Promise<TuyaResponse<MQTTConfig>> {
-    const response = await this.post<any>(`/v1.0/open-hub/access/config`, {
-      link_id: randomBytes(8).readUInt8(),
-      uid: this.userId,
-      link_type: "mqtt",
-      topics: "ipc",
-    });
+  // public async getWebRTCMQConfig(
+  //   webRTCDeviceConfig: DeviceWebRTConfig
+  // ): Promise<TuyaResponse<MQTTConfig>> {
+  //   const response = await this.post<any>(`/v1.0/open-hub/access/config`, {
+  //     link_id: randomBytes(8).readUInt8(),
+  //     uid: this.userId,
+  //     link_type: "mqtt",
+  //     topics: "ipc",
+  //   });
 
-    if (response.success) {
-      response.result = {
-        ...response.result,
-        sink_topic: (response.result.sink_topic.ipc as string)
-          .replace("{device_id}", webRTCDeviceConfig.id)
-          .replace("moto_id", webRTCDeviceConfig.moto_id),
-        source_topic: response.result.source_topic.ipc as string,
-      };
-      return response;
-    }
+  //   if (response.success) {
+  //     response.result = {
+  //       ...response.result,
+  //       sink_topic: (response.result.sink_topic.ipc as string)
+  //         .replace("{device_id}", webRTCDeviceConfig.id)
+  //         .replace("moto_id", webRTCDeviceConfig.moto_id),
+  //       source_topic: response.result.source_topic.ipc as string,
+  //     };
+  //     return response;
+  //   }
 
-    return response;
-  }
+  //   return response;
+  // }
 
   public getSessionUserId(): string | undefined {
     return this.session?.uid;
@@ -193,7 +191,7 @@ export class TuyaCloud {
   ): Promise<TuyaResponse<T>> {
     if (!(await this.login())) {
       return {
-        result: undefined,
+        result: undefined as any,
         success: false,
         t: Date.now(),
       };
@@ -209,23 +207,24 @@ export class TuyaCloud {
       headers,
       body
     );
-    const sign = HmacSHA256(
+
+    const hashed = createHmac("sha256", this.secret);
+    hashed.update(
       this.clientId +
-        this.session.accessToken +
-        timestamp +
-        this.nonce +
-        stringToSign,
-      this.secret
+      this.session?.accessToken +
+      timestamp +
+      this.nonce +
+      stringToSign,
     )
-      .toString()
-      .toUpperCase();
+
+    const sign = hashed.digest('hex').toUpperCase();
 
     let requestHeaders = {
       client_id: this.clientId,
       sign: sign,
       sign_method: "HMAC-SHA256",
       t: timestamp,
-      access_token: this.session.accessToken,
+      access_token: this.session?.accessToken,
       "Signature-Headers": Object.keys(headers).join(":"),
       nonce: this.nonce,
     };
@@ -264,9 +263,7 @@ export class TuyaCloud {
           Object.keys(query)
             .map((key) => `${key}=${query[key]}`)
             .join("&"));
-    const contentHashed = SHA256(
-      isBodyEmpty ? "" : JSON.stringify(body)
-    ).toString();
+    const contentHashed = hash("sha256", isBodyEmpty ? "" : JSON.stringify(body));
     const headersParsed = Object.keys(headers)
       .map((key) => `${key}:${headers[key]}`)
       .join("\n");
@@ -290,12 +287,11 @@ export class TuyaCloud {
 
     const timestamp = new Date().getTime().toString();
     const stringToSign = this.getStringToSign("GET", url);
-    const signString = HmacSHA256(
-      this.clientId + timestamp + stringToSign,
-      this.secret
-    )
-      .toString()
-      .toUpperCase();
+
+    const sign = createHmac('sha256', this.secret);
+    sign.update(this.clientId + timestamp + stringToSign);
+
+    const signString = sign.digest('hex').toUpperCase();
 
     const headers = {
       t: timestamp,

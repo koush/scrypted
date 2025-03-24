@@ -3,7 +3,7 @@
 
 import Event from "events";
 import WebSocket from "ws";
-import { MD5, AES, enc, mode, pad } from "crypto-js";
+import { createCipheriv, createDecipheriv, createHash } from "crypto";
 
 export interface TuyaPulsarMessage {
   payload: {
@@ -201,7 +201,7 @@ export class TuyaPulsar {
   }
 
   private subClose(server: WebSocket) {
-    server.on("close", (...data) => {
+    server.on("close", (...data: any) => {
       this._reconnect();
       this.clearKeepAlive();
       this.event.emit(TuyaPulsar.close, ...data);
@@ -209,7 +209,7 @@ export class TuyaPulsar {
   }
 
   private subError(server: WebSocket) {
-    server.on("error", (e) => {
+    server.on("error", (e: any) => {
       this.event.emit(TuyaPulsar.error, this.server, e);
     });
   }
@@ -250,8 +250,8 @@ function buildQuery(query: { [key: string]: number | string }) {
 }
 
 function buildPassword(accessId: string, accessKey: string) {
-  const key = MD5(accessKey).toString();
-  return MD5(`${accessId}${key}`).toString().substr(8, 16);
+  const key = createHash('md5').update(accessKey).digest().toString();
+  return createHash('md5').update((`${accessId}${key}`)).digest().toString().substring(8, 16);
 }
 
 function decrypt(
@@ -259,12 +259,11 @@ function decrypt(
   accessKey: string
 ): TuyaPulsarMessage | undefined {
   try {
-    const realKey = enc.Utf8.parse(accessKey.substring(8, 24));
-    const json = AES.decrypt(data, realKey, {
-      mode: mode.ECB,
-      padding: pad.Pkcs7,
-    });
-    const dataStr = enc.Utf8.stringify(json).toString();
+    const key = Buffer.from(accessKey.substring(8, 24), 'utf-8');
+    const decrypt = createDecipheriv('aes-256-ecb', key, null);
+    decrypt.setAutoPadding(true)
+    decrypt.update(data, 'utf-8');
+    const dataStr = decrypt.final().toString('utf-8');
     return JSON.parse(dataStr);
   } catch (e) {
     return undefined;
@@ -273,13 +272,12 @@ function decrypt(
 
 function encrypt(data: any, accessKey: string) {
   try {
-    const realKey = enc.Utf8.parse(accessKey.substring(8, 24));
-    const realData = JSON.stringify(data);
-    const retData = AES.encrypt(realData, realKey, {
-      mode: mode.ECB,
-      padding: pad.Pkcs7,
-    }).toString();
-    return retData;
+    const key = Buffer.from(accessKey.substring(8, 24), 'utf-8');
+    const stringData = JSON.stringify(data);
+    const encrypt = createCipheriv('aes-128-ecb', key, null);
+    encrypt.setAutoPadding(true);
+    encrypt.update(stringData, 'utf-8');
+    return encrypt.final().toString('base64');
   } catch (e) {
     return "";
   }
