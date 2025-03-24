@@ -23,7 +23,7 @@ import sdk, {
   ScryptedNativeId,
 } from "@scrypted/sdk";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
-import { TuyaPlugin } from "./plugin";
+import { TuyaPlugin } from "./main";
 import {
   MQTTConfig,
   TuyaDeviceConfig,

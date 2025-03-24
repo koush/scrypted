@@ -1,11 +1,13 @@
 {
     "compilerOptions": {
-        "module": "CommonJS",
-        "target": "ES2021",
+        "target": "ESNext",
+        "moduleResolution": "bundler",
+        "module": "ESNext",
+        "strict": true,
+        "sourceMap": true,
         "resolveJsonModule": true,
-        "moduleResolution": "Node10",
         "esModuleInterop": true,
-        "sourceMap": true
+        "allowSyntheticDefaultImports": true
     },
     "include": [
         "src/**/*"

@@ -4,14 +4,16 @@
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
       "build": "scrypted-webpack",
-      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
-      "prescrypted-vscode-launch": "scrypted-webpack",
+      "preprepublishOnly": "scrypted-changelog",
+      "prepublishOnly": "scrypted-changelog && WEBPACK_DEVTOOL=nosources-source-map NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "WEBPACK_DEVTOOL=nosources-source-map scrypted-webpack",
       "scrypted-vscode-launch": "scrypted-deploy-debug",
       "scrypted-deploy-debug": "scrypted-deploy-debug",
       "scrypted-debug": "scrypted-debug",
       "scrypted-deploy": "scrypted-deploy",
-      "scrypted-readme": "scrypted-readme",
-      "scrypted-package-json": "scrypted-package-json"
+      "scrypted-changelog": "scrypted-changelog",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-readme": "scrypted-readme"
    },
    "keywords": [
       "scrypted",
@@ -20,33 +22,20 @@
       "camera"
    ],
    "scrypted": {
+      "rollup": true,
       "name": "Tuya Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
          "Settings"
-      ],
-      "pluginDependencies": [
-         "@scrypted/prebuffer-mixin",
-         "@scrypted/snapshot",
-         "@scrypted/webrtc"
       ]
    },
    "dependencies": {
-      "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk",
-      "axios": "^0.27.2",
-      "crypto-js": "^4.1.1",
-      "mqtt": "^4.3.7",
-      "mqtt-packet": "^8.1.2",
-      "ws": "^8.8.1"
+      "@scrypted/sdk": "^0.3.88"
    },
    "devDependencies": {
-      "@types/crypto-js": "^4.1.1",
-      "@types/node": "^16.6.1",
-      "@types/uuid": "^8.3.4",
-      "@types/ws": "^8.5.3",
-      "scrypted": "file:../../"
+      "@types/node": "^22.10.2"
    },
-   "version": "0.0.8"
+   "version": "0.0.9",
+   "packageManager": "npm@10.9.2+sha512.8ab88f10f224a0c614cb717a7f7c30499014f77134120e9c1f0211ea3cf3397592cbe483feb38e0c4b3be1c54e347292c76a1b5edb94a3289d5448484ab8ac81"
 }
