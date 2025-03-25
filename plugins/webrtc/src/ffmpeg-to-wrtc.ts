@@ -69,7 +69,7 @@ export async function createTrackForwarder(options: {
         requestDestination = 'remote';
     }
 
-    const h265TransceiverCodec = videoTransceiver.codecs.find(codec => codec.mimeType === 'video/H265');
+    const hasH265Support = !!videoTransceiver.codecs.find(codec => codec.mimeType === 'video/H265');
 
     const mo = await requestMediaStream({
         video: {
@@ -78,7 +78,7 @@ export async function createTrackForwarder(options: {
             // alternateCodecs property.
             codec: 'h264',
             // allow h265 if supported
-            alternateCodecs: h265TransceiverCodec ? ['h265', 'h264'] : undefined,
+            alternateCodecs: hasH265Support ? ['h265', 'h264'] : undefined,
             width,
             height,
         },
@@ -135,22 +135,31 @@ export async function createTrackForwarder(options: {
         ...clientOptions,
     });
 
+    const findAndSetCodec = (transceiver: RTCRtpTransceiver, mimeType: string) => {
+        const found = transceiver.codecs.find(codec => codec.mimeType === mimeType);
+        if (found)
+            transceiver.sender.codec = found;
+        return found;
+    };
+
+    let negotiatedAudioCodec = 'audio/opus';
+    let negotiatedVideoCodec = 'video/H264';
     let willNeedTranscode = mediaStreamOptions?.video?.codec !== 'h264';
     if (!maximumCompatibilityMode) {
-        let found: RTCRtpCodecParameters;
         if (mediaStreamOptions?.audio?.codec === 'pcm_mulaw') {
-            found = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU')
+            findAndSetCodec(audioTransceiver, 'audio/PCMU');
+            negotiatedAudioCodec = 'audio/PCMU';
         }
         else if (mediaStreamOptions?.audio?.codec === 'pcm_alaw') {
-            found = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA')
+            findAndSetCodec(audioTransceiver, 'audio/PCMA');
+            negotiatedAudioCodec = 'audio/PCMA';
         }
-        if (found)
-            audioTransceiver.sender.codec = found;
 
         if (mediaStreamOptions?.video?.codec === 'h265') {
-            if (h265TransceiverCodec) {
-                videoTransceiver.sender.codec = h265TransceiverCodec;
+            if (hasH265Support) {
+                findAndSetCodec(videoTransceiver, 'video/H265');
                 willNeedTranscode = false;
+                negotiatedVideoCodec = 'video/H265';
             }
         }
     }
@@ -264,6 +273,8 @@ export async function createTrackForwarder(options: {
                 }
             }
             else {
+                if (audioTransceiver.sender.codec.mimeType !== negotiatedAudioCodec)
+                    findAndSetCodec(audioTransceiver, negotiatedAudioCodec);
                 const rtp = RtpPacket.deSerialize(buffer);
                 const now = Date.now();
                 rtp.header.marker = now - lastPacketTs > 1000; // set the marker if it's been more than 1s since the last packet
@@ -339,6 +350,8 @@ export async function createTrackForwarder(options: {
                 }
 
                 onRtp = buffer => {
+                    if (videoTransceiver.sender.codec.mimeType !== negotiatedVideoCodec)
+                        findAndSetCodec(videoTransceiver, negotiatedVideoCodec);
                     const repacketized = repacketizer.repacketize(RtpPacket.deSerialize(buffer));
                     for (const packet of repacketized) {
                         videoTransceiver.sender.sendRtp(packet);
@@ -347,6 +360,8 @@ export async function createTrackForwarder(options: {
             }
             else {
                 onRtp = buffer => {
+                    if (videoTransceiver.sender.codec.mimeType !== negotiatedVideoCodec)
+                        findAndSetCodec(videoTransceiver, negotiatedVideoCodec);
                     videoTransceiver.sender.sendRtp(buffer);
                 };
             }
