@@ -527,10 +527,34 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         });
     }
 
+    const resolvedSdp = new Deferred<string>();
+    resolvedSdp.promise.catch(() => { });
+    (async () => {
+        try {
+            const videoSection = await videoSectionDeferred.promise;
+            const audioSection = await audioSectionDeferred.promise;
+            let sdp = `v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=Media Server
+c=IN IP4 127.0.0.1
+t=0 0`;
+            const parsed = parseSdp(sdp);
+            if (videoSection)
+                parsed.msections.push(videoSection);
+            if (audioSection)
+                parsed.msections.push(audioSection);
+            sdp = parsed.toSdp();
+            resolvedSdp.resolve(sdp);
+        }
+        catch (e) {
+            resolvedSdp.reject(e);
+        }
+    })();
+
     return {
         cp,
         rtspServer: rtspServerDeferred.promise,
-        sdpContents: sdpDeferred.promise,
+        sdpContents: resolvedSdp.promise,
         videoSection: videoSectionDeferred.promise,
         audioSection: audioSectionDeferred.promise,
         kill: () => killDeferred.resolve(undefined),
