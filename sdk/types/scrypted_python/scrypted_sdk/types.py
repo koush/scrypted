@@ -368,6 +368,7 @@ class RequestAudioStreamOptions(TypedDict):
 
 class RequestMediaStreamAdaptiveOptions(TypedDict):
 
+    codecSwitch: bool
     keyframe: bool
     packetLoss: bool
     pictureLoss: bool

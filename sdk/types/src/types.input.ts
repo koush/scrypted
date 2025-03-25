@@ -597,6 +597,7 @@ export interface RequestMediaStreamAdaptiveOptions {
   keyframe?: boolean;
   reconfigure?: boolean;
   resize?: boolean;
+  codecSwitch?: boolean;
 }
 
 export interface RequestMediaStreamOptions extends MediaStreamOptions {
