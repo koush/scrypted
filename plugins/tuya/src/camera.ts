@@ -21,12 +21,10 @@ import { TuyaDeviceConfig } from "./tuya/const";
 import { TuyaDevice } from "./tuya/device";
 import { TuyaMQ } from "./tuya/mq";
 import { randomUUID } from "crypto";
+import { TuyaManager } from "./tuya/manager";
 const { deviceManager } = sdk;
 
-export class TuyaCameraLight
-  extends ScryptedDeviceBase
-  implements OnOff, Online
-{
+export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online {
   constructor(public camera: TuyaCamera, nativeId: string) {
     super(nativeId);
   }
@@ -50,7 +48,7 @@ export class TuyaCameraLight
     const lightSwitchStatus = TuyaDevice.getLightSwitchStatus(camera);
 
     if (camera.online && lightSwitchStatus) {
-      await this.camera.controller.manager.cloud?.updateDevice(camera, [
+      await this.camera.controller.cloud?.updateDevice(camera, [
         {
           code: lightSwitchStatus.code,
           value: on,
@@ -68,23 +66,14 @@ export class TuyaCameraLight
   }
 }
 
-export class TuyaCamera
-  extends ScryptedDeviceBase
-  implements
-    DeviceProvider,
-    VideoCamera,
-    BinarySensor,
-    MotionSensor,
-    OnOff,
-    Online
-{
+export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff, Online {
   private cameraLightSwitch?: TuyaCameraLight;
   private previousMotion?: any;
   private previousDoorbellRing?: any;
   private motionTimeout?: NodeJS.Timeout;
   private binaryTimeout?: NodeJS.Timeout;
 
-  constructor(public controller: TuyaPlugin, nativeId: string) {
+  constructor(public controller: TuyaManager, nativeId: string) {
     super(nativeId);
   }
 
@@ -104,7 +93,7 @@ export class TuyaCamera
 
     throw new Error(
       "This Camera Device Provider has not been implemented of type: " +
-        nativeId?.split("-")[1]
+      nativeId?.split("-")[1]
     );
   }
 
@@ -132,7 +121,7 @@ export class TuyaCamera
     const statusIndicator = TuyaDevice.getStatusIndicator(camera);
 
     if (statusIndicator) {
-      await this.controller.manager.cloud?.updateDevice(camera, [
+      await this.controller.cloud?.updateDevice(camera, [
         {
           code: statusIndicator.code,
           value: on,
@@ -163,7 +152,7 @@ export class TuyaCamera
       throw new Error(`Failed to stream ${this.name}: Camera is offline.`);
     }
 
-    const rtsps = await this.controller.manager.cloud?.getRTSPS(camera);
+    const rtsps = await this.controller.cloud?.getRTSPS(camera);
 
     if (!rtsps) {
       this.logger.e(
@@ -235,7 +224,7 @@ export class TuyaCamera
   }
 
   findCamera() {
-    return this.controller.manager.cloud?.cameras?.find(
+    return this.controller.cloud?.cameras?.find(
       (device) => device.id === this.nativeId
     );
   }

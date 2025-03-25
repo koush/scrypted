@@ -1,7 +1,6 @@
 import Event from "events";
-// import * as mqtt from "mqtt";
-// import { IClientPublishOptions } from "mqtt";
-// import { IPublishPacket } from "mqtt-packet";
+import { connect, IClientPublishOptions, MqttClient } from "mqtt";
+import { IPublishPacket } from "mqtt-packet";
 import { MQTTConfig } from "./const";
 
 export class TuyaMQ {
@@ -10,7 +9,7 @@ export class TuyaMQ {
   static error = "TUYA_ERROR";
   static close = "TUYA_CLOSE";
 
-  private client?: mqtt.MqttClient;
+  private client?: MqttClient;
   private config: MQTTConfig;
   private event: Event;
 
@@ -23,9 +22,9 @@ export class TuyaMQ {
     this.client?.end();
   }
 
-  public async connect(): Promise<mqtt.Client> {
+  public async connect(): Promise<MqttClient> {
     return new Promise((resolve, reject) => {
-      this.event.on(TuyaMQ.connected, (client: mqtt.MqttClient) => {
+      this.event.on(TuyaMQ.connected, (client: MqttClient) => {
         if (client.connected) {
           resolve(client);
         } else {
@@ -36,15 +35,15 @@ export class TuyaMQ {
     });
   }
 
-  public message(cb: (client: mqtt.MqttClient, message: any) => void) {
+  public message(cb: (client: MqttClient, message: any) => void) {
     this.event.on(TuyaMQ.message, cb);
   }
 
-  public error(cb: (client: mqtt.MqttClient, error: Error) => void) {
+  public error(cb: (client: MqttClient, error: Error) => void) {
     this.event.on(TuyaMQ.error, cb);
   }
 
-  public close(cb: (client: mqtt.MqttClient) => void) {
+  public close(cb: (client: MqttClient) => void) {
     this.event.on(TuyaMQ.close, cb);
   }
 
@@ -58,13 +57,13 @@ export class TuyaMQ {
   }
 
   public removeMessageListener(
-    cb: (client: mqtt.MqttClient, message: any) => void
+    cb: (client: MqttClient, message: any) => void
   ) {
     this.event.removeListener(TuyaMQ.message, cb);
   }
 
   private _connect() {
-    this.client = mqtt.connect(this.config.url, {
+    this.client = connect(this.config.url, {
       clientId: this.config.client_id,
       username: this.config.username,
       password: this.config.password,
@@ -77,14 +76,14 @@ export class TuyaMQ {
     return this.client;
   }
 
-  private subConnect(client: mqtt.MqttClient) {
+  private subConnect(client: MqttClient) {
     client.on("connect", () => {
       client.subscribe(this.config.source_topic);
       this.event.emit(TuyaMQ.connected, client);
     });
   }
 
-  private subMessage(client: mqtt.MqttClient) {
+  private subMessage(client: MqttClient) {
     client.on(
       "message",
       (topic: string, payload: Buffer, packet: IPublishPacket) => {
@@ -93,13 +92,13 @@ export class TuyaMQ {
     );
   }
 
-  private subError(client: mqtt.MqttClient) {
+  private subError(client: MqttClient) {
     client.on("error", (error: Error) => {
       this.event.emit(TuyaMQ.error, error);
     });
   }
 
-  private subClose(client: mqtt.MqttClient) {
+  private subClose(client: MqttClient) {
     client.on("close", () => {
       this.event.emit(TuyaMQ.close, this.client);
     });

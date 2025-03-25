@@ -129,40 +129,6 @@ export class TuyaCloud {
     }
   }
 
-  // public async getDeviceWebRTConfig(
-  //   camera: TuyaDeviceConfig
-  // ): Promise<TuyaResponse<DeviceWebRTConfig>> {
-  //   const response = await this.get<DeviceWebRTConfig>(
-  //     `/v1.0/users/${this.userId}/devices/${camera.id}/webrtc-configs`
-  //   );
-
-  //   return response;
-  // }
-
-  // public async getWebRTCMQConfig(
-  //   webRTCDeviceConfig: DeviceWebRTConfig
-  // ): Promise<TuyaResponse<MQTTConfig>> {
-  //   const response = await this.post<any>(`/v1.0/open-hub/access/config`, {
-  //     link_id: randomBytes(8).readUInt8(),
-  //     uid: this.userId,
-  //     link_type: "mqtt",
-  //     topics: "ipc",
-  //   });
-
-  //   if (response.success) {
-  //     response.result = {
-  //       ...response.result,
-  //       sink_topic: (response.result.sink_topic.ipc as string)
-  //         .replace("{device_id}", webRTCDeviceConfig.id)
-  //         .replace("moto_id", webRTCDeviceConfig.moto_id),
-  //       source_topic: response.result.source_topic.ipc as string,
-  //     };
-  //     return response;
-  //   }
-
-  //   return response;
-  // }
-
   public getSessionUserId(): string | undefined {
     return this.session?.uid;
   }
