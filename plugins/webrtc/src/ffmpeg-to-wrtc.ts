@@ -86,7 +86,12 @@ export async function createTrackForwarder(options: {
             codec: 'opus',
             alternateCodecs: ['opus', 'pcm_mulaw', 'pcm_alaw'],
         },
-        adaptive: handlesHighResolution,
+        adaptive: handlesHighResolution
+            ? {
+                codecSwitch: true,
+                pictureLoss: true,
+            }
+            : undefined,
         destination: requestDestination,
         destinationId,
         tool: !handlesHighResolution ? 'ffmpeg' : 'scrypted',
@@ -142,24 +147,35 @@ export async function createTrackForwarder(options: {
         return found;
     };
 
-    let negotiatedAudioCodec = 'audio/opus';
-    let negotiatedVideoCodec = 'video/H264';
+    const codecMap = {
+        'audio/PCMU': 'pcm_mulaw',
+        'audio/PCMA': 'pcm_alaw',
+        'audio/opus': 'opus',
+        'video/H264': 'h264',
+        'video/H265': 'h265',
+    };
+
+    const codecReverseMap = {
+        'pcm_mulaw': 'audio/PCMU',
+        'pcm_alaw': 'audio/PCMA',
+        'opus': 'audio/opus',
+        'h264': 'video/H264',
+        'h265': 'video/H265',
+    }
+
     let willNeedTranscode = mediaStreamOptions?.video?.codec !== 'h264';
     if (!maximumCompatibilityMode) {
         if (mediaStreamOptions?.audio?.codec === 'pcm_mulaw') {
             findAndSetCodec(audioTransceiver, 'audio/PCMU');
-            negotiatedAudioCodec = 'audio/PCMU';
         }
         else if (mediaStreamOptions?.audio?.codec === 'pcm_alaw') {
             findAndSetCodec(audioTransceiver, 'audio/PCMA');
-            negotiatedAudioCodec = 'audio/PCMA';
         }
 
         if (mediaStreamOptions?.video?.codec === 'h265') {
             if (hasH265Support) {
                 findAndSetCodec(videoTransceiver, 'video/H265');
                 willNeedTranscode = false;
-                negotiatedVideoCodec = 'video/H265';
             }
         }
     }
@@ -263,7 +279,8 @@ export async function createTrackForwarder(options: {
             return msection.rtpmap.clock === 8000;
         },
         // codecCopy: audioCodecCopy,
-        onRtp: buffer => {
+        alternateCodecs: ['opus', 'pcm_mulaw', 'pcm_alaw'],
+        onRtp: (buffer, codec) => {
             if (false && audioTransceiver.sender.codec.mimeType?.toLowerCase() === "audio/opus") {
                 // this will use 3 20ms frames, 60ms. seems to work up to 6/120ms
                 if (!opusRepacketizer)
@@ -273,8 +290,8 @@ export async function createTrackForwarder(options: {
                 }
             }
             else {
-                if (audioTransceiver.sender.codec.mimeType !== negotiatedAudioCodec)
-                    findAndSetCodec(audioTransceiver, negotiatedAudioCodec);
+                if (codecMap[audioTransceiver.sender.codec.mimeType] !== codec)
+                    findAndSetCodec(audioTransceiver, codecReverseMap[codec]);
                 const rtp = RtpPacket.deSerialize(buffer);
                 const now = Date.now();
                 rtp.header.marker = now - lastPacketTs > 1000; // set the marker if it's been more than 1s since the last packet
@@ -328,10 +345,11 @@ export async function createTrackForwarder(options: {
 
     const videoRtpTrack: RtpTrack = {
         codecCopy: videoCodecCopy,
+        alternateCodecs: hasH265Support ? ['h264', 'h265'] : undefined,
         packetSize: videoPacketSize,
         onMSection: (v) => videoSection = v,
-        onRtp: (buffer) => {
-            let onRtp: (rtp: Buffer) => void;
+        onRtp: (buffer, codec) => {
+            let onRtp: typeof videoRtpTrack.onRtp;
 
             if (needPacketization && !repacketizer) {
                 if (videoSection.codec === 'h264') {
@@ -349,9 +367,9 @@ export async function createTrackForwarder(options: {
                     });
                 }
 
-                onRtp = buffer => {
-                    if (videoTransceiver.sender.codec.mimeType !== negotiatedVideoCodec)
-                        findAndSetCodec(videoTransceiver, negotiatedVideoCodec);
+                onRtp = (buffer, codec) => {
+                    if (codecMap[videoTransceiver.sender.codec.mimeType] !== codec)
+                        findAndSetCodec(videoTransceiver, codecReverseMap[codec]);
                     const repacketized = repacketizer.repacketize(RtpPacket.deSerialize(buffer));
                     for (const packet of repacketized) {
                         videoTransceiver.sender.sendRtp(packet);
@@ -359,15 +377,15 @@ export async function createTrackForwarder(options: {
                 };
             }
             else {
-                onRtp = buffer => {
-                    if (videoTransceiver.sender.codec.mimeType !== negotiatedVideoCodec)
-                        findAndSetCodec(videoTransceiver, negotiatedVideoCodec);
+                onRtp = (buffer, codec) => {
+                    if (codecMap[videoTransceiver.sender.codec.mimeType] !== codec)
+                        findAndSetCodec(videoTransceiver, codecReverseMap[codec]);
                     videoTransceiver.sender.sendRtp(buffer);
                 };
             }
 
             videoRtpTrack.onRtp = onRtp;
-            videoRtpTrack.onRtp(buffer);
+            videoRtpTrack.onRtp(buffer, codec);
         },
         encoderArguments: [
             ...videoTranscodeArguments,
