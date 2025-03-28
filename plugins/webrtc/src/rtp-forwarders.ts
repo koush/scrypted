@@ -57,8 +57,9 @@ function createPacketDelivery(track: RtpTrack) {
     return (rtp: Buffer, codec: string) => track.onRtp(rtp, codec);
 }
 
-function attachTrackDgram(track: RtpTrack, server: dgram.Socket) {
-    server?.on('message', createPacketDelivery(track));
+function attachTrackDgram(track: RtpTrack, server: dgram.Socket, codec: () =>string) {
+    const delivery = createPacketDelivery(track);
+    server?.on('message', rtp => delivery(rtp, codec()));
 }
 
 async function setupRtspClient(console: Console, rtspClient: RtspClient, channel: number, section: MSection, rtspClientForceTcp: boolean, deliver: ReturnType<typeof createPacketDelivery>) {
@@ -370,11 +371,16 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         console.log('video codec/container not matched, transcoding:', videoCodec, JSON.stringify(ffmpegInput));
     }
 
+    let rtpVideoCodec: string;
+    let rtpAudioCodec: string;
     const reportTranscodedSections = (sdp: string) => {
         sdpDeferred.resolve(sdp);
         const parsedSdp = parseSdp(sdp);
         const videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
         const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
+
+        rtpVideoCodec = videoSection?.codec;
+        rtpAudioCodec = audioSection?.codec;
 
         videoSectionDeferred.resolve(videoSection);
         audioSectionDeferred.resolve(audioSection);
@@ -442,9 +448,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
         if (useRtp) {
             if (video?.bind?.server)
-                attachTrackDgram(video, video.bind.server);
+                attachTrackDgram(video, video.bind.server, () => rtpVideoCodec);
             if (audio?.bind?.server)
-                attachTrackDgram(audio, audio.bind.server);
+                attachTrackDgram(audio, audio.bind.server, () => rtpAudioCodec);
 
             args.push(
                 '-sdp_file', 'pipe:4',
@@ -475,9 +481,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                 await rtspServer.handleSetup();
 
                 if (video)
-                    attachTrackDgram(video, rtspServer.setupTracks[videoSection?.control]?.rtp);
+                    attachTrackDgram(video, rtspServer.setupTracks[videoSection?.control]?.rtp, () => videoSection.codec);
                 if (audio)
-                    attachTrackDgram(audio, rtspServer.setupTracks[audioSection?.control]?.rtp);
+                    attachTrackDgram(audio, rtspServer.setupTracks[audioSection?.control]?.rtp, () => audioSection.codec);
 
                 rtspServerDeferred.resolve(rtspServer);
 
