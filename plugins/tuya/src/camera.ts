@@ -15,18 +15,16 @@ import sdk, {
   Intercom,
   ScryptedNativeId,
 } from "@scrypted/sdk";
-// import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { TuyaPlugin } from "./plugin";
 import { TuyaDeviceConfig } from "./tuya/const";
-import { TuyaDevice } from "./tuya/device";
-import { TuyaMQ } from "./tuya/mq";
-import { randomUUID } from "crypto";
-import { TuyaManager } from "./tuya/manager";
 const { deviceManager } = sdk;
 
 export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online {
-  constructor(public camera: TuyaCamera, nativeId: string) {
+  private camera: TuyaCamera;
+
+  constructor(nativeId: string, camera: TuyaCamera) {
     super(nativeId);
+    this.camera = camera;
   }
 
   async turnOff(): Promise<void> {
@@ -38,57 +36,62 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online
   }
 
   private async setLightSwitch(on: boolean) {
-    const camera = this.camera.findCamera();
+    // const camera = this.camera.findCamera();
 
-    if (!camera) {
-      this.log.w(`Camera was not found for ${this.name}`);
-      return;
-    }
+    // if (!camera) {
+    //   this.log.w(`Camera was not found for ${this.name}`);
+    //   return;
+    // }
 
-    const lightSwitchStatus = TuyaDevice.getLightSwitchStatus(camera);
+    // const lightSwitchStatus = TuyaDevice.getLightSwitchStatus(camera);
 
-    if (camera.online && lightSwitchStatus) {
-      await this.camera.controller.cloud?.updateDevice(camera, [
-        {
-          code: lightSwitchStatus.code,
-          value: on,
-        },
-      ]);
-    }
+    // if (camera.online && lightSwitchStatus) {
+    //   await this.camera.controller.api.updateDevice(camera, [
+    //     {
+    //       code: lightSwitchStatus.code,
+    //       value: on,
+    //     },
+    //   ]);
+    // }
   }
 
   updateState(camera?: TuyaDeviceConfig) {
     camera = camera || this.camera.findCamera();
     if (!camera) return;
 
-    this.on = TuyaDevice.getLightSwitchStatus(camera)?.value;
+    // this.on = TuyaDevice.getLightSwitchStatus(camera)?.value;
     this.online = camera.online;
   }
 }
 
 export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff, Online {
-  private cameraLightSwitch?: TuyaCameraLight;
+  private deviceConfig: TuyaDeviceConfig
+  private controller: TuyaPlugin;
+
+  private lightSwitch?: TuyaCameraLight;
   private previousMotion?: any;
   private previousDoorbellRing?: any;
   private motionTimeout?: NodeJS.Timeout;
   private binaryTimeout?: NodeJS.Timeout;
 
-  constructor(public controller: TuyaManager, nativeId: string) {
-    super(nativeId);
+  constructor(deviceConfig: TuyaDeviceConfig, controller: TuyaPlugin) {
+    super(deviceConfig.id);
+    this.deviceConfig = deviceConfig;
+    this.controller = controller
   }
 
   // Camera Light Device Provider.
 
   async getDevice(nativeId: ScryptedNativeId): Promise<TuyaCameraLight> {
     // Find created devices
-    if (this.cameraLightSwitch && this.cameraLightSwitch.id === nativeId) {
-      return this.cameraLightSwitch;
+    if (this.lightSwitch && this.lightSwitch.id === nativeId) {
+      return this.lightSwitch;
     }
 
     // Create devices if not found.
     if (nativeId === this.nativeLightSwitchId) {
-      this.cameraLightSwitch = new TuyaCameraLight(this, nativeId);
-      return this.cameraLightSwitch;
+      this.lightSwitch = new TuyaCameraLight(nativeId, this);
+      return this.lightSwitch;
     }
 
     throw new Error(
@@ -98,7 +101,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
   }
 
   async releaseDevice(id: string, nativeId: ScryptedNativeId): Promise<void> {
-    throw new Error("Method not implemented.");
+
   }
 
   // OnOff Status Indicator
@@ -118,16 +121,16 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
       return;
     }
 
-    const statusIndicator = TuyaDevice.getStatusIndicator(camera);
+    // const statusIndicator = TuyaDevice.getStatusIndicator(camera);
 
-    if (statusIndicator) {
-      await this.controller.cloud?.updateDevice(camera, [
-        {
-          code: statusIndicator.code,
-          value: on,
-        },
-      ]);
-    }
+    // if (statusIndicator) {
+    //   await this.controller.api?.updateDevice(camera.id, [
+    //     {
+    //       code: statusIndicator.code,
+    //       value: on,
+    //     },
+    //   ]);
+    // }
   }
 
   // VideoCamera
@@ -138,21 +141,19 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
     // Always create new rtsp since it can only be used once and we only have 30 seconds before we can
     // use it.
 
-    const camera = this.findCamera();
-
-    if (!camera) {
+    if (!this.deviceConfig) {
       this.logger.e(`Could not find camera for ${this.name} to show stream.`);
       throw new Error(`Failed to stream ${this.name}: Camera not found.`);
     }
 
-    if (!camera.online) {
+    if (!this.deviceConfig.online) {
       this.logger.e(
         `${this.name} is currently offline. Will not be able to stream until device is back online.`
       );
       throw new Error(`Failed to stream ${this.name}: Camera is offline.`);
     }
 
-    const rtsps = await this.controller.cloud?.getRTSPS(camera);
+    const rtsps = await this.controller.api?.getRTSP(this.deviceConfig.id);
 
     if (!rtsps) {
       this.logger.e(
@@ -223,10 +224,8 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
     }
   }
 
-  findCamera() {
-    return this.controller.cloud?.cameras?.find(
-      (device) => device.id === this.nativeId
-    );
+  findCamera(): TuyaDeviceConfig | undefined {
+    return undefined;
   }
 
   updateState(camera?: TuyaDeviceConfig) {
@@ -238,40 +237,40 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
 
     this.online = camera.online;
 
-    if (TuyaDevice.hasStatusIndicator(camera)) {
-      this.on = TuyaDevice.getStatusIndicator(camera)?.value;
-    }
+    // if (TuyaDevice.hasStatusIndicator(camera)) {
+    //   this.on = TuyaDevice.getStatusIndicator(camera)?.value;
+    // }
 
-    if (TuyaDevice.hasMotionDetection(camera)) {
-      const motionDetectedStatus = TuyaDevice.getMotionDetectionStatus(camera);
-      if (motionDetectedStatus) {
-        if (!this.previousMotion) {
-          this.previousMotion = motionDetectedStatus.value;
-        } else if (this.previousMotion !== motionDetectedStatus.value) {
-          this.previousMotion = motionDetectedStatus.value;
-          this.triggerMotion();
-        }
-      }
-    }
+    // if (TuyaDevice.hasMotionDetection(camera)) {
+    //   const motionDetectedStatus = TuyaDevice.getMotionDetectionStatus(camera);
+    //   if (motionDetectedStatus) {
+    //     if (!this.previousMotion) {
+    //       this.previousMotion = motionDetectedStatus.value;
+    //     } else if (this.previousMotion !== motionDetectedStatus.value) {
+    //       this.previousMotion = motionDetectedStatus.value;
+    //       this.triggerMotion();
+    //     }
+    //   }
+    // }
 
-    if (TuyaDevice.isDoorbell(camera)) {
-      const doorbellRingStatus = TuyaDevice.getDoorbellRing(camera);
-      if (doorbellRingStatus) {
-        if (!this.previousDoorbellRing) {
-          this.previousDoorbellRing = doorbellRingStatus.value;
-        } else if (this.previousDoorbellRing !== doorbellRingStatus.value) {
-          this.previousDoorbellRing = doorbellRingStatus.value;
-          this.triggerBinaryState();
-        }
-      }
-    }
+    // if (TuyaDevice.isDoorbell(camera)) {
+    //   const doorbellRingStatus = TuyaDevice.getDoorbellRing(camera);
+    //   if (doorbellRingStatus) {
+    //     if (!this.previousDoorbellRing) {
+    //       this.previousDoorbellRing = doorbellRingStatus.value;
+    //     } else if (this.previousDoorbellRing !== doorbellRingStatus.value) {
+    //       this.previousDoorbellRing = doorbellRingStatus.value;
+    //       this.triggerBinaryState();
+    //     }
+    //   }
+    // }
 
-    // By the time this is called, scrypted would have already reported the device
-    // Only set light switch on cameras that have a light switch.
+    // // By the time this is called, scrypted would have already reported the device
+    // // Only set light switch on cameras that have a light switch.
 
-    if (TuyaDevice.hasLightSwitch(camera)) {
-      // this.getDevice(this.nativeLightSwitchId)?.updateState(camera);
-    }
+    // if (TuyaDevice.hasLightSwitch(camera)) {
+    //   // this.getDevice(this.nativeLightSwitchId)?.updateState(camera);
+    // }
   }
 
   private get nativeLightSwitchId(): string {

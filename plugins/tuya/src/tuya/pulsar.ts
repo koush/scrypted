@@ -5,6 +5,9 @@ import Event from "events";
 import WebSocket from "ws";
 import { createCipheriv, createDecipheriv, createHash } from "crypto";
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 export interface TuyaPulsarMessage {
   payload: {
     data: {
@@ -26,6 +29,9 @@ export interface TuyaPulsarMessage {
   key: string;
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 interface StatusItem {
   code: string;
   value: any;
@@ -33,6 +39,9 @@ interface StatusItem {
   // "data point": string
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 interface IConfig {
   accessId: string;
   accessKey: string;
@@ -43,6 +52,9 @@ interface IConfig {
   retryTimeout?: number;
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 export class TuyaPulsar {
   static data = "TUTA_DATA";
   static error = "TUYA_ERROR";
@@ -234,6 +246,9 @@ export class TuyaPulsar {
   }
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 function getTopicUrl(
   websocketUrl: string,
   accessId: string,
@@ -243,17 +258,26 @@ function getTopicUrl(
   return `${websocketUrl}ws/v2/consumer/persistent/${accessId}/out/${env}/${accessId}-sub${query}`;
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 function buildQuery(query: { [key: string]: number | string }) {
   return Object.keys(query)
     .map((key) => `${key}=${encodeURIComponent(query[key])}`)
     .join("&");
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 function buildPassword(accessId: string, accessKey: string) {
   const key = createHash('md5').update(accessKey).digest().toString();
   return createHash('md5').update((`${accessId}${key}`)).digest().toString().substring(8, 16);
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 function decrypt(
   data: string,
   accessKey: string
@@ -270,6 +294,9 @@ function decrypt(
   }
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 function encrypt(data: any, accessKey: string) {
   try {
     const key = Buffer.from(accessKey.substring(8, 24), 'utf-8');

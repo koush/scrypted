@@ -1,10 +1,21 @@
-export interface TuyaResponse<T> {
-  success: boolean;
-  t: number;
-  result: T;
+import { TuyaCloudTokenInfo } from "./cloud";
+import { TuyaSharingTokenInfo } from "./sharing";
+
+export enum TuyaLoginMethod {
+  App = "Tuya (Smart Life) App",
+  Account = "Tuya Developer Account"
 }
 
-export interface TuyaDeviceConfig {
+export type TuyaTokenInfo = (TuyaSharingTokenInfo & { type: TuyaLoginMethod.App }) | (TuyaCloudTokenInfo & { type: TuyaLoginMethod.Account });
+
+export type TuyaResponse<T> = {
+  success?: boolean;
+  t?: number;
+  result: T;
+  tid?: string;
+}
+
+export type TuyaDeviceConfig = {
   id: string;
   name: string;
   local_key: string;
@@ -20,8 +31,9 @@ export interface TuyaDeviceConfig {
   active_time: number;
   create_time: number;
   update_time: number;
-  status: TuyaDeviceStatus[];
-  functions: DeviceFunction[];
+  status: { [key: string]: TuyaDeviceStatus };
+  functions: { [key: string]: TuyaDeviceFunction };
+  status_range: { [key: string]: TuyaDeviceStatusRange }
 
   // Not necessary?
 
@@ -31,25 +43,31 @@ export interface TuyaDeviceConfig {
   owner_id: string;
 }
 
-export interface TuyaDeviceStatus {
+export type TuyaDeviceStatus = {
   code: string;
   value: any;
 }
 
-export interface DeviceFunction {
+export type TuyaDeviceStatusRange = {
   code: string;
   type: string;
   values: string;
-  desc: string;
+}
+
+export type TuyaDeviceFunction = {
+  code: string;
+  type: string;
   name: string;
+  desc: string;
+  values: { [key: string]: any };
 }
 
-export interface RTSPToken {
+export type RTSPToken = {
   url: string;
-  expires: Date;
+  expires: number;
 }
 
-export interface MQTTConfig {
+export type MQTTConfig = {
   url: string;
   username: string;
   password: string;

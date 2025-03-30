@@ -1,16 +1,26 @@
-enum EndpointGroup {
+
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
+export enum EndpointGroup {
   Europe,
   America,
   India,
   China,
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 export interface TuyaSupportedCountry {
   country: string;
   countryCode: number;
   endpointGroup: EndpointGroup;
 }
 
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
 export const TUYA_COUNTRIES: TuyaSupportedCountry[] = [
   {
     country: "Afghanistan",
@@ -742,14 +752,17 @@ export const TUYA_COUNTRIES: TuyaSupportedCountry[] = [
   },
 ];
 
-export function getEndPointWithCountryCode(code: number) {
-  const item = TUYA_COUNTRIES.find((item) => {
-    return item.countryCode === code;
-  });
-  return item ? item.endpointGroup : EndpointGroup.Europe;
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
+export function getEndPointWithCountryName(name: string) {
+  return getTuyaCloudEndpoint(TUYA_COUNTRIES.find(c => c.country == name) ?? { endpointGroup: EndpointGroup.America });
 }
 
-export function getTuyaCloudEndpoint(country: TuyaSupportedCountry): string {
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
+export function getTuyaCloudEndpoint<T extends { endpointGroup: EndpointGroup }>(country: T): string {
   const AMERICA = "https://openapi.tuyaus.com";
   const EUROPE = "https://openapi.tuyaeu.com";
   const INDIA = "https://openapi.tuyain.com";
@@ -767,7 +780,10 @@ export function getTuyaCloudEndpoint(country: TuyaSupportedCountry): string {
   }
 }
 
-export function getTuyaPulsarEndpoint(country: TuyaSupportedCountry): string {
+/**
+ * @deprecated Will eventually be removed in favor of Sharing SDK
+ */
+export function getTuyaPulsarEndpoint<T extends { endpointGroup: EndpointGroup }>(country: T): string {
   const CHINA = "wss://mqe.tuyacn.com:8285/";
   const AMERICA = "wss://mqe.tuyaus.com:8285/";
   const EUROPE = "wss://mqe.tuyaeu.com:8285/";
