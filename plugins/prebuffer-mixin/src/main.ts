@@ -1024,8 +1024,11 @@ class PrebufferSession {
     const parsedSdp = parseSdp(sdp);
     const videoSection = parsedSdp.msections.find(msection => msection.codec && msection.codec === mediaStreamOptions.video?.codec) || parsedSdp.msections.find(msection => msection.type === 'video');
     let audioSection = parsedSdp.msections.find(msection => msection.codec && msection.codec === mediaStreamOptions.audio?.codec) || parsedSdp.msections.find(msection => msection.type === 'audio');
+    // ensure the mso and sdp both reflect audio mute, or no audio found (which can be an upstream plugin error)
     if (mediaStreamOptions.audio === null)
       audioSection = undefined;
+    if (!audioSection)
+      mediaStreamOptions.audio = null;
     parsedSdp.msections = parsedSdp.msections.filter(msection => msection === videoSection || msection === audioSection);
     const filterPrebufferAudio = options?.prebuffer === undefined;
     const videoCodec = parsedSdp.msections.find(msection => msection.type === 'video')?.codec;
