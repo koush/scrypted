@@ -4,24 +4,13 @@
 import Event from "events";
 import WebSocket from "ws";
 import { createCipheriv, createDecipheriv, createHash } from "crypto";
+import { TuyaMessage } from "./const";
 
 /**
  * @deprecated Will eventually be removed in favor of Sharing SDK
  */
 export interface TuyaPulsarMessage {
-  payload: {
-    data: {
-      devId: string;
-      productKey: string;
-      bizCode?: string;
-      bizData?: any;
-      status?: StatusItem[];
-    };
-    protocol: number;
-    pv: string;
-    sign: string;
-    t: number;
-  };
+  payload: TuyaMessage;
   messageId: string;
   properties: any;
   publishTime: string;

@@ -1,10 +1,15 @@
-import { Online, Device as ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import { DeviceProvider, Online, Device as ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId } from "@scrypted/sdk";
 import { TuyaPlugin } from "../plugin";
-import { TuyaDevice, TuyaDeviceStatus } from "../tuya/const";
+import { TuyaDevice, TuyaDeviceSchema, TuyaDeviceStatus } from "../tuya/const";
+
+type Debounced = {
+}
 
 export abstract class TuyaAccessory extends ScryptedDeviceBase implements Online {
   tuyaDevice: TuyaDevice;
   plugin: TuyaPlugin;
+
+  private debounced = new Map<string, NodeJS.Timeout>();
 
   get deviceSpecs(): ScryptedDevice {
     return {
@@ -24,7 +29,6 @@ export abstract class TuyaAccessory extends ScryptedDeviceBase implements Online
     super(state.id);
     this.tuyaDevice = state;
     this.plugin = controller;
-    this.updateAllValues();
   }
 
   getStatus(code: string) {
@@ -44,7 +48,33 @@ export abstract class TuyaAccessory extends ScryptedDeviceBase implements Online
     await this.plugin.api?.sendCommands(this.tuyaDevice.id, commands);
   }
 
-  updateAllValues() {
+  async updateAllValues(): Promise<void> {
     this.online = this.tuyaDevice.online;
+    await this.updateStatus(this.tuyaDevice.status);
+  }
+
+  abstract updateStatus(status: TuyaDeviceStatus[]): Promise<void>;
+
+  protected debounce(
+    schema: TuyaDeviceSchema,
+    duration: number,
+    initial: () => void,
+    timeout: () => void
+  ) {
+    const prevDebouncing = this.debounced.get(schema.code);
+    if (prevDebouncing) {
+      clearTimeout(prevDebouncing);
+      this.debounced.delete(schema.code);
+    }
+
+    if (!prevDebouncing) initial();
+    this.debounced.set(schema.code, setTimeout(
+      () => {
+        timeout();
+        this.debounced.delete(schema.code);
+      },
+      duration
+    )
+    )
   }
 }

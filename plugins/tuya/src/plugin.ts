@@ -12,7 +12,7 @@ import { StorageSettings } from "@scrypted/sdk/storage-settings";
 
 import QRCode from "qrcode-svg";
 
-import { TuyaLoginMethod, TuyaTokenInfo } from "./tuya/const";
+import { TuyaLoginMethod, TuyaMessage, TuyaMessageProtocol, TuyaTokenInfo } from "./tuya/const";
 import { TuyaLoginQRCode, TuyaSharingAPI } from "./tuya/sharing";
 import { TuyaAccessory } from "./accessories/accessory";
 import { TuyaCloudAPI } from "./tuya/cloud";
@@ -251,19 +251,6 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
         );
     }
 
-    // if (this.api instanceof TuyaSharingAPI) {
-    //   const mqConfig = await this.api.fetchMqttConfig();
-    //   this.mq = new TuyaMQ(mqConfig);
-    // }
-
-    // this.mq?.message((mq, msg) => {
-    //   this.console.log("New message", msg);
-    // });
-
-    // await this.mq?.connect();
-
-    // this.mq = new TuyaMQ();
-
     const devices = await this.api.fetchDevices();
 
     this.devices = new Map(
@@ -274,77 +261,49 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
       .filter((p): p is [string, TuyaAccessory] => !!p)
     );
 
-    sdk.deviceManager.onDevicesChanged({
+    await sdk.deviceManager.onDevicesChanged({
       devices: Array.from(this.devices.values()).map(d => ({ ...d.deviceSpecs, providerNativeId: this.nativeId }))
     });
+
+    this.devices.forEach(d => d.updateAllValues());
+
+    try {
+      if (this.api instanceof TuyaSharingAPI) {
+        const homes = await this.api.queryHomes();
+        const mqConfig = await this.api.fetchMqttConfig(homes.map(h => h.ownerId), devices.map(d => d.id));
+        this.mq = new TuyaMQ(mqConfig);
+        this.mq?.message((mq, msg) => {
+          const string = (msg as Buffer).toString('utf-8');
+          const obj = JSON.parse(string) as TuyaMessage;
+          if (!obj) return;
+          this.onMessage(obj);
+        });
+        await this.mq?.connect();
+      }
+    } catch {
+      this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Failed to connect to Mqtt. Will not observe live changes to devices.`);
+    }
   }
 
-  private onMessage(message: TuyaPulsarMessage) {
-    // const data = message.payload.data;
-    // const { devId, productKey } = data;
-    // let refreshDevice = false;
-
-    // const device = this.devices.get(devId);
-
-    // let messageLogs: string[] = ["Received new TuyaPulsar Message:"];
-
-    // if (data.bizCode) {
-    //   if (device && (data.bizCode === "online" || data.bizCode === "offline")) {
-    //     // Device status changed
-    //     const isOnline = data.bizCode === "online";
-    //     device.online = isOnline;
-    //     refreshDevice = true;
-    //     messageLogs.push(
-    //       `- Changed device to ${data.bizCode} for ${device.name}`
-    //     );
-    //   } else if (device && data.bizCode === "delete") {
-    //     // Device needs to be deleted
-    //     // - devId
-    //     // - uid
-
-    //     messageLogs.push(`- Delete ${device.name} from homekit`);
-    //     const { uid } = data.bizData;
-    //     // TODO: delete device
-    //   } else if (data.bizCode === "add") {
-    //     // TODO: There is a new device added, refetch
-    //     messageLogs.push(
-    //       `- Add new device with devId: ${data.devId} to homekit`
-    //     );
-    //   } else {
-    //     messageLogs.push(
-    //       `- Unknown bizCode: ${data.bizCode} with data: ${JSON.stringify(
-    //         data.bizData
-    //       )}.`
-    //     );
-    //   }
-    // } else if (device && data.status) {
-    //   const newStatus = data.status || [];
-
-    //   messageLogs.push(`- ${device.name} received new status updates:`);
-
-    //   newStatus.forEach((item) => {
-    //     messageLogs.push(`\t- ${JSON.stringify(item)}`);
-
-    //     // const index = device.status.findIndex(
-    //     //   (status) => status.code == item.code
-    //     // );
-    //     // if (index !== -1) {
-    //     //   device.status[index].value = item.value;
-    //     // }
-    //   });
-
-    //   refreshDevice = true;
-    // } else {
-    //   messageLogs.push(
-    //     `- Unknown TuyaPulsar message received: ${JSON.stringify(data)}`
-    //   );
-    // }
-
-    // messageLogs.push("");
-    // // this.console.debug(pulsarMessageLogs.join("\n"));
-
-    // if (refreshDevice) {
-    //   return this.devices.get(devId);
-    // }
+  private onMessage(message: TuyaMessage) {
+    this.console.debug("Received new message", message);
+    if (message.protocol === TuyaMessageProtocol.DEVICE) {
+      const device = this.devices.get(message.data.devId);
+      if (!device) return;
+      device.updateStatus(message.data.status)
+    } else if (message.protocol === TuyaMessageProtocol.OTHER) {
+      const device = this.devices.get(message.data.bizData.devId);
+      if (!device) return;
+      if (message.data.bizCode === "online" || message.data.bizCode === "offline") {
+        const isOnline = message.data.bizCode === "online";
+        device.online = isOnline;
+      } else if (message.data.bizCode === "delete") {
+        // TODO: Remove device
+      } else if (message.data.bizCode === "nameUpdate") {
+        // TODO: update name
+      }
+    } else {
+      this.console.log("Unknown message received.", message);
+    }
   }
 }

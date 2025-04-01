@@ -90,6 +90,38 @@ export type TuyaDeviceFunction = {
   values: string;
 }
 
+export enum TuyaMessageProtocol {
+  DEVICE = 4,
+  OTHER = 30
+}
+
+export type TuyaMessage = {
+  data: {
+    dataId?: string;
+  };
+  protocol: number;
+  pv?: string;
+  sign?: string;
+  t: number;
+} & (
+  {
+    protocol: TuyaMessageProtocol.DEVICE;
+    data: {
+      devId: string;
+      status: (TuyaDeviceStatus & { t: number })[]
+    }
+  } | {
+    protocol: TuyaMessageProtocol.OTHER;
+    data: {
+      bizData: {
+        devId: string;
+        name?: string;
+      };
+      bizCode: "online" | "offline" | "nameUpdate" | "dpNameUpdate" | "bindUser" | "delete";
+    }
+  }
+)
+
 export type RTSPToken = {
   url: string;
   expires: number;

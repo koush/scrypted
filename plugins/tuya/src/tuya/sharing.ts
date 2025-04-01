@@ -71,7 +71,7 @@ export class TuyaSharingAPI {
     }
   }
 
-  public async fetchMqttConfig(): Promise<MqttConfig> {
+  public async fetchMqttConfig(homeIds: string[], deviceIds: string[]): Promise<MqttConfig> {
     const linkId = "@scrypted/tuya." + randomUUID();
     const response = await this._request<{
       url: string,
@@ -80,7 +80,10 @@ export class TuyaSharingAPI {
       password: string, 
       expireTime: number, 
       topic: { 
-        ownerId: { sub: string }, 
+        ownerId: {
+          pub: string,
+          sub: string 
+        }, 
         devId: { sub: string } 
       } 
     }>(
@@ -97,13 +100,13 @@ export class TuyaSharingAPI {
       clientId: response.result.clientId,
       username: response.result.username,
       password: response.result.password,
-      sourceTopic: response.result.topic.ownerId.sub,
-      sinkTopic: response.result.topic.devId.sub,
+      topics: homeIds.map(id => response.result.topic.ownerId.sub.replace("{ownerId}", id))
+        .concat(deviceIds.map(id => response.result.topic.devId.sub.replace("{devId}", id) + "/sta")),
       expires: (response.t ?? 0) + (response.result.expireTime ?? 0) * 1000
     }
   }
 
-  private async queryHomes() {
+  async queryHomes() {
     const response = await this._request<[{ uid: string, id: number, ownerId: string, name: string }]>("GET", "/v1.0/m/life/users/homes");
     return response?.result || [];
   }

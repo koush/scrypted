@@ -7,23 +7,22 @@ export type MqttConfig = {
   clientId: string;
   username: string;
   password: string;
-  sourceTopic: string;
-  sinkTopic: string;
+  topics: string[];
   expires: number;
 }
 
 export class TuyaMQ {
-  static connected = "TUYA_CONNECTED";
-  static message = "TUYA_MESSAGE";
-  static error = "TUYA_ERROR";
-  static close = "TUYA_CLOSE";
+  private static connected = "TUYA_CONNECTED";
+  private static message = "TUYA_MESSAGE";
+  private static error = "TUYA_ERROR";
+  private static close = "TUYA_CLOSE";
 
   private client?: MqttClient;
   private config: MqttConfig;
   private event: Event;
 
   constructor(config: MqttConfig) {
-    this.config = config || {};
+    this.config = config;
     this.event = new Event();
   }
 
@@ -56,18 +55,16 @@ export class TuyaMQ {
     this.event.on(TuyaMQ.close, cb);
   }
 
-  public publish(message: string) {
+  public publish(topic: string, message: string) {
     const properties: IClientPublishOptions = {
       qos: 1,
       retain: false,
     };
 
-    this.client?.publish(this.config.sinkTopic, message, properties);
+    this.client?.publish(topic, message, properties);
   }
 
-  public removeMessageListener(
-    cb: (client: MqttClient, message: any) => void
-  ) {
+  public removeMessageListener(cb: (client: MqttClient, message: any) => void) {
     this.event.removeListener(TuyaMQ.message, cb);
   }
 
@@ -87,7 +84,9 @@ export class TuyaMQ {
 
   private subConnect(client: MqttClient) {
     client.on("connect", () => {
-      client.subscribe(this.config.sourceTopic);
+      for (const topic of this.config.topics) {
+        client.subscribe(topic);
+      }
       this.event.emit(TuyaMQ.connected, client);
     });
   }

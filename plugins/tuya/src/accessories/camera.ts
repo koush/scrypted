@@ -19,55 +19,65 @@ import sdk, {
   ScryptedInterface,
 } from "@scrypted/sdk";
 import { TuyaAccessory } from "./accessory";
+import { TuyaDeviceStatus } from "../tuya/const";
 
-export class TuyaCamera extends TuyaAccessory implements VideoCamera, BinarySensor, MotionSensor, OnOff {
-  private static SCHEMA_CODE = {
-    MOTION_ON: ['motion_switch', 'pir_sensitivity', 'motion_sensitivity'],
-    MOTION_DETECT: ['movement_detect_pic'],
-    // Indicates that this is possibly a doorbell
-    DOORBELL: ['doorbell_ring_exist'],
-    // Notifies when a doorbell ring occurs.
-    DOORBELL_RING: ['doorbell_pic'],
-    // Notifies when a doorbell ring or motion occurs.
-    ALARM_MESSAGE: ['alarm_message'],
-    LIGHT_ON: ['floodlight_switch'],
-    LIGHT_BRIGHT: ['floodlight_lightness'],
-    INDICATOR: ["basic_indicator"]
-  };
+// TODO: Allow setting motion info based on dp name?
+const SCHEMA_CODE = {
+  MOTION_ON: ['motion_switch', 'pir_sensitivity', 'motion_sensitivity'],
+  MOTION_DETECT: ['movement_detect_pic'],
+  // Indicates that this is possibly a doorbell
+  DOORBELL: ['doorbell_ring_exist'],
+  // Notifies when a doorbell ring occurs.
+  DOORBELL_RING: ['doorbell_pic'],
+  // Notifies when a doorbell ring or motion occurs.
+  ALARM_MESSAGE: ['alarm_message'],
+  LIGHT_ON: ['floodlight_switch'],
+  LIGHT_BRIGHT: ['floodlight_lightness'],
+  INDICATOR: ["basic_indicator"]
+};
 
-  // private lightSwitch?: TuyaCameraLight;
-  // private previousMotion?: any;
-  // private previousDoorbellRing?: any;
-  // private motionTimeout?: NodeJS.Timeout;
-  // private binaryTimeout?: NodeJS.Timeout;
+export class TuyaCamera extends TuyaAccessory implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff {
+  private lightAccessory: ScryptedDeviceBase | undefined;
 
   get deviceSpecs(): Device {
-    const indicatorSchema = this.getSchema(...TuyaCamera.SCHEMA_CODE.INDICATOR);
-    const motionSchema = this.getSchema(...TuyaCamera.SCHEMA_CODE.MOTION_ON);
+    const indicatorSchema = !!this.getSchema(...SCHEMA_CODE.INDICATOR);
+    const motionSchema = !!this.getSchema(...SCHEMA_CODE.MOTION_ON);
+    const doorbellSchema = !!this.getSchema(...SCHEMA_CODE.DOORBELL) && !!this.getSchema(...SCHEMA_CODE.ALARM_MESSAGE, ...SCHEMA_CODE.DOORBELL_RING);
 
     return {
       ...super.deviceSpecs,
-      type: ScryptedDeviceType.Camera,
+      type: doorbellSchema ? ScryptedDeviceType.Doorbell : ScryptedDeviceType.Camera,
       interfaces: [
         ...super.deviceSpecs.interfaces,
         ScryptedInterface.VideoCamera,
-        !!indicatorSchema ? ScryptedInterface.OnOff : null,
-        !!motionSchema ? ScryptedInterface.MotionSensor : null
-        // ScryptedInterface.DeviceProvider
+        ScryptedInterface.DeviceProvider,
+        indicatorSchema ? ScryptedInterface.OnOff : null,
+        motionSchema ? ScryptedInterface.MotionSensor : null,
+        doorbellSchema ? ScryptedInterface.BinarySensor : null,
       ]
       .filter((p): p is ScryptedInterface => !!p)
     }
   }
 
+  async getDevice(nativeId: ScryptedNativeId) {
+    if (nativeId === this.nativeId + "-light") {
+      return this.lightAccessory;
+    } else {
+      throw new Error("Light not found")
+    }
+  }
+
+  async releaseDevice(id: string, nativeId: ScryptedNativeId): Promise<void> { }
+
   // OnOff Status Indicator
   async turnOff(): Promise<void> {
-    const indicatorSchema = this.getSchema(...TuyaCamera.SCHEMA_CODE.INDICATOR);
+    const indicatorSchema = this.getSchema(...SCHEMA_CODE.INDICATOR);
     if (!indicatorSchema || indicatorSchema.mode == "r") return;
     await this.sendCommands({ code: indicatorSchema.code, value: false })
   }
 
   async turnOn(): Promise<void> {
-    const indicatorSchema = this.getSchema(...TuyaCamera.SCHEMA_CODE.INDICATOR);
+    const indicatorSchema = this.getSchema(...SCHEMA_CODE.INDICATOR);
     if (!indicatorSchema || indicatorSchema.mode == "r") return;
     await this.sendCommands({ code: indicatorSchema.code, value: true })
   }
@@ -116,128 +126,67 @@ export class TuyaCamera extends TuyaAccessory implements VideoCamera, BinarySens
     ];
   }
 
-  updateAllValues() {
-    super.updateAllValues();
-
-    const indicatorSchema = this.getSchema(...TuyaCamera.SCHEMA_CODE.INDICATOR);
+  async updateStatus(status: TuyaDeviceStatus[]): Promise<void> {
+    const indicatorSchema = this.getSchema(...SCHEMA_CODE.INDICATOR);
     if (indicatorSchema) this.on = !!this.getStatus(indicatorSchema?.code)?.value;
 
-    // const motionDetection = this.getSchema(...TuyaCamera.SCHEMA_CODE.MOTION_DETECT);
-    // if (motionDetection) this.motionDetected
+    const motionSchema = this.getSchema(...SCHEMA_CODE.MOTION_DETECT);
+    if (motionSchema) {
+      const motionStatus = status.find(s => s.code == motionSchema.code);
+      motionStatus && motionStatus.value.toString().length > 1 && this.debounce(
+        motionSchema,
+        10 * 1000,
+        () => this.motionDetected = true, 
+        () => this.motionDetected = false,
+      )
+    }
+
+    const doorbellNotifSchema = this.getSchema(...SCHEMA_CODE.ALARM_MESSAGE, ...SCHEMA_CODE.DOORBELL_RING);
+    if (this.getSchema(...SCHEMA_CODE.DOORBELL) && doorbellNotifSchema) {
+      const doorbellStatus = status.find(s => [...SCHEMA_CODE.ALARM_MESSAGE, ...SCHEMA_CODE.DOORBELL_RING].includes(s.code));
+      doorbellStatus && doorbellStatus.value.toString().length > 1 && this.debounce(
+        doorbellNotifSchema,
+        10 * 1000,
+        () => this.binaryState = true, 
+        () => this.binaryState = false
+      );
+    }
+
+    const lightSchema = this.getSchema(...SCHEMA_CODE.LIGHT_ON);
+    if (lightSchema) {
+      const plugin = this.plugin;
+      const deviceId = this.tuyaDevice.id;
+
+      if (!this.lightAccessory) {
+        this.lightAccessory = Object.assign(
+          new ScryptedDeviceBase(this.tuyaDevice.id + "-light"),
+          {
+            turnOff: async function () {
+              await plugin.api?.sendCommands(deviceId, [{ code: lightSchema.code, value: false }])
+            },
+            turnOn: async function () {
+              await plugin.api?.sendCommands(deviceId, [{ code: lightSchema.code, value: true }])
+            },
+          } satisfies OnOff & Online
+        );
+
+        await sdk.deviceManager.onDeviceDiscovered(
+          {
+            providerNativeId: this.tuyaDevice.id,
+            name: this.tuyaDevice.name + " Light",
+            nativeId: this.lightAccessory.nativeId,
+            info: this.deviceSpecs.info,
+            type: ScryptedDeviceType.Light,
+            interfaces: [
+              ScryptedInterface.OnOff,
+              ScryptedInterface.Online
+            ]
+          }
+        )
+      }
+
+      const lightStatus = status.find(s => s.code === lightSchema.code);
+      lightStatus && (this.lightAccessory.on = !!lightStatus.value)
+    }
   }
-
-  /// Motion
-
-  // most cameras have have motion and doorbell press events, but dont notify when the event ends.
-  // so set a timeout ourselves to reset the state.
-  // triggerBinaryState() {
-  //   clearTimeout(this.binaryTimeout);
-  //   this.binaryState = true;
-  //   this.binaryTimeout = setTimeout(() => {
-  //     this.binaryState = false;
-  //   }, 10 * 1000);
-  // }
-
-  // This will trigger a motion detected alert if it has no timeout. If there is a timeout, then
-  // it will restart the timeout in order to turn off motion detected
-  // triggerMotion() {
-  //   const timeoutCallback = () => {
-  //     this.motionDetected = false;
-  //     this.motionTimeout = undefined;
-  //   };
-  //   if (!this.motionTimeout) {
-  //     this.motionTimeout = setTimeout(timeoutCallback, 10 * 1000);
-  //     this.motionDetected = true;
-  //   } else {
-  //     // Cancel the timeout and start again.
-  //     clearTimeout(this.motionTimeout);
-  //     this.motionTimeout = setTimeout(timeoutCallback, 10 * 1000);
-  //   }
-  // }
-
-  // updateState(device: TuyaDeviceConfig) {
-    // camera = camera || this.findCamera();
-
-    // if (!camera) {
-      // return;
-    // }
-
-    // this.online = camera.online;
-
-    // if (TuyaDevice.hasStatusIndicator(camera)) {
-    //   this.on = TuyaDevice.getStatusIndicator(camera)?.value;
-    // }
-
-    // if (TuyaDevice.hasMotionDetection(camera)) {
-    //   const motionDetectedStatus = TuyaDevice.getMotionDetectionStatus(camera);
-    //   if (motionDetectedStatus) {
-    //     if (!this.previousMotion) {
-    //       this.previousMotion = motionDetectedStatus.value;
-    //     } else if (this.previousMotion !== motionDetectedStatus.value) {
-    //       this.previousMotion = motionDetectedStatus.value;
-    //       this.triggerMotion();
-    //     }
-    //   }
-    // }
-
-    // if (TuyaDevice.isDoorbell(camera)) {
-    //   const doorbellRingStatus = TuyaDevice.getDoorbellRing(camera);
-    //   if (doorbellRingStatus) {
-    //     if (!this.previousDoorbellRing) {
-    //       this.previousDoorbellRing = doorbellRingStatus.value;
-    //     } else if (this.previousDoorbellRing !== doorbellRingStatus.value) {
-    //       this.previousDoorbellRing = doorbellRingStatus.value;
-    //       this.triggerBinaryState();
-    //     }
-    //   }
-    // }
-
-    // // By the time this is called, scrypted would have already reported the device
-    // // Only set light switch on cameras that have a light switch.
-
-    // if (TuyaDevice.hasLightSwitch(camera)) {
-    //   // this.getDevice(this.nativeLightSwitchId)?.updateState(camera);
-    // }
-  // }
-
-  // private get nativeLightSwitchId(): string {
-  //   return `${this.nativeId}-light`;
-  // }
 }
-
-// class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online {
-//   private camera: TuyaCamera;
-
-//   constructor(nativeId: string, camera: TuyaCamera) {
-//     super(nativeId);
-//     this.camera = camera;
-//   }
-
-//   async turnOff(): Promise<void> {
-//     await this.setLightSwitch(false);
-//   }
-
-//   async turnOn(): Promise<void> {
-//     await this.setLightSwitch(true);
-//   }
-
-//   private async setLightSwitch(on: boolean) {
-//     // const lightSwitchStatus = TuyaDevice.getLightSwitchStatus(camera);
-
-//     // if (camera.online && lightSwitchStatus) {
-//     //   await this.camera.controller.api.updateDevice(camera, [
-//     //     {
-//     //       code: lightSwitchStatus.code,
-//     //       value: on,
-//     //     },
-//     //   ]);
-//     // }
-//   }
-
-//   // updateState(device?: TuyaDeviceConfig) {
-//     // if (!device) return;
-
-//     // this.on = TuyaDevice.getLightSwitchStatus(camera)?.value;
-//     // this.online = device.online;
-//   // }
-// }
