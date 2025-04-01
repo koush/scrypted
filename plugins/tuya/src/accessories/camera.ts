@@ -128,7 +128,7 @@ export class TuyaCamera extends TuyaAccessory implements DeviceProvider, VideoCa
 
   async updateStatus(status: TuyaDeviceStatus[]): Promise<void> {
     const indicatorSchema = this.getSchema(...SCHEMA_CODE.INDICATOR);
-    if (indicatorSchema) this.on = !!this.getStatus(indicatorSchema?.code)?.value;
+    if (indicatorSchema) this.on = this.getStatus(indicatorSchema.code)?.value == true;
 
     const motionSchema = this.getSchema(...SCHEMA_CODE.MOTION_DETECT);
     if (motionSchema) {
