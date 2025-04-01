@@ -717,4 +717,53 @@ export class ReolinkCameraClient {
             this.console.error('error during call to setPirState', JSON.stringify(body), error);
         }
     }
+
+    // Could not find any way to check NVR connected cams, it would return the hub connectivity
+    async getLocalLink() {
+        const url = new URL(`http://${this.host}/api.cgi`);
+
+        const body = [
+            {
+                cmd: 'GetLocalLink',
+                action: 0,
+                param: {}
+            },
+            {
+                cmd: 'GetWifiSignal',
+                action: 0,
+                param: { channel: this.channelId }
+            },
+        ];
+
+        const response = await this.requestWithLogin({
+            url,
+            method: 'POST',
+            responseType: 'json',
+        }, this.createReadable(body));
+
+        const error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to getLocalLink', JSON.stringify(body), error);
+        }
+
+        const activeLink = response.body?.find(entry => entry.cmd === 'GetLocalLink')
+            ?.value?.LocalLink?.activeLink;
+        const wifiSignal = response.body?.find(entry => entry.cmd === 'GetWifiSignal')
+            ?.value?.wifiSignal ?? undefined
+
+        let isWifi = false;
+        if (wifiSignal !== undefined) {
+            isWifi = wifiSignal >= 0 && wifiSignal <= 4;
+        }
+
+        if (!isWifi && activeLink) {
+            isWifi = activeLink !== 'LAN';
+        }
+
+        return {
+            activeLink,
+            wifiSignal,
+            isWifi
+        };
+    }
 }
