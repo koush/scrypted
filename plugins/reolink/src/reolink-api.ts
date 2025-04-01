@@ -718,7 +718,6 @@ export class ReolinkCameraClient {
         }
     }
 
-    // Could not find any way to check NVR connected cams, it would return the hub connectivity
     async getLocalLink() {
         const url = new URL(`http://${this.host}/api.cgi`);
 
