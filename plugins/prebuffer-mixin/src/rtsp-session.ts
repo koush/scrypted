@@ -5,7 +5,7 @@ import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
 import dgram from 'dgram';
 import { EventEmitter } from "stream";
-import { ParserSession, setupActivityTimer } from "./ffmpeg-rebroadcast";
+import { ParserSession, setupActivityTimer } from "./ffmpeg-session";
 import { negotiateMediaStream } from "./rfc4571";
 
 export type RtspChannelCodecMapping = { [key: number]: string };

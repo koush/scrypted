@@ -7,7 +7,7 @@ import { MediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import { parse as spsParse } from "h264-sps-parser";
 import net from 'net';
 import { EventEmitter, Readable } from "stream";
-import { ParserSession, setupActivityTimer } from "./ffmpeg-rebroadcast";
+import { ParserSession, setupActivityTimer } from "./ffmpeg-session";
 import { getSpsResolution } from "./sps-resolution";
 
 export function negotiateMediaStream(sdp: string, mediaStreamOptions: MediaStreamOptions, inputVideoCodec: string, inputAudioCodec: string, requestMediaStream: MediaStreamOptions) {

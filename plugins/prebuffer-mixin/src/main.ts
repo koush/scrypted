@@ -14,7 +14,7 @@ import { parse as h264SpsParse } from "h264-sps-parser";
 import net, { AddressInfo } from 'net';
 import path from 'path';
 import { Duplex } from 'stream';
-import { ParserOptions, ParserSession, startParserSession } from './ffmpeg-rebroadcast';
+import { ParserOptions, ParserSession, startParserSession } from './ffmpeg-session';
 import { FileRtspServer } from './file-rtsp-server';
 import { getUrlLocalAdresses } from './local-addresses';
 import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
@@ -22,6 +22,7 @@ import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { getSpsResolution } from './sps-resolution';
 import { createStreamSettings } from './stream-settings';
+import { startLibavSession } from './libav-parser';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -32,6 +33,8 @@ const SCRYPTED_PARSER_TCP = 'Scrypted (TCP)';
 const SCRYPTED_PARSER_UDP = 'Scrypted (UDP)';
 const FFMPEG_PARSER_TCP = 'FFmpeg (TCP)';
 const FFMPEG_PARSER_UDP = 'FFmpeg (UDP)';
+const LIBAV_PARSER_TCP = 'Scrypted libav (TCP)';
+const LIBAV_PARSER_UDP = 'Scrypted libav (UDP)';
 const STRING_DEFAULT = 'Default';
 
 interface PrebufferStreamChunk extends StreamChunk {
@@ -59,7 +62,6 @@ class PrebufferSession {
   rtspPrebuffer: PrebufferStreamChunk[] = []
   parsers: { [container: string]: StreamParser };
   sdp: Promise<string>;
-  usingScryptedParser = false;
   usingScryptedUdpParser = false;
 
   mixinDevice: VideoCamera;
@@ -236,6 +238,8 @@ class PrebufferSession {
         rtspParser = localStorage.getItem('defaultRtspParser');
       }
       switch (rtspParser) {
+        case LIBAV_PARSER_TCP:
+        case LIBAV_PARSER_UDP:
         case FFMPEG_PARSER_TCP:
         case FFMPEG_PARSER_UDP:
         case SCRYPTED_PARSER_TCP:
@@ -392,6 +396,8 @@ class PrebufferSession {
             SCRYPTED_PARSER_UDP,
             FFMPEG_PARSER_TCP,
             FFMPEG_PARSER_UDP,
+            LIBAV_PARSER_TCP,
+            LIBAV_PARSER_UDP,
           ],
         }
       );
@@ -542,12 +548,11 @@ class PrebufferSession {
     // before launching the parser session, clear out the last detected codec.
     // an erroneous cached codec could cause ffmpeg to fail to start.
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
-    this.usingScryptedParser = false;
-
+    let usingScryptedParser = false;
     const h264Oddities = this.getLastH264Oddities();
 
     if (isRfc4571) {
-      this.usingScryptedParser = true;
+      usingScryptedParser = true;
       this.console.log('bypassing ffmpeg: using scrypted rfc4571 parser')
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       let { url, sdp, mediaStreamOptions } = json;
@@ -566,21 +571,22 @@ class PrebufferSession {
       sessionMso = ffmpegInput.mediaStreamOptions || this.advertisedMediaStreamOptions;
 
       let { parser, isDefault } = this.getParser(sessionMso);
-      this.usingScryptedParser = parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP;
+      usingScryptedParser = parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP;
+      const usingLibavParser = parser === LIBAV_PARSER_TCP || parser === LIBAV_PARSER_UDP;
       this.usingScryptedUdpParser = parser === SCRYPTED_PARSER_UDP;
 
       // prefer ffmpeg if this is a prebuffered stream.
       if (isDefault
-        && this.usingScryptedParser
+        && usingScryptedParser
         && h264Oddities
         && !this.stopInactive
         && sessionMso.tool !== 'scrypted') {
         this.console.warn('H264 oddities were detected in prebuffered video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
-        this.usingScryptedParser = false;
+        usingScryptedParser = false;
         parser = FFMPEG_PARSER_TCP;
       }
 
-      if (this.usingScryptedParser) {
+      if (usingScryptedParser) {
         const rtspParser = createRtspParser();
         rbo.parsers.rtsp = rtspParser;
 
@@ -588,6 +594,16 @@ class PrebufferSession {
           useUdp: parser === SCRYPTED_PARSER_UDP,
           audioSoftMuted,
           rtspRequestTimeout: 10000,
+        });
+      }
+      else if (usingLibavParser) {
+        const rtspParser = createRtspParser();
+        rbo.parsers.rtsp = rtspParser;
+
+        session = await startLibavSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
+          useUdp: parser === LIBAV_PARSER_UDP,
+          audioSoftMuted,
+          activityTimeout: 10000,
         });
       }
       else {
@@ -645,7 +661,7 @@ class PrebufferSession {
         console.error('rebroadcast error', e)
     });
 
-    if (this.usingScryptedParser && !isRfc4571) {
+    if (usingScryptedParser && !isRfc4571) {
       // watch the stream for 10 seconds to see if an weird nalu is encountered.
       // if one is found and using scrypted parser as default, will need to restart rebroadcast to prevent
       // downstream issues.
@@ -1005,10 +1021,6 @@ class PrebufferSession {
     const codecInfo = await this.parseCodecs(true);
     const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options, codecInfo.inputVideoCodec, codecInfo.inputAudioCodec);
     let sdp = await this.sdp;
-    if (!mediaStreamOptions.video?.h264Info && this.usingScryptedParser) {
-      mediaStreamOptions.video ||= {};
-      mediaStreamOptions.video.h264Info = this.getLastH264Probe();
-    }
 
     if (this.mixin.streamSettings.storageSettings.values.noAudio)
       mediaStreamOptions.audio = null;
@@ -1621,6 +1633,8 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
         SCRYPTED_PARSER_UDP,
         FFMPEG_PARSER_TCP,
         FFMPEG_PARSER_UDP,
+        LIBAV_PARSER_TCP,
+        LIBAV_PARSER_UDP,
       ],
       onPut: () => {
         this.log.a('Rebroadcast Plugin will restart momentarily.');
@@ -1753,7 +1767,9 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     this.setHasEnabledMixin(mixinDeviceState.id);
 
     const { id } = mixinDeviceState;
-    const forked = sdk.fork<RebroadcastPluginFork>();
+    const forked = sdk.fork<RebroadcastPluginFork>({
+      runtime: 'node',
+    });
     const { worker } = forked;
     const result = await forked.result;
     const mixin = await result.newPrebufferMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState);

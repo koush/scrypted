@@ -38,12 +38,14 @@
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
+      "@scrypted/libav": "^1.0.193",
       "@scrypted/sdk": "file:../../sdk",
       "h264-sps-parser": "^0.2.1",
       "semver": "^7.3.7"
    },
    "devDependencies": {
       "@types/node": "^22.13.14",
-      "@types/semver": "^7.3.12"
+      "@types/semver": "^7.3.12",
+      "prebuild-install": "npm:@scrypted/prebuild-install@^7.1.9"
    }
 }
