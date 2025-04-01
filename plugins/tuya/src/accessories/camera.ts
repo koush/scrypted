@@ -131,7 +131,7 @@ export class TuyaCamera extends TuyaAccessory implements DeviceProvider, VideoCa
     if (indicatorSchema) this.on = this.getStatus(indicatorSchema.code)?.value == true;
 
     const motionSchema = this.getSchema(...SCHEMA_CODE.MOTION_DETECT);
-    if (motionSchema) {
+    if (this.getSchema(...SCHEMA_CODE.MOTION_ON) && motionSchema) {
       const motionStatus = status.find(s => s.code == motionSchema.code);
       motionStatus && motionStatus.value.toString().length > 1 && this.debounce(
         motionSchema,
