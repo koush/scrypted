@@ -14,14 +14,17 @@ import QRCode from "qrcode-svg";
 
 import { TuyaLoginMethod, TuyaTokenInfo } from "./tuya/const";
 import { TuyaLoginQRCode, TuyaSharingAPI } from "./tuya/sharing";
-import { TuyaCamera } from "./camera";
+import { TuyaAccessory } from "./accessories/accessory";
 import { TuyaCloudAPI } from "./tuya/cloud";
 import { TUYA_COUNTRIES } from "./tuya/deprecated";
 import { TuyaPulsarMessage } from "./tuya/pulsar";
+import { createTuyaDevice } from "./accessories/factory";
+import { TuyaMQ } from "./tuya/mq";
 
 export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings {
   api: TuyaSharingAPI | TuyaCloudAPI | undefined;
-  devices = new Map<string, TuyaCamera>();
+  mq: TuyaMQ | undefined;
+  devices = new Map<string, TuyaAccessory>();
 
   settingsStorage = new StorageSettings(this, {
     loginMethod: {
@@ -88,10 +91,19 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
       onPut: () => this.tryLogin()
     },
 
-    // Token
+    // Token Storage
     tokenInfo: {
       hide: true,
       json: true
+    },
+
+    // TODO: Show who is logged in.
+    loggedIn: {
+      title: "Logged in as: ",
+      hide: true,
+      noStore: true,
+      type: "string",
+      readonly: true
     }
   });
 
@@ -141,6 +153,7 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
 
   private async tryLogin(state: { useTokenFromStorage?: boolean, loggedInClicked?: boolean } = {}) {
     this.api = undefined;
+    this.mq = undefined;
     this.log.clearAlerts();
 
     const { useTokenFromStorage, loggedInClicked } = state;
@@ -168,7 +181,7 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
               const qrCode = await TuyaSharingAPI.generateQRCode(userCode);
               this.settingsStorage.settings.qrCode.defaultValue = qrCode;
             } catch (e) {
-              this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Failed to fetch qr code auth.`, e);
+              this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Failed to fetch new QR Code.`, e);
             }
             this.onDeviceEvent(ScryptedInterface.Settings, undefined);
           } else if (loggedInClicked) {
@@ -177,8 +190,8 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
               storeToken = { type: TuyaLoginMethod.App, ...token };
               this.settingsStorage.settings.qrCode.defaultValue = undefined;
             } catch (e) {
-              // If failed to get token, recreate qrcode
-              this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Failed to authenticate. Please recheck and verify credentials.`, e);
+              this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Failed to authenticate with QR Code.`, e);
+              this.log.a("Failed to authenticate with credentials. Ensure you scanned the QR Code with Tuya (Smart Life) App and try again.");
             }
             this.onDeviceEvent(ScryptedInterface.Settings, undefined);
           }
@@ -193,7 +206,8 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
             )
             storeToken = { type: TuyaLoginMethod.Account, ...token };
           } catch (e) {
-            this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Failed to authenticate. Please recheck and verify credentials.`, e);
+            this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Failed to authenticate.`, e);
+            this.log.a("Failed to authenticate with credentials.");
           }
           break;
       }
@@ -205,6 +219,64 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
 
     if (!storeToken) return;
     await this.initializeDevices(storeToken);
+  }
+
+  private async initializeDevices(token: TuyaTokenInfo) {
+    switch (token.type) {
+      case TuyaLoginMethod.App:
+        this.api = new TuyaSharingAPI(
+          token,
+          (updatedToken) => {
+            this.settingsStorage.putSetting("tokenInfo", JSON.stringify({ ...updatedToken, type: TuyaLoginMethod.App }))
+          },
+          () => {
+            this.settingsStorage.putSetting("tokenInfo", undefined);
+            this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Request reauthentication.`);
+            this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+            this.log.a(`Reauthentication to Tuya required. Refresh plugin to retrieve new QR Code.`)
+          }
+        );
+        break;
+      case TuyaLoginMethod.Account:
+        this.api = new TuyaCloudAPI(
+          token,
+          (updatedToken) => {
+            this.settingsStorage.putSetting("tokenInfo", JSON.stringify({ ...updatedToken, type: TuyaLoginMethod.Account }))
+          },
+          () => {
+            this.settingsStorage.putSetting("tokenInfo", undefined);
+            this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Request reauthentication.`);
+            this.log.a(`Reauthentication to Tuya required. Refresh plugin to log in again.`)
+          }
+        );
+    }
+
+    // if (this.api instanceof TuyaSharingAPI) {
+    //   const mqConfig = await this.api.fetchMqttConfig();
+    //   this.mq = new TuyaMQ(mqConfig);
+    // }
+
+    // this.mq?.message((mq, msg) => {
+    //   this.console.log("New message", msg);
+    // });
+
+    // await this.mq?.connect();
+
+    // this.mq = new TuyaMQ();
+
+    const devices = await this.api.fetchDevices();
+
+    this.devices = new Map(
+      devices.map(d => {
+        const device = createTuyaDevice(d, this);
+        return !!device ? [d.id, device] : undefined
+      })
+      .filter((p): p is [string, TuyaAccessory] => !!p)
+    );
+
+    sdk.deviceManager.onDevicesChanged({
+      devices: Array.from(this.devices.values()).map(d => ({ ...d.deviceSpecs, providerNativeId: this.nativeId }))
+    });
   }
 
   private onMessage(message: TuyaPulsarMessage) {
@@ -274,67 +346,5 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
     // if (refreshDevice) {
     //   return this.devices.get(devId);
     // }
-  }
-
-  private async initializeDevices(token: TuyaTokenInfo) {
-    switch (token.type) {
-      case TuyaLoginMethod.App:
-        this.api = new TuyaSharingAPI(
-          token,
-          (updatedToken) => {
-            this.settingsStorage.putSetting("tokenInfo", JSON.stringify({...updatedToken, type: TuyaLoginMethod.App}))
-          },
-          () => {
-            this.settingsStorage.putSetting("tokenInfo", undefined);
-            this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Request new authentication.`);
-            this.onDeviceEvent(ScryptedInterface.Settings, undefined);
-          }
-        );
-        break;
-      case TuyaLoginMethod.Account:
-        this.api = new TuyaCloudAPI(
-          token,
-          (updatedToken) => {
-            this.settingsStorage.putSetting("tokenInfo", JSON.stringify({...updatedToken, type: TuyaLoginMethod.Account}))
-          },
-          () => {
-            // TODO: Reauthenticate
-            this.settingsStorage.putSetting("tokenInfo", undefined);
-            this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Request new authentication.`);
-          }
-        );
-    }
-
-    const devices = await this.api.fetchDevices();
-
-    // Only accept camera types
-    this.devices = new Map(
-      devices.filter(d => d.category === "sp" || d.category === "dghsxj")
-        .map(d => [d.id, new TuyaCamera(d, this)])
-    );
-
-    sdk.deviceManager.onDevicesChanged({
-      devices: devices.map(d => ({
-        providerNativeId: this.nativeId,
-        name: d.name,
-        nativeId: d.id,
-        info: {
-          manufacturer: "Tuya Inc.",
-          model: d.product_id,
-          serialNumber: d.uuid
-        },
-        type: ScryptedDeviceType.Camera,
-        interfaces: [
-          ScryptedInterface.VideoCamera,
-          ScryptedInterface.Online,
-          !!d.status["motion_sensitivity"] || !!d.status["pir_sensitivity"] ? ScryptedInterface.MotionSensor : null,
-          !!d.status["basic_indicator"] ? ScryptedInterface.OnOff : null
-          // ,
-          // ScryptedInterface.MotionSensor,
-          // ScryptedInterface.DeviceProvider
-        ]
-        .filter(i => !!i)
-      }))
-    });
   }
 }

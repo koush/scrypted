@@ -3,7 +3,7 @@ import { getEndPointWithCountryName } from "./deprecated";
 import {
   TuyaDeviceStatus,
   RTSPToken,
-  TuyaDeviceConfig,
+  TuyaDevice,
   TuyaResponse
 } from "./const";
 import { randomBytes, createHmac, hash } from "node:crypto";
@@ -53,7 +53,7 @@ export class TuyaCloudAPI {
 
   // Set Device Status
 
-  public async updateDevice(
+  public async sendCommands(
     deviceId: string,
     commands: TuyaDeviceStatus[]
   ): Promise<boolean> {
@@ -69,8 +69,8 @@ export class TuyaCloudAPI {
 
   // Get Devices
 
-  public async fetchDevices(): Promise<TuyaDeviceConfig[]> {
-    let response = await this._request<TuyaDeviceConfig[]>("get", `/v1.0/users/${this.tokenInfo.uid}/devices`);
+  public async fetchDevices(): Promise<TuyaDevice[]> {
+    let response = await this._request<TuyaDevice[]>("get", `/v1.0/users/${this.tokenInfo.uid}/devices`);
 
     if (!response.success) {
       throw Error(`Failed to fetch Device configurations.`);
@@ -82,7 +82,8 @@ export class TuyaCloudAPI {
       var device = devices[i];
       const response = await this._request("get", `/v1.0/devices/${device.id}/functions`);
       if (!response.success) continue;
-      device.functions = response.result.function;
+      // TODO: Add schema
+      // device.schema = response.result.function;
       devices[i] = device;
     }
     return devices;
@@ -91,11 +92,7 @@ export class TuyaCloudAPI {
   // Camera Functions
 
   public async getRTSP(cameraId: string): Promise<RTSPToken> {
-    interface RTSPResponse {
-      url: string;
-    }
-
-    const response = await this._request<RTSPResponse>(
+    const response = await this._request<{ url: string }>(
       "POST",
       `/v1.0/devices/${cameraId}/stream/actions/allocate`,
       { type: "rtsp" }

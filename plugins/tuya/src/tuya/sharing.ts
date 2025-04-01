@@ -1,6 +1,7 @@
 import { Axios, Method } from "axios";
-import { RTSPToken, TuyaDeviceConfig, TuyaDeviceFunction, TuyaDeviceStatus, TuyaDeviceStatusRange, TuyaResponse } from "./const";
+import { RTSPToken, TuyaDevice, TuyaDeviceFunction, TuyaDeviceSchema, TuyaDeviceStatus, TuyaResponse } from "./const";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomInt, randomUUID } from "node:crypto";
+import { MqttConfig } from "./mq";
 
 export type TuyaSharingTokenInfo = {
   userCode: string;
@@ -18,37 +19,38 @@ export type TuyaLoginQRCode = { userCode: string } & TuyaResponse<{ qrcode: stri
 export class TuyaSharingAPI {
   private static clientId = "HA_3y9q4ak7g4ephrvke";
 
-  private client: Axios;
+  private session: Axios;
   private tokenInfo: TuyaSharingTokenInfo;
   private updateToken: (token: TuyaSharingTokenInfo) => void;
   private requiresReauthentication: () => void;
+  private updatingTokenPromise: Promise<void> | null = null;
 
   constructor(
-    initialTokenInfo: TuyaSharingTokenInfo, 
-    updateToken: (token: TuyaSharingTokenInfo) => void, 
+    initialTokenInfo: TuyaSharingTokenInfo,
+    updateToken: (token: TuyaSharingTokenInfo) => void,
     requiresReauth: () => void
   ) {
     this.tokenInfo = initialTokenInfo;
     this.updateToken = updateToken;
     this.requiresReauthentication = requiresReauth;
-    this.client = new Axios({
+    this.session = new Axios({
       baseURL: this.tokenInfo.endpoint
     });
   }
 
-  public async fetchDevices(): Promise<TuyaDeviceConfig[]> {
+  public async fetchDevices(): Promise<TuyaDevice[]> {
     const homes = await this.queryHomes();
     const firstHomeId = homes.at(0)?.ownerId;
     if (!firstHomeId) return [];
-    const devicesResponse = await this._request<TuyaDeviceConfig[]>("GET", "/v1.0/m/life/ha/home/devices", { homeId: firstHomeId });
+    const devicesResponse = await this._request<TuyaDevice[]>("GET", "/v1.0/m/life/ha/home/devices", { homeId: firstHomeId });
     return Promise.all((devicesResponse.result || [])
       .map(p => this.updateDeviceSpecs(p).catch(() => p)));
   }
 
-  public async updateDevice(deviceId: string, commands: TuyaDeviceStatus[]): Promise<boolean> {
+  public async sendCommands(deviceId: string, commands: TuyaDeviceStatus[]): Promise<boolean> {
     return this._request<boolean>("post", `/v1.1/m/thing/${deviceId}/commands`, undefined, { commands })
-    .then(r => !!r.success && !!r.result)
-    .catch(() => false)
+      .then(r => !!r.success && !!r.result)
+      .catch(() => false)
   }
 
   public async getRTSP(deviceId: string): Promise<RTSPToken> {
@@ -69,30 +71,67 @@ export class TuyaSharingAPI {
     }
   }
 
+  public async fetchMqttConfig(): Promise<MqttConfig> {
+    const linkId = "@scrypted/tuya." + randomUUID();
+    const response = await this._request<{
+      url: string,
+      clientId: string, 
+      username: string, 
+      password: string, 
+      expireTime: number, 
+      topic: { 
+        ownerId: { sub: string }, 
+        devId: { sub: string } 
+      } 
+    }>(
+      "post",
+      "/v1.0/m/life/ha/access/config",
+      undefined,
+      { linkId }
+    );
+
+    if (!response.success) throw new Error("Failed to fetch MQTT Config");
+
+    return {
+      url: response.result.url,
+      clientId: response.result.clientId,
+      username: response.result.username,
+      password: response.result.password,
+      sourceTopic: response.result.topic.ownerId.sub,
+      sinkTopic: response.result.topic.devId.sub,
+      expires: (response.t ?? 0) + (response.result.expireTime ?? 0) * 1000
+    }
+  }
+
   private async queryHomes() {
     const response = await this._request<[{ uid: string, id: number, ownerId: string, name: string }]>("GET", "/v1.0/m/life/users/homes");
     return response?.result || [];
   }
 
-  private async updateDeviceSpecs(device: TuyaDeviceConfig): Promise<TuyaDeviceConfig> {
-    device.functions = {}
-    device.status_range = {};
-    try {
-      const response = await this._request<{ category: string, functions?: TuyaDeviceFunction[], status?: TuyaDeviceStatusRange[] } | undefined>("get", `/v1.1/m/life/${device.id}/specifications`);
-      if (!!response.result?.functions) {
-        for (const func of response.result.functions) {
-          device.functions[func.code] = func;
-        }
-      }
+  private async updateDeviceSpecs(device: TuyaDevice): Promise<TuyaDevice> {
+    const schemas = new Map<string, TuyaDeviceSchema>();
 
-      if (!!response.result?.status) {
-        for (const status of response.result.status) {
-          device.status_range[status.code] = status;
+    try {
+      const response = await this._request<{ status: TuyaDeviceFunction[], functions: TuyaDeviceFunction[] }>("get", `/v1.1/m/life/${device.id}/specifications`);
+
+      for (const { code, type, values } of [...response.result.status, ...response.result.functions]) {
+        const read = response.result.status.find(r => r.code == code);
+        const write = response.result.functions.find(f => f.code == code);
+        try {
+          schemas.set(code, {
+            code,
+            mode: !!read && !!write ? "rw" : !!write ? "w" : "r",
+            type: type as any,
+            specs: JSON.parse(values)
+          });
+        } catch {
+          continue;
         }
       }
     } catch {
       console.log(`[TuyaSharing] Could not fetch specifications for device: ${device.name} [${device.id}]`)
     }
+    device.schema = Array.from(schemas.values());
     return device;
   }
 
@@ -135,7 +174,7 @@ export class TuyaSharingAPI {
     headers.set("X-token", this.tokenInfo.accessToken)
     headers.set("X-sign", _restfulSign(hashKey, queryEncData, bodyEncData, headers));
 
-    const response = await this.client.request({
+    const response = await this.session.request({
       method,
       url: path,
       params: !params || !Object.keys(params).length ? undefined : params,
@@ -153,18 +192,23 @@ export class TuyaSharingAPI {
   }
 
   private async refreshTokenIfNeeded() {
-    const tokenInfo = this.tokenInfo;
-    if (tokenInfo.expires > Date.now()) return;
+    if (this.updatingTokenPromise) {
+      await this.updatingTokenPromise;
+    } else {
+      this.updatingTokenPromise = this._internalRefreshTokenIfNeeded().finally(() => this.updatingTokenPromise = null);
+      await this.updatingTokenPromise;
+    }
+  }
+
+  private async _internalRefreshTokenIfNeeded() {
+    if (this.tokenInfo.expires > Date.now()) return;
 
     const response = await this._request<{
-      access_token: string;
-      refresh_token: string;
+      accessToken: string;
+      refreshToken: string;
       uid: string;
-      expire_time?: number;
-      terminal_id: string;
-      endpoint: string;
-      username: string;
-    }>("GET", `/v1.0/m/token/${tokenInfo.refreshToken}`, undefined, undefined, true);
+      expireTime?: number;
+    }>("GET", `/v1.0/m/token/${this.tokenInfo.refreshToken}`, undefined, undefined, true);
 
     if (!response.success) {
       this.requiresReauthentication();
@@ -172,11 +216,10 @@ export class TuyaSharingAPI {
     }
 
     this.tokenInfo = {
-      ...tokenInfo,
-      expires: (response.t ?? 0) + (response.result.expire_time ?? 0) * 1000,
-      accessToken: response.result.access_token,
-      refreshToken: response.result.refresh_token,
-      terminalId: response.result.terminal_id ?? tokenInfo.terminalId
+      ...this.tokenInfo,
+      expires: (response.t ?? 0) + (response.result.expireTime ?? 0) * 1000,
+      accessToken: response.result.accessToken,
+      refreshToken: response.result.refreshToken
     };
     this.updateToken(this.tokenInfo);
   }

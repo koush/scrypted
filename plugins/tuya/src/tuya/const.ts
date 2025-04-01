@@ -15,7 +15,7 @@ export type TuyaResponse<T> = {
   tid?: string;
 }
 
-export type TuyaDeviceConfig = {
+export type TuyaDevice = {
   id: string;
   name: string;
   local_key: string;
@@ -31,48 +31,66 @@ export type TuyaDeviceConfig = {
   active_time: number;
   create_time: number;
   update_time: number;
-  status: { [key: string]: TuyaDeviceStatus };
-  functions: { [key: string]: TuyaDeviceFunction };
-  status_range: { [key: string]: TuyaDeviceStatusRange }
+  status: TuyaDeviceStatus[];
+  schema: TuyaDeviceSchema[];
 
   // Not necessary?
 
   uid: string;
   biz_type: number;
-  model: string;
+  model?: string;
   owner_id: string;
 }
 
+export type TuyaDeviceSchema = {
+  code: string;
+  mode: "rw" | "r" | "w";
+} & (
+    {
+      type: "Boolean";
+      specs: never;
+    } | {
+      type: "Integer";
+      specs: {
+        unit?: string;
+        min: number;
+        max: number;
+        scale: number;
+        step: number;
+      }
+    } | {
+      type: "Enum";
+      specs: {
+        range: string[]
+      }
+    } | {
+      type: "String";
+      specs: {
+        maxlen: number
+      };
+    } | {
+      type: "Json";
+      specs: object;
+    } | {
+      type: "Raw";
+      specs: any;
+    }
+  )
+
 export type TuyaDeviceStatus = {
   code: string;
-  value: any;
-}
-
-export type TuyaDeviceStatusRange = {
-  code: string;
-  type: string;
-  values: string;
+  value: string | number | boolean;
 }
 
 export type TuyaDeviceFunction = {
   code: string;
   type: string;
-  name: string;
-  desc: string;
-  values: { [key: string]: any };
+  name?: string;
+  desc?: string;
+  values: string;
 }
 
 export type RTSPToken = {
   url: string;
   expires: number;
-}
-
-export type MQTTConfig = {
-  url: string;
-  username: string;
-  password: string;
-  client_id: string;
-  source_topic: string;
-  sink_topic: string;
-  expire_time: number;
 }
