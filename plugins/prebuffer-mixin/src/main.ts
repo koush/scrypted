@@ -626,6 +626,7 @@ class PrebufferSession {
         // extraOutputArguments must contain full codec information
         if (extraOutputArguments) {
           vcodec = [...extraOutputArguments.split(' ').filter(d => !!d)];
+          acodec = [];
         }
 
         const rtspParser = createRtspParser({
