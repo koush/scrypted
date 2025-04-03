@@ -1740,9 +1740,7 @@ export interface Image {
 export interface VideoFrame {
   __json_copy_serialize_children: true;
   timestamp: number;
-  queued: number;
   image: Image & MediaObject;
-  flush(count?: number): Promise<void>;
 }
 export interface VideoFrameGeneratorOptions extends ImageOptions {
   queue?: number;

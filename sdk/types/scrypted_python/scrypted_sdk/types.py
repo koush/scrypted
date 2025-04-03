@@ -961,6 +961,12 @@ class VideoClipThumbnailOptions(TypedDict):
 
     aspectRatio: float
 
+class VideoFrame(TypedDict):
+
+    __json_copy_serialize_children: Any
+    image: Union[Image, MediaObject]
+    timestamp: float
+
 class VideoFrameGeneratorOptions(TypedDict):
 
     clusterWorkerId: str
@@ -3417,16 +3423,6 @@ class HttpResponse:
         pass
 
     def sendStream(self, stream: AsyncGenerator[bytearray, None], options: HttpResponseOptions = None) -> None:
-        pass
-
-
-class VideoFrame:
-
-    __json_copy_serialize_children: Any
-    image: Union[Image, MediaObject]
-    queued: float
-    timestamp: float
-    async def flush(self, count: float = None) -> None:
         pass
 
 
