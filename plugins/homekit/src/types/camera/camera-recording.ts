@@ -141,10 +141,6 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         container: 'mp4',
     });
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFmpegInput;
-    if (!ffmpegInput.mediaStreamOptions?.prebuffer) {
-        log.a(`${device.name} is not prebuffered. Please install and enable the Rebroadcast plugin.`);
-    }
-
     const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
     const audioCodec = ffmpegInput.mediaStreamOptions?.audio?.codec;
     const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;

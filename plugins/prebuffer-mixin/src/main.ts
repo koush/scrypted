@@ -1124,8 +1124,7 @@ class PrebufferSession {
       session,
       filter,
     });
-
-    mediaStreamOptions.prebuffer = requestedPrebuffer;
+    mediaStreamOptions.prebuffer = 0;
 
     if (audioSection) {
       mediaStreamOptions.audio ||= {};
@@ -1145,6 +1144,8 @@ class PrebufferSession {
     for (const prebuffer of prebufferContainer) {
       if (prebuffer.time < now - requestedPrebuffer)
         continue;
+      if (!mediaStreamOptions.prebuffer)
+        mediaStreamOptions.prebuffer = now - prebuffer.time;
       for (const chunk of prebuffer.chunks) {
         available += chunk.length;
       }
