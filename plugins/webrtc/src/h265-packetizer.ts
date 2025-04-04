@@ -137,6 +137,7 @@ export class H265Repacketizer {
     // the AP packet that will be sent before an IDR frame.
     ap: RtpPacket;
     fuMin: number;
+    sendNonFuaIdrAp = true;
 
     constructor(public console: Console, private maxPacketSize: number, public codecInfo?: H265CodecInfo, public jitterBuffer = new JitterBuffer(console, 4)) {
         this.setMaxPacketSize(maxPacketSize);
@@ -640,7 +641,21 @@ export class H265Repacketizer {
             if (nalType === NAL_TYPE_IDR_W_RADL || nalType === NAL_TYPE_IDR_N_LP ||
                 nalType === NAL_TYPE_BLA_W_LP || nalType === NAL_TYPE_BLA_W_RADL ||
                 nalType === NAL_TYPE_BLA_N_LP) {
-                this.maybeSendAPCodecInfo(packet, ret);
+                // unifi cams seem to send a burst of IDR frames in a single packet.
+                // unsure of how this actually works, because an ostensible IDR frame
+                // shouldn't fit into a single packet.
+                // the packets all share the same RTP timestamp. Without this check,
+                // the IDR frames are interleaved with codec information which causes decode failure.
+                // The interleaved codec issues does not cause issues with Safari, but does cause
+                // Chrome to send repeated Picture Loss Indication (PLI) requests.
+                // the fix is to send the codec information before the first IDR frame,
+                // then wait for the marker bit, which denotes the last packet for a given rtp
+                // timestamp, to reset the flag.
+                // expected result:
+                // AP codec info -> IDR frame 1 -> IDR frame 2 -> ... -> IDR frame N with marker bit set
+                if (this.sendNonFuaIdrAp)
+                    this.maybeSendAPCodecInfo(packet, ret);
+                this.sendNonFuaIdrAp = packet.header.marker;
             }
 
             this.fragment(packet, ret);
