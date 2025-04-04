@@ -347,7 +347,7 @@ async function start(mainFilename: string, options?: {
     });
 
     // all methods under /web/component require admin auth.
-    app.all('/web/component/{*ignored}', (req, res, next) => {
+    app.all('/web/component/*ignored', (req, res, next) => {
         // check if the user is admin authed already, and if not, continue on with basic auth to escalate.
         // this will cover anonymous access like in demo site.
         if (res.locals.username && !res.locals.aclId) {
@@ -377,7 +377,7 @@ async function start(mainFilename: string, options?: {
     });
 
     // verify all plugin related requests have admin auth
-    app.all('/web/component/{*ignored}', (req, res, next) => {
+    app.all('/web/component/*ignored', (req, res, next) => {
         if (!res.locals.username || res.locals.aclId) {
             res.status(401);
             res.send('Not Authorized');
