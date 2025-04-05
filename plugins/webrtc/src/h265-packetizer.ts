@@ -148,7 +148,7 @@ export class H265Repacketizer {
     // timestamp, to reset the flag.
     // expected result:
     // AP codec info -> IDR frame 1 -> IDR frame 2 -> ... -> IDR frame N with marker bit set
-    canSendCodecInfoBeforeIdr = true;
+    sentMarker = true;
 
     constructor(public console: Console, private maxPacketSize: number, public codecInfo?: H265CodecInfo, public jitterBuffer = new JitterBuffer(console, 4)) {
         this.setMaxPacketSize(maxPacketSize);
@@ -328,6 +328,7 @@ export class H265Repacketizer {
         ret.payload = data;
         if (data.length > this.maxPacketSize)
             this.console.warn('packet exceeded max packet size. this may be a bug.');
+        this.sentMarker = ret.header.marker;
         return ret;
     }
 
@@ -436,6 +437,10 @@ export class H265Repacketizer {
     }
 
     maybeSendAPCodecInfo(packet: RtpPacket, ret: RtpPacket[]) {
+        // can not send codec info if in the middle of sending packets for a specific rtp timestamp.
+        if (!this.sentMarker)
+            return;
+
         if (this.ap) {
             // AP with codec information was sent recently, no need to send codec info.
             this.ap = undefined;
@@ -529,9 +534,7 @@ export class H265Repacketizer {
 
                 // If this is an IDR frame, but no codec info has been sent via an AP, send it
                 if (originalNalType === NAL_TYPE_IDR_W_RADL || originalNalType === NAL_TYPE_IDR_N_LP) {
-                    if (this.canSendCodecInfoBeforeIdr)
-                        this.maybeSendAPCodecInfo(packet, ret);
-                    this.canSendCodecInfoBeforeIdr = packet.header.marker;
+                    this.maybeSendAPCodecInfo(packet, ret);
                 }
             }
             else {
@@ -563,6 +566,7 @@ export class H265Repacketizer {
                 last.payload = retain.payload;
                 this.pendingFU = [last];
                 ret.push(...partial);
+                this.sentMarker = false;
             }
         }
         else if (nalType === NAL_TYPE_AP) {
@@ -672,9 +676,7 @@ export class H265Repacketizer {
             if (nalType === NAL_TYPE_IDR_W_RADL || nalType === NAL_TYPE_IDR_N_LP ||
                 nalType === NAL_TYPE_BLA_W_LP || nalType === NAL_TYPE_BLA_W_RADL ||
                 nalType === NAL_TYPE_BLA_N_LP) {
-                if (this.canSendCodecInfoBeforeIdr)
-                    this.maybeSendAPCodecInfo(packet, ret);
-                this.canSendCodecInfoBeforeIdr = packet.header.marker;
+                this.maybeSendAPCodecInfo(packet, ret);
             }
 
             this.fragment(packet, ret);
