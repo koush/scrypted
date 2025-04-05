@@ -164,10 +164,10 @@ export function findH265NaluTypeInNalu(nalu: Buffer, naluType: number) {
     return;
 }
 
-export function getNaluTypes(streamChunk: StreamChunk) {
+export function getStartedH264NaluTypes(streamChunk: StreamChunk) {
     if (streamChunk.type !== 'h264')
         return new Set<number>();
-    return getNaluTypesInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12))
+    return getNaluTypesInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), true)
 }
 
 export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false, fuaRequireEnd = false) {
@@ -208,10 +208,10 @@ export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false, fuaReq
     return ret;
 }
 
-export function getH265NaluTypes(streamChunk: StreamChunk) {
+export function getStartedH265NaluTypes(streamChunk: StreamChunk) {
     if (streamChunk.type !== 'h265')
         return new Set<number>();
-    return getNaluTypesInH265Nalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12))
+    return getNaluTypesInH265Nalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), true)
 }
 
 export function getNaluTypesInH265Nalu(nalu: Buffer, fuaRequireStart = false, fuaRequireEnd = false) {
@@ -275,13 +275,13 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
                 if (streamChunk.type === 'h264') {
-                    const naluTypes = getNaluTypes(streamChunk);
+                    const naluTypes = getStartedH264NaluTypes(streamChunk);
                     if (naluTypes.has(H264_NAL_TYPE_SPS) || naluTypes.has(H264_NAL_TYPE_IDR)) {
                         return streamChunks.slice(prebufferIndex);
                     }
                 }
                 else if (streamChunk.type === 'h265') {
-                    const naluTypes = getH265NaluTypes(streamChunk);
+                    const naluTypes = getStartedH265NaluTypes(streamChunk);
 
                     if (naluTypes.has(H265_NAL_TYPE_VPS)
                         || naluTypes.has(H265_NAL_TYPE_SPS)

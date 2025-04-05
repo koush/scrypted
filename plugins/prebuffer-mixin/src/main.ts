@@ -1,7 +1,7 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { ListenZeroSingleClientTimeoutError, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_SPS, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack, createRtspParser, findH264NaluType, getNaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
+import { H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_SPS, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack, createRtspParser, findH264NaluType, getStartedH264NaluTypes, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, getSpsPps, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
@@ -656,7 +656,7 @@ class PrebufferSession {
         if (chunk.type !== 'h264')
           return;
 
-        const types = getNaluTypes(chunk);
+        const types = getStartedH264NaluTypes(chunk);
         h264Probe.fuab ||= types.has(H264_NAL_TYPE_FU_B);
         h264Probe.stapb ||= types.has(H264_NAL_TYPE_STAP_B);
         h264Probe.mtap16 ||= types.has(H264_NAL_TYPE_MTAP16);
@@ -1000,7 +1000,7 @@ class PrebufferSession {
       // prebuffer search for remote streaming should be even more conservative than local network.
       const defaultPrebuffer = options?.destination === 'remote' ? 2000 : 4000;
       // try to gaurantee a sync frame, but don't search too much prebuffer to make it happen.
-      requestedPrebuffer = Math.min(defaultPrebuffer, this.getDetectedIdrInterval() || defaultPrebuffer);;
+      requestedPrebuffer = Math.min(defaultPrebuffer, this.getDetectedIdrInterval() || defaultPrebuffer);
     }
 
     const codecInfo = await this.parseCodecs(true);
