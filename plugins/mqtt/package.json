@@ -43,5 +43,5 @@
       "@types/node": "^18.4.2",
       "@types/nunjucks": "^3.2.0"
    },
-   "version": "0.0.86"
+   "version": "0.0.87"
 }
