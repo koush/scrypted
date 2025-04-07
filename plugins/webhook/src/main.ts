@@ -1,12 +1,12 @@
-import { HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, PushHandler, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, Setting, Settings, SettingValue, WritableDeviceState } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
-import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
+import sdk, { HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, PushHandler, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, Setting, Settings, SettingValue, WritableDeviceState } from '@scrypted/sdk';
+import { StorageSettings, StorageSettingsDevice } from '@scrypted/sdk/storage-settings';
 import { randomBytes } from 'crypto';
+import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 
 const allInterfaceMethods: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.methods));
 const allInterfaceProperties: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.properties));
 
-import { isPublishable} from '../../mqtt/src/publishable-types';
+import { isPublishable } from '../../mqtt/src/publishable-types';
 
 const { systemManager, endpointManager, mediaManager } = sdk;
 
@@ -15,7 +15,19 @@ const mediaObjectMethods = [
     'getVideoStream',
 ]
 
+function getMixinStorageSettings(device: StorageSettingsDevice) {
+    return new StorageSettings(device, {
+        token: {
+            hide: true,
+            persistedDefaultValue: randomBytes(8).toString('hex'),
+        }
+    })
+
+}
+
 class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
+    storageSettings = getMixinStorageSettings(this);
+
     async getMixinSettings(): Promise<Setting[]> {
         const realDevice = systemManager.getDeviceById(this.id);
         return [
@@ -24,6 +36,8 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
                 key: 'create',
                 description: 'Create a Webhook for a device interface. E.g., OnOff to turn a light on or off, or Camera to retrieve an image. The created webhook will be viewable in the Console.',
                 choices: realDevice.interfaces,
+                immediate: true,
+                console: true,
             }
         ]
     }
@@ -31,11 +45,7 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
     async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
 
-        let token = this.storage.getItem('token');
-        if (!token) {
-            token = randomBytes(8).toString('hex');
-            this.storage.setItem('token', token);
-        }
+        const { token } = this.storageSettings.values;
 
         this.console.log();
         this.console.log();
@@ -79,7 +89,11 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
         this.console.log("##################################################")
     }
 
-    async maybeSendMediaObject(response: HttpResponse, value: any, method: string) {
+
+}
+
+class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvider, HttpRequestHandler, PushHandler {
+    static async maybeSendMediaObject(response: HttpResponse, value: any, method: string) {
         if (!mediaObjectMethods.includes(method)) {
             response?.send(value?.toString());
             return;
@@ -93,9 +107,16 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
         });
     }
 
-    async handle(request: HttpRequest, response: HttpResponse, device: ScryptedDevice, pathSegments: string[]) {
+    static async handleMixin(request: HttpRequest, response: HttpResponse, device: ScryptedDevice, pathSegments: string[]) {
         const token = pathSegments[2];
-        if (token !== this.storage.getItem('token')) {
+        const mixinStorage = sdk.deviceManager.getMixinStorage(device.id);
+        const console = sdk.deviceManager.getMixinConsole(device.id);
+        const storageSettings = getMixinStorageSettings({
+            async onDeviceEvent() { },
+            storage: mixinStorage,
+        });
+
+        if (token !== storageSettings.values.token) {
             response?.send('Invalid Token', {
                 code: 401,
             });
@@ -124,7 +145,7 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
                 }
             }
             catch (e) {
-                this.console.error('webhook action error', e);
+                console.error('webhook action error', e);
                 response.send('Internal Error', {
                     code: 500,
                 });
@@ -144,16 +165,12 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
             }
         }
         else {
-            this.console.error('Unknown method or property', methodOrProperty);
+            console.error('Unknown method or property', methodOrProperty);
             response.send('Not Found', {
                 code: 404,
             });
         }
     }
-}
-
-class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvider, HttpRequestHandler, PushHandler {
-    createdMixins = new Map<string, WebhookMixin>();
 
     async handle(request: HttpRequest, response?: HttpResponse) {
         this.console.log('received webhook', request);
@@ -180,17 +197,14 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
             return;
         }
 
-        if (!this.createdMixins.has(id)) {
-            await device.getSettings();
-        }
-        const mixin = this.createdMixins.get(id);
-        if (!mixin) {
+        if (!device.mixins?.includes(this.id)) {
             response.send('Not Found', {
                 code: 404,
             });
             return;
         }
-        await mixin.handle(request, response, device, pathSegments);
+
+        await WebhookPlugin.handleMixin(request, response, device, pathSegments);
     }
 
     onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
@@ -228,15 +242,11 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
             groupKey: "webhook",
         });
 
-        this.createdMixins.set(ret.id, ret);
         return ret;
     }
 
     async releaseMixin(id: string, mixinDevice: any): Promise<void> {
-        if (this.createdMixins.get(id) === mixinDevice) {
-            this.createdMixins.delete(id);
-        }
     }
 }
 
-export default new WebhookPlugin();
+export default WebhookPlugin;

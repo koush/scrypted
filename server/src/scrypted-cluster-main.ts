@@ -307,6 +307,7 @@ export function startClusterClient(mainFilename: string, options?: {
                 const { clusterId, clusterWorkerId } = await connectForkWorker(auth, properties);
                 const clusterPeerSetup = setupCluster(peer);
                 await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret, clusterWorkerId });
+                console.log('Cluster server authenticated.', localAddress, localPort, properties);
 
                 peer.params['fork'] = createClusterForkParam(mainFilename, clusterId, clusterSecret, clusterWorkerId, clusterPluginHosts);
 

@@ -16,22 +16,22 @@ export abstract class PluginHttp<T> {
     }
 
     addMiddleware() {
-        this.app.all(['/endpoint/@:owner/:pkg/public/engine.io/*', '/endpoint/:pkg/public/engine.io/*'], (req, res) => {
+        this.app.all(['/endpoint/@:owner/:pkg/public/engine.io/*ignored', '/endpoint/:pkg/public/engine.io/*ignored'], (req, res) => {
             this.endpointHandler(req, res, true, true, this.handleEngineIOEndpoint.bind(this))
         });
 
-        this.app.all(['/endpoint/@:owner/:pkg/engine.io/*', '/endpoint/@:owner/:pkg/engine.io/*'], (req, res) => {
+        this.app.all(['/endpoint/@:owner/:pkg/engine.io/*ignored', '/endpoint/@:owner/:pkg/engine.io/*ignored'], (req, res) => {
             this.endpointHandler(req, res, false, true, this.handleEngineIOEndpoint.bind(this))
         });
 
         // stringify all http endpoints
-        this.app.all(['/endpoint/@:owner/:pkg/public', '/endpoint/@:owner/:pkg/public/*', '/endpoint/:pkg', '/endpoint/:pkg/*'], bodyParser.text() as any);
+        this.app.all(['/endpoint/@:owner/:pkg/public', '/endpoint/@:owner/:pkg/public/*ignored', '/endpoint/:pkg', '/endpoint/:pkg/*ignored'], bodyParser.text() as any);
 
-        this.app.all(['/endpoint/@:owner/:pkg/public', '/endpoint/@:owner/:pkg/public/*', '/endpoint/:pkg/public', '/endpoint/:pkg/public/*'], (req, res) => {
+        this.app.all(['/endpoint/@:owner/:pkg/public', '/endpoint/@:owner/:pkg/public/*ignored', '/endpoint/:pkg/public', '/endpoint/:pkg/public/*ignored'], (req, res) => {
             this.endpointHandler(req, res, true, false, this.handleRequestEndpoint.bind(this))
         });
 
-        this.app.all(['/endpoint/@:owner/:pkg', '/endpoint/@:owner/:pkg/*', '/endpoint/:pkg', '/endpoint/:pkg/*'], (req, res) => {
+        this.app.all(['/endpoint/@:owner/:pkg', '/endpoint/@:owner/:pkg/*ignored', '/endpoint/:pkg', '/endpoint/:pkg/*ignored'], (req, res) => {
             this.endpointHandler(req, res, false, false, this.handleRequestEndpoint.bind(this))
         });
     }
