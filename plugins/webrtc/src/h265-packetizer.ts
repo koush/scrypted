@@ -137,6 +137,18 @@ export class H265Repacketizer {
     // the AP packet that will be sent before an IDR frame.
     ap: RtpPacket;
     fuMin: number;
+    // h265 can send multiple IDR and TRAIL_R frames per RTP timestamp.
+    // the repurposed h264-packetizer code sends codec information before every
+    // IDR frame.
+    // the IDR burst frames are interleaved with codec information which causes decode failure.
+    // The interleaved codec issues does not cause issues with Safari, but does cause
+    // Chrome to send repeated Picture Loss Indication (PLI) requests.
+    // the fix is to send the codec information before the first IDR frame,
+    // then wait for the marker bit, which denotes the last packet for a given rtp
+    // timestamp, to reset the flag.
+    // expected result:
+    // AP codec info -> IDR frame 1 -> IDR frame 2 -> ... -> IDR frame N with marker bit set
+    sentMarker = true;
 
     constructor(public console: Console, private maxPacketSize: number, public codecInfo?: H265CodecInfo, public jitterBuffer = new JitterBuffer(console, 4)) {
         this.setMaxPacketSize(maxPacketSize);
@@ -316,6 +328,7 @@ export class H265Repacketizer {
         ret.payload = data;
         if (data.length > this.maxPacketSize)
             this.console.warn('packet exceeded max packet size. this may be a bug.');
+        this.sentMarker = ret.header.marker;
         return ret;
     }
 
@@ -424,6 +437,10 @@ export class H265Repacketizer {
     }
 
     maybeSendAPCodecInfo(packet: RtpPacket, ret: RtpPacket[]) {
+        // can not send codec info if in the middle of sending packets for a specific rtp timestamp.
+        if (!this.sentMarker)
+            return;
+
         if (this.ap) {
             // AP with codec information was sent recently, no need to send codec info.
             this.ap = undefined;
@@ -549,6 +566,7 @@ export class H265Repacketizer {
                 last.payload = retain.payload;
                 this.pendingFU = [last];
                 ret.push(...partial);
+                this.sentMarker = false;
             }
         }
         else if (nalType === NAL_TYPE_AP) {
@@ -595,11 +613,29 @@ export class H265Repacketizer {
             });
 
             // Log that an AP with codec info was sent
-            if (hasVps && hasSps && hasPps)
+            if (hasVps && hasSps && hasPps && packet.payload.length <= this.maxPacketSize) {
                 this.ap = packet;
 
-            const ap = this.packetizeAP(depacketized);
-            this.createRtpPackets(packet, ap, ret);
+                const ap = this.packetizeAP(depacketized);
+                this.createRtpPackets(packet, ap, ret);
+            }
+            else {
+                // h265 can send multiple IDR or TRAIL_R per rtp timestamp
+                // so this can result in a large aggregation packet
+                // if the MTU is large (like 64k on localhost udp).
+                // the aggregation packet must be depacketized and potentially
+                // fragmented.
+                const fus: Buffer[] = [];
+                while (depacketized.length) {
+                    const next = depacketized.shift();
+                    if (next.length <= this.maxPacketSize) {
+                        fus.push(next);
+                        continue;
+                    }
+                    fus.push(...this.packetizeFU(next));
+                }
+                this.createRtpPackets(packet, fus, ret);
+            }
         }
         else if (nalType <= NAL_TYPE_RSV_IRAP_VCL23 || (nalType >= NAL_TYPE_VPS && nalType <= NAL_TYPE_SEI_SUFFIX)) {
             this.flushPendingFU(ret);

@@ -39,12 +39,16 @@ launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist || echo ""
 echo "Installing Scrypted dependencies..."
 RUN_IGNORE xcode-select --install
 RUN brew update
-RUN_IGNORE brew install node@20
-# dlib
-RUN brew install cmake
 
-# seems to be necessary for python-codecs' pycairo dependency or something?
-RUN_IGNORE gobject-introspection libffi pkg-config
+# in sequoia, brew node is unusable because it is not signed and can't access local network unless run as root.
+# https://developer.apple.com/forums/thread/766270
+# RUN_IGNORE brew install node@20
+# NODE_PATH=$(brew --prefix node@20)
+# NODE_BIN_PATH=$NODE_PATH/bin
+RUN_IGNORE curl -L https://nodejs.org/dist/v22.14.0/node-v22.14.0.pkg -o /tmp/node.pkg
+RUN_IGNORE sudo installer -pkg /tmp/node.pkg -target /
+NODE_PATH=/usr/local # used to pass var test
+NODE_BIN_PATH=/usr/local/bin
 
 # gstreamer plugins
 RUN_IGNORE brew install gstreamer
@@ -82,14 +86,12 @@ echo "Installing Scrypted Launch Agent..."
 
 RUN mkdir -p ~/Library/LaunchAgents
 
-NODE_PATH=$(brew --prefix node@20)
 if [ ! -d "$NODE_PATH" ]
 then
     echo "Unable to determine node@20 path."
     exit 1
 fi
 
-NODE_BIN_PATH=$NODE_PATH/bin
 if [ ! -d "$NODE_BIN_PATH" ]
 then
     echo "Unable to determine node@20 bin path."
@@ -155,7 +157,7 @@ cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
             <key>NODE_OPTIONS</key>
                 <string>$NODE_OPTIONS</string>
             <key>PATH</key>
-                <string>$NODE_BIN_PATH:$PYTHON_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+                <string>$PYTHON_BIN_PATH:$NODE_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
                 <string>/Users/$USER</string>
             <key>SCRYPTED_PYTHON_PATH</key>

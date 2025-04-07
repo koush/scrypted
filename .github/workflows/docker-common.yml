@@ -8,7 +8,7 @@ jobs:
     name: Push Docker image to Docker Hub
     runs-on: self-hosted
     env:
-      NODE_VERSION: '20'
+      NODE_VERSION: '22'
     strategy:
       matrix:
         BASE: ["noble"]

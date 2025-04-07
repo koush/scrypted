@@ -60,10 +60,6 @@ export async function startLibavSessionWrapped(formatContext: AVFormatContext, c
                         rejectUnauthorized: false,
                     });
                     await once(tlsSocket, 'secureConnect');
-                    socket.on('data', data => {
-                        console.log('proxy data', data.toString());
-                    });
-
                     socket.pipe(tlsSocket).pipe(socket);
                 }
                 catch (e) {

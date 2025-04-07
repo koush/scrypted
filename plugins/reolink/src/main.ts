@@ -109,6 +109,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     floodlight: ReolinkCameraFloodlight;
     pirSensor: ReolinkCameraPirSensor;
     batteryTimeout: NodeJS.Timeout;
+    isWifi: boolean;
 
     storageSettings = new StorageSettings(this, {
         doorbell: {
@@ -357,6 +358,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         } catch (e) {
             abilities = await apiWithToken.getAbility();
         }
+        try {
+            const { isWifi } = await apiWithToken.getLocalLink();
+            this.isWifi = isWifi;
+        } catch { }
+
         this.storageSettings.values.abilities = abilities;
         this.console.log('getAbility', JSON.stringify(abilities));
     }
