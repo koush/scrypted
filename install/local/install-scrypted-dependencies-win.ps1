@@ -1,4 +1,13 @@
-#Requires -RunAsAdministrator
+# Check if the script is running as administrator
+$IsAdmin = [System.Security.Principal.WindowsPrincipal] [System.Security.Principal.WindowsIdentity]::GetCurrent()
+$AdminRole = [System.Security.Principal.WindowsBuiltInRole]::Administrator
+
+if (-not $IsAdmin.IsInRole($AdminRole)) {
+    # If not, relaunch the script with elevated privileges
+    $ScriptPath = $PSCommandPath
+    Start-Process powershell -ArgumentList "-File `"$ScriptPath`"" -Verb RunAs
+    exit
+}
 
 # Set-PSDebug -Trace 1
 
