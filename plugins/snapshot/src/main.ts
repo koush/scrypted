@@ -175,6 +175,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 };
 
                 const request = prebufferChannel as RequestMediaStreamOptions;
+                request.audio = null;
                 // specify the prebuffer based on the usage. events shouldn't request
                 // lengthy prebuffers as it may not contain the image it needs.
                 request.prebuffer = eventSnapshot ? 1000 : 6000;
