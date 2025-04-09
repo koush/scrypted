@@ -23,7 +23,7 @@ jobs:
           ["noble-nvidia", ".s6", "noble-nvidia"],
           ["noble-full", ".s6", "noble-full"],
           ["noble-lite", "", "noble-lite"],
-          ["noble-lite", ".router", "noble-router"],
+          # ["noble-lite", ".router", "noble-router"],
         ]
     steps:
       - name: Check out the repo

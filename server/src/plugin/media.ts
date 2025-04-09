@@ -1,9 +1,9 @@
 import { BufferConverter, DeviceManager, FFmpegInput, MediaConverter, MediaManager, MediaObjectCreateOptions, MediaObject as MediaObjectInterface, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import fs from 'fs';
 import https from 'https';
+import mime from 'mime';
 import Graph from 'node-dijkstra';
 import path from 'path';
-import send from 'send';
 import MimeType from 'whatwg-mimetype';
 import { getScryptedFFmpegPath } from './ffmpeg-path';
 import { MediaObject } from "./mediaobject";
@@ -77,7 +77,7 @@ export abstract class MediaManagerBase implements MediaManager {
                 }
 
                 const ab = await fs.promises.readFile(filename);
-                const mt = send.mime.lookup(filename);
+                const mt = mime.getType(filename);
                 const mo = this.createMediaObject(ab, mt);
                 return mo;
             }
@@ -238,8 +238,8 @@ export abstract class MediaManagerBase implements MediaManager {
 
     ensureMediaObjectRemote(mediaObject: string | MediaObjectInterface): MediaObjectRemote {
         if (typeof mediaObject === 'string') {
-            const mime = send.mime.lookup(mediaObject);
-            return this.createMediaObjectRemote(mediaObject, mime);
+            const mt = mime.getType(mediaObject);
+            return this.createMediaObjectRemote(mediaObject, mt);
         }
         return mediaObject as MediaObjectRemote;
     }

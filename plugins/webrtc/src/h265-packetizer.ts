@@ -127,7 +127,8 @@ export interface H265CodecInfo {
     vps: Buffer;
     sps: Buffer;
     pps: Buffer;
-    sei?: Buffer;
+    seiPrefix?: Buffer;
+    seiSuffix?: Buffer;
 }
 
 export class H265Repacketizer {
@@ -186,9 +187,14 @@ export class H265Repacketizer {
         this.codecInfo.pps = pps;
     }
 
-    updateSei(sei: Buffer) {
+    updateSeiPrefix(sei: Buffer) {
         this.ensureCodecInfo();
-        this.codecInfo.sei = sei;
+        this.codecInfo.seiPrefix = sei;
+    }
+
+    updateSeiSuffix(sei: Buffer) {
+        this.ensureCodecInfo();
+        this.codecInfo.seiSuffix = sei;
     }
 
     shouldFilter(nalType: number) {
@@ -454,8 +460,10 @@ export class H265Repacketizer {
         const agg = [this.codecInfo.sps, this.codecInfo.pps];
         if (this.codecInfo.vps)
             agg.unshift(this.codecInfo.vps);
-        if (this.codecInfo?.sei)
-            agg.push(this.codecInfo.sei);
+        if (this.codecInfo?.seiPrefix)
+            agg.push(this.codecInfo.seiPrefix);
+        if (this.codecInfo?.seiSuffix)
+            agg.push(this.codecInfo.seiSuffix);
 
         const aggregates = this.packetizeAP(agg);
         if (aggregates.length !== 1) {
@@ -592,8 +600,11 @@ export class H265Repacketizer {
                     hasPps = true;
                     this.updatePps(payload);
                 }
-                else if (nalType === NAL_TYPE_SEI_PREFIX || nalType === NAL_TYPE_SEI_SUFFIX) {
-                    this.updateSei(payload);
+                else if (nalType === NAL_TYPE_SEI_PREFIX ) {
+                    this.updateSeiPrefix(payload);
+                }
+                else if ( nalType === NAL_TYPE_SEI_SUFFIX) {
+                    this.updateSeiSuffix(payload);
                 }
                 else if (nalType === NAL_TYPE_AUD) {
                     // Access Unit Delimiter - typically a no-op
@@ -661,9 +672,14 @@ export class H265Repacketizer {
                 this.updatePps(packet.payload);
                 return;
             }
-            else if (nalType === NAL_TYPE_SEI_PREFIX || nalType === NAL_TYPE_SEI_SUFFIX) {
+            else if (nalType === NAL_TYPE_SEI_PREFIX ) {
                 this.extraPackets--;
-                this.updateSei(packet.payload);
+                this.updateSeiPrefix(packet.payload);
+                return;
+            }
+            else if ( nalType === NAL_TYPE_SEI_SUFFIX) {
+                this.extraPackets--;
+                this.updateSeiSuffix(packet.payload);
                 return;
             }
 
