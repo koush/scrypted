@@ -97,7 +97,12 @@ export class HttpResponseImpl implements HttpResponse {
                 stream = await clusterSetup.connectRPCObject(stream);
 
                 for await (const chunk of stream) {
-                    this.res.write(chunk);
+                    await new Promise<void>((r, f) => this.res.write(chunk, e => {
+                        if (e)
+                            f(e);
+                        else
+                            r();
+                    }));
                 }
                 this.res.end();
             }
