@@ -116,7 +116,7 @@ export async function startLibavSessionWrapped(formatContext: AVFormatContext, c
         try {
             await startDeferred.promise;
 
-            formatContext.streams.forEach(stream => {
+            const pipelines = formatContext.streams.map(stream => {
                 if (options.audioSoftMuted && stream.type === 'audio')
                     return;
                 if (stream.type !== 'video' && stream.type !== 'audio')
@@ -145,19 +145,19 @@ export async function startLibavSessionWrapped(formatContext: AVFormatContext, c
                     rtp,
                     index,
                 });
-            });
+
+                return {
+                    streamIndex: stream.index,
+                    writeFormatContext: rtp,
+                }
+            }).filter(Boolean);
 
             while (!killDeferred.finished) {
-                using packet = await formatContext.readFrame();
+                using result = await formatContext.receiveFrame(pipelines);
+                if (result)
+                    resetActivityTimer();
                 if (killDeferred.finished)
                     break;
-                if (!packet)
-                    continue;
-                const context = indexToContext.get(packet.streamIndex);
-                if (!context)
-                    continue;
-                context.rtp.writeFrame(context.index, packet);
-                resetActivityTimer?.();
             }
         }
         catch (e) {
