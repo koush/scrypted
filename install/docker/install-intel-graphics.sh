@@ -18,6 +18,7 @@ fi
 if [ -n "$UBUNTU_22_04" ]
 then
     distro="jammy"
+    
 else
     distro="noble"
 fi
@@ -39,13 +40,26 @@ set -e
 
 # need intel-media-va-driver-non-free, but all the other intel packages are installed from Intel github.
 echo "Installing Intel graphics packages."
-apt-get update && apt-get install -y gpg-agent &&
-rm -f /usr/share/keyrings/intel-graphics.gpg &&
-curl -L https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --yes --output /usr/share/keyrings/intel-graphics.gpg &&
-echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu '$distro' arc' | tee  /etc/apt/sources.list.d/intel.gpu.$distro.list &&
-apt-get -y update &&
-apt-get -y install intel-media-va-driver-non-free &&
-apt-get -y dist-upgrade;
+
+if [ "$distro" == "jammy" ]
+then
+    apt-get update && apt-get install -y gpg-agent &&
+    rm -f /usr/share/keyrings/intel-graphics.gpg &&
+    curl -L https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --yes --output /usr/share/keyrings/intel-graphics.gpg &&
+    echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu $distro arc" | tee  /etc/apt/sources.list.d/intel.gpu.$distro.list &&
+    apt-get -y update &&
+    apt-get -y install intel-media-va-driver-non-free &&
+    apt-get -y dist-upgrade;
+else
+    apt-get update && apt-get install -y gpg-agent &&
+    rm -f /usr/share/keyrings/intel-graphics.gpg &&
+    curl -L https://repositories.intel.com/gpu/intel-graphics.key | gpg --dearmor --yes --output /usr/share/keyrings/intel-graphics.gpg &&
+    echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu $distro unified" | tee /etc/apt/sources.list.d/intel-gpu-$distro.list &&
+    apt-get -y update &&
+    apt-get -y install intel-media-va-driver-non-free &&
+    apt-get -y dist-upgrade;
+fi
+
 
 rm -rf /tmp/gpu && mkdir -p /tmp/gpu && cd /tmp/gpu
 
