@@ -443,15 +443,15 @@ export class H265Repacketizer {
     }
 
     maybeSendAPCodecInfo(packet: RtpPacket, ret: RtpPacket[]) {
-        // can not send codec info if in the middle of sending packets for a specific rtp timestamp.
-        if (!this.sentMarker)
-            return;
-
         if (this.ap) {
             // AP with codec information was sent recently, no need to send codec info.
             this.ap = undefined;
             return;
         }
+
+        // can not send codec info if in the middle of sending packets for a specific rtp timestamp.
+        if (!this.sentMarker)
+            return;
 
         // vps is not required.
         if (!this.codecInfo?.sps || !this.codecInfo?.pps)
@@ -600,10 +600,10 @@ export class H265Repacketizer {
                     hasPps = true;
                     this.updatePps(payload);
                 }
-                else if (nalType === NAL_TYPE_SEI_PREFIX ) {
+                else if (nalType === NAL_TYPE_SEI_PREFIX) {
                     this.updateSeiPrefix(payload);
                 }
-                else if ( nalType === NAL_TYPE_SEI_SUFFIX) {
+                else if (nalType === NAL_TYPE_SEI_SUFFIX) {
                     this.updateSeiSuffix(payload);
                 }
                 else if (nalType === NAL_TYPE_AUD) {
@@ -672,12 +672,12 @@ export class H265Repacketizer {
                 this.updatePps(packet.payload);
                 return;
             }
-            else if (nalType === NAL_TYPE_SEI_PREFIX ) {
+            else if (nalType === NAL_TYPE_SEI_PREFIX) {
                 this.extraPackets--;
                 this.updateSeiPrefix(packet.payload);
                 return;
             }
-            else if ( nalType === NAL_TYPE_SEI_SUFFIX) {
+            else if (nalType === NAL_TYPE_SEI_SUFFIX) {
                 this.extraPackets--;
                 this.updateSeiSuffix(packet.payload);
                 return;

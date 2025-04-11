@@ -4,6 +4,25 @@ then
     exit 0
 fi
 
+
+UBUNTU_22_04=$(lsb_release -r | grep "22.04")
+UBUNTU_24_04=$(lsb_release -r | grep "24.04")
+
+# needs either ubuntu 22.0.4 or 24.04
+if [ -z "$UBUNTU_22_04" ] && [ -z "$UBUNTU_24_04" ]
+then
+    echo "Intel graphics package can not be installed. Ubuntu version could not be detected when checking lsb-release and /etc/os-release."
+    exit 1
+fi
+
+if [ -n "$UBUNTU_22_04" ]
+then
+    distro="jammy"
+    
+else
+    distro="noble"
+fi
+
 # no errors beyond this point
 set -e
 
@@ -21,13 +40,26 @@ set -e
 
 # need intel-media-va-driver-non-free, but all the other intel packages are installed from Intel github.
 echo "Installing Intel graphics packages."
-apt-get update && apt-get install -y gpg-agent &&
-rm -f /usr/share/keyrings/intel-graphics.gpg &&
-curl -L https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --yes --output /usr/share/keyrings/intel-graphics.gpg &&
-echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy arc' | tee  /etc/apt/sources.list.d/intel.gpu.jammy.list &&
-apt-get -y update &&
-apt-get -y install intel-media-va-driver-non-free &&
-apt-get -y dist-upgrade;
+
+if [ "$distro" == "jammy" ]
+then
+    apt-get update && apt-get install -y gpg-agent &&
+    rm -f /usr/share/keyrings/intel-graphics.gpg &&
+    curl -L https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --yes --output /usr/share/keyrings/intel-graphics.gpg &&
+    echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu $distro arc" | tee  /etc/apt/sources.list.d/intel.gpu.$distro.list &&
+    apt-get -y update &&
+    apt-get -y install intel-media-va-driver-non-free &&
+    apt-get -y dist-upgrade;
+else
+    apt-get update && apt-get install -y gpg-agent &&
+    rm -f /usr/share/keyrings/intel-graphics.gpg &&
+    curl -L https://repositories.intel.com/gpu/intel-graphics.key | gpg --dearmor --yes --output /usr/share/keyrings/intel-graphics.gpg &&
+    echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu $distro unified" | tee /etc/apt/sources.list.d/intel-gpu-$distro.list &&
+    apt-get -y update &&
+    apt-get -y install intel-media-va-driver-non-free &&
+    apt-get -y dist-upgrade;
+fi
+
 
 rm -rf /tmp/gpu && mkdir -p /tmp/gpu && cd /tmp/gpu
 
