@@ -16,13 +16,13 @@ import path from 'path';
 import { Duplex } from 'stream';
 import { ParserOptions, ParserSession, startParserSession } from './ffmpeg-session';
 import { FileRtspServer } from './file-rtsp-server';
+import { startLibavSession } from './libav-parser';
 import { getUrlLocalAdresses } from './local-addresses';
 import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { getSpsResolution } from './sps-resolution';
 import { createStreamSettings } from './stream-settings';
-import { startLibavSession } from './libav-parser';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
