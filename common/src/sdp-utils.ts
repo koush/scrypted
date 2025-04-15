@@ -242,12 +242,22 @@ export function parseRtpMap(mline: ReturnType<typeof parseMLine>, rtpmap: string
         }
     }
 
+    // assigned payload types do not need to provide a clock, there is a default.
+    let clock = parseInt(match?.[3]);
+    if (!clock) {
+        clock = undefined;
+        if (codec === 'pcm_mulaw' || codec === 'pcm_alaw')
+            clock = 8000;
+        else if (codec === 'pcm_s16be')
+            clock = 16000;
+    }
+
     return {
         line: rtpmap,
         codec,
         ffmpegEncoder,
         rawCodec: match?.[2],
-        clock: parseInt(match?.[3]),
+        clock,
         channels: parseInt(match?.[5]) || undefined,
         payloadType: parseInt(match?.[1]),
     }
