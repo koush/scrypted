@@ -12,6 +12,7 @@ import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filte
 import { ImageConverter, ImageConverterNativeId } from './image-converter';
 import { ImageReader, ImageReaderNativeId, loadSharp, loadVipsImage } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
+import { fixLegacyClipPath, normalizeBox, polygonIntersectsBoundingBox } from '../../objectdetector/src/polygon';
 
 const { mediaManager, systemManager } = sdk;
 if (os.cpus().find(cpu => cpu.model?.toLowerCase().includes('qemu'))) {
@@ -433,10 +434,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         if (!this.storageSettings.values.snapshotCropScale?.length)
             return picture;
 
-        const xmin = Math.min(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
-        const ymin = Math.min(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
-        const xmax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
-        const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
+        const clipPath = fixLegacyClipPath(this.storageSettings.values.snapshotCropScale);
+        const xmin = Math.min(...clipPath.map(([x, y]) => x));
+        const ymin = Math.min(...clipPath.map(([x, y]) => y));
+        const xmax = Math.max(...clipPath.map(([x, y]) => x));
+        const ymax = Math.max(...clipPath.map(([x, y]) => y));
 
         if (loadSharp()) {
             const vips = await loadVipsImage(picture, this.id);
