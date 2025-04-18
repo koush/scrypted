@@ -246,12 +246,16 @@ export function startClusterClient(mainFilename: string, options?: {
                 family: 4,
                 keepAlive: true,
             });
+            rawSocket.on('close', () => {
+                console.log('Cluster server disconnected.', host, port);    
+            });
 
             try {
                 await once(rawSocket, 'connect');
             }
             catch (e) {
                 console.warn('Cluster server not available.', host, port, e);
+                rawSocket.destroy();
                 continue;
             }
 
@@ -264,6 +268,7 @@ export function startClusterClient(mainFilename: string, options?: {
                 await once(socket, 'secureConnect');
             }
             catch (e) {
+                socket.destroy();
                 console.warn('Cluster server tls failed.', host, port, e);
                 continue;
             }
