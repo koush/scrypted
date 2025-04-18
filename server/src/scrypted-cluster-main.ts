@@ -246,9 +246,6 @@ export function startClusterClient(mainFilename: string, options?: {
                 family: 4,
                 keepAlive: true,
             });
-            rawSocket.on('close', () => {
-                console.log('Cluster server disconnected.', host, port);    
-            });
 
             try {
                 await once(rawSocket, 'connect');
