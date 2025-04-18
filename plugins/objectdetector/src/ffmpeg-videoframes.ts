@@ -138,7 +138,6 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
 
         try {
             reader();
-            const flush = async () => { };
 
             while (!finished) {
                 frameDeferred = new Deferred();
@@ -151,9 +150,7 @@ export class FFmpegVideoFrameGenerator extends ScryptedDeviceBase implements Vid
                     yield {
                         __json_copy_serialize_children: true,
                         timestamp: 0,
-                        queued: 0,
                         image,
-                        flush,
                     };
                 }
                 finally {
