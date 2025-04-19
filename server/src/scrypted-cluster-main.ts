@@ -172,6 +172,9 @@ function createClusterForkParam(mainFilename: string, clusterId: string, cluster
         });
         let getRemote: any;
         let ping: any;
+        const timeout = setTimeout(() => {
+            threadPeer.kill('cluster fork timeout');
+        }, 10000);
         try {
             const initializeCluster: InitializeCluster = await threadPeer.getParam('initializeCluster');
             await initializeCluster({ clusterId, clusterSecret, clusterWorkerId });
@@ -189,9 +192,6 @@ function createClusterForkParam(mainFilename: string, clusterId: string, cluster
             }
         }
 
-        const timeout = setTimeout(() => {
-            threadPeer.kill('cluster fork timeout');
-        }, 10000);
         const clusterGetRemote = (...args: any[]) => {
             clearTimeout(timeout);
             return {
