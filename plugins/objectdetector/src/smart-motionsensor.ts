@@ -85,7 +85,8 @@ export class SmartMotionSensor extends ScryptedDeviceBase implements Settings, R
 
         this.storageSettings.settings.detections.onGet = async () => {
             const objectDetector: ObjectDetector = this.storageSettings.values.objectDetector;
-            const choices = [...new Set(...(await objectDetector?.getObjectTypes?.())?.classes || [])];
+            const classes = (await objectDetector?.getObjectTypes?.())?.classes || [];
+            const choices = [...new Set(classes)];
             return {
                 hide: !objectDetector,
                 choices,
