@@ -104,7 +104,8 @@ export class SmartOccupancySensor extends ScryptedDeviceBase implements Settings
 
         this.storageSettings.settings.detections.onGet = async () => {
             const objectDetection: ObjectDetection = this.storageSettings.values.objectDetection;
-            const choices = (await objectDetection?.getDetectionModel())?.classes || [];
+            const classes = (await objectDetection?.getDetectionModel())?.classes || []
+            const choices = [...new Set(classes)];
             return {
                 hide: !objectDetection,
                 choices,
