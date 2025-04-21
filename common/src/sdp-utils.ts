@@ -175,6 +175,8 @@ export type RTPMap = ReturnType<typeof parseRtpMap>;
 export function parseRtpMap(mline: ReturnType<typeof parseMLine>, rtpmap: string) {
     const mlineType = mline.type;
     const match = rtpmap?.match(/a=rtpmap:([\d]+) (.*?)\/([\d]+)(\/([\d]+))?/);
+    let channels = parseInt(match?.[5]) || undefined;
+    let payloadType = parseInt(match?.[1]);
 
     rtpmap = rtpmap?.toLowerCase();
 
@@ -222,14 +224,20 @@ export function parseRtpMap(mline: ReturnType<typeof parseMLine>, rtpmap: string
         if (mline.payloadTypes?.includes(0)) {
             codec = 'pcm_mulaw';
             ffmpegEncoder = 'pcm_mulaw';
+            payloadType = 0;
+            channels = 1;
         }
         else if (mline.payloadTypes?.includes(8)) {
             codec = 'pcm_alaw';
             ffmpegEncoder = 'pcm_alaw';
+            payloadType = 8;
+            channels = 1;
         }
         else if (mline.payloadTypes?.includes(14)) {
             codec = 'mp3';
             ffmpegEncoder = 'mp3';
+            payloadType = 14;
+            channels = 2;
         }
         else {
             // ffmpeg seems to omit the rtpmap type for pcm alaw when creating sdp?
@@ -239,6 +247,8 @@ export function parseRtpMap(mline: ReturnType<typeof parseMLine>, rtpmap: string
             // https://en.wikipedia.org/wiki/RTP_payload_formats
             codec = 'pcm_alaw';
             ffmpegEncoder = 'pcm_alaw';
+            payloadType = 8;
+            channels = 1;
         }
     }
 
@@ -258,8 +268,8 @@ export function parseRtpMap(mline: ReturnType<typeof parseMLine>, rtpmap: string
         ffmpegEncoder,
         rawCodec: match?.[2],
         clock,
-        channels: parseInt(match?.[5]) || undefined,
-        payloadType: parseInt(match?.[1]),
+        channels,
+        payloadType,
     }
 }
 
