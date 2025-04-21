@@ -1,7 +1,7 @@
 import { BufferConverter, DeviceManager, FFmpegInput, MediaConverter, MediaManager, MediaObjectCreateOptions, MediaObject as MediaObjectInterface, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import fs from 'fs';
 import https from 'https';
-import mime from 'mime';
+import mime from 'mime-types';
 import Graph from 'node-dijkstra';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
@@ -77,8 +77,8 @@ export abstract class MediaManagerBase implements MediaManager {
                 }
 
                 const ab = await fs.promises.readFile(filename);
-                const mt = mime.getType(filename);
-                const mo = this.createMediaObject(ab, mt);
+                const mt = mime.lookup(filename);
+                const mo = this.createMediaObject(ab, mt || 'application/octet-stream');
                 return mo;
             }
         });
@@ -238,8 +238,8 @@ export abstract class MediaManagerBase implements MediaManager {
 
     ensureMediaObjectRemote(mediaObject: string | MediaObjectInterface): MediaObjectRemote {
         if (typeof mediaObject === 'string') {
-            const mt = mime.getType(mediaObject);
-            return this.createMediaObjectRemote(mediaObject, mt);
+            const mt = mime.lookup(mediaObject);
+            return this.createMediaObjectRemote(mediaObject, mt || 'application/octet-stream');
         }
         return mediaObject as MediaObjectRemote;
     }
