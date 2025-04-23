@@ -79,6 +79,16 @@ function getNalType(data: Buffer): number {
     return (data[0] & 0x7E) >> 1;  // 6 bits starting from bit 1
 }
 
+function isKeyFrame(nalType: number): boolean {
+    // For IDR frames, send codec info first
+    if (nalType === NAL_TYPE_IDR_W_RADL || nalType === NAL_TYPE_IDR_N_LP ||
+        nalType === NAL_TYPE_BLA_W_LP || nalType === NAL_TYPE_BLA_W_RADL ||
+        nalType === NAL_TYPE_BLA_N_LP || nalType === NAL_TYPE_CRA_NUT) {
+     return true;
+    }
+    return false;
+}
+
 // Function to depacketize Aggregation Packets (similar to STAP-A in H.264)
 export function depacketizeAP(data: Buffer) {
     const ret: Buffer[] = [];
@@ -385,7 +395,7 @@ export class H265Repacketizer {
                 }
                 else {
                     // For IDR frames, send codec info first
-                    if (splitNaluType === NAL_TYPE_IDR_W_RADL || splitNaluType === NAL_TYPE_IDR_N_LP) {
+                    if (isKeyFrame(splitNaluType)) {
                         this.maybeSendAPCodecInfo(first, ret);
                     }
 
@@ -689,9 +699,7 @@ export class H265Repacketizer {
             }
 
             // For IDR frames, send codec info first
-            if (nalType === NAL_TYPE_IDR_W_RADL || nalType === NAL_TYPE_IDR_N_LP ||
-                nalType === NAL_TYPE_BLA_W_LP || nalType === NAL_TYPE_BLA_W_RADL ||
-                nalType === NAL_TYPE_BLA_N_LP) {
+            if (isKeyFrame(nalType)) {
                 this.maybeSendAPCodecInfo(packet, ret);
             }
 

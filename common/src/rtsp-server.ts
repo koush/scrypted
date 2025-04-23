@@ -93,8 +93,12 @@ export const H265_NAL_TYPE_AGG = 48;
 export const H265_NAL_TYPE_VPS = 32;
 export const H265_NAL_TYPE_SPS = 33;
 export const H265_NAL_TYPE_PPS = 34;
-export const H265_NAL_TYPE_IDR_N = 19;
-export const H265_NAL_TYPE_IDR_W = 20;
+export const H265_NAL_TYPE_BLA_W_LP = 16;
+export const H265_NAL_TYPE_BLA_W_RADL = 17;
+export const H265_NAL_TYPE_BLA_N_LP = 18;
+export const H265_NAL_TYPE_IDR_W_RADL = 19;
+export const H265_NAL_TYPE_IDR_N_LP = 20;
+export const H265_NAL_TYPE_CRA_NUT = 21;
 export const H265_NAL_TYPE_FU = 49;
 export const H265_NAL_TYPE_SEI_PREFIX = 39;
 export const H265_NAL_TYPE_SEI_SUFFIX = 40;
@@ -252,6 +256,26 @@ export function getNaluTypesInH265Nalu(nalu: Buffer, fuaRequireStart = false, fu
     return ret;
 }
 
+export function isH265KeyFrameRelatedInSet(naluTypes: Set<number>, allowCodecInfo = true) {
+    if (naluTypes.has(H265_NAL_TYPE_IDR_N_LP)
+        || naluTypes.has(H265_NAL_TYPE_IDR_W_RADL)
+        || naluTypes.has(H265_NAL_TYPE_CRA_NUT)
+        || naluTypes.has(H265_NAL_TYPE_BLA_N_LP)
+        || naluTypes.has(H265_NAL_TYPE_BLA_W_LP)
+        || naluTypes.has(H265_NAL_TYPE_BLA_W_RADL)) {
+        return true;
+    }
+
+    if (allowCodecInfo) {
+        if (naluTypes.has(H265_NAL_TYPE_VPS)
+            || naluTypes.has(H265_NAL_TYPE_SPS)
+            || naluTypes.has(H265_NAL_TYPE_PPS))
+            return true;
+    }
+    return false;
+}
+
+
 export function createRtspParser(options?: StreamParserOptions): RtspStreamParser {
     let resolve: any;
 
@@ -283,12 +307,7 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
                 else if (streamChunk.type === 'h265') {
                     const naluTypes = getStartedH265NaluTypes(streamChunk);
 
-                    if (naluTypes.has(H265_NAL_TYPE_VPS)
-                        || naluTypes.has(H265_NAL_TYPE_SPS)
-                        || naluTypes.has(H265_NAL_TYPE_PPS)
-                        || naluTypes.has(H265_NAL_TYPE_IDR_N)
-                        || naluTypes.has(H265_NAL_TYPE_IDR_W)
-                    ) {
+                    if (isH265KeyFrameRelatedInSet(naluTypes)) {
                         return streamChunks.slice(prebufferIndex);
                     }
                 }
