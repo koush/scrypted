@@ -458,7 +458,11 @@ export function parseOptions(options: RTCSignalingOptions) {
     if (options?.userAgent?.includes('Firefox/'))
         sessionSupportsH264High = true;
 
-    const transcodeWidth = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
+    // Some devices return a `screen width` value that is not a multiple of 2, which is not allowed for the h264 codec.
+    // Convert to a smaller even value.
+    const screenWidthForTranscodeH264 = Math.trunc((options?.screen?.width || 960) / 2) * 2;
+
+    const transcodeWidth = Math.max(640, Math.min(screenWidthForTranscodeH264, 1280));
     const devicePixelRatio = options?.screen?.devicePixelRatio || 1;
     const width = (options?.screen?.width * devicePixelRatio) || undefined;
     const height = (options?.screen?.height * devicePixelRatio) || undefined;
