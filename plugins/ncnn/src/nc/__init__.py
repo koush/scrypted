@@ -123,12 +123,12 @@ class NCNNPlugin(
 
 
         self.net = ncnn.Net()
-        # self.net.opt.use_vulkan_compute = True
+        self.net.opt.use_vulkan_compute = True
         # self.net.opt.use_winograd_convolution = False
         # self.net.opt.use_sgemm_convolution = False
-        # self.net.opt.use_fp16_packed = False
-        # self.net.opt.use_fp16_storage = False
-        # self.net.opt.use_fp16_arithmetic = False
+        self.net.opt.use_fp16_packed = False
+        self.net.opt.use_fp16_storage = False
+        self.net.opt.use_fp16_arithmetic = False
         # self.net.opt.use_int8_storage = False
         # self.net.opt.use_int8_arithmetic = False
 
@@ -239,6 +239,8 @@ class NCNNPlugin(
             im = np.expand_dims(input, axis=0)
             im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
             im = im.astype(np.float32) / 255.0
+            # no batch? https://github.com/Tencent/ncnn/issues/5990#issuecomment-2832927105
+            im = im.reshape((1, 3, 320, 320)).squeeze(0)
             im = np.ascontiguousarray(im)  # contiguous
             return im
 
