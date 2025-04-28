@@ -25,9 +25,6 @@ def cosine_similarity(vector_a, vector_b):
     similarity = dot_product / (norm_a * norm_b)
     return similarity
 
-
-predictExecutor = concurrent.futures.ThreadPoolExecutor(8, "Vision-Predict")
-
 class CoreMLFaceRecognition(FaceRecognizeDetection):
     def __init__(self, plugin, nativeId: str):
         super().__init__(plugin, nativeId)

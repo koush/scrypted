@@ -3,9 +3,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import concurrent.futures
-import os
 import re
-import threading
 import traceback
 from typing import Any, List, Tuple
 
@@ -18,11 +16,11 @@ import ncnn
 from common import yolo
 
 try:
-    from ncnn.face_recognition import NCNNFaceRecognition
+    from nc.face_recognition import NCNNFaceRecognition
 except:
     NCNNFaceRecognition = None
 try:
-    from ncnn.text_recognition import NCNNTextRecognition
+    from nc.text_recognition import NCNNTextRecognition
 except:
     NCNNTextRecognition = None
 from predict import Prediction, PredictPlugin
@@ -106,7 +104,7 @@ class NCNNPlugin(
             }
             files = [
                 f"{model}/best_converted.ncnn.bin",
-                f"{model}//best_converted.ncnn.param",
+                f"{model}/best_converted.ncnn.param",
             ]
 
             for f in files:
@@ -124,13 +122,9 @@ class NCNNPlugin(
 
         self.net = ncnn.Net()
         self.net.opt.use_vulkan_compute = True
-        # self.net.opt.use_winograd_convolution = False
-        # self.net.opt.use_sgemm_convolution = False
         self.net.opt.use_fp16_packed = False
         self.net.opt.use_fp16_storage = False
         self.net.opt.use_fp16_arithmetic = False
-        # self.net.opt.use_int8_storage = False
-        # self.net.opt.use_int8_arithmetic = False
 
         self.net.load_param(paramFile)
         self.net.load_model(binFile)
@@ -153,55 +147,55 @@ class NCNNPlugin(
         # self.loop = asyncio.get_event_loop()
         # self.minThreshold = 0.2
 
-    #     self.faceDevice = None
-    #     self.textDevice = None
+        self.faceDevice = None
+        self.textDevice = None
 
-    #     if not self.forked:
-    #         asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
+        if not self.forked:
+            asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
 
-    # async def prepareRecognitionModels(self):
-    #     try:
-    #         devices = [
-    #             {
-    #                 "nativeId": "facerecognition",
-    #                 "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
-    #                 "interfaces": [
-    #                         scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
-    #                     scrypted_sdk.ScryptedInterface.ObjectDetection.value,
-    #                 ],
-    #                 "name": "NCNN Face Recognition",
-    #             },
-    #         ]
+    async def prepareRecognitionModels(self):
+        try:
+            devices = [
+                {
+                    "nativeId": "facerecognition",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                    ],
+                    "name": "NCNN Face Recognition",
+                },
+            ]
 
-    #         if NCNNTextRecognition:
-    #             devices.append(
-    #                 {
-    #                     "nativeId": "textrecognition",
-    #                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
-    #                     "interfaces": [
-    #                         scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
-    #                         scrypted_sdk.ScryptedInterface.ObjectDetection.value,
-    #                     ],
-    #                     "name": "NCNN Text Recognition",
-    #                 },
-    #             )
+            if NCNNTextRecognition:
+                devices.append(
+                    {
+                        "nativeId": "textrecognition",
+                        "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                        "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                            scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                        ],
+                        "name": "NCNN Text Recognition",
+                    },
+                )
 
-    #         await scrypted_sdk.deviceManager.onDevicesChanged(
-    #             {
-    #                 "devices": devices,
-    #             }
-    #         )
-    #     except:
-    #         pass
+            await scrypted_sdk.deviceManager.onDevicesChanged(
+                {
+                    "devices": devices,
+                }
+            )
+        except:
+            pass
 
-    # async def getDevice(self, nativeId: str) -> Any:
-    #     if nativeId == "facerecognition":
-    #         self.faceDevice = self.faceDevice or NCNNFaceRecognition(self, nativeId)
-    #         return self.faceDevice
-    #     if nativeId == "textrecognition":
-    #         self.textDevice = self.textDevice or NCNNTextRecognition(self, nativeId)
-    #         return self.textDevice
-    #     raise Exception("unknown device")
+    async def getDevice(self, nativeId: str) -> Any:
+        if nativeId == "facerecognition":
+            self.faceDevice = self.faceDevice or NCNNFaceRecognition(self, nativeId)
+            return self.faceDevice
+        if nativeId == "textrecognition":
+            self.textDevice = self.textDevice or NCNNTextRecognition(self, nativeId)
+            return self.textDevice
+        raise Exception("unknown device")
 
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"

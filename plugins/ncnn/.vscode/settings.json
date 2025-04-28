@@ -1,6 +1,6 @@
 
 {
-    "scrypted.debugHost": "scrypted-nvr",
+    "scrypted.debugHost": "scrypted-amd",
     "python.analysis.extraPaths": [
         "./node_modules/@scrypted/sdk/types/scrypted_python"
     ]
