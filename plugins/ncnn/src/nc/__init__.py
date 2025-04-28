@@ -31,18 +31,14 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "NCNN-Prepare")
 
 availableModels = [
     "Default",
-    "scrypted_yolov10m_320",
-    "scrypted_yolov10n_320",
-    "scrypted_yolo_nas_s_320",
-    "scrypted_yolov9e_320",
+    "scrypted_yolov9c_relu_320",
+    "scrypted_yolov9m_relu_320",
+    "scrypted_yolov9s_relu_320",
+    "scrypted_yolov9t_relu_320",
     "scrypted_yolov9c_320",
+    "scrypted_yolov9m_320",
     "scrypted_yolov9s_320",
     "scrypted_yolov9t_320",
-    "scrypted_yolov6n_320",
-    "scrypted_yolov6s_320",
-    "scrypted_yolov8n_320",
-    "ssdlite_mobilenet_v2",
-    "yolov4-tiny",
 ]
 
 
