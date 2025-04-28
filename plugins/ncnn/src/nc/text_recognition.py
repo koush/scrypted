@@ -3,30 +3,23 @@ from __future__ import annotations
 import asyncio
 
 import numpy as np
-from PIL import Image
 
 import ncnn
 from nc import async_infer
-from predict.face_recognize import FaceRecognizeDetection
+from predict.text_recognize import TextRecognition
 
-faceDetectPrepare, faceDetectPredict = async_infer.create_executors("FaceDetect")
-faceRecognizePrepare, faceRecognizePredict = async_infer.create_executors(
-    "FaceRecognize"
+textDetectPrepare, textDetectPredict = async_infer.create_executors("TextDetect")
+textRecognizePrepare, textRecognizePredict = async_infer.create_executors(
+    "TextRecognize"
 )
 
 
-class NCNNFaceRecognition(FaceRecognizeDetection):
-    def __init__(self, plugin, nativeId: str):
-        super().__init__(plugin=plugin, nativeId=nativeId)
-        self.prefer_relu = True
-
+class NCNNTextRecognition(TextRecognition):
     def downloadModel(self, model: str):
-        scrypted_yolov9 = "scrypted_yolov9" in model
-        ncnnmodel = "best_converted" if scrypted_yolov9 else model
         model_version = "v1"
         files = [
-            f"{model}/{ncnnmodel}.ncnn.bin",
-            f"{model}/{ncnnmodel}.ncnn.param",
+            f"{model}/{model}.ncnn.bin",
+            f"{model}/{model}.ncnn.param",
         ]
 
         for f in files:
@@ -53,14 +46,11 @@ class NCNNFaceRecognition(FaceRecognizeDetection):
 
         return [net, input_name]
 
-    async def predictDetectModel(self, input: Image.Image):
+
+    async def predictDetectModel(self, input: np.ndarray):
         def prepare():
-            im = np.array(input)
-            im = np.expand_dims(input, axis=0)
-            im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
-            im = im.astype(np.float32) / 255.0
             # no batch? https://github.com/Tencent/ncnn/issues/5990#issuecomment-2832927105
-            im = im.reshape((1, 3, 320, 320)).squeeze(0)
+            im = input.squeeze(0)
             im = np.ascontiguousarray(im)  # contiguous
             return im
 
@@ -74,17 +64,19 @@ class NCNNFaceRecognition(FaceRecognizeDetection):
             ex.extract("out0", output_ncnn)
 
             output_tensors = np.array(output_ncnn)
+            output_tensors = output_tensors.transpose((1, 2, 0))
+            # readd a batch dimension
+            output_tensors = np.expand_dims(output_tensors, axis=0)
             return output_tensors
 
         input_tensor = await asyncio.get_event_loop().run_in_executor(
-            faceDetectPrepare, lambda: prepare()
+            textDetectPrepare, lambda: prepare()
         )
         return await asyncio.get_event_loop().run_in_executor(
-            faceDetectPredict, lambda: predict(input_tensor)
+            textDetectPredict, lambda: predict(input_tensor)
         )
 
-
-    async def predictFaceModel(self, input: np.ndarray):
+    async def predictTextModel(self, input: np.ndarray):
         def prepare():
             # no batch? https://github.com/Tencent/ncnn/issues/5990#issuecomment-2832927105
             im = input.squeeze(0)
@@ -92,7 +84,7 @@ class NCNNFaceRecognition(FaceRecognizeDetection):
             return im
 
         def predict(input_tensor):
-            net, input_name = self.faceModel
+            net, input_name = self.textModel
             input_ncnn = ncnn.Mat(input_tensor)
             ex = net.create_extractor()
             ex.input(input_name, input_ncnn)
@@ -101,11 +93,13 @@ class NCNNFaceRecognition(FaceRecognizeDetection):
             ex.extract("out0", output_ncnn)
 
             output_tensors = np.array(output_ncnn)
+            # readd a batch dimension
+            output_tensors = np.expand_dims(output_tensors, axis=0)
             return output_tensors
 
         input_tensor = await asyncio.get_event_loop().run_in_executor(
-            faceDetectPrepare, lambda: prepare()
+            textRecognizePrepare, lambda: prepare()
         )
         return await asyncio.get_event_loop().run_in_executor(
-            faceDetectPredict, lambda: predict(input_tensor)
+            textRecognizePredict, lambda: predict(input_tensor)
         )
