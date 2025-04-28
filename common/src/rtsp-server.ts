@@ -689,9 +689,12 @@ export class RtspClient extends RtspBase {
         // @ts-ignore
         const { parseHTTPHeadersQuotedKeyValueSet } = await import('http-auth-utils/dist/utils');
 
+        const authedUrl = new URL(this.url);
+        const username = decodeURIComponent(authedUrl.username);
+        const password = decodeURIComponent(authedUrl.password);
+
         if (this.wwwAuthenticate.includes('Basic')) {
-            const parsedUrl = new URL(this.url);
-            const hash = BASIC.computeHash({ username: parsedUrl.username, password: parsedUrl.password });
+            const hash = BASIC.computeHash({ username, password });
             return `Basic ${hash}`;
         }
 
@@ -710,10 +713,6 @@ export class RtspClient extends RtspBase {
             } as any,
             REQUIRED_WWW_AUTHENTICATE_KEYS,
         ) as DigestWWWAuthenticateData;
-
-        const authedUrl = new URL(this.url);
-        const username = decodeURIComponent(authedUrl.username);
-        const password = decodeURIComponent(authedUrl.password);
 
         const strippedUrl = new URL(url.toString());
         strippedUrl.username = '';
