@@ -42,9 +42,6 @@ RUN brew update
 
 # in sequoia, brew node is unusable because it is not signed and can't access local network unless run as root.
 # https://developer.apple.com/forums/thread/766270
-# RUN_IGNORE brew install node@20
-# NODE_PATH=$(brew --prefix node@20)
-# NODE_BIN_PATH=$NODE_PATH/bin
 RUN_IGNORE curl -L https://nodejs.org/dist/v22.14.0/node-v22.14.0.pkg -o /tmp/node.pkg
 RUN_IGNORE sudo installer -pkg /tmp/node.pkg -target /
 NODE_PATH=/usr/local # used to pass var test
@@ -88,13 +85,13 @@ RUN mkdir -p ~/Library/LaunchAgents
 
 if [ ! -d "$NODE_PATH" ]
 then
-    echo "Unable to determine node@20 path."
+    echo "Unable to determine node path."
     exit 1
 fi
 
 if [ ! -d "$NODE_BIN_PATH" ]
 then
-    echo "Unable to determine node@20 bin path."
+    echo "Unable to determine node bin path."
     echo "$NODE_BIN_PATH does not exist."
     exit 1
 fi

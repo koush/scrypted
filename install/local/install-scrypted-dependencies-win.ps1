@@ -19,7 +19,7 @@ sc.exe stop scrypted.exe
 iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
 # Install node.js
-choco upgrade -y nodejs-lts --version=20.18.0
+choco upgrade -y nodejs-lts --version=22.15.0
 
 # Install VC Redist, which is necessary for portable python
 choco install -y vcredist140
@@ -34,7 +34,7 @@ $SCRYPTED_WINDOWS_PYTHON_VERSION="-3.9"
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
 
 # Workaround Windows Node no longer creating %APPDATA%\npm which causes npx to fail
-# Fixed in newer versions of NPM but not the one bundled with Node 20
+# Fixed in newer versions of NPM but not the one bundled with Node 2x
 # https://github.com/nodejs/node/issues/53538
 npm i -g npm
 
