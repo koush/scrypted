@@ -35,12 +35,12 @@
       ],
       "runtime": "python",
       "pythonVersion": {
-         "default": "3.9",
+         "default": "3.11",
          "darwin": {
-            "arm64": "3.10"
+            "arm64": "3.11"
          },
          "win32": {
-            "x64": "3.9"
+            "x64": "3.11"
          }
       },
       "type": "API",

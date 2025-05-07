@@ -4,26 +4,18 @@ import json
 import threading
 
 from PIL import Image
-from pycoral.adapters import detect
 
 from .tflite_common import *
 
-loaded_py_coral = False
-try:
-    from pycoral.utils.edgetpu import list_edge_tpus, make_interpreter
+from tflite_support.task import vision, core, processor
 
-    loaded_py_coral = True
-    print("coral edge tpu library loaded successfully")
-except Exception as e:
-    print("coral edge tpu library load failed", e)
-    pass
 import asyncio
 import concurrent.futures
 import re
 from typing import Any, Tuple
 
 import scrypted_sdk
-import tflite_runtime.interpreter as tflite
+from ai_edge_litert.interpreter import Interpreter
 from .yolo_separate_outputs import *
 from scrypted_sdk.types import Setting, SettingValue
 
@@ -74,17 +66,6 @@ class TensorFlowLitePlugin(
     def __init__(self, nativeId: str | None = None, forked: bool = False):
         super().__init__(nativeId=nativeId, forked=forked)
 
-        edge_tpus = None
-        try:
-            edge_tpus = list_edge_tpus()
-            print("edge tpus", edge_tpus)
-            if not len(edge_tpus):
-                raise Exception("no edge tpu found")
-        except Exception as e:
-            print("unable to use Coral Edge TPU", e)
-            edge_tpus = None
-            pass
-
         model_version = "v14"
         model = self.storage.getItem("model") or "Default"
         if model not in availableModels:
@@ -92,6 +73,7 @@ class TensorFlowLitePlugin(
             model = "Default"
         defaultModel = model == "Default"
         branch = "main"
+        suffix = ""
 
         labelsFile = None
 
@@ -140,44 +122,15 @@ class TensorFlowLitePlugin(
                 f"{model_version}/{model}/{tflite_model}{suffix}.tflite",
             )
 
-        try:
-            if edge_tpus:
-                configureModel()
-                suffix = "_edgetpu"
-                modelFile = downloadModel()
-                self.edge_tpu_found = json.dumps(edge_tpus)
-                for idx, edge_tpu in enumerate(edge_tpus):
-                    try:
-                        interpreter = make_interpreter(modelFile, ":%s" % idx)
-                        interpreter.allocate_tensors()
-                        self.image_input_details = interpreter.get_input_details()[0]
-                        _, height, width, channels = self.image_input_details[
-                            "shape"
-                        ]
-                        self.input_details = int(width), int(height), int(channels)
-                        available_interpreters.append(interpreter)
-                        self.interpreter_count = self.interpreter_count + 1
-                        print("added tpu %s" % (edge_tpu))
-                    except Exception as e:
-                        print("unable to use Coral Edge TPU", e)
-
-                if not self.interpreter_count:
-                    raise Exception("all tpus failed to load")
-            else:
-                raise Exception()
-        except Exception as e:
-            edge_tpus = None
-            self.edge_tpu_found = "Edge TPU not found"
-            suffix = ""
-            configureModel()
-            modelFile = downloadModel()
-            interpreter = tflite.Interpreter(model_path=modelFile)
-            interpreter.allocate_tensors()
-            self.image_input_details = interpreter.get_input_details()[0]
-            _, height, width, channels = self.image_input_details["shape"]
-            self.input_details = int(width), int(height), int(channels)
-            available_interpreters.append(interpreter)
-            self.interpreter_count = self.interpreter_count + 1
+        configureModel()
+        modelFile = downloadModel()
+        interpreter = Interpreter(model_path=modelFile)
+        interpreter.allocate_tensors()
+        self.image_input_details = interpreter.get_input_details()[0]
+        _, height, width, channels = self.image_input_details["shape"]
+        self.input_details = int(width), int(height), int(channels)
+        available_interpreters.append(interpreter)
+        self.interpreter_count = self.interpreter_count + 1
 
         print(modelFile, labelsFile)
 
@@ -201,13 +154,6 @@ class TensorFlowLitePlugin(
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"
         return [
-            {
-                "title": "Detected Edge TPU",
-                "description": "The device paths of the Coral Edge TPUs that will be used for detections.",
-                "value": self.edge_tpu_found,
-                "readonly": True,
-                "key": "coral",
-            },
             {
                 "key": "model",
                 "title": "Model",
@@ -251,9 +197,9 @@ class TensorFlowLitePlugin(
             if not self.yolo:
                 tflite_common.set_input(interpreter, im)
                 interpreter.invoke()
-                objs = detect.get_objects(
-                    interpreter, score_threshold=0.2, image_scale=(1, 1)
-                )
+                detector = vision.ObjectDetector.create_from_file(interpreter.model_path)
+
+                objs = detector.detect(im)
                 return objs
 
             tensor_index = input_details(interpreter, "index")
