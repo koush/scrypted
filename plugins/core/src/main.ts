@@ -1,4 +1,5 @@
 import { readFileAsString, tsCompile } from '@scrypted/common/src/eval/scrypted-eval';
+import { sleep } from '@scrypted/common/src/sleep';
 import sdk, { DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, Settings } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { writeFileSync } from 'fs';
@@ -8,6 +9,7 @@ import yaml from 'yaml';
 import { getUsableNetworkAddresses } from '../../../server/src/ip';
 import { AggregateCore, AggregateCoreNativeId } from './aggregate-core';
 import { AutomationCore, AutomationCoreNativeId } from './automations-core';
+import { ClusterCore, ClusterCoreNativeId } from './cluster';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
 import { checkLegacyLxc, checkLxc } from './platform/lxc';
@@ -15,7 +17,6 @@ import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId, newTerminalService } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
-import { ClusterCore, ClusterCoreNativeId } from './cluster';
 
 const { deviceManager, endpointManager } = sdk;
 
@@ -210,6 +211,32 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                 },
             );
         })();
+
+        // check on workers once an hour.
+        this.updateWorkers();
+        setInterval(() => this.updateWorkers(), 1000 * 60 * 60);
+    }
+
+    async updateWorkers() {
+        const workers = await sdk.clusterManager?.getClusterWorkers();
+        if (!workers)
+            return;
+        for (const [id, worker] of Object.entries(workers)) {
+            const forked = sdk.fork<ReturnType<typeof fork>>({
+                clusterWorkerId: id,
+                runtime: 'node',
+            });
+
+            (async () => {
+                try {
+                    const result = await forked.result;
+                    result.checkLxc();
+                }
+                catch (e) {
+                    forked.worker.terminate();
+                }
+            })();
+        }
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -332,5 +359,15 @@ export async function fork() {
         tsCompile,
         newScript,
         newTerminalService,
+        checkLxc: async () => {
+            try {
+                // console.warn('Checking for LXC installation...');
+                await checkLxc();
+            }
+            finally {
+                await sleep(1000);
+                process.exit(0);
+            }
+        }
     }
 }

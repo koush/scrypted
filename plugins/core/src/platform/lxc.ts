@@ -30,6 +30,8 @@ export async function checkLxc() {
         return;
     }
 
+    // console.warn('lxc needs updating', sdk.clusterManager.getClusterWorkerId());
+    // console.warn(foundDockerComposeSh);
     await fs.promises.copyFile(LXC_DOCKER_COMPOSE_SH_PATH, DOCKER_COMPOSE_SH_PATH);
     await fs.promises.chmod(DOCKER_COMPOSE_SH_PATH, 0o755);
 }
