@@ -72,12 +72,12 @@ apt-get install -y ocl-icd-libopencl1
 # https://github.com/intel/compute-runtime/releases/tag/24.35.30872.22
 curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.17537.20/intel-igc-core_1.0.17537.20_amd64.deb
 curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.17537.20/intel-igc-opencl_1.0.17537.20_amd64.deb
-curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-level-zero-gpu-dbgsym_1.3.30872.22_amd64.ddeb
-curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-level-zero-gpu-legacy1-dbgsym_1.3.30872.22_amd64.ddeb
+# curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-level-zero-gpu-dbgsym_1.3.30872.22_amd64.ddeb
+# curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-level-zero-gpu-legacy1-dbgsym_1.3.30872.22_amd64.ddeb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-level-zero-gpu-legacy1_1.3.30872.22_amd64.deb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-level-zero-gpu_1.3.30872.22_amd64.deb
-curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd-dbgsym_24.35.30872.22_amd64.ddeb
-curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd-legacy1-dbgsym_24.35.30872.22_amd64.ddeb
+# curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd-dbgsym_24.35.30872.22_amd64.ddeb
+# curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd-legacy1-dbgsym_24.35.30872.22_amd64.ddeb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd-legacy1_24.35.30872.22_amd64.deb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/intel-opencl-icd_24.35.30872.22_amd64.deb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/24.35.30872.22/libigdgmm12_22.5.0_amd64.deb
@@ -94,9 +94,9 @@ ZERO_GPU_VERSION=1.6.32224.5_amd64
 LIBIGDGMM_VERSION=22.5.5_amd64
 curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v$IGC_BASE_VERSION/intel-igc-core-$IGC_VERSION.deb
 curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v$IGC_BASE_VERSION/intel-igc-opencl-$IGC_VERSION.deb
-curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-level-zero-gpu-dbgsym_$ZERO_GPU_VERSION.ddeb
+# curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-level-zero-gpu-dbgsym_$ZERO_GPU_VERSION.ddeb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-level-zero-gpu_$ZERO_GPU_VERSION.deb
-curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-opencl-icd-dbgsym_"$COMPUTE_VERSION"_amd64.ddeb
+# curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-opencl-icd-dbgsym_"$COMPUTE_VERSION"_amd64.ddeb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-opencl-icd_"$COMPUTE_VERSION"_amd64.deb
 curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/libigdgmm12_$LIBIGDGMM_VERSION.deb
 
