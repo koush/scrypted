@@ -7,7 +7,7 @@ import { OnvifCameraAPI, OnvifEvent, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
 import { DevInfo } from './probe';
-import { AIState, Enc, ReolinkCameraClient } from './reolink-api';
+import { AIState, Enc, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     sirenTimeout: NodeJS.Timeout;
@@ -571,6 +571,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     async listenEvents() {
         let killed = false;
         const client = this.getClient();
+        const deviceInfo = await client.getDeviceInfo();
 
         // reolink ai might not trigger motion if objects are detected, weird.
         const startAI = async (ret: Destroyable, triggerMotion: () => void) => {
@@ -620,7 +621,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                     }
                 }
                 catch (e) {
-                    if (!hasSucceeded)
+                    if (!hasSucceeded && !isDeviceNvr(deviceInfo))
                         return;
                     ret.emit('error', e);
                 }

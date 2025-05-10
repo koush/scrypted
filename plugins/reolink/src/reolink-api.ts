@@ -75,6 +75,8 @@ export interface PtzPreset {
     name: string;
 }
 
+export const isDeviceNvr = (deviceInfo: DevInfo) => ['HOMEHUB', 'NVR', 'NVR_WIFI'].includes(deviceInfo.exactType);
+
 export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
     parameters: Record<string, string>;
@@ -320,7 +322,7 @@ export class ReolinkCameraClient {
         const deviceInfo: DevInfo = await response.body?.[0]?.value?.DevInfo;
 
         // Will need to check if it's valid for NVR and NVR_WIFI
-        if (!['HOMEHUB', 'NVR', 'NVR_WIFI'].includes(deviceInfo.exactType)) {
+        if (!isDeviceNvr(deviceInfo)) {
             return deviceInfo;
         }
 
