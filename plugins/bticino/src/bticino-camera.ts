@@ -199,11 +199,18 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
         }
 
         const ffmpegPath = await mediaManager.getFFmpegPath();
+        // keyframes every 2 seconds to improve HKSV compatibility
         const ffmpegArgs = [
             '-hide_banner',
             '-nostats',
             '-y',
             '-i', avifile,
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-g', '20',            // GOP length: 20 frames
+            '-keyint_min', '20',   // Minimum keyframe interval
+            '-sc_threshold', '0',  // Disable scene change triggering keyframes
+            '-c:a', 'aac',         // Optional: re-encode audio for compatibility
             outputfile
         ];
 
