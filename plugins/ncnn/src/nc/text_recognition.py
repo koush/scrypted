@@ -35,9 +35,9 @@ class NCNNTextRecognition(TextRecognition):
 
         net = ncnn.Net()
         net.opt.use_vulkan_compute = True
-        net.opt.use_fp16_packed = False
-        net.opt.use_fp16_storage = False
-        net.opt.use_fp16_arithmetic = False
+        # net.opt.use_fp16_packed = False
+        # net.opt.use_fp16_storage = False
+        # net.opt.use_fp16_arithmetic = False
 
         net.load_param(paramFile)
         net.load_model(binFile)
