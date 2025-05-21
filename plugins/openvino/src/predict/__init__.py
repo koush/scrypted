@@ -363,6 +363,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
             ret = await result.getTextRecognition()
         elif self.nativeId == "facerecognition":
             ret = await result.getFaceRecognition()
+        else:
+            ret = await result.getCustomDetection(self.nativeId)
         return ret
 
     async def startCluster(self):
@@ -456,6 +458,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
                 "interfaces": [
                     scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
                     scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                    "CustomObjectDetection",
                 ],
                 "name": name,
             },
@@ -484,3 +487,6 @@ class Fork:
 
     async def getFaceRecognition(self):
         return await self.plugin.getDevice("facerecognition")
+
+    async def getCustomDetection(self, nativeId: str):
+        return await self.plugin.getDevice(nativeId)
