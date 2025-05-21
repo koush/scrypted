@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import random
+import re
 import asyncio
 import math
 import os
@@ -45,7 +48,7 @@ class Prediction:
         self.embedding = embedding
 
 
-class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
+class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sdk.ScryptedSystemDevice, scrypted_sdk.DeviceCreator, scrypted_sdk.DeviceProvider):
     labels: dict
 
     def __init__(
@@ -55,6 +58,10 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
         forked: bool = False,
     ):
         super().__init__(nativeId=nativeId)
+
+        self.systemDevice = {
+            "deviceCreator": "Model",
+        }
 
         self.plugin = plugin
         # self.clusterIndex = 0
@@ -393,6 +400,74 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface):
 
             asyncio.ensure_future(startClusterWorker(), loop=self.loop)
 
+
+    async def getCreateDeviceSettings(self):
+        ret: list[Setting] = []
+
+        ret.append({
+            "key": "name",
+            "title": "Model Name",
+            "description": "The name or description of this model. E.g., Bird Classifier."
+        })
+
+        ret.append({
+            "key": "url",
+            "title": "Model URL",
+            "description": "The URL of the model. This should be a Github repo or url path to the model's config.json."
+        })
+
+        ret.append({
+            "key": "info",
+            "type": "html",
+            "title": "Sample Model",
+            "value": "<a href='https://github.com/scryptedapp/bird-classifier'>A reference bird classification model.</a>"
+        })
+        return ret
+
+    async def createDevice(self, settings):
+        name = settings.get('name', None)
+        if not name:
+            raise Exception("Model name not provided")
+        model_url: str = settings.get('url', None)
+        if not model_url:
+            raise Exception("Model URL not provided")
+        if not model_url.endswith('config.json'):
+            plugin_suffix = self.pluginId.split('/')[1]
+            match = re.match(r'https://github\.com/([^/]+)/([^/]+)', model_url)
+            if not match:
+                raise ValueError("Invalid GitHub repository URL.")
+            
+            org, repo = match.groups()
+            model_url = f"https://raw.githubusercontent.com/{org}/{repo}/refs/heads/main/models/{plugin_suffix}/config.json"
+
+        response = urllib.request.urlopen(model_url)
+        if response.getcode() < 200 or response.getcode() >= 300:
+            raise Exception(f"non-2xx response code")
+        data = response.read()
+
+        config = json.loads(data)
+
+        nativeId = ''.join(random.choices('0123456789abcdef', k=32))
+
+        id = await scrypted_sdk.deviceManager.onDeviceDiscovered(
+            {
+                "nativeId": nativeId,
+                "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                "interfaces": [
+                    scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                    scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                ],
+                "name": name,
+            },
+        )
+
+        from .custom_detect import CustomDetection
+        device: CustomDetection = await self.getDevice(nativeId)
+        device.storage.setItem("config_url", model_url)
+        device.storage.setItem("config", json.dumps(config))
+        device.init_model()
+
+        return id
 
 class Fork:
     def __init__(self, PluginType: Any):

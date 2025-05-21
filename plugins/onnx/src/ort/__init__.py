@@ -17,6 +17,7 @@ from PIL import Image
 from scrypted_sdk.other import SettingValue
 from scrypted_sdk.types import Setting
 
+from .custom_detection import ONNXCustomDetection
 import common.yolo as yolo
 from predict import PredictPlugin
 
@@ -57,6 +58,8 @@ class ONNXPlugin(
 ):
     def __init__(self, nativeId: str | None = None, forked: bool = False):
         super().__init__(nativeId=nativeId, forked=forked)
+
+        self.custom_models = {}
 
         model = self.storage.getItem("model") or "Default"
         if model == "Default" or model not in availableModels:
@@ -168,7 +171,7 @@ class ONNXPlugin(
 
     async def prepareRecognitionModels(self):
         try:
-            devices = [
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(
                 {
                     "nativeId": "facerecognition",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
@@ -178,10 +181,10 @@ class ONNXPlugin(
                     ],
                     "name": "ONNX Face Recognition",
                 },
-            ]
+            )
 
             if ONNXTextRecognition:
-                devices.append(
+                await scrypted_sdk.deviceManager.onDeviceDiscovered(
                     {
                         "nativeId": "textrecognition",
                         "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
@@ -192,12 +195,6 @@ class ONNXPlugin(
                         "name": "ONNX Text Recognition",
                     },
                 )
-
-            await scrypted_sdk.deviceManager.onDevicesChanged(
-                {
-                    "devices": devices,
-                }
-            )
         except:
             pass
 
@@ -208,7 +205,12 @@ class ONNXPlugin(
         elif nativeId == "textrecognition":
             self.textDevice = self.textDevice or ONNXTextRecognition(self, nativeId)
             return self.textDevice
-        raise Exception("unknown device")
+        custom_model = self.custom_models.get(nativeId, None)
+        if custom_model:
+            return custom_model
+        custom_model = ONNXCustomDetection(self, nativeId)
+        self.custom_models[nativeId] = custom_model
+        return custom_model
 
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"

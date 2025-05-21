@@ -33,6 +33,8 @@
       "runtime": "python",
       "type": "API",
       "interfaces": [
+         "ScryptedSystemDevice",
+         "DeviceCreator",
          "Settings",
          "DeviceProvider",
          "ClusterForkInterface",
@@ -48,5 +50,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.1.83"
+   "version": "0.1.84"
 }

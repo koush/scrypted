@@ -18,6 +18,7 @@ import common.yolo as yolo
 from predict import Prediction, PredictPlugin
 from predict.rectangle import Rectangle
 
+from .custom_detection import OpenVINOCustomDetection
 from .face_recognition import OpenVINOFaceRecognition
 
 try:
@@ -103,6 +104,8 @@ class OpenVINOPlugin(
 ):
     def __init__(self, nativeId: str | None = None, forked: bool = False):
         super().__init__(nativeId=nativeId, forked=forked)
+
+        self.custom_models = {}
 
         self.core = ov.Core()
         dump_device_properties(self.core)
@@ -395,7 +398,7 @@ class OpenVINOPlugin(
 
     async def prepareRecognitionModels(self):
         try:
-            devices = [
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(
                 {
                     "nativeId": "facerecognition",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
@@ -405,10 +408,10 @@ class OpenVINOPlugin(
                     ],
                     "name": "OpenVINO Face Recognition",
                 },
-            ]
+            )
 
             if OpenVINOTextRecognition:
-                devices.append(
+                await scrypted_sdk.deviceManager.onDeviceDiscovered(
                     {
                         "nativeId": "textrecognition",
                         "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
@@ -417,14 +420,8 @@ class OpenVINOPlugin(
                             scrypted_sdk.ScryptedInterface.ObjectDetection.value,
                         ],
                         "name": "OpenVINO Text Recognition",
-                    },
+                    }
                 )
-
-            await scrypted_sdk.deviceManager.onDevicesChanged(
-                {
-                    "devices": devices,
-                }
-            )
         except:
             pass
 
@@ -435,4 +432,9 @@ class OpenVINOPlugin(
         elif nativeId == "textrecognition":
             self.textDevice = self.textDevice or OpenVINOTextRecognition(self, nativeId)
             return self.textDevice
-        raise Exception("unknown device")
+        custom_model = self.custom_models.get(nativeId, None)
+        if custom_model:
+            return custom_model
+        custom_model = OpenVINOCustomDetection(self, nativeId)
+        self.custom_models[nativeId] = custom_model
+        return custom_model

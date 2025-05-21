@@ -14,6 +14,7 @@ from scrypted_sdk import Setting, SettingValue
 
 from common import yolo
 from coreml.face_recognition import CoreMLFaceRecognition
+from coreml.custom_detection import CoreMLCustomDetection
 
 try:
     from coreml.text_recognition import CoreMLTextRecognition
@@ -76,6 +77,8 @@ class CoreMLPlugin(
 ):
     def __init__(self, nativeId: str | None = None, forked: bool = False):
         super().__init__(nativeId=nativeId, forked=forked)
+
+        self.custom_models = {}
 
         model = self.storage.getItem("model") or "Default"
         if model == "Default" or model not in availableModels:
@@ -149,7 +152,7 @@ class CoreMLPlugin(
 
     async def prepareRecognitionModels(self):
         try:
-            devices = [
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(
                 {
                     "nativeId": "facerecognition",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
@@ -159,10 +162,10 @@ class CoreMLPlugin(
                     ],
                     "name": "CoreML Face Recognition",
                 },
-            ]
+            )
 
             if CoreMLTextRecognition:
-                devices.append(
+                await scrypted_sdk.deviceManager.onDeviceDiscovered(
                     {
                         "nativeId": "textrecognition",
                         "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
@@ -174,11 +177,6 @@ class CoreMLPlugin(
                     },
                 )
 
-            await scrypted_sdk.deviceManager.onDevicesChanged(
-                {
-                    "devices": devices,
-                }
-            )
         except:
             pass
 
@@ -189,7 +187,12 @@ class CoreMLPlugin(
         if nativeId == "textrecognition":
             self.textDevice = self.textDevice or CoreMLTextRecognition(self, nativeId)
             return self.textDevice
-        raise Exception("unknown device")
+        custom_model = self.custom_models.get(nativeId, None)
+        if custom_model:
+            return custom_model
+        custom_model = CoreMLCustomDetection(self, nativeId)
+        self.custom_models[nativeId] = custom_model
+        return custom_model
 
     async def getSettings(self) -> list[Setting]:
         model = self.storage.getItem("model") or "Default"
