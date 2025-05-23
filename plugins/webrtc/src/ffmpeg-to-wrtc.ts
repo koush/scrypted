@@ -69,7 +69,7 @@ export async function createTrackForwarder(options: {
         requestDestination = 'remote';
     }
 
-    const hasH265Support = !!videoTransceiver.codecs.find(codec => codec.mimeType === 'video/H265');
+    const hasH265Support = !!videoTransceiver?.codecs.find(codec => codec.mimeType === 'video/H265');
 
     const mo = await requestMediaStream({
         video: {
@@ -141,7 +141,7 @@ export async function createTrackForwarder(options: {
     });
 
     const findAndSetCodec = (transceiver: RTCRtpTransceiver, mimeType: string) => {
-        const found = transceiver.codecs.find(codec => codec.mimeType === mimeType);
+        const found = transceiver?.codecs.find(codec => codec.mimeType === mimeType);
         if (found)
             transceiver.sender.codec = found;
         return found;
