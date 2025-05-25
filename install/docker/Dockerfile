@@ -1,4 +1,4 @@
-ARG BASE="20-jammy-full"
+ARG BASE="noble-full"
 FROM ghcr.io/koush/scrypted-common:${BASE}
 
 WORKDIR /
