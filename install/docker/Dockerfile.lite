@@ -1,5 +1,5 @@
 ARG BASE="jammy"
-FROM ubuntu:${BASE} as header
+FROM ubuntu:${BASE} AS header
 
 ENV DEBIAN_FRONTEND=noninteractive
 
