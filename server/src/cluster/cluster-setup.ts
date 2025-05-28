@@ -463,7 +463,7 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
 
 export async function clusterListenZero(callback: (socket: net.Socket) => void) {
     const SCRYPTED_CLUSTER_ADDRESS = process.env.SCRYPTED_CLUSTER_ADDRESS;
-    if (!SCRYPTED_CLUSTER_ADDRESS) {
+    if (!SCRYPTED_CLUSTER_ADDRESS || SCRYPTED_CLUSTER_ADDRESS === '127.0.0.1') {
         const server = new net.Server(callback);
         const port = await listenZero(server, '127.0.0.1');
         return {
