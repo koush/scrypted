@@ -34,8 +34,8 @@ class OpenVINOCustomDetection(CustomDetection):
             im = im.astype(np.float32) / 255.0
 
             if self.model_config.get("mean", None) and self.model_config.get("std", None):
-                mean = np.array(self.model_config["mean"])
-                std = np.array(self.model_config["std"])
+                mean = np.array(self.model_config["mean"]).astype(np.float32)
+                std = np.array(self.model_config["std"]).astype(np.float32)
                 mean = mean.reshape(1, -1, 1, 1)
                 std = std.reshape(1, -1, 1, 1)
                 im = (im - mean) / std

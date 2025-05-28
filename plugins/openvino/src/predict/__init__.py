@@ -449,20 +449,9 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
 
         config = json.loads(data)
 
-        nativeId = ''.join(random.choices('0123456789abcdef', k=32))
+        nativeId = ''.join(random.choices('0123456789abcdef', k=8))
 
-        id = await scrypted_sdk.deviceManager.onDeviceDiscovered(
-            {
-                "nativeId": nativeId,
-                "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
-                "interfaces": [
-                    scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
-                    scrypted_sdk.ScryptedInterface.ObjectDetection.value,
-                    "CustomObjectDetection",
-                ],
-                "name": name,
-            },
-        )
+        id = await self.reportDevice(nativeId, name)
 
         from .custom_detect import CustomDetection
         device: CustomDetection = await self.getDevice(nativeId)
@@ -471,6 +460,21 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
         device.init_model()
 
         return id
+    
+    async def reportDevice(self, nativeId: str, name: str):
+        return await scrypted_sdk.deviceManager.onDeviceDiscovered(
+            {
+                "nativeId": nativeId,
+                "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                "interfaces": [
+                    scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                    scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                    scrypted_sdk.ScryptedInterface.Settings.value,
+                    "CustomObjectDetection",
+                ],
+                "name": name,
+            },
+        )
 
 class Fork:
     def __init__(self, PluginType: Any):

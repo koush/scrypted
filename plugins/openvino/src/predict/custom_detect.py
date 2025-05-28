@@ -9,10 +9,17 @@ import numpy as np
 from PIL import Image
 from scrypted_sdk import (ObjectDetectionResult, ObjectDetectionSession,
                           ObjectsDetected)
+import scrypted_sdk
 
 from common import yolo
 from predict import PredictPlugin
 from common import softmax
+
+def safe_parse_json(value: str):
+    try:
+        return json.loads(value)
+    except Exception:
+        return None
 
 def replace_last_path_component(url, new_path):
     # Parse the original URL
@@ -38,7 +45,7 @@ def replace_last_path_component(url, new_path):
     
     return new_url
 
-class CustomDetection(PredictPlugin):
+class CustomDetection(PredictPlugin, scrypted_sdk.Settings):
     def __init__(self, plugin: PredictPlugin, nativeId: str):
         super().__init__(nativeId=nativeId, plugin=plugin)
 
@@ -99,15 +106,30 @@ class CustomDetection(PredictPlugin):
             ret = self.create_detection_result(objs, src_size, cvss)
             return ret
         elif self.model_config["model"] == "resnet":
+            # create excluded indices from labels
+            excluded_indices = set()
+            exclude_classes = safe_parse_json(self.storage.getItem('excludeClasses')) or []
+            while len(exclude_classes):
+                excluded_class = exclude_classes.pop()
+                for idx, class_name in self.labels.items():
+                    if class_name == excluded_class:
+                        excluded_indices.add(idx)
+            # filter out excluded indices
+            results = np.array(results)
+            if len(excluded_indices):
+                results = np.delete(results, list(excluded_indices))
             sm = softmax.softmax(results)
-            idx = np.argmax(sm, axis=0)
-            label = self.labels[int(idx)]
-            score = float(sm[int(idx)])
+            # get anything over the threshold, sort by score, top 3
+            min_indexes = np.where(sm > self.minThreshold)[0]
+            min_indexes = min_indexes[np.argsort(sm[min_indexes])[::-1]]
+            min_indexes = min_indexes[:3]
             detection_result: ObjectsDetected = {}
             detections: List[ObjectDetectionResult] = []
             detection_result["detections"] = detections
             detection_result["inputDimensions"] = src_size
-            if score > self.minThreshold:
+            for idx in min_indexes:
+                label = self.labels[int(idx)]
+                score = float(sm[int(idx)])
                 detections.append(
                     {
                         "className": label,
@@ -120,3 +142,23 @@ class CustomDetection(PredictPlugin):
 
     async def predictModel(self, input: Image.Image) -> ObjectsDetected:
         pass
+
+    async def getSettings(self):
+        return [
+            {
+                'key': 'excludeClasses',
+                'title': 'Exclude Classes',
+                'description': 'Classes to exclude from detection.',
+                'multiple': True,
+                'choices': list(self.labels.values()),
+                'value': safe_parse_json(self.storage.getItem('excludeClasses')),
+            }
+        ]
+    
+    async def putSetting(self, key: str, value: str):
+        if value:
+            self.storage.setItem(key, json.dumps(value))
+        else:
+            self.storage.removeItem(key)
+        await scrypted_sdk.deviceManager.onDeviceEvent(self.nativeId, scrypted_sdk.ScryptedInterface.Settings.value, None)
+

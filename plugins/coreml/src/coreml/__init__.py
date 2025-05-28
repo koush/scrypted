@@ -192,6 +192,7 @@ class CoreMLPlugin(
             return custom_model
         custom_model = CoreMLCustomDetection(self, nativeId)
         self.custom_models[nativeId] = custom_model
+        await custom_model.reportDevice(nativeId, custom_model.providedName)
         return custom_model
 
     async def getSettings(self) -> list[Setting]:

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-
-import numpy as np
-from PIL import Image
+import concurrent.futures
 import os
-import coremltools as ct
 
+import coremltools as ct
+import numpy as np
+import scrypted_sdk
+from PIL import Image
 
 from predict.custom_detect import CustomDetection
-from scrypted_sdk import ObjectsDetected
-import concurrent.futures
 
 
 class CoreMLCustomDetection(CustomDetection):
@@ -31,26 +30,26 @@ class CoreMLCustomDetection(CustomDetection):
         inputName = model.get_spec().description.input[0].name
         return model, inputName
     
-    async def predictModel(self, input: Image.Image) -> ObjectsDetected:
+    async def predictModel(self, input: Image.Image) -> scrypted_sdk.ObjectsDetected:
+        model, inputName = self.model
         def predict():
             if self.model_config.get("mean", None) and self.model_config.get("std", None):
-                model, inputName = self.model
-                im = np.expand_dims(input, axis=0)
-                im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+                im = np.array(input)
                 im = im.astype(np.float32) / 255.0
 
-                mean = np.array(self.model_config["mean"])
-                std = np.array(self.model_config["std"])
-                mean = mean.reshape(1, -1, 1, 1)
-                std = std.reshape(1, -1, 1, 1)
+                mean = np.array(self.model_config.get("mean", None), dtype=np.float32)
+                std = np.array(self.model_config.get("std", None), dtype=np.float32)
                 im = (im - mean) / std
-                im = im.astype(np.float32)
 
+                # Convert HWC to CHW
+                im = im.transpose(2, 0, 1)  # Channels first
+                im = im.astype(np.float32)
                 im = np.ascontiguousarray(im)
+                im = np.expand_dims(im, axis=0)
 
                 out_dict = model.predict({inputName: im})
             else:
-                out_dict = self.model.predict({self.inputName: input})
+                out_dict = model.predict({inputName: input})
 
             results = list(out_dict.values())[0][0]
             return results
