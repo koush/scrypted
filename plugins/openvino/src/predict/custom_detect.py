@@ -106,18 +106,12 @@ class CustomDetection(PredictPlugin, scrypted_sdk.Settings):
             ret = self.create_detection_result(objs, src_size, cvss)
             return ret
         elif self.model_config["model"] == "resnet":
-            # create excluded indices from labels
-            excluded_indices = set()
             exclude_classes = safe_parse_json(self.storage.getItem('excludeClasses')) or []
             while len(exclude_classes):
                 excluded_class = exclude_classes.pop()
                 for idx, class_name in self.labels.items():
                     if class_name == excluded_class:
-                        excluded_indices.add(idx)
-            # filter out excluded indices
-            results = np.array(results)
-            if len(excluded_indices):
-                results = np.delete(results, list(excluded_indices))
+                        results[idx] = 0
             sm = softmax.softmax(results)
             # get anything over the threshold, sort by score, top 3
             min_indexes = np.where(sm > self.minThreshold)[0]
