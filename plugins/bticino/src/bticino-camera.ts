@@ -642,8 +642,11 @@ export class BticinoSipCamera extends ScryptedDeviceBase implements MotionSensor
             this.binaryState = true
             setTimeout( () => {
                 // Assumption that flexisip only holds this call active for 20 seconds ... might be revised
+                // Extended the doorbell motion timeout from 20s to 60s.
+                // HomeKit Secure Video (HKSV) clips were limited to ~10s due to the short event duration.
+                // By keeping the motion event active longer, HKSV can record longer clips if activity persists.
                 this.reset()
-            }, 20 * 1000 )            
+            }, 60 * 1000 )            
             response.send('Success', {
                 code: 200,
             });
