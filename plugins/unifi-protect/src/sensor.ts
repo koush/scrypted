@@ -15,7 +15,7 @@ export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, Humi
 
     findSensor() {
         const id = this.protect.findId(this.nativeId);
-        return this.protect.api.sensors.find(sensor => sensor.id === id);
+        return this.protect.api.bootstrap.sensors.find(sensor => sensor.id === id);
     }
 
     async setTemperatureUnit(temperatureUnit: TemperatureUnit): Promise<void> {

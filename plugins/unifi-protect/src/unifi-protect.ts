@@ -1,3 +1,3 @@
 // export * from '@koush/unifi-protect'
-export * from '@koush/unifi-protect/src/index'
+export * from 'unifi-protect'
 // export * from '../../../external/unifi-protect/src/index'

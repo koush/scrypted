@@ -2,14 +2,14 @@ import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isIns
 import { sleep } from "@scrypted/common/src/sleep";
 import sdk, { Device, DeviceProvider, ObjectDetectionResult, ObjectsDetected, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
-import axios from "axios";
+import axios, {ResponseType} from "axios";
 import { UnifiCamera } from "./camera";
+import { debounceFingerprintDetected, debounceMotionDetected } from "./camera-sensors";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
-import { debounceFingerprintDetected, debounceMotionDetected } from "./camera-sensors";
 import { UnifiSensor } from "./sensor";
-import { FeatureFlagsShim, LastSeenShim } from "./shim";
-import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect";
+import { FeatureFlagsShim } from "./shim";
+import { ProtectApi, ProtectCameraConfigInterface, ProtectEventAddInterface, ProtectEventPacket } from "./unifi-protect";
 
 const { deviceManager } = sdk;
 
@@ -46,18 +46,18 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         this.updateManagementUrl();
     }
 
-    handleUpdatePacket(packet: any) {
-        if (packet.action.action !== "update") {
+    handleUpdatePacket(packet: ProtectEventPacket) {
+        if (packet.header.action !== "update") {
             return;
         }
-        if (!packet.action.id) {
+        if (!packet.header.id) {
             return;
         }
 
-        const device = this.api.cameras?.find(c => c.id === packet.action.id)
-            || this.api.lights?.find(c => c.id === packet.action.id)
-            || this.api.doorlocks?.find(c => c.id === packet.action.id)
-            || this.api.sensors?.find(c => c.id === packet.action.id);
+        const device = this.api.bootstrap.cameras?.find(c => c.id === packet.header.id)
+            || this.api.bootstrap.lights?.find(c => c.id === packet.header.id)
+            || (this.api.bootstrap.doorlocks as any)?.find(c => c.id === packet.header.id)
+            || this.api.bootstrap.sensors?.find(c => c.id === packet.header.id);
 
         if (!device) {
             return;
@@ -81,7 +81,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         return ret;
     }
 
-    public async loginFetch(url: string, options?: { method?: string, signal?: AbortSignal, responseType?: axios.ResponseType }) {
+    public async loginFetch(url: string, options?: { method?: string, signal?: AbortSignal, responseType?: ResponseType }) {
         const api = this.api as any;
         if (!(await api.login()))
             throw new Error('Login failed.');
@@ -100,8 +100,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         })
     }
 
-    listener(event: Buffer) {
-        const updatePacket = ProtectApiUpdates.decodeUpdatePacket(this.console, event);
+    listener(updatePacket: ProtectEventPacket) {
         if (!updatePacket)
             return;
 
@@ -109,27 +108,27 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
         const unifiDevice = this.handleUpdatePacket(updatePacket);
 
-        switch (updatePacket.action.modelKey) {
+        switch (updatePacket.header.modelKey) {
             case "sensor":
             case "doorlock":
             case "light":
             case "camera": {
                 if (!unifiDevice) {
-                    this.console.log('unknown device, sync needed?', updatePacket.action.id);
+                    this.console.log('unknown device, sync needed?', updatePacket.header.id);
                     return;
                 }
-                if (updatePacket.action.action !== "update") {
-                    unifiDevice.console.log('non update', updatePacket.action.action);
+                if (updatePacket.header.action !== "update") {
+                    unifiDevice.console.log('non update', updatePacket.header.action);
                     return;
                 }
                 unifiDevice.updateState();
 
-                if (updatePacket.action.modelKey === "doorlock")
+                if (updatePacket.header.modelKey === "doorlock")
                     return;
 
-                const payload = updatePacket.payload as any as ProtectNvrUpdatePayloadCameraUpdate & LastSeenShim;
+                const payload = updatePacket.payload as ProtectCameraConfigInterface;
 
-                if (updatePacket.action.modelKey !== "camera")
+                if (updatePacket.header.modelKey !== "camera")
                     return;
 
                 const unifiCamera = unifiDevice as UnifiCamera;
@@ -142,19 +141,19 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 break;
             }
             case "event": {
-                if (updatePacket.action.action !== "add") {
-                    if ((updatePacket?.payload as any)?.end && updatePacket.action.id) {
+                const payload = updatePacket.payload as ProtectEventAddInterface;
+                if (updatePacket.header.action !== "add") {
+                    if (payload.end && updatePacket.header.id) {
                         // unifi reports the event ended but it seems to take a moment before the snapshot
                         // is actually ready.
                         setTimeout(() => {
-                            const running = this.runningEvents.get(updatePacket.action.id);
+                            const running = this.runningEvents.get(updatePacket.header.id);
                             running?.resolve?.(undefined)
                         }, 2000);
                     }
                     return;
                 }
 
-                const payload = updatePacket.payload as ProtectNvrUpdatePayloadEventAdd;
                 if (!payload.camera)
                     return;
                 const nativeId = this.getNativeId({ id: payload.camera }, false);
@@ -166,7 +165,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 }
 
                 const detectionId = payload.id;
-                const actionId = updatePacket.action.id;
+                const actionId = updatePacket.header.id;
 
                 let resolve: (value: unknown) => void;
                 const promise = new Promise(r => resolve = r);
@@ -203,7 +202,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     detections = payload.smartDetectTypes.map(type => ({
                         className: type,
                         score: payload.score,
-                        label: (payload as any).metadata?.[type]?.name,
+                        label: payload.metadata?.[type]?.name,
                     }));
                 }
                 else {
@@ -249,7 +248,26 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             this.console.log(message, ...parameters);
     }
 
+
+    reconnecting = false;
+    wsTimeout: NodeJS.Timeout;
+    reconnect(reason: string) {
+        return async () => {
+            if (this.reconnecting)
+                return;
+            this.reconnecting = true;
+            this.api?.reset();
+            this.console.error('Event Listener reconnecting in 10 seconds:', reason);
+            await sleep(10000);
+            this.discoverDevices(0);
+        }
+    }
+
     async discoverDevices(duration: number) {
+        this.api?.reset();
+        this.reconnecting = false;
+        clearTimeout(this.wsTimeout);
+
         const ip = this.getSetting('ip');
         const username = this.getSetting('username');
         const password = this.getSetting('password');
@@ -271,10 +289,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             return
         }
 
-        this.api?.eventsWs?.removeAllListeners();
-        this.api?.eventsWs?.close();
         if (!this.api) {
-            this.api = new ProtectApi(ip, username, password, {
+            this.api = new ProtectApi({
                 debug() { },
                 error: (...args) => {
                     this.console.error(...args);
@@ -284,48 +300,37 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             });
         }
 
-        let reconnecting = false;
-        const reconnect = (reason: string) => {
-            return async () => {
-                if (reconnecting)
-                    return;
-                reconnecting = true;
-                this.api?.eventsWs?.close();
-                this.api?.eventsWs?.emit('close');
-                this.api?.eventsWs?.removeAllListeners();
-                if (this.api.eventsWs) {
-                    this.console.warn('Event Listener failed to close. Requesting plugin restart.');
-                    deviceManager.requestRestart();
-                }
-                this.console.error('Event Listener reconnecting in 10 seconds:', reason);
-                await sleep(10000);
-                this.discoverDevices(0);
-            }
-        }
-
         try {
-            if (!await this.api.refreshDevices()) {
-                reconnect('refresh failed')();
+            const loginResult = await this.api.login(ip, username, password);
+            if (!loginResult) {
+                this.log.a('Login failed. Check credentials.');
                 return;
             }
 
-            let wsTimeout: NodeJS.Timeout;
+            if (!await this.api.getBootstrap()) {
+                this.reconnect('refresh failed')();
+                return;
+            }
+
             const resetWsTimeout = () => {
-                clearTimeout(wsTimeout);
-                wsTimeout = setTimeout(reconnect('timeout'), 5 * 60 * 1000);
+                clearTimeout(this.wsTimeout);
+                this.wsTimeout = setTimeout(() => this.reconnect('timeout'), 5 * 60 * 1000);
             };
             resetWsTimeout();
 
-            this.api.eventsWs?.on('message', (data) => {
+            this.api.on('message', message => {
                 resetWsTimeout();
-                this.listener(data as Buffer);
-            });
-            this.api.eventsWs?.on('close', reconnect('close'));
-            this.api.eventsWs?.on('error', reconnect('error'));
+                this.listener(message);
+            })
 
             const devices: Device[] = [];
 
-            for (let camera of this.api.cameras || []) {
+            if (!this.api.bootstrap.cameras.length) {
+                this.console.warn('no cameras found. is this an admin account? cancelling sync.');
+                return;
+            }
+
+            for (let camera of this.api.bootstrap.cameras || []) {
                 if (camera.isAdoptedByOther) {
                     this.console.log('skipping camera that is adopted by another nvr', camera.id, camera.name);
                     continue;
@@ -347,7 +352,9 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 }
 
                 if (needUpdate) {
-                    camera = await this.api.updateCameraChannels(camera);
+                    camera = await this.api.updateDevice(camera, {
+                        channels: camera.channels,
+                    });
                     if (!camera) {
                         this.log.a('Unable to enable RTSP and IDR interval on camera. Is this an admin account?');
                         continue;
@@ -392,7 +399,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 if (camera.featureFlags.hasLcdScreen) {
                     d.interfaces.push(ScryptedInterface.Notifier);
                 }
-                if ((camera.featureFlags as any as FeatureFlagsShim).hasPackageCamera) {
+                if (camera.featureFlags.hasPackageCamera) {
                     d.interfaces.push(ScryptedInterface.DeviceProvider);
                 }
                 if (camera.featureFlags.hasLedStatus) {
@@ -405,7 +412,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 devices.push(d);
             }
 
-            for (const sensor of this.api.sensors || []) {
+            for (const sensor of this.api.bootstrap.sensors || []) {
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: sensor.name,
@@ -433,7 +440,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 devices.push(d);
             }
 
-            for (const light of this.api.lights || []) {
+            for (const light of this.api.bootstrap.lights || []) {
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: light.name,
@@ -458,7 +465,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 devices.push(d);
             }
 
-            for (const lock of this.api.doorlocks || []) {
+            for (const lock of (this.api.bootstrap.doorlocks as any) || []) {
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: lock.name,
@@ -490,12 +497,12 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             }
 
             // handle package cameras as a sub device
-            for (const camera of this.api.cameras) {
+            for (const camera of this.api.bootstrap.cameras) {
                 const devices: Device[] = [];
 
                 const providerNativeId = this.getNativeId(camera, true);
 
-                if ((camera.featureFlags as any as FeatureFlagsShim).hasPackageCamera) {
+                if (camera.featureFlags.hasPackageCamera) {
                     const nativeId = providerNativeId + '-packageCamera';
                     const d: Device = {
                         providerNativeId,
@@ -518,7 +525,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     devices.push(d);
                 }
 
-                if ((camera.featureFlags as any as FeatureFlagsShim).hasFingerprintSensor) {
+                if (camera.featureFlags.hasFingerprintSensor) {
                     const nativeId = providerNativeId + '-fingerprintSensor';
                     const d: Device = {
                         providerNativeId,
@@ -569,25 +576,25 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             return this.locks.get(nativeId);
 
         const id = this.findId(nativeId);
-        const camera = this.api.cameras.find(camera => camera.id === id);
+        const camera = this.api.bootstrap.cameras.find(camera => camera.id === id);
         if (camera) {
             const ret = new UnifiCamera(this, nativeId, camera);
             this.cameras.set(nativeId, ret);
             return ret;
         }
-        const sensor = this.api.sensors.find(sensor => sensor.id === id);
+        const sensor = this.api.bootstrap.sensors.find(sensor => sensor.id === id);
         if (sensor) {
             const ret = new UnifiSensor(this, nativeId, sensor);
             this.unifiSensors.set(nativeId, ret);
             return ret;
         }
-        const light = this.api.lights.find(light => light.id === id);
+        const light = this.api.bootstrap.lights.find(light => light.id === id);
         if (light) {
             const ret = new UnifiLight(this, nativeId, light);
             this.lights.set(nativeId, ret);
             return ret;
         }
-        const lock = this.api.doorlocks?.find(lock => lock.id === id);
+        const lock = (this.api.bootstrap.doorlocks as any)?.find(lock => lock.id === id);
         if (lock) {
             const ret = new UnifiLock(this, nativeId, lock);
             this.locks.set(nativeId, ret);
