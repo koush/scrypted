@@ -8,8 +8,12 @@ import { debounceFingerprintDetected, debounceMotionDetected } from "./camera-se
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
 import { UnifiSensor } from "./sensor";
-import { FeatureFlagsShim } from "./shim";
 import { ProtectApi, ProtectCameraConfigInterface, ProtectEventAddInterface, ProtectEventPacket } from "./unifi-protect";
+import https from 'https';
+
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false,
+});
 
 const { deviceManager } = sdk;
 
@@ -81,23 +85,45 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         return ret;
     }
 
-    public async loginFetch(url: string, options?: { method?: string, signal?: AbortSignal, responseType?: ResponseType }) {
-        const api = this.api as any;
-        if (!(await api.login()))
-            throw new Error('Login failed.');
-
-        const headers: Record<string, string> = {};
-        for (const [header, value] of api.headers) {
-            headers[header] = value;
+    async relogin() {
+        const ip = this.getSetting('ip');
+        const username = this.getSetting('username');
+        const password = this.getSetting('password');
+        const loginResult = await this.api.login(ip, username, password);
+        if (!loginResult) {
+            this.log.a('Login failed. Check credentials.');
+            return;
         }
 
-        return axios(url, {
-            responseType: options?.responseType,
-            method: options?.method,
-            headers,
-            httpsAgent: api.httpsAgent,
-            signal: options?.signal,
-        })
+        if (!await this.api.getBootstrap()) {
+            this.reconnect('refresh failed')();
+            return;
+        }
+        return loginResult;
+    }
+
+    public async loginFetch(url: string, options?: { method?: string, signal?: AbortSignal, responseType?: ResponseType }, relogin = false) {
+        try {
+            const api = this.api as any;
+            const headers: Record<string, string> = {};
+            for (const [header, value] of api.headers) {
+                headers[header] = value;
+            }
+
+            return await axios(url, {
+                responseType: options?.responseType,
+                method: options?.method,
+                headers,
+                httpsAgent,
+                signal: options?.signal,
+            });
+        }
+        catch (e) {
+            if (relogin) {
+                await this.relogin();
+                return this.loginFetch(url, options);
+            }
+        }
     }
 
     listener(updatePacket: ProtectEventPacket) {
@@ -301,7 +327,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
 
         try {
-            const loginResult = await this.api.login(ip, username, password);
+            const loginResult = await this.relogin();
             if (!loginResult) {
                 this.log.a('Login failed. Check credentials.');
                 return;
@@ -487,6 +513,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 devices.push(d);
             }
 
+            if (!devices.length) {
+                this.console.warn('no devices found. is this an admin account? cancelling sync.');
+                return;
+            }
+
             await deviceManager.onDevicesChanged({
                 providerNativeId: this.nativeId,
                 devices,
@@ -643,11 +674,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             hide: true,
             json: true,
             defaultValue: {
-                mac: {},
                 anonymousDeviceId: {},
-                id: {},
                 nativeId: {},
-                host: {},
             },
         }
     });
@@ -662,10 +690,10 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         const idMaps = this.storageSettings.values.idMaps;
 
         // try to find an existing nativeId given the mac and anonymous device id
-        const found = (mac && idMaps.mac[mac])
-            || (anonymousDeviceId && idMaps.anonymousDeviceId[anonymousDeviceId])
-            || (id && idMaps.id[id])
-            || (host && idMaps.host[host])
+        const found = (mac && idMaps.mac?.[mac])
+            || (anonymousDeviceId && idMaps.anonymousDeviceId?.[anonymousDeviceId])
+            || (id && idMaps.id?.[id])
+            || (host && idMaps.host?.[host])
             ;
 
         // use the found id if one exists (device got provisioned a new id), otherwise use the id provided by the device.
@@ -674,25 +702,42 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         if (!update)
             return nativeId;
 
+        // Remove any existing mappings to this nativeId
+        const cleanDict = (dict: Record<string, string>) => {
+            if (!dict) return;
+            const entries = Object.entries(dict);
+            for (const [key, value] of entries) {
+                if (value === nativeId) {
+                    delete dict[key];
+                }
+            }
+        }
+
+        // Clean existing mappings before adding new ones
+        idMaps.mac ||= {};
+        idMaps.anonymousDeviceId ||= {};
+        idMaps.host ||= {};
+        idMaps.id ||= {};
+        idMaps.nativeId ||= {};
+
+        cleanDict(idMaps.mac);
+        cleanDict(idMaps.anonymousDeviceId);
+        cleanDict(idMaps.host);
+        cleanDict(idMaps.id);
+
         // map the mac, host, and anonymous device id to the native id.
         if (mac) {
-            idMaps.mac ||= {};
             idMaps.mac[mac] = nativeId;
         }
         if (anonymousDeviceId) {
-            idMaps.anonymousDeviceId ||= {};
             idMaps.anonymousDeviceId[anonymousDeviceId] = nativeId;
         }
         if (host) {
-            idMaps.host ||= {};
             idMaps.host[host] = nativeId;
         }
 
         // map the id and native id to each other.
-        idMaps.id ||= {};
         idMaps.id[id] = nativeId;
-
-        idMaps.nativeId ||= {};
         idMaps.nativeId[nativeId] = id;
 
         this.storageSettings.values.idMaps = idMaps;
