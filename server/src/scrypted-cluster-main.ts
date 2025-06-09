@@ -245,6 +245,7 @@ export function startClusterClient(mainFilename: string, options?: {
                 // require ipv4 to normalize cluster address.
                 family: 4,
                 keepAlive: true,
+                keepAliveInitialDelay: 10000,
             });
 
             try {
@@ -352,7 +353,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
             console.log('Cluster client disconnected.', socket.remoteAddress, socket.remotePort);
         });
 
-        socket.setKeepAlive(true);
+        socket.setKeepAlive(true, 10000);
 
         const peer = preparePeer(socket, 'server');
 
