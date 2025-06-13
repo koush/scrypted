@@ -38,15 +38,15 @@ set -e
 rm -rf /tmp/npu && mkdir -p /tmp/npu && cd /tmp/npu
 
 # level zero must also be installed
-LEVEL_ZERO_VERSION=1.19.2
+LEVEL_ZERO_VERSION=1.21.9
 # https://github.com/oneapi-src/level-zero
 curl -O -L https://github.com/oneapi-src/level-zero/releases/download/v"$LEVEL_ZERO_VERSION"/level-zero_"$LEVEL_ZERO_VERSION"+u$distro.deb
 curl -O -L https://github.com/oneapi-src/level-zero/releases/download/v"$LEVEL_ZERO_VERSION"/level-zero-devel_"$LEVEL_ZERO_VERSION"+u$distro.deb
 
 # npu driver
 # https://github.com/intel/linux-npu-driver
-NPU_VERSION=1.13.0
-NPU_VERSION_DATE=20250131-13074932693
+NPU_VERSION=1.17.0
+NPU_VERSION_DATE=20250508-14912879441
 curl -O -L https://github.com/intel/linux-npu-driver/releases/download/v"$NPU_VERSION"/intel-driver-compiler-npu_$NPU_VERSION."$NPU_VERSION_DATE"_ubuntu$distro.deb
 # firmware can only be installed on host. will cause problems inside container.
 if [ -n "$INTEL_FW_NPU" ]
