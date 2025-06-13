@@ -77,13 +77,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  build-nvidia:
-    name: Push NVIDIA Docker image to Docker Hub
+  build-vendor:
+    name: Push Vendor Docker image to Docker Hub
     needs: build
     runs-on: self-hosted
     strategy:
       matrix:
         BASE: ["noble"]
+        VENDOR: ["nvidia", "intel"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -138,11 +139,11 @@ jobs:
           build-args: |
             BASE=ghcr.io/koush/scrypted-common:${{ matrix.BASE }}-full
           context: install/docker/
-          file: install/docker/Dockerfile.nvidia
+          file: install/docker/Dockerfile.${{ matrix.VENDOR }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            koush/scrypted-common:${{ matrix.BASE }}-nvidia
-            ghcr.io/koush/scrypted-common:${{ matrix.BASE }}-nvidia
+            koush/scrypted-common:${{ matrix.BASE }}-${{ matrix.VENDOR }}
+            ghcr.io/koush/scrypted-common:${{ matrix.BASE }}-${{ matrix.VENDOR }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
