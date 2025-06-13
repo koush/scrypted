@@ -1,6 +1,12 @@
 <details>
 <summary>Changelog</summary>
 
+### 0.1.0-beta.2
+
+bump version
+improve mqtt reconnect, also update status
+
+
 ### 0.1.0-beta.1
 
 wip: prevent setting motion if device has no motion detection
