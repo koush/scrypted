@@ -1,14 +1,21 @@
 <details>
 <summary>Changelog</summary>
 
+### 0.1.0-beta.3
+
+quick fix
+bump to beta 3
+
+
 ### 0.1.0-beta.2
 
+update commit
 bump version
-improve mqtt reconnect, also update status
 
 
 ### 0.1.0-beta.1
 
+improve mqtt reconnect, also update status
 wip: prevent setting motion if device has no motion detection
 fix: resolve indicator not updating
 feat: add support for light accessory in camera
