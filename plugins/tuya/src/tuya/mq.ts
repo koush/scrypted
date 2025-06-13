@@ -35,6 +35,9 @@ export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
       this.on("connected", () => {
         resolve();
       });
+      this.on("error", (error) => {
+        reject(error);
+      });
       this._connect();
     });
   }
@@ -62,17 +65,15 @@ export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
   private async _connect() {
     this.stop();
     const config = this.config && (this.config.expires - 60_000) > Date.now() ? this.config : await this.fetchConfig()
-    this.config = config;
-    this.client = connect(config.url, {
+    const client = connect(config.url, {
       clientId: config.clientId,
       username: config.username,
       password: config.password,
     });
-    
-    this.client.on("connect", (packet) => {
+    client.on("connect", (packet) => {
       if (packet.reasonCode === 0) {
         for (const topic of config.topics) {
-          this.client?.subscribe(topic);
+          client.subscribe(topic);
         }
         this.emit("connected");
         this.retryTimeout = setTimeout(this._connect, config.expires - 60_000)
@@ -80,18 +81,19 @@ export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
         this.emit("error", new Error("Not authorized"));
       }
     });
-    this.client.on("message", (...args) => {
+    client.on("message", (...args) => {
         this.emit("message", ...args);
     });
-    this.client.on("error", (error: Error) => {
+    client.on("error", (error: Error) => {
       this.emit("error", error);
       this._connect();
     });
-    this.client.on("close", () => {
+    client.on("close", () => {
       this.emit("close");
       this.stop();
     });
-    this.client.connect();
-    return this.client;
+    this.client = client;
+    this.config = config;
+    return client;
   }
 }

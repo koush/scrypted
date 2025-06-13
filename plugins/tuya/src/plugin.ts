@@ -281,6 +281,9 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
           if (!obj) return;
           this.onMessage(obj);
         });
+        this.mq.on("error", (error) => {
+          this.console.error(`[${this.name}] (${new Date().toLocaleString()}) failed to connect to mqtt, will retry.`, error)
+        });
         await this.mq.start();
       }
     } catch {
