@@ -76,7 +76,6 @@ export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
           client.subscribe(topic);
         }
         this.emit("connected");
-        this.retryTimeout = setTimeout(this._connect, config.expires - 60_000)
       } else if (packet.returnCode === 5) {
         this.emit("error", new Error("Not authorized"));
       } else {
@@ -96,6 +95,7 @@ export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
     });
     this.client = client;
     this.config = config;
+    this.retryTimeout = setTimeout(this._connect, (config.expires - 60_000) - Date.now())
     return client;
   }
 }
