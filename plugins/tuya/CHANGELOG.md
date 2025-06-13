@@ -3,7 +3,7 @@
 
 ### 0.1.0-beta.3
 
-quick fix
+resolve array crash
 bump to beta 3
 
 
