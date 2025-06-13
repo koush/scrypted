@@ -1,6 +1,18 @@
 <details>
 <summary>Changelog</summary>
 
+### 0.1.0-beta.5
+
+fix: use correct property for checking connection state
+chore: bump version
+
+
+### 0.1.0-beta.4
+
+fix: resolve mqtt connection issues
+bump version
+
+
 ### 0.1.0-beta.3
 
 fixchangelog
