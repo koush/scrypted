@@ -1,8 +1,15 @@
 <details>
 <summary>Changelog</summary>
 
+### 0.1.0-beta.6
+
+fix: ensure timeout is actually correct and bound corretly
+chore: bump version
+
+
 ### 0.1.0-beta.5
 
+chore: update changelog
 fix: use correct property for checking connection state
 chore: bump version
 
