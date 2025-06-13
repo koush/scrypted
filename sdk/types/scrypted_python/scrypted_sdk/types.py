@@ -89,6 +89,7 @@ class ScryptedDeviceType(str, Enum):
     Internet = "Internet"
     Irrigation = "Irrigation"
     Light = "Light"
+    LLM = "LLM"
     Lock = "Lock"
     Network = "Network"
     Notifier = "Notifier"
@@ -147,6 +148,7 @@ class ScryptedInterface(str, Enum):
     HumiditySetting = "HumiditySetting"
     Intercom = "Intercom"
     LauncherApplication = "LauncherApplication"
+    LLMTools = "LLMTools"
     Lock = "Lock"
     LuminanceSensor = "LuminanceSensor"
     MediaConverter = "MediaConverter"
@@ -644,6 +646,13 @@ class LauncherApplicationInfo(TypedDict):
     icon: str  # Supports: mdi-icon, fa-icon, urls.
     name: str
 
+class LLMToolDefinition(TypedDict):
+
+    description: str  # A description of what the function does, used by the model to choose when and how to call the function.
+    name: str  # The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
+    parameters: Mapping[str, unknown]  # The parameters the functions accepts, described as a JSON Schema object. See the [guide](https://platform.openai.com/docs/guides/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.  Omitting   defines a function with an empty parameter list.
+    strict: bool  # Whether to enable strict schema adherence when generating the function call. If set to true, the model will follow the exact schema defined in the   field. Only a subset of JSON Schema is supported when   is  . Learn more about Structured Outputs in the [function calling guide]( ).
+
 class MediaObjectOptions(TypedDict):
 
     sourceId: str  # The device id of the source of the MediaObject.
@@ -995,7 +1004,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.12"
+TYPES_VERSION = "0.5.13"
 
 
 class AirPurifier:
@@ -1231,6 +1240,15 @@ class Intercom:
 class LauncherApplication:
 
     applicationInfo: LauncherApplicationInfo
+
+class LLMTools:
+
+    async def callLLMTool(self, name: str, parameters: Mapping[str, Any]) -> str:
+        pass
+
+    async def getLLMTools(self) -> list[LLMToolDefinition]:
+        pass
+
 
 class Lock:
     """Lock controls devices that can lock or unlock entries. Often works in tandem with PasswordControl."""
@@ -2096,6 +2114,8 @@ class ScryptedInterfaceMethods(str, Enum):
     generateVideoFrames = "generateVideoFrames"
     connectStream = "connectStream"
     getTTYSettings = "getTTYSettings"
+    callLLMTool = "callLLMTool"
+    getLLMTools = "getLLMTools"
 
 class DeviceState:
 
@@ -3381,6 +3401,14 @@ ScryptedInterfaceDescriptors = {
     "name": "TTYSettings",
     "methods": [
       "getTTYSettings"
+    ],
+    "properties": []
+  },
+  "LLMTools": {
+    "name": "LLMTools",
+    "methods": [
+      "callLLMTool",
+      "getLLMTools"
     ],
     "properties": []
   },
