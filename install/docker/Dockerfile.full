@@ -61,7 +61,7 @@ RUN python3 -m pip install debugpy
 ################################################################
 # Begin section generated from template/Dockerfile.full.footer
 ################################################################
-FROM header as base
+FROM header AS base
 
 # vulkan
 RUN apt -y install libvulkan1
