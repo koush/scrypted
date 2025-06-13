@@ -91,6 +91,7 @@ export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
       this.emit("close");
       this.stop();
     });
+    this.client.connect();
     return this.client;
   }
 }
