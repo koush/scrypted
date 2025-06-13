@@ -8,6 +8,9 @@ RUN apt-get update && apt-get -y install \
     libavahi-compat-libdnssd-dev \
     xz-utils
 
+# killall
+RUN apt -y install psmisc
+
 # copy configurations and scripts
 COPY fs /
 
