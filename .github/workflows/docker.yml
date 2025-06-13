@@ -21,9 +21,10 @@ jobs:
       matrix:
         BASE: [
           ["noble-nvidia", ".s6", "noble-nvidia"],
+          ["noble-intel", ".s6", "noble-intel"],
           ["noble-full", ".s6", "noble-full"],
           ["noble-lite", "", "noble-lite"],
-          # ["noble-lite", ".router", "noble-router"],
+          ["noble-lite", ".router", "noble-router"],
         ]
     steps:
       - name: Check out the repo
@@ -98,6 +99,7 @@ jobs:
             ${{ format('koush/scrypted:v{1}-{0}', matrix.BASE[2], github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
             ${{ matrix.BASE[2] == 'noble-full' && format('koush/scrypted:{0}', github.event.inputs.tag) || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-nvidia' && 'koush/scrypted:nvidia' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-intel' && 'koush/scrypted:intel' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-full' && 'koush/scrypted:full' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-lite' && matrix.BASE[1] == '' && 'koush/scrypted:lite' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-router' && 'koush/scrypted:router' || '' }}
@@ -105,6 +107,7 @@ jobs:
             ${{ format('ghcr.io/koush/scrypted:v{1}-{0}', matrix.BASE[0], github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
             ${{ matrix.BASE[2] == 'noble-full' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.tag) || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-nvidia' && 'ghcr.io/koush/scrypted:nvidia' || '' }}
+            ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-intel' && 'ghcr.io/koush/scrypted:intel' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-full' && 'ghcr.io/koush/scrypted:full' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-lite' && matrix.BASE[1] == '' && 'ghcr.io/koush/scrypted:lite' || '' }}
             ${{ github.event.inputs.tag == 'latest' && matrix.BASE[2] == 'noble-lite' && 'ghcr.io/koush/scrypted:router' || '' }}
