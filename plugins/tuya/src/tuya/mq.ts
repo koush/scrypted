@@ -71,14 +71,16 @@ export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
       password: config.password,
     });
     client.on("connect", (packet) => {
-      if (packet.reasonCode === 0) {
+      if (packet.returnCode === 0) {
         for (const topic of config.topics) {
           client.subscribe(topic);
         }
         this.emit("connected");
         this.retryTimeout = setTimeout(this._connect, config.expires - 60_000)
-      } else if (packet.reasonCode === 5) {
+      } else if (packet.returnCode === 5) {
         this.emit("error", new Error("Not authorized"));
+      } else {
+        this.emit("error", new Error("Connection failed to connect."));
       }
     });
     client.on("message", (...args) => {
