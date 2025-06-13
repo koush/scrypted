@@ -1,9 +1,5 @@
 ARG BASE="ghcr.io/koush/scrypted-common:20-jammy-full"
 FROM $BASE
 
-ENV NVIDIA_DRIVER_CAPABILITIES=all
-ENV NVIDIA_VISIBLE_DEVICES=all
-
-# nvidia cudnn/libcublas etc.
-# for some reason this is not provided by the nvidia container toolkit
-RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-nvidia-graphics.sh | bash
+RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-oneapi.sh | bash
+ENV LD_LIBRARY_PATH=/opt/intel/oneapi/tcm/1.3/lib:/opt/intel/oneapi/umf/0.10/lib:/opt/intel/oneapi/tbb/2022.1/env/../lib/intel64/gcc4.8:/opt/intel/oneapi/mkl/2025.1/lib:/opt/intel/oneapi/compiler/2025.1/opt/compiler/lib:/opt/intel/oneapi/compiler/2025.1/lib
