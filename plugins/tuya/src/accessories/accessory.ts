@@ -55,11 +55,11 @@ export abstract class TuyaAccessory extends ScryptedDeviceBase implements Online
 
   async updateStatus(status: TuyaDeviceStatus[]): Promise<void> {
     for (const stat of status) {
-      const idx = this.tuyaDevice.status.findIndex(o => o.code === stat.code);
-      if (idx) {
-        this.tuyaDevice.status[idx] = stat;
+      const old = this.tuyaDevice.status.find(o => o.code === stat.code);
+      if (old) {
+        old.value = stat.value;
       } else {
-        this.tuyaDevice.status.push(stat);
+        this.tuyaDevice.status = [...this.tuyaDevice.status, stat];
       }
     }
   }
