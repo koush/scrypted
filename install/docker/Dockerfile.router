@@ -1,6 +1,8 @@
 ARG BASE="noble-lite"
 FROM ghcr.io/koush/scrypted-common:${BASE}
 
+ENV SCRYPTED_DOCKER_FLAVOR="router"
+
 # tools
 RUN apt -y update && apt -y install nano net-tools dnsutils dnsmasq vlan bridge-utils netplan.io nftables isc-dhcp-client
 RUN rm -f /etc/systemd/system/multi-user.target.wants/dnsmasq.service

@@ -1,6 +1,8 @@
 ARG BASE="jammy"
 FROM ubuntu:${BASE} AS header
 
+ENV SCRYPTED_DOCKER_FLAVOR="lite"
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 # base tools and development stuff
@@ -26,5 +28,3 @@ ENV SHELL="/bin/bash"
 RUN test -f "/usr/bin/python3" && test -f "/usr/bin/python3.12"
 ENV SCRYPTED_PYTHON_PATH="/usr/bin/python3"
 ENV SCRYPTED_PYTHON312_PATH="/usr/bin/python3.12"
-
-ENV SCRYPTED_DOCKER_FLAVOR="lite"

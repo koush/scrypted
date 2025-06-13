@@ -1,6 +1,8 @@
 ARG BASE="ghcr.io/koush/scrypted-common:20-jammy-full"
 FROM $BASE
 
+ENV SCRYPTED_DOCKER_FLAVOR="nvidia"
+
 ENV NVIDIA_DRIVER_CAPABILITIES=all
 ENV NVIDIA_VISIBLE_DEVICES=all
 
