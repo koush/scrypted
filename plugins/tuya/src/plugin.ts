@@ -269,16 +269,19 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
 
     try {
       if (this.api instanceof TuyaSharingAPI) {
-        const homes = await this.api.queryHomes();
-        const mqConfig = await this.api.fetchMqttConfig(homes.map(h => h.ownerId), devices.map(d => d.id));
-        this.mq = new TuyaMQ(mqConfig);
-        this.mq?.message((mq, msg) => {
+        const api = this.api;
+        const fetch = async function() {
+          const homes = await api.queryHomes();
+          return await api.fetchMqttConfig(homes.map(h => h.ownerId), devices.map(d => d.id));
+        }
+        this.mq = new TuyaMQ(fetch)
+        this.mq.on("message", (mq, msg) => {
           const string = (msg as Buffer).toString('utf-8');
           const obj = JSON.parse(string) as TuyaMessage;
           if (!obj) return;
           this.onMessage(obj);
         });
-        await this.mq?.connect();
+        await this.mq.start();
       }
     } catch {
       this.console.log(`[${this.name}] (${new Date().toLocaleString()}) Failed to connect to Mqtt. Will not observe live changes to devices.`);
@@ -286,17 +289,15 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, Se
   }
 
   private onMessage(message: TuyaMessage) {
-    this.console.debug("Received new message", message);
+    this.console.debug("Received new message", JSON.stringify(message));
     if (message.protocol === TuyaMessageProtocol.DEVICE) {
       const device = this.devices.get(message.data.devId);
-      if (!device) return;
-      device.updateStatus(message.data.status)
+      device?.updateStatus(message.data.status)
     } else if (message.protocol === TuyaMessageProtocol.OTHER) {
       const device = this.devices.get(message.data.bizData.devId);
       if (!device) return;
       if (message.data.bizCode === "online" || message.data.bizCode === "offline") {
-        const isOnline = message.data.bizCode === "online";
-        device.online = isOnline;
+        device.online = message.data.bizCode === "online";
       } else if (message.data.bizCode === "delete") {
         // TODO: Remove device
       } else if (message.data.bizCode === "nameUpdate") {

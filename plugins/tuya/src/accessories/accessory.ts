@@ -53,7 +53,16 @@ export abstract class TuyaAccessory extends ScryptedDeviceBase implements Online
     await this.updateStatus(this.tuyaDevice.status);
   }
 
-  abstract updateStatus(status: TuyaDeviceStatus[]): Promise<void>;
+  async updateStatus(status: TuyaDeviceStatus[]): Promise<void> {
+    for (const stat of status) {
+      const idx = this.tuyaDevice.status.findIndex(o => o.code === stat.code);
+      if (idx) {
+        this.tuyaDevice.status[idx] = stat;
+      } else {
+        this.tuyaDevice.status.push(stat);
+      }
+    }
+  }
 
   protected debounce(
     schema: TuyaDeviceSchema,
@@ -65,16 +74,13 @@ export abstract class TuyaAccessory extends ScryptedDeviceBase implements Online
     if (prevDebouncing) {
       clearTimeout(prevDebouncing);
       this.debounced.delete(schema.code);
+    } else {
+      initial();
     }
 
-    if (!prevDebouncing) initial();
-    this.debounced.set(schema.code, setTimeout(
-      () => {
-        timeout();
-        this.debounced.delete(schema.code);
-      },
-      duration
-    )
+    this.debounced.set(
+      schema.code,
+      setTimeout(() => { timeout(); this.debounced.delete(schema.code); }, duration)
     )
   }
 }

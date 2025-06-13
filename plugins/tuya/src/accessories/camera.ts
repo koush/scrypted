@@ -127,12 +127,17 @@ export class TuyaCamera extends TuyaAccessory implements DeviceProvider, VideoCa
   }
 
   async updateStatus(status: TuyaDeviceStatus[]): Promise<void> {
+    super.updateStatus(status);
+
     const indicatorSchema = this.getSchema(...SCHEMA_CODE.INDICATOR);
-    if (indicatorSchema) this.on = this.getStatus(indicatorSchema.code)?.value == true;
+    if (indicatorSchema) {
+      const indicatorStatus = status.find(s=> s.code === indicatorSchema.code);
+      indicatorStatus && (this.on = indicatorStatus.value === true)
+    }
 
     const motionSchema = this.getSchema(...SCHEMA_CODE.MOTION_DETECT);
     if (this.getSchema(...SCHEMA_CODE.MOTION_ON) && motionSchema) {
-      const motionStatus = status.find(s => s.code == motionSchema.code);
+      const motionStatus = status.find(s=> s.code === motionSchema.code);
       motionStatus && motionStatus.value.toString().length > 1 && this.debounce(
         motionSchema,
         10 * 1000,
@@ -185,8 +190,8 @@ export class TuyaCamera extends TuyaAccessory implements DeviceProvider, VideoCa
         )
       }
 
-      const lightStatus = status.find(s => s.code === lightSchema.code);
-      lightStatus && (this.lightAccessory.on = !!lightStatus.value)
+      const lightStatus = status.find(s=> s.code === lightSchema.code);
+      lightStatus && (this.lightAccessory.on = !!lightStatus.value);
     }
   }
 }

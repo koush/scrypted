@@ -1,6 +1,7 @@
 import Event from "events";
-import { connect, IClientPublishOptions, MqttClient } from "mqtt";
+import { connect, IClientPublishOptions, MqttClient, OnCloseCallback, OnErrorCallback, OnMessageCallback } from "mqtt";
 import { IPublishPacket } from "mqtt-packet";
+import { EventEmitter } from "events";
 
 export type MqttConfig = {
   url: string;
@@ -11,48 +12,42 @@ export type MqttConfig = {
   expires: number;
 }
 
-export class TuyaMQ {
-  private static connected = "TUYA_CONNECTED";
-  private static message = "TUYA_MESSAGE";
-  private static error = "TUYA_ERROR";
-  private static close = "TUYA_CLOSE";
+export type TuyaMQEvent = {
+  connected: [];
+  message: Parameters<OnMessageCallback>;
+  error: Parameters<OnErrorCallback>
+  close: Parameters<OnCloseCallback>
+}
 
+export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
   private client?: MqttClient;
-  private config: MqttConfig;
-  private event: Event;
+  private config: MqttConfig | undefined;
+  private fetchConfig: () => Promise<MqttConfig>;
+  private retryTimeout: NodeJS.Timeout | undefined;
 
-  constructor(config: MqttConfig) {
-    this.config = config;
-    this.event = new Event();
+  constructor(fetchConfig: () => Promise<MqttConfig>) {
+    super();
+    this.fetchConfig = fetchConfig;
+  }
+  
+  public async start(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.on("connected", () => {
+        resolve();
+      });
+      this._connect();
+    });
   }
 
   public stop() {
     this.client?.end();
-  }
-
-  public async connect(): Promise<MqttClient> {
-    return new Promise((resolve, reject) => {
-      this.event.on(TuyaMQ.connected, (client: MqttClient) => {
-        if (client.connected) {
-          resolve(client);
-        } else {
-          reject(new Error("Client did not connect successfully."));
-        }
-      });
-      this.client = this._connect();
-    });
-  }
-
-  public message(cb: (client: MqttClient, message: any) => void) {
-    this.event.on(TuyaMQ.message, cb);
-  }
-
-  public error(cb: (client: MqttClient, error: Error) => void) {
-    this.event.on(TuyaMQ.error, cb);
-  }
-
-  public close(cb: (client: MqttClient) => void) {
-    this.event.on(TuyaMQ.close, cb);
+    this.client?.removeAllListeners();
+    this.client = undefined;
+    this.config = undefined;
+    if (this.retryTimeout) {
+      clearTimeout(this.retryTimeout);
+      this.retryTimeout = undefined;
+    }
   }
 
   public publish(topic: string, message: string) {
@@ -64,51 +59,38 @@ export class TuyaMQ {
     this.client?.publish(topic, message, properties);
   }
 
-  public removeMessageListener(cb: (client: MqttClient, message: any) => void) {
-    this.event.removeListener(TuyaMQ.message, cb);
-  }
-
-  private _connect() {
-    this.client = connect(this.config.url, {
-      clientId: this.config.clientId,
-      username: this.config.username,
-      password: this.config.password,
+  private async _connect() {
+    this.stop();
+    const config = this.config && (this.config.expires - 60_000) > Date.now() ? this.config : await this.fetchConfig()
+    this.config = config;
+    this.client = connect(config.url, {
+      clientId: config.clientId,
+      username: config.username,
+      password: config.password,
     });
-
-    this.subConnect(this.client);
-    this.subMessage(this.client);
-    this.subError(this.client);
-    this.subClose(this.client);
+    
+    this.client.on("connect", (packet) => {
+      if (packet.reasonCode === 0) {
+        for (const topic of config.topics) {
+          this.client?.subscribe(topic);
+        }
+        this.emit("connected");
+        this.retryTimeout = setTimeout(this._connect, config.expires - 60_000)
+      } else if (packet.reasonCode === 5) {
+        this.emit("error", new Error("Not authorized"));
+      }
+    });
+    this.client.on("message", (...args) => {
+        this.emit("message", ...args);
+    });
+    this.client.on("error", (error: Error) => {
+      this.emit("error", error);
+      this._connect();
+    });
+    this.client.on("close", () => {
+      this.emit("close");
+      this.stop();
+    });
     return this.client;
-  }
-
-  private subConnect(client: MqttClient) {
-    client.on("connect", () => {
-      for (const topic of this.config.topics) {
-        client.subscribe(topic);
-      }
-      this.event.emit(TuyaMQ.connected, client);
-    });
-  }
-
-  private subMessage(client: MqttClient) {
-    client.on(
-      "message",
-      (topic: string, payload: Buffer, packet: IPublishPacket) => {
-        this.event.emit(TuyaMQ.message, client, payload);
-      }
-    );
-  }
-
-  private subError(client: MqttClient) {
-    client.on("error", (error: Error) => {
-      this.event.emit(TuyaMQ.error, error);
-    });
-  }
-
-  private subClose(client: MqttClient) {
-    client.on("close", () => {
-      this.event.emit(TuyaMQ.close, this.client);
-    });
   }
 }
