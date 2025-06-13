@@ -87,18 +87,15 @@ rm -f *.deb
 
 # https://github.com/intel/compute-runtime/releases/tag/24.45.31740.9
 # note that at time of commit, IGC supports ubuntu 24.04 only possibly due to their builder being on 24.04.
-IGC_BASE_VERSION=2.5.6
-IGC_VERSION=2_$IGC_BASE_VERSION+18417_amd64
-COMPUTE_VERSION=24.52.32224.5
-ZERO_GPU_VERSION=1.6.32224.5_amd64
-LIBIGDGMM_VERSION=22.5.5_amd64
-curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v$IGC_BASE_VERSION/intel-igc-core-$IGC_VERSION.deb
-curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v$IGC_BASE_VERSION/intel-igc-opencl-$IGC_VERSION.deb
-# curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-level-zero-gpu-dbgsym_$ZERO_GPU_VERSION.ddeb
-curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-level-zero-gpu_$ZERO_GPU_VERSION.deb
-# curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-opencl-icd-dbgsym_"$COMPUTE_VERSION"_amd64.ddeb
-curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/intel-opencl-icd_"$COMPUTE_VERSION"_amd64.deb
-curl -O -L https://github.com/intel/compute-runtime/releases/download/$COMPUTE_VERSION/libigdgmm12_$LIBIGDGMM_VERSION.deb
+curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v2.11.7/intel-igc-core-2_2.11.7+19146_amd64.deb
+curl -O -L https://github.com/intel/intel-graphics-compiler/releases/download/v2.11.7/intel-igc-opencl-2_2.11.7+19146_amd64.deb
+# curl -O -L https://github.com/intel/compute-runtime/releases/download/25.18.33578.6/intel-ocloc-dbgsym_25.18.33578.6-0_amd64.ddeb
+curl -O -L https://github.com/intel/compute-runtime/releases/download/25.18.33578.6/intel-ocloc_25.18.33578.6-0_amd64.deb
+# curl -O -L https://github.com/intel/compute-runtime/releases/download/25.18.33578.6/intel-opencl-icd-dbgsym_25.18.33578.6-0_amd64.ddeb
+curl -O -L https://github.com/intel/compute-runtime/releases/download/25.18.33578.6/intel-opencl-icd_25.18.33578.6-0_amd64.deb
+curl -O -L https://github.com/intel/compute-runtime/releases/download/25.18.33578.6/libigdgmm12_22.7.0_amd64.deb
+# curl -O -L https://github.com/intel/compute-runtime/releases/download/25.18.33578.6/libze-intel-gpu1-dbgsym_25.18.33578.6-0_amd64.ddeb
+curl -O -L https://github.com/intel/compute-runtime/releases/download/25.18.33578.6/libze-intel-gpu1_25.18.33578.6-0_amd64.deb
 
 set +e
 dpkg -i *.deb
