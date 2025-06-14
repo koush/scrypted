@@ -81,8 +81,11 @@ async function readAmcrestMessage(client: Readable): Promise<string[]> {
     }
 }
 
-function findValue(blob: string, prefix: string, key: string) {
-    const lines = blob.split('\n');
+function getLines(blob: string) {
+    return blob.split(/\r?\n/).filter(line => line);
+}
+
+function findValue(lines: string[], prefix: string, key: string) {
     const value = lines.find(line => line.startsWith(`${prefix}.${key}`));
     if (!value)
         return;
@@ -124,7 +127,7 @@ const amcrestResolutions = {
     "720P": [1280, 720],
     "D1": [704, 480],
     "HD1": [352, 480],
-    "BCIF": [704, 240],
+    "BCIF": [528, 240],
     "2CIF": [704, 240],
     "CIF": [352, 240],
     "QCIF": [176, 120],
@@ -133,7 +136,21 @@ const amcrestResolutions = {
     "QVGA": [320, 240]
 };
 
-function fromAmcrestResolution(resolution: string) {
+const palAmcrestResolutions = {
+    "D1": [704, 576],
+    "HD1": [352, 576],
+    "BCIF": [528, 288],
+    "2CIF": [704, 288],
+    "CIF": [352, 288],
+    "QCIF": [176, 144],
+};
+
+function fromAmcrestResolution(resolution: string, videoStandard: string) {
+    if (videoStandard === 'PAL') {
+        const named = palAmcrestResolutions[resolution];
+        if (named)
+            return named;
+    }
     const named = amcrestResolutions[resolution];
     if (named)
         return named;
@@ -438,6 +455,12 @@ export class AmcrestCameraClient {
 
         this.console.log(capsResponse.body);
 
+        const videoStandardResponse = await this.request({
+            url: `http://${this.ip}/cgi-bin/configManager.cgi?action=getConfig&name=VideoStandard`,
+            responseType: 'text',
+        });
+        this.console.log(videoStandardResponse.body);
+
         const formatNumber = Math.max(0, parseInt(options.id?.substring('channel'.length)) - 1);
         const format = options.id === 'channel0' ? 'MainFormat' : 'ExtraFormat';
         const encode = `Encode[${cameraNumber - 1}].${format}[${formatNumber}]`;
@@ -493,17 +516,19 @@ export class AmcrestCameraClient {
 
         const caps = `caps[${cameraNumber - 1}].${format}[${formatNumber}]`;
         const singleCaps = `caps.${format}[${formatNumber}]`;
+        const capsLines = getLines(capsResponse.body);
+        const videoStandard = findValue(getLines(videoStandardResponse.body), 'table', 'VideoStandard');
 
         const findCaps = (key: string) => {
-            const found = findValue(capsResponse.body, caps, key);
+            const found = findValue(capsLines, caps, key);
             if (found)
                 return found;
             // ad410 doesnt return a camera number if accessed directly
             if (cameraNumber - 1 === 0)
-                return findValue(capsResponse.body, singleCaps, key);
+                return findValue(capsLines, singleCaps, key);
         }
 
-        const resolutions = findCaps('Video.ResolutionTypes').split(',').map(fromAmcrestResolution);
+        const resolutions = findCaps('Video.ResolutionTypes').split(',').map(r => fromAmcrestResolution(r, videoStandard));
         const bitrates = findCaps('Video.BitRateOptions').split(',').map(s => parseInt(s) * 1000);
         const fpsMax = parseInt(findCaps('Video.FPSMax'));
         const vso: MediaStreamConfiguration = {
@@ -533,6 +558,7 @@ export class AmcrestCameraClient {
             responseType: 'text',
         });
         this.console.log(encodeResponse.body);
+        const encodeLines = getLines(encodeResponse.body);
 
         for (let i = 0; i < vsos.length; i++) {
             const vso = vsos[i];
@@ -544,27 +570,27 @@ export class AmcrestCameraClient {
                 encName = `table.Encode[${cameraNumber - 1}].ExtraFormat[${i - 1}]`;
             }
 
-            const videoCodec = fromAmcrestVideoCodec(findValue(encodeResponse.body, encName, 'Video.Compression'));
-            const audioCodec = fromAmcrestAudioCodec(findValue(encodeResponse.body, encName, 'Audio.Compression'));
+            const videoCodec = fromAmcrestVideoCodec(findValue(encodeLines, encName, 'Video.Compression'));
+            const audioCodec = fromAmcrestAudioCodec(findValue(encodeLines, encName, 'Audio.Compression'));
 
             if (vso.audio)
                 vso.audio.codec = audioCodec;
             vso.video.codec = videoCodec;
 
-            const width = findValue(encodeResponse.body, encName, 'Video.Width');
-            const height = findValue(encodeResponse.body, encName, 'Video.Height');
+            const width = findValue(encodeLines, encName, 'Video.Width');
+            const height = findValue(encodeLines, encName, 'Video.Height');
             if (width && height) {
                 vso.video.width = parseInt(width);
                 vso.video.height = parseInt(height);
             }
 
-            const videoEnable = findValue(encodeResponse.body, encName, 'VideoEnable');
+            const videoEnable = findValue(encodeLines, encName, 'VideoEnable');
             if (videoEnable?.trim() === 'false') {
                 this.console.warn('Video stream is disabled and should likely be enabled:', encName);
                 continue;
             }
 
-            const encodeOptions = findValue(encodeResponse.body, encName, 'Video.BitRate');
+            const encodeOptions = findValue(encodeLines, encName, 'Video.BitRate');
             if (!encodeOptions)
                 continue;
 
