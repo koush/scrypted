@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from 'path';
-import { ArrayType, DeclarationReflection, InferredType, LiteralType, ProjectReflection, ReferenceType, ReflectionKind, SomeType, Type } from 'typedoc';
+import { DeclarationReflection, ProjectReflection, ReflectionKind, SomeType } from 'typedoc';
 import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 
 const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../gen/schema.json')).toString()) as ProjectReflection;

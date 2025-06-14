@@ -126,6 +126,7 @@ class ScryptedInterface(str, Enum):
     Buttons = "Buttons"
     Camera = "Camera"
     Charger = "Charger"
+    ChatCompletion = "ChatCompletion"
     ClusterForkInterface = "ClusterForkInterface"
     CO2Sensor = "CO2Sensor"
     ColorSettingHsv = "ColorSettingHsv"
@@ -646,13 +647,6 @@ class LauncherApplicationInfo(TypedDict):
     icon: str  # Supports: mdi-icon, fa-icon, urls.
     name: str
 
-class LLMToolDefinition(TypedDict):
-
-    description: str  # A description of what the function does, used by the model to choose when and how to call the function.
-    name: str  # The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
-    parameters: Mapping[str, unknown]  # The parameters the functions accepts, described as a JSON Schema object. See the [guide](https://platform.openai.com/docs/guides/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.  Omitting   defines a function with an empty parameter list.
-    strict: bool  # Whether to enable strict schema adherence when generating the function call. If set to true, the model will follow the exact schema defined in the   field. Only a subset of JSON Schema is supported when   is  . Learn more about Structured Outputs in the [function calling guide]( ).
-
 class MediaObjectOptions(TypedDict):
 
     sourceId: str  # The device id of the source of the MediaObject.
@@ -1004,7 +998,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.13"
+TYPES_VERSION = "0.5.14"
 
 
 class AirPurifier:
@@ -1077,6 +1071,15 @@ class Charger:
     """Charger reports whether or not a device is being charged from an external power source. Usually used for battery powered devices."""
 
     chargeState: ChargeState
+
+class ChatCompletion:
+
+    async def getChatCompletion(self, body: ChatCompletionCreateParamsNonStreaming) -> ChatCompletion:
+        pass
+
+    async def streamChatCompletion(self, params: ChatCompletionCreateParamsStreaming) -> AsyncGenerator[ChatCompletion | ChatCompletionChunk, None]:
+        pass
+
 
 class ClusterForkInterface:
     """Requests that the ScryptedDevice create a fork to"""
@@ -1246,7 +1249,7 @@ class LLMTools:
     async def callLLMTool(self, name: str, parameters: Mapping[str, Any]) -> str:
         pass
 
-    async def getLLMTools(self) -> list[LLMToolDefinition]:
+    async def getLLMTools(self) -> list[ChatCompletionTool]:
         pass
 
 
@@ -1849,7 +1852,7 @@ class MediaManager:
     async def convertMediaObject(self, mediaObject: MediaObject, toMimeType: str) -> Any:
         pass
 
-    async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> bytearray:
+    async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> ArrayBufferLike:
         pass
 
     async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
@@ -2114,6 +2117,8 @@ class ScryptedInterfaceMethods(str, Enum):
     generateVideoFrames = "generateVideoFrames"
     connectStream = "connectStream"
     getTTYSettings = "getTTYSettings"
+    getChatCompletion = "getChatCompletion"
+    streamChatCompletion = "streamChatCompletion"
     callLLMTool = "callLLMTool"
     getLLMTools = "getLLMTools"
 
@@ -3404,6 +3409,14 @@ ScryptedInterfaceDescriptors = {
     ],
     "properties": []
   },
+  "ChatCompletion": {
+    "name": "ChatCompletion",
+    "methods": [
+      "getChatCompletion",
+      "streamChatCompletion"
+    ],
+    "properties": []
+  },
   "LLMTools": {
     "name": "LLMTools",
     "methods": [
@@ -3450,7 +3463,7 @@ class HttpResponse:
     def sendSocket(self, socket: Any, options: HttpResponseOptions = None) -> None:
         pass
 
-    def sendStream(self, stream: AsyncGenerator[bytearray, None], options: HttpResponseOptions = None) -> None:
+    def sendStream(self, stream: AsyncGenerator[ArrayBufferLike, None], options: HttpResponseOptions = None) -> None:
         pass
 
 
@@ -3470,7 +3483,7 @@ class Image:
     async def close(self) -> None:
         pass
 
-    async def toBuffer(self, options: ImageOptions = None) -> bytearray:
+    async def toBuffer(self, options: ImageOptions = None) -> ArrayBufferLike:
         pass
 
     async def toImage(self, options: ImageOptions = None) -> Union[Image, MediaObject]:

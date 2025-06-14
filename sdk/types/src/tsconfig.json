@@ -5,6 +5,7 @@
         "noImplicitAny": true,
         "esModuleInterop": true,
         "resolveJsonModule": true,
+        "skipLibCheck": true,
         "noEmit": true,
         "strict": true
     },
