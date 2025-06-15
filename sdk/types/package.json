@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/types",
-  "version": "0.5.16",
+  "version": "0.5.17",
   "description": "",
   "main": "dist/index.js",
   "author": "",
@@ -9,5 +9,8 @@
     "prepublishOnly": "npm run build",
     "build": "tsc --project src && rimraf dist gen && typedoc && ts-node ./src/build.ts && tsc"
   },
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "openai": "^5.3.0"
+  }
 }
