@@ -95,7 +95,7 @@ export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
     });
     this.client = client;
     this.config = config;
-    this.retryTimeout = setTimeout(this._connect, (config.expires - 60_000) - Date.now())
+    this.retryTimeout = setTimeout(() => this._connect(), (config.expires - 60_000) - Date.now())
     return client;
   }
 }
