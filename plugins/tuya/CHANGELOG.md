@@ -1,8 +1,15 @@
 <details>
 <summary>Changelog</summary>
 
+### 0.1.0-beta.7
+
+fix: fix setTimeout undefined function
+bump version
+
+
 ### 0.1.0-beta.6
 
+chore: update changelog
 fix: ensure timeout is actually correct and bound corretly
 chore: bump version
 
