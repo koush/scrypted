@@ -15,6 +15,7 @@ from scrypted_sdk import Setting, SettingValue
 from common import yolo
 from coreml.face_recognition import CoreMLFaceRecognition
 from coreml.custom_detection import CoreMLCustomDetection
+from coreml.clip_embedding import CoreMLClipEmbedding
 
 try:
     from coreml.text_recognition import CoreMLTextRecognition
@@ -146,6 +147,7 @@ class CoreMLPlugin(
 
         self.faceDevice = None
         self.textDevice = None
+        self.clipDevice = None
 
         if not self.forked:
             asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
@@ -177,6 +179,19 @@ class CoreMLPlugin(
                     },
                 )
 
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(
+                {
+                    "nativeId": "clipembedding",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                        scrypted_sdk.ScryptedInterface.TextEmbedding.value,
+                        scrypted_sdk.ScryptedInterface.ImageEmbedding.value,
+                    ],
+                    "name": "CoreML CLIP Embedding",
+                }
+            )
         except:
             pass
 
@@ -184,9 +199,12 @@ class CoreMLPlugin(
         if nativeId == "facerecognition":
             self.faceDevice = self.faceDevice or CoreMLFaceRecognition(self, nativeId)
             return self.faceDevice
-        if nativeId == "textrecognition":
+        elif nativeId == "textrecognition":
             self.textDevice = self.textDevice or CoreMLTextRecognition(self, nativeId)
             return self.textDevice
+        elif nativeId == "clipembedding":
+            self.clipDevice = self.clipDevice or CoreMLClipEmbedding(self, nativeId)
+            return self.clipDevice
         custom_model = self.custom_models.get(nativeId, None)
         if custom_model:
             return custom_model
