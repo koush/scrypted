@@ -200,6 +200,7 @@ class ScryptedInterface(str, Enum):
     StreamService = "StreamService"
     TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
+    TextEmbedding = "TextEmbedding"
     Thermometer = "Thermometer"
     TTY = "TTY"
     TTYSettings = "TTYSettings"
@@ -1054,7 +1055,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.17"
+TYPES_VERSION = "0.5.19"
 
 
 class AirPurifier:
@@ -1692,6 +1693,12 @@ class TemperatureSetting:
         pass
 
 
+class TextEmbedding:
+
+    async def getTextEmbedding(self, input: str) -> ArrayBufferLike:
+        pass
+
+
 class Thermometer:
 
     temperature: float  # Get the ambient temperature in Celsius.
@@ -2175,6 +2182,7 @@ class ScryptedInterfaceMethods(str, Enum):
     getTTYSettings = "getTTYSettings"
     getChatCompletion = "getChatCompletion"
     streamChatCompletion = "streamChatCompletion"
+    getTextEmbedding = "getTextEmbedding"
     callLLMTool = "callLLMTool"
     getLLMTools = "getLLMTools"
 
@@ -3470,6 +3478,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [
       "getChatCompletion",
       "streamChatCompletion"
+    ],
+    "properties": []
+  },
+  "TextEmbedding": {
+    "name": "TextEmbedding",
+    "methods": [
+      "getTextEmbedding"
     ],
     "properties": []
   },

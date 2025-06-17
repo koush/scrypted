@@ -1076,6 +1076,10 @@ export interface ChatCompletion {
   streamChatCompletion(params: ChatCompletionStreamParams): Promise<AsyncGenerator<ChatCompletionChunk | ChatCompletionResponse>>;
 }
 
+export interface TextEmbedding {
+  getTextEmbedding(input: string): Promise<Buffer>;
+}
+
 export interface PanTiltZoomCapabilities {
   pan?: boolean;
   tilt?: boolean;
@@ -2441,6 +2445,7 @@ export enum ScryptedInterface {
   TTYSettings = 'TTYSettings',
 
   ChatCompletion = "ChatCompletion",
+  TextEmbedding = "TextEmbedding",
   LLMTools = "LLMTools",
 
   ScryptedSystemDevice = "ScryptedSystemDevice",
