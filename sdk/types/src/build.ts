@@ -116,6 +116,7 @@ function toPythonType(type: any): string {
         case 'any':
             return 'Any';
         case 'Buffer':
+        case 'ArrayBufferLike':
             return 'bytearray';
         // generic return type... how to handle this?
         case 'T':

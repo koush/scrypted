@@ -1055,7 +1055,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.19"
+TYPES_VERSION = "0.5.20"
 
 
 class AirPurifier:
@@ -1695,7 +1695,7 @@ class TemperatureSetting:
 
 class TextEmbedding:
 
-    async def getTextEmbedding(self, input: str) -> ArrayBufferLike:
+    async def getTextEmbedding(self, input: str) -> bytearray:
         pass
 
 
@@ -1915,7 +1915,7 @@ class MediaManager:
     async def convertMediaObject(self, mediaObject: MediaObject, toMimeType: str) -> Any:
         pass
 
-    async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> ArrayBufferLike:
+    async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> bytearray:
         pass
 
     async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
@@ -3534,7 +3534,7 @@ class HttpResponse:
     def sendSocket(self, socket: Any, options: HttpResponseOptions = None) -> None:
         pass
 
-    def sendStream(self, stream: AsyncGenerator[ArrayBufferLike, None], options: HttpResponseOptions = None) -> None:
+    def sendStream(self, stream: AsyncGenerator[bytearray, None], options: HttpResponseOptions = None) -> None:
         pass
 
 
@@ -3554,7 +3554,7 @@ class Image:
     async def close(self) -> None:
         pass
 
-    async def toBuffer(self, options: ImageOptions = None) -> ArrayBufferLike:
+    async def toBuffer(self, options: ImageOptions = None) -> bytearray:
         pass
 
     async def toImage(self, options: ImageOptions = None) -> Union[Image, MediaObject]:
