@@ -46,26 +46,37 @@ class OpenVINOClipEmbedding(ClipEmbedding):
         return textModel, visionModel
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
-        inputs = self.processor(images=input, return_tensors="np", padding="max_length", truncation=True)
-        _, vision_model = self.model
-        vision_predictions = vision_model(inputs.data['pixel_values'])
-        image_embeds = vision_predictions[0]
-        # this is a hack to utilize the existing image massaging infrastructure
-        embedding = bytearray(image_embeds.astype(np.float32).tobytes())
-        ret: ObjectsDetected = {
-            "detections": [
-                {
-                    "embedding": embedding,
-                }
-            ],
-            "inputDimensions": src_size
-        }
+        def predict():
+            inputs = self.processor(images=input, return_tensors="np", padding="max_length", truncation=True)
+            _, vision_model = self.model
+            vision_predictions = vision_model(inputs.data['pixel_values'])
+            image_embeds = vision_predictions[0]
+            # this is a hack to utilize the existing image massaging infrastructure
+            embedding = bytearray(image_embeds.astype(np.float32).tobytes())
+            ret: ObjectsDetected = {
+                "detections": [
+                    {
+                        "embedding": embedding,
+                    }
+                ],
+                "inputDimensions": src_size
+            }
+            return ret
 
+        ret = await asyncio.get_event_loop().run_in_executor(
+            clipPredict, lambda: predict()
+        )
         return ret
 
     async def getTextEmbedding(self, input):
-        inputs = self.processor(text=input, return_tensors="np", padding="max_length", truncation=True)
-        text_model, _ = self.model
-        text_predictions = text_model((inputs.data['input_ids'], inputs.data['attention_mask']))
-        text_embeds = text_predictions[0]
-        return bytearray(text_embeds.astype(np.float32).tobytes())
+        def predict():
+            inputs = self.processor(text=input, return_tensors="np", padding="max_length", truncation=True)
+            text_model, _ = self.model
+            text_predictions = text_model((inputs.data['input_ids'], inputs.data['attention_mask']))
+            text_embeds = text_predictions[0]
+            return bytearray(text_embeds.astype(np.float32).tobytes())
+
+        ret = await asyncio.get_event_loop().run_in_executor(
+            clipPredict, lambda: predict()
+        )
+        return ret
