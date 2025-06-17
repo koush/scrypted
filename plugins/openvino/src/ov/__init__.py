@@ -26,6 +26,8 @@ try:
 except:
     OpenVINOTextRecognition = None
 
+from .clip_embedding import OpenVINOClipEmbedding
+
 predictExecutor = concurrent.futures.ThreadPoolExecutor(
     thread_name_prefix="OpenVINO-Predict"
 )
@@ -300,6 +302,7 @@ class OpenVINOPlugin(
 
         self.faceDevice = None
         self.textDevice = None
+        self.clipDevice = None
 
         if not self.forked:
             asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
@@ -422,6 +425,20 @@ class OpenVINOPlugin(
                         "name": "OpenVINO Text Recognition",
                     }
                 )
+
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(
+                {
+                    "nativeId": "clipembedding",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                        scrypted_sdk.ScryptedInterface.TextEmbedding.value,
+                        scrypted_sdk.ScryptedInterface.ImageEmbedding.value,
+                    ],
+                    "name": "OpenVINO CLIP Embedding",
+                }
+            )
         except:
             pass
 
@@ -432,6 +449,9 @@ class OpenVINOPlugin(
         elif nativeId == "textrecognition":
             self.textDevice = self.textDevice or OpenVINOTextRecognition(self, nativeId)
             return self.textDevice
+        elif nativeId == "clipembedding":
+            self.clipDevice = self.clipDevice or OpenVINOClipEmbedding(self, nativeId)
+            return self.clipDevice
         custom_model = self.custom_models.get(nativeId, None)
         if custom_model:
             return custom_model
