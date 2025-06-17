@@ -1076,6 +1076,10 @@ export interface ChatCompletion {
   streamChatCompletion(params: ChatCompletionStreamParams): Promise<AsyncGenerator<ChatCompletionChunk | ChatCompletionResponse>>;
 }
 
+export interface ImageEmbedding {
+  getImageEmbedding(input: MediaObject): Promise<Buffer>;
+}
+
 export interface TextEmbedding {
   getTextEmbedding(input: string): Promise<Buffer>;
 }
@@ -2446,6 +2450,7 @@ export enum ScryptedInterface {
 
   ChatCompletion = "ChatCompletion",
   TextEmbedding = "TextEmbedding",
+  ImageEmbedding = "ImageEmbedding",
   LLMTools = "LLMTools",
 
   ScryptedSystemDevice = "ScryptedSystemDevice",

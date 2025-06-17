@@ -147,6 +147,7 @@ class ScryptedInterface(str, Enum):
     HttpRequestHandler = "HttpRequestHandler"
     HumiditySensor = "HumiditySensor"
     HumiditySetting = "HumiditySetting"
+    ImageEmbedding = "ImageEmbedding"
     Intercom = "Intercom"
     LauncherApplication = "LauncherApplication"
     LLMTools = "LLMTools"
@@ -1055,7 +1056,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.20"
+TYPES_VERSION = "0.5.21"
 
 
 class AirPurifier:
@@ -1284,6 +1285,12 @@ class HumiditySetting:
 
     humiditySetting: HumiditySettingStatus
     async def setHumidity(self, humidity: HumidityCommand) -> None:
+        pass
+
+
+class ImageEmbedding:
+
+    async def getImageEmbedding(self, input: MediaObject) -> bytearray:
         pass
 
 
@@ -2183,6 +2190,7 @@ class ScryptedInterfaceMethods(str, Enum):
     getChatCompletion = "getChatCompletion"
     streamChatCompletion = "streamChatCompletion"
     getTextEmbedding = "getTextEmbedding"
+    getImageEmbedding = "getImageEmbedding"
     callLLMTool = "callLLMTool"
     getLLMTools = "getLLMTools"
 
@@ -3485,6 +3493,13 @@ ScryptedInterfaceDescriptors = {
     "name": "TextEmbedding",
     "methods": [
       "getTextEmbedding"
+    ],
+    "properties": []
+  },
+  "ImageEmbedding": {
+    "name": "ImageEmbedding",
+    "methods": [
+      "getImageEmbedding"
     ],
     "properties": []
   },
