@@ -9,3 +9,5 @@ onnxruntime; 'darwin' in sys_platform or platform_machine == 'aarch64'
 
 Pillow==10.3.0
 opencv-python-headless==4.10.0.84
+
+transformers==4.52.4

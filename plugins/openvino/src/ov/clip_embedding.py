@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, List, Tuple
+from typing import Any
 
 import numpy as np
 import openvino.runtime as ov

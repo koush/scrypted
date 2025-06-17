@@ -22,6 +22,7 @@ import common.yolo as yolo
 from predict import PredictPlugin
 
 from .face_recognition import ONNXFaceRecognition
+from .clip_embedding import ONNXClipEmbedding
 
 try:
     from .text_recognition import ONNXTextRecognition
@@ -165,6 +166,7 @@ class ONNXPlugin(
 
         self.faceDevice = None
         self.textDevice = None
+        self.clipDevice = None
 
         if not self.forked:
             asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
@@ -195,6 +197,20 @@ class ONNXPlugin(
                         "name": "ONNX Text Recognition",
                     },
                 )
+
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(
+                {
+                    "nativeId": "clipembedding",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                        scrypted_sdk.ScryptedInterface.TextEmbedding.value,
+                        scrypted_sdk.ScryptedInterface.ImageEmbedding.value,
+                    ],
+                    "name": "ONNX CLIP Embedding",
+                }
+            )
         except:
             pass
 
@@ -205,6 +221,9 @@ class ONNXPlugin(
         elif nativeId == "textrecognition":
             self.textDevice = self.textDevice or ONNXTextRecognition(self, nativeId)
             return self.textDevice
+        elif nativeId == "clipembedding":
+            self.clipDevice = self.clipDevice or ONNXClipEmbedding(self, nativeId)
+            return self.clipDevice
         custom_model = self.custom_models.get(nativeId, None)
         if custom_model:
             return custom_model

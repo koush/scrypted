@@ -1,21 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
+import os
 from typing import Any
 
+import coremltools as ct
 import numpy as np
 from PIL import Image
-
-import coremltools as ct
-from predict.clip import ClipEmbedding
 from scrypted_sdk import ObjectsDetected
-import os
-import concurrent.futures
+
+from predict.clip import ClipEmbedding
+
 
 class CoreMLClipEmbedding(ClipEmbedding):
     def __init__(self, plugin, nativeId: str):
         super().__init__(plugin=plugin, nativeId=nativeId)
-        self.predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "detect-custom")
+        self.predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "predict-clip")
 
     def getFiles(self):
         return [

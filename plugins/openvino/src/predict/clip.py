@@ -1,21 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from urllib.parse import urlparse, urlunparse
-from typing import Any, List, Tuple
-import json
 import base64
+import os
+from typing import Tuple
 
-import numpy as np
-from PIL import Image
-from scrypted_sdk import ObjectDetectionResult, ObjectDetectionSession, ObjectsDetected
 import scrypted_sdk
 from transformers import CLIPProcessor
 
-from common import yolo
 from predict import PredictPlugin
-from common import softmax
-import os
 
 
 class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.ImageEmbedding):
