@@ -365,9 +365,13 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return this.constructedVideoStreamOptions;
     }
 
-    putSettingBase(key: string, value: SettingValue): Promise<void> {
-        this.constructedVideoStreamOptions = undefined;
-        return super.putSettingBase(key, value);
+    async putSettingBase(key: string, value: SettingValue): Promise<void> {
+        try {
+            return await super.putSettingBase(key, value);
+        }
+        finally {
+            this.constructedVideoStreamOptions = undefined;
+        }
     }
 }
 

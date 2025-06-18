@@ -103,7 +103,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     clientWithToken: ReolinkCameraClient;
     onvifClient: OnvifCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
-    videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     motionTimeout: NodeJS.Timeout;
     siren: ReolinkCameraSiren;
     floodlight: ReolinkCameraFloodlight;
@@ -770,15 +769,6 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
-        this.videoStreamOptions ||= this.getConstructedVideoStreamOptionsInternal().catch(e => {
-            this.constructedVideoStreamOptions = undefined;
-            throw e;
-        });
-
-        return this.videoStreamOptions;
-    }
-
-    async getConstructedVideoStreamOptionsInternal(): Promise<UrlMediaStreamOptions[]> {
         let deviceInfo: DevInfo;
         try {
             const client = this.getClient();
