@@ -14,26 +14,31 @@ from scrypted_sdk import ObjectsDetected
 clipPrepare, clipPredict = async_infer.create_executors("ClipPredict")
 
 
+# _int8 is available but seems slower in addition to the accuracy loss.
+model_suffix = ""
+text_xml_name = f"text{model_suffix}.xml"
+vision_xml_name = f"vision{model_suffix}.xml"
+
 class OpenVINOClipEmbedding(ClipEmbedding):
     def __init__(self, plugin, nativeId: str):
         super().__init__(plugin=plugin, nativeId=nativeId)
 
     def getFiles(self):
         return [
-            "openvino/text.xml",
-            "openvino/text.bin",
-            "openvino/vision.xml",
-            "openvino/vision.bin"
+            f"openvino/{text_xml_name}",
+            f"openvino/text{model_suffix}.bin",
+            f"openvino/{vision_xml_name}",
+            f"openvino/vision{model_suffix}.bin"
         ]
 
     def loadModel(self, files):
         # find the xml file in the files list
-        text_xml = [f for f in files if f.lower().endswith('text.xml')]
+        text_xml = [f for f in files if f.lower().endswith(text_xml_name)]
         if not text_xml:
             raise ValueError("No XML model file found in the provided files list")
         text_xml = text_xml[0]
 
-        vision_xml = [f for f in files if f.lower().endswith('vision.xml')]
+        vision_xml = [f for f in files if f.lower().endswith(vision_xml_name)]
         if not vision_xml:
             raise ValueError("No XML model file found in the provided files list")
         vision_xml = vision_xml[0]
