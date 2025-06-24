@@ -1,4 +1,4 @@
-import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedUser, ScryptedUserAccessControl, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceManifest, DeviceProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedUser, ScryptedUserAccessControl, Setting, Settings, SettingValue } from "@scrypted/sdk";
 import { addAccessControlsForInterface } from "@scrypted/sdk/acl";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 export const UsersNativeId = 'users';
@@ -132,7 +132,13 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
             deviceCreator: 'Scrypted User',
         };
 
-        this.syncUsers();
+        this.syncUsers()
+        .then(length => {
+            if (!length) {
+                this.console.log('no users found, looping for first user');
+                setInterval(() => this.syncUsers(), 60 * 1000);
+            }
+        })
     }
 
     async getDevice(nativeId: string): Promise<any> {
@@ -192,7 +198,7 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
     async syncUsers() {
         const usersService = await sdk.systemManager.getComponent('users');
         const users: DBUser[] = await usersService.getAllUsers();
-        await sdk.deviceManager.onDevicesChanged({
+        const manifest: DeviceManifest = {
             providerNativeId: this.nativeId,
             devices: users.map(user => ({
                 name: user.username,
@@ -203,6 +209,16 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
                 ],
                 type: ScryptedDeviceType.Person,
             })),
-        })
+        };
+        const nativeIds = new Set(manifest.devices.map(d => d.nativeId));
+        for (const nativeId of sdk.deviceManager.getNativeIds()) {
+            nativeIds.delete(nativeId);
+        }
+        if (nativeIds.size) {
+            // add any missing users.
+            await sdk.deviceManager.onDevicesChanged(manifest);
+        }
+
+        return manifest.devices.length;
     }
 }
