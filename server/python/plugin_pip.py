@@ -101,7 +101,10 @@ def install_with_pip(
         line = p.stdout.readline()
         if not line:
             break
-        line = line.decode("utf8").rstrip("\r\n")
+        try:
+            line = line.decode("utf8").rstrip("\r\n")
+        except UnicodeDecodeError:
+            line = line.decode("latin-1").rstrip("\r\n")  # Fallback to Latin
         print(line)
     result = p.wait()
     print("pip install result %s" % result)
