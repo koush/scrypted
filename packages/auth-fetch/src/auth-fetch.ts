@@ -27,7 +27,8 @@ async function getAuth(options: AuthFetchOptions, url: string | URL, method: str
         ++credential.count;
         const nc = ('00000000' + credential.count).slice(-8);
         const cnonce = [...Array(24)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
-        const uri = new URL(url).pathname;
+        const parsedURL = new URL(url);
+        const uri = parsedURL.pathname + parsedURL.search;
 
         const { DIGEST, buildAuthorizationHeader } = await import('http-auth-utils');
 

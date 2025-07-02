@@ -1,12 +1,12 @@
-import { AuthFetchCredentialState, HttpFetchOptions, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
+import { AuthFetchCredentialState, authHttpFetch, HttpFetchOptions } from '@scrypted/common/src/http-auth-fetch';
 import { readLine } from '@scrypted/common/src/read-stream';
 import { parseHeaders, readBody } from '@scrypted/common/src/rtsp-server';
+import { MediaStreamConfiguration, Point } from '@scrypted/sdk';
 import contentType from 'content-type';
 import { IncomingMessage } from 'http';
 import { EventEmitter, Readable } from 'stream';
 import { createRtspMediaStreamOptions, Destroyable, UrlMediaStreamOptions } from '../../rtsp/src/rtsp';
 import { getDeviceInfo } from './probe';
-import { MediaStreamConfiguration, MediaStreamOptions, Point } from '@scrypted/sdk';
 
 export interface AmcrestObjectDetails {
     Action: string;
