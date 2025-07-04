@@ -1,9 +1,9 @@
 import type { ChildProcess as NodeChildProcess } from 'child_process';
 import type { Socket as NodeNetSocket } from 'net';
 import type { ChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
-import type { ChatCompletionChunk, ChatCompletionCreateParamsNonStreaming, ChatCompletion as ChatCompletionResponse, ChatCompletionTool } from 'openai/resources';
+import type { ChatCompletionChunk, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletion as ChatCompletionResponse, ChatCompletionTool } from 'openai/resources';
 import type { Worker as NodeWorker } from 'worker_threads';
-export type { ChatCompletionChunk, ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming, ChatCompletion as ChatCompletionResponse, ChatCompletionTool } from 'openai/resources';
+export type { ChatCompletionChunk, ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming, ChatCompletionMessageParam, ChatCompletion as ChatCompletionResponse, ChatCompletionTool } from 'openai/resources';
 
 export type ScryptedNativeId = string | undefined;
 
@@ -1073,7 +1073,7 @@ export interface LLMTools {
 
 export interface ChatCompletion {
   getChatCompletion(body: ChatCompletionCreateParamsNonStreaming): Promise<ChatCompletionResponse>;
-  streamChatCompletion(params: ChatCompletionStreamParams): Promise<AsyncGenerator<ChatCompletionChunk | ChatCompletionResponse>>;
+  streamChatCompletion(params: ChatCompletionStreamParams, userMessages?: AsyncGenerator<ChatCompletionMessageParam>): Promise<AsyncGenerator<ChatCompletionChunk | ChatCompletionResponse>>;
 }
 
 export interface ImageEmbedding {

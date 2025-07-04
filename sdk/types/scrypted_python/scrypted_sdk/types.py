@@ -1045,6 +1045,17 @@ class VideoTextOverlay(TypedDict):
     readonly: bool
     text: str | bool  # The text value to set the overlay to, if it is not readonly. True or false otherwise to enable/disable.
 
+class ChatCompletionMessageParam(TypedDict):
+    """
+    Developer-provided instructions that the model should follow, regardless of messages sent by the user. With o1 models and newer, 
+
+     messages replace the previous 
+
+     messages.    """
+
+    pass
+
+
 class MediaConverterTypes(TypedDict):
     """[fromMimeType, toMimeType]"""
 
@@ -1056,7 +1067,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.21"
+TYPES_VERSION = "0.5.22"
 
 
 class AirPurifier:
@@ -1135,7 +1146,7 @@ class ChatCompletion:
     async def getChatCompletion(self, body: ChatCompletionCreateParamsNonStreaming) -> ChatCompletion:
         pass
 
-    async def streamChatCompletion(self, params: ChatCompletionStreamParams) -> AsyncGenerator[ChatCompletion | ChatCompletionChunk, None]:
+    async def streamChatCompletion(self, params: ChatCompletionStreamParams, userMessages: AsyncGenerator[ChatCompletionMessageParam, None] = None) -> AsyncGenerator[ChatCompletion | ChatCompletionChunk, None]:
         pass
 
 
