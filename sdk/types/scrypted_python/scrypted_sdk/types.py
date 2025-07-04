@@ -1067,7 +1067,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.22"
+TYPES_VERSION = "0.5.23"
 
 
 class AirPurifier:
@@ -1146,7 +1146,7 @@ class ChatCompletion:
     async def getChatCompletion(self, body: ChatCompletionCreateParamsNonStreaming) -> ChatCompletion:
         pass
 
-    async def streamChatCompletion(self, params: ChatCompletionStreamParams, userMessages: AsyncGenerator[ChatCompletionMessageParam, None] = None) -> AsyncGenerator[ChatCompletion | ChatCompletionChunk, None]:
+    async def streamChatCompletion(self, params: ChatCompletionStreamParams, newMessages: AsyncGenerator[list[ChatCompletionMessageParam], None] = None) -> AsyncGenerator[ChatCompletion | ChatCompletionChunk, None]:
         pass
 
 

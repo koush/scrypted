@@ -19,7 +19,7 @@
     "typescript": "^5.8.3"
   },
   "peerDependencies": {
-    "@scrypted/types": "^0.5.22"
+    "@scrypted/types": "^0.5.23"
   },
   "dependencies": {
     "engine.io-client": "^6.6.3",

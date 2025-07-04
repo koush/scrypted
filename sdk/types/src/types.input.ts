@@ -1073,7 +1073,7 @@ export interface LLMTools {
 
 export interface ChatCompletion {
   getChatCompletion(body: ChatCompletionCreateParamsNonStreaming): Promise<ChatCompletionResponse>;
-  streamChatCompletion(params: ChatCompletionStreamParams, userMessages?: AsyncGenerator<ChatCompletionMessageParam>): Promise<AsyncGenerator<ChatCompletionChunk | ChatCompletionResponse>>;
+  streamChatCompletion(params: ChatCompletionStreamParams, newMessages?: AsyncGenerator<ChatCompletionMessageParam[]>): Promise<AsyncGenerator<ChatCompletionChunk | ChatCompletionResponse>>;
 }
 
 export interface ImageEmbedding {
