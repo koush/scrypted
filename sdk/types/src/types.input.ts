@@ -1074,7 +1074,8 @@ export interface LLMTools {
 export interface ChatCompletion {
   getChatCompletion(body: ChatCompletionCreateParamsNonStreaming): Promise<ChatCompletionResponse>;
   streamChatCompletion(params: ChatCompletionStreamParams, newMessages?: AsyncGenerator<ChatCompletionMessageParam[]>): Promise<AsyncGenerator<ChatCompletionChunk | ChatCompletionResponse>>;
-  streamChatCompletion(params: ChatCompletionStreamParams, newMessages: undefined | AsyncGenerator<ChatCompletionMessageParam[]>, callback: (chunk: ChatCompletionChunk | ChatCompletionResponse) => Promise<boolean>): Promise<void>;
+  streamChatCompletion(params: ChatCompletionStreamParams, newMessages: undefined | AsyncGenerator<ChatCompletionMessageParam[]>, callback: ((chunk: ChatCompletionChunk) => Promise<boolean>)): Promise<AsyncGenerator<ChatCompletionResponse>>;
+  streamChatCompletion(params: ChatCompletionStreamParams, newMessages: AsyncGenerator<ChatCompletionMessageParam[]>, callback: null | ((chunk: ChatCompletionChunk) => Promise<boolean>)): Promise<AsyncGenerator<ChatCompletionResponse>>;
 }
 
 export interface ImageEmbedding {
