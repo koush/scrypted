@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@scrypted/sdk": "file:../sdk",
+    "@scrypted/types": "^0.5.27",
     "http-auth-utils": "^5.0.1",
     "typescript": "^5.5.3"
   },

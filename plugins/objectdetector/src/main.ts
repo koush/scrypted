@@ -9,7 +9,8 @@ import { FFmpegVideoFrameGenerator } from './ffmpeg-videoframes';
 import { fixLegacyClipPath, normalizeBox, polygonContainsBoundingBox, polygonIntersectsBoundingBox } from './polygon';
 import { SMART_MOTIONSENSOR_PREFIX, SmartMotionSensor } from './smart-motionsensor';
 import { SMART_OCCUPANCYSENSOR_PREFIX, SmartOccupancySensor } from './smart-occupancy-sensor';
-import { getAllDevices, safeParseJson } from './util';
+import { safeParseJson } from '../../../common/src/json';
+import { getAllDevices } from '../../../common/src/devices';
 import { FFmpegAudioDetectionMixinProvider } from './ffmpeg-audiosensor';
 
 
@@ -94,7 +95,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       onGet: async () => {
         const choices = [
           'Default',
-          ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
+          ...getAllDevices(sdk.systemManager).filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
         ];
         return {
           hide: this.model?.decoder,
@@ -690,7 +691,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (frameGenerator === 'Default')
       frameGenerator = this.plugin.storageSettings.values.defaultDecoder || 'Default';
 
-    const pipelines = getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator));
+    const pipelines = getAllDevices(sdk.systemManager).filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator));
     const webassembly = sdk.systemManager.getDeviceById('@scrypted/nvr', 'decoder') || undefined;
     const gstreamer = sdk.systemManager.getDeviceById('@scrypted/python-codecs', 'gstreamer') || undefined;
     const libav = sdk.systemManager.getDeviceById('@scrypted/python-codecs', 'libav') || undefined;
@@ -1026,7 +1027,7 @@ export class ObjectDetectionPlugin extends AutoenableMixinProvider implements Se
       onGet: async () => {
         const choices = [
           'Default',
-          ...getAllDevices().filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
+          ...getAllDevices(sdk.systemManager).filter(d => d.interfaces.includes(ScryptedInterface.VideoFrameGenerator)).map(d => d.name),
         ];
         return {
           choices,
