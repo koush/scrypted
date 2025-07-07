@@ -36,7 +36,8 @@ curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --yes --dea
     tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 apt -y update
 # is there a way to get a versioned package automatically?
-apt -y install cuda-drivers
+# cuda-drivers does not work with blackwell for some reason, container toolkit it broken IIRC.
+apt -y install nvidia-open
 apt -y install nvidia-container-toolkit
 
 nvidia-ctk runtime configure --runtime=docker
