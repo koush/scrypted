@@ -1,5 +1,8 @@
 if [ "$(uname -m)" = "x86_64" ]
 then
+    apt -y update
+    apt -y install gpg
+
     # download the key to system keyring
     curl -1sLf https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor --yes --output /usr/share/keyrings/oneapi-archive-keyring.gpg
 
