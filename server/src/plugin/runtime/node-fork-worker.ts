@@ -6,6 +6,7 @@ import { RpcMessage, RpcPeer } from "../../rpc";
 import { SidebandSocketSerializer } from "../socket-serializer";
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
+import { getPluginNodePath } from '../plugin-npm-dependencies';
 
 export const NODE_PLUGIN_CHILD_PROCESS = 'child';
 export const NODE_PLUGIN_FORK_PROCESS = 'fork';
@@ -49,6 +50,8 @@ export class NodeForkWorker extends ChildProcessWorker {
         ];
 
         const nodePaths: string[] = [
+            // /server/volume/plugins/@scrypted/core/n-node-v127-linux-x64-20250101
+            path.join(getPluginNodePath(this.pluginId), 'node_modules'),
             // /server/node_modules/@scrypted/server/node_modules
             path.resolve(__dirname, '..', '..', '..', 'node_modules'),
             // /server/node_modules
