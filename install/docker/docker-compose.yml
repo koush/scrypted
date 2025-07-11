@@ -45,10 +45,10 @@ services:
             # - SCRYPTED_DOCKER_AVAHI=true
 
         # NVIDIA (Part 1 of 2)
-        # runtime: nvidia
+        # nvidia runtime: nvidia
 
         # NVIDIA (Part 2 of 2) - Use NVIDIA image, and remove subsequent default image.
-        # image: ghcr.io/koush/scrypted:nvidia
+        # nvidia image: ghcr.io/koush/scrypted:nvidia
         image: ghcr.io/koush/scrypted
 
         volumes:

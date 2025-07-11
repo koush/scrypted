@@ -13,6 +13,8 @@ then
 fi
 
 function readyn() {
+    echo
+    echo
     if [ ! -z "$SCRYPTED_NONINTERACTIVE" ]
     then
         yn="y"
@@ -91,6 +93,25 @@ else
 
     sudo systemctl stop apparmor || true
     sudo apt -y purge apparmor || true
+fi
+
+HAS_NVIDIA=$(lspci | grep -i nvidia)
+if [ ! -z "$HAS_NVIDIA" ]
+then
+    readyn "NVIDIA GPU detected. Use NVIDIA image for GPU acceleration?"
+    if [ "$yn" == "y" ]
+    then
+        readyn "NVIDIA image requires the NVIDIA Drivers and Container Toolkit to be installed. This script can install them for you. Install NVIDIA Drivers and Container Toolkit for GPU acceleration?"
+        if [ "$yn" == "y" ]
+        then
+            curl -fsSL https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-nvidia-container-toolkit.sh -o install-nvidia-container-toolkit.sh
+            chmod +x install-nvidia-container-toolkit.sh
+            ./install-nvidia-container-toolkit.sh
+            rm install-nvidia-container-toolkit.sh
+        fi
+        sed -i 's/'#' nvidia //g' $DOCKER_COMPOSE_YML
+        sed -i 's/ghcr.io\/koush\/scrypted/ghcr.io\/koush\/scrypted:nvidia/g' $DOCKER_COMPOSE_YML
+    fi
 fi
 
 readyn "Install avahi-daemon? This is the recommended for reliable HomeKit discovery and pairing."
