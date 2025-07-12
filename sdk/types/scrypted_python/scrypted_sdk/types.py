@@ -491,6 +491,13 @@ class AudioVolumes(TypedDict):
     pass
 
 
+class ChatCompletionCapabilities(TypedDict):
+
+    audio: bool
+    audioGeneration: bool
+    image: bool
+    imageGeneration: bool
+
 class ChatCompletionChunk(TypedDict):
     """Represents a streamed chunk of a chat completion response returned by the model, based on the provided input. [Learn more](https://platform.openai.com/docs/guides/streaming-responses)."""
 
@@ -1067,7 +1074,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.27"
+TYPES_VERSION = "0.5.28"
 
 
 class AirPurifier:
@@ -1143,6 +1150,7 @@ class Charger:
 
 class ChatCompletion:
 
+    chatCompletionCapabilities: ChatCompletionCapabilities
     async def getChatCompletion(self, body: ChatCompletionCreateParamsNonStreaming) -> ChatCompletion:
         pass
 
@@ -2085,6 +2093,7 @@ class ScryptedInterfaceProperty(str, Enum):
     humiditySetting = "humiditySetting"
     fan = "fan"
     applicationInfo = "applicationInfo"
+    chatCompletionCapabilities = "chatCompletionCapabilities"
     systemDevice = "systemDevice"
 
 class ScryptedInterfaceMethods(str, Enum):
@@ -2725,6 +2734,14 @@ class DeviceState:
     @applicationInfo.setter
     def applicationInfo(self, value: LauncherApplicationInfo):
         self.setScryptedProperty("applicationInfo", value)
+
+    @property
+    def chatCompletionCapabilities(self) -> ChatCompletionCapabilities:
+        return self.getScryptedProperty("chatCompletionCapabilities")
+
+    @chatCompletionCapabilities.setter
+    def chatCompletionCapabilities(self, value: ChatCompletionCapabilities):
+        self.setScryptedProperty("chatCompletionCapabilities", value)
 
     @property
     def systemDevice(self) -> ScryptedSystemDeviceInfo:
@@ -3498,7 +3515,9 @@ ScryptedInterfaceDescriptors = {
       "getChatCompletion",
       "streamChatCompletion"
     ],
-    "properties": []
+    "properties": [
+      "chatCompletionCapabilities"
+    ]
   },
   "TextEmbedding": {
     "name": "TextEmbedding",

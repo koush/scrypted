@@ -1071,7 +1071,16 @@ export interface LLMTools {
   callLLMTool(name: string, parameters: Record<string, any>): Promise<string>;
 }
 
+export interface ChatCompletionCapabilities {
+  image?: boolean;
+  audio?: boolean;
+  imageGeneration?: boolean;
+  audioGeneration?: boolean;
+}
+
 export interface ChatCompletion {
+  chatCompletionCapabilities?: ChatCompletionCapabilities;
+
   getChatCompletion(body: ChatCompletionCreateParamsNonStreaming): Promise<ChatCompletionResponse>;
   streamChatCompletion(params: ChatCompletionStreamParams, newMessages?: AsyncGenerator<ChatCompletionMessageParam[]>): Promise<AsyncGenerator<ChatCompletionChunk | ChatCompletionResponse>>;
   streamChatCompletion(params: ChatCompletionStreamParams, newMessages: undefined | AsyncGenerator<ChatCompletionMessageParam[]>, callback: ((chunk: ChatCompletionChunk) => Promise<boolean>)): Promise<AsyncGenerator<ChatCompletionResponse>>;
