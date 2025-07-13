@@ -46,6 +46,8 @@ if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
 }
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json').toString()));
+const interfaceDescriptors = packageJson.scrypted?.interfaceDescriptors;
+delete packageJson.scrypted?.interfaceDescriptors;
 
 const optionalDependencies = Object.keys(packageJson.optionalDependencies || {});
 
@@ -219,6 +221,7 @@ function finishZip() {
     const sdkVersion = require(path.join(__dirname, '../package.json')).version;
     zip.addFile('sdk.json', Buffer.from(JSON.stringify({
         version: sdkVersion,
+        interfaceDescriptors,
     })));
 
     if (packageJson.type === 'module') {

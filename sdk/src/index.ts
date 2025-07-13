@@ -1,4 +1,5 @@
 export * from '../types/gen/index';
+import fs from 'fs';
 import type { DeviceManager, DeviceState, EndpointManager, EventListenerRegister, Logger, MediaManager, MediaObject, ScryptedInterface, ScryptedNativeId, ScryptedStatic, SystemManager, WritableDeviceState } from '../types/gen/index';
 import { DeviceBase, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, TYPES_VERSION } from '../types/gen/index';
 import { createRequire } from 'module';
@@ -266,7 +267,23 @@ try {
   }
 
   try {
-    (sdk.systemManager as any).setScryptedInterfaceDescriptors?.(TYPES_VERSION, ScryptedInterfaceDescriptors)?.catch(() => { });
+    let descriptors = {
+      ...ScryptedInterfaceDescriptors,
+    };
+    try {
+      const sdkJson = JSON.parse(fs.readFileSync('../sdk.json').toString());
+      const customDescriptors  = sdkJson.interfaceDescriptors;
+      if (customDescriptors) {
+        descriptors = {
+          ...descriptors,
+          ...customDescriptors,
+        };
+      }
+    }
+    catch (e) {
+      console.warn('failed to load custom interface descriptors', e);
+    }
+    (sdk.systemManager as any).setScryptedInterfaceDescriptors?.(TYPES_VERSION, descriptors)?.catch(() => { });
   }
   catch (e) {
   }
