@@ -32,7 +32,9 @@ class OpenVINOTextRecognition(TextRecognition):
             model.reshape([1, 1, 64, 384])
             return self.plugin.core.compile_model(model, self.plugin.mode)
         else:
-            return self.plugin.core.compile_model(xmlFile, self.plugin.mode)
+            model = self.plugin.core.read_model(xmlFile)
+            model.reshape([1, 3, 640, 640])
+            return self.plugin.core.compile_model(model, self.plugin.mode)
 
     async def predictDetectModel(self, input: np.ndarray):
         def predict():
