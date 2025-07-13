@@ -15,10 +15,6 @@ function createLevelDocument(documentConstructor: any, json: any) {
     return doc;
 }
 
-class Foo {
-
-}
-
 export class WrappedLevel extends Level<string, string | number> {
     curId: number;
 
