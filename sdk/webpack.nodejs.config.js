@@ -62,6 +62,7 @@ const polyfills = [
     '@scrypted/node-pty',
     'node-forge',
     'sharp',
+    'level',
     'source-map-support/register',
     'adm-zip',
     "memfs",

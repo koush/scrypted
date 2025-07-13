@@ -32,6 +32,19 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json').to
 const external = Object.keys(packageJson.optionalDependencies || {});
 const tsconfig = JSON.parse(fs.readFileSync(path.join(cwd, 'tsconfig.json').toString()));
 
+external.push(
+    '@scrypted/node-pty',
+    'node-forge',
+    'sharp',
+    'level',
+    'source-map-support/register',
+    'adm-zip',
+    "memfs",
+    "realfs",
+    "fakefs",
+    "mdns",
+    "typescript",
+);
 
 const defaultMainNodeJs = 'main.nodejs.js';
 const entries = [];
