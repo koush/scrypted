@@ -1,0 +1,1 @@
+const level = __non_webpack_require__('level'); module.exports = level;

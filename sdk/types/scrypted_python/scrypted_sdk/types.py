@@ -449,6 +449,11 @@ class VideoStreamOptions(TypedDict):
     quality: float
     width: float
 
+class ContentBlock(TypedDict):
+
+    pass
+
+
 class MediaStreamDestination(TypedDict):
 
     pass
@@ -490,6 +495,14 @@ class AudioVolumes(TypedDict):
 
     pass
 
+
+class CallToolResult(TypedDict):
+    """https://modelcontextprotocol.io/specification/2025-06-18/schema#blobresourcecontents"""
+
+    _meta: Any
+    content: list[ContentBlock]
+    isError: bool
+    structuredContent: Any
 
 class ChatCompletionCapabilities(TypedDict):
 
@@ -1074,7 +1087,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.30"
+TYPES_VERSION = "0.5.31"
 
 
 class AirPurifier:
@@ -1329,7 +1342,7 @@ class LauncherApplication:
 
 class LLMTools:
 
-    async def callLLMTool(self, name: str, parameters: Mapping[str, Any]) -> str:
+    async def callLLMTool(self, name: str, parameters: Mapping[str, Any]) -> CallToolResult:
         pass
 
     async def getLLMTools(self) -> list[ChatCompletionTool]:

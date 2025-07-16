@@ -79,6 +79,7 @@ ${fs.readFileSync(path.join(__dirname, './types.input.ts'))}
 `;
 
 fs.writeFileSync(path.join(__dirname, '../gen/index.ts'), contents);
+fs.copyFileSync(path.join(__dirname, './mcp.ts'), path.join(__dirname, '../gen/mcp.ts'));
 
 const discoveredTypes = new Set<string>();
 discoveredTypes.add('EventDetails');

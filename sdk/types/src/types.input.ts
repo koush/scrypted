@@ -3,7 +3,9 @@ import type { Socket as NodeNetSocket } from 'net';
 import type { ChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
 import type { ChatCompletionChunk, ChatCompletionCreateParamsNonStreaming, ChatCompletionMessageParam, ChatCompletion as ChatCompletionResponse, ChatCompletionTool } from 'openai/resources';
 import type { Worker as NodeWorker } from 'worker_threads';
+import { CallToolResult } from './mcp';
 export type { ChatCompletionChunk, ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming, ChatCompletionMessageParam, ChatCompletion as ChatCompletionResponse, ChatCompletionTool } from 'openai/resources';
+export type * from './mcp';
 
 export type ScryptedNativeId = string | undefined;
 
@@ -1066,9 +1068,10 @@ export interface PanTiltZoomCommand {
   preset?: string;
 }
 
+
 export interface LLMTools {
   getLLMTools(): Promise<ChatCompletionTool[]>;
-  callLLMTool(name: string, parameters: Record<string, any>): Promise<string>;
+  callLLMTool(name: string, parameters: Record<string, any>): Promise<CallToolResult>;
 }
 
 export interface ChatCompletionCapabilities {
