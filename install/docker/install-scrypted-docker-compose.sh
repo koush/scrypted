@@ -53,6 +53,9 @@ rm -rf $SCRYPTED_HOME/install.json
 rm -rf $SCRYPTED_HOME/package.json
 rm -rf $SCRYPTED_HOME/package-lock.json
 
+# must get this value as grep returns non zero if empty
+HAS_NVIDIA=$(lspci | grep -i nvidia)
+
 set -e
 cd $SCRYPTED_HOME
 
@@ -95,7 +98,6 @@ else
     sudo apt -y purge apparmor || true
 fi
 
-HAS_NVIDIA=$(lspci | grep -i nvidia)
 if [ ! -z "$HAS_NVIDIA" ]
 then
     readyn "NVIDIA GPU detected. Use NVIDIA image for GPU acceleration?"
