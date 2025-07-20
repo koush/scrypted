@@ -1608,6 +1608,10 @@ export interface SecuritySystem {
   disarmSecuritySystem(): Promise<void>;
 }
 
+export interface ObjectDetectionZones {
+  getZones(): Promise<ObjectDetectionZone[]>;
+}
+
 export interface ObjectDetectionHistory {
   firstSeen: number;
   lastSeen: number;
@@ -1673,6 +1677,11 @@ export interface ObjectsDetected {
   inputDimensions?: [number, number],
   timestamp: number;
   resources?: VideoResource;
+  /**
+   * The id of the generation source.
+   * Can be a camera id or a plugin id 
+   */
+  sourceId?: string;
 }
 export type ObjectDetectionClass = 'motion' | 'face' | 'person' | string;
 export interface ObjectDetectionTypes {
@@ -1698,6 +1707,9 @@ export interface ObjectDetector {
    */
   getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject>;
   getObjectTypes(): Promise<ObjectDetectionTypes>;
+}
+export interface NativebjectDetector {
+  getNativeObjectTypes(): Promise<ObjectDetectionTypes>;
 }
 export interface ObjectDetectionGeneratorSession {
   zones?: ObjectDetectionZone[];
@@ -2392,6 +2404,7 @@ export enum ScryptedInterface {
   VideoCamera = "VideoCamera",
   VideoCameraMask = "VideoCameraMask",
   VideoTextOverlays = "VideoTextOverlays",
+  ObjectDetectionZones = "ObjectDetectionZones",
   VideoRecorder = "VideoRecorder",
   VideoRecorderManagement = "VideoRecorderManagement",
   PanTiltZoom = "PanTiltZoom",
@@ -2448,6 +2461,7 @@ export enum ScryptedInterface {
   ClusterForkInterface = "ClusterForkInterface",
   ObjectTracker = "ObjectTracker",
   ObjectDetector = "ObjectDetector",
+  NativebjectDetector = "NativebjectDetector",
   ObjectDetection = "ObjectDetection",
   ObjectDetectionPreview = "ObjectDetectionPreview",
   ObjectDetectionGenerator = "ObjectDetectionGenerator",
