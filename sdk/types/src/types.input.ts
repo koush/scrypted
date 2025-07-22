@@ -1708,9 +1708,6 @@ export interface ObjectDetector {
   getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject>;
   getObjectTypes(): Promise<ObjectDetectionTypes>;
 }
-export interface NativebjectDetector {
-  getNativeObjectTypes(): Promise<ObjectDetectionTypes>;
-}
 export interface ObjectDetectionGeneratorSession {
   zones?: ObjectDetectionZone[];
   settings?: { [key: string]: any };
@@ -2461,7 +2458,6 @@ export enum ScryptedInterface {
   ClusterForkInterface = "ClusterForkInterface",
   ObjectTracker = "ObjectTracker",
   ObjectDetector = "ObjectDetector",
-  NativebjectDetector = "NativebjectDetector",
   ObjectDetection = "ObjectDetection",
   ObjectDetectionPreview = "ObjectDetectionPreview",
   ObjectDetectionGenerator = "ObjectDetectionGenerator",

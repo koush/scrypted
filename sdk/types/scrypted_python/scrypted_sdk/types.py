@@ -166,7 +166,6 @@ class ScryptedInterface(str, Enum):
     ObjectDetectionPreview = "ObjectDetectionPreview"
     ObjectDetectionZones = "ObjectDetectionZones"
     ObjectDetector = "ObjectDetector"
-    NativebjectDetector = "NativebjectDetector"
     ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
     Online = "Online"
@@ -1469,12 +1468,6 @@ class ObjectDetector:
 
     async def getObjectTypes(self) -> ObjectDetectionTypes:
         pass
-
-class NativebjectDetector:
-
-    async def getNativeObjectTypes(self) -> ObjectDetectionTypes:
-        pass
-
 
 class ObjectTracker:
     """Given object detections with bounding boxes, return a similar list with tracker ids."""
@@ -3441,13 +3434,6 @@ ScryptedInterfaceDescriptors = {
     "methods": [
       "getDetectionInput",
       "getObjectTypes"
-    ],
-    "properties": []
-  },
-  "NativebjectDetector": {
-    "name": "NativebjectDetector",
-    "methods": [
-      "getNativeObjectTypes"
     ],
     "properties": []
   },
