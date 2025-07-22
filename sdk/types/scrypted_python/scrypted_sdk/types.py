@@ -164,6 +164,7 @@ class ScryptedInterface(str, Enum):
     ObjectDetection = "ObjectDetection"
     ObjectDetectionGenerator = "ObjectDetectionGenerator"
     ObjectDetectionPreview = "ObjectDetectionPreview"
+    ObjectDetectionZones = "ObjectDetectionZones"
     ObjectDetector = "ObjectDetector"
     ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
@@ -825,6 +826,7 @@ class ObjectsDetected(TypedDict):
     inputDimensions: tuple[float, float]
     resources: VideoResource
     timestamp: float
+    sourceId: str # The id of the generation source. Can be a camera id or a plugin id 
 
 class PanTiltZoomCapabilities(TypedDict):
 
@@ -1467,7 +1469,6 @@ class ObjectDetector:
     async def getObjectTypes(self) -> ObjectDetectionTypes:
         pass
 
-
 class ObjectTracker:
     """Given object detections with bounding boxes, return a similar list with tracker ids."""
 
@@ -1717,6 +1718,11 @@ class StreamService:
     """Generic bidirectional stream connection."""
 
     async def connectStream(self, input: AsyncGenerator[Any, None] = None, options: Any = None) -> AsyncGenerator[Any, None]:
+        pass
+
+class ObjectDetectionZones:
+
+    async def getZones(self) -> Any:
         pass
 
 
@@ -3569,6 +3575,13 @@ ScryptedInterfaceDescriptors = {
   "ScryptedSettings": {
     "name": "ScryptedSettings",
     "methods": [],
+    "properties": []
+  },
+  "ObjectDetectionZones": {
+    "name": "ObjectDetectionZones",
+    "methods": [
+      "getZones"
+    ],
     "properties": []
   }
 }
