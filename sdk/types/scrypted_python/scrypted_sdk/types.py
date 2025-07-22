@@ -164,7 +164,6 @@ class ScryptedInterface(str, Enum):
     ObjectDetection = "ObjectDetection"
     ObjectDetectionGenerator = "ObjectDetectionGenerator"
     ObjectDetectionPreview = "ObjectDetectionPreview"
-    ObjectDetectionZones = "ObjectDetectionZones"
     ObjectDetector = "ObjectDetector"
     ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
@@ -1718,11 +1717,6 @@ class StreamService:
     """Generic bidirectional stream connection."""
 
     async def connectStream(self, input: AsyncGenerator[Any, None] = None, options: Any = None) -> AsyncGenerator[Any, None]:
-        pass
-
-class ObjectDetectionZones:
-
-    async def getZones(self) -> Any:
         pass
 
 
@@ -3575,13 +3569,6 @@ ScryptedInterfaceDescriptors = {
   "ScryptedSettings": {
     "name": "ScryptedSettings",
     "methods": [],
-    "properties": []
-  },
-  "ObjectDetectionZones": {
-    "name": "ObjectDetectionZones",
-    "methods": [
-      "getZones"
-    ],
     "properties": []
   }
 }

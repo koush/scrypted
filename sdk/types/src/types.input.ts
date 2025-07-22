@@ -1608,10 +1608,6 @@ export interface SecuritySystem {
   disarmSecuritySystem(): Promise<void>;
 }
 
-export interface ObjectDetectionZones {
-  getZones(): Promise<ObjectDetectionZone[]>;
-}
-
 export interface ObjectDetectionHistory {
   firstSeen: number;
   lastSeen: number;
@@ -2401,7 +2397,6 @@ export enum ScryptedInterface {
   VideoCamera = "VideoCamera",
   VideoCameraMask = "VideoCameraMask",
   VideoTextOverlays = "VideoTextOverlays",
-  ObjectDetectionZones = "ObjectDetectionZones",
   VideoRecorder = "VideoRecorder",
   VideoRecorderManagement = "VideoRecorderManagement",
   PanTiltZoom = "PanTiltZoom",
