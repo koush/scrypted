@@ -8,6 +8,7 @@ import { randomBytes } from 'crypto';
 import net from 'net';
 import { PassThrough, Readable } from "stream";
 import { ApiMotionEvent, ApiRingEvent, DoorbirdAPI } from "./doorbird-api";
+import * as fs from "fs";
 
 const { deviceManager, mediaManager } = sdk;
 
@@ -159,25 +160,45 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
     }
 
     async startAudioTransmitter(media: MediaObject): Promise<void> {
+        this.console.log('Doorbird: Init audio transmitter...');
         const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
 
         const ffmpegArgs = ffmpegInput.inputArguments.slice();
         ffmpegArgs.push(
-            '-vn', '-dn', '-sn',
+            // Do not process video streams (disable video)
+            '-vn',
+            // Do not process data streams (e.g. timed metadata)
+            '-dn',
+            // Do not process subtitle streams
+            '-sn',
+            // Encode audio using PCM µ-law (G.711 codec, 8-bit logarithmic compression)
             '-acodec', 'pcm_mulaw',
-            '-flags', '+global_header',
+            // Bypass internal I/O buffering (write directly to output)
+            "-avioflags", "direct",
+            // Disable input buffering
+            '-fflags', '+flush_packets+nobuffer',
+            // Force flushing packets after every frame
+            '-flush_packets', '1',
+            // Use global headers (required by some muxers) and enable low-latency flags
+            '-flags', '+global_header+low_delay',
+            // Set number of audio channels to mono
             '-ac', '1',
-            '-ar', '8k',
+            // Set audio sample rate to 8000 Hz (expected by Doorbird)
+            '-ar', '8000',
+            // Force raw µ-law output format (no container)
             '-f', 'mulaw',
+            // Do not buffer or delay packets in the muxer
+            '-muxdelay', '0',
+            // Output to file descriptor 3 (e.g. pipe:3, for inter-process communication)
             'pipe:3'
         );
 
-        safePrintFFmpegArguments(console, ffmpegArgs);
+        safePrintFFmpegArguments(this.console, ffmpegArgs);
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), ffmpegArgs, {
             stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
         });
         this.audioTXProcess = cp;
-        ffmpegLogInitialOutput(console, cp);
+        ffmpegLogInitialOutput(this.console, cp);
         cp.on('exit', () => this.console.log('Doorbird: Audio transmitter ended.'));
         cp.stdout.on('data', data => this.console.log(data.toString()));
         cp.stderr.on('data', data => this.console.log(data.toString()));
@@ -188,39 +209,42 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         const password: string = this.getPassword();
         const audioTxUrl: string = `${this.getHttpBaseAddress()}/bha-api/audio-transmit.cgi`;
 
-        this.console.log('Doorbird: Starting audio transmitter...');
-
         (async () => {
-            this.console.log('Doorbird: audio transmitter started.');
-
+            this.console.log('Doorbird: Audio transmitter started.');
             const passthrough = new PassThrough();
-            authHttpFetch({
-                method: 'POST',
-                url: audioTxUrl,
-                credential: {
-                    username,
-                    password,
-                },
-                headers: {
-                    'Content-Type': 'audio/basic',
-                    'Content-Length': '9999999'
-                },
-                data: passthrough,
-            });
-
+            const abortController = new AbortController();
             try {
+                authHttpFetch({
+                    method: 'POST',
+                    url: audioTxUrl,
+                    credential: {
+                        username,
+                        password
+                    },
+                    headers: {
+                        'Content-Type': 'audio/basic',
+                        'Content-Length': '9999999',
+                        'Authorization': `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
+                    },
+                    signal: abortController.signal,
+                    body: passthrough,
+                    responseType: 'readable',
+                });
+
+                this.console.log('Doorbird: Audio transmitter connected.');
                 while (true) {
-                    const data = await readLength(socket, 1024);
+                    const data = await readLength(socket, 4 * 1024);
                     passthrough.push(data);
                 }
             }
             catch (e) {
+                this.console.debug('Doorbird: Audio transmitter error: ', e);
             }
             finally {
-                this.console.log('Doorbird: audio transmitter finished.');
-                passthrough.end();
+                this.console.log('Doorbird: Audio transmitter finished.');
+                passthrough.destroy();
+                abortController.abort();
             }
-
             this.stopAudioTransmitter();
         })();
     }

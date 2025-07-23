@@ -7,7 +7,7 @@
 # install script.
 ################################################################
 ARG BASE="noble"
-FROM ubuntu:${BASE} AS header
+FROM ubuntu:${BASE} as header
 
 ENV DEBIAN_FRONTEND=noninteractive
 

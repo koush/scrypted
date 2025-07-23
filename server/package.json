@@ -3,7 +3,6 @@
   "version": "0.140.6",
   "description": "",
   "dependencies": {
-    "@scrypted/ffmpeg-static": "^6.1.0-build3",
     "@scrypted/node-pty": "^1.0.24",
     "@scrypted/types": "^0.5.23",
     "adm-zip": "^0.5.16",
