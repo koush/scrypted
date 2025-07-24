@@ -1,16 +1,36 @@
-import { authHttpFetch } from "@scrypted/common/src/http-auth-fetch";
-import { listenZero } from '@scrypted/common/src/listen-cluster';
-import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
-import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { BinarySensor, Camera, DeviceCreator, DeviceCreatorSettings, DeviceInformation, DeviceProvider, FFmpegInput, Intercom, MediaObject, MotionSensor, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
-import child_process, { ChildProcess } from 'child_process';
-import { randomBytes } from 'crypto';
+import {httpFetch} from '../../../server/src/fetch/http-fetch';
+import {listenZero} from '@scrypted/common/src/listen-cluster';
+import {ffmpegLogInitialOutput, safePrintFFmpegArguments} from "@scrypted/common/src/media-helpers";
+import {readLength, StreamEndError} from "@scrypted/common/src/read-stream";
+import sdk, {
+    BinarySensor,
+    Camera,
+    DeviceCreator,
+    DeviceCreatorSettings,
+    DeviceInformation,
+    DeviceProvider,
+    FFmpegInput,
+    Intercom,
+    MediaObject,
+    MotionSensor,
+    PictureOptions,
+    ResponseMediaStreamOptions,
+    ScryptedDeviceBase,
+    ScryptedDeviceType,
+    ScryptedInterface,
+    ScryptedMimeTypes,
+    Setting,
+    Settings,
+    VideoCamera
+} from '@scrypted/sdk';
+import child_process, {ChildProcess} from 'child_process';
+import {randomBytes} from 'crypto';
 import net from 'net';
-import { PassThrough, Readable } from "stream";
-import { ApiMotionEvent, ApiRingEvent, DoorbirdAPI } from "./doorbird-api";
-import * as fs from "fs";
+import {PassThrough, Readable} from "stream";
+import {ApiMotionEvent, ApiRingEvent, DoorbirdAPI} from "./doorbird-api";
 
-const { deviceManager, mediaManager } = sdk;
+
+const {deviceManager, mediaManager} = sdk;
 
 class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, Settings, BinarySensor, MotionSensor {
     doorbirdApi: DoorbirdAPI | undefined;
@@ -22,6 +42,8 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
     audioSilenceProcess: ChildProcess;
     audioRXClientSocket: net.Socket;
     pendingPicture: Promise<MediaObject>;
+
+    private static readonly TRANSMIT_AUDIO_CHUNK_SIZE: number = 256;
 
     constructor(nativeId: string, public provider: DoorbirdCamProvider) {
         super(nativeId);
@@ -90,7 +112,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
     public async getPictureOptions(): Promise<PictureOptions[]> {
         return [{
             id: 'VGA',
-            picture: { width: 640, height: 480 }
+            picture: {width: 640, height: 480}
         }];
     }
 
@@ -210,43 +232,77 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         const audioTxUrl: string = `${this.getHttpBaseAddress()}/bha-api/audio-transmit.cgi`;
 
         (async () => {
+
             this.console.log('Doorbird: Audio transmitter started.');
             const passthrough = new PassThrough();
             const abortController = new AbortController();
+            let totalBytesWritten: number = 0;
+            let totalTimeWaited: number = 0;
+
             try {
-                authHttpFetch({
-                    method: 'POST',
+                // Perform POST request instantly instead of unneeded handling with DIGEST authentication.
+                // Credentials will be thrown into network by all other requests anyway.
+                httpFetch({
                     url: audioTxUrl,
-                    credential: {
-                        username,
-                        password
-                    },
+                    method: 'POST',
                     headers: {
                         'Content-Type': 'audio/basic',
                         'Content-Length': '9999999',
-                        'Authorization': `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
+                        'Authorization': this.getBasicAuthorization(username, password),
                     },
                     signal: abortController.signal,
                     body: passthrough,
                     responseType: 'readable',
-                });
+                })
+                // The ideal interval for 256-byte chunks at 8000 bytes/sec is 32ms.
+                const throttlingIntervalMillis: number = 32;
 
-                this.console.log('Doorbird: Audio transmitter connected.');
-                while (true) {
-                    const data = await readLength(socket, 4 * 1024);
+                // Initialize the next chunk send timestamp to the current time.
+                let nextChunkSendTimeStamp: number = Date.now();
+
+                while (true) {  // Loop will be broken by StreamEndError.
+
+                    // Read the next chunk of audio data from the Doorbird camera.
+                    const data = await readLength(socket, DoorbirdCamera.TRANSMIT_AUDIO_CHUNK_SIZE);
+                    if (data.length === 0) {
+                        break;
+                    }
+
+                    // Calculate the time to wait until the next chunk should be sent.
+                    const timeToWait = Math.max(0, nextChunkSendTimeStamp - Date.now());
+
+                    // If the time to wait is negative, it means we are ahead of schedule,
+                    // so we can send the data immediately. Otherwise, we wait for the calculated time.
+                    // This should usually not happen as FFmpeg is already throttling the output to 8000 bytes/sec.
+                    if (timeToWait > 0) {
+                        await new Promise(resolve => setTimeout(resolve, timeToWait));
+                        totalTimeWaited += timeToWait;
+                    }
+
+                    // Actually write the data to the passthrough stream.
                     passthrough.push(data);
+
+                    // Schedule the next chunk relative to the last scheduled time to avoid drift.
+                    nextChunkSendTimeStamp += throttlingIntervalMillis;
+
+                    // Add the length of the data to the total bytes written.
+                    totalBytesWritten += data.length;
                 }
-            }
-            catch (e) {
-                this.console.debug('Doorbird: Audio transmitter error: ', e);
-            }
-            finally {
-                this.console.log('Doorbird: Audio transmitter finished.');
+            } catch (e) {
+                if (!(e instanceof StreamEndError)) {
+                    this.console.error('Doorbird: Audio transmitter error', e);
+                }
+            } finally {
+                this.console.log(`Doorbird: Audio transmitter finished. Audio data bytes written: ${totalBytesWritten}, total time waited: ${totalTimeWaited}ms`);
                 passthrough.destroy();
                 abortController.abort();
             }
-            this.stopAudioTransmitter();
+            this.stopIntercom();
         })();
+    }
+
+    private getBasicAuthorization(username: string, password: string) {
+        return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
     }
 
     stopAudioTransmitter() {
@@ -263,17 +319,53 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         const ffmpegPath = await mediaManager.getFFmpegPath();
 
         const ffmpegArgs = [
+            // Suppress printing the FFmpeg banner. Keeps logs clean.
             '-hide_banner',
+            // Disable periodic progress/statistics logging. Reduces noise and CPU usage.
             '-nostats',
+
+            // --- Low-latency Input Flags ---
+            // Reduce input buffer latency by flushing packets immediately and disabling demuxer buffering.
+            '-fflags', '+flush_packets+nobuffer',
+            // Do not spend time analyzing the stream to determine properties. Crucial for live streams.
             '-analyzeduration', '0',
+            // Set a very small probe size to speed up initial connection, as we already know the format.
             '-probesize', '32',
+            // Read input at its native frame rate to ensure real-time processing.
             '-re',
+
+            // --- Input Format Specification ---
+            // Set the audio sample rate to 8000 Hz, matching the Doorbird's stream.
             '-ar', '8000',
+            // Set the number of audio channels to 1 (mono).
             '-ac', '1',
+            // Force the input format to be interpreted as G.711 µ-law.
             '-f', 'mulaw',
+            // Specify the input URL for the Doorbird's audio stream.
             '-i', `${audioRxUrl}`,
-            '-acodec', 'copy',
+
+            // --- Audio Filtering ---
+            // Apply the 'aecho' filter to reduce acoustic echo.
+            // Format: aecho=in_gain:out_gain:delay:decay
+            // You may need to tune 'delay' and 'decay' for your environment.
+            '-af', 'aecho=0.8:0.9:100:0.3',
+
+            // --- Low-latency Output Flags ---
+            // Enable low-delay flags in the encoder, preventing frame buffering for lookahead.
+            '-flags', '+global_header+low_delay',
+            // Bypass FFmpeg's internal I/O buffering, writing directly to the output pipe.
+            '-avioflags', 'direct',
+            // Force flushing packets to the output immediately after encoding.
+            '-flush_packets', '1',
+            // Set the maximum demux-decode delay to zero, preventing buffering in the muxer.
+            '-muxdelay', '0',
+
+            // --- Output Format Specification ---
+            // Re-encode the audio to PCM µ-law after the filter has been applied.
+            '-acodec', 'pcm_mulaw',
+            // Force the output container format to raw µ-law.
             '-f', 'mulaw',
+            // Output the processed audio to file descriptor 3 (the pipe).
             'pipe:3'
         ];
 
@@ -286,7 +378,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
 
         cp.on('exit', () => {
             this.console.log('Doorbird: audio receiver ended.')
-            this.audioRXProcess = undefined;
+            this.stopIntercom();
         });
         cp.stdout.on('data', data => this.console.log(data.toString()));
         cp.stderr.on('data', data => this.console.log(data.toString()));
@@ -322,24 +414,55 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
 
     async getVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
 
-        const port = await this.startAudioRXServer();
+        const audioRtspStreamPort = await this.startAudioRXServer();
 
         const ffmpegInput: FFmpegInput = {
             url: undefined,
             inputArguments: [
+                // --- Low-latency Input Flags (for both streams) ---
+                // Suppress printing the FFmpeg banner.
+                '-hide_banner',
+                // Disable periodic progress/statistics logging.
+                '-nostats',
+                // Reduce input buffer latency by flushing packets immediately and disabling demuxer buffering.
+                // '+nobuffer' is particularly important for live streams.
+                '-fflags', '+flush_packets+nobuffer',
+                // Do not spend time analyzing the stream to determine properties. Crucial for live streams.
                 '-analyzeduration', '0',
+                // Set a very small probe size to speed up initial connection, as we know the formats.
                 '-probesize', '32',
-                '-fflags', 'nobuffer',
+                // Request low-delay flags from decoders.
                 '-flags', 'low_delay',
+
+                // --- Video Input (Input 0) ---
+                // Generate timestamps for the video stream to handle potential irregularities.
+                '-fflags', '+genpts',
+                // Force the input format to be interpreted as RTSP.
                 '-f', 'rtsp',
+                // Use TCP for RTSP transport for better reliability over potentially lossy networks.
                 '-rtsp_transport', 'tcp',
+                // Specify the input URL for the Doorbird's RTSP video stream.
                 '-i', `${this.getRtspAddress()}`,
+
+                // --- Audio Input (Input 1) ---
+                // Force the format of the second input to be interpreted as G.711 µ-law.
                 '-f', 'mulaw',
+                // Set the number of audio channels to 1 (mono) for the audio input.
                 '-ac', '1',
+                // Set the audio sample rate to 8000 Hz for the audio input.
                 '-ar', '8000',
+                // Explicitly define the channel layout as mono.
                 '-channel_layout', 'mono',
-                '-use_wallclock_as_timestamps', 'true',
-                '-i', `tcp://127.0.0.1:${port}?tcp_nodelay=1`,
+                // Use the system's wall clock for timestamps. This helps synchronize the separate audio
+                // and video streams, which do not share a common clock source.
+                '-use_wallclock_as_timestamps', '1',
+                // Specify the second input as the local TCP socket providing the audio stream.
+                // `tcp_nodelay=1` disables Nagle's algorithm, reducing latency for small packets.
+                '-i', `tcp://127.0.0.1:${audioRtspStreamPort}?tcp_nodelay=1`,
+                // --- Output Stream Handling ---
+                // Finish encoding when the shortest input stream (the video) ends.
+                // This ensures ffmpeg terminates if the video stream is interrupted.
+                '-shortest',
             ],
             mediaStreamOptions: options,
         };
@@ -356,12 +479,29 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
 
         const ffmpegPath = await mediaManager.getFFmpegPath();
         const ffmpegArgs = [
+            // Suppress printing the FFmpeg banner.
             '-hide_banner',
+            // Disable periodic progress/statistics logging.
             '-nostats',
+            // Read input at its native frame rate to ensure real-time processing.
             '-re',
+            // Use the lavfi (libavfilter) virtual input device.
             '-f', 'lavfi',
+            // Specify the input source as a null audio source (silence) with a sample rate of 8000 Hz and mono channel layout.
             '-i', 'anullsrc=r=8000:cl=mono',
+
+            // --- Low-latency Output Flags ---
+            // Bypass FFmpeg's internal I/O buffering, writing directly to the output pipe.
+            '-avioflags', 'direct',
+            // Force flushing packets to the output immediately after encoding.
+            '-flush_packets', '1',
+            // Set the maximum demux-decode delay to zero, preventing buffering in the muxer.
+            '-muxdelay', '0',
+
+            // --- Output Format Specification ---
+            // Force the output container format to raw µ-law.
             '-f', 'mulaw',
+            // Output the processed audio to file descriptor 3 (the pipe).
             'pipe:3'
         ];
 
@@ -394,6 +534,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
 
         const server = net.createServer(async (clientSocket) => {
             clearTimeout(serverTimeout);
+            this.console.log(`Doorbird: audio connection from client ${JSON.stringify(clientSocket.address())}`);
 
             this.audioRXClientSocket = clientSocket;
 
@@ -403,13 +544,14 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                 this.stopSilenceGenerator();
                 this.audioRXClientSocket = null;
             });
+
         });
         const serverTimeout = setTimeout(() => {
             this.console.log('Doorbird: timed out waiting for tcp client from ffmpeg');
             server.close();
         }, 30000);
         const port = await listenZero(server, '127.0.0.1');
-
+        this.console.log(`Doorbird: audio server started on port ${port}`);
         return port;
     }
 
@@ -436,8 +578,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
     getRtspAddress() {
         if (this.storage.getItem('rtspUrl') !== undefined) {
             return this.storage.getItem('rtspUrl');
-        }
-        else {
+        } else {
             return this.getRtspDefaultAddress();
         }
     }
@@ -496,8 +637,7 @@ export class DoorbirdCamProvider extends ScryptedDeviceBase implements DevicePro
                 info.mac = deviceInfo.serialNumber;
                 info.manufacturer = 'Bird Home Automation GmbH';
                 info.managementUrl = 'https://webadmin.doorbird.com';
-            }
-            catch (e) {
+            } catch (e) {
                 this.console.error('Error adding Doorbird camera', e);
                 throw e;
             }
