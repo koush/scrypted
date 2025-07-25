@@ -164,6 +164,30 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                 placeholder: 'rtsp://192.168.2.100/my_doorbird_video_stream',
                 value: this.storage.getItem('rtspUrl'),
                 description: 'Use this in case you are already using another RTSP server/proxy (e.g. mediamtx, go2rtc, etc.) to limit the number of streams from the camera.',
+            },
+            {
+                key: 'audioEchoCancellation',
+                type: 'boolean',
+                subgroup: 'Advanced',
+                title: 'Echo Cancellation',
+                value: this.storage.getItem('audioEchoCancellation') === 'true',
+                description: 'Enable echo cancellation audio sent by Doorbird.',
+            },
+            {
+                key: 'audioDenoise',
+                type: 'boolean',
+                subgroup: 'Advanced',
+                title: 'Denoise',
+                value: this.storage.getItem('audioDenoise') === 'true',
+                description: 'Denoise both input and output audio streams to reduce background noises.',
+            },
+            {
+                key: 'audioSpeechEnhancement',
+                type: 'boolean',
+                subgroup: 'Advanced',
+                title: 'Speech Enhancement',
+                value: this.storage.getItem('audioSpeechEnhancement') === 'true',
+                description: 'Apply band filtering and dynamic normalization to both audio streams.',
             }
         ];
     }
@@ -211,6 +235,8 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
             '-f', 'mulaw',
             // Do not buffer or delay packets in the muxer
             '-muxdelay', '0',
+            // --- Audio Filtering ---
+            ...(this.getAudioTransmitFilter()),
             // Output to file descriptor 3 (e.g. pipe:3, for inter-process communication)
             'pipe:3'
         );
@@ -293,7 +319,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                     this.console.error('Doorbird: Audio transmitter error', e);
                 }
             } finally {
-                this.console.log(`Doorbird: Audio transmitter finished. Audio data bytes written: ${totalBytesWritten}, total time waited: ${totalTimeWaited}ms`);
+                this.console.log(`Doorbird: Audio transmitter finished. bytesOut={totalBytesWritten}, throttleOut=${totalTimeWaited}ms`);
                 passthrough.destroy();
                 abortController.abort();
             }
@@ -345,10 +371,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
             '-i', `${audioRxUrl}`,
 
             // --- Audio Filtering ---
-            // Apply the 'aecho' filter to reduce acoustic echo.
-            // Format: aecho=in_gain:out_gain:delay:decay
-            // You may need to tune 'delay' and 'decay' for your environment.
-            '-af', 'aecho=0.8:0.9:100:0.3',
+            ...(this.getAudioReceiveFilter()),
 
             // --- Low-latency Output Flags ---
             // Enable low-delay flags in the encoder, preventing frame buffering for lookahead.
@@ -424,6 +447,9 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                 '-hide_banner',
                 // Disable periodic progress/statistics logging.
                 '-nostats',
+                // Set the log level to 'error' to suppress verbose informational messages.
+                '-loglevel', 'error',
+
                 // Reduce input buffer latency by flushing packets immediately and disabling demuxer buffering.
                 // '+nobuffer' is particularly important for live streams.
                 '-fflags', '+flush_packets+nobuffer',
@@ -435,8 +461,6 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                 '-flags', 'low_delay',
 
                 // --- Video Input (Input 0) ---
-                // Generate timestamps for the video stream to handle potential irregularities.
-                '-fflags', '+genpts',
                 // Force the input format to be interpreted as RTSP.
                 '-f', 'rtsp',
                 // Use TCP for RTSP transport for better reliability over potentially lossy networks.
@@ -460,8 +484,12 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                 // `tcp_nodelay=1` disables Nagle's algorithm, reducing latency for small packets.
                 '-i', `tcp://127.0.0.1:${audioRtspStreamPort}?tcp_nodelay=1`,
                 // --- Output Stream Handling ---
+                // Increase the maximum delay for the muxing queue to 5 seconds (in microseconds).
+                // This prevents the "Delay between the first packet and last packet" error
+                // by allowing more time for packets from different streams to arrive.
+                '-max_delay', '5000000',
                 // Finish encoding when the shortest input stream (the video) ends.
-                // This ensures ffmpeg terminates if the video stream is interrupted.
+                // This ensures ffmpeg terminates if the video stream is interrupted by Doorbird.
                 '-shortest',
             ],
             mediaStreamOptions: options,
@@ -602,6 +630,69 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
     getPassword() {
         return this.storage.getItem('password');
     }
+
+    setAudioEchoCancellation(enabled: boolean) {
+        this.storage.setItem('audioEchoCancellation', enabled.toString());
+    }
+
+    getAudioEchoCancellation(): boolean {
+        return this.storage.getItem('audioEchoCancellation') === 'true';
+    }
+
+    setAudioDenoise(enabled: boolean) {
+        this.storage.setItem('audioDenoise', enabled.toString());
+    }
+
+    getAudioDenoise(): boolean {
+        return this.storage.getItem('audioDenoise') === 'true';
+    }
+
+    setAudioSpeechEnhancement(enabled: boolean) {
+        this.storage.setItem('audioSpeechEnhancement', enabled.toString());
+    }
+
+    getAudioSpeechEnhancement(): boolean {
+        return this.storage.getItem('audioSpeechEnhancement') === 'true';
+    }
+
+    private getAudioTransmitFilter() {
+        const filters = [];
+        if (this.getAudioDenoise()) {
+            // Apply noise reduction using the 'afftdn' filter.
+            filters.push('afftdn=nf=-50', 'agate=threshold=0.06:attack=20:release=250');
+        }
+        if (this.getAudioSpeechEnhancement()) {
+            // Apply high-pass and low-pass filters to remove frequencies outside the human voice range and apply dynamic normalization.
+            filters.push('highpass=f=200', 'lowpass=f=3000', 'acompressor=threshold=0.1:ratio=4:attack=20:release=200', 'volume=4');
+        }
+
+        if (filters.length === 0) {
+            return [];
+        }
+        return ['-af', filters.join(',')];
+    }
+
+    private getAudioReceiveFilter() {
+        const filters = [];
+        if (this.getAudioDenoise()) {
+            // Apply noise reduction using the 'afftdn' filter.
+            filters.push('afftdn=nf=-50', 'agate=threshold=0.06:attack=20:release=250');
+        }
+        if (this.getAudioEchoCancellation()) {
+            // Apply the 'aecho' filter to reduce acoustic echo.
+            // Format: aecho=in_gain:out_gain:delay:decay
+            filters.push('aecho=0.8:0.9:40:0.5');
+        }
+        if (this.getAudioSpeechEnhancement()) {
+            // Apply high-pass and low-pass filters to remove frequencies outside the human voice range and apply dynamic normalization.
+            filters.push('highpass=f=200', 'lowpass=f=3000', 'acompressor=threshold=0.1:ratio=4:attack=20:release=200', 'volume=4');
+        }
+
+        if (filters.length === 0) {
+            return [];
+        }
+        return ['-af', filters.join(',')];
+    }
 }
 
 export class DoorbirdCamProvider extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
@@ -654,6 +745,9 @@ export class DoorbirdCamProvider extends ScryptedDeviceBase implements DevicePro
         device.putSetting('password', password);
         device.setIPAddress(settings.ip.toString());
         device.setHttpPortOverride(settings.httpPort?.toString());
+        device.setAudioEchoCancellation(settings.audioEchoCancellation === 'true');
+        device.setAudioDenoise(settings.audioDenoise === 'true');
+        device.setAudioSpeechEnhancement(settings.audioSpeechEnhancement === 'true');
 
         return nativeId;
     }
