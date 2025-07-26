@@ -165,7 +165,6 @@ class ScryptedInterface(str, Enum):
     ObjectDetectionGenerator = "ObjectDetectionGenerator"
     ObjectDetectionPreview = "ObjectDetectionPreview"
     ObjectDetector = "ObjectDetector"
-    ObjectTracker = "ObjectTracker"
     OccupancySensor = "OccupancySensor"
     Online = "Online"
     OnOff = "OnOff"
@@ -1468,13 +1467,6 @@ class ObjectDetector:
     async def getObjectTypes(self) -> ObjectDetectionTypes:
         pass
 
-class ObjectTracker:
-    """Given object detections with bounding boxes, return a similar list with tracker ids."""
-
-    async def trackObjects(self, detection: ObjectsDetected) -> ObjectsDetected:
-        pass
-
-
 class OccupancySensor:
 
     occupied: bool
@@ -2206,7 +2198,6 @@ class ScryptedInterfaceMethods(str, Enum):
     loadScripts = "loadScripts"
     saveScript = "saveScript"
     forkInterface = "forkInterface"
-    trackObjects = "trackObjects"
     getDetectionInput = "getDetectionInput"
     getObjectTypes = "getObjectTypes"
     detectObjects = "detectObjects"
@@ -3413,13 +3404,6 @@ ScryptedInterfaceDescriptors = {
     "name": "ClusterForkInterface",
     "methods": [
       "forkInterface"
-    ],
-    "properties": []
-  },
-  "ObjectTracker": {
-    "name": "ObjectTracker",
-    "methods": [
-      "trackObjects"
     ],
     "properties": []
   },
