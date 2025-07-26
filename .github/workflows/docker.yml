@@ -109,7 +109,7 @@ jobs:
             ${{ format('koush/scrypted:v{0}-{1}', github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION, matrix.BASE[2]) }}
             ${{ matrix.BASE[2] == 'noble-full' && format('koush/scrypted:{0}', github.event.inputs.tag) || '' }}
             ${{ github.event.inputs.tag == 'latest' && format('koush/scrypted:{0}', matrix.BASE[3]) || '' }}
-            ${{ github.event.inputs.tag != 'latest' && format('koush/scrypted:{0}-{1}', github.event.inputs.tag, matrix.BASE[3]) }}
+            ${{ github.event.inputs.tag != 'latest' && format('koush/scrypted:{0}-{1}', github.event.inputs.tag, matrix.BASE[3]) || '' }}
 
             ${{ format('ghcr.io/koush/scrypted:v{1}-{0}', matrix.BASE[0], github.event.inputs.publish_tag || steps.package-version.outputs.NPM_VERSION) }}
             ${{ matrix.BASE[2] == 'noble-full' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.tag) || '' }}
