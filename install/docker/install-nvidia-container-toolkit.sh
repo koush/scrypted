@@ -11,6 +11,15 @@ set -e
 
 if [ -z "$UBUNTU_22_04" ] && [ -z "$UBUNTU_24_04" ]
 then
+    # proxmox is compatible with ubuntu 22.04, check for  /etc/pve directory
+    if [ -d "/etc/pve" ]
+    then
+        UBUNTU_22_04=true
+    fi
+fi
+
+if [ -z "$UBUNTU_22_04" ] && [ -z "$UBUNTU_24_04" ]
+then
     echo "NVIDIA container toolkit can not be installed. Ubuntu version could not be detected when checking lsb-release and /etc/os-release."
     exit 1
 fi
