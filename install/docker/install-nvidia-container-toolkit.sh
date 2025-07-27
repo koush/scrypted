@@ -1,3 +1,5 @@
+apt -y install lsb-release
+
 UBUNTU_22_04=$(lsb_release -r | grep "22.04")
 UBUNTU_24_04=$(lsb_release -r | grep "24.04")
 
@@ -14,6 +16,7 @@ then
     # proxmox is compatible with ubuntu 22.04, check for  /etc/pve directory
     if [ -d "/etc/pve" ]
     then
+        apt -y install pve-headers-$(uname -r)
         UBUNTU_22_04=true
     fi
 fi
@@ -47,7 +50,11 @@ apt -y update
 # is there a way to get a versioned package automatically?
 # cuda-drivers does not work with blackwell for some reason, container toolkit it broken IIRC.
 apt -y install nvidia-open
-apt -y install nvidia-container-toolkit
 
-nvidia-ctk runtime configure --runtime=docker
-systemctl restart docker
+if [ ! -d "/etc/pve" ]
+then
+    apt -y install nvidia-container-toolkit
+    
+    nvidia-ctk runtime configure --runtime=docker
+    systemctl restart docker
+fi
