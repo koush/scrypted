@@ -58,3 +58,6 @@ then
     nvidia-ctk runtime configure --runtime=docker
     systemctl restart docker
 fi
+
+# need this if running inside lxc...
+# nvidia-ctk config --set nvidia-container-cli.no-cgroups --in-place
