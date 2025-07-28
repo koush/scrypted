@@ -166,14 +166,6 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                 description: 'Use this in case you are already using another RTSP server/proxy (e.g. mediamtx, go2rtc, etc.) to limit the number of streams from the camera.',
             },
             {
-                key: 'audioEchoCancellation',
-                type: 'boolean',
-                subgroup: 'Advanced',
-                title: 'Echo Cancellation',
-                value: this.storage.getItem('audioEchoCancellation') === 'true',
-                description: 'Enable echo cancellation audio sent by Doorbird.',
-            },
-            {
                 key: 'audioDenoise',
                 type: 'boolean',
                 subgroup: 'Advanced',
@@ -236,7 +228,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
             // Do not buffer or delay packets in the muxer
             '-muxdelay', '0',
             // --- Audio Filtering ---
-            ...(this.getAudioTransmitFilter()),
+            ...(this.getAudioFilter()),
             // Output to file descriptor 3 (e.g. pipe:3, for inter-process communication)
             'pipe:3'
         );
@@ -319,7 +311,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                     this.console.error('Doorbird: Audio transmitter error', e);
                 }
             } finally {
-                this.console.log(`Doorbird: Audio transmitter finished. bytesOut={totalBytesWritten}, throttleOut=${totalTimeWaited}ms`);
+                this.console.log(`Doorbird: Audio transmitter finished. bytesOut=${totalBytesWritten}, throttleOut=${totalTimeWaited}ms`);
                 passthrough.destroy();
                 abortController.abort();
             }
@@ -371,7 +363,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
             '-i', `${audioRxUrl}`,
 
             // --- Audio Filtering ---
-            ...(this.getAudioReceiveFilter()),
+            ...(this.getAudioFilter()),
 
             // --- Low-latency Output Flags ---
             // Enable low-delay flags in the encoder, preventing frame buffering for lookahead.
@@ -631,14 +623,6 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         return this.storage.getItem('password');
     }
 
-    setAudioEchoCancellation(enabled: boolean) {
-        this.storage.setItem('audioEchoCancellation', enabled.toString());
-    }
-
-    getAudioEchoCancellation(): boolean {
-        return this.storage.getItem('audioEchoCancellation') === 'true';
-    }
-
     setAudioDenoise(enabled: boolean) {
         this.storage.setItem('audioDenoise', enabled.toString());
     }
@@ -655,36 +639,27 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         return this.storage.getItem('audioSpeechEnhancement') === 'true';
     }
 
-    private getAudioTransmitFilter() {
-        const filters = [];
+    private getAudioFilter() {
+        const filters: string[] = [];
         if (this.getAudioDenoise()) {
             // Apply noise reduction using the 'afftdn' filter.
+            // - 'afftdn=nf=-50' removes background noise below -50 dB (e.g. hiss, hum)
+            // - 'agate=threshold=0.06:attack=20:release=250' gates quiet sounds:
+            //      threshold=0.06  → suppresses signals below ~-24 dBFS (breaths, room noise)
+            //      attack=20       → gate opens smoothly in 20 ms to preserve speech onset
+            //      release=250     → gate closes slowly in 250 ms to avoid cutting word ends
             filters.push('afftdn=nf=-50', 'agate=threshold=0.06:attack=20:release=250');
         }
         if (this.getAudioSpeechEnhancement()) {
             // Apply high-pass and low-pass filters to remove frequencies outside the human voice range and apply dynamic normalization.
-            filters.push('highpass=f=200', 'lowpass=f=3000', 'acompressor=threshold=0.1:ratio=4:attack=20:release=200', 'volume=4');
-        }
-
-        if (filters.length === 0) {
-            return [];
-        }
-        return ['-af', filters.join(',')];
-    }
-
-    private getAudioReceiveFilter() {
-        const filters = [];
-        if (this.getAudioDenoise()) {
-            // Apply noise reduction using the 'afftdn' filter.
-            filters.push('afftdn=nf=-50', 'agate=threshold=0.06:attack=20:release=250');
-        }
-        if (this.getAudioEchoCancellation()) {
-            // Apply the 'aecho' filter to reduce acoustic echo.
-            // Format: aecho=in_gain:out_gain:delay:decay
-            filters.push('aecho=0.8:0.9:40:0.5');
-        }
-        if (this.getAudioSpeechEnhancement()) {
-            // Apply high-pass and low-pass filters to remove frequencies outside the human voice range and apply dynamic normalization.
+            // - 'highpass=f=200'      → removes low rumbles below 200 Hz (e.g. touch intercom while speaking, low street noise)
+            // - 'lowpass=f=3000'      → removes harsh highs above 3 kHz to reduce hiss/sibilance
+            // - 'acompressor=threshold=0.1:ratio=4:attack=20:release=200'
+            //      threshold=0.1      → starts compressing above ~-20 dBFS
+            //      ratio=4            → reduces dynamic range by a 4:1 ratio
+            //      attack=20          → begins compression quickly to catch loud speech
+            //      release=200        → smooths out gain after loud parts
+            // - 'volume=4'            → boosts output gain 4x after compression
             filters.push('highpass=f=200', 'lowpass=f=3000', 'acompressor=threshold=0.1:ratio=4:attack=20:release=200', 'volume=4');
         }
 
@@ -745,7 +720,6 @@ export class DoorbirdCamProvider extends ScryptedDeviceBase implements DevicePro
         device.putSetting('password', password);
         device.setIPAddress(settings.ip.toString());
         device.setHttpPortOverride(settings.httpPort?.toString());
-        device.setAudioEchoCancellation(settings.audioEchoCancellation === 'true');
         device.setAudioDenoise(settings.audioDenoise === 'true');
         device.setAudioSpeechEnhancement(settings.audioSpeechEnhancement === 'true');
 
