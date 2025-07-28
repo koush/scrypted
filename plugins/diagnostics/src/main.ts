@@ -331,6 +331,23 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             timeout: 5000,
         }).then(r => r.body.trim()));
 
+        await this.validate(this.console, 'System Time Accuracy', async () => {
+            const response = await httpFetch({
+                url: 'http://worldtimeapi.org/api/timezone/etc/utc',
+                responseType: 'json',
+                timeout: 5000,
+            });
+            
+            const serverTime = new Date(response.body.utc_datetime).getTime();
+            const localTime = Date.now();
+            const difference = Math.abs(serverTime - localTime);
+            const differenceSeconds = Math.floor(difference / 1000);
+            
+            if (differenceSeconds > 5) {
+                throw new Error(`Time drift detected: ${differenceSeconds} seconds difference from accurate time source.`);
+            }
+        });
+
         await this.validate(this.console, 'IPv6 (wtfismyip.com)', httpFetch({
             url: 'https://wtfismyip.com/text',
             family: 6,
