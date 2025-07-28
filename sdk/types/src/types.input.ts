@@ -1673,11 +1673,6 @@ export interface ObjectsDetected {
   inputDimensions?: [number, number],
   timestamp: number;
   resources?: VideoResource;
-  /**
-   * The id of the generation source.
-   * Can be a camera id or a plugin id 
-   */
-  sourceId?: string;
 }
 export type ObjectDetectionClass = 'motion' | 'face' | 'person' | string;
 export interface ObjectDetectionTypes {

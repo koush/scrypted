@@ -64,7 +64,7 @@ export class DoorbirdAPI {
 
     stopEventSocket() {
         this.console?.log("Doorbird: stopping event socket listening...");
-        this.doorbirdUdpSocket.close();
+        this.doorbirdUdpSocket.close();        
     }
 
     registerRingCallback(ringCallback: ApiRingCallback) {

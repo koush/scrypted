@@ -1,5 +1,3 @@
-apt -y install lsb-release
-
 UBUNTU_22_04=$(lsb_release -r | grep "22.04")
 UBUNTU_24_04=$(lsb_release -r | grep "24.04")
 
@@ -10,16 +8,6 @@ set -e
 # Install CUDA for 24.04
 # https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=24.04&target_type=deb_network
 # Do not apt install nvidia-open, must use cuda-drivers.
-
-if [ -z "$UBUNTU_22_04" ] && [ -z "$UBUNTU_24_04" ]
-then
-    # proxmox is compatible with ubuntu 22.04, check for  /etc/pve directory
-    if [ -d "/etc/pve" ]
-    then
-        apt -y install pve-headers-$(uname -r)
-        UBUNTU_22_04=true
-    fi
-fi
 
 if [ -z "$UBUNTU_22_04" ] && [ -z "$UBUNTU_24_04" ]
 then
@@ -50,14 +38,7 @@ apt -y update
 # is there a way to get a versioned package automatically?
 # cuda-drivers does not work with blackwell for some reason, container toolkit it broken IIRC.
 apt -y install nvidia-open
+apt -y install nvidia-container-toolkit
 
-if [ ! -d "/etc/pve" ]
-then
-    apt -y install nvidia-container-toolkit
-    
-    nvidia-ctk runtime configure --runtime=docker
-    systemctl restart docker
-fi
-
-# need this if running inside lxc...
-# nvidia-ctk config --set nvidia-container-cli.no-cgroups --in-place
+nvidia-ctk runtime configure --runtime=docker
+systemctl restart docker
