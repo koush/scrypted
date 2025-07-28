@@ -27,7 +27,7 @@ echo "external/werift > npm install"
 npm install
 popd
 
-for directory in rtsp ffmpeg-camera onvif prebuffer-mixin snapshot core webrtc homekit doorbird
+for directory in rtsp ffmpeg-camera amcrest onvif hikvision reolink unifi-protect webrtc homekit
 do
     echo "$directory > npm install"
     pushd plugins/$directory
