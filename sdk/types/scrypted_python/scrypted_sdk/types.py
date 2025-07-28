@@ -824,6 +824,7 @@ class ObjectsDetected(TypedDict):
     inputDimensions: tuple[float, float]
     resources: VideoResource
     timestamp: float
+    sourceId: str # The id of the generation source. Can be a camera id or a plugin id 
 
 class PanTiltZoomCapabilities(TypedDict):
 
@@ -1465,7 +1466,6 @@ class ObjectDetector:
 
     async def getObjectTypes(self) -> ObjectDetectionTypes:
         pass
-
 
 class OccupancySensor:
 
