@@ -315,6 +315,8 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
 
         const ffmpegPath = await mediaManager.getFFmpegPath();
 
+        const audioFilters = this.getAudioFilter();
+
         const ffmpegArgs = [
             // Suppress printing the FFmpeg banner. Keeps logs clean.
             '-hide_banner',
@@ -342,7 +344,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
             '-i', `${audioRxUrl}`,
 
             // --- Audio Filtering ---
-            ...(this.getAudioFilter()),
+            ...(audioFilters),
 
             // --- Low-latency Output Flags ---
             // Enable low-delay flags in the encoder, preventing frame buffering for lookahead.
@@ -355,8 +357,8 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
             '-muxdelay', '0',
 
             // --- Output Format Specification ---
-            // Re-encode the audio to PCM µ-law after the filter has been applied.
-            '-acodec', 'pcm_mulaw',
+            // Re-encode the audio to PCM µ-law after the filter has been applied, or just copy it if no filters are applied.
+            '-acodec', (audioFilters.length > 0 ? 'pcm_mulaw' : 'copy'),
             // Force the output container format to raw µ-law.
             '-f', 'mulaw',
             // Output the processed audio to file descriptor 3 (the pipe).
