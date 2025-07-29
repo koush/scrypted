@@ -29,7 +29,6 @@ import net from 'net';
 import {PassThrough, Readable} from "stream";
 import {ApiMotionEvent, ApiRingEvent, DoorbirdAPI} from "./doorbird-api";
 
-
 const {deviceManager, mediaManager} = sdk;
 
 class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, Settings, BinarySensor, MotionSensor {
@@ -255,7 +254,6 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
             const passthrough = new PassThrough();
             const abortController = new AbortController();
             let totalBytesWritten: number = 0;
-            let totalTimeWaited: number = 0;
 
             try {
                 // Perform POST request instantly instead of unneeded handling with DIGEST authentication.
@@ -272,11 +270,6 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                     body: passthrough,
                     responseType: 'readable',
                 })
-                // The ideal interval for 256-byte chunks at 8000 bytes/sec is 32ms.
-                const throttlingIntervalMillis: number = 32;
-
-                // Initialize the next chunk send timestamp to the current time.
-                let nextChunkSendTimeStamp: number = Date.now();
 
                 while (true) {  // Loop will be broken by StreamEndError.
 
@@ -286,22 +279,8 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                         break;
                     }
 
-                    // Calculate the time to wait until the next chunk should be sent.
-                    const timeToWait = Math.max(0, nextChunkSendTimeStamp - Date.now());
-
-                    // If the time to wait is negative, it means we are ahead of schedule,
-                    // so we can send the data immediately. Otherwise, we wait for the calculated time.
-                    // This should usually not happen as FFmpeg is already throttling the output to 8000 bytes/sec.
-                    if (timeToWait > 0) {
-                        await new Promise(resolve => setTimeout(resolve, timeToWait));
-                        totalTimeWaited += timeToWait;
-                    }
-
                     // Actually write the data to the passthrough stream.
                     passthrough.push(data);
-
-                    // Schedule the next chunk relative to the last scheduled time to avoid drift.
-                    nextChunkSendTimeStamp += throttlingIntervalMillis;
 
                     // Add the length of the data to the total bytes written.
                     totalBytesWritten += data.length;
@@ -311,7 +290,7 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                     this.console.error('Doorbird: Audio transmitter error', e);
                 }
             } finally {
-                this.console.log(`Doorbird: Audio transmitter finished. bytesOut=${totalBytesWritten}, throttleOut=${totalTimeWaited}ms`);
+                this.console.log(`Doorbird: Audio transmitter finished. bytesOut=${totalBytesWritten}ms`);
                 passthrough.destroy();
                 abortController.abort();
             }
