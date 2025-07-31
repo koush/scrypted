@@ -6,7 +6,6 @@ import inspect
 import multiprocessing
 import multiprocessing.connection
 import os
-from pathlib import Path
 import platform
 import random
 import sys
@@ -18,25 +17,24 @@ from asyncio.futures import Future
 from asyncio.streams import StreamReader, StreamWriter
 from collections.abc import Mapping
 from io import StringIO
+from pathlib import Path
 from typing import Any, Callable, Coroutine, Optional, Set, Tuple, TypedDict
+
+import cluster_labels
 import plugin_console
 import plugin_volume as pv
 import rpc
 import rpc_reader
 import scrypted_python.scrypted_sdk.types
 from cluster_setup import ClusterSetup
-import cluster_labels
 from plugin_pip import install_with_pip, need_requirements, remove_pip_dirs
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
-from scrypted_python.scrypted_sdk.types import (
-    Device,
-    DeviceManifest,
-    EventDetails,
-    ScryptedInterface,
-    ScryptedInterfaceMethods,
-    ScryptedInterfaceProperty,
-    Storage,
-)
+from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
+                                                EventDetails,
+                                                ScryptedInterface,
+                                                ScryptedInterfaceMethods,
+                                                ScryptedInterfaceProperty,
+                                                Storage)
 
 SCRYPTED_REQUIREMENTS = """
 ptpython
@@ -115,9 +113,7 @@ class EventRegistry(object):
         str, Set[Callable[[scrypted_python.scrypted_sdk.EventDetails, Any], None]]
     ]
 
-    __allowedEventInterfaces = set(
-        [ScryptedInterface.ScryptedDevice.value, "Logger"]
-    )
+    __allowedEventInterfaces = set([ScryptedInterface.ScryptedDevice.value, "Logger"])
 
     def __init__(self) -> None:
         self.systemListeners = set()
@@ -474,7 +470,7 @@ class MediaManager:
         # try to get the ffmpeg path as a value of another variable
         # ie, in docker builds:
         # export SCRYPTED_FFMPEG_PATH_ENV_VARIABLE=SCRYPTED_RASPBIAN_FFMPEG_PATH
-        v = os.getenv('SCRYPTED_FFMPEG_PATH_ENV_VARIABLE')
+        v = os.getenv("SCRYPTED_FFMPEG_PATH_ENV_VARIABLE")
         if v:
             f = os.getenv(v)
             if f and Path(f).exists():
@@ -483,7 +479,7 @@ class MediaManager:
         # try to get the ffmpeg path from a variable
         # ie:
         # export SCRYPTED_FFMPEG_PATH=/usr/local/bin/ffmpeg
-        f = os.getenv('SCRYPTED_FFMPEG_PATH')
+        f = os.getenv("SCRYPTED_FFMPEG_PATH")
         if f and Path(f).exists():
             return f
 
@@ -491,12 +487,12 @@ class MediaManager:
 
     async def getFilesPath(self):
         # Get the value of the SCRYPTED_PLUGIN_VOLUME environment variable
-        files_path = os.getenv('SCRYPTED_PLUGIN_VOLUME')
+        files_path = os.getenv("SCRYPTED_PLUGIN_VOLUME")
         if not files_path:
-            raise ValueError('SCRYPTED_PLUGIN_VOLUME env variable not set?')
+            raise ValueError("SCRYPTED_PLUGIN_VOLUME env variable not set?")
 
         # Construct the path for the 'files' directory
-        ret = Path(files_path) / 'files'
+        ret = Path(files_path) / "files"
 
         # Ensure the directory exists
         await asyncio.to_thread(ret.mkdir, parents=True, exist_ok=True)
