@@ -1,3 +1,4 @@
+import dataclasses
 import inspect
 import random
 import string
@@ -281,7 +282,7 @@ class RpcPeer:
         return props
 
     def isTransportSafe(value: any):
-        return not value or (type(value) in jsonSerializable)
+        return not value or (type(value) in jsonSerializable) or dataclasses.is_dataclass(value)
 
     def serialize(self, value, serializationContext: Dict):
         if type(value) == dict and value.get(
