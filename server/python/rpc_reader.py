@@ -6,6 +6,7 @@ import concurrent.futures
 import json
 import multiprocessing.connection
 import os
+import pickle
 import threading
 from asyncio.events import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
@@ -47,7 +48,7 @@ class RpcTransport:
     def writeBuffer(self, buffer, reject):
         pass
 
-    def writeJSON(self, json, reject):
+    def writeSerialized(self, json, reject):
         pass
 
 
@@ -95,7 +96,7 @@ class RpcFileTransport(RpcTransport):
             if reject:
                 reject(e)
 
-    def writeJSON(self, j, reject):
+    def writeSerialized(self, j, reject):
         return self.writeMessage(
             0, bytes(json.dumps(j, allow_nan=False), "utf8"), reject
         )
@@ -133,10 +134,48 @@ class RpcStreamTransport(RpcTransport):
             if reject:
                 reject(e)
 
-    def writeJSON(self, j, reject):
+    def writeSerialized(self, j, reject):
         return self.writeMessage(
             0, bytes(json.dumps(j, allow_nan=False), "utf8"), reject
         )
+
+    def writeBuffer(self, buffer, reject):
+        return self.writeMessage(1, buffer, reject)
+
+
+class RpcPickleStreamTransport(RpcTransport):
+    def __init__(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, pickler = pickle
+    ) -> None:
+        super().__init__()
+        self.reader = reader
+        self.writer = writer
+        self.pickler = pickler
+
+    async def read(self):
+        lengthBytes = await self.reader.readexactly(4)
+        typeBytes = await self.reader.readexactly(1)
+        type = typeBytes[0]
+        length = int.from_bytes(lengthBytes, "big")
+        data = await self.reader.readexactly(length - 1)
+        if type == 1:
+            return data
+        message = self.pickler.loads(data)
+        return message
+
+    def writeMessage(self, type: int, buffer, reject):
+        length = len(buffer) + 1
+        lb = length.to_bytes(4, "big")
+        try:
+            for b in [lb, bytes([type]), buffer]:
+                self.writer.write(b)
+        except Exception as e:
+            if reject:
+                reject(e)
+
+    def writeSerialized(self, j, reject):
+        pickled = self.pickler.dumps(j)
+        return self.writeMessage(0, pickled, reject)
 
     def writeBuffer(self, buffer, reject):
         return self.writeMessage(1, buffer, reject)
@@ -160,7 +199,7 @@ class RpcConnectionTransport(RpcTransport):
             if reject:
                 reject(e)
 
-    def writeJSON(self, json, reject):
+    def writeSerialized(self, json, reject):
         return self.writeMessage(json, reject)
 
     def writeBuffer(self, buffer, reject):
@@ -197,7 +236,7 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, rpcTransport: RpcTransp
                     for buffer in buffers:
                         rpcTransport.writeBuffer(buffer, reject)
 
-            rpcTransport.writeJSON(message, reject)
+            rpcTransport.writeSerialized(message, reject)
 
     peer = rpc.RpcPeer(send)
     peer.nameDeserializerMap["Buffer"] = SidebandBufferSerializer()
