@@ -7,7 +7,6 @@ import express, { Request, Response } from 'express';
 import { ParamsDictionary } from 'express-serve-static-core';
 import fs from 'fs';
 import http, { ServerResponse } from 'http';
-import https from 'https';
 import net from 'net';
 import path from 'path';
 import { ParsedQs } from 'qs';
@@ -412,10 +411,17 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             return;
         }
 
-        if (!pluginHost || !pluginDevice) {
-            console.error('plugin does not exist or is still starting up.');
-            res.writeHead(500);
-            res.end();
+        if (!pluginHost) {
+            if (!pluginDevice) {
+                console.error('plugin is not installed.');
+                res.writeHead(404);
+                res.end();
+            }
+            else {
+                console.error('plugin is crashed or not started.');
+                res.writeHead(500);
+                res.end();
+            }
             return;
         }
 
