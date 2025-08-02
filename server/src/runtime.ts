@@ -411,17 +411,17 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             return;
         }
 
+        if (!pluginDevice) {
+            console.error('plugin is not installed.');
+            res.writeHead(404);
+            res.end();
+            return;
+        }
+
         if (!pluginHost) {
-            if (!pluginDevice) {
-                console.error('plugin is not installed.');
-                res.writeHead(404);
-                res.end();
-            }
-            else {
-                console.error('plugin is crashed or not started.');
-                res.writeHead(500);
-                res.end();
-            }
+            console.error('plugin is crashed or not started.');
+            res.writeHead(500);
+            res.end();
             return;
         }
 
