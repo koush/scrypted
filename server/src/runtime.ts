@@ -397,6 +397,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     async handleEngineIOEndpoint(req: Request, res: ServerResponse & { locals: any }, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
         const { pluginHost, pluginDevice } = pluginData;
 
+        if (!pluginDevice) {
+            console.error('plugin is not installed.');
+            res.writeHead(404);
+            res.end();
+            return;
+        }
+
         const { username } = res.locals;
         let accessControls: AccessControls;
 
@@ -407,13 +414,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
         catch (e) {
             res.writeHead(401);
-            res.end();
-            return;
-        }
-
-        if (!pluginDevice) {
-            console.error('plugin is not installed.');
-            res.writeHead(404);
             res.end();
             return;
         }
