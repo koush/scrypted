@@ -579,7 +579,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     async probe() {
     }
 
-    async createTracks(mediaObject: MediaObject, intercomId?: string) {
+    async createTracks(mediaObject: MediaObject) {
         let requestMediaStream: RequestMediaStream;
 
         try {
@@ -589,14 +589,14 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             requestMediaStream = async () => mediaObject;
         }
 
-        const intercom = sdk.systemManager.getDeviceById<Intercom>(intercomId);
+        const intercom = sdk.systemManager.getDeviceById<Intercom>(mediaObject.sourceId);
 
         const vtrack = new MediaStreamTrack({
             kind: "video",
         });
 
         const atrack = new MediaStreamTrack({ kind: "audio" });
-        const console = sdk.deviceManager.getMixinConsole(mediaObject?.sourceId || intercomId);
+        const console = sdk.deviceManager.getMixinConsole(mediaObject.sourceId);
 
         const timeStart = Date.now();
 
@@ -653,28 +653,29 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         }
     }
 
-    addInputTrack(options: { videoMid?: string; audioMid?: string; }): Promise<RTCInputMediaObjectTrack> {
-        throw new Error('not implemented');
-    }
-
     async addTrack(mediaObject: MediaObject, options?: {
         videoMid?: string,
         audioMid?: string,
-        /**
-         * @deprecated
-         */
-        intercomId?: string,
+        videoDirection?: 'sendrecv' | 'sendonly' | 'recvonly',
+        audioDirection?: 'sendrecv' | 'sendonly' | 'recvonly',
     }) {
-        const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject, options?.intercomId);
+        const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject);
+
+        // no support for 2 way video yet.
+        const videoDirection = 'sendonly';
+        let audioDirection = options?.audioDirection || 'sendrecv';
+        if (!intercom){
+            audioDirection = 'sendonly';
+        }
 
         const videoTransceiver = this.pc.addTransceiver(vtrack, {
-            direction: 'sendonly',
+            direction: videoDirection,
         });
 
         videoTransceiver.mid = options?.videoMid;
 
         const audioTransceiver = this.pc.addTransceiver(atrack, {
-            direction: intercom ? 'sendrecv' : 'sendonly',
+            direction: audioDirection,
         });
         audioTransceiver.mid = options?.audioMid;
 
@@ -725,7 +726,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
 export async function createRTCPeerConnectionSink(
     clientSignalingSession: RTCSignalingSession,
     console: Console,
-    intercom: ScryptedDevice & Intercom,
+    audioDirection: 'sendrecv' | 'sendonly' | 'recvonly',
     mo: MediaObject,
     requireOpus: boolean,
     maximumCompatibilityMode: boolean,
@@ -742,7 +743,7 @@ export async function createRTCPeerConnectionSink(
     });
 
     const track = await connection.addTrack(mo, {
-        intercomId: intercom?.id,
+        audioDirection,
     });
 
     track.control.killed.promise.then(() => {
@@ -752,7 +753,7 @@ export async function createRTCPeerConnectionSink(
 
     const setup: Partial<RTCAVSignalingSetup> = {
         audio: {
-            direction: intercom ? 'sendrecv' : 'recvonly',
+            direction: audioDirection,
         },
         video: {
             direction: 'recvonly',

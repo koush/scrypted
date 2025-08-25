@@ -823,8 +823,8 @@ class ObjectsDetected(TypedDict):
     detections: list[ObjectDetectionResult]
     inputDimensions: tuple[float, float]
     resources: VideoResource
+    sourceId: str  # The id of the generation source. Can be a camera id or a plugin id
     timestamp: float
-    sourceId: str # The id of the generation source. Can be a camera id or a plugin id 
 
 class PanTiltZoomCapabilities(TypedDict):
 
@@ -1087,7 +1087,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.31"
+TYPES_VERSION = "0.5.33"
 
 
 class AirPurifier:
@@ -1466,6 +1466,7 @@ class ObjectDetector:
 
     async def getObjectTypes(self) -> ObjectDetectionTypes:
         pass
+
 
 class OccupancySensor:
 

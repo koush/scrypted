@@ -130,7 +130,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
         return createRTCPeerConnectionSink(
             session,
             this.console,
-            hasIntercom ? device : undefined,
+            hasIntercom ? 'sendrecv' : 'recvonly',
             mo,
             this.plugin.storageSettings.values.requireOpus,
             this.plugin.storageSettings.values.maximumCompatibilityMode,

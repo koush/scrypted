@@ -2582,15 +2582,9 @@ export interface RTCConnectionManagement {
   addTrack(mediaObject: MediaObject, options?: {
     videoMid?: string,
     audioMid?: string,
-    /**
-     * @deprecated
-     */
-    intercomId?: string,
+    videoDirection?: 'sendrecv' | 'sendonly' | 'recvonly',
+    audioDirection?: 'sendrecv' | 'sendonly' | 'recvonly',
   }): Promise<RTCOutputMediaObjectTrack>;
-  addInputTrack(options: {
-    videoMid?: string,
-    audioMid?: string,
-  }): Promise<RTCInputMediaObjectTrack>;
   close(): Promise<void>;
   probe(): Promise<void>;
 }
