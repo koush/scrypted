@@ -707,13 +707,44 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     }
 
     async createRPCGeneratorDataChannel(label: string, generator: AsyncGenerator<Buffer>, options?: {
-        bufferedAmountLowThreshold?: number,
+        initialWindowSize?: number,
     }) {
+
         generator = await sdk.connectRPCObject(generator);
 
+        let windowSize = options?.initialWindowSize;
         const createdDc = this.pc.createDataChannel(label, {
             ordered: true,
         });
+
+        let windowUpdate: Deferred<void>;
+        if (typeof windowSize === 'number' && windowSize <= 0) {
+            windowUpdate = new Deferred();
+        }
+
+        createdDc.onmessage = (event) => {
+            const data = event.data;
+            if (typeof data === 'string') {
+                try {
+                    const msg = JSON.parse(data);
+                    const u = windowUpdate;
+                    if (typeof msg.windowSize === 'number') {
+                        windowSize += msg.windowSize;
+                        if (windowSize > 0) {
+                            windowUpdate = undefined;
+                            u?.resolve();
+                        }
+                    }
+                    else if (msg.windowSize === null) {
+                        windowSize = undefined;
+                        u?.resolve();
+                    }
+                }
+                catch (e) {
+                    this.console.error('Error processing WebRTC datachannel control message.', data);
+                }
+            }
+        };
 
         const q = createAsyncQueue<Buffer>();
 
@@ -729,54 +760,73 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             dcDeferred.reject(e.error);
         };
 
-        if (options?.bufferedAmountLowThreshold > 0)
-            createdDc.bufferedAmountLowThreshold = options.bufferedAmountLowThreshold;
+        this.negotiation.then(async () => {
+            const dc = await dcDeferred.promise;
 
-        await this.negotiation;
-        const dc = await dcDeferred.promise;
+            const closed = waitClosed(this.pc).finally(() => q.end());
 
-        const closed = waitClosed(this.pc).finally(() => q.end());
-
-        (async () => {
-            try {
-                for await (const chunk of generator) {
-                    if (!q.submit(chunk))
-                        break;
-                }
-            }
-            catch (e) {
-                q.end(e);
-            }
-            finally {
-                q.end();
-            }
-        })();
-
-
-        (async () => {
-            try {
-                for await (const chunk of q.queue) {
-                    if (dc.readyState !== 'open')
-                        break;
-                    dc.send(chunk);
-
-                    if (dc.bufferedAmount > dc.bufferedAmountLowThreshold) {
-                        await Promise.any([closed, dc.bufferedAmountLow.asPromise()]);
+            (async () => {
+                try {
+                    for await (const chunk of generator) {
+                        if (!q.submit(chunk))
+                            break;
                     }
                 }
-            }
-            catch (e) {
-                this.console.error('Generator ended with error.', e);
-                if (dc.readyState === 'open') {
-                    dc.send(e.toString());
+                catch (e) {
+                    q.end(e);
                 }
-            }
-            finally {
-                q.end();
-            }
-        })();
+                finally {
+                    q.end();
+                }
+            })();
 
-        return new RTCGeneratorDataChannelWrapper(dc);
+
+            (async () => {
+                try {
+                    await windowUpdate?.promise;
+
+                    for await (const chunk of q.queue) {
+                        if (dc.readyState !== 'open')
+                            break;
+                        // split into 32k segments and send, webrtc or sctp has chunk size limitation
+                        let preamble = Buffer.alloc(4);
+                        preamble.writeUint32BE(chunk.length);
+                        for (let i = 0; i < chunk.length; i += 32 * 1024) {
+                            let sending = chunk.subarray(i, i + 32 * 1024);
+                            if (preamble) {
+                                sending = Buffer.concat([preamble, sending]);
+                                preamble = undefined;
+                            }
+                            dc.send(sending);
+                        }
+
+                        if (typeof windowSize === 'number') {
+                            windowSize -= chunk.length;
+                            if (windowSize <= 0) {
+                                windowUpdate = new Deferred();
+                                await windowUpdate.promise;
+                            }
+                        }
+                        else {
+                            if (dc.bufferedAmount > dc.bufferedAmountLowThreshold) {
+                                await Promise.any([closed, dc.bufferedAmountLow.asPromise()]);
+                            }
+                        }
+                    }
+                }
+                catch (e) {
+                    this.console.error('Generator ended with error.', e);
+                    if (dc.readyState === 'open') {
+                        dc.send(e.toString());
+                    }
+                }
+                finally {
+                    q.end();
+                }
+            })();
+        });
+
+        return new RTCGeneratorDataChannelWrapper(createdDc);
     }
 
     async close(): Promise<void> {
