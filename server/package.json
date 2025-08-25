@@ -5,7 +5,7 @@
   "dependencies": {
     "@scrypted/ffmpeg-static": "^6.1.0-build3",
     "@scrypted/node-pty": "^1.0.24",
-    "@scrypted/types": "^0.5.23",
+    "@scrypted/types": "^0.5.34",
     "adm-zip": "^0.5.16",
     "body-parser": "^2.2.0",
     "cookie-parser": "^1.4.7",

@@ -2557,6 +2557,10 @@ export interface RTCMediaObjectTrack {
   stop(): Promise<void>;
 }
 
+export interface RTCGeneratorDataChannel {
+  close(): Promise<void>;
+}
+
 /**
  * @category WebRTC Reference
  */
@@ -2585,6 +2589,9 @@ export interface RTCConnectionManagement {
     videoDirection?: 'sendrecv' | 'sendonly' | 'recvonly',
     audioDirection?: 'sendrecv' | 'sendonly' | 'recvonly',
   }): Promise<RTCOutputMediaObjectTrack>;
+  createRPCGeneratorDataChannel(label: string, generator: AsyncGenerator<Buffer>, options?: {
+    bufferedAmountLowThreshold?: number,
+  }): Promise<RTCGeneratorDataChannel>;
   close(): Promise<void>;
   probe(): Promise<void>;
 }
