@@ -728,14 +728,14 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                 try {
                     const msg = JSON.parse(data);
                     const u = windowUpdate;
-                    if (typeof msg.windowSize === 'number') {
-                        windowSize += msg.windowSize;
+                    if (typeof msg.windowUpdate === 'number') {
+                        windowSize += msg.windowUpdate;
                         if (windowSize > 0) {
                             windowUpdate = undefined;
                             u?.resolve();
                         }
                     }
-                    else if (msg.windowSize === null) {
+                    else if (msg.windowUpdate === null) {
                         windowSize = undefined;
                         u?.resolve();
                     }
@@ -804,6 +804,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                             windowSize -= chunk.length;
                             if (windowSize <= 0) {
                                 windowUpdate = new Deferred();
+                                this.console.log('waiting for window update');
                                 await windowUpdate.promise;
                             }
                         }
