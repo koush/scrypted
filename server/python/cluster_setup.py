@@ -215,7 +215,7 @@ class ClusterSetup:
         port = clusterObject["port"]
         proxyId = clusterObject["proxyId"]
         if port == self.clusterPort:
-            return await self.connectRPCObject(clusterObject)
+            return await self.connectClusterObject(clusterObject)
 
         clusterPeerPromise = self.ensureClusterPeer(address, port)
 
