@@ -247,7 +247,7 @@ async def cluster_listen_zero(
     callback: Callable[[asyncio.StreamReader, asyncio.StreamWriter]]
 ) -> ClusterServerListener:
     SCRYPTED_CLUSTER_ADDRESS = os.getenv("SCRYPTED_CLUSTER_ADDRESS")
-    if not SCRYPTED_CLUSTER_ADDRESS:
+    if not SCRYPTED_CLUSTER_ADDRESS or SCRYPTED_CLUSTER_ADDRESS == "127.0.0.1":
         server = await asyncio.start_server(callback, host=None, port=0)
         port = server.sockets[0].getsockname()[1]
         return {
