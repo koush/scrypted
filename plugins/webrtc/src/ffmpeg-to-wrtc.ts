@@ -1,7 +1,7 @@
 import { MediaStreamTrack, PeerConfig, RTCDataChannel, RTCPeerConnection, RTCRtpTransceiver, RtpPacket } from "./werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCGeneratorDataChannel, RTCInputMediaObjectTrack, RTCOutputMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCGeneratorDataChannel, RTCInputMediaObjectTrack, RTCOutputMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedInterface, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ScryptedSessionControl } from "./session-control";
 import { optionalVideoCodec, opusAudioCodecOnly, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { logIsLocalIceTransport } from "./werift-util";
@@ -590,7 +590,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             requestMediaStream = async () => mediaObject;
         }
 
-        const intercom = sdk.systemManager.getDeviceById<Intercom>(mediaObject.sourceId);
+        let intercom = sdk.systemManager.getDeviceById<Intercom>(mediaObject.sourceId);
+        if (!intercom.interfaces?.includes(ScryptedInterface.Intercom))
+            intercom = undefined;
 
         const vtrack = new MediaStreamTrack({
             kind: "video",
