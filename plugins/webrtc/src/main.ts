@@ -364,7 +364,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         let connection: WebRTCConnectionManagement;
         try {
             const { createConnection } = await result.result;
-            connection = await createConnection({}, undefined, session,
+            connection = await createConnection(session,
                 this.storageSettings.values.requireOpus,
                 maximumCompatibilityMode,
                 clientOptions,
@@ -627,8 +627,7 @@ function delayProcessExit() {
     }, 1000);
 }
 
-async function createConnection(message: any,
-    port: number,
+async function createConnection(
     clientSession: RTCSignalingSession,
     requireOpus: boolean,
     maximumCompatibilityMode: boolean,
@@ -680,37 +679,7 @@ async function createConnection(message: any,
     const { pc } = connection;
     waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
 
-    const { connectionManagementId, updateSessionId } = message;
-    if (connectionManagementId || updateSessionId) {
-        const plugins = await systemManager.getComponent('plugins');
-        if (connectionManagementId) {
-            plugins.setHostParam('@scrypted/webrtc', connectionManagementId, connection);
-        }
-        if (updateSessionId) {
-            await plugins.setHostParam('@scrypted/webrtc', updateSessionId, (session: RTCSignalingSession) => connection.clientSession = session);
-        }
-    }
-
-    if (port) {
-        const socket = net.connect(port, '127.0.0.1');
-        cleanup.promise.finally(() => socket.destroy());
-
-        const dc = pc.createDataChannel('rpc');
-        dc.onMessage.subscribe(message => socket.write(message));
-
-        const debouncer = new DataChannelDebouncer({
-            send: u8 => dc.send(Buffer.from(u8)),
-        }, e => {
-            this.console.error('datachannel send error', e);
-            socket.destroy();
-        });
-        socket.on('data', data => debouncer.send(data));
-        socket.on('close', () => cleanup.resolve('socket closed'));
-        socket.on('error', () => cleanup.resolve('socket error'));
-    }
-    else {
-        pc.createDataChannel('dummy');
-    }
+    const dc = pc.createDataChannel('rpc');
 
     return connection;
 }
@@ -739,8 +708,7 @@ export async function fork() {
             }
         },
 
-        async createConnection(message: any,
-            port: number,
+        async createConnection(
             clientSession: RTCSignalingSession,
             requireOpus: boolean,
             maximumCompatibilityMode: boolean,
@@ -752,7 +720,7 @@ export async function fork() {
                 ipv4Ban?: string[];
             }) {
             try {
-                return await createConnection(message, port, clientSession, requireOpus, maximumCompatibilityMode, clientOptions, options);
+                return await createConnection(clientSession, requireOpus, maximumCompatibilityMode, clientOptions, options);
             }
             catch (e) {
                 delayProcessExit();

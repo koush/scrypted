@@ -16,7 +16,6 @@ import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from 
 import { RtpCodecCopy, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
 import { WeriftSignalingSession } from "./werift-signaling-session";
-import { createAsyncQueue } from "../../../common/src/async-queue";
 
 function getDebugModeH264EncoderArgs() {
     return [
@@ -715,121 +714,109 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         generator = await sdk.connectRPCObject(generator);
 
         let windowSize = options?.initialWindowSize;
-        const createdDc = this.pc.createDataChannel(label, {
-            ordered: true,
-        });
+
 
         let windowUpdate: Deferred<void>;
         if (typeof windowSize === 'number' && windowSize <= 0) {
             windowUpdate = new Deferred();
         }
 
-        createdDc.onmessage = (event) => {
-            const data = event.data;
-            if (typeof data === 'string') {
-                try {
-                    const msg = JSON.parse(data);
-                    const u = windowUpdate;
-                    if (typeof msg.windowUpdate === 'number') {
-                        windowSize += msg.windowUpdate;
-                        if (windowSize > 0) {
-                            windowUpdate = undefined;
+        const dcDeferred = new Deferred<RTCDataChannel>();
+
+        const dcStatus = new Deferred<void>();
+        waitClosed(this.pc).finally(() => dcStatus.reject(new Error('data channel closed')));
+
+        this.negotiation.then(async () => {
+            const createdDc = this.pc.createDataChannel(label, {
+                ordered: true,
+            });
+            createdDc.onmessage = (event) => {
+                const data = event.data;
+                if (typeof data === 'string') {
+                    try {
+                        const msg = JSON.parse(data);
+                        const u = windowUpdate;
+                        if (typeof msg.windowUpdate === 'number') {
+                            windowSize += msg.windowUpdate;
+                            if (windowSize > 0) {
+                                windowUpdate = undefined;
+                                u?.resolve();
+                            }
+                        }
+                        else if (msg.windowUpdate === null) {
+                            windowSize = undefined;
                             u?.resolve();
                         }
                     }
-                    else if (msg.windowUpdate === null) {
-                        windowSize = undefined;
-                        u?.resolve();
+                    catch (e) {
+                        this.console.error('Error processing WebRTC datachannel control message.', data);
                     }
                 }
-                catch (e) {
-                    this.console.error('Error processing WebRTC datachannel control message.', data);
-                }
-            }
-        };
+            };
 
-        const q = createAsyncQueue<Buffer>();
+            createdDc.onopen = () => dcDeferred.resolve(createdDc);
+            createdDc.onclose = () => {
+                dcStatus.reject(new Error('data channel closed'));
+                dcDeferred.reject(new Error('data channel closed'));
+            };
+            createdDc.onerror = (e) => {
+                dcStatus.reject(e.error);
+                dcDeferred.reject(e.error);
+            };
 
-        const dcDeferred = new Deferred<typeof createdDc>();
-
-        createdDc.onopen = () => dcDeferred.resolve(createdDc);
-        createdDc.onclose = () => {
-            q.end();
-            dcDeferred.reject(new Error('data channel closed'));
-        };
-        createdDc.onerror = (e) => {
-            q.end(e.error);
-            dcDeferred.reject(e.error);
-        };
-
-        this.negotiation.then(async () => {
-            const dc = await dcDeferred.promise;
-
-            const closed = waitClosed(this.pc).finally(() => q.end());
-
-            (async () => {
-                try {
-                    for await (const chunk of generator) {
-                        if (!q.submit(chunk))
-                            break;
-                    }
-                }
-                catch (e) {
-                    q.end(e);
-                }
-                finally {
-                    q.end();
-                }
-            })();
-
-
-            (async () => {
-                try {
-                    await windowUpdate?.promise;
-
-                    for await (const chunk of q.queue) {
-                        if (dc.readyState !== 'open')
-                            break;
-                        // split into 32k segments and send, webrtc or sctp has chunk size limitation
-                        let preamble = Buffer.alloc(4);
-                        preamble.writeUint32BE(chunk.length);
-                        for (let i = 0; i < chunk.length; i += 32 * 1024) {
-                            let sending = chunk.subarray(i, i + 32 * 1024);
-                            if (preamble) {
-                                sending = Buffer.concat([preamble, sending]);
-                                preamble = undefined;
-                            }
-                            dc.send(sending);
-                        }
-
-                        if (typeof windowSize === 'number') {
-                            windowSize -= chunk.length;
-                            if (windowSize <= 0) {
-                                windowUpdate = new Deferred();
-                                this.console.log('waiting for window update');
-                                await windowUpdate.promise;
-                            }
-                        }
-                        else {
-                            if (dc.bufferedAmount > dc.bufferedAmountLowThreshold) {
-                                await Promise.any([closed, dc.bufferedAmountLow.asPromise()]);
-                            }
-                        }
-                    }
-                }
-                catch (e) {
-                    this.console.error('Generator ended with error.', e);
-                    if (dc.readyState === 'open') {
-                        dc.send(e.toString());
-                    }
-                }
-                finally {
-                    q.end();
-                }
-            })();
+            await dcDeferred.promise;
+            // await sleep(1000);
         });
 
-        return new RTCGeneratorDataChannelWrapper(createdDc);
+        Promise.resolve().then(async () => {
+            try {
+                await windowUpdate?.promise;
+
+                for await (const chunk of generator) {
+                    if (dcStatus.finished) {
+                        break;
+                    }
+
+                    const dc = await dcDeferred.promise;
+                    if (dc.readyState !== 'open')
+                        break;
+                    // split into 32k segments and send, webrtc or sctp has chunk size limitation
+                    let preamble = Buffer.alloc(4);
+                    preamble.writeUint32BE(chunk.length);
+                    for (let i = 0; i < chunk.length; i += 32 * 1024) {
+                        let sending = chunk.subarray(i, i + 32 * 1024);
+                        if (preamble) {
+                            sending = Buffer.concat([preamble, sending]);
+                            preamble = undefined;
+                        }
+                        dc.send(sending);
+                    }
+
+                    if (typeof windowSize === 'number') {
+                        windowSize -= chunk.length;
+                        if (windowSize <= 0) {
+                            windowUpdate = new Deferred();
+                            this.console.log('waiting for window update');
+                            await Promise.any([windowUpdate.promise, dcStatus.promise]);
+                        }
+                    }
+                    else {
+                        if (dc.bufferedAmount > dc.bufferedAmountLowThreshold) {
+                            this.console.log('waiting for buffered amount low', dc.bufferedAmount);
+                            await Promise.any([dc.bufferedAmountLow.asPromise(), dcStatus.promise]);
+                        }
+                    }
+                }
+            }
+            catch (e) {
+                const dc = await dcDeferred.promise;
+                if (dc.readyState === 'open') {
+                    dc.send(e.toString());
+                }
+            }
+        });
+
+        return new RTCGeneratorDataChannelWrapper(this, dcDeferred.promise, dcStatus.promise);
     }
 
     async close(): Promise<void> {
@@ -851,11 +838,21 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
 }
 
 class RTCGeneratorDataChannelWrapper implements RTCGeneratorDataChannel {
-    constructor(public dc: RTCDataChannel) {
+    constructor(public conn: WebRTCConnectionManagement, public dc: Promise<RTCDataChannel>, public dcStatus: Promise<void>) {
     }
 
     async close() {
-        this.dc.close();
+        this.conn.negotiation.then(async () => {
+            try {
+                const channel = await this.dc;
+                if (channel.readyState === 'closed')
+                    return;
+                channel.close();
+                await this.dcStatus.catch(() => {});
+            }
+            catch (e) {
+            }
+        });
     }
 }
 
