@@ -17,6 +17,9 @@ import { isIPAddress } from "./ip";
 import { domFetch } from "../../../server/src/fetch";
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
 
+export * as rpc from '../../../server/src/rpc';
+export * as rpc_serializer from '../../../server/src/rpc-serializer';
+
 let fetcher: typeof httpFetch | typeof domFetch;
 try {
     if (process.arch === 'browser' as any)
