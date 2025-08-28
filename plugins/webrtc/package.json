@@ -30,6 +30,7 @@
       ]
    },
    "dependencies": {
+      "@scrypted/server": "file:../../server",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "ip": "^2.0.1"

@@ -707,116 +707,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         return ret;
     }
 
-    async createRPCGeneratorDataChannel(label: string, generator: AsyncGenerator<Buffer>, options?: {
-        initialWindowSize?: number,
-    }) {
-
-        generator = await sdk.connectRPCObject(generator);
-
-        let windowSize = options?.initialWindowSize;
-
-
-        let windowUpdate: Deferred<void>;
-        if (typeof windowSize === 'number' && windowSize <= 0) {
-            windowUpdate = new Deferred();
-        }
-
-        const dcDeferred = new Deferred<RTCDataChannel>();
-
-        const dcStatus = new Deferred<void>();
-        waitClosed(this.pc).finally(() => dcStatus.reject(new Error('data channel closed')));
-
-        this.negotiation.then(async () => {
-            const createdDc = this.pc.createDataChannel(label, {
-                ordered: true,
-            });
-            createdDc.onmessage = (event) => {
-                const data = event.data;
-                if (typeof data === 'string') {
-                    try {
-                        const msg = JSON.parse(data);
-                        const u = windowUpdate;
-                        if (typeof msg.windowUpdate === 'number') {
-                            windowSize += msg.windowUpdate;
-                            if (windowSize > 0) {
-                                windowUpdate = undefined;
-                                u?.resolve();
-                            }
-                        }
-                        else if (msg.windowUpdate === null) {
-                            windowSize = undefined;
-                            u?.resolve();
-                        }
-                    }
-                    catch (e) {
-                        this.console.error('Error processing WebRTC datachannel control message.', data);
-                    }
-                }
-            };
-
-            createdDc.onopen = () => dcDeferred.resolve(createdDc);
-            createdDc.onclose = () => {
-                dcStatus.reject(new Error('data channel closed'));
-                dcDeferred.reject(new Error('data channel closed'));
-            };
-            createdDc.onerror = (e) => {
-                dcStatus.reject(e.error);
-                dcDeferred.reject(e.error);
-            };
-
-            await dcDeferred.promise;
-            // await sleep(1000);
-        });
-
-        Promise.resolve().then(async () => {
-            try {
-                await windowUpdate?.promise;
-
-                for await (const chunk of generator) {
-                    if (dcStatus.finished) {
-                        break;
-                    }
-
-                    const dc = await dcDeferred.promise;
-                    if (dc.readyState !== 'open')
-                        break;
-                    // split into 32k segments and send, webrtc or sctp has chunk size limitation
-                    let preamble = Buffer.alloc(4);
-                    preamble.writeUint32BE(chunk.length);
-                    for (let i = 0; i < chunk.length; i += 32 * 1024) {
-                        let sending = chunk.subarray(i, i + 32 * 1024);
-                        if (preamble) {
-                            sending = Buffer.concat([preamble, sending]);
-                            preamble = undefined;
-                        }
-                        dc.send(sending);
-                    }
-
-                    if (typeof windowSize === 'number') {
-                        windowSize -= chunk.length;
-                        if (windowSize <= 0) {
-                            windowUpdate = new Deferred();
-                            this.console.log('waiting for window update');
-                            await Promise.any([windowUpdate.promise, dcStatus.promise]);
-                        }
-                    }
-                    else {
-                        if (dc.bufferedAmount > dc.bufferedAmountLowThreshold) {
-                            this.console.log('waiting for buffered amount low', dc.bufferedAmount);
-                            await Promise.any([dc.bufferedAmountLow.asPromise(), dcStatus.promise]);
-                        }
-                    }
-                }
-            }
-            catch (e) {
-                const dc = await dcDeferred.promise;
-                if (dc.readyState === 'open') {
-                    dc.send(e.toString());
-                }
-            }
-        });
-
-        return new RTCGeneratorDataChannelWrapper(this, dcDeferred.promise, dcStatus.promise);
+    async connectRPCObject(o: any) {
+        // this should never actually be called as the client side should call the getParam version.
+        return sdk.connectRPCObject(o);
     }
 
     async close(): Promise<void> {
@@ -834,25 +727,6 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     async waitConnected() {
         await waitIceConnected(this.pc);
         await waitConnected(this.pc);
-    }
-}
-
-class RTCGeneratorDataChannelWrapper implements RTCGeneratorDataChannel {
-    constructor(public conn: WebRTCConnectionManagement, public dc: Promise<RTCDataChannel>, public dcStatus: Promise<void>) {
-    }
-
-    async close() {
-        this.conn.negotiation.then(async () => {
-            try {
-                const channel = await this.dc;
-                if (channel.readyState === 'closed')
-                    return;
-                channel.close();
-                await this.dcStatus.catch(() => {});
-            }
-            catch (e) {
-            }
-        });
     }
 }
 

@@ -1,7 +1,6 @@
 import { MediaObjectCreateOptions, ScryptedStatic } from "@scrypted/types";
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
-import { Deferred } from "../../../common/src/deferred";
 import { timeoutPromise } from "../../../common/src/promise-utils";
 import type { ClusterObject, ConnectRPCObject } from '../../../server/src/cluster/connect-rpc-object';
 import type { IOSocket } from '../../../server/src/io';
@@ -397,10 +396,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
     const explicitBaseUrl = baseUrl || `${globalThis.location.protocol}//${globalThis.location.host}`;
 
-    // underlying webrtc rpc transport may queue up messages before its ready to be to be handled.
-    // watch for this flush.
-    const flush = new Deferred<void>();
-
     const addresses: string[] = [];
     const localAddressDefault = isNotChromeOrIsInstalledApp;
 
@@ -537,7 +532,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             serializer.setupRpcPeer(rpcPeer);
         }
 
-        setTimeout(() => flush.resolve(undefined), 0);
         const scrypted = await attachPluginRemote(rpcPeer, undefined);
         const {
             serverVersion,

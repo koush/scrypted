@@ -4,14 +4,13 @@ import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { createZygote } from '@scrypted/common/src/zygote';
-import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, ForkWorker, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, ForkWorker, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
+import { RpcPeer } from '@scrypted/server/src/rpc';
 import crypto from 'crypto';
 import ip from 'ip';
-import net from 'net';
 import os from 'os';
-import worker_threads from 'worker_threads';
-import { DataChannelDebouncer } from './datachannel-debouncer';
+import { createDataChannelSerializer } from './datachannel-serializer';
 import { WebRTCConnectionManagement, createRTCPeerConnectionSink, createTrackForwarder } from "./ffmpeg-to-wrtc";
 import { stunServers, turnServers, weriftStunServers, weriftTurnServers } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
@@ -680,6 +679,23 @@ async function createConnection(
     waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
 
     const dc = pc.createDataChannel('rpc');
+
+    const serializer = createDataChannelSerializer(dc);
+    const rpcPeer = new RpcPeer('webrtc-plugin', 'webrtc-client', serializer.sendMessage);
+    serializer.setupRpcPeer(rpcPeer);
+    dc.onmessage = (event) => {
+        if (event.data instanceof Buffer) {
+            serializer.onData(event.data);
+        }
+    };
+
+    // connect webrtc plugin directly to another plugin's object and proxy it over the datachannel.
+    // useful for generators.
+    const connectRPCObject: typeof sdk.connectRPCObject = async (o) => {
+        const ret = await sdk.connectRPCObject(o);
+        return ret;
+    };
+    rpcPeer.params.connectRPCObject = connectRPCObject;
 
     return connection;
 }

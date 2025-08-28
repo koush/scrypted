@@ -2589,9 +2589,7 @@ export interface RTCConnectionManagement {
     videoDirection?: 'sendrecv' | 'sendonly' | 'recvonly',
     audioDirection?: 'sendrecv' | 'sendonly' | 'recvonly',
   }): Promise<RTCOutputMediaObjectTrack>;
-  createRPCGeneratorDataChannel(label: string, generator: AsyncGenerator<Buffer>, options?: {
-    initialWindowSize?: number,
-  }): Promise<RTCGeneratorDataChannel>;
+  connectRPCObject<T>(value: T): Promise<T>;
   close(): Promise<void>;
   probe(): Promise<void>;
 }

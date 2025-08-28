@@ -35,7 +35,7 @@ export function createRpcSerializer(options: {
         rpcPeer.kill('connection closed.');
     }
 
-    const sendMessage = (message: any, reject: (e: Error) => void, serializationContext: any,) => {
+    const sendMessage = (message: any, reject?: (e: Error) => void, serializationContext?: any) => {
         if (!connected) {
             reject?.(new Error('peer disconnected'));
             return;
