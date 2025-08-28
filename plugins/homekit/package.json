@@ -48,7 +48,7 @@
       "@scrypted/sdk": "file:../../sdk",
       "@types/debug": "^4.1.12",
       "@types/lodash": "^4.17.7",
-      "@types/node": "^20.14.11",
+      "@types/node": "^22.18.0",
       "@types/qrcode-svg": "^1.1.5",
       "@types/url-parse": "^1.4.11"
    }
