@@ -332,13 +332,25 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         }).then(r => r.body.trim()));
 
         await this.validate(this.console, 'System Time Accuracy', async () => {
-            const response = await httpFetch({
-                url: 'http://worldtimeapi.org/api/timezone/etc/utc',
-                responseType: 'json',
-                timeout: 5000,
-            });
+            let response: any;
+            let serverTime: number;
             
-            const serverTime = new Date(response.body.utc_datetime).getTime();
+            try {
+                response = await httpFetch({
+                    url: 'http://worldtimeapi.org/api/timezone/etc/utc',
+                    responseType: 'json',
+                    timeout: 5000,
+                });
+                serverTime = new Date(response.body.utc_datetime).getTime();
+            } catch (error) {
+                response = await httpFetch({
+                    url: 'https://timeapi.io/api/Time/current/zone?timeZone=UTC',
+                    responseType: 'json',
+                    timeout: 5000,
+                });
+                serverTime = new Date(response.body.dateTime).getTime();
+            }
+            
             const localTime = Date.now();
             const difference = Math.abs(serverTime - localTime);
             const differenceSeconds = Math.floor(difference / 1000);
