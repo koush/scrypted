@@ -9,6 +9,16 @@ export function createAsyncQueue<T>() {
     const waiting: Deferred<T>[] = [];
     const queued: { item: T, dequeued?: Deferred<void> }[] = [];
 
+    const wait = async (index: number) => {
+        const q = queued[index];
+        if (!q)
+            return;
+        if (!q.dequeued) {
+            q.dequeued = new Deferred<void>();
+        }
+        return q.dequeued.promise;
+    }
+
     const dequeue = async () => {
         if (queued.length) {
             const { item, dequeued: enqueue } = queued.shift()!;
@@ -66,7 +76,7 @@ export function createAsyncQueue<T>() {
             dequeued?.reject(new Error('abort'));
         };
 
-        dequeued?.promise.catch(() => {}).finally(() => signal.removeEventListener('abort', h));
+        dequeued?.promise.catch(() => { }).finally(() => signal.removeEventListener('abort', h));
         signal.addEventListener('abort', h);
 
         return true;
@@ -154,13 +164,14 @@ export function createAsyncQueue<T>() {
         dequeue,
         get queue() {
             return queue();
-        }
+        },
+        wait,
     }
 }
 
 export function createAsyncQueueFromGenerator<T>(generator: AsyncGenerator<T>) {
     const q = createAsyncQueue<T>();
-    (async() => {
+    (async () => {
         try {
             for await (const i of generator) {
                 await q.enqueue(i);

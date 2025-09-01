@@ -367,10 +367,6 @@ export async function createRTCPeerConnectionSource(options: {
     };
 }
 
-interface ReceivedRtpPacket extends RtpPacket {
-    uptime?: number;
-}
-
 export function getRTCMediaStreamOptions(id: string, name: string): ResponseMediaStreamOptions {
     return {
         // set by consumer

@@ -1,21 +1,18 @@
-import { MediaStreamTrack, PeerConfig, RTCDataChannel, RTCPeerConnection, RTCRtpTransceiver, RtpPacket } from "./werift";
-
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCGeneratorDataChannel, RTCInputMediaObjectTrack, RTCOutputMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedInterface, ScryptedMimeTypes } from "@scrypted/sdk";
-import { ScryptedSessionControl } from "./session-control";
-import { optionalVideoCodec, opusAudioCodecOnly, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { logIsLocalIceTransport } from "./werift-util";
-
 import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients, legacyGetSignalingSessionOptions } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps, getSpsPpsVps, MSection } from "@scrypted/common/src/sdp-utils";
+import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCInputMediaObjectTrack, RTCOutputMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedInterface, ScryptedMimeTypes } from "@scrypted/sdk";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
 import { OpusRepacketizer } from "../../homekit/src/types/camera/opus-repacketizer";
 import { H265Repacketizer } from "./h265-packetizer";
 import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { RtpCodecCopy, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
-import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
+import { ScryptedSessionControl } from "./session-control";
+import { getAudioCodec, getFFmpegRtpAudioOutputArguments, optionalVideoCodec, opusAudioCodecOnly, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
+import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RTCRtpTransceiver, RtpPacket } from "./werift";
 import { WeriftSignalingSession } from "./werift-signaling-session";
+import { logIsLocalIceTransport } from "./werift-util";
 
 function getDebugModeH264EncoderArgs() {
     return [

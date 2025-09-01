@@ -4,7 +4,7 @@ import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { createZygote } from '@scrypted/common/src/zygote';
-import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, ForkWorker, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, ForkWorker, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, PluginFork, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { RpcPeer } from '@scrypted/server/src/rpc';
 import crypto from 'crypto';
@@ -27,9 +27,12 @@ defaultPeerConfig.headerExtensions = {
     audio: [],
 };
 
-function delayWorkerExit(worker: ForkWorker) {
+function delayWorkerExit(f: PluginFork<ReturnType<typeof fork>>) {
     setTimeout(() => {
-        worker.terminate();
+        f.result.then(r => r.then(rr => rr.exit())).catch(() => { });
+    }, 1000);
+    setTimeout(() => {
+        f.worker.terminate();
     }, 10000);
 }
 
@@ -175,13 +178,13 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
             const pcc = pcClose();
             pcc.finally(() => {
                 this.webrtcIntercom = undefined;
-                delayWorkerExit(result.worker);
+                delayWorkerExit(result);
             });
 
             return mediaObject;
         }
         catch (e) {
-            delayWorkerExit(result.worker);
+            delayWorkerExit(result);
             throw e;
         }
     }
@@ -375,7 +378,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             );
         }
         catch (e) {
-            delayWorkerExit(result.worker);
+            delayWorkerExit(result);
             throw e;
         }
         await connection.negotiateRTCSignalingSession();
@@ -404,7 +407,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const mediaStreamUrl = rtcSource.mediaObject;
             return await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaStreamUrl, ScryptedMimeTypes.FFmpegInput);
         } catch (e) {
-            delayWorkerExit(result.worker);
+            delayWorkerExit(result);
             throw e;
         }
     }
@@ -424,11 +427,11 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             try {
                 const connection = await timeoutPromise(2 * 60 * 1000, this.convertToRTCConnectionManagement(result, data, fromMimeType, toMimeType, options));
                 // wait a bit to allow ffmpegs to get terminated by the thread.
-                connection.waitClosed().finally(() => delayWorkerExit(result.worker));
+                connection.waitClosed().finally(() => delayWorkerExit(result));
                 return connection;
             }
             catch (e) {
-                delayWorkerExit(result.worker);
+                delayWorkerExit(result);
                 throw e;
             }
         }
@@ -438,7 +441,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                 return await timeoutPromise(2 * 60 * 1000, this.convertToFFmpegInput(result, data, fromMimeType, toMimeType, options));
             }
             catch (e) {
-                delayWorkerExit(result.worker);
+                delayWorkerExit(result);
                 throw e;
             }
         }
@@ -699,8 +702,12 @@ async function createConnection(
 
     return connection;
 }
+
 export async function fork() {
     return {
+        exit() {
+            delayProcessExit();
+        },
         async createRTCPeerConnectionSource(options: {
             __json_copy_serialize_children: true,
             mixinId: string,
@@ -710,13 +717,15 @@ export async function fork() {
             maximumCompatibilityMode: boolean,
         }): Promise<RTCPeerConnectionPipe> {
             try {
-                return await createRTCPeerConnectionSource({
+                const ret = await createRTCPeerConnectionSource({
                     nativeId: this.nativeId,
                     mixinId: options.mixinId,
                     mediaStreamOptions: options.mediaStreamOptions,
                     startRTCSignalingSession: (session) => options.startRTCSignalingSession(session),
                     maximumCompatibilityMode: options.maximumCompatibilityMode,
                 });
+                ret.pcClose().finally(() => delayProcessExit());
+                return ret;
             }
             catch (e) {
                 delayProcessExit();
@@ -736,7 +745,9 @@ export async function fork() {
                 ipv4Ban?: string[];
             }) {
             try {
-                return await createConnection(clientSession, requireOpus, maximumCompatibilityMode, clientOptions, options);
+                const ret = await createConnection(clientSession, requireOpus, maximumCompatibilityMode, clientOptions, options);
+                ret.waitClosed().finally(() => delayProcessExit());
+                return ret;
             }
             catch (e) {
                 delayProcessExit();

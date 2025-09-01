@@ -17,7 +17,7 @@
     "typescript": "^5.5.3"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@types/node": "^20.19.11",
     "monaco-editor": "^0.50.0",
     "ts-node": "^10.9.2"
   }
