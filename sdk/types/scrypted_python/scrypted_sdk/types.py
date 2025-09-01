@@ -862,6 +862,7 @@ class RecordedEventOptions(TypedDict):
 
     count: float
     endTime: float
+    exclude: list[str]
     startTime: float
 
 class RecordingStreamThumbnailOptions(TypedDict):
@@ -1087,7 +1088,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.37"
+TYPES_VERSION = "0.5.38"
 
 
 class AirPurifier:

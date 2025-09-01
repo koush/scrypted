@@ -931,6 +931,7 @@ export interface RecordedEventOptions {
   startTime?: number;
   endTime?: number;
   count?: number;
+  exclude?: string[];
 }
 
 export interface EventRecorder {
