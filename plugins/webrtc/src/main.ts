@@ -4,7 +4,7 @@ import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { legacyGetSignalingSessionOptions } from '@scrypted/common/src/rtc-signaling';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { createZygote } from '@scrypted/common/src/zygote';
-import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, PluginFork, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, Intercom, MediaConverter, MediaObject, MediaObjectOptions, MixinProvider, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSession, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, SettingValue, Settings, VideoCamera, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { RpcPeer } from '@scrypted/server/src/rpc';
 import { createDataChannelSerializer } from '@scrypted/server/src/rpc-serializer';
@@ -27,9 +27,9 @@ defaultPeerConfig.headerExtensions = {
     audio: [],
 };
 
-function delayWorkerExit(f: PluginFork<ReturnType<typeof fork>>) {
+function delayWorkerExit(f: ReturnType<WebRTCPlugin['createTrackedFork']>) {
     setTimeout(() => {
-        f.result.then(r => r.then(rr => rr.exit())).catch(() => { });
+        f.result.then(rr => rr.exit()).catch(() => { });
     }, 1000);
     setTimeout(() => {
         f.worker.terminate();
@@ -272,7 +272,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         },
     });
     activeConnections = 0;
-    zygote = createZygote<ReturnType<typeof fork>>();
+    zygote = createZygote<Awaited<ReturnType<typeof fork>>>();
 
     constructor() {
         super();

@@ -97,16 +97,17 @@ export async function createTrackForwarder(options: {
     if (!mo)
         return;
 
-    let mediaStreamFeedback: MediaStreamFeedback;
+    let hasMediaStreamFeedback = false;
     try {
-        mediaStreamFeedback = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.MediaStreamFeedback);
+        const mediaStreamFeedback = await sdk.connectRPCObject(await sdk.mediaManager.convertMediaObject<MediaStreamFeedback>(mo, ScryptedMimeTypes.MediaStreamFeedback));
+        if (mediaStreamFeedback) {
+            videoTransceiver.sender.onRtcp.subscribe(rtcp => {
+                mediaStreamFeedback.onRtcp(rtcp.serialize());
+            });
+            hasMediaStreamFeedback = true;
+        }
     }
     catch (e) {
-    }
-    if (mediaStreamFeedback) {
-        videoTransceiver.sender.onRtcp.subscribe(rtcp => {
-            mediaStreamFeedback.onRtcp(rtcp.serialize());
-        });
     }
 
     const console = sdk.deviceManager.getMixinConsole(mo.sourceId);
@@ -253,7 +254,7 @@ export async function createTrackForwarder(options: {
         }
     }
 
-    if (mediaStreamFeedback)
+    if (hasMediaStreamFeedback)
         needPacketization = false;
 
     let opusRepacketizer: OpusRepacketizer;
@@ -580,9 +581,10 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         let requestMediaStream: RequestMediaStream;
 
         try {
-            requestMediaStream = await sdk.mediaManager.convertMediaObject(mediaObject, ScryptedMimeTypes.RequestMediaStream);
+            requestMediaStream = await sdk.connectRPCObject(await sdk.mediaManager.convertMediaObject(mediaObject, ScryptedMimeTypes.RequestMediaStream));
         }
         catch (e) {
+            mediaObject = await sdk.connectRPCObject(mediaObject);
             requestMediaStream = async () => mediaObject;
         }
 

@@ -52,7 +52,12 @@ export function createZygote<T>(options?: ForkOptions): Zygote<T> {
     }
 
     const gen = next();
-    return () => gen.next().value as PluginFork<T>;
+    return () => {
+        const ret = gen.next();
+        if (ret.done || !ret.value)
+            throw new Error('Zygote exhausted');
+        return ret.value;
+    };
 }
 
 
