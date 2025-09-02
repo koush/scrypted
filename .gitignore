@@ -2,3 +2,12 @@
 __pycache__
 venv
 .venv
+
+# Plugin development/debugging files
+plugins/*/node_modules/
+plugins/*/out/
+plugins/*/plugin.log
+plugins/*/*.ts.upstream
+plugins/*/extract-stream-url.js
+plugins/*/deploy.sh
+plugins/*/cast.ts

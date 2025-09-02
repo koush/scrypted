@@ -17,6 +17,19 @@
             "localRoot": "${workspaceFolder}/out",
             "remoteRoot": "/plugin/",
             "type": "pwa-node"
+        },
+        {
+            "name": "Attach to Scrypted (No Deploy)",
+            "address": "${config:scrypted.debugHost}",
+            "port": 10081,
+            "request": "attach",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "sourceMaps": true,
+            "localRoot": "${workspaceFolder}/out",
+            "remoteRoot": "/plugin/",
+            "type": "pwa-node"
         }
     ]
 }

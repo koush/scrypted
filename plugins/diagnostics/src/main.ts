@@ -333,16 +333,20 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
         await this.validate(this.console, 'System Time Accuracy', async () => {
             const response = await httpFetch({
-                url: 'https://timeapi.io/api/Time/current/zone?timeZone=UTC',
-                responseType: 'json',
-                timeout: 5000,
+                url: 'https://cloudflare.com',
+                responseType: 'text',
+                timeout: 10000,
             });
+            const dateHeader = response.headers.get('date');            
+            if (!dateHeader) {
+                throw new Error('No date header in response');
+            }
             
-            const serverTime = new Date(response.body.dateTime).getTime();
+            const serverTime = new Date(dateHeader).getTime();
             const localTime = Date.now();
             const difference = Math.abs(serverTime - localTime);
             const differenceSeconds = Math.floor(difference / 1000);
-            
+                        
             if (differenceSeconds > 5) {
                 throw new Error(`Time drift detected: ${differenceSeconds} seconds difference from accurate time source.`);
             }
