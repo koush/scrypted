@@ -747,6 +747,13 @@ export async function fork() {
             try {
                 const ret = await createConnection(clientSession, requireOpus, maximumCompatibilityMode, clientOptions, options);
                 ret.waitClosed().finally(() => delayProcessExit());
+                // let states: typeof ret.pc.iceConnectionState[] = [];
+                // ret.pc.iceConnectionStateChange.subscribe(state => {
+                //     states.push(state);
+                // });
+                // setInterval(() => {
+                //     console.log('Connection is still active', ret.pc.connectionState, ret.pc.iceConnectionState);
+                // }, 10000);
                 return ret;
             }
             catch (e) {

@@ -588,6 +588,15 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             requestMediaStream = async () => mediaObject;
         }
 
+        const wrapped: RequestMediaStream = async options => {
+            if (!requestMediaStream)
+                throw new Error("RequestMediaStream can't be called twice");
+            const rms = requestMediaStream;
+            requestMediaStream = undefined;
+            const mo = rms(options);
+            return sdk.connectRPCObject(mo);
+        }
+
         let intercom = sdk.systemManager.getDeviceById<Intercom>(mediaObject.sourceId);
         if (!intercom.interfaces?.includes(ScryptedInterface.Intercom))
             intercom = undefined;
@@ -609,7 +618,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                 const ret = await createTrackForwarder({
                     timeStart,
                     ...logIsLocalIceTransport(console, this.pc),
-                    requestMediaStream,
+                    requestMediaStream: wrapped,
                     videoTransceiver,
                     audioTransceiver,
                     maximumCompatibilityMode: this.maximumCompatibilityMode,
