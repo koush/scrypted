@@ -31,8 +31,10 @@ fi
 
 if [ -n "$UBUNTU_22_04" ]
 then
+    ubuntu_distro=ubuntu2204
     distro="22.04_amd64"
 else
+    ubuntu_distro=ubuntu2404
     distro="24.04_amd64"
 fi
 
@@ -53,13 +55,7 @@ curl -O -L https://github.com/oneapi-src/level-zero/releases/download/v"$LEVEL_Z
 # https://github.com/intel/linux-npu-driver
 NPU_VERSION=1.23.0
 NPU_VERSION_DATE=20250827-17270089246
-curl -O -L https://github.com/intel/linux-npu-driver/releases/download/v"$NPU_VERSION"/intel-driver-compiler-npu_$NPU_VERSION."$NPU_VERSION_DATE"_ubuntu$distro.deb
-# firmware can only be installed on host. will cause problems inside container.
-if [ -n "$INTEL_FW_NPU" ]
-then
-    curl -O -L https://github.com/intel/linux-npu-driver/releases/download/v"$NPU_VERSION"/intel-fw-npu_$NPU_VERSION."$NPU_VERSION_DATE"_ubuntu$distro.deb
-fi
-curl -O -L https://github.com/intel/linux-npu-driver/releases/download/v"$NPU_VERSION"/intel-level-zero-npu_$NPU_VERSION."$NPU_VERSION_DATE"_ubuntu$distro.deb
+curl -O -L https://github.com/intel/linux-npu-driver/releases/download/v"$NPU_VERSION"/linux-npu-driver-v"$NPU_VERSION"."$NPU_VERSION_DATE"-$ubuntu_distro.tar.gz
 
 apt -y update
 apt -y install libtbb12
@@ -69,6 +65,7 @@ cd /tmp && rm -rf /tmp/npu
 
 apt-get -y dist-upgrade
 
+# firmware can only be installed on host. will cause problems inside container.
 if [ -n "$INTEL_FW_NPU" ]
 then
     echo
