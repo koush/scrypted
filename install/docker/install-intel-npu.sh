@@ -55,7 +55,15 @@ curl -O -L https://github.com/oneapi-src/level-zero/releases/download/v"$LEVEL_Z
 # https://github.com/intel/linux-npu-driver
 NPU_VERSION=1.23.0
 NPU_VERSION_DATE=20250827-17270089246
-curl -O -L https://github.com/intel/linux-npu-driver/releases/download/v"$NPU_VERSION"/linux-npu-driver-v"$NPU_VERSION"."$NPU_VERSION_DATE"-$ubuntu_distro.tar.gz
+NPU_TAR_FILENAME=linux-npu-driver-v"$NPU_VERSION"."$NPU_VERSION_DATE"-$ubuntu_distro.tar.gz
+curl -O -L https://github.com/intel/linux-npu-driver/releases/download/v"$NPU_VERSION"/"$NPU_TAR_FILENAME"
+tar xzvf "$NPU_TAR_FILENAME"
+
+# firmware can only be installed on host. will cause problems inside container.
+if [ ! -z "$INTEL_FW_NPU" ]
+then
+    rm *fw-npu*
+fi
 
 apt -y update
 apt -y install libtbb12
@@ -65,7 +73,6 @@ cd /tmp && rm -rf /tmp/npu
 
 apt-get -y dist-upgrade
 
-# firmware can only be installed on host. will cause problems inside container.
 if [ -n "$INTEL_FW_NPU" ]
 then
     echo
