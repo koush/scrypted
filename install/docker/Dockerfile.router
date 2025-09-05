@@ -9,7 +9,15 @@ RUN rm -f /etc/systemd/system/multi-user.target.wants/dnsmasq.service
 RUN rm -f /etc/systemd/system/sysinit.target.wants/systemd-resolved.service
 
 # go + caddy
-RUN apt -y install golang-go
+RUN GO_VERSION=1.25.1 && ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then GOARCH="amd64"; \
+    elif [ "$ARCH" = "arm64" ]; then GOARCH="arm64"; \
+    elif [ "$ARCH" = "armhf" ]; then GOARCH="armv6l"; \
+    else echo "Unsupported architecture: $ARCH" && exit 1; fi && \
+    curl -LO "https://go.dev/dl/go${GO_VERSION}.linux-${GOARCH}.tar.gz" && \
+    tar -C /usr/local -xzf "go${GO_VERSION}.linux-${GOARCH}.tar.gz" && \
+    rm "go${GO_VERSION}.linux-${GOARCH}.tar.gz"
+ENV PATH=$PATH:/usr/local/go/bin
 RUN apt install -y debian-keyring debian-archive-keyring apt-transport-https
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/caddy/xcaddy/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-xcaddy-archive-keyring.gpg
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/caddy/xcaddy/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-xcaddy.list
