@@ -9,11 +9,17 @@ UBUNTU_24_04=$(lsb_release -r | grep "24.04")
 
 if [ -z "$UBUNTU_22_04" ] && [ -z "$UBUNTU_24_04" ]
 then
-    # proxmox is compatible with ubuntu 22.04, check for  /etc/pve directory
-    if [ -d "/etc/pve" ]
-    then
+    # proxmox is compatible with intel's ubuntu builds, check for /etc/pve directory
+    # then determine debian version
+    version=$(cat /etc/debian_version 2>/dev/null)
+
+    # Determine if it's Debian 12 or 13
+    if [[ "$version" == 12* ]]; then
         UBUNTU_22_04=true
+    elif [[ "$version" == 13* ]]; then
+        UBUNTU_24_04=true
     fi
+
 fi
 
 # needs either ubuntu 22.0.4 or 24.04
