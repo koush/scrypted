@@ -56,8 +56,9 @@ function once(socket: IOClientSocket, event: 'open' | 'message') {
  * The type of connection used by the Scrypted client.
  * http-cloud is through Scrypted Cloud
  * http-direct is a direct connection to the Scrypted server via one of the local network interfaces or public IP addresses.
+ * http is a direct connection with the base url or browser url.
  */
-export type ScryptedClientConnectionType = 'http-cloud' | 'http-direct';
+export type ScryptedClientConnectionType = 'http-cloud' | 'http-direct' | 'http';
 
 export interface ScryptedClientStatic extends ScryptedStatic {
     userId?: string;
@@ -491,7 +492,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         return {
             ready: check,
             address: explicitBaseUrl,
-            connectionType: scryptedCloud ? 'http-cloud' : 'http-direct',
+            connectionType: scryptedCloud ? 'http-cloud' : 'http',
         };
     })());
 
