@@ -388,11 +388,11 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const eioPath = `endpoint/${pluginId}/engine.io/api`;
     const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
     // https://github.com/socketio/engine.io/issues/690
-    const cacehBust = Math.random().toString(36).substring(3, 10);
+    const cacheBust = Math.random().toString(36).substring(3, 10);
     const eioOptions: Partial<SocketOptions> = {
         path: eioEndpoint,
         query: {
-            cacehBust,
+            cacheBust,
         },
         withCredentials: true,
         extraHeaders,
@@ -590,7 +590,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 const clusterPeerOptions = {
                     path: eioEndpoint,
                     query: {
-                        cacehBust,
+                        cacheBust,
                         clusterObject: JSON.stringify(clusterObject),
                     },
                     withCredentials: true,
@@ -601,7 +601,47 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
                 const clusterPeerSocket = new eio.Socket(explicitBaseUrl, clusterPeerOptions);
                 let peerReady = false;
+
+                // Timeout handling for dedicated transports
+                let receiveTimeout: NodeJS.Timeout | undefined;
+                let sendTimeout: NodeJS.Timeout | undefined;
+                let clusterPeer: RpcPeer | undefined;
+
+                const clearTimers = () => {
+                    if (receiveTimeout) {
+                        clearTimeout(receiveTimeout);
+                        receiveTimeout = undefined;
+                    }
+                    if (sendTimeout) {
+                        clearTimeout(sendTimeout);
+                        sendTimeout = undefined;
+                    }
+                };
+
+                const resetReceiveTimeout = connectRPCObjectOptions?.dedicatedTransport?.receiveTimeout ? () => {
+                    if (receiveTimeout) {
+                        clearTimeout(receiveTimeout);
+                    }
+                    receiveTimeout = setTimeout(() => {
+                        if (clusterPeer) {
+                            clusterPeer.kill('receive timeout');
+                        }
+                    }, connectRPCObjectOptions.dedicatedTransport.receiveTimeout);
+                } : undefined;
+
+                const resetSendTimeout = connectRPCObjectOptions?.dedicatedTransport?.sendTimeout ? () => {
+                    if (sendTimeout) {
+                        clearTimeout(sendTimeout);
+                    }
+                    sendTimeout = setTimeout(() => {
+                        if (clusterPeer) {
+                            clusterPeer.kill('send timeout');
+                        }
+                    }, connectRPCObjectOptions.dedicatedTransport.sendTimeout);
+                } : undefined;
+
                 clusterPeerSocket.on('close', () => {
+                    clearTimers();
                     // Only remove from clusterPeers if it's not a dedicated transport
                     if (!connectRPCObjectOptions?.dedicatedTransport) {
                         clusterPeers.delete(clusterObject.port);
@@ -615,24 +655,39 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     await once(clusterPeerSocket, 'open');
 
                     const serializer = createRpcDuplexSerializer({
-                        write: data => clusterPeerSocket.send(data),
+                        write: data => {
+                            resetSendTimeout?.();
+                            clusterPeerSocket.send(data);
+                        },
                     });
-                    clusterPeerSocket.on('message', data => serializer.onData(Buffer.from(data)));
 
-                    const clusterPeer = new RpcPeer(clientName || 'engine.io-client', "cluster-proxy", (message, reject, serializationContext) => {
+                    clusterPeerSocket.on('message', data => {
+                        resetReceiveTimeout?.();
+                        serializer.onData(Buffer.from(data));
+                    });
+
+                    clusterPeer = new RpcPeer(clientName || 'engine.io-client', "cluster-proxy", (message, reject, serializationContext) => {
                         try {
+                            resetSendTimeout?.();
                             serializer.sendMessage(message, reject, serializationContext);
                         }
                         catch (e) {
                             reject?.(e as Error);
                         }
                     });
+                    clusterPeer.killedSafe.finally(() => clusterPeerSocket.close());
                     serializer.setupRpcPeer(clusterPeer);
                     clusterPeer.tags.localPort = sourcePeerId;
                     peerReady = true;
+
+                    // Initialize timeouts if configured
+                    resetReceiveTimeout?.();
+                    resetSendTimeout?.();
+
                     return clusterPeer;
                 }
                 catch (e) {
+                    clearTimers();
                     console.error('failure ipc connect', e);
                     clusterPeerSocket.close();
                     throw e;
