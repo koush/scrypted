@@ -2837,6 +2837,13 @@ export interface ClusterManager {
   getClusterWorkers(): Promise<Record<string, ClusterWorker>>;
 }
 
+export interface ConnectRPCObjectOptions {
+    dedicatedTransport?: {
+      receiveTimeout?: number;
+      sendTimeout?: number;
+    };
+}
+
 export interface ScryptedStatic {
   /**
    * @deprecated
@@ -2871,5 +2878,5 @@ export interface ScryptedStatic {
    * through the Scrypted Server which typically manages plugin communication.
    * This is ideal for sending large amounts of data.
    */
-  connectRPCObject<T>(value: T): Promise<T>;
+  connectRPCObject<T>(value: T, options?: ConnectRPCObjectOptions): Promise<T>;
 }
