@@ -641,7 +641,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 } : undefined;
 
                 clusterPeerSocket.on('close', () => {
-                    clearTimers();
+                    clusterPeer?.kill('socket closed');
                     // Only remove from clusterPeers if it's not a dedicated transport
                     if (!connectRPCObjectOptions?.dedicatedTransport) {
                         clusterPeers.delete(clusterObject.port);
@@ -675,7 +675,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                             reject?.(e as Error);
                         }
                     });
-                    clusterPeer.killedSafe.finally(() => clusterPeerSocket.close());
+                    clusterPeer.killedSafe.finally(() => {
+                        clearTimers();
+                        clusterPeerSocket.close();
+                    });
                     serializer.setupRpcPeer(clusterPeer);
                     clusterPeer.tags.localPort = sourcePeerId;
                     peerReady = true;
