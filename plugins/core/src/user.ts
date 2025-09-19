@@ -111,7 +111,7 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
         const { username, admin } = user;
         const nativeId = `user:${username}`;
         const aclId = await sdk.deviceManager.onDeviceDiscovered({
-            providerNativeId: this.nativeId,
+            providerNativeId: UsersNativeId,
             name: username.toString(),
             nativeId,
             interfaces: [
