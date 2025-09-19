@@ -2,17 +2,17 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/http-auth-fetch';
 import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, Sleep, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
+import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, Resolution, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, Sleep, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import https from 'https';
 import os from 'os';
 import path from 'path';
 import url from 'url';
+import { fixLegacyClipPath } from '../../objectdetector/src/polygon';
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 import { ImageConverter, ImageConverterNativeId } from './image-converter';
 import { ImageReader, ImageReaderNativeId, loadSharp, loadVipsImage } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
-import { fixLegacyClipPath, normalizeBox, polygonIntersectsBoundingBox } from '../../objectdetector/src/polygon';
 
 const { mediaManager, systemManager } = sdk;
 if (os.cpus().find(cpu => cpu.model?.toLowerCase().includes('qemu'))) {
@@ -31,7 +31,7 @@ class PrebufferUnavailableError extends Error {
 
 }
 
-class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
+class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, Resolution {
     storageSettings = new StorageSettings(this, {
         defaultSnapshotChannel: {
             title: 'Default Snapshot Channel',
@@ -390,6 +390,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
                 if (loadSharp()) {
                     const vips = await loadVipsImage(rawPicture.picture, this.id);
+                    if (this.resolution?.[0] !== vips.width || this.resolution?.[1] !== vips.height)
+                        this.resolution = [vips.width, vips.height];
                     try {
                         const ret = await vips.toBuffer({
                             resize: options?.picture,
@@ -458,29 +460,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 vips.close();
             }
         }
-
-        // try {
-        //     const mo = await mediaManager.createMediaObject(picture, 'image/jpeg');
-        //     const image = await mediaManager.convertMediaObject<Image>(mo, ScryptedMimeTypes.Image);
-        //     const left = image.width * xmin;
-        //     const width = image.width * (xmax - xmin);
-        //     const top = image.height * ymin;
-        //     const height = image.height * (ymax - ymin);
-
-        //     return await image.toBuffer({
-        //         crop: {
-        //             left,
-        //             width,
-        //             top,
-        //             height,
-        //         },
-        //         format: 'jpg',
-        //     });
-        // }
-        // catch (e) {
-        //     if (!e.message?.includes('no converter found'))
-        //         throw e;
-        // }
 
         return ffmpegFilterImageBuffer(picture, {
             console: this.debugConsole,
@@ -767,7 +746,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
         if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell) && interfaces.includes(ScryptedInterface.VideoCamera))
-            return [ScryptedInterface.Camera, ScryptedInterface.Settings];
+            return [ScryptedInterface.Camera, ScryptedInterface.Settings, ScryptedInterface.Resolution];
         return undefined;
     }
 

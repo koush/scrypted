@@ -475,6 +475,10 @@ export interface Camera {
   getPictureOptions(): Promise<ResponsePictureOptions[]>;
 }
 
+export interface Resolution {
+  resolution?: number[];
+}
+
 export interface H264Info {
   sei?: boolean;
   stapb?: boolean;
@@ -2386,6 +2390,7 @@ export enum ScryptedInterface {
   Thermometer = "Thermometer",
   HumiditySensor = "HumiditySensor",
   Camera = "Camera",
+  Resolution = "Resolution",
   Microphone = "Microphone",
   AudioVolumeControl = "AudioVolumeControl",
   Display = "Display",

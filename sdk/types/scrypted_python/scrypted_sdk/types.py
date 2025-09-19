@@ -181,6 +181,7 @@ class ScryptedInterface(str, Enum):
     Readme = "Readme"
     Reboot = "Reboot"
     Refresh = "Refresh"
+    Resolution = "Resolution"
     RTCSignalingChannel = "RTCSignalingChannel"
     RTCSignalingClient = "RTCSignalingClient"
     Scene = "Scene"
@@ -1088,7 +1089,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.41"
+TYPES_VERSION = "0.5.43"
 
 
 class AirPurifier:
@@ -1574,6 +1575,10 @@ class Refresh:
     async def refresh(self, refreshInterface: str, userInitiated: bool) -> None:
         pass
 
+
+class Resolution:
+
+    resolution: list[float]
 
 class Scene:
     """Scenes control multiple different devices into a given state."""
@@ -2064,6 +2069,7 @@ class ScryptedInterfaceProperty(str, Enum):
     temperature = "temperature"
     temperatureUnit = "temperatureUnit"
     humidity = "humidity"
+    resolution = "resolution"
     audioVolumes = "audioVolumes"
     recordingActive = "recordingActive"
     ptzCapabilities = "ptzCapabilities"
@@ -2452,6 +2458,14 @@ class DeviceState:
     @humidity.setter
     def humidity(self, value: float):
         self.setScryptedProperty("humidity", value)
+
+    @property
+    def resolution(self) -> list[float]:
+        return self.getScryptedProperty("resolution")
+
+    @resolution.setter
+    def resolution(self, value: list[float]):
+        self.setScryptedProperty("resolution", value)
 
     @property
     def audioVolumes(self) -> AudioVolumes:
@@ -2937,6 +2951,13 @@ ScryptedInterfaceDescriptors = {
       "takePicture"
     ],
     "properties": []
+  },
+  "Resolution": {
+    "name": "Resolution",
+    "methods": [],
+    "properties": [
+      "resolution"
+    ]
   },
   "Microphone": {
     "name": "Microphone",
