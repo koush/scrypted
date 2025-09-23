@@ -592,6 +592,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     query: {
                         cacheBust,
                         clusterObject: JSON.stringify(clusterObject),
+                        ...queryToken,
                     },
                     withCredentials: true,
                     extraHeaders,
