@@ -586,7 +586,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
             const clusterPeerPromise = (async () => {
                 const eioPath = 'engine.io/connectRPCObject';
-                const eioEndpoint = baseUrl ? new URL(eioPath, baseUrl).pathname : '/' + eioPath;
+                const eioEndpoint = address ? new URL(eioPath, address).pathname : '/' + eioPath;
                 const clusterPeerOptions = {
                     path: eioEndpoint,
                     query: {
