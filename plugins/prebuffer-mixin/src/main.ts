@@ -573,8 +573,7 @@ class PrebufferSession {
       if (isDefault
         && this.usingScryptedParser
         && h264Oddities
-        && !this.stopInactive
-        && sessionMso.tool !== 'scrypted') {
+        && !this.stopInactive) {
         this.console.warn('H264 oddities were detected in prebuffered video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
         this.usingScryptedParser = false;
         parser = FFMPEG_PARSER_TCP;
@@ -672,11 +671,6 @@ class PrebufferSession {
           this.console.warn('H264 oddity detected.');
           if (!isDefault) {
             this.console.warn('If there are issues streaming, consider using the Default parser.');
-            return;
-          }
-
-          if (sessionMso.tool === 'scrypted') {
-            this.console.warn('Stream tool is marked safe as "scrypted", ignoring oddity. If there are issues streaming, consider switching to FFmpeg parser.');
             return;
           }
 
