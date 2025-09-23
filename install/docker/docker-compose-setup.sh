@@ -6,4 +6,4 @@ docker run --rm \
   -v "$(pwd):/app" \
   -w /app \
   python:3.12-slim \
-  sh -c "pip install ruamel.yaml && python docker-compose-setup.py"
+  sh -c "pip install -q --root-user-action=ignore ruamel.yaml && python docker-compose-setup.py"
