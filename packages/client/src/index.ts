@@ -586,7 +586,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
             const clusterPeerPromise = (async () => {
                 const eioPath = 'engine.io/connectRPCObject';
-                const eioEndpoint = address ? new URL(eioPath, address).pathname : '/' + eioPath;
+                const eioEndpoint = new URL(eioPath, address).pathname;
                 const clusterPeerOptions = {
                     path: eioEndpoint,
                     query: {
@@ -599,7 +599,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     transports: options?.transports,
                 };
 
-                const clusterPeerSocket = new eio.Socket(explicitBaseUrl, clusterPeerOptions);
+                const clusterPeerSocket = new eio.Socket(address, clusterPeerOptions);
                 let peerReady = false;
 
                 // Timeout handling for dedicated transports
