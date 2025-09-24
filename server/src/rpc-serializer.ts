@@ -50,7 +50,7 @@ export function createRpcSerializer(options: {
         sendMessageFinish(message);
     }
 
-    let pendingSerializationContext: any = {};
+    let pendingSerializationContext: any = undefined;
     const setupRpcPeer = (peer: RpcPeer) => {
         rpcPeer = peer;
         rpcPeer.addSerializer(Buffer, 'Buffer', new SidebandBufferSerializer());
@@ -58,9 +58,8 @@ export function createRpcSerializer(options: {
     }
 
     const onMessageBuffer = (buffer: Buffer) => {
-        pendingSerializationContext = pendingSerializationContext || {
-            buffers: [],
-        };
+        pendingSerializationContext = pendingSerializationContext || {};
+        pendingSerializationContext.buffers ||= [];
         const buffers: Buffer[] = pendingSerializationContext.buffers;
         buffers.push(buffer);
     };
