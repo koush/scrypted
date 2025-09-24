@@ -384,7 +384,7 @@ class PrebufferSession {
           group,
           subgroup,
           title: 'RTSP Parser',
-          description: `The RTSP Parser used to read the stream. The default is "${defaultValue}" for this container.`,
+          description: `The RTSP Parser used to read the stream. The default is "${defaultValue}" for this stream.`,
           value: currentParser,
           choices: [
             STRING_DEFAULT,
@@ -569,16 +569,6 @@ class PrebufferSession {
       this.usingScryptedParser = parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP;
       this.usingScryptedUdpParser = parser === SCRYPTED_PARSER_UDP;
 
-      // prefer ffmpeg if this is a prebuffered stream.
-      if (isDefault
-        && this.usingScryptedParser
-        && h264Oddities
-        && !this.stopInactive) {
-        this.console.warn('H264 oddities were detected in prebuffered video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
-        this.usingScryptedParser = false;
-        parser = FFMPEG_PARSER_TCP;
-      }
-
       if (this.usingScryptedParser) {
         const rtspParser = createRtspParser();
         rbo.parsers.rtsp = rtspParser;
@@ -671,18 +661,6 @@ class PrebufferSession {
           this.console.warn('H264 oddity detected.');
           if (!isDefault) {
             this.console.warn('If there are issues streaming, consider using the Default parser.');
-            return;
-          }
-
-          // don't restart the stream if it is not a prebuffered stream.
-          // allow this specific request to continue, and possibly fail.
-          // the next time the stream is requested, ffmpeg will be used.
-          if (!this.stopInactive) {
-            this.console.warn('Oddity in prebuffered stream. Restarting rebroadcast to use FFmpeg instead.');
-            session.kill(new Error('restarting due to H264 oddity detection'));
-            this.storage.setItem(this.lastH264ProbeKey, JSON.stringify(h264Probe));
-            removeOddityProbe();
-            this.startPrebufferSession();
             return;
           }
 
