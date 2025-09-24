@@ -1,7 +1,7 @@
 {
    "name": "@scrypted/unifi-protect",
    "type": "module",
-   "version": "0.0.164",
+   "version": "0.1.0",
    "description": "Unifi Protect Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -27,6 +27,7 @@
       "name": "Unifi Protect Plugin",
       "type": "DeviceProvider",
       "interfaces": [
+         "DeviceDiscovery",
          "DeviceProvider",
          "Settings"
       ],
@@ -41,8 +42,8 @@
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "axios": "^1.7.9",
+      "axios": "^1.12.2",
       "unifi-protect": "^4.21.0",
-      "ws": "^8.18.2"
+      "ws": "^8.18.3"
    }
 }

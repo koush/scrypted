@@ -1,15 +1,15 @@
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '@scrypted/common/src/provider-plugin';
 import { sleep } from "@scrypted/common/src/sleep";
-import sdk, { Device, DeviceProvider, ObjectDetectionResult, ObjectsDetected, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings } from "@scrypted/sdk";
+import sdk, { AdoptDevice, Device, DeviceDiscovery, DeviceProvider, DiscoveredDevice, ObjectDetectionResult, ObjectsDetected, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
-import axios, {ResponseType} from "axios";
+import axios, { ResponseType } from "axios";
+import https from 'https';
 import { UnifiCamera } from "./camera";
 import { debounceFingerprintDetected, debounceMotionDetected } from "./camera-sensors";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
 import { UnifiSensor } from "./sensor";
 import { ProtectApi, ProtectCameraConfigInterface, ProtectEventAddInterface, ProtectEventPacket } from "./unifi-protect";
-import https from 'https';
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -31,7 +31,7 @@ const filter = [
     'wifiConnectionState',
 ];
 
-export class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvider {
+export class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvider, DeviceDiscovery {
     authorization: string | undefined;
     accessKey: string | undefined;
     cameras = new Map<string, UnifiCamera>()
@@ -45,7 +45,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     constructor(nativeId?: string) {
         super(nativeId);
 
-        this.startup = this.discoverDevices(0)
+        this.startup = this.connectProtect()
 
         this.updateManagementUrl();
     }
@@ -285,11 +285,318 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             this.api?.reset();
             this.console.error('Event Listener reconnecting in 10 seconds:', reason);
             await sleep(10000);
-            this.discoverDevices(0);
+            this.connectProtect();
         }
     }
 
-    async discoverDevices(duration: number) {
+    async discoverDevices(): Promise<DiscoveredDevice[]> {
+        if (!this.api?.bootstrap)
+            return [];
+
+        let settings: Setting[] = undefined;
+        if (this.failedDevices.size) {
+            settings = [
+                {
+                    title: 'Add Device',
+                    key: 'addDevice',
+                    type: 'radiopanel',
+                    choices: [
+                        'Add New Device',
+                        'Reassociate Existing Device'
+                    ],
+                    value: 'Add New Device',
+                },
+                {
+                    radioGroups: ['Reassociate Existing Device'],
+                    key: 'reassociate',
+                    title: 'Device',
+                    description: 'These devices previously failed to load. Select one to reassociate it with a new Unifi Protect device.',
+                    choices: Array.from(this.failedDevices.values()),
+                }
+            ];
+        }
+
+        const nativeIds = new Set(deviceManager.getNativeIds());
+
+        const devices: DiscoveredDevice[] = [];
+        for (const camera of this.api.bootstrap.cameras) {
+            if (!camera.isAdopted || camera.isAdoptedByOther) {
+                continue;
+            }
+
+            const nativeId = this.getNativeId(camera, true);
+            if (nativeId && nativeIds.has(nativeId))
+                continue;
+
+            const managementUrl = `https://${this.storage.getItem('ip')}/protect/timelapse/${camera.id}`;
+
+            const isDoorbell = camera.featureFlags.isDoorbell || camera.featureFlags.hasChime;
+            const d: DiscoveredDevice = {
+                settings,
+                description: camera.host || camera.id,
+                name: camera.name,
+                nativeId: camera.id,
+                info: {
+                    manufacturer: camera.isThirdPartyCamera ? undefined : 'Ubiquiti',
+                    model: camera.type,
+                    firmware: camera.firmwareVersion,
+                    version: camera.hardwareRevision,
+                    ip: camera.host,
+                    serialNumber: camera.id,
+                    mac: camera.mac,
+                    managementUrl,
+                },
+                interfaces: [
+                    ScryptedInterface.Settings,
+                    ScryptedInterface.Camera,
+                    ScryptedInterface.VideoCamera,
+                    ScryptedInterface.VideoCameraMask,
+                    ScryptedInterface.VideoCameraConfiguration,
+                    ScryptedInterface.MotionSensor,
+                ],
+                type: isDoorbell
+                    ? ScryptedDeviceType.Doorbell
+                    : ScryptedDeviceType.Camera,
+            };
+            if (isDoorbell) {
+                d.interfaces.push(ScryptedInterface.BinarySensor);
+            }
+            if (camera.featureFlags.hasSpeaker) {
+                d.interfaces.push(ScryptedInterface.Intercom);
+            }
+            if (camera.featureFlags.hasLcdScreen) {
+                d.interfaces.push(ScryptedInterface.Notifier);
+            }
+            if (camera.featureFlags.hasPackageCamera) {
+                d.interfaces.push(ScryptedInterface.DeviceProvider);
+            }
+            if (camera.featureFlags.hasLedStatus) {
+                d.interfaces.push(ScryptedInterface.OnOff);
+            }
+            if (camera.featureFlags.canOpticalZoom) {
+                d.interfaces.push(ScryptedInterface.PanTiltZoom);
+            }
+            d.interfaces.push(ScryptedInterface.ObjectDetector);
+
+            devices.push(d);
+        }
+
+        for (const sensor of this.api.bootstrap.sensors || []) {
+            if (!sensor.isAdopted || sensor.isAdoptedByOther) {
+                continue;
+            }
+
+            const nativeId = this.getNativeId(sensor, true);
+            if (nativeId && nativeIds.has(nativeId))
+                continue;
+
+            const d: DiscoveredDevice = {
+                settings,
+                description: sensor.host || sensor.id,
+                name: sensor.name,
+                nativeId: sensor.id,
+                info: {
+                    manufacturer: 'Ubiquiti',
+                    model: sensor.type,
+                    ip: sensor.host,
+                    firmware: sensor.firmwareVersion,
+                    version: sensor.hardwareRevision,
+                    serialNumber: sensor.id,
+                },
+                interfaces: [
+                    // todo light sensor
+                    ScryptedInterface.Thermometer,
+                    ScryptedInterface.HumiditySensor,
+                    ScryptedInterface.AudioSensor,
+                    ScryptedInterface.BinarySensor,
+                    ScryptedInterface.MotionSensor,
+                    ScryptedInterface.FloodSensor,
+                ],
+                type: ScryptedDeviceType.Sensor,
+            };
+
+            devices.push(d);
+        }
+
+        for (const light of this.api.bootstrap.lights || []) {
+            if (!light.isAdopted || light.isAdoptedByOther) {
+                continue;
+            }
+
+            const nativeId = this.getNativeId(light, true);
+            if (nativeId && nativeIds.has(nativeId))
+                continue;
+
+
+            const d: DiscoveredDevice = {
+                settings,
+                description: light.host || light.id,
+                name: light.name,
+                nativeId: light.id,
+                info: {
+                    manufacturer: 'Ubiquiti',
+                    model: light.type,
+                    ip: light.host,
+                    firmware: light.firmwareVersion,
+                    version: light.hardwareRevision,
+                    serialNumber: light.id,
+                },
+                interfaces: [
+                    // todo light sensor
+                    ScryptedInterface.OnOff,
+                    ScryptedInterface.Brightness,
+                    ScryptedInterface.MotionSensor,
+                ],
+                type: ScryptedDeviceType.Light,
+            };
+
+            devices.push(d);
+        }
+
+        for (const lock of (this.api.bootstrap.doorlocks as any) || []) {
+            if (!lock.isAdopted || lock.isAdoptedByOther) {
+                continue;
+            }
+
+            const nativeId = this.getNativeId(lock, true);
+            if (nativeId && nativeIds.has(nativeId))
+                continue;
+
+            const d: DiscoveredDevice = {
+                settings,
+                description: lock.host || lock.id,
+                name: lock.name,
+                nativeId: lock.id,
+                info: {
+                    manufacturer: 'Ubiquiti',
+                    model: lock.type,
+                    ip: lock.host,
+                    firmware: lock.firmwareVersion,
+                    version: lock.hardwareRevision.toString(),
+                    serialNumber: lock.id,
+                },
+                interfaces: [
+                    ScryptedInterface.Lock,
+                ],
+                type: ScryptedDeviceType.Lock,
+            };
+
+            devices.push(d);
+        }
+
+        return devices;
+    }
+
+    async adoptDevice(device: AdoptDevice): Promise<string> {
+        const discoveredDevices = await this.discoverDevices();
+        const d = discoveredDevices.find(d => d.nativeId === device.nativeId);
+        if (!d)
+            throw new Error('device not found');
+
+        if (device.settings.addDevice === 'Reassociate Existing Device') {
+            if (!device.settings.reassociate)
+                throw new Error('Select a device to reassociate.');
+
+            const failedNativeId = [...this.failedDevices.entries()].find(([id, name]) => name === device.settings.reassociate)?.[0];
+            if (!failedNativeId)
+                throw new Error('Failed to find device to reassociate.');
+
+            const idToNativeId = this.storageSettings.values.idToNativeId || {};
+            idToNativeId[device.nativeId] = failedNativeId;
+            this.storageSettings.values.idToNativeId = idToNativeId;
+            device.nativeId = failedNativeId;
+        }
+
+        const id = await deviceManager.onDeviceDiscovered({
+            ...d,
+            interfaces: d.interfaces!,
+            providerNativeId: this.nativeId,
+        });
+
+        this.getDevice(device.nativeId).then(device => device?.updateState());
+
+        let camera = this.api.bootstrap.cameras.find(c => c.id === this.findId(d.nativeId));
+        if (camera) {
+            let needUpdate = false;
+            for (const channel of camera.channels) {
+                if (channel.idrInterval !== 4 || !channel.isRtspEnabled) {
+                    if (channel.idrInterval !== 4)
+                        this.console.log('attempting to change invalid idr interval. if this message shows up again on plugin reload, it failed. idr:', channel.idrInterval);
+                    channel.idrInterval = 4;
+                    channel.isRtspEnabled = true;
+                    needUpdate = true;
+                }
+            }
+
+            if (needUpdate) {
+                camera = await this.api.updateDevice(camera, {
+                    channels: camera.channels,
+                });
+                if (!camera) {
+                    this.log.a('Unable to enable RTSP and IDR interval on camera. Is this an admin account?');
+                }
+            }
+
+            const devices: Device[] = [];
+
+            const providerNativeId = this.getNativeId(camera, true);
+
+            if (camera.featureFlags.hasPackageCamera) {
+                const nativeId = providerNativeId + '-packageCamera';
+                const d: Device = {
+                    providerNativeId,
+                    name: camera.name + ' Package Camera',
+                    nativeId,
+                    info: {
+                        manufacturer: 'Ubiquiti',
+                        model: camera.type,
+                        firmware: camera.firmwareVersion,
+                        version: camera.hardwareRevision,
+                        serialNumber: camera.id,
+                    },
+                    interfaces: [
+                        ScryptedInterface.Camera,
+                        ScryptedInterface.VideoCamera,
+                        ScryptedInterface.MotionSensor,
+                    ],
+                    type: ScryptedDeviceType.Camera,
+                };
+                devices.push(d);
+            }
+
+            if (camera.featureFlags.hasFingerprintSensor) {
+                const nativeId = providerNativeId + '-fingerprintSensor';
+                const d: Device = {
+                    providerNativeId,
+                    name: camera.name + ' Fingerprint Sensor',
+                    nativeId,
+                    info: {
+                        manufacturer: 'Ubiquiti',
+                        model: camera.type,
+                        firmware: camera.firmwareVersion,
+                        version: camera.hardwareRevision,
+                        serialNumber: camera.id,
+                    },
+                    interfaces: [
+                        ScryptedInterface.BinarySensor,
+                    ],
+                    type: ScryptedDeviceType.Sensor,
+                };
+                devices.push(d);
+            }
+
+            if (devices.length) {
+                await deviceManager.onDevicesChanged({
+                    providerNativeId: device.nativeId,
+                    devices,
+                });
+            }
+        }
+
+        return id;
+    }
+
+    async connectProtect() {
         this.api?.reset();
         this.reconnecting = false;
         clearTimeout(this.wsTimeout);
@@ -347,243 +654,24 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             this.api.on('message', message => {
                 resetWsTimeout();
                 this.listener(message);
-            })
-
-            const devices: Device[] = [];
-
-            if (!this.api.bootstrap.cameras.length) {
-                this.console.warn('no cameras found. is this an admin account? cancelling sync.');
-                return;
-            }
-
-            for (let camera of this.api.bootstrap.cameras || []) {
-                if (camera.isAdoptedByOther) {
-                    this.console.log('skipping camera that is adopted by another nvr', camera.id, camera.name);
-                    continue;
-                }
-                if (!camera.isAdopted) {
-                    this.console.log('skipping camera that is not adopted', camera.id, camera.name);
-                    continue;
-                }
-
-                let needUpdate = false;
-                for (const channel of camera.channels) {
-                    if (channel.idrInterval !== 4 || !channel.isRtspEnabled) {
-                        if (channel.idrInterval !== 4)
-                            this.console.log('attempting to change invalid idr interval. if this message shows up again on plugin reload, it failed. idr:', channel.idrInterval);
-                        channel.idrInterval = 4;
-                        channel.isRtspEnabled = true;
-                        needUpdate = true;
-                    }
-                }
-
-                if (needUpdate) {
-                    camera = await this.api.updateDevice(camera, {
-                        channels: camera.channels,
-                    });
-                    if (!camera) {
-                        this.log.a('Unable to enable RTSP and IDR interval on camera. Is this an admin account?');
-                        continue;
-                    }
-                }
-
-                const managementUrl = `https://${this.storage.getItem('ip')}/protect/timelapse/${camera.id}`;
-
-                const isDoorbell = camera.featureFlags.isDoorbell || camera.featureFlags.hasChime;
-                const d: Device = {
-                    providerNativeId: this.nativeId,
-                    name: camera.name,
-                    nativeId: this.getNativeId(camera, true),
-                    info: {
-                        manufacturer: 'Ubiquiti',
-                        model: camera.type,
-                        firmware: camera.firmwareVersion,
-                        version: camera.hardwareRevision,
-                        ip: camera.host,
-                        serialNumber: camera.id,
-                        mac: camera.mac,
-                        managementUrl,
-                    },
-                    interfaces: [
-                        ScryptedInterface.Settings,
-                        ScryptedInterface.Camera,
-                        ScryptedInterface.VideoCamera,
-                        ScryptedInterface.VideoCameraMask,
-                        ScryptedInterface.VideoCameraConfiguration,
-                        ScryptedInterface.MotionSensor,
-                    ],
-                    type: isDoorbell
-                        ? ScryptedDeviceType.Doorbell
-                        : ScryptedDeviceType.Camera,
-                };
-                if (isDoorbell) {
-                    d.interfaces.push(ScryptedInterface.BinarySensor);
-                }
-                if (camera.featureFlags.hasSpeaker) {
-                    d.interfaces.push(ScryptedInterface.Intercom);
-                }
-                if (camera.featureFlags.hasLcdScreen) {
-                    d.interfaces.push(ScryptedInterface.Notifier);
-                }
-                if (camera.featureFlags.hasPackageCamera) {
-                    d.interfaces.push(ScryptedInterface.DeviceProvider);
-                }
-                if (camera.featureFlags.hasLedStatus) {
-                    d.interfaces.push(ScryptedInterface.OnOff);
-                }
-                if (camera.featureFlags.canOpticalZoom) {
-                    d.interfaces.push(ScryptedInterface.PanTiltZoom);
-                }
-                d.interfaces.push(ScryptedInterface.ObjectDetector);
-                devices.push(d);
-            }
-
-            for (const sensor of this.api.bootstrap.sensors || []) {
-                const d: Device = {
-                    providerNativeId: this.nativeId,
-                    name: sensor.name,
-                    nativeId: this.getNativeId(sensor, true),
-                    info: {
-                        manufacturer: 'Ubiquiti',
-                        model: sensor.type,
-                        ip: sensor.host,
-                        firmware: sensor.firmwareVersion,
-                        version: sensor.hardwareRevision,
-                        serialNumber: sensor.id,
-                    },
-                    interfaces: [
-                        // todo light sensor
-                        ScryptedInterface.Thermometer,
-                        ScryptedInterface.HumiditySensor,
-                        ScryptedInterface.AudioSensor,
-                        ScryptedInterface.BinarySensor,
-                        ScryptedInterface.MotionSensor,
-                        ScryptedInterface.FloodSensor,
-                    ],
-                    type: ScryptedDeviceType.Sensor,
-                };
-
-                devices.push(d);
-            }
-
-            for (const light of this.api.bootstrap.lights || []) {
-                const d: Device = {
-                    providerNativeId: this.nativeId,
-                    name: light.name,
-                    nativeId: this.getNativeId(light, true),
-                    info: {
-                        manufacturer: 'Ubiquiti',
-                        model: light.type,
-                        ip: light.host,
-                        firmware: light.firmwareVersion,
-                        version: light.hardwareRevision,
-                        serialNumber: light.id,
-                    },
-                    interfaces: [
-                        // todo light sensor
-                        ScryptedInterface.OnOff,
-                        ScryptedInterface.Brightness,
-                        ScryptedInterface.MotionSensor,
-                    ],
-                    type: ScryptedDeviceType.Light,
-                };
-
-                devices.push(d);
-            }
-
-            for (const lock of (this.api.bootstrap.doorlocks as any) || []) {
-                const d: Device = {
-                    providerNativeId: this.nativeId,
-                    name: lock.name,
-                    nativeId: this.getNativeId(lock, true),
-                    info: {
-                        manufacturer: 'Ubiquiti',
-                        model: lock.type,
-                        ip: lock.host,
-                        firmware: lock.firmwareVersion,
-                        version: lock.hardwareRevision.toString(),
-                        serialNumber: lock.id,
-                    },
-                    interfaces: [
-                        ScryptedInterface.Lock,
-                    ],
-                    type: ScryptedDeviceType.Lock,
-                };
-
-                devices.push(d);
-            }
-
-            if (!devices.length) {
-                this.console.warn('no devices found. is this an admin account? cancelling sync.');
-                return;
-            }
-
-            await deviceManager.onDevicesChanged({
-                providerNativeId: this.nativeId,
-                devices,
             });
 
-            for (const device of devices) {
-                this.getDevice(device.nativeId).then(device => device?.updateState());
-            }
+            const nativeIds = new Set(deviceManager.getNativeIds());
 
-            // handle package cameras as a sub device
-            for (const camera of this.api.bootstrap.cameras) {
-                const devices: Device[] = [];
+            // refresh all adopted devices and update state.
+            const adoptedDevices = [
+                ...this.api.bootstrap.cameras || [],
+                ...this.api.bootstrap.sensors || [],
+                ...this.api.bootstrap.lights || [],
+                ...(this.api.bootstrap.doorlocks as any) || [],
+            ]
+                .filter(device => device.isAdopted && !device.isAdoptedByOther);
 
-                const providerNativeId = this.getNativeId(camera, true);
-
-                if (camera.featureFlags.hasPackageCamera) {
-                    const nativeId = providerNativeId + '-packageCamera';
-                    const d: Device = {
-                        providerNativeId,
-                        name: camera.name + ' Package Camera',
-                        nativeId,
-                        info: {
-                            manufacturer: 'Ubiquiti',
-                            model: camera.type,
-                            firmware: camera.firmwareVersion,
-                            version: camera.hardwareRevision,
-                            serialNumber: camera.id,
-                        },
-                        interfaces: [
-                            ScryptedInterface.Camera,
-                            ScryptedInterface.VideoCamera,
-                            ScryptedInterface.MotionSensor,
-                        ],
-                        type: ScryptedDeviceType.Camera,
-                    };
-                    devices.push(d);
+            for (const device of adoptedDevices) {
+                const nativeId = this.getNativeId(device, true);
+                if (nativeId && !nativeIds.has(nativeId)) {
+                    this.adoptDevice(nativeId).catch(() => { });
                 }
-
-                if (camera.featureFlags.hasFingerprintSensor) {
-                    const nativeId = providerNativeId + '-fingerprintSensor';
-                    const d: Device = {
-                        providerNativeId,
-                        name: camera.name + ' Fingerprint Sensor',
-                        nativeId,
-                        info: {
-                            manufacturer: 'Ubiquiti',
-                            model: camera.type,
-                            firmware: camera.firmwareVersion,
-                            version: camera.hardwareRevision,
-                            serialNumber: camera.id,
-                        },
-                        interfaces: [
-                            ScryptedInterface.BinarySensor,
-                        ],
-                        type: ScryptedDeviceType.Sensor,
-                    };
-                    devices.push(d);
-                }
-
-                if (!devices.length)
-                    continue;
-
-                await deviceManager.onDevicesChanged({
-                    providerNativeId: this.getNativeId(camera, true),
-                    devices,
-                });
             }
         }
         catch (e) {
@@ -593,44 +681,63 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     }
 
     async releaseDevice(id: string, nativeId: string): Promise<void> {
+        this.cameras.delete(nativeId);
+        this.unifiSensors.delete(nativeId);
+        this.lights.delete(nativeId);
+        this.locks.delete(nativeId);
     }
+
+    failedDevices = new Map<string, string>();
 
     async getDevice(nativeId: string): Promise<UnifiCamera | UnifiLight | UnifiSensor | UnifiLock> {
         await this.startup;
-        if (this.cameras.has(nativeId))
-            return this.cameras.get(nativeId);
-        if (this.unifiSensors.has(nativeId))
-            return this.unifiSensors.get(nativeId);
-        if (this.lights.has(nativeId))
-            return this.lights.get(nativeId);
-        if (this.locks.has(nativeId))
-            return this.locks.get(nativeId);
+        try {
+            if (this.cameras.has(nativeId))
+                return this.cameras.get(nativeId);
+            if (this.unifiSensors.has(nativeId))
+                return this.unifiSensors.get(nativeId);
+            if (this.lights.has(nativeId))
+                return this.lights.get(nativeId);
+            if (this.locks.has(nativeId))
+                return this.locks.get(nativeId);
 
-        const id = this.findId(nativeId);
-        const camera = this.api.bootstrap.cameras.find(camera => camera.id === id);
-        if (camera) {
-            const ret = new UnifiCamera(this, nativeId, camera);
-            this.cameras.set(nativeId, ret);
-            return ret;
+            const id = this.findId(nativeId);
+            const camera = this.api.bootstrap.cameras.find(camera => camera.id === id);
+            if (camera) {
+                const ret = new UnifiCamera(this, nativeId, camera);
+                this.cameras.set(nativeId, ret);
+                return ret;
+            }
+            const sensor = this.api.bootstrap.sensors.find(sensor => sensor.id === id);
+            if (sensor) {
+                const ret = new UnifiSensor(this, nativeId, sensor);
+                this.unifiSensors.set(nativeId, ret);
+                return ret;
+            }
+            const light = this.api.bootstrap.lights.find(light => light.id === id);
+            if (light) {
+                const ret = new UnifiLight(this, nativeId, light);
+                this.lights.set(nativeId, ret);
+                return ret;
+            }
+            const lock = (this.api.bootstrap.doorlocks as any)?.find(lock => lock.id === id);
+            if (lock) {
+                const ret = new UnifiLock(this, nativeId, lock);
+                this.locks.set(nativeId, ret);
+                return ret;
+            }
         }
-        const sensor = this.api.bootstrap.sensors.find(sensor => sensor.id === id);
-        if (sensor) {
-            const ret = new UnifiSensor(this, nativeId, sensor);
-            this.unifiSensors.set(nativeId, ret);
-            return ret;
+        finally {
+            this.failedDevices.delete(nativeId);
         }
-        const light = this.api.bootstrap.lights.find(light => light.id === id);
-        if (light) {
-            const ret = new UnifiLight(this, nativeId, light);
-            this.lights.set(nativeId, ret);
-            return ret;
-        }
-        const lock = (this.api.bootstrap.doorlocks as any)?.find(lock => lock.id === id);
-        if (lock) {
-            const ret = new UnifiLock(this, nativeId, lock);
-            this.locks.set(nativeId, ret);
-            return ret;
-        }
+
+        const logger = deviceManager.getDeviceLogger(nativeId);
+        logger.a('Device not found in Unifi Protect. This may be caused by Unifi Protect changing the device id. Reassociate the device in the Unifi Protect plugin to continue using it.');
+
+        const d = new ScryptedDeviceBase(nativeId);
+        const uniqueName = `${d.name} (${nativeId})`;
+        this.failedDevices.set(nativeId, uniqueName);
+
         throw new Error('device not found?');
     }
 
@@ -638,25 +745,25 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         return this.storage.getItem(key);
     }
 
-    rediscover() {
-        this.discoverDevices(0);
+    forceReconnect() {
+        this.connectProtect();
         this.updateManagementUrl();
     }
 
     storageSettings = new StorageSettings(this, {
         username: {
             title: 'Username',
-            onPut: () => this.rediscover(),
+            onPut: () => this.forceReconnect(),
         },
         password: {
             title: 'Password',
             type: 'password',
-            onPut: () => this.rediscover(),
+            onPut: () => this.forceReconnect(),
         },
         ip: {
             title: 'Unifi Protect IP',
             placeholder: '192.168.1.100',
-            onPut: () => this.rediscover(),
+            onPut: () => this.forceReconnect(),
         },
         useConnectionHost: {
             title: 'Use Connection Host',
@@ -670,6 +777,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             group: 'Advanced',
             type: 'boolean',
         },
+        idToNativeId: {
+            hide: true,
+            json: true,
+            defaultValue: {},
+        },
         idMaps: {
             hide: true,
             json: true,
@@ -681,11 +793,32 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     });
 
     findId(nativeId: string) {
-        // the native id should be mapped to an id...
-        return this.storageSettings.values.idMaps.nativeId?.[nativeId] || nativeId;
+        // the id and nativeId will be the same unless unifi clobbers the id.
+
+        // new path
+        const found = Object.entries(this.storageSettings.values.idToNativeId || {}).find(([id, nid]) => nid === nativeId);
+        if (found)
+            return found[0];
+
+        // legacy path
+        const id = this.storageSettings.values.idMaps.nativeId?.[nativeId] || nativeId;
+        const existingNativeId = this.storageSettings.values.idToNativeId?.[id];
+        if (!existingNativeId || nativeId === existingNativeId)
+            return id;
+        return undefined;
     }
 
     getNativeId(device: { id?: string, mac?: string; anonymousDeviceId?: string, host?: string }, update: boolean) {
+        if (device.id) {
+            const nativeId = this.storageSettings.values.idToNativeId?.[device.id];
+            if (nativeId)
+                return nativeId;
+            // at some point later this will return the id itself and update the mapping.
+            // return device.id;
+
+            // for now fall back to old behavior which will be removed at a later date.
+        }
+
         const { id, mac, anonymousDeviceId, host } = device;
         const idMaps = this.storageSettings.values.idMaps;
 
@@ -741,6 +874,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         idMaps.nativeId[nativeId] = id;
 
         this.storageSettings.values.idMaps = idMaps;
+
+        // update mappings for new behavior.
+        const idToNativeId = this.storageSettings.values.idToNativeId || {};
+        idToNativeId[id] = nativeId;
+        this.storageSettings.values.idToNativeId = idToNativeId;
         return nativeId;
     }
 
