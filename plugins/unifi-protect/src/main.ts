@@ -511,6 +511,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             idToNativeId[device.nativeId] = failedNativeId;
             this.storageSettings.values.idToNativeId = idToNativeId;
             mappedNativeId = failedNativeId;
+            return this.adoptDeviceInternal(device, true, mappedNativeId);
         }
 
         return this.adoptDeviceInternal(device, false, mappedNativeId);
@@ -835,7 +836,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         const existingNativeId = this.storageSettings.values.idToNativeId?.[id];
         if (!existingNativeId || nativeId === existingNativeId)
             return id;
-        return undefined;
+
+        return nativeId;
     }
 
     getNativeId(device: { id?: string, mac?: string; anonymousDeviceId?: string, host?: string }, update: boolean): string {
