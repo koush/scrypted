@@ -135,10 +135,10 @@ services:
         # Use global DNS servers to avoid issues with some local DNS servers.
         # particularly with npm registry, etc.
         dns:
-            - 1.1.1.1
-            - 8.8.8.8
-            - 2606:4700:4700::1111
-            - 2001:4860:4860::8888
+            - ${SCRYPTED_DNS4_SERVER_0:-1.1.1.1}
+            - ${SCRYPTED_DNS4_SERVER_1:-8.8.8.8}
+            - ${SCRYPTED_DNS6_SERVER_0:-2606:4700:4700::1111}
+            - ${SCRYPTED_DNS6_SERVER_1:-2001:4860:4860::8888}
 
     # watchtower manages updates for Scrypted.
     watchtower:
@@ -164,7 +164,7 @@ services:
         # Use global DNS servers to avoid issues with some local DNS servers.
         # particularly with npm registry, etc.
         dns:
-            - 1.1.1.1
-            - 8.8.8.8
-            - 2606:4700:4700::1111
-            - 2001:4860:4860::8888
+            - ${SCRYPTED_DNS4_SERVER_0:-1.1.1.1}
+            - ${SCRYPTED_DNS4_SERVER_1:-8.8.8.8}
+            - ${SCRYPTED_DNS6_SERVER_0:-2606:4700:4700::1111}
+            - ${SCRYPTED_DNS6_SERVER_1:-2001:4860:4860::8888}
