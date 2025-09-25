@@ -290,6 +290,10 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     }
 
     async discoverDevices(): Promise<DiscoveredDevice[]> {
+        return this.discoverDevicesInternal(false);
+    }
+
+    async discoverDevicesInternal(skipCheck: boolean): Promise<DiscoveredDevice[]> {
         if (!this.api?.bootstrap)
             return [];
 
@@ -318,14 +322,22 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
         const nativeIds = new Set(deviceManager.getNativeIds());
 
+        const checkNativeId = (device: any) => {
+            if (skipCheck)
+                return false;
+            const nativeId = this.getNativeId(device, true);
+            if (nativeId && nativeIds.has(nativeId))
+                return true;
+            return false;
+        }
+
         const devices: DiscoveredDevice[] = [];
         for (const camera of this.api.bootstrap.cameras) {
             if (!camera.isAdopted || camera.isAdoptedByOther) {
                 continue;
             }
 
-            const nativeId = this.getNativeId(camera, true);
-            if (nativeId && nativeIds.has(nativeId))
+            if (checkNativeId(camera))
                 continue;
 
             const managementUrl = `https://${this.storage.getItem('ip')}/protect/timelapse/${camera.id}`;
@@ -386,8 +398,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 continue;
             }
 
-            const nativeId = this.getNativeId(sensor, true);
-            if (nativeId && nativeIds.has(nativeId))
+            if (checkNativeId(sensor))
                 continue;
 
             const d: DiscoveredDevice = {
@@ -423,8 +434,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 continue;
             }
 
-            const nativeId = this.getNativeId(light, true);
-            if (nativeId && nativeIds.has(nativeId))
+            if (checkNativeId(light))
                 continue;
 
 
@@ -458,8 +468,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 continue;
             }
 
-            const nativeId = this.getNativeId(lock, true);
-            if (nativeId && nativeIds.has(nativeId))
+            if (checkNativeId(lock))
                 continue;
 
             const d: DiscoveredDevice = {
@@ -488,12 +497,9 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     }
 
     async adoptDevice(device: AdoptDevice): Promise<string> {
-        const discoveredDevices = await this.discoverDevices();
-        const d = discoveredDevices.find(d => d.nativeId === device.nativeId);
-        if (!d)
-            throw new Error('device not found');
+        let mappedNativeId = device.nativeId;
 
-        if (device.settings.addDevice === 'Reassociate Existing Device') {
+        if (device.settings?.addDevice === 'Reassociate Existing Device') {
             if (!device.settings.reassociate)
                 throw new Error('Select a device to reassociate.');
 
@@ -504,18 +510,28 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             const idToNativeId = this.storageSettings.values.idToNativeId || {};
             idToNativeId[device.nativeId] = failedNativeId;
             this.storageSettings.values.idToNativeId = idToNativeId;
-            device.nativeId = failedNativeId;
+            mappedNativeId = failedNativeId;
         }
+
+        return this.adoptDeviceInternal(device, false, mappedNativeId);
+    }
+
+    async adoptDeviceInternal(device: { nativeId: string, settings?: any }, skipCheck: boolean, mappedNativeId = device.nativeId): Promise<string> {
+        const discoveredDevices = await this.discoverDevicesInternal(skipCheck);
+        const d = discoveredDevices.find(d => d.nativeId === device.nativeId);
+        if (!d)
+            throw new Error('device not found');
 
         const id = await deviceManager.onDeviceDiscovered({
             ...d,
+            nativeId: mappedNativeId,
             interfaces: d.interfaces!,
             providerNativeId: this.nativeId,
         });
 
-        this.getDevice(device.nativeId).then(device => device?.updateState());
+        this.getDevice(mappedNativeId).then(device => device?.updateState());
 
-        let camera = this.api.bootstrap.cameras.find(c => c.id === this.findId(d.nativeId));
+        let camera = this.api.bootstrap.cameras.find(c => c.id === d.nativeId);
         if (camera) {
             let needUpdate = false;
             for (const channel of camera.channels) {
@@ -529,11 +545,14 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             }
 
             if (needUpdate) {
-                camera = await this.api.updateDevice(camera, {
+                const updated = await this.api.updateDevice(camera, {
                     channels: camera.channels,
                 });
                 if (!camera) {
                     this.log.a('Unable to enable RTSP and IDR interval on camera. Is this an admin account?');
+                }
+                else {
+                    camera = updated;
                 }
             }
 
@@ -587,7 +606,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
             if (devices.length) {
                 await deviceManager.onDevicesChanged({
-                    providerNativeId: device.nativeId,
+                    providerNativeId: mappedNativeId,
                     devices,
                 });
             }
@@ -667,10 +686,21 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             ]
                 .filter(device => device.isAdopted && !device.isAdoptedByOther);
 
+            if (adoptedDevices.length) {
+                // clean up the idToNativeId mapping
+                const idToNativeId = this.storageSettings.values.idToNativeId || {};
+                for (const k of Object.keys(idToNativeId)) {
+                    if (!adoptedDevices.find(d => d.id === k)) {
+                        delete idToNativeId[k];
+                    }
+                }
+                this.storageSettings.values.idToNativeId = idToNativeId;
+            }
+
             for (const device of adoptedDevices) {
                 const nativeId = this.getNativeId(device, true);
-                if (nativeId && !nativeIds.has(nativeId)) {
-                    this.adoptDevice(nativeId).catch(() => { });
+                if (nativeId && nativeIds.has(nativeId)) {
+                    this.adoptDeviceInternal({ nativeId: device.id }, true, nativeId).catch(() => { });
                 }
             }
         }
@@ -808,7 +838,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         return undefined;
     }
 
-    getNativeId(device: { id?: string, mac?: string; anonymousDeviceId?: string, host?: string }, update: boolean) {
+    getNativeId(device: { id?: string, mac?: string; anonymousDeviceId?: string, host?: string }, update: boolean): string {
         if (device.id) {
             const nativeId = this.storageSettings.values.idToNativeId?.[device.id];
             if (nativeId)
