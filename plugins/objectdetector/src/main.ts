@@ -56,10 +56,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     zones: {
       title: 'Zones',
       type: 'string',
-      description: 'Enter the name of a new zone or delete an existing zone.',
+      description: 'Add a new zone by name to create a configurable detection area.',
       multiple: true,
       combobox: true,
       choices: [],
+      immediate: true,
     },
     motionSensorSupplementation: {
       title: 'Built-In Motion Sensor',
