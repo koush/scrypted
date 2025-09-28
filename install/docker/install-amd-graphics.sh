@@ -33,7 +33,7 @@ fi
 set -e
 mkdir -p /tmp/amd
 cd /tmp/amd
-curl -O -L http://repo.radeon.com/amdgpu-install/latest/ubuntu/$distro/$FILENAME
+curl -O -L https://repo.radeon.com/amdgpu-install/latest/ubuntu/$distro/$FILENAME
 apt -y update
 apt -y install rsync
 dpkg -i $FILENAME
