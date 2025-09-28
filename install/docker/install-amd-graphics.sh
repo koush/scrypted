@@ -21,6 +21,12 @@ else
     distro="noble"
 fi
 
+apt -y update
+apt -y install rsync gpg
+# the deb no longer seems to install a key?
+gpg --keyserver keyserver.ubuntu.com --recv-keys 9386B48A1A693C5C
+gpg --export --armor 9386B48A1A693C5C | tee /etc/apt/trusted.gpg.d/amdgpu.asc
+
 # https://amdgpu-install.readthedocs.io/en/latest/install-prereq.html#installing-the-installer-package
 
 # AMD keeps breaking these links. Use hard links.
@@ -39,12 +45,7 @@ cd /tmp/amd
 
 FILENAME=amdgpu-install_7.0.1.70001-1_all.deb
 curl -O -L https://repo.radeon.com/amdgpu-install/7.0.1/ubuntu/$distro/$FILENAME
-# the deb no longer seems to install a key?
-gpg --keyserver keyserver.ubuntu.com --recv-keys 9386B48A1A693C5C
-gpg --export --armor 9386B48A1A693C5C | tee /etc/apt/trusted.gpg.d/amdgpu.asc
 
-apt -y update
-apt -y install rsync gpg
 dpkg -i $FILENAME
 apt -y update
 
