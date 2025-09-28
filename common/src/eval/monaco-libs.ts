@@ -2,6 +2,7 @@ import type * as monacoEditor from 'monaco-editor';
 
 export interface StandardLibs {
     '@types/node/globals.d.ts': string,
+    '@types/node/module.d.ts': string,
     '@types/node/buffer.d.ts': string,
     '@types/node/process.d.ts': string,
     '@types/node/events.d.ts': string,

@@ -116,6 +116,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
 export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
     const standardlibs: StandardLibs = {
         "@types/node/globals.d.ts": readFileAsString('@types/node/globals.d.ts'),
+        "@types/node/module.d.ts": readFileAsString('@types/node/module.d.ts'),
         "@types/node/buffer.d.ts": readFileAsString('@types/node/buffer.d.ts'),
         "@types/node/process.d.ts": readFileAsString('@types/node/process.d.ts'),
         "@types/node/events.d.ts": readFileAsString('@types/node/events.d.ts'),
