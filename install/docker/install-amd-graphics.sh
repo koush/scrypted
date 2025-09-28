@@ -32,9 +32,9 @@ fi
 #     exit 1
 # fi
 
-# set -e
-# mkdir -p /tmp/amd
-# cd /tmp/amd
+set -e
+mkdir -p /tmp/amd
+cd /tmp/amd
 # curl -O -L https://repo.radeon.com/amdgpu-install/latest/ubuntu/$distro/$FILENAME
 
 FILENAME=amdgpu-install_7.0.1.70001-1_all.deb
