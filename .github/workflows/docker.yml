@@ -22,6 +22,7 @@ jobs:
         BASE: [
           ["noble-nvidia", ".s6", "noble-nvidia", "nvidia"],
           ["noble-intel", ".s6", "noble-intel", "intel"],
+          ["noble-amd", ".s6", "noble-amd", "amd"],
           ["noble-full", ".s6", "noble-full", "full"],
           ["noble-lite", "", "noble-lite", "lite"],
           ["noble-lite", ".router", "noble-router", "router"],
