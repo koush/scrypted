@@ -4,7 +4,7 @@
   "description": "",
   "dependencies": {
     "@scrypted/ffmpeg-static": "^6.1.0-build3",
-    "@scrypted/node-pty": "^1.0.24",
+    "@scrypted/node-pty": "^1.0.25",
     "@scrypted/types": "^0.5.43",
     "adm-zip": "^0.5.16",
     "body-parser": "^2.2.0",
