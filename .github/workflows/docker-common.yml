@@ -84,7 +84,7 @@ jobs:
     strategy:
       matrix:
         BASE: ["noble"]
-        VENDOR: ["nvidia", "intel"]
+        VENDOR: ["nvidia", "intel", "amd"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3

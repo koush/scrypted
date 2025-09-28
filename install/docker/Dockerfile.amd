@@ -1,0 +1,7 @@
+ARG BASE="ghcr.io/koush/scrypted-common:20-jammy-full"
+FROM $BASE
+
+ENV SCRYPTED_DOCKER_FLAVOR="amd"
+
+# amd opencl
+RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-amd-graphics.sh | bash
