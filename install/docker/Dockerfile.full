@@ -92,7 +92,7 @@ RUN python3.9 -m pip install debugpy
 # Coral Edge TPU
 # https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
 RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+RUN curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/coral-edgetpu.gpg
 RUN apt-get -y update && apt-get -y install libedgetpu1-std
 
 # set default shell to bash
