@@ -32,11 +32,11 @@ export function syncResponse(device: ScryptedDevice, type: string): homegraph_v1
             defaultNames: [],
             nicknames: [],
         },
-        otherDeviceIds: [
+        otherDeviceIds: (device.type !== ScryptedDeviceType.Camera && device.type !== ScryptedDeviceType.Doorbell) ? [
             {
                 deviceId: device.id,
             }
-        ],
+        ] : undefined,
         attributes: {},
         traits: [],
         type,

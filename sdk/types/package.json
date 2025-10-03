@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/types",
-  "version": "0.5.43",
+  "version": "0.5.44",
   "description": "",
   "main": "dist/index.js",
   "author": "",
@@ -11,6 +11,6 @@
   },
   "types": "dist/index.d.ts",
   "dependencies": {
-    "openai": "^5.3.0"
+    "openai": "^6.1.0"
   }
 }
