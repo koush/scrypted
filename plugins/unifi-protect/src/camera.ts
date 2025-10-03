@@ -170,7 +170,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const ffmpegInput = JSON.parse(buffer.toString()) as FFmpegInput;
 
         const camera = this.findCamera();
-        const endpoint = new URL(this.protect.api.getApiEndpoint("talkback"));
+        const endpoint = new URL(this.protect.api.getApiEndpoint("websocket") + "/talkback");
         endpoint.searchParams.set('camera', camera.id);
         const response = await this.protect.loginFetch(endpoint.toString());
         const tb = response.data as Record<string, string>;
