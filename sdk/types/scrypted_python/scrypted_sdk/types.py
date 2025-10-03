@@ -449,12 +449,6 @@ class VideoStreamOptions(TypedDict):
     quality: float
     width: float
 
-class ChatCompletionTool(TypedDict):
-    """A function tool that can be used to generate a response."""
-
-    pass
-
-
 class ContentBlock(TypedDict):
 
     pass
@@ -565,6 +559,12 @@ class ChatCompletionCreateParamsNonStreaming(TypedDict):
     user: str
     verbosity: Any | Any | Any  # Constrains the verbosity of the model's response. Lower values will result in more concise responses, while higher values will result in more verbose responses. Currently supported values are  ,  , and  .
     web_search_options: WebSearchOptions  # This tool searches the web for relevant results to use in a response. Learn more about the [web search tool](https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat).
+
+class ChatCompletionFunctionTool(TypedDict):
+    """A function tool that can be used to generate a response."""
+
+    function: FunctionDefinition
+    type: Any  # The type of the tool. Currently, only   is supported.
 
 class ClusterForkInterfaceOptions(TypedDict):
 
@@ -1093,7 +1093,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.44"
+TYPES_VERSION = "0.5.45"
 
 
 class AirPurifier:
