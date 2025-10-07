@@ -4,7 +4,7 @@ import asyncio
 from typing import Any
 
 import numpy as np
-import openvino.runtime as ov
+import openvino as ov
 from PIL import Image
 
 from ov import async_infer

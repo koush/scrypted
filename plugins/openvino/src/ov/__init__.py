@@ -8,7 +8,7 @@ import traceback
 from typing import Any, Tuple
 
 import numpy as np
-import openvino.runtime as ov
+import openvino as ov
 import scrypted_sdk
 from PIL import Image
 from scrypted_sdk.other import SettingValue
@@ -38,6 +38,7 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(
 availableModels = [
     "Default",
     "scrypted_yolov9c_relu_int8_320",
+    "scrypted_yolov9m_relu_int8_320",
     "scrypted_yolov9s_relu_int8_320",
     "scrypted_yolov9t_relu_int8_320",
     "scrypted_yolov9c_int8_320",

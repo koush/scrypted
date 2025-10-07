@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 
 import numpy as np
-import openvino.runtime as ov
+import openvino as ov
 
 from ov import async_infer
 from predict.text_recognize import TextRecognition
