@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/diagnostics",
-   "version": "0.0.20",
+   "version": "0.0.21",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -32,6 +32,6 @@
       "sharp": "^0.33.5"
    },
    "devDependencies": {
-      "@types/node": "^22.5.4"
+      "@types/node": "^22.18.8"
    }
 }

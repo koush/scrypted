@@ -332,14 +332,17 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         }).then(r => r.body.trim()));
 
         await this.validate(this.console, 'System Time Accuracy', async () => {
-            const response = await httpFetch({
-                url: 'http://worldtimeapi.org/api/timezone/etc/utc',
-                responseType: 'json',
-                timeout: 5000,
+const response = await httpFetch({
+                url: 'https://cloudflare.com',
+                responseType: 'text',
+                timeout: 10000,
             });
-            
-            const serverTime = new Date(response.body.utc_datetime).getTime();
-            const localTime = Date.now();
+            const dateHeader = response.headers.get('date');            
+            if (!dateHeader) {
+                throw new Error('No date header in response');
+            }
+
+            const serverTime = new Date(dateHeader).getTime();            const localTime = Date.now();
             const difference = Math.abs(serverTime - localTime);
             const differenceSeconds = Math.floor(difference / 1000);
             
@@ -354,6 +357,30 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             responseType: 'text',
             timeout: 5000,
         }).then(r => r.body.trim()));
+
+        await this.validate(this.console, 'Scrypted Cloud Services', async () => {
+            const endpoints = [
+                'https://home.scrypted.app',
+                'https://billing.scrypted.app'
+            ];
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await httpFetch({
+                        url: endpoint,
+                        timeout: 5000,
+                    });
+                    
+                    if (response.statusCode >= 400) {
+                        throw new Error(`${endpoint} returned status ${response.statusCode}`);
+                    }
+                } catch (error) {
+                    throw new Error(`${endpoint} is not accessible: ${(error as Error).message}`);
+                }
+            }
+            
+            return 'Both endpoints accessible';
+        });
 
         await this.validate(this.console, 'Scrypted Server Address', async () => {
             const addresses = await sdk.endpointManager.getLocalAddresses();
