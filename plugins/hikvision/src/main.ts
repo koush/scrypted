@@ -707,6 +707,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
 
             if (isIsapiTwoWayChannelEnabled === 'true') {
                 await this.closeIsapiTwoWayAudioChannel(this.isapiTwoWayAudioChannelId);
+                this.console.log('closed ISAPI TwoWayAudioChannel');
             }
         } catch (e) {
             this.console.error('Failure to check ISAPI TwoWayAudioChannels')
@@ -819,17 +820,17 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             return this.onvifIntercom.stopIntercom();
         }
 
+
         this.closeIsapiTwoWayAudioChannel(this.isapiTwoWayAudioChannelId);
+        this.console.log('closed ISAPI TwoWayAudioChannel');
     }
 
     async closeIsapiTwoWayAudioChannel(isapiChannel: string): Promise<void> {
-        const closeChannel = await this.getClient().request({
+        await this.getClient().request({
             url: `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${isapiChannel}/close`,
             method: 'PUT',
             responseType: 'text',
         });
-
-        this.console.log('closing ISAPI TwoWayAudioChannel: ', closeChannel);
     }
 }
 
