@@ -7,6 +7,8 @@ import * as Auth from 'http-auth-client';
 export interface AuthRequestOptions extends Http.RequestOptions {
     sessionAuth?: Auth.Basic | Auth.Digest | Auth.Bearer;
     responseType: HttpFetchResponseType;
+    // Internal: number of digest retries performed for this request
+    digestRetry?: number;
 }
 
 export type  AuthRequestBody = string | Buffer | Readable;
@@ -15,11 +17,13 @@ export class AuthRequst {
 
     private username: string;
     private password: string;
+    private console: Console;
     private auth: Auth.Basic | Auth.Digest | Auth.Bearer;
 
     constructor(username:string, password: string, console: Console) {
         this.username = username;
         this.password = password;
+        this.console = console;
     }
 
     async request(url: string, options: AuthRequestOptions, body?: AuthRequestBody) {
@@ -42,18 +46,29 @@ export class AuthRequst {
 
                 if (resp.statusCode == 401) {
 
-                    if (opt.sessionAuth) {
+                    // Hikvision quirk: even if we already had a sessionAuth, a fresh
+                    // WWW-Authenticate challenge may require rebuilding credentials.
+                    // Limit the number of digest rebuilds to avoid infinite loops.
+                    const attempt = (opt.digestRetry ?? 0);
+                    if (attempt >= 2) {
+                        // Give up after a couple of rebuild attempts and surface the 401 response
                         resolve(await this.parseResponse (opt.responseType, resp));
                         return;
                     }
 
-                    opt.sessionAuth = this.createAuth(resp.headers['www-authenticate'], !!this.auth);
+                    const newAuth = this.createAuth(resp.headers['www-authenticate'], !!this.auth);
+                    // Clear cached auth to avoid stale nonce reuse
                     this.auth = undefined;
+                    opt.sessionAuth = newAuth;
+                    opt.digestRetry = attempt + 1;
                     const result = await this.request(url, opt, body);
                     resolve(result);
                 }
                 else {
+                    // Cache the negotiated session auth only if it was provided for this request.
+                    if (opt.sessionAuth) {
                     this.auth = opt.sessionAuth;
+                    }
                     resolve(await this.parseResponse(opt.responseType, resp));
                 }
             });
@@ -73,7 +88,6 @@ export class AuthRequst {
                 req.end();
             }
             else {
-
                 this.readableBody(req, body).pipe(req);
                 req.flushHeaders();
             }

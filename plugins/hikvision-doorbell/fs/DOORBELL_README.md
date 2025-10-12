@@ -1,26 +1,45 @@
 # Hikvision Doorbell
 
-At the moment, plugin was tested with the **DS-KV6113PE1[C]** model `doorbell` with firmware version: **V2.2.65 build 231213**, in the following modes:
+**⚠️ Important: Version 2.x Breaking Changes**
+
+Version 2 of this plugin is **not compatible** with version 1.x. Before installing or upgrading to version 2:
+- **Option 1**: Completely remove the old plugin from Scrypted
+- **Option 2**: Delete all devices that belong to the old plugin
+
+After removing the old version, you will need to reconfigure all doorbell devices from scratch.
+
+## Introduction
+
+At the moment, plugin was tested with the **DS-KV6113-PE1(C)** model `doorbell` with firmware version: **V3.7.0 build 250818**, in the following modes:
 
 - the `doorbell` is connected to the `Hik-Connect` service;
-- the `doorbell` is connected to a local SIP proxy (asterisk);
 - the `doorbell` is connected to a fake SIP proxy, which this plugin runs.
 
 ## Settings
 
 ### Support door lock opening
 
-Most of these doorbells have the ability to control an electromechanical lock. To implement the lock controller software interface in Scrypted, you need to create a separate device with the `Lock` type. Such a device is created automatically if you enable the **Expose Door Lock Controller** checkbox.
+The doorbell can control electromechanical locks connected to it. To enable lock control in Scrypted, go to the doorbell device settings, navigate to **Advanced Settings**, and select **Locks** in the **Provided devices** option.
 
-The lock controller is linked to this device (doorbell). Therefore, when the doorbell is deleted, the associated lock controller will also be deleted.
+This will create dependent lock device(s) with the `Lock` type. The plugin automatically detects how many doors the doorbell supports (typically 1, but some models support multiple doors). If multiple doors are supported, each lock device will be named with its door number (e.g., "Door Lock 1", "Door Lock 2"). 
+
+Lock devices are automatically removed when the parent doorbell device is deleted.
+
+### Support contact sensors
+
+Door open/close status monitoring is available through contact sensors. To enable this functionality in Scrypted, go to the doorbell device settings, navigate to **Advanced Settings**, and select **Contact Sensors** in the **Provided devices** option.
+
+This will create dependent contact sensor device(s) with the `BinarySensor` type. The plugin automatically detects how many doors the doorbell supports (typically 1, but some models support multiple doors). If multiple doors are supported, each contact sensor will be named with its door number (e.g., "Contact Sensor 1", "Contact Sensor 2").
+
+Contact sensor devices are automatically removed when the parent doorbell device is deleted.
 
 ### Support tamper alert
 
-Most of a doorbells have a tamper alert. To implement the tamper alert software interface in Scrypted, you need to create a separate device with the `Switch` type. Such a device is created automatically if you enable the **Expose Tamper Alert Controller** checkbox. If you leave this checkbox disabled, the tamper signal will be interpreted as a `Motion Detection` event.
+For security, the doorbell includes a built-in tamper detection sensor. To enable tamper alert monitoring in Scrypted, go to the doorbell device settings, navigate to **Advanced Settings**, and select **Tamper Alert** in the **Provided devices** option. If you don't enable this option, tamper alert signals will be interpreted as `Motion Detection` events.
 
-If the tamper on the doorbell is triggered, the controller (`Switch`) will **turn on**. You can **turn off** the switch manually in the Scrypted web interface only.
+This will create a dependent tamper alert device with the `BinarySensor` type. When the doorbell's tamper sensor is triggered, the device will turn **on**. You can manually turn it **off** in the Scrypted web interface. 
 
-The tamper alert controller is linked to this device (doorbell). Therefore, when the doorbell is deleted, the associated tamper alert controller will also be deleted.
+The tamper alert device is automatically removed when the parent doorbell device is deleted.
 
 ### Setting up a receiving call (the ability to ringing)
 
@@ -44,10 +63,17 @@ This mode should be used when you have a separate SIP gateway and all your inter
 
 #### Emulate SIP Proxy
 
-This mode should be used when you have a `doorbell` but no **Indoor Station**, and you want to connect this `doorbell` to Scrypted server only.
+This mode should be used when you have a `doorbell` but no **Indoor Station**, and you want to connect the `doorbell` directly to the Scrypted server.
 
-In this mode, the plugin creates a fake SIP proxy that listens for a connection on the specified port (or auto-select a port if not specified). The task of this server is to receive a notification about a call and, in the event of an intercom start (two way audio), simulate picking up the handset so that the `doorbell` switches to conversation mode (stops ringing).
+In this mode, the plugin creates a fake SIP proxy that listens for connections on the specified port (or auto-selects a port if left blank). This server receives call notifications and, when intercom starts (two-way audio), simulates picking up the handset so the `doorbell` switches to conversation mode (stops ringing).
 
-On the additional tab, configure the desired port, and you can also enable the **Autoinstall Fake SIP Proxy** checkbox, for not to configure `doorbell` manually.
+**Important**: When you enable this mode, the plugin **automatically configures the doorbell** with the necessary SIP settings. You don't need to configure the doorbell manually.
 
-In the `doorbell` settings you can configure the connection to the fake SIP proxy manually. You should specify the IP address of the Scrypted server and the port of the fake proxy. The contents of the other fields do not matter, since the SIP proxy authorizes the “*client*” using the known doorbell’s IP address.
+On the additional settings tab, you can configure:
+- **Port**: The listening port for the fake SIP proxy (leave blank for automatic selection)
+- **Room Number**: Virtual room number (1-9999) that represents this fake SIP proxy
+- **SIP Proxy Phone Number**: Phone number representing the fake SIP proxy (default: 10102)
+- **Doorbell Phone Number**: Phone number representing the doorbell (default: 10101)
+- **Button Number**: Call button number for doorbells with multiple buttons (1-99, default: 1)
+
+The plugin automatically applies these settings to the doorbell device via ISAPI. If the doorbell is temporarily unreachable, the plugin will retry the configuration automatically.

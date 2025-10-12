@@ -5,7 +5,8 @@
         "resolveJsonModule": true,
         "moduleResolution": "Node16",
         "esModuleInterop": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "skipLibCheck": true
     },
     "include": [
         "src/**/*"
