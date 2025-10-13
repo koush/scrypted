@@ -8,6 +8,14 @@ Most commonly this plugin is used with 2 plugins: Rebroadcast and HomeKit.
 Device must have built-in motion detection (most Hikvision doorbells have this).
 If the doorbell do not have motion detection, you will have to use a separate plugin or device to achieve this (e.g., `opencv`, `pam-diff`, or `dummy-switch`) and group it to the doorbell.
 
+## ⚠️ Important: Version 2.x Breaking Changes
+
+Version 2 of this plugin is **not compatible** with version 1.x. Before installing or upgrading to version 2:
+- **Option 1**: Completely remove the old plugin from Scrypted
+- **Option 2**: Delete all devices that belong to the old plugin
+
+After removing the old version, you will need to reconfigure all doorbell devices from scratch.
+
 ## Two Way Audio
 
 Two Way Audio is supported if the audio codec is set to G.711ulaw on the doorbell, which is usually the default audio codec. This audio codec will also work with HomeKit. Changing the audio codec from G.711ulaw will cause Two Way Audio to fail on the doorbells that were tested.
