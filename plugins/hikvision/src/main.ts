@@ -37,7 +37,11 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
     supplementLight: HikvisionSupplementalLight;
     alarm: HikvisionAlarmSwitch;
     ptzPresets: string[];
-    isapiTwoWayAudioChannelId: string;
+    isapiTwoWayAudioChannelInfo?: {
+        id: string;
+        enabled: string;
+        audioCompressionType: string;
+    };
 
     client: HikvisionAPI;
 
@@ -688,9 +692,14 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             delete this.alarm;
     }
 
-    async startIntercom(media: MediaObject): Promise<void> {
-        let isapiTwoWayAudioChannel: any;
-        let isIsapiTwoWayChannelEnabled: string;
+    async getTwoWayAudioChannelInfo(): Promise<{
+        id: string;
+        enabled: string;
+        audioCompressionType: string;
+    }> {
+        if (this.isapiTwoWayAudioChannelInfo) {
+            return this.isapiTwoWayAudioChannelInfo;
+        }
 
         try {
             const parameters = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels`;
@@ -699,18 +708,33 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 responseType: 'text',
             });
 
-            const parsedXml = await xml2js.parseStringPromise(twoWayChannelResponse.body, {explicitArray: false, mergeAttrs: true});
+            const parsedXml = await xml2js.parseStringPromise(twoWayChannelResponse.body, {
+                explicitArray: false,
+                mergeAttrs: true,
+            });
             this.console.log('ISAPI two way audio channels info:\n', parsedXml.TwoWayAudioChannelList.TwoWayAudioChannel);
-            isapiTwoWayAudioChannel = parsedXml.TwoWayAudioChannelList.TwoWayAudioChannel;
-            this.isapiTwoWayAudioChannelId = isapiTwoWayAudioChannel?.id || '1';
-            isIsapiTwoWayChannelEnabled = isapiTwoWayAudioChannel?.enabled || 'true';
 
-            if (isIsapiTwoWayChannelEnabled === 'true') {
-                await this.closeIsapiTwoWayAudioChannel(this.isapiTwoWayAudioChannelId);
-                this.console.log('closed ISAPI TwoWayAudioChannel');
-            }
+            const isapiTwoWayAudioChannel = parsedXml.TwoWayAudioChannelList.TwoWayAudioChannel;
+            this.isapiTwoWayAudioChannelInfo = {
+                id: isapiTwoWayAudioChannel?.id || '1',
+                enabled: isapiTwoWayAudioChannel?.enabled || 'true',
+                audioCompressionType: isapiTwoWayAudioChannel?.audioCompressionType,
+            };
+
+            return this.isapiTwoWayAudioChannelInfo;
         } catch (e) {
-            this.console.error('Failure to check ISAPI TwoWayAudioChannels')
+            this.console.error('Failure to check ISAPI TwoWayAudioChannels');
+        }
+    }
+
+    async startIntercom(media: MediaObject): Promise<void> {
+        let codec: string;
+        const isapiTwoWayAudioChannelInfo = await this.getTwoWayAudioChannelInfo();
+        codec = isapiTwoWayAudioChannelInfo.audioCompressionType;
+
+        if (isapiTwoWayAudioChannelInfo.enabled === 'true') {
+            await this.closeIsapiTwoWayAudioChannel(isapiTwoWayAudioChannelInfo.id);
+            this.console.log('closed ISAPI TwoWayAudioChannel');
         }
 
         if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
@@ -721,10 +745,8 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             this.onvifIntercom.url = stream.url;
             return this.onvifIntercom.startIntercom(media);
         }
-        let codec: string;
-        let format: string;
 
-        codec = isapiTwoWayAudioChannel?.audioCompressionType;
+        let format: string;
 
         if (codec === 'G.711ulaw') {
             codec = 'pcm_mulaw';
@@ -749,7 +771,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         const ffmpegInput = JSON.parse(buffer.toString()) as FFmpegInput;
 
         const passthrough = new PassThrough();
-        const open = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.isapiTwoWayAudioChannelId}/open`;
+        const open = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${isapiTwoWayAudioChannelInfo.id}/open`;
         const { body } = await this.getClient().request({
             url: open,
             responseType: 'text',
@@ -757,7 +779,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         });
         this.console.log('two way audio opened', body);
 
-        const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.isapiTwoWayAudioChannelId}/audioData`;
+        const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${isapiTwoWayAudioChannelInfo.id}/audioData`;
         this.console.log('posting audio data to', url);
 
         const put = this.getClient().request({
@@ -820,8 +842,8 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             return this.onvifIntercom.stopIntercom();
         }
 
-
-        this.closeIsapiTwoWayAudioChannel(this.isapiTwoWayAudioChannelId);
+        const channelInfo = await this.getTwoWayAudioChannelInfo();
+        await this.closeIsapiTwoWayAudioChannel(channelInfo.id);
         this.console.log('closed ISAPI TwoWayAudioChannel');
     }
 
