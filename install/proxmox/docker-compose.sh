@@ -7,9 +7,24 @@ export DEBIAN_FRONTEND=noninteractive
 yes | dpkg --configure -a
 apt -y --fix-broken install && apt -y update && apt -y dist-upgrade
 
+function cleanup() {
+    IS_UP=$(docker compose ps scrypted -a | grep Up)
+    # Only clean up when scrypted is running to safely free space without risking its image deletion
+    if [ -z "$IS_UP" ]; then
+        echo "scrypted is not running, skipping cleanup to preserve its image"
+        return
+    fi
+    echo $(date) > .last_cleanup
+    echo "scrypted is running, proceeding with cleanup to free space"
+    docker container prune -f
+    docker image prune -a -f
+}
+
 # force a pull to ensure we have the latest images.
 # not using --pull always cause that fails everything on network down
 docker compose pull
+
+(sleep 60 && cleanup) &
 
 # do not daemonize, when it exits, systemd will restart it.
 # force a recreate as .env may have changed.
