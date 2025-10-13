@@ -986,7 +986,7 @@ export interface VideoClips {
  */
 export interface Intercom {
   startIntercom(media: MediaObject): Promise<void>;
-  stopIntercom(): Promise<void>;
+  stopIntercom(channel?: string): Promise<void>;
 }
 
 export interface PrivacyMask {

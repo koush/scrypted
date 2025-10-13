@@ -1338,7 +1338,7 @@ class Intercom:
     async def startIntercom(self, media: MediaObject) -> None:
         pass
 
-    async def stopIntercom(self) -> None:
+    async def stopIntercom(self, channel: str = None) -> None:
         pass
 
 
