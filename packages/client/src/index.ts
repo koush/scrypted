@@ -587,12 +587,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             const clusterPeerPromise = (async () => {
                 const eioPath = 'engine.io/connectRPCObject';
                 const eioEndpoint = new URL(eioPath, address).pathname;
+                const eioQueryToken = connectionType === 'http' ? undefined : queryToken;
                 const clusterPeerOptions = {
                     path: eioEndpoint,
                     query: {
                         cacheBust,
                         clusterObject: JSON.stringify(clusterObject),
-                        ...queryToken,
+                        ...eioQueryToken,
                     },
                     withCredentials: true,
                     extraHeaders,
