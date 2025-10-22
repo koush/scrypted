@@ -16,6 +16,10 @@ Version 2 of this plugin is **not compatible** with version 1.x. Before installi
 
 After removing the old version, you will need to reconfigure all doorbell devices from scratch.
 
+### Firmware Requirements
+
+This version **requires firmware v3.7 or higher**. Older firmware versions are not supported.
+
 ## Two Way Audio
 
 Two Way Audio is supported if the audio codec is set to G.711ulaw on the doorbell, which is usually the default audio codec. This audio codec will also work with HomeKit. Changing the audio codec from G.711ulaw will cause Two Way Audio to fail on the doorbells that were tested.
