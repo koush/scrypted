@@ -1,4 +1,4 @@
-import { MediaObjectCreateOptions, ScryptedStatic, ConnectRPCObjectOptions } from "@scrypted/types";
+import { ConnectRPCObjectOptions, MediaObjectCreateOptions, ScryptedStatic } from "@scrypted/types";
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
 import { timeoutPromise } from "../../../common/src/promise-utils";
@@ -115,19 +115,51 @@ export async function logoutScryptedClient(baseUrl?: string) {
     return response.body;
 }
 
-export function getCurrentBaseUrl() {
-    // an endpoint within scrypted will be served at /endpoint/[org/][id]
-    // find the endpoint prefix and anything prior to that will be the server base url.
-    const url = new URL(window.location.href);
-    url.search = '';
-    url.hash = '';
-    let endpointPath = window.location.pathname;
-    const parts = endpointPath.split('/');
-    const index = parts.findIndex(p => p === 'endpoint');
-    if (index === -1) {
-        // console.warn('path not recognized, does not contain the segment "endpoint".')
-        return undefined;
+function getBaseUrl(href: string) {
+    try {
+        // an endpoint within scrypted will be served at /endpoint/[org/][id]
+        // find the endpoint prefix and anything prior to that will be the server base url.
+        const url = new URL(href);
+        url.search = '';
+        url.hash = '';
+        let endpointPath = url.pathname;
+        const parts = endpointPath.split('/');
+        const index = parts.findIndex(p => p === 'endpoint');
+        if (index === -1) {
+            // console.warn('path not recognized, does not contain the segment "endpoint".')
+            return;
+        }
+        return { url, parts, index };
     }
+    catch (e) {
+    }
+}
+
+function importMetaUrlWithoutAssetsPath() {
+    // @ts-ignore
+    const url = new URL(import.meta.url);
+    const parts = url.pathname.split('/');
+    parts.pop();
+    parts.pop();
+    parts.push('public')
+    parts.push('');
+    url.pathname = parts.join('/');
+    return url.toString();
+}
+
+export function getCurrentBaseUrlRaw() {
+    const url = getBaseUrl(window.location.href)
+        || getBaseUrl(document.baseURI)
+        || getBaseUrl(importMetaUrlWithoutAssetsPath());
+    return url;
+}
+
+export function getCurrentBaseUrl() {
+    const s = getCurrentBaseUrlRaw();
+    if (!s) {
+        return;
+    }
+    const { url, parts, index } = s;
     const keep = parts.slice(0, index);
     keep.push('');
     url.pathname = keep.join('/');
