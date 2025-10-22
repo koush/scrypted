@@ -89,7 +89,6 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
     endpoint: string;
     auth: AuthRequst;
 
-    private eventServer?: Server;
     private listener?: Destroyable;
     private requestQueue: Promise<any> = Promise.resolve();
     private alertStream?: Readable;
@@ -130,7 +129,6 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
     destroy(): void 
     {
         this.listener?.destroy();
-        this.eventServer?.close();
         this.stopAlertStream();
     }
 
@@ -1157,6 +1155,8 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
         if (eventType === 'videoloss') {
             // Track alert stream tick time
             this.alertTick = Date.now();
+            // Emit 'data' to reset activityTimeout in RtspSmartCamera.listenLoop()
+            this.emitEvent ('data', eventData);
             return;
         }
 
