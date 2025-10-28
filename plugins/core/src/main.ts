@@ -64,7 +64,10 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                 'Default',
                 'latest',
                 'beta',
-                `v${sdk.serverVersion}-jammy-full`,
+                'intel',
+                'amd',
+                'nvidia',
+                `v${sdk.serverVersion}-noble-full`,
             ],
             combobox: true,
             onPut: (ov, nv) => {
