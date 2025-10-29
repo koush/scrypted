@@ -6,6 +6,7 @@ import virtual from '@rollup/plugin-virtual';
 import { defineConfig } from 'rollup';
 import fs from 'fs';
 import path from 'path';
+import terser from '@rollup/plugin-terser';
 
 // replace createRequire to force rollup.
 function replaceCreateRequire() {
@@ -31,6 +32,7 @@ const cwd = process.cwd();
 const packageJson = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json').toString()));
 const external = Object.keys(packageJson.optionalDependencies || {});
 const tsconfig = JSON.parse(fs.readFileSync(path.join(cwd, 'tsconfig.json').toString()));
+const isProduction = process.env.NODE_ENV === 'production';
 
 external.push(
     '@scrypted/node-pty',
@@ -75,9 +77,10 @@ const config = defineConfig(
             exports: "named",
             strict: false,
             sourcemap: true,
+            sourcemapExcludeSources: true,
             preserveModules: false,
 
-            inlineDynamicImports:true,
+            inlineDynamicImports: true,
             file: `${process.env.NODE_ENV === 'production' ? 'dist' : 'out'}/${entry.output}`,
             // dir: `${process.env.NODE_ENV === 'production' ? 'dist' : 'out'}`,
 
@@ -120,6 +123,17 @@ const config = defineConfig(
                 preferBuiltins: true,
             }),
             json(),
+            isProduction &&
+            terser({
+                compress: {
+                    typeofs: false,
+                },
+                // mangle: {
+                //     properties: {
+                //         regex: /^[\$_]/
+                //     }
+                // },
+            })
         ]
     })),
 );

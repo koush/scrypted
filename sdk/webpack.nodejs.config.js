@@ -143,7 +143,12 @@ module.exports = {
                     terserOptions: {
                         compress: {
                             typeofs: false,
-                        }
+                        },
+                        // mangle: {
+                        //     properties: {
+                        //         regex: /^[\$_]/
+                        //     }
+                        // },
                     }
                 },
             ),
