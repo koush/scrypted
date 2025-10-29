@@ -72,6 +72,7 @@ const config = defineConfig(
     entries.map(entry => ({
         input: `${entry.filename.slice(0, -3)}.nodejs.ts`,
         output: {
+            exports: "named",
             strict: false,
             sourcemap: true,
             preserveModules: false,
