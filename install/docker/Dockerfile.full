@@ -66,14 +66,11 @@ FROM header AS base
 # vulkan
 RUN apt -y install libvulkan1
 
-# intel opencl for openvino
+# intel GPU
 RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-graphics.sh | bash
 
-# NPU driver will SIGILL on openvino prior to 2024.5.0
+# intel NPU
 RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-npu.sh | bash
-
-# amd opencl
-RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-amd-graphics.sh | bash
 
 # python 3.9 from ppa.
 # 3.9 is the version with prebuilt support for tensorflow lite

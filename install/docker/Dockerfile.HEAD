@@ -1,4 +1,4 @@
-ARG BASE="16-jammy"
+ARG BASE="noble-full"
 FROM ghcr.io/koush/scrypted-common:${BASE}
 
 WORKDIR /
@@ -8,4 +8,4 @@ WORKDIR /scrypted/server
 RUN npm install
 RUN npm run build
 
-CMD npm run serve-no-build
+CMD ["npm", "run", "serve-no-build"]

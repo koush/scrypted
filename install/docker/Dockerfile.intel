@@ -1,4 +1,4 @@
-ARG BASE="ghcr.io/koush/scrypted-common:20-jammy-full"
+ARG BASE="ghcr.io/koush/scrypted-common:noble-intel"
 FROM $BASE
 
 ENV SCRYPTED_DOCKER_FLAVOR="intel"

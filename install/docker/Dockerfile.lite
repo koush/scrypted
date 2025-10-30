@@ -1,4 +1,4 @@
-ARG BASE="jammy"
+ARG BASE="noble-lite"
 FROM ubuntu:${BASE} AS header
 
 ENV SCRYPTED_DOCKER_FLAVOR="lite"
