@@ -151,6 +151,14 @@ export function getCurrentBaseUrlRaw() {
     const url = getBaseUrl(window.location.href)
         || getBaseUrl(document.baseURI)
         || getBaseUrl(importMetaUrlWithoutAssetsPath());
+
+    if (!url) {
+        try {
+            return getBaseUrl(process.env.SCRYPTED_ENDPOINT_PATH);
+        }
+        catch (e) {
+        }
+    }
     return url;
 }
 
