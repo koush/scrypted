@@ -1,0 +1,11 @@
+ARG BASE="ghcr.io/koush/scrypted-common:20-jammy-full"
+FROM $BASE
+
+ENV SCRYPTED_DOCKER_FLAVOR="nvidia"
+
+ENV NVIDIA_DRIVER_CAPABILITIES=all
+ENV NVIDIA_VISIBLE_DEVICES=all
+
+# nvidia cudnn/libcublas etc.
+# for some reason this is not provided by the nvidia container toolkit
+RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-nvidia-graphics-legacy.sh | bash
