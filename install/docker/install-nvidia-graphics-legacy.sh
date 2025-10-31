@@ -23,7 +23,7 @@ then
         && wget -qO /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/$distro/$(uname -m)/cuda-keyring_1.1-1_all.deb \
         && dpkg -i /cuda-keyring.deb \
         && apt update -q \
-        && apt install -y cuda-nvcc-12-6 libcublas-12-6 libcudnn9-cuda-12 cuda-libraries-12-6;
+        && apt install -y cuda-nvcc-12-6 libcublas-12-6 libcudnn9-cuda-12=9.10.0.56-1 cuda-libraries-12-6;
 
     if [ "$?" != "0" ]
     then
