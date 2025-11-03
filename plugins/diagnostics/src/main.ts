@@ -1,3 +1,4 @@
+import dns from 'dns';
 import { Deferred } from '@scrypted/common/src/deferred';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import sdk, { Camera, FFmpegInput, Image, MediaObject, MediaStreamDestination, MotionSensor, Notifier, ObjectDetection, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
@@ -332,20 +333,20 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         }).then(r => r.body.trim()));
 
         await this.validate(this.console, 'System Time Accuracy', async () => {
-const response = await httpFetch({
+            const response = await httpFetch({
                 url: 'https://cloudflare.com',
                 responseType: 'text',
                 timeout: 10000,
             });
-            const dateHeader = response.headers.get('date');            
+            const dateHeader = response.headers.get('date');
             if (!dateHeader) {
                 throw new Error('No date header in response');
             }
 
-            const serverTime = new Date(dateHeader).getTime();            const localTime = Date.now();
+            const serverTime = new Date(dateHeader).getTime(); const localTime = Date.now();
             const difference = Math.abs(serverTime - localTime);
             const differenceSeconds = Math.floor(difference / 1000);
-            
+
             if (differenceSeconds > 5) {
                 throw new Error(`Time drift detected: ${differenceSeconds} seconds difference from accurate time source.`);
             }
@@ -363,14 +364,14 @@ const response = await httpFetch({
                 'https://home.scrypted.app',
                 'https://billing.scrypted.app'
             ];
-            
+
             for (const endpoint of endpoints) {
                 try {
                     const response = await httpFetch({
                         url: endpoint,
                         timeout: 5000,
                     });
-                    
+
                     if (response.statusCode >= 400) {
                         throw new Error(`${endpoint} returned status ${response.statusCode}`);
                     }
@@ -378,7 +379,7 @@ const response = await httpFetch({
                     throw new Error(`${endpoint} is not accessible: ${(error as Error).message}`);
                 }
             }
-            
+
             return 'Both endpoints accessible';
         });
 
@@ -455,6 +456,41 @@ const response = await httpFetch({
             if (Buffer.compare(logo.body, shortLogoCheck.body))
                 throw new Error('Invalid response received from short lived URL.');
         });
+
+        if (cloudPlugin) {
+            await this.validate(this.console, 'Cloud IPv4 Address', async () => {
+                const externalAddress = await sdk.endpointManager.getCloudEndpoint();
+                if (!externalAddress)
+                    throw new Error('Scrypted Cloud endpoint not found.');
+                const url = new URL(externalAddress);
+                const { hostname } = url;
+                if (net.isIP(hostname))
+                    return;
+                const addresses = await dns.promises.lookup(hostname, { all: true });
+                const hasIPv4 = addresses.find(address => address.family === 4);
+                if (!hasIPv4)
+                    this.warnStep(this.console, 'No IPv4 address found for Scrypted Cloud endpoint.');
+                else
+                    return hasIPv4.address;
+            });
+
+            await this.validate(this.console, 'Cloud IPv6 Address', async () => {
+                const externalAddress = await sdk.endpointManager.getCloudEndpoint();
+                if (!externalAddress)
+                    throw new Error('Scrypted Cloud endpoint not found.');
+
+                const url = new URL(externalAddress);
+                const { hostname } = url;
+                if (net.isIP(hostname))
+                    return;
+                const addresses = await dns.promises.lookup(hostname, { all: true });
+                const hasIPv6 = addresses.find(address => address.family === 6);
+                if (!hasIPv6)
+                    this.warnStep(this.console, 'No IPv6 address found for Scrypted Cloud endpoint.');
+                else
+                    return hasIPv6.address;
+            });
+        }
 
         if ((hasCUDA || process.platform === 'win32') && onnxPlugin) {
             await this.validate(this.console, 'ONNX Plugin', async () => {
