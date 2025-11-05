@@ -94,6 +94,9 @@ else
     # never restart, systemd will handle it
     sed -i 's/restart: unless-stopped/restart: no/g' $DOCKER_COMPOSE_YML
 
+    # uncomment disabled profiles line
+    sed -i 's/# profiles: \["disabled"\]/profiles: ["disabled"]/g' $DOCKER_COMPOSE_YML
+
     sudo systemctl stop apparmor || true
     sudo apt -y purge apparmor || true
 fi
