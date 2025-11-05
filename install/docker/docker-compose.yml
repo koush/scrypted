@@ -165,4 +165,4 @@ services:
             - ${SCRYPTED_DNS_SERVER_0:-1.1.1.1}
             - ${SCRYPTED_DNS_SERVER_1:-8.8.8.8}
         # LXC usage only
-        # profiles: ["disabled"]
+        # lxc profiles: ["disabled"]
