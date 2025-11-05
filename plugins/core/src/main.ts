@@ -345,7 +345,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
         const dockerCompose = yaml.parseDocument(readFileAsString('/root/.scrypted/docker-compose.yml'));
         // @ts-ignore
         dockerCompose.contents.get('services').get('scrypted').set('image', `ghcr.io/koush/scrypted${releaseChannel}`);
-        yaml.stringify(dockerCompose);
         writeFileSync('/root/.scrypted/docker-compose.yml', yaml.stringify(dockerCompose));
         this.setPullImage();
 

@@ -36,4 +36,5 @@ docker compose pull
 WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum | head -c 32) docker compose up --force-recreate
 
 # abort on container exit is problematic if watchtower is the one that aborts.
+# this is also redundant now that watchtower is disabled.
 # WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum | head -c 32) docker compose up --force-recreate --abort-on-container-exit

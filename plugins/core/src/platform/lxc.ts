@@ -1,5 +1,7 @@
-import fs from 'fs';
+import fs, { writeFileSync } from 'fs';
 import sdk from '@scrypted/sdk';
+import yaml from 'yaml';
+import { readFileAsString } from '@scrypted/common/src/eval/scrypted-eval';
 
 export const SCRYPTED_INSTALL_ENVIRONMENT_LXC = 'lxc';
 export const SCRYPTED_INSTALL_ENVIRONMENT_LXC_DOCKER = 'lxc-docker';
@@ -18,6 +20,25 @@ export async function checkLxc() {
     if (process.env.SCRYPTED_INSTALL_ENVIRONMENT !== SCRYPTED_INSTALL_ENVIRONMENT_LXC_DOCKER)
         return;
 
+    await checkLxcCompose();
+    await checkLxcScript();
+}
+
+async function checkLxcCompose() {
+    // the lxc-docker used watchtower for automatic updates but watchtower started crashing in the lxc environment
+    // after a docker update.
+    // watchtower was removed from the lxc as a result.
+    // however existing installations may still have watchtower in their docker-compose.yml and need it removed.
+    const dockerCompose = yaml.parseDocument(readFileAsString('/root/.scrypted/docker-compose.yml'));
+    // @ts-ignore
+    const watchtower = dockerCompose.contents.get('services').get('watchtower');
+    if (watchtower.get('profiles'))
+        return;
+    watchtower.set('profiles', ['disabled']);
+    writeFileSync('/root/.scrypted/docker-compose.yml', yaml.stringify(dockerCompose));
+}
+
+async function checkLxcScript() {
     const foundDockerComposeSh = await fs.promises.readFile(DOCKER_COMPOSE_SH_PATH, 'utf8');
     const dockerComposeSh = await fs.promises.readFile(LXC_DOCKER_COMPOSE_SH_PATH, 'utf8');
 
