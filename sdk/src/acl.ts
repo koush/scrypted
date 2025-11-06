@@ -2,8 +2,8 @@ import { access } from "fs";
 import { ScryptedInterfaceDescriptors, ScryptedInterface, ScryptedDeviceAccessControl, ScryptedUserAccessControl } from ".";
 
 export function addAccessControlsForInterface(id: string, ...scryptedInterfaces: ScryptedInterface[]): ScryptedDeviceAccessControl {
-    const methods = scryptedInterfaces.map(scryptedInterface => ScryptedInterfaceDescriptors[scryptedInterface].methods).flat();
-    const properties = scryptedInterfaces.map(scryptedInterface => ScryptedInterfaceDescriptors[scryptedInterface].properties).flat();
+    const methods = scryptedInterfaces.map(scryptedInterface => ScryptedInterfaceDescriptors[scryptedInterface]?.methods || []).flat();
+    const properties = scryptedInterfaces.map(scryptedInterface => ScryptedInterfaceDescriptors[scryptedInterface]?.properties || []).flat();
     const interfaces = scryptedInterfaces;
     return {
         id,
