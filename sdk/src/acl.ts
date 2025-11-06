@@ -1,5 +1,4 @@
-import { access } from "fs";
-import { ScryptedInterfaceDescriptors, ScryptedInterface, ScryptedDeviceAccessControl, ScryptedUserAccessControl } from ".";
+import { ScryptedDeviceAccessControl, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedUserAccessControl } from ".";
 
 export function addAccessControlsForInterface(id: string, ...scryptedInterfaces: ScryptedInterface[]): ScryptedDeviceAccessControl {
     const methods = scryptedInterfaces.map(scryptedInterface => ScryptedInterfaceDescriptors[scryptedInterface]?.methods || []).flat();
