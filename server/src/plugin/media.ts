@@ -208,20 +208,25 @@ export abstract class MediaManagerBase implements MediaManager {
             .map(([id]) => {
                 const device = this.getDeviceById<MediaConverter & BufferConverter>(id);
 
-                return (device.converters || []).map(([fromMimeType, toMimeType], index) => {
-                    return {
-                        id: `${id}-${index}`,
-                        name: device.name,
-                        fromMimeType,
-                        toMimeType,
-                        convert(data, fromMimeType, toMimeType, options?) {
-                            // MediaConverter is injected the plugin's node runtime which may be compiled against an
-                            // older sdk that does not have MediaConverter. use the older convert method instead.
-                            // once BufferConverter is removed, this can be simplified to device.convertMedia.
-                            return (device.convertMedia || device.convert)(data, fromMimeType, toMimeType, options);
-                        },
-                    } as IdBufferConverter;
-                });
+                try {
+                    return (device.converters || []).map(([fromMimeType, toMimeType], index) => {
+                        return {
+                            id: `${id}-${index}`,
+                            name: device.name,
+                            fromMimeType,
+                            toMimeType,
+                            convert(data, fromMimeType, toMimeType, options?) {
+                                // MediaConverter is injected the plugin's node runtime which may be compiled against an
+                                // older sdk that does not have MediaConverter. use the older convert method instead.
+                                // once BufferConverter is removed, this can be simplified to device.convertMedia.
+                                return (device.convertMedia || device.convert)(data, fromMimeType, toMimeType, options);
+                            },
+                        } as IdBufferConverter;
+                    });
+                }
+                catch (e) {
+                    return [];
+                }
             });
 
         const converters = [...mediaConverters.flat(), ...bufferConverters];
