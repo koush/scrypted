@@ -4,6 +4,13 @@ FROM $BASE
 ENV SCRYPTED_DOCKER_FLAVOR="intel"
 
 RUN curl https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-intel-oneapi.sh | bash
-# these paths must be updated if oneapi is updated via the install-intel-oneapi.sh script
-# note that the 2022.2 seems to be a typo in the intel script...?
-ENV LD_LIBRARY_PATH=/opt/intel/oneapi/tcm/1.4/lib:/opt/intel/oneapi/umf/0.11/lib:/opt/intel/oneapi/tbb/2022.2/env/../lib/intel64/gcc4.8:/opt/intel/oneapi/mkl/2025.2/lib:/opt/intel/oneapi/compiler/2025.2/opt/compiler/lib:/opt/intel/oneapi/compiler/2025.2/lib
+ENV LD_LIBRARY_PATH=/opt/intel/oneapi/tcm/latest/lib
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/opt/intel/oneapi/umf/latest/lib
+
+# gcc4.8 does not have a latest link however, it does seem to point to a relative lib path
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/opt/intel/oneapi/tbb/latest/env/../lib/intel64/gcc4.8
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/opt/intel/oneapi/tbb/latest/lib
+
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/opt/intel/oneapi/mkl/latest/lib
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/opt/intel/oneapi/compiler/latest/opt/compiler/lib
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/opt/intel/oneapi/compiler/latest/lib
