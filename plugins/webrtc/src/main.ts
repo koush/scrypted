@@ -321,12 +321,20 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
         if (fromMimeType === ScryptedMimeTypes.FFmpegInput) {
             const ffmpegInput: FFmpegInput = typeof data === 'object' && !Buffer.isBuffer(data) ? data : JSON.parse(data.toString());
-            const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput);
+            const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput, {
+                sourceId: options?.sourceId,
+            });
+
+            let intercom = sdk.systemManager.getDeviceById<Intercom>(mo.sourceId);
+            if (!intercom.interfaces?.includes(ScryptedInterface.Intercom))
+                intercom = undefined;
+
+            const audioDirection = intercom ? 'sendrecv' : undefined;
 
             class OnDemandSignalingChannel implements RTCSignalingChannel {
                 async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
                     return createRTCPeerConnectionSink(session, console,
-                        undefined,
+                        audioDirection,
                         mo,
                         plugin.storageSettings.values.requireOpus,
                         plugin.storageSettings.values.maximumCompatibilityMode,
