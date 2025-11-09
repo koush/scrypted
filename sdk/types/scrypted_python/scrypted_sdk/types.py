@@ -76,6 +76,7 @@ class ScryptedDeviceType(str, Enum):
     Automation = "Automation"
     Bridge = "Bridge"
     Builtin = "Builtin"
+    Buttons = "Buttons"
     Camera = "Camera"
     DataSource = "DataSource"
     DeviceProvider = "DeviceProvider"
@@ -1093,7 +1094,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.48"
+TYPES_VERSION = "0.5.49"
 
 
 class AirPurifier:

@@ -145,6 +145,7 @@ export enum ScryptedDeviceType {
   DeviceProvider = "DeviceProvider",
   DataSource = "DataSource",
   API = "API",
+  Buttons = "Buttons",
   Doorbell = "Doorbell",
   Irrigation = "Irrigation",
   Valve = "Valve",
