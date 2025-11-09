@@ -697,7 +697,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     const gstreamer = sdk.systemManager.getDeviceById('@scrypted/python-codecs', 'gstreamer') || undefined;
     const libav = sdk.systemManager.getDeviceById('@scrypted/python-codecs', 'libav') || undefined;
     const ffmpeg = sdk.systemManager.getDeviceById('@scrypted/objectdetector', 'ffmpeg') || undefined;
-    const use = pipelines.find(p => p.name === frameGenerator) || webassembly || gstreamer || libav || ffmpeg;
+    const use = pipelines.find(p => p.name === frameGenerator) || webassembly || libav || gstreamer || ffmpeg;
     return use.id;
   }
 
