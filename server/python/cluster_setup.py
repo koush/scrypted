@@ -264,7 +264,6 @@ async def cluster_listen_zero(
         port = cluster_server.sockets[0].getsockname()[1]
 
         try:
-            print('trying to bind to port', port)
             local_server = await asyncio.start_server(
                 callback, host="127.0.0.1", port=port
             )
