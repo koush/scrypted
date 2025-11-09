@@ -110,7 +110,9 @@ export class BrowserSignalingSession implements RTCSignalingSession {
             await this.microphone.replaceTrack(mic.getTracks()[0]);
         }
 
-        this.microphone.track.enabled = enabled;
+        if (this.microphone?.track) {
+            this.microphone.track.enabled = enabled;
+        }
     }
 
     close() {
