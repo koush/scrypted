@@ -240,8 +240,10 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     upnpClient = upnp.createClient();
     upnpStatus = 'Starting';
     randomBytes = crypto.randomBytes(16).toString('base64');
+    healthCheckToken = crypto.randomBytes(16).toString('hex');
     reverseConnections = new Set<Duplex>();
     cloudflaredLoginController?: AbortController;
+    healthCheckInterval?: NodeJS.Timeout;
 
     get portForwardingDisabled() {
         return this.storageSettings.values.forwardingMode === 'Disabled' || this.storageSettings.values.forwardingMode === 'Default';
@@ -852,6 +854,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 }
                 res.end();
             }
+            else if (url.pathname === '/_punch/cloudflared_callback') {
+                res.writeHead(200);
+                res.write(this.healthCheckToken);
+                res.end();
+                return;
+            }
             else if (url.pathname === '/web/') {
                 const validDomain = this.getSSLHostname();
                 if (validDomain) {
@@ -1122,6 +1130,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     maxDelay: 300000,
                 });
 
+                // Start health check after cloudflared is successfully started
+                this.startHealthCheck();
+
                 await once(this.cloudflared.child, 'exit').catch(() => { });
                 // the successfully started cloudflared process may exit at some point, loop and allow it to restart.
                 this.console.error('cloudflared exited');
@@ -1131,11 +1142,74 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.console.error('cloudflared error', e);
             }
             finally {
+                clearInterval(this.healthCheckInterval);
+                this.healthCheckInterval = undefined;
                 this.cloudflared = undefined;
                 this.cloudflareTunnel = undefined;
                 this.updateExternalAddresses();
             }
         }
+    }
+
+    async startHealthCheck() {
+        // Clear any existing health check interval
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+        }
+
+        // Local failure counter - only accessible within this method
+        let failureCount = 0;
+        const maxFailuresBeforeRestart = 3;
+
+        const check = async () => {
+            // Only perform health check if cloudflare is enabled and we have a tunnel URL
+            if (!this.storageSettings.values.cloudflareEnabled || !this.cloudflareTunnel) {
+                return;
+            }
+
+            try {
+                const healthCheckUrl = `${this.cloudflareTunnel}/_punch/cloudflared_callback`;
+                this.console.log(`Performing health check: ${healthCheckUrl}`);
+
+                const response = await httpFetch({
+                    url: healthCheckUrl,
+                    responseType: 'text',
+                    timeout: 30000, // 30 second timeout
+                });
+
+                if (response.body !== this.healthCheckToken) {
+                    throw new Error(`Health check failed: Expected token ${this.healthCheckToken}, got ${response.body}`);
+                }
+
+                // Reset failure count on success
+                failureCount = 0;
+                this.console.log('Cloudflared health check passed');
+            } catch (error) {
+                // Increment failure count on error
+                failureCount++;
+                this.console.error(`Cloudflared health check failed (${failureCount}/${maxFailuresBeforeRestart}):`, error);
+
+                // Only restart after 3 consecutive failures
+                if (failureCount >= maxFailuresBeforeRestart) {
+                    this.console.log('3 consecutive health check failures detected. Restarting cloudflared process.');
+                    this.log.a('Cloudflared health check failed 3 times consecutively. Restarting cloudflared process.');
+
+                    // Kill the current cloudflared process to trigger restart
+                    if (this.cloudflared?.child) {
+                        this.cloudflared.child.kill();
+                    }
+
+                    // Reset the counter after triggering restart
+                    failureCount = 0;
+                } else {
+                    this.console.log(`Waiting for ${maxFailuresBeforeRestart - failureCount} more consecutive failures before restarting.`);
+                }
+            }
+        };
+
+        // Start a new health check interval (every 2 minutes)
+        this.healthCheckInterval = setInterval(check, 2 * 60 * 1000); // Run every 2 minutes
+        check();
     }
 
     get serverIdentifier() {
