@@ -1160,6 +1160,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         // Local failure counter - only accessible within this method
         let failureCount = 0;
         const maxFailuresBeforeRestart = 3;
+        const alertTitle = 'Cloudflared health check failed 3 times consecutively. Restarting cloudflared process.';
 
         const check = async () => {
             // Only perform health check if cloudflare is enabled and we have a tunnel URL
@@ -1177,39 +1178,30 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     timeout: 30000, // 30 second timeout
                 });
 
+                this.log.clearAlert(alertTitle);
+
                 if (response.body !== this.healthCheckToken) {
                     throw new Error(`Health check failed: Expected token ${this.healthCheckToken}, got ${response.body}`);
                 }
 
-                // Reset failure count on success
                 failureCount = 0;
                 this.console.log('Cloudflared health check passed');
             } catch (error) {
-                // Increment failure count on error
                 failureCount++;
                 this.console.error(`Cloudflared health check failed (${failureCount}/${maxFailuresBeforeRestart}):`, error);
 
-                // Only restart after 3 consecutive failures
                 if (failureCount >= maxFailuresBeforeRestart) {
-                    this.console.log('3 consecutive health check failures detected. Restarting cloudflared process.');
-                    this.log.a('Cloudflared health check failed 3 times consecutively. Restarting cloudflared process.');
+                    this.console.warn('3 consecutive health check failures detected. Restarting cloudflared process.');
+                    this.log.a(alertTitle);
+                    this.cloudflared?.child?.kill();
 
-                    // Kill the current cloudflared process to trigger restart
-                    if (this.cloudflared?.child) {
-                        this.cloudflared.child.kill();
-                    }
-
-                    // Reset the counter after triggering restart
                     failureCount = 0;
-                } else {
-                    this.console.log(`Waiting for ${maxFailuresBeforeRestart - failureCount} more consecutive failures before restarting.`);
                 }
             }
         };
 
         // Start a new health check interval (every 2 minutes)
         this.healthCheckInterval = setInterval(check, 2 * 60 * 1000); // Run every 2 minutes
-        check();
     }
 
     get serverIdentifier() {
