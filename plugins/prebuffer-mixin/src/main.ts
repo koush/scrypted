@@ -456,6 +456,10 @@ class PrebufferSession {
     catch (e) {
     }
 
+    if (this.mixin.streamSettings.storageSettings.values.privacyMode) {
+      mso.audio = null;
+    }
+
     // camera may explicity request that its audio stream be muted via a null.
     // respect that setting.
     const audioSoftMuted = mso?.audio === null;
@@ -474,7 +478,22 @@ class PrebufferSession {
     this.parsers = rbo.parsers;
 
     let mo: MediaObject;
-    if (this.mixin.streamSettings.storageSettings.values.synthenticStreams.includes(this.streamId)) {
+    if (this.mixin.streamSettings.storageSettings.values.privacyMode) {
+      const ffmpegInput: FFmpegInput = {
+        container: 'mp4',
+        inputArguments: [
+          '-re',
+          '-stream_loop', '-1',
+          '-i', 'camera-slash.mp4',
+        ],
+        mediaStreamOptions: {
+          id: this.streamId,
+          container: 'mp4',
+        }
+      };
+      mo = await mediaManager.createMediaObject(ffmpegInput, ScryptedMimeTypes.FFmpegInput);
+    }
+    else if (this.mixin.streamSettings.storageSettings.values.synthenticStreams.includes(this.streamId)) {
       const syntheticInputId = this.storage.getItem(this.syntheticInputIdKey);
       if (!syntheticInputId)
         throw new Error('synthetic stream has not been configured with an input');

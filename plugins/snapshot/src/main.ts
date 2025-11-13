@@ -13,6 +13,7 @@ import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filte
 import { ImageConverter, ImageConverterNativeId } from './image-converter';
 import { ImageReader, ImageReaderNativeId, loadSharp, loadVipsImage } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
+import fs from 'fs';
 
 const { mediaManager, systemManager } = sdk;
 if (os.cpus().find(cpu => cpu.model?.toLowerCase().includes('qemu'))) {
@@ -103,6 +104,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
             description: 'Set the approximate region to crop and scale to 16:9 snapshots.',
             type: 'clippath',
         },
+        privacyMode: {
+            group: 'Privacy',
+            title: 'Disable Snapshot',
+            description: 'Disable this camera\'s snapshot to all services provided by Scrypted.',
+            type: 'boolean',
+        },
     });
     snapshotDebouncer = createMapPromiseDebouncer<{
         picture: Buffer;
@@ -130,6 +137,10 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
 
     async takePictureInternal(id: string, eventSnapshot: boolean): Promise<Buffer> {
         this.debugConsole?.log("Picture requested from camera", { id, eventSnapshot });
+        if (this.storageSettings.values.privacyMode) {
+            return await fs.promises.readFile('camera-slash.jpg');
+        }
+
         const { snapshotsFromPrebuffer } = this.storageSettings.values;
         let usePrebufferSnapshots: boolean;
         switch (snapshotsFromPrebuffer) {

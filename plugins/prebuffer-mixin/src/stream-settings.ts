@@ -86,6 +86,12 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             description: 'Enable this setting if the camera does not have audio or to mute audio.',
             type: 'boolean',
         },
+        privacyMode: {
+            group: 'Privacy',
+            title: 'Disable Stream',
+            description: 'Disable this camera\'s stream to all services provided by Scrypted.',
+            type: 'boolean',
+        },
         enabledStreams: {
             subgroup,
             title: 'Prebuffered Streams',
