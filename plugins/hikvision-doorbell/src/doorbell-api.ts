@@ -49,6 +49,7 @@ interface AcsEventResponse {
 const maxEventAgeSeconds = 30; // Ignore events older than this many seconds
 const callPollingIntervalSec = 1; // Call status polling interval in seconds
 const alertTickTimeoutSec = 60; // Alert stream tick timeout in seconds
+const acsPollingTimeoutSec = 5; // ACS polling request timeout in seconds
 
 const EventCodeMap = new Map<string, HikvisionDoorbellEvent>([
     ['5,25', HikvisionDoorbellEvent.DoorOpened],
@@ -113,16 +114,19 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
         password: string, 
         callStatusPolling: boolean,
         public console: Console, 
-        public storage: Storage
+        public storage: Storage,
+        skipCapabilitiesInit: boolean = false
     )
     {
-        let endpoint = libip.isV4Format(address) ? `${address}:${port}` : `[${address}]:${port}`;
+        let endpoint = libip.isV4Format (address) ? `${address}:${port}` : `[${address}]:${port}`;
         super (endpoint, username, password, console);
         this.endpoint = endpoint;
         this.auth = new AuthRequst (username, password, console);
         
-        // Initialize door capabilities
-        this.initializeDoorCapabilities();
+        // Initialize door capabilities (skip for event-only API instances)
+        if (!skipCapabilitiesInit) {
+            this.initializeDoorCapabilities();
+        }
         this.useCallStatusPolling = callStatusPolling;
     }
 
@@ -136,18 +140,28 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
     {
         // Create a promise for this specific request to prevent queue blocking
         const requestPromise = this.requestQueue.then(async () => {
-            let url: string = urlOrOptions as string;
+            let url: string | undefined;
             let opt: AuthRequestOptions | undefined;
-            if (typeof urlOrOptions !== 'string') {
-                url = urlOrOptions.url as string;
-                if (typeof urlOrOptions.url !== 'string') {
-                    url = (urlOrOptions.url as URL).toString();
+            
+            if (typeof urlOrOptions === 'string') {
+                url = urlOrOptions;
+            } else {
+                if (urlOrOptions.url) {
+                    url = typeof urlOrOptions.url === 'string' 
+                        ? urlOrOptions.url 
+                        : urlOrOptions.url.toString();
                 }
                 opt = {
                     method: urlOrOptions.method,
                     responseType: urlOrOptions.responseType || 'buffer',
                     headers: urlOrOptions.headers as OutgoingHttpHeaders,
+                    timeout: urlOrOptions.timeout,
                 };
+            }
+
+            // Validate URL before making request
+            if (!url || url.includes ('undefined')) {
+                throw new Error (`Invalid request URL: ${url}`);
             }
 
             // Safety fallback and attach debug id
@@ -155,7 +169,7 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
                 opt = { responseType: 'buffer' } as AuthRequestOptions;
             }
 
-            return await this.auth.request(url, opt, body);
+            return await this.auth.request (url, opt, body);
         });
 
         // Update the queue to continue after this request (success or failure)
@@ -416,7 +430,8 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
         
         // If already loading, wait for the existing promise
         if (this.loadCapabilitiesPromise) {
-            return this.loadCapabilitiesPromise;
+            await this.loadCapabilitiesPromise;
+            return;
         }
         
         // Start loading and store the promise
@@ -654,23 +669,35 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
             this.console.error ('Failed to set phone number record:', e);
         }
 
-        // Set call button configuration
+        // Small delay to allow device to process previous request
+        await new Promise (resolve => setTimeout (resolve, 500));
+
+        // Set call button configuration with retry logic
         const keyCfgData = `<?xml version="1.0" encoding="UTF-8"?><KeyCfg xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0"><id>${buttonNumber}</id><callNumber>${roomNumber}</callNumber><moduleId>1</moduleId><templateNo>0</templateNo></KeyCfg>`;
 
-        try {
-            const response = await this.request ({
-                url: `http://${this.endpoint}/ISAPI/VideoIntercom/keyCfg/${buttonNumber}`,
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                responseType: 'text',
-            }, keyCfgData);
-                
-            this.console.debug (`Call button ${buttonNumber} configured for room ${roomNumber}: ${response.body}`);
-        }
-        catch (e) {
-            this.console.error (`Failed to configure call button ${buttonNumber}:`, e);
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const response = await this.request ({
+                    url: `http://${this.endpoint}/ISAPI/VideoIntercom/keyCfg/${buttonNumber}`,
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/xml'
+                    },
+                    responseType: 'text',
+                }, keyCfgData);
+                    
+                this.console.debug (`Call button ${buttonNumber} configured for room ${roomNumber}: ${response.body}`);
+                break;
+            }
+            catch (e) {
+                if (attempt === 0 && (e.code === 'EPIPE' || e.code === 'ECONNRESET')) {
+                    this.console.warn (`Call button ${buttonNumber} configuration failed (${e.code}), retrying...`);
+                    await new Promise (resolve => setTimeout (resolve, 1000));
+                    continue;
+                }
+                this.console.error (`Failed to configure call button ${buttonNumber}:`, e);
+                break;
+            }
         }
 
         
@@ -719,8 +746,8 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
     private isCallPollingActive: boolean = false;
     
     // ACS event polling properties
-    private acsEventPollingInterval?: NodeJS.Timeout;
     private lastAcsEventTime: Date = new Date();
+    private isAcsPollingInProgress: boolean = false;
     
     // Timezone properties
     private deviceTimezone?: string; // GMT offset in format like '+03:00'
@@ -901,6 +928,7 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
             const response = await this.request ({
                 url: `http://${this.endpoint}/ISAPI/AccessControl/AcsEvent?format=json`,
                 method: 'POST',
+                timeout: acsPollingTimeoutSec * 1000,
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
@@ -961,8 +989,15 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
      * This method can be called periodically to check for new events
      * @param lastEventTime - Optional timestamp to filter events newer than this time
      */
-    private async pollAndProcessAcsEvents (lastEventTime?: Date): Promise<void>
+    private async pollAndProcessAcsEvents (lastEventTime?: Date, isRetry: boolean = false): Promise<void>
     {
+        // Prevent multiple concurrent polling requests
+        if (this.isAcsPollingInProgress) {
+            this.console.debug ('ACS polling already in progress, skipping');
+            return;
+        }
+
+        this.isAcsPollingInProgress = true;
         try {
             const eventResponse = await this.getAcsEvents();
             let latestEventTime: Date | undefined;
@@ -993,7 +1028,16 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
             
         } catch (error) {
             this.console.error (`Failed to poll and process ACS events: ${error}`);
-            throw error;
+            
+            // Retry once after a short delay if this was the first attempt
+            if (!isRetry) {
+                this.console.debug (`Retrying ACS polling after ${acsPollingTimeoutSec} seconds...`);
+                this.isAcsPollingInProgress = false;
+                await new Promise (resolve => setTimeout (resolve, acsPollingTimeoutSec * 1000));
+                return this.pollAndProcessAcsEvents (lastEventTime, true);
+            }
+        } finally {
+            this.isAcsPollingInProgress = false;
         }
     }
     
@@ -1061,7 +1105,8 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
                 url: `http://${this.endpoint}/ISAPI/Event/notification/alertStream`,
                 responseType: 'readable',
                 headers: {
-                    'Accept': '*/*'
+                    'Accept': '*/*',
+                    'Connection': 'keep-alive'
                 }
             });
     
@@ -1162,6 +1207,7 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
 
         this.console.debug (`AlertStream JSON: ${JSON.stringify (eventData, null, 2)}`);
     
+        // Poll ACS events (errors are handled internally)
         this.pollAndProcessAcsEvents (this.lastAcsEventTime);
     }
 }

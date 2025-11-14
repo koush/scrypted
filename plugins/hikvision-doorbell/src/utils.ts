@@ -2,22 +2,37 @@ import sdk from '@scrypted/sdk';
 import { isLoopback, isV4Format, isV6Format } from 'ip';
 import dgram from 'node:dgram';
 
+const MAX_RETRIES = 10;
+const RETRY_DELAY_SEC = 10;
+
 export async function localServiceIpAddress (doorbellIp: string): Promise<string>
 {
-    let host = "localhost";
-    try {
-        const typeCheck = isV4Format (doorbellIp) ? isV4Format : isV6Format;
-        for (const address of await sdk.endpointManager.getLocalAddresses()) {
-            if (!isLoopback(address) && typeCheck(address)) {
-                host = address;
-                break;
+    const typeCheck = isV4Format (doorbellIp) ? isV4Format : isV6Format;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        try
+        {
+            const addresses = await sdk.endpointManager.getLocalAddresses();
+
+            for (const address of addresses || [])
+            {
+                if (!isLoopback (address) && typeCheck (address))
+                {
+                    return address;
+                }
             }
         }
-    }
-    catch (e) {
+        catch (e) {
+        }
+
+        // Wait before retry if addresses not available yet
+        if (attempt < MAX_RETRIES - 1) {
+            await awaitTimeout (RETRY_DELAY_SEC * 1000);
+        }
     }
 
-    return host;
+    throw new Error('Could not find local service IP address');
 }
 
 export function udpSocketType (ip: string): dgram.SocketType {

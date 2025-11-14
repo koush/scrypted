@@ -93,6 +93,14 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
         const debugEnabled = this.storage.getItem ('debug');
         this.debugController.setDebugEnabled (debugEnabled === 'true');
         
+        // Add global unhandledRejection handler to prevent silent failures
+        process.on ('unhandledRejection', (reason: any, promise: Promise<any>) => {
+            this.console.error (`Unhandled Promise Rejection: ${reason}`);
+            if (reason?.stack) {
+                this.console.error (`Stack trace: ${reason.stack}`);
+            }
+        });
+        
         this.updateSip();
     }
 
@@ -210,6 +218,8 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
                                 this.stopIntercom();
                             });
                         }
+                    }).catch(e => {
+                        this.console.error('Failed to stop call during reconnection:', e);
                     });
                     return;
                 }
@@ -1152,6 +1162,9 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
                     this.httpStreamSwitcher.destroy();
                     this.httpStreamSwitcher = undefined;
                 }
+            } catch (error) {
+                this.console.error (`Failed to stop intercom: ${error}`);
+                // Don't throw - we want to ensure cleanup happens
             } finally {
                 // Always reset state
                 this.intercomBusy = false;
@@ -1168,6 +1181,7 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
 
     private createEventApi(): HikvisionDoorbellAPI
     {
+        // Event API only listens for events, skip door capabilities initialization
         return new HikvisionDoorbellAPI (
             this.getIPAddress(), 
             this.getHttpPort(), 
@@ -1175,7 +1189,8 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
             this.getPassword(), 
             this.isCallPolling(),
             this.console,
-            this.storage
+            this.storage,
+            true // skipCapabilitiesInit
         );
     }
 
@@ -1218,7 +1233,11 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
             } catch (e) {
                 this.console.error (`Error installing fake SIP settings: ${e}`);
                 // repeat if unreached
-                this.installSipSettingsOnDeviceTimeout = setTimeout (() => this.installSipSettingsOnDevice(), UNREACHED_RETRY_SEC * 1000);
+                this.installSipSettingsOnDeviceTimeout = setTimeout (() => {
+                    this.installSipSettingsOnDevice().catch(err => {
+                        this.console.error('Failed to retry installing SIP settings:', err);
+                    });
+                }, UNREACHED_RETRY_SEC * 1000);
             }
         }
     }
