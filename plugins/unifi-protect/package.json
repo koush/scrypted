@@ -1,7 +1,7 @@
 {
    "name": "@scrypted/unifi-protect",
    "type": "module",
-   "version": "0.1.0",
+   "version": "0.1.2",
    "description": "Unifi Protect Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
