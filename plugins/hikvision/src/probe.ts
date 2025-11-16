@@ -20,6 +20,11 @@ export async function getDeviceInfo(credential: AuthFetchCredentialState, addres
     const serialNumber = response.body.match(/>(.*?)<\/serialNumber>/)?.[1];
     const macAddress = response.body.match(/>(.*?)<\/macAddress>/)?.[1];
     const firmwareVersion = response.body.match(/>(.*?)<\/firmwareVersion>/)?.[1];
+
+    if (!deviceModel && !deviceName && !serialNumber && !macAddress && !firmwareVersion) {
+        throw new Error('Failed to parse device info from camera.');
+    }
+
     return {
         deviceModel,
         deviceName,
