@@ -1,4 +1,4 @@
-# openvino 2025.3.0 is failing to load on 9700, this may be because models need to be reexported.
+# openvino 2025.3.0 is failing to load on 9700 (VGG), this may be because models need to be reexported.
 # openvino 2025.0.0 does not detect CPU on 13500H
 # openvino 2024.5.0 crashes NPU. Update: NPU can not be used with AUTO in this version
 # openvino 2024.4.0 crashes legacy systems.
