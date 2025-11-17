@@ -29,7 +29,10 @@ class OpenVINOTextRecognition(TextRecognition):
         )
         if "vgg" in model:
             model = self.plugin.core.read_model(xmlFile)
-            model.reshape([1, 1, 64, 384])
+            # this reshape causes a crash on GPU but causes a crash if NOT used with NPU...
+            # on older systems skipping the reshape does not crash, but does throw na exception which is recoverable.
+            if "NPU" in self.plugin.mode:
+                model.reshape([1, 1, 64, 384])
             return self.plugin.core.compile_model(model, self.plugin.mode)
         else:
             model = self.plugin.core.read_model(xmlFile)
