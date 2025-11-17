@@ -4,6 +4,7 @@ import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromi
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, Resolution, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, Sleep, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import fs from 'fs';
 import https from 'https';
 import os from 'os';
 import path from 'path';
@@ -13,7 +14,6 @@ import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filte
 import { ImageConverter, ImageConverterNativeId } from './image-converter';
 import { ImageReader, ImageReaderNativeId, loadSharp, loadVipsImage } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
-import fs from 'fs';
 
 const { mediaManager, systemManager } = sdk;
 if (os.cpus().find(cpu => cpu.model?.toLowerCase().includes('qemu'))) {
@@ -103,6 +103,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
             title: 'Crop and Scale',
             description: 'Set the approximate region to crop and scale to 16:9 snapshots.',
             type: 'clippath',
+        },
+        snapshotAspectRatio: {
+            title: 'Snapshot Aspect Ratio',
+            description: 'Set a fixed aspect ratio for snapshots (e.g., 1.777 for 16:9). Used when explicit width/height are not provided.',
+            type: 'number',
+            placeholder: '1.777',
         },
         privacyMode: {
             group: 'Privacy',
@@ -384,7 +390,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
             availablePicture = undefined;
         }
 
-        const needSoftwareResize = !!(options?.picture?.width || options?.picture?.height) && this.storageSettings.values.snapshotResolution !== 'Full Resolution';
+        const aspectRatio = this.storageSettings.values.snapshotAspectRatio;
+        const needSoftwareResize = (!!(options?.picture?.width || options?.picture?.height) && this.storageSettings.values.snapshotResolution !== 'Full Resolution')
+            || aspectRatio;
 
         if (!needSoftwareResize)
             return rawPicture.picture;
@@ -403,9 +411,46 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
                     const vips = await loadVipsImage(rawPicture.picture, this.id);
                     if (this.resolution?.[0] !== vips.width || this.resolution?.[1] !== vips.height)
                         this.resolution = [vips.width, vips.height];
+
+                    let resizeOptions = options?.picture;
+                    if (aspectRatio) {
+                        resizeOptions ||= {};
+                        const { width, height } = resizeOptions;
+
+                        if (!width && !height) {
+                            const imageAspectRatio = vips.width / vips.height;
+
+                            if (imageAspectRatio > aspectRatio) {
+                                resizeOptions = {
+                                    ...resizeOptions,
+                                    height: vips.height,
+                                    width: Math.round(vips.height * aspectRatio)
+                                };
+                            } else {
+                                resizeOptions = {
+                                    ...resizeOptions,
+                                    width: vips.width,
+                                    height: Math.round(vips.width / aspectRatio)
+                                };
+                            }
+                        }
+                        else if (!width) {
+                            resizeOptions = {
+                                ...resizeOptions,
+                                width: Math.round(resizeOptions.height * aspectRatio)
+                            };
+                        }
+                        else if (!height) {
+                            resizeOptions = {
+                                ...resizeOptions,
+                                height: Math.round(resizeOptions.width / aspectRatio)
+                            };
+                        }
+                    }
+
                     try {
                         const ret = await vips.toBuffer({
-                            resize: options?.picture,
+                            resize: resizeOptions,
                             format: 'jpg',
                         });
                         return {
