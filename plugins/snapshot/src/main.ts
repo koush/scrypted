@@ -32,6 +32,25 @@ class PrebufferUnavailableError extends Error {
 
 }
 
+function calculateConstrainedDimensions(originalWidth: number, originalHeight: number, targetAspectRatio: number) {
+    const imageAspectRatio = originalWidth / originalHeight;
+
+    if (imageAspectRatio > targetAspectRatio) {
+        // Image is wider than target aspect ratio, constrain by height
+        return {
+            width: Math.round(originalHeight * targetAspectRatio),
+            height: originalHeight
+        };
+    } else {
+        // Image is taller than target aspect ratio, constrain by width
+        return {
+            width: originalWidth,
+            height: Math.round(originalWidth / targetAspectRatio)
+        };
+    }
+}
+
+
 class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, Resolution {
     storageSettings = new StorageSettings(this, {
         defaultSnapshotChannel: {
@@ -409,8 +428,16 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
 
                 if (loadSharp()) {
                     const vips = await loadVipsImage(rawPicture.picture, this.id);
-                    if (this.resolution?.[0] !== vips.width || this.resolution?.[1] !== vips.height)
-                        this.resolution = [vips.width, vips.height];
+
+                    let resolutionWidth = vips.width;
+                    let resolutionHeight = vips.height;
+                    if (aspectRatio) {
+                        const constrained = calculateConstrainedDimensions(vips.width, vips.height, aspectRatio);
+                        resolutionWidth = constrained.width;
+                        resolutionHeight = constrained.height;
+                    }
+                    if (this.resolution?.[0] !== resolutionWidth || this.resolution?.[1] !== resolutionHeight)
+                        this.resolution = [resolutionWidth, resolutionHeight];
 
                     let resizeOptions = options?.picture;
                     if (aspectRatio) {
@@ -418,21 +445,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
                         const { width, height } = resizeOptions;
 
                         if (!width && !height) {
-                            const imageAspectRatio = vips.width / vips.height;
-
-                            if (imageAspectRatio > aspectRatio) {
-                                resizeOptions = {
-                                    ...resizeOptions,
-                                    height: vips.height,
-                                    width: Math.round(vips.height * aspectRatio)
-                                };
-                            } else {
-                                resizeOptions = {
-                                    ...resizeOptions,
-                                    width: vips.width,
-                                    height: Math.round(vips.width / aspectRatio)
-                                };
-                            }
+                            resizeOptions = {
+                                ...resizeOptions,
+                                width: resolutionWidth,
+                                height: resolutionHeight,
+                            };
                         }
                         else if (!width) {
                             resizeOptions = {
