@@ -125,7 +125,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
         },
         snapshotAspectRatio: {
             title: 'Snapshot Aspect Ratio',
-            description: 'Set a fixed aspect ratio for snapshots (e.g., 1.777 for 16:9). Used when explicit width/height are not provided.',
+            description: 'Override the aspect ratio for snapshots (e.g., 1.777 for 16:9). Images from the camera will be resized to this aspect ratio.',
             type: 'number',
             placeholder: '1.777',
         },
