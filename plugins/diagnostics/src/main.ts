@@ -228,14 +228,16 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
         const validated = new Set<string | undefined>();
         const validateMediaStream = async (stepName: string, destination: MediaStreamDestination) => {
-            const vsos = await device.getVideoStreamOptions();
-            const streamId = vsos.find(vso => vso.destinations?.includes(destination))?.id;
+            let streamId: string|undefined;
+            await this.validate(console, stepName + ' (Metadata)', async () => {
+                const vsos = await device.getVideoStreamOptions();
+                streamId = vsos.find(vso => vso.destinations?.includes(destination))?.id;
+            });
 
             if (validated.has(streamId)) {
                 await this.validate(console, stepName, async () => "Skipped (Duplicate)");
                 return;
             }
-
             validated.add(streamId);
 
             const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await getVideoStream(destination), ScryptedMimeTypes.FFmpegInput);
