@@ -1,9 +1,9 @@
-import dns from 'dns';
 import { Deferred } from '@scrypted/common/src/deferred';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import sdk, { Camera, FFmpegInput, Image, MediaObject, MediaStreamDestination, MotionSensor, Notifier, ObjectDetection, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import child_process from 'child_process';
+import dns from 'dns';
 import { once } from 'events';
 import fs from 'fs';
 import net from 'net';
@@ -228,11 +228,16 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
         const validated = new Set<string | undefined>();
         const validateMediaStream = async (stepName: string, destination: MediaStreamDestination) => {
-            let streamId: string|undefined;
+            let streamId: string | undefined;
             await this.validate(console, stepName + ' (Metadata)', async () => {
                 const vsos = await device.getVideoStreamOptions();
                 streamId = vsos.find(vso => vso.destinations?.includes(destination))?.id;
             });
+
+            if (!streamId) {
+                await this.validate(console, stepName, async () => "Skipped (Not Configured)");
+                return;
+            }
 
             if (validated.has(streamId)) {
                 await this.validate(console, stepName, async () => "Skipped (Duplicate)");
@@ -240,9 +245,11 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             }
             validated.add(streamId);
 
-            const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await getVideoStream(destination), ScryptedMimeTypes.FFmpegInput);
-            if (ffmpegInput.mediaStreamOptions?.video?.codec !== 'h264')
-                this.warnStep(console, `Stream ${stepName} is using codec ${ffmpegInput.mediaStreamOptions?.video?.codec}. h264 is recommended.`);
+            await this.validate(console, stepName + ' (Codec)', async () => {
+                const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await getVideoStream(destination), ScryptedMimeTypes.FFmpegInput);
+                if (ffmpegInput.mediaStreamOptions?.video?.codec !== 'h264')
+                    this.warnStep(console, `Stream ${stepName} is using codec ${ffmpegInput.mediaStreamOptions?.video?.codec}. h264 is recommended.`);
+            });
 
             await validateMedia(stepName, getVideoStream(destination));
             const start = Date.now();
