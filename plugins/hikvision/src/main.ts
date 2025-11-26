@@ -255,6 +255,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                 detectionId,
                 timestamp: now,
                 detections,
+                sourceId: this.pluginId
             };
 
             this.onDeviceEvent(ScryptedInterface.ObjectDetector, detected);
