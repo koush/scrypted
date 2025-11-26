@@ -41,11 +41,19 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     api: ProtectApi;
     startup: Promise<void>;
     runningEvents = new Map<string, { promise: Promise<unknown>, resolve: (value: unknown) => void }>();
+    reconnecting = false;
+    wsInterval: NodeJS.Timeout;
+    lastWsMessage = Date.now();
 
     constructor(nativeId?: string) {
         super(nativeId);
 
-        this.startup = this.connectProtect()
+        this.startup = this.connectProtect(true);
+        this.wsInterval = setInterval(() => {
+            if (Date.now() - this.lastWsMessage < 10 * 60 * 1000)
+                return;
+            this.reconnect('ws timed out')();
+        }, 1 * 60 * 1000);
 
         this.updateManagementUrl();
     }
@@ -275,8 +283,6 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     }
 
 
-    reconnecting = false;
-    wsTimeout: NodeJS.Timeout;
     reconnect(reason: string) {
         return async () => {
             if (this.reconnecting)
@@ -285,7 +291,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             this.api?.reset();
             this.console.error('Event Listener reconnecting in 10 seconds:', reason);
             await sleep(10000);
-            this.connectProtect();
+            this.connectProtect(true);
         }
     }
 
@@ -616,10 +622,9 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         return id;
     }
 
-    async connectProtect() {
+    async connectProtect(silent: boolean) {
         this.api?.reset();
         this.reconnecting = false;
-        clearTimeout(this.wsTimeout);
 
         const ip = this.getSetting('ip');
         const username = this.getSetting('username');
@@ -628,18 +633,21 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         this.log.clearAlerts();
 
         if (!ip) {
-            this.log.a('Must provide IP address.');
-            return
+            if (!silent)
+                this.log.a('Must provide IP address.');
+            return;
         }
 
         if (!username) {
-            this.log.a('Must provide username.');
-            return
+            if (!silent)
+                this.log.a('Must provide username.');
+            return;
         }
 
         if (!password) {
-            this.log.a('Must provide password.');
-            return
+            if (!silent)
+                this.log.a('Must provide password.');
+            return;
         }
 
         if (!this.api) {
@@ -666,8 +674,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             }
 
             const resetWsTimeout = () => {
-                clearTimeout(this.wsTimeout);
-                this.wsTimeout = setTimeout(() => this.reconnect('timeout'), 5 * 60 * 1000);
+                this.lastWsMessage = Date.now();
             };
             resetWsTimeout();
 
@@ -716,6 +723,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         this.unifiSensors.delete(nativeId);
         this.lights.delete(nativeId);
         this.locks.delete(nativeId);
+        
     }
 
     failedDevices = new Map<string, string>();
@@ -777,7 +785,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     }
 
     forceReconnect() {
-        this.connectProtect();
+        this.connectProtect(false);
         this.updateManagementUrl();
     }
 
