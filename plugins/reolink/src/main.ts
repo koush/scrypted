@@ -656,6 +656,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                     const od: ObjectsDetected = {
                         timestamp: Date.now(),
                         detections: [],
+                        sourceId: this.pluginId
                     };
                     for (const c of classes) {
                         const { alarm_state } = ai.value[c];
@@ -713,6 +714,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                                 score: 1,
                             }
                         ],
+                        sourceId: this.pluginId
                     };
                     sdk.deviceManager.onDeviceEvent(this.nativeId, ScryptedInterface.ObjectDetector, od);
                 }
