@@ -7,7 +7,7 @@ import { OnvifCameraAPI, OnvifEvent, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
 import { DevInfo } from './probe';
-import { AIState, Enc, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
+import { AIState, Enc, isDeviceNvr, ReolinkCameraClient, isDeviceHomeHub } from './reolink-api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     sirenTimeout: NodeJS.Timeout;
@@ -237,11 +237,54 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             await this.updateAbilities();
             await this.updateDevice();
             await this.reportDevices();
+            await this.checkNetData();
             this.startDevicesStatesPolling();
         })()
             .catch(e => {
                 this.console.log('device refresh failed', e);
             });
+    }
+
+    async checkNetData() {
+        try {
+            const api = this.getClientWithToken();
+            const { netData } = await api.getNetData();
+            this.console.log('netData', JSON.stringify(netData));
+            const deviceInfo = this.storageSettings.values.deviceInfo;
+            const isHomeHub = isDeviceHomeHub(deviceInfo);
+
+            const shouldDisableHttps = this.hasHttps() ? netData.httpsEnable === 1 : false;
+            const shouldEnableRtmp = this.hasRtmp() ? (!isHomeHub && netData.rtmpEnable === 0) : false;
+            const shouldDisableRtmp = this.hasRtmp() ? (isHomeHub && netData.rtmpEnable === 1) : false;
+            const shouldEnableRtsp = this.hasRtsp() ? netData.rtspEnable === 0 : false;
+            const shouldEnableOnvif = this.hasOnvif() ? netData.onvifEnable === 0 : false;
+
+            if (shouldDisableHttps || shouldEnableRtmp || shouldEnableRtsp || shouldEnableOnvif || shouldDisableRtmp) {
+                this.console.log(`Fixing netdata settings: shouldDisableHttps: ${shouldDisableHttps}, shouldEnableRtmp: ${shouldEnableRtmp}, shouldEnableRtsp: ${shouldEnableRtsp}, shouldEnableOnvif: ${shouldEnableOnvif}, shouldDisableRtmp: ${shouldDisableRtmp}`);
+                const newNetData = {
+                    ...netData
+                };
+
+                if (shouldDisableHttps) {
+                    newNetData.httpsEnable = 0;
+                }
+                if (shouldEnableRtmp) {
+                    newNetData.rtmpEnable = 1;
+                }
+                if (shouldDisableRtmp) {
+                    newNetData.rtmpEnable = 0;
+                }
+                if (shouldEnableRtsp) {
+                    newNetData.rtspEnable = 1;
+                }
+                if (shouldEnableOnvif) {
+                    newNetData.onvifEnable = 1;
+                }
+                await api.setNetData(newNetData);
+            }
+        } catch (e) {
+            this.console.error('Error in pollDeviceStates', e);
+        }
     }
 
     async pollDeviceStates() {
@@ -425,43 +468,52 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         return this.onvifIntercom.stopIntercom();
     }
 
-    hasSiren() {
+    hasAbility(ability: string) {
         const channel = this.getRtspChannel();
-        const mainAbility = this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm
-        const channelAbility = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel]?.supportAudioAlarm
+        const mainAbility = this.storageSettings.values.abilities?.value?.Ability?.[ability];
+        const channelAbility = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel]?.[ability];
 
         return (mainAbility && mainAbility?.ver !== 0) || (channelAbility && channelAbility?.ver !== 0);
+    }
 
+    hasSiren() {
+        return this.hasAbility('supportAudioAlarm');
+    }
+
+    hasRtsp() {
+        return this.hasAbility('supportRtspEnable');
+    }
+
+    hasRtmp() {
+        return this.hasAbility('supportRtmpEnable');
+    }
+
+    hasOnvif() {
+        return this.hasAbility('supportOnvifEnable');
+    }
+
+    hasHttps() {
+        return this.hasAbility('supportHttpsEnable');
     }
 
     hasFloodlight() {
-        const channel = this.getRtspChannel();
+        const hasFloodlight = this.hasAbility('floodLight');
+        const hasSupportFLswitch = this.hasAbility('supportFLswitch');
+        const hasSupportFLBrightness = this.hasAbility('supportFLBrightness');
 
-        const channelData = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel];
-        if (channelData) {
-            const floodLightConfigVer = channelData.floodLight?.ver ?? 0;
-            const supportFLswitchConfigVer = channelData.supportFLswitch?.ver ?? 0;
-            const supportFLBrightnessConfigVer = channelData.supportFLBrightness?.ver ?? 0;
-
-            return floodLightConfigVer > 0 || supportFLswitchConfigVer > 0 || supportFLBrightnessConfigVer > 0;
-        }
-
-        return false;
+        return hasFloodlight || hasSupportFLswitch || hasSupportFLBrightness;
     }
 
     hasBattery() {
-        const batteryConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.battery?.ver ?? 0;
-        return batteryConfigVer > 0;
+        return this.hasAbility('battery');
     }
 
     hasPirEvents() {
-        const pirEvents = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
-        return pirEvents > 0;
+        return this.hasAbility('mdWithPir');
     }
 
     hasPirSensor() {
-        const batteryConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
-        return batteryConfigVer > 0;
+        return this.hasAbility('mdWithPir');
     }
 
     async updateDevice() {
@@ -842,7 +894,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // anecdotally, encoders of type h265 do not have a working RTMP main stream.
         const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[rtspChannel]?.mainEncType?.ver;
 
-        if (live === 2) {
+        // RTMP streams on homehub connected devices is bad
+        if (isDeviceHomeHub(deviceInfo)) {
+            streams.push(...[rtspMain, rtspSub]);
+        } else if (live === 2) {
             if (mainEncType === 1) {
                 streams.push(rtmpSub, rtspMain, rtspSub);
             }
