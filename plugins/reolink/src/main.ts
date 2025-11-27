@@ -477,7 +477,11 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     hasSiren() {
-        return this.hasAbility('supportAudioAlarm');
+        const channel = this.getRtspChannel();
+        const mainAbility = this.storageSettings.values.abilities?.value?.Ability?.supportAudioAlarm
+        const channelAbility = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel]?.supportAudioAlarm
+
+        return (mainAbility && mainAbility?.ver !== 0) || (channelAbility && channelAbility?.ver !== 0);
     }
 
     hasRtsp() {
@@ -497,23 +501,33 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     hasFloodlight() {
-        const hasFloodlight = this.hasAbility('floodLight');
-        const hasSupportFLswitch = this.hasAbility('supportFLswitch');
-        const hasSupportFLBrightness = this.hasAbility('supportFLBrightness');
+        const channel = this.getRtspChannel();
+        const channelData = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[channel];
 
-        return hasFloodlight || hasSupportFLswitch || hasSupportFLBrightness;
+        if (channelData) {
+            const floodLightConfigVer = channelData.floodLight?.ver ?? 0;
+            const supportFLswitchConfigVer = channelData.supportFLswitch?.ver ?? 0;
+            const supportFLBrightnessConfigVer = channelData.supportFLBrightness?.ver ?? 0;
+
+            return floodLightConfigVer > 0 || supportFLswitchConfigVer > 0 || supportFLBrightnessConfigVer > 0;
+        }
+
+        return false;
     }
 
     hasBattery() {
-        return this.hasAbility('battery');
+        const batteryConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.battery?.ver ?? 0;
+        return batteryConfigVer > 0;
     }
 
     hasPirEvents() {
-        return this.hasAbility('mdWithPir');
+        const pirEventsVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
+        return pirEventsVer > 0;
     }
 
     hasPirSensor() {
-        return this.hasAbility('mdWithPir');
+        const pirSensorVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
+        return pirSensorVer > 0;
     }
 
     async updateDevice() {
