@@ -7,7 +7,7 @@ import { OnvifCameraAPI, OnvifEvent, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
 import { DevInfo } from './probe';
-import { AIState, Enc, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
+import { AIState, Enc, isDeviceHomeHub, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     sirenTimeout: NodeJS.Timeout;
@@ -237,6 +237,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             await this.updateAbilities();
             await this.updateDevice();
             await this.reportDevices();
+            await this.checkNetData();
             this.startDevicesStatesPolling();
         })()
             .catch(e => {
@@ -462,6 +463,26 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     hasPirSensor() {
         const batteryConfigVer = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[this.getRtspChannel()]?.mdWithPir?.ver ?? 0;
         return batteryConfigVer > 0;
+    }
+
+    hasRtsp() {
+        const rtspAbility = this.storageSettings.values.abilities?.value?.Ability?.supportRtspEnable;
+        return rtspAbility && rtspAbility?.ver !== 0;
+    }
+
+    hasRtmp() {
+        const rtmpAbility = this.storageSettings.values.abilities?.value?.Ability?.supportRtmpEnable;
+        return rtmpAbility && rtmpAbility?.ver !== 0;
+    }
+
+    hasOnvif() {
+        const onvifAbility = this.storageSettings.values.abilities?.value?.Ability?.supportOnvifEnable;
+        return onvifAbility && onvifAbility?.ver !== 0;
+    }
+
+    hasHttps() {
+        const httpsAbility = this.storageSettings.values.abilities?.value?.Ability?.supportHttpsEnable;
+        return httpsAbility && httpsAbility?.ver !== 0;
     }
 
     async updateDevice() {
@@ -844,7 +865,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // anecdotally, encoders of type h265 do not have a working RTMP main stream.
         const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[rtspChannel]?.mainEncType?.ver;
 
-        if (live === 2) {
+        if (isDeviceHomeHub(deviceInfo)) {
+            streams.push(...[rtspMain, rtspSub]);
+        } else if (live === 2) {
             if (mainEncType === 1) {
                 streams.push(rtmpSub, rtspMain, rtspSub);
             }
@@ -1037,6 +1060,53 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             providerNativeId: this.nativeId,
             devices
         });
+    }
+
+
+    async checkNetData() {
+        try {
+            const api = this.getClientWithToken();
+            const { netData } = await api.getNetData();
+            this.console.log('netData', JSON.stringify(netData));
+            const deviceInfo = this.storageSettings.values.deviceInfo;
+            const isHomeHub = isDeviceHomeHub(deviceInfo);
+
+            const shouldDisableHttps = this.hasHttps() ? netData.httpsEnable === 1 : false;
+            const shouldEnableRtmp = this.hasRtmp() ? (!isHomeHub && netData.rtmpEnable === 0) : false;
+            const shouldDisableRtmp = this.hasRtmp() ? (isHomeHub && netData.rtmpEnable === 1) : false;
+            const shouldEnableRtsp = this.hasRtsp() ? netData.rtspEnable === 0 : false;
+            const shouldEnableOnvif = this.hasOnvif() ? netData.onvifEnable === 0 : false;
+
+            this.console.log(`NetData checks: shouldDisableHttps: ${shouldDisableHttps}, shouldEnableRtmp: ${shouldEnableRtmp}, shouldEnableRtsp: ${shouldEnableRtsp}, shouldEnableOnvif: ${shouldEnableOnvif}, shouldDisableRtmp: ${shouldDisableRtmp}`);
+
+            if (shouldDisableHttps || shouldEnableRtmp || shouldEnableRtsp || shouldEnableOnvif || shouldDisableRtmp) {
+                const newNetData = {
+                    ...netData
+                };
+
+                if (shouldDisableHttps) {
+                    newNetData.httpsEnable = 0;
+                }
+                if (shouldEnableRtmp) {
+                    newNetData.rtmpEnable = 1;
+                }
+                if (shouldDisableRtmp) {
+                    newNetData.rtmpEnable = 0;
+                }
+                if (shouldEnableRtsp) {
+                    newNetData.rtspEnable = 1;
+                }
+                if (shouldEnableOnvif) {
+                    newNetData.onvifEnable = 1;
+                }
+
+                this.console.log(`Fixing netdata settings: ${JSON.stringify(newNetData)}`);
+
+                await api.setNetData(newNetData);
+            }
+        } catch (e) {
+            this.console.error('Error in pollDeviceStates', e);
+        }
     }
 
     async getDevice(nativeId: string): Promise<any> {
