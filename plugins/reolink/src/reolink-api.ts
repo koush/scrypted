@@ -54,6 +54,7 @@ export interface Osd {
     value: Initial;
 }
 
+
 export interface AIDetectionState {
     alarm_state: number;
     support: number;
@@ -74,22 +75,7 @@ export interface PtzPreset {
     name: string;
 }
 
-export interface NetData {
-    httpEnable: 1 | 0,
-    httpPort: number,
-    httpsEnable: 1 | 0,
-    httpsPort: number,
-    mediaPort: number,
-    onvifEnable: 1 | 0,
-    onvifPort: number,
-    rtmpEnable: 1 | 0,
-    rtmpPort: number,
-    rtspEnable: 1 | 0,
-    rtspPort: number
-}
-
 export const isDeviceNvr = (deviceInfo: DevInfo) => ['HOMEHUB', 'NVR', 'NVR_WIFI'].includes(deviceInfo.exactType);
-export const isDeviceHomeHub = (deviceInfo: DevInfo) => deviceInfo.exactType === 'HOMEHUB';
 
 export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
@@ -780,52 +766,5 @@ export class ReolinkCameraClient {
             wifiSignal,
             isWifi
         };
-    }
-
-    async getNetData() {
-        const url = new URL(`http://${this.host}/api.cgi`);
-
-        const body = [{
-            cmd: 'GetNetPort',
-            action: 1,
-        }];
-
-        const response = await this.requestWithLogin({
-            url,
-            method: 'POST',
-            responseType: 'json',
-        }, this.createReadable(body));
-
-        const error = response.body?.[0]?.error;
-        if (error) {
-            this.console.error('error during call to getWhiteLedState', JSON.stringify(body), error);
-        }
-
-
-        return {
-            netData: response.body?.[0]?.value as NetData,
-        };
-    }
-
-    async setNetData(netData: NetData) {
-        const url = new URL(`http://${this.host}/api.cgi`);
-
-        const body = [{
-            cmd: 'SetNetPort',
-            param: {
-                NetPort: netData
-            }
-        }];
-
-        const response = await this.requestWithLogin({
-            url,
-            method: 'POST',
-            responseType: 'json',
-        }, this.createReadable(body));
-
-        const error = response.body?.[0]?.error;
-        if (error) {
-            this.console.error('error during call to setNetData', JSON.stringify(body), error);
-        }
     }
 }
