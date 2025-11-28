@@ -294,28 +294,20 @@ export class ReolinkCameraClient {
     async jpegSnapshot(timeout = 10000) {
         const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
 
-        const body = [
-            {
-                cmd: "Snap",
-                channel: this.channelId.toString(),
-                rs: Date.now().toString()
-            }
-        ];
+        const params = url.searchParams;
+        params.set('cmd', 'Snap');
+        params.set('channel', this.channelId.toString());
+        params.set('rs', Date.now().toString());
 
         let response = await this.requestWithLogin({
             url,
             timeout,
             method: 'POST',
-        }, this.createReadable(body));
+        });
 
         let error = response.body?.[0]?.error;
         if (error) {
             this.console.error('error during call to jpegSnapshot POST, Trying with GET', error);
-
-            const params = url.searchParams;
-            params.set('cmd', 'Snap');
-            params.set('channel', this.channelId.toString());
-            params.set('rs', Date.now().toString());
 
             response = await this.requestWithLogin({
                 url,
@@ -332,16 +324,43 @@ export class ReolinkCameraClient {
         return response.body;
     }
 
-    async getEncoderConfiguration(): Promise<Enc> {
-        const url = new URL(`http://${this.host}/api.cgi`);
-        const params = url.searchParams;
-        params.set('cmd', 'GetEnc');
-        // is channel used on this call?
-        params.set('channel', this.channelId.toString());
-        const response = await this.requestWithLogin({
+    async getEncoderConfiguration() {
+        const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
+
+        const body = [
+            {
+                cmd: "GetEnc",
+                action: 1,
+                param: {
+                    channel: this.channelId,
+                }
+            }
+        ];
+
+        let response = await this.requestWithLogin({
             url,
             responseType: 'json',
-        });
+            method: 'POST',
+        }, this.createReadable(body));
+
+        let error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to getEncoderConfiguration POST, Trying with GET', error);
+
+            const params = url.searchParams;
+            params.set('cmd', 'GetEnc');
+
+            response = await this.requestWithLogin({
+                url,
+                responseType: 'json',
+            });
+
+            error = response.body?.[0]?.error;
+            if (error) {
+                this.console.error('error during call to getEncoderConfiguration GET', error);
+                throw new Error('error during call to getEncoderConfiguration');
+            }
+        }
 
         return response.body?.[0]?.value?.Enc;
     }
