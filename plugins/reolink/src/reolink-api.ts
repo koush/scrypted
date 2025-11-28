@@ -280,7 +280,7 @@ export class ReolinkCameraClient {
 
             error = response.body?.[0]?.error;
             if (error) {
-                this.console.error('error during call to getAbility GET, Trying with POST', error);
+                this.console.error('error during call to getAbility POST', error);
                 throw new Error('error during call to getAbility');
             }
         }
@@ -324,17 +324,37 @@ export class ReolinkCameraClient {
         const url = new URL(`http://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'GetDevInfo');
-        const response = await this.requestWithLogin({
+        let response = await this.requestWithLogin({
             url,
             responseType: 'json',
         });
-        const error = response.body?.[0]?.error;
+
+        let error = response.body?.[0]?.error;
         if (error) {
-            this.console.error('error during call to getDeviceInfo', error);
-            throw new Error('error during call to getDeviceInfo');
+            this.console.error('error during call to getDeviceInfo GET, Trying with POST', error);
+
+            url.search = '';
+
+            const body = [
+                {
+                    cmd: "GetDevInfo",
+                }
+            ];
+
+            response = await this.requestWithLogin({
+                url,
+                responseType: 'json',
+                method: 'POST',
+            }, this.createReadable(body));
+
+            error = response.body?.[0]?.error;
+            if (error) {
+                this.console.error('error during call to getDeviceInfo POST', error);
+                throw new Error('error during call to getDeviceInfo');
+            }
         }
 
-        const deviceInfo: DevInfo = await response.body?.[0]?.value?.DevInfo;
+        const deviceInfo: DevInfo = response.body?.[0]?.value?.DevInfo;
 
         // Will need to check if it's valid for NVR and NVR_WIFI
         if (!isDeviceNvr(deviceInfo)) {
