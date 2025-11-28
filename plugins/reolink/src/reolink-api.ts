@@ -280,7 +280,7 @@ export class ReolinkCameraClient {
 
             error = response.body?.[0]?.error;
             if (error) {
-                this.console.error('error during call to getAbility GET, Trying with POST', error);
+                this.console.error('error during call to getAbility POST', error);
                 throw new Error('error during call to getAbility');
             }
         }
@@ -293,48 +293,112 @@ export class ReolinkCameraClient {
 
     async jpegSnapshot(timeout = 10000) {
         const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
+
         const params = url.searchParams;
         params.set('cmd', 'Snap');
         params.set('channel', this.channelId.toString());
         params.set('rs', Date.now().toString());
 
-        const response = await this.requestWithLogin({
+        let response = await this.requestWithLogin({
             url,
             timeout,
+            method: 'POST',
         });
+
+        let error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to jpegSnapshot POST, Trying with GET', error);
+
+            response = await this.requestWithLogin({
+                url,
+                timeout,
+            });
+
+            error = response.body?.[0]?.error;
+            if (error) {
+                this.console.error('error during call to jpegSnapshot GET', error);
+                throw new Error('error during call to jpegSnapshot');
+            }
+        }
 
         return response.body;
     }
 
-    async getEncoderConfiguration(): Promise<Enc> {
-        const url = new URL(`http://${this.host}/api.cgi`);
-        const params = url.searchParams;
-        params.set('cmd', 'GetEnc');
-        // is channel used on this call?
-        params.set('channel', this.channelId.toString());
-        const response = await this.requestWithLogin({
+    async getEncoderConfiguration() {
+        const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
+
+        const body = [
+            {
+                cmd: "GetEnc",
+                action: 1,
+                param: {
+                    channel: this.channelId,
+                }
+            }
+        ];
+
+        let response = await this.requestWithLogin({
             url,
             responseType: 'json',
-        });
+            method: 'POST',
+        }, this.createReadable(body));
+
+        let error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to getEncoderConfiguration POST, Trying with GET', error);
+
+            const params = url.searchParams;
+            params.set('cmd', 'GetEnc');
+
+            response = await this.requestWithLogin({
+                url,
+                responseType: 'json',
+            });
+
+            error = response.body?.[0]?.error;
+            if (error) {
+                this.console.error('error during call to getEncoderConfiguration GET', error);
+                throw new Error('error during call to getEncoderConfiguration');
+            }
+        }
 
         return response.body?.[0]?.value?.Enc;
     }
 
     async getDeviceInfo(): Promise<DevInfo> {
         const url = new URL(`http://${this.host}/api.cgi`);
-        const params = url.searchParams;
-        params.set('cmd', 'GetDevInfo');
-        const response = await this.requestWithLogin({
+
+        const body = [
+            {
+                cmd: "GetDevInfo",
+            }
+        ];
+
+        let response = await this.requestWithLogin({
             url,
             responseType: 'json',
-        });
-        const error = response.body?.[0]?.error;
+            method: 'POST',
+        }, this.createReadable(body));
+
+        let error = response.body?.[0]?.error;
         if (error) {
-            this.console.error('error during call to getDeviceInfo', error);
-            throw new Error('error during call to getDeviceInfo');
+            this.console.error('error during call to getDeviceInfo POST, Trying with GET', error);
+
+            const params = url.searchParams;
+            params.set('cmd', 'GetDevInfo');
+            response = await this.requestWithLogin({
+                url,
+                responseType: 'json',
+            });
+
+            error = response.body?.[0]?.error;
+            if (error) {
+                this.console.error('error during call to getDeviceInfo GET', error);
+                throw new Error('error during call to getDeviceInfo');
+            }
         }
 
-        const deviceInfo: DevInfo = await response.body?.[0]?.value?.DevInfo;
+        const deviceInfo: DevInfo = response.body?.[0]?.value?.DevInfo;
 
         // Will need to check if it's valid for NVR and NVR_WIFI
         if (!isDeviceNvr(deviceInfo)) {
@@ -343,7 +407,7 @@ export class ReolinkCameraClient {
 
         // If the device is listed as homehub, fetch the channel specific information
         url.search = '';
-        const body = [
+        const additionalInfoBody = [
             { cmd: "GetChnTypeInfo", action: 0, param: { channel: this.channelId } },
             { cmd: "GetChannelstatus", action: 0, param: {} },
         ]
@@ -352,7 +416,7 @@ export class ReolinkCameraClient {
             url,
             method: 'POST',
             responseType: 'json'
-        }, this.createReadable(body));
+        }, this.createReadable(additionalInfoBody));
 
         const chnTypeInfo = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChnTypeInfo');
         const chnStatus = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChannelstatus');
