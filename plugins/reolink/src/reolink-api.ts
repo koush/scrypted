@@ -298,10 +298,36 @@ export class ReolinkCameraClient {
         params.set('channel', this.channelId.toString());
         params.set('rs', Date.now().toString());
 
-        const response = await this.requestWithLogin({
+        let response = await this.requestWithLogin({
             url,
             timeout,
         });
+        let error = response.body?.[0]?.error;
+        if (error) {
+            this.console.error('error during call to jpegSnapshot GET, Trying with POST', error);
+
+            url.search = '';
+
+            const body = [
+                {
+                    cmd: "Snap",
+                    channel: this.channelId.toString(),
+                    rs: Date.now().toString()
+                }
+            ];
+
+            response = await this.requestWithLogin({
+                url,
+                timeout,
+                method: 'POST',
+            }, this.createReadable(body));
+
+            error = response.body?.[0]?.error;
+            if (error) {
+                this.console.error('error during call to jpegSnapshot POST', error);
+                throw new Error('error during call to jpegSnapshot');
+            }
+        }
 
         return response.body;
     }
