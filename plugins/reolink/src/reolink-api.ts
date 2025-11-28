@@ -293,38 +293,38 @@ export class ReolinkCameraClient {
 
     async jpegSnapshot(timeout = 10000) {
         const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
-        const params = url.searchParams;
-        params.set('cmd', 'Snap');
-        params.set('channel', this.channelId.toString());
-        params.set('rs', Date.now().toString());
+
+        const body = [
+            {
+                cmd: "Snap",
+                channel: this.channelId.toString(),
+                rs: Date.now().toString()
+            }
+        ];
 
         let response = await this.requestWithLogin({
             url,
             timeout,
-        });
+            method: 'POST',
+        }, this.createReadable(body));
+
         let error = response.body?.[0]?.error;
         if (error) {
-            this.console.error('error during call to jpegSnapshot GET, Trying with POST', error);
+            this.console.error('error during call to jpegSnapshot POST, Trying with GET', error);
 
-            url.search = '';
-
-            const body = [
-                {
-                    cmd: "Snap",
-                    channel: this.channelId.toString(),
-                    rs: Date.now().toString()
-                }
-            ];
+            const params = url.searchParams;
+            params.set('cmd', 'Snap');
+            params.set('channel', this.channelId.toString());
+            params.set('rs', Date.now().toString());
 
             response = await this.requestWithLogin({
                 url,
                 timeout,
-                method: 'POST',
-            }, this.createReadable(body));
+            });
 
             error = response.body?.[0]?.error;
             if (error) {
-                this.console.error('error during call to jpegSnapshot POST', error);
+                this.console.error('error during call to jpegSnapshot GET', error);
                 throw new Error('error during call to jpegSnapshot');
             }
         }
@@ -348,34 +348,33 @@ export class ReolinkCameraClient {
 
     async getDeviceInfo(): Promise<DevInfo> {
         const url = new URL(`http://${this.host}/api.cgi`);
-        const params = url.searchParams;
-        params.set('cmd', 'GetDevInfo');
+
+        const body = [
+            {
+                cmd: "GetDevInfo",
+            }
+        ];
+
         let response = await this.requestWithLogin({
             url,
             responseType: 'json',
-        });
+            method: 'POST',
+        }, this.createReadable(body));
 
         let error = response.body?.[0]?.error;
         if (error) {
-            this.console.error('error during call to getDeviceInfo GET, Trying with POST', error);
+            this.console.error('error during call to getDeviceInfo POST, Trying with GET', error);
 
-            url.search = '';
-
-            const body = [
-                {
-                    cmd: "GetDevInfo",
-                }
-            ];
-
+            const params = url.searchParams;
+            params.set('cmd', 'GetDevInfo');
             response = await this.requestWithLogin({
                 url,
                 responseType: 'json',
-                method: 'POST',
-            }, this.createReadable(body));
+            });
 
             error = response.body?.[0]?.error;
             if (error) {
-                this.console.error('error during call to getDeviceInfo POST', error);
+                this.console.error('error during call to getDeviceInfo GET', error);
                 throw new Error('error during call to getDeviceInfo');
             }
         }
@@ -389,7 +388,7 @@ export class ReolinkCameraClient {
 
         // If the device is listed as homehub, fetch the channel specific information
         url.search = '';
-        const body = [
+        const additionalInfoBody = [
             { cmd: "GetChnTypeInfo", action: 0, param: { channel: this.channelId } },
             { cmd: "GetChannelstatus", action: 0, param: {} },
         ]
@@ -398,7 +397,7 @@ export class ReolinkCameraClient {
             url,
             method: 'POST',
             responseType: 'json'
-        }, this.createReadable(body));
+        }, this.createReadable(additionalInfoBody));
 
         const chnTypeInfo = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChnTypeInfo');
         const chnStatus = additionalInfoResponse?.body?.find(elem => elem.cmd === 'GetChannelstatus');
