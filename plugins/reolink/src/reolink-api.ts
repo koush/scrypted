@@ -90,7 +90,7 @@ export interface NetData {
 }
 
 export const isDeviceNvr = (deviceInfo: DevInfo) => ['HOMEHUB', 'NVR', 'NVR_WIFI'].includes(deviceInfo.exactType);
-export const isDeviceHomeHub = (deviceInfo: DevInfo) => deviceInfo.exactType === 'HOMEHUB';
+export const isDeviceHomeHub = (deviceInfo: DevInfo) => deviceInfo?.exactType === 'HOMEHUB';
 
 export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
