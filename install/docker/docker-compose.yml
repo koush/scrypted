@@ -145,7 +145,7 @@ services:
             - WATCHTOWER_HTTP_API_UPDATE=true
             - WATCHTOWER_SCOPE=scrypted
             - WATCHTOWER_HTTP_API_PERIODIC_POLLS=${WATCHTOWER_HTTP_API_PERIODIC_POLLS:-true}
-        image: containrrr/watchtower
+        image: nicholas-fedor/watchtower
         container_name: scrypted-watchtower
         restart: unless-stopped
         volumes:
