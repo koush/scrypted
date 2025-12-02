@@ -8,6 +8,7 @@ import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
 import { DevInfo } from './probe';
 import { AIState, Enc, isDeviceHomeHub, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
+import { ReolinkNvrDevice } from './nvr/nvr';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     sirenTimeout: NodeJS.Timeout;
@@ -1134,8 +1135,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 }
 
 class ReolinkProvider extends RtspProvider {
+    nvrDevices = new Map<string, ReolinkNvrDevice>();
+
     getScryptedDeviceCreator(): string {
-        return 'Reolink Camera';
+        return 'Reolink Camera/NVR';
     }
 
     getAdditionalInterfaces() {
@@ -1149,63 +1152,117 @@ class ReolinkProvider extends RtspProvider {
         ];
     }
 
+    getDevice(nativeId: string) {
+        if (nativeId.endsWith('-reolink-nvr')) {
+            let ret = this.nvrDevices.get(nativeId);
+            if (!ret) {
+                ret = this.createNVRDevice(nativeId);
+                if (ret)
+                    this.nvrDevices.set(nativeId, ret);
+            }
+
+            return ret;
+        } else {
+            return super.getDevice(nativeId);
+        }
+    }
+
     async createDevice(settings: DeviceCreatorSettings, nativeId?: string): Promise<string> {
-        const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
         let info: DeviceInformation = {};
 
         const skipValidate = settings.skipValidate?.toString() === 'true';
         const username = settings.username?.toString();
         const password = settings.password?.toString();
-        let doorbell: boolean = false;
-        let name: string = 'Reolink Camera';
-        let deviceInfo: DevInfo;
-        let ai;
-        let abilities;
-        const rtspChannel = parseInt(settings.rtspChannel?.toString()) || 0;
-        if (!skipValidate) {
-            const api = new ReolinkCameraClient(httpAddress, username, password, rtspChannel, this.console);
-            const apiWithToken = new ReolinkCameraClient(httpAddress, username, password, rtspChannel, this.console, true);
-            try {
-                await api.jpegSnapshot();
-            }
-            catch (e) {
-                this.console.error('Error adding Reolink camera', e);
-                throw e;
-            }
+        const ip = settings.ip?.toString();
+        const httpPort = settings.httpPort;
+        const isNvr = settings.isNvr?.toString() === 'true';
+        const rtspPort = settings.rtspPort;
+        const httpAddress = `${ip}:${httpPort || 80}`;
 
-            try {
-                deviceInfo = await api.getDeviceInfo();
-                doorbell = deviceInfo.type === 'BELL';
-                name = deviceInfo.name ?? 'Reolink Camera';
-                ai = await api.getAiState();
+        if (isNvr) {
+            const apiWithToken = new ReolinkCameraClient(httpAddress, username, password, undefined, this.console, true);
+            const devInfo = await apiWithToken.getDeviceInfo();
+
+            if (!devInfo) {
+                throw new Error('Unable to connect to Reolink NVR. Please verify the IP address, port, username, and password are correct.');
+            }``
+
+            const { detail, name } = devInfo;
+            const nativeId = `${detail}-reolink-nvr`;
+
+            await sdk.deviceManager.onDeviceDiscovered({
+                nativeId,
+                name,
+                interfaces: [
+                    ScryptedInterface.Settings,
+                    ScryptedInterface.DeviceDiscovery,
+                    ScryptedInterface.DeviceProvider,
+                    ScryptedInterface.Reboot,
+                ],
+                type: ScryptedDeviceType.API,
+            });
+
+            const nvrDevice = await this.getDevice(nativeId) as ReolinkNvrDevice;
+            nvrDevice.storageSettings.values.ipAddress = ip;
+            nvrDevice.storageSettings.values.username = username;
+            nvrDevice.storageSettings.values.password = password;
+            nvrDevice.storageSettings.values.httpPort = httpPort;
+            nvrDevice.storageSettings.values.rtspPort = rtspPort;
+            nvrDevice.updateDeviceInfo(devInfo);
+
+            return nativeId;
+        } else {
+            let doorbell: boolean = false;
+            let name: string = 'Reolink Camera';
+            let deviceInfo: DevInfo;
+            let ai;
+            let abilities;
+            const rtspChannel = parseInt(settings.rtspChannel?.toString()) || 0;
+            if (!skipValidate) {
+                const api = new ReolinkCameraClient(httpAddress, username, password, rtspChannel, this.console);
+                const apiWithToken = new ReolinkCameraClient(httpAddress, username, password, rtspChannel, this.console, true);
                 try {
-                    abilities = await api.getAbility();
-                } catch (e) {
-                    abilities = await apiWithToken.getAbility();
+                    await api.jpegSnapshot();
+                }
+                catch (e) {
+                    this.console.error('Error adding Reolink camera', e);
+                    throw e;
+                }
+
+                try {
+                    deviceInfo = await api.getDeviceInfo();
+                    doorbell = deviceInfo.type === 'BELL';
+                    name = deviceInfo.name ?? 'Reolink Camera';
+                    ai = await api.getAiState();
+                    try {
+                        abilities = await api.getAbility();
+                    } catch (e) {
+                        abilities = await apiWithToken.getAbility();
+                    }
+                }
+                catch (e) {
+                    this.console.error('Reolink camera does not support AI events', e);
                 }
             }
-            catch (e) {
-                this.console.error('Reolink camera does not support AI events', e);
-            }
+            settings.newCamera ||= name;
+
+            nativeId = await super.createDevice(settings, nativeId);
+
+            const device = await this.getDevice(nativeId) as ReolinkCamera;
+            device.info = info;
+            device.putSetting('username', username);
+            device.putSetting('password', password);
+            device.storageSettings.values.doorbell = doorbell;
+            device.storageSettings.values.deviceInfo = deviceInfo;
+            device.storageSettings.values.abilities = abilities;
+            device.storageSettings.values.hasObjectDetector = ai;
+            device.setIPAddress(settings.ip?.toString());
+            device.putSetting('rtspChannel', settings.rtspChannel?.toString());
+            device.setHttpPortOverride(settings.httpPort?.toString());
+            device.updateDeviceInfo();
+
+            return nativeId;
         }
-        settings.newCamera ||= name;
-
-        nativeId = await super.createDevice(settings, nativeId);
-
-        const device = await this.getDevice(nativeId) as ReolinkCamera;
-        device.info = info;
-        device.putSetting('username', username);
-        device.putSetting('password', password);
-        device.storageSettings.values.doorbell = doorbell;
-        device.storageSettings.values.deviceInfo = deviceInfo;
-        device.storageSettings.values.abilities = abilities;
-        device.storageSettings.values.hasObjectDetector = ai;
-        device.setIPAddress(settings.ip?.toString());
-        device.putSetting('rtspChannel', settings.rtspChannel?.toString());
-        device.setHttpPortOverride(settings.httpPort?.toString());
-        device.updateDeviceInfo();
-
-        return nativeId;
     }
 
     async getCreateDeviceSettings(): Promise<Setting[]> {
@@ -1223,6 +1280,12 @@ class ReolinkProvider extends RtspProvider {
                 key: 'ip',
                 title: 'IP Address',
                 placeholder: '192.168.2.222',
+            },
+            {
+                key: 'isNvr',
+                title: 'Is NVR',
+                description: 'Set if adding a Reolink NVR device. This will allow adding cameras connected to the NVR.',
+                type: 'boolean',
             },
             {
                 subgroup: 'Advanced',
@@ -1251,6 +1314,10 @@ class ReolinkProvider extends RtspProvider {
 
     createCamera(nativeId: string) {
         return new ReolinkCamera(nativeId, this);
+    }
+
+    createNVRDevice(nativeId: string) {
+        return new ReolinkNvrDevice(nativeId, this);
     }
 }
 
