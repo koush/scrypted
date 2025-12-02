@@ -487,6 +487,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
     async updateDevice() {
         const interfaces = this.provider.getInterfaces();
+        interfaces.push(this.pluginId);
         let type = ScryptedDeviceType.Camera;
         let name = 'Reolink Camera';
         if (this.storageSettings.values.doorbell) {

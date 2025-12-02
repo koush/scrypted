@@ -430,6 +430,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
         const ptzCapabilities = JSON.parse(this.storage.getItem('ptzCapabilities') || '[]') as string[];
 
         const interfaces = this.provider.getInterfaces();
+        interfaces.push(this.pluginId);
         let type: ScryptedDeviceType = undefined;
         if (isDoorbell) {
             type = ScryptedDeviceType.Doorbell;
