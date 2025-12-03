@@ -2489,6 +2489,7 @@ export enum ScryptedInterface {
   StreamService = 'StreamService',
   TTY = 'TTY',
   TTYSettings = 'TTYSettings',
+  WebComponent = "WebComponent",
 
   ChatCompletion = "ChatCompletion",
   TextEmbedding = "TextEmbedding",

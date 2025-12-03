@@ -216,6 +216,7 @@ class ScryptedInterface(str, Enum):
     VideoRecorderManagement = "VideoRecorderManagement"
     VideoTextOverlays = "VideoTextOverlays"
     VOCSensor = "VOCSensor"
+    WebComponent = "WebComponent"
 
 class ScryptedMimeTypes(str, Enum):
 
@@ -1072,6 +1073,13 @@ class VideoTextOverlay(TypedDict):
     readonly: bool
     text: str | bool  # The text value to set the overlay to, if it is not readonly. True or false otherwise to enable/disable.
 
+class WebComponentManifest(TypedDict):
+    """WebComponentManifest describes a web component to be rendered in the Scrypted management console."""
+
+    name: str  # The name of the web component.
+    scripts: list[str]  # Raw scripts to be included in the web component.
+    styles: list[str]  # Raw styles to be included in the web component.
+
 class ChatCompletionMessageParam(TypedDict):
     """
     Developer-provided instructions that the model should follow, regardless of messages sent by the user. With o1 models and newer, 
@@ -1851,6 +1859,13 @@ class VOCSensor:
 
     vocDensity: float
 
+class WebComponent:
+    """WebComponent allows plugins to expose custom web components to be used in the Scrypted management console."""
+
+    async def getWebComponent(self) -> WebComponentManifest:
+        pass
+
+
 class Logger:
     """Logger is exposed via log.* to allow writing to the Scrypted log."""
 
@@ -2224,6 +2239,7 @@ class ScryptedInterfaceMethods(str, Enum):
     generateVideoFrames = "generateVideoFrames"
     connectStream = "connectStream"
     getTTYSettings = "getTTYSettings"
+    getWebComponent = "getWebComponent"
     getChatCompletion = "getChatCompletion"
     streamChatCompletion = "streamChatCompletion"
     getTextEmbedding = "getTextEmbedding"
@@ -3531,6 +3547,13 @@ ScryptedInterfaceDescriptors = {
     "name": "TTYSettings",
     "methods": [
       "getTTYSettings"
+    ],
+    "properties": []
+  },
+  "WebComponent": {
+    "name": "WebComponent",
+    "methods": [
+      "getWebComponent"
     ],
     "properties": []
   },
