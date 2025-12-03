@@ -1681,7 +1681,7 @@ export interface ObjectsDetected {
   resources?: VideoResource;
   /**
    * The id of the generation source.
-   * Can be a camera id or a plugin id 
+   * Can be a camera id or a plugin id
    */
   sourceId?: string;
 }
@@ -1815,6 +1815,29 @@ export interface TTYSettings {
   getTTYSettings(): Promise<{
     paths?: string[];
   }>;
+}
+/**
+ * WebComponent allows plugins to expose custom web components to be used in the Scrypted management console.
+ */
+export interface WebComponent {
+  getWebComponent(): Promise<WebComponentManifest>;
+}
+/**
+ * WebComponentManifest describes a web component to be rendered in the Scrypted management console.
+ */
+export interface WebComponentManifest {
+  /**
+   * Raw scripts to be included in the web component.
+   */
+  scripts?: string[];
+  /**
+   * Raw styles to be included in the web component.
+   */
+  styles?: string[];
+  /**
+   * The name of the web component.
+   */
+  name: string;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -2256,8 +2279,8 @@ export interface HttpResponse {
 
   /**
    * @deprecated
-   * @param socket 
-   * @param options 
+   * @param socket
+   * @param options
    */
   sendSocket(socket: any, options?: HttpResponseOptions): void;
 
@@ -2685,7 +2708,7 @@ export interface ClusterForkInterfaceOptions extends Required<Pick<ForkOptions, 
 }
 
 /**
- * Requests that the ScryptedDevice create a fork to 
+ * Requests that the ScryptedDevice create a fork to
  */
 export interface ClusterForkInterface {
   forkInterface(forkInterface: ScryptedInterface.ObjectDetection, options?: ClusterForkInterfaceOptions): Promise<ObjectDetection>;
