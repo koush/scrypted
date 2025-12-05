@@ -1,10 +1,10 @@
 import type { ChildProcess as NodeChildProcess } from 'child_process';
 import type { Socket as NodeNetSocket } from 'net';
-import type { ChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
-import type { ChatCompletionChunk, ChatCompletionCreateParamsNonStreaming, ChatCompletionFunctionTool, ChatCompletionMessageParam, ChatCompletion as ChatCompletionResponse } from 'openai/resources';
+import type { ChatCompletionStreamParams as OpenAIChatCompletionStreamParams } from 'openai/lib/ChatCompletionStream';
+import type { ChatCompletionChunk, ChatCompletionFunctionTool, ChatCompletionMessageParam, ChatCompletion as ChatCompletionResponse, ChatCompletionCreateParamsNonStreaming as OpenAIChatCompletionCreateParamsNonStreaming } from 'openai/resources';
 import type { Worker as NodeWorker } from 'worker_threads';
 import { CallToolResult } from './mcp';
-export type { ChatCompletionChunk, ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming, ChatCompletionFunctionTool, ChatCompletionMessageParam, ChatCompletion as ChatCompletionResponse } from 'openai/resources';
+export type { ChatCompletionChunk, ChatCompletionFunctionTool, ChatCompletionMessageParam, ChatCompletion as ChatCompletionResponse } from 'openai/resources';
 export type * from './mcp';
 
 export type ScryptedNativeId = string | undefined;
@@ -1085,6 +1085,14 @@ export interface ChatCompletionCapabilities {
   audio?: boolean;
   imageGeneration?: boolean;
   audioGeneration?: boolean;
+}
+
+export interface ChatCompletionStreamParams extends OpenAIChatCompletionStreamParams {
+  [key: string]: any;
+}
+
+export interface ChatCompletionCreateParamsNonStreaming extends OpenAIChatCompletionCreateParamsNonStreaming {
+  [key: string]: any;
 }
 
 export interface ChatCompletion {
@@ -2844,10 +2852,10 @@ export interface ClusterManager {
 }
 
 export interface ConnectRPCObjectOptions {
-    dedicatedTransport?: {
-      receiveTimeout?: number;
-      sendTimeout?: number;
-    };
+  dedicatedTransport?: {
+    receiveTimeout?: number;
+    sendTimeout?: number;
+  };
 }
 
 export interface ScryptedStatic {
