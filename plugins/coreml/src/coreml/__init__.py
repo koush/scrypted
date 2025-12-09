@@ -79,6 +79,10 @@ class CoreMLPlugin(
     def __init__(self, nativeId: str | None = None, forked: bool = False):
         super().__init__(nativeId=nativeId, forked=forked)
 
+        # this used to work but a bug in macos is causing recompilation of the coreml models every time it restarts
+        # and the cache is not reused and also not cleared until the whole system reboots.
+        self.periodic_restart = False
+
         self.custom_models = {}
 
         model = self.storage.getItem("model") or "Default"
