@@ -1077,7 +1077,7 @@ export interface PanTiltZoomCommand {
 
 export interface LLMTools {
   getLLMTools(): Promise<ChatCompletionFunctionTool[]>;
-  callLLMTool(name: string, parameters: Record<string, any>): Promise<CallToolResult>;
+  callLLMTool(toolCallId: string, name: string, parameters: Record<string, any>): Promise<CallToolResult>;
 }
 
 export interface ChatCompletionCapabilities {

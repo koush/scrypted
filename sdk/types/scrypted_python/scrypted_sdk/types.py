@@ -1131,7 +1131,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.50"
+TYPES_VERSION = "0.5.52"
 
 
 class AirPurifier:
@@ -1386,7 +1386,7 @@ class LauncherApplication:
 
 class LLMTools:
 
-    async def callLLMTool(self, name: str, parameters: Mapping[str, Any]) -> CallToolResult:
+    async def callLLMTool(self, toolCallId: str, name: str, parameters: Mapping[str, Any]) -> CallToolResult:
         pass
 
     async def getLLMTools(self) -> list[ChatCompletionFunctionTool]:
