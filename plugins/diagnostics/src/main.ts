@@ -12,6 +12,14 @@ import sharp from 'sharp';
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
 class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     storageSettings = new StorageSettings(this, {
+        validateSystem: {
+            console: true,
+            group: 'System',
+            title: 'Validate System',
+            description: 'Validate the system configuration.',
+            type: 'button',
+            onPut: () => this.validateSystem(),
+        },
         testDevice: {
             group: 'Device',
             title: 'Validation Device',
@@ -29,14 +37,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             onPut: async () => {
                 this.validateDevice();
             },
-        },
-        validateSystem: {
-            console: true,
-            group: 'System',
-            title: 'Validate System',
-            description: 'Validate the system configuration.',
-            type: 'button',
-            onPut: () => this.validateSystem(),
         },
     });
 
@@ -530,6 +530,29 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                     throw new Error('Person not detected in test image.');
             });
         }
+
+        await this.validate(this.console, 'External Resource Access', async () => {
+            const urls = [
+                'https://huggingface.co/koushd/clip/resolve/main/requirements.txt',
+                'https://raw.githubusercontent.com/koush/openvino-models/refs/heads/main/scrypted_labels.txt',
+                'https://registry.npmjs.org/@scrypted/server'
+            ];
+
+            for (const url of urls) {
+                try {
+                    const response = await httpFetch({
+                        url,
+                        timeout: 5000,
+                    });
+
+                    if (response.statusCode >= 400) {
+                        throw new Error(`${url} returned status ${response.statusCode}`);
+                    }
+                } catch (error) {
+                    throw new Error(`${url} is not accessible: ${(error as Error).message}`);
+                }
+            }
+        });
 
         if (nvrPlugin) {
             await this.validate(this.console, "GPU Decode", async () => {
