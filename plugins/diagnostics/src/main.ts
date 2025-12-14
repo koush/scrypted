@@ -132,8 +132,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             if (!(similarityDogs < similarityCats && similarityCats < similarityVerySpecific)) {
                 throw new Error(`Similarity ordering incorrect: dogs=${similarityDogs}, cats=${similarityCats}, veryspecific=${similarityVerySpecific}`);
             }
-
-            return `Similarity ordering correct: dogs(${similarityDogs.toFixed(4)}) < cats(${similarityCats.toFixed(4)}) < veryspecific(${similarityVerySpecific.toFixed(4)})`;
         });
 
         // Consolidated loop for detection plugins
