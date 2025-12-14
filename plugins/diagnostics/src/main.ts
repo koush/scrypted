@@ -1,6 +1,6 @@
 import { Deferred } from '@scrypted/common/src/deferred';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
-import sdk, { Camera, FFmpegInput, Image, MediaObject, MediaStreamDestination, MotionSensor, Notifier, ObjectDetection, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import sdk, { Camera, FFmpegInput, Image, MediaObject, MediaStreamDestination, MotionSensor, Notifier, ObjectDetection, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, TextEmbedding, ImageEmbedding } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import child_process from 'child_process';
 import dns from 'dns';
@@ -10,6 +10,18 @@ import net from 'net';
 import os from 'os';
 import sharp from 'sharp';
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
+
+function cosineSimilarityPrenormalized(e1: Buffer, e2: Buffer) {
+    const embedding1 = new Float32Array(e1.buffer, e1.byteOffset, e1.length / Float32Array.BYTES_PER_ELEMENT);
+    const embedding2 = new Float32Array(e2.buffer, e2.byteOffset, e2.length / Float32Array.BYTES_PER_ELEMENT);
+
+    let dotProduct = 0;
+    for (let i = 0; i < embedding1.length; i++) {
+        dotProduct += embedding1[i] * embedding2[i];
+    }
+    return dotProduct;
+}
+
 class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     storageSettings = new StorageSettings(this, {
         validateSystem: {
@@ -85,6 +97,104 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         }
         catch (e) {
             console.error(stepName.padEnd(24), '\x1b[31m Failed\x1b[0m'.padEnd(24), (e as Error).message);
+        }
+    }
+
+    async validateNVR() {
+        const console = this.console;
+        const nvrPlugin = sdk.systemManager.getDeviceById('@scrypted/nvr');
+
+        if (!nvrPlugin) {
+            await this.validate(console, 'NVR Plugin Check', async () => {
+                throw new Error('NVR plugin not installed.');
+            });
+            return;
+        }
+
+        // Validate CLIP embeddings with specific test
+        await this.validate(console, 'CLIP Embedding Test', async () => {
+            const clip = sdk.systemManager.getDeviceByName<TextEmbedding & ImageEmbedding>('CoreML CLIP Embedding');
+
+            if (!clip) {
+                throw new Error('CoreML CLIP Embedding device not found.');
+            }
+
+            const mo = await sdk.mediaManager.createMediaObjectFromUrl('http://images.cocodataset.org/val2017/000000039769.jpg');
+            const imageEmbedding = await clip.getImageEmbedding(mo);
+            const veryspecific = await clip.getTextEmbedding('two cats sleeping on a pink blanket');
+            const cats = await clip.getTextEmbedding('cat');
+            const dogs = await clip.getTextEmbedding('dog');
+
+            const similarityDogs = cosineSimilarityPrenormalized(imageEmbedding, dogs);
+            const similarityCats = cosineSimilarityPrenormalized(imageEmbedding, cats);
+            const similarityVerySpecific = cosineSimilarityPrenormalized(imageEmbedding, veryspecific);
+
+            if (!(similarityDogs < similarityCats && similarityCats < similarityVerySpecific)) {
+                throw new Error(`Similarity ordering incorrect: dogs=${similarityDogs}, cats=${similarityCats}, veryspecific=${similarityVerySpecific}`);
+            }
+
+            return `Similarity ordering correct: dogs(${similarityDogs.toFixed(4)}) < cats(${similarityCats.toFixed(4)}) < veryspecific(${similarityVerySpecific.toFixed(4)})`;
+        });
+
+        // Consolidated loop for detection plugins
+        const detectionPlugins = [
+            '@scrypted/onnx',
+            '@scrypted/openvino',
+            '@scrypted/coreml',
+            '@scrypted/ncnn',
+            '@scrypted/tensorflow-lite'
+        ];
+
+        for (const pluginId of detectionPlugins) {
+            const plugin = sdk.systemManager.getDeviceById<Settings & ObjectDetection>(pluginId);
+
+            if (!plugin) {
+                continue;
+            }
+
+            // Detect objects test
+            await this.validate(console, `${pluginId} Detection`, async () => {
+                const settings = await plugin.getSettings();
+                const executionDevice = settings.find(s => s.key === 'execution_device');
+                if (executionDevice?.value?.toString().includes('CPU')) {
+                    this.warnStep(console, 'Using CPU execution. GPU recommended for better performance.');
+                }
+
+                const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
+                const detected = await plugin.detectObjects(zidane);
+                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
+                if (!personFound) {
+                    throw new Error('Person not detected in test image.');
+                }
+            });
+
+            // CLIP implementation test
+            await this.validate(console, `${pluginId} CLIP`, async () => {
+                const clip = sdk.systemManager.getDeviceById<TextEmbedding & ImageEmbedding>(pluginId, 'clipembedding');
+
+                if (!clip) {
+                    return;
+                }
+
+                // Test CLIP functionality
+                const testText = 'test';
+                const textEmbedding = await clip.getTextEmbedding(testText);
+                if (!textEmbedding || textEmbedding.length === 0) {
+                    throw new Error('Failed to get text embedding.');
+                }
+
+                const testImage = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
+                const imageEmbedding = await clip.getImageEmbedding(testImage);
+                if (!imageEmbedding || imageEmbedding.length === 0) {
+                    throw new Error('Failed to get image embedding.');
+                }
+
+                // Test similarity calculation
+                const similarity = cosineSimilarityPrenormalized(imageEmbedding, textEmbedding);
+                if (typeof similarity !== 'number') {
+                    throw new Error('Failed to calculate similarity.');
+                }
+            });
         }
     }
 
@@ -507,12 +617,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 const executionDevice = settings.find(s => s.key === 'execution_device');
                 if (executionDevice?.value?.toString().includes('CPU'))
                     this.warnStep(this.console, 'GPU device unvailable or not passed through to container.');
-
-                const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
-                const detected = await onnxPlugin.detectObjects(zidane);
-                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
-                if (!personFound)
-                    throw new Error('Person not detected in test image.');
             });
         }
 
@@ -522,14 +626,10 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 const availbleDevices = settings.find(s => s.key === 'available_devices');
                 if (!availbleDevices?.value?.toString().includes('GPU'))
                     this.warnStep(this.console, 'GPU device unvailable or not passed through to container.');
-
-                const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
-                const detected = await openvinoPlugin.detectObjects(zidane);
-                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
-                if (!personFound)
-                    throw new Error('Person not detected in test image.');
             });
         }
+
+        await this.validateNVR();
 
         await this.validate(this.console, 'External Resource Access', async () => {
             const urls = [
