@@ -111,29 +111,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             return;
         }
 
-        // Validate CLIP embeddings with specific test
-        await this.validate(console, 'CLIP Embedding Test', async () => {
-            const clip = sdk.systemManager.getDeviceByName<TextEmbedding & ImageEmbedding>('CoreML CLIP Embedding');
-
-            if (!clip) {
-                throw new Error('CoreML CLIP Embedding device not found.');
-            }
-
-            const mo = await sdk.mediaManager.createMediaObjectFromUrl('http://images.cocodataset.org/val2017/000000039769.jpg');
-            const imageEmbedding = await clip.getImageEmbedding(mo);
-            const veryspecific = await clip.getTextEmbedding('two cats sleeping on a pink blanket');
-            const cats = await clip.getTextEmbedding('cat');
-            const dogs = await clip.getTextEmbedding('dog');
-
-            const similarityDogs = cosineSimilarityPrenormalized(imageEmbedding, dogs);
-            const similarityCats = cosineSimilarityPrenormalized(imageEmbedding, cats);
-            const similarityVerySpecific = cosineSimilarityPrenormalized(imageEmbedding, veryspecific);
-
-            if (!(similarityDogs < similarityCats && similarityCats < similarityVerySpecific)) {
-                throw new Error(`Similarity ordering incorrect: dogs=${similarityDogs}, cats=${similarityCats}, veryspecific=${similarityVerySpecific}`);
-            }
-        });
-
         // Consolidated loop for detection plugins
         const detectionPlugins = [
             '@scrypted/onnx',
@@ -151,7 +128,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             }
 
             // Detect objects test
-            await this.validate(console, `${pluginId} Detection`, async () => {
+            await this.validate(console, `${pluginId}`, async () => {
                 const settings = await plugin.getSettings();
                 const executionDevice = settings.find(s => s.key === 'execution_device');
                 if (executionDevice?.value?.toString().includes('CPU')) {
@@ -166,14 +143,15 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 }
             });
 
+            const clip = sdk.systemManager.getDeviceById<TextEmbedding & ImageEmbedding>(pluginId, 'clipembedding');
+
+            // tflite and ncnn doesnt have it
+            if (!clip) {
+                continue;
+            }
+
             // CLIP implementation test
             await this.validate(console, `${pluginId} CLIP`, async () => {
-                const clip = sdk.systemManager.getDeviceById<TextEmbedding & ImageEmbedding>(pluginId, 'clipembedding');
-
-                if (!clip) {
-                    return;
-                }
-
                 // Test CLIP functionality
                 const testText = 'test';
                 const textEmbedding = await clip.getTextEmbedding(testText);
