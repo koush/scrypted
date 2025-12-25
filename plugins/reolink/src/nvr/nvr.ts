@@ -1,4 +1,4 @@
-import sdk, { Settings, ScryptedDeviceBase, Setting, SettingValue, DeviceDiscovery, AdoptDevice, DiscoveredDevice, Device, ScryptedInterface, ScryptedDeviceType, DeviceProvider, Reboot } from "@scrypted/sdk";
+import sdk, { Settings, ScryptedDeviceBase, Setting, SettingValue, DeviceDiscovery, AdoptDevice, DiscoveredDevice, Device, ScryptedInterface, ScryptedDeviceType, DeviceProvider, Reboot, DeviceCreatorSettings } from "@scrypted/sdk";
 import ReolinkProvider from "../main";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { DevInfo } from "../probe";
@@ -15,16 +15,19 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
         ipAddress: {
             title: 'IP address',
             type: 'string',
+            onPut: async () => await this.reinit()
         },
         username: {
             title: 'Username',
             placeholder: 'admin',
             defaultValue: 'admin',
             type: 'string',
+            onPut: async () => await this.reinit()
         },
         password: {
             title: 'Password',
             type: 'password',
+            onPut: async () => await this.reinit()
         },
         httpPort: {
             title: 'HTTP Port',
@@ -32,20 +35,23 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             defaultValue: 80,
             placeholder: '80',
             type: 'number',
+            onPut: async () => await this.reinit()
         },
         rtspPort: {
             subgroup: 'Advanced',
             title: 'RTSP Port',
             placeholder: '554',
             defaultValue: 554,
-            type: 'number'
+            type: 'number',
+            onPut: async () => await this.reinit()
         },
         rtmpPort: {
             subgroup: 'Advanced',
             title: 'RTMP Port',
             placeholder: '1935',
             defaultValue: 1935,
-            type: 'number'
+            type: 'number',
+            onPut: async () => await this.reinit()
         },
         abilities: {
             json: true,
@@ -80,7 +86,9 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
         super(nativeId);
         this.plugin = plugin;
 
-        this.init().catch(this.console.error);
+        setTimeout(async () => {
+            await this.init();
+        }, 5000);
     }
 
     async reboot(): Promise<void> {
@@ -92,13 +100,18 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
         return this.console;
     }
 
+    async reinit() {
+        this.client = undefined;
+        // await this.init();
+    }
+
     async init() {
         const client = this.getClient();
         await client.login();
         const logger = this.getLogger();
 
         setInterval(async () => {
-            if (this.processing) {
+            if (this.processing || !client) {
                 return;
             }
             this.processing = true;
@@ -315,11 +328,12 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             const name = channelStatus.name || `Channel ${channel}`;
 
             const nativeId = this.buildNativeId(channelStatus.uid);
+            const actualDevice = sdk.systemManager.getDeviceById(this.pluginId, nativeId);
             const device: Device = {
                 nativeId,
-                name,
+                name: actualDevice?.name || name,
                 providerNativeId: this.nativeId,
-                interfaces: this.getCameraInterfaces(),
+                interfaces: actualDevice?.interfaces || this.getCameraInterfaces(),
                 type: ScryptedDeviceType.Camera,
                 info: {
                     manufacturer: 'Reolink',

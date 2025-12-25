@@ -2,7 +2,7 @@ import { AuthFetchCredentialState, authHttpFetch, HttpFetchOptions } from '@scry
 import { PassThrough, Readable } from 'stream';
 import { sleep } from "@scrypted/common/src/sleep";
 import { PanTiltZoomCommand, VideoClipOptions } from "@scrypted/sdk";
-import { getLoginParameters } from '../probe';
+import { DevInfo, getLoginParameters } from '../probe';
 
 export interface DeviceInputData {
     hasBattery: boolean,
@@ -339,10 +339,12 @@ export class ReolinkNvrClient {
 
         const abilities = response.body.find(item => item.cmd === 'GetAbility')?.value;
         const hubData = response.body.find(item => item.cmd === 'GetDevInfo')?.value;
+        const devInfo: DevInfo = hubData?.DevInfo;
 
         return {
             abilities,
             hubData,
+            devInfo,
             response: response.body
         };
     }

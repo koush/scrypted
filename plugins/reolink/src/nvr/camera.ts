@@ -1,12 +1,11 @@
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { Settings, Brightness, Camera, Device, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Sleep, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
+import sdk, { Brightness, Camera, Device, DeviceProvider, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PanTiltZoom, PanTiltZoomCommand, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, Sleep, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import { EventEmitter } from "stream";
+import { createRtspMediaStreamOptions, RtspSmartCamera, UrlMediaStreamOptions } from "../../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI } from '../onvif-api';
 import { OnvifIntercom } from '../onvif-intercom';
-import { createRtspMediaStreamOptions, Destroyable, RtspSmartCamera, UrlMediaStreamOptions } from "../../../rtsp/src/rtsp";
-import { ReolinkNvrDevice } from './nvr';
 import { AIState, BatteryInfoResponse, DeviceStatusResponse, Enc, EventsResponse } from './api';
+import { ReolinkNvrDevice } from './nvr';
 
 export const moToB64 = async (mo: MediaObject) => {
     const bufferImage = await sdk.mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg');
@@ -118,7 +117,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     lastB64Snapshot: string;
     lastSnapshotTaken: number;
     nvrDevice: ReolinkNvrDevice;
-    eventsEmitter: Destroyable;
+    abilities: any;
 
     storageSettings = new StorageSettings(this, {
         debugEvents: {
@@ -237,7 +236,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     async init() {
         const logger = this.getLogger();
 
-        while (!this.nvrDevice.client.loggedIn) {
+        while (!this.nvrDevice.client || !this.nvrDevice.client.loggedIn) {
             logger.log('Waiting for plugin connection');
             await sleep(3000);
         }
@@ -307,7 +306,12 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     getAbilities() {
-        return this.nvrDevice.storageSettings.values.abilities?.Ability?.abilityChn?.[this.getRtspChannel()];
+        if (!this.abilities) {
+            const channel = Number(this.getRtspChannel());
+            this.abilities = this.nvrDevice.storageSettings.values.abilities?.Ability?.abilityChn?.[channel];
+        }
+
+        return this.abilities;
     }
 
     getEncoderSettings() {
@@ -471,7 +475,6 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     async processBatteryData(data: BatteryInfoResponse) {
-        this.eventsEmitter.emit('data', JSON.stringify(data));
         const logger = this.getLogger();
         const { batteryLevel, sleeping } = data;
         const { debugEvents } = this.storageSettings.values;
@@ -490,7 +493,6 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     async processDeviceStatusData(data: DeviceStatusResponse) {
-        this.eventsEmitter.emit('data', JSON.stringify(data));
         const { floodlightEnabled, pirEnabled, ptzPresets, osd } = data;
         const logger = this.getLogger();
 
@@ -547,7 +549,6 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     async processEvents(events: EventsResponse) {
-        this.eventsEmitter.emit('data', JSON.stringify(events));
         const logger = this.getLogger();
 
         const { debugEvents } = this.storageSettings.values;
@@ -582,21 +583,12 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         }
     }
 
-    async listenEvents() {
-        const events = new EventEmitter();
-        const ret: Destroyable = {
-            on: function (eventName: string | symbol, listener: (...args: any[]) => void): void {
-                events.on(eventName, listener);
-            },
-            destroy: function (): void {
-            },
-            emit: function (eventName: string | symbol, ...args: any[]): boolean {
-                return events.emit(eventName, ...args);
-            }
-        };
+    async listenLoop() {
+        return null;
+    }
 
-        this.eventsEmitter = ret;
-        return ret;
+    async listenEvents() {
+        return null;
     }
 
     async takeSnapshotInternal(timeout?: number) {

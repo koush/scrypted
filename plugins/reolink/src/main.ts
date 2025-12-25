@@ -9,6 +9,7 @@ import { OnvifIntercom } from './onvif-intercom';
 import { DevInfo } from './probe';
 import { AIState, Enc, isDeviceHomeHub, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
 import { ReolinkNvrDevice } from './nvr/nvr';
+import { ReolinkNvrClient } from './nvr/api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     sirenTimeout: NodeJS.Timeout;
@@ -1175,17 +1176,17 @@ class ReolinkProvider extends RtspProvider {
         const password = settings.password?.toString();
         const ip = settings.ip?.toString();
         const httpPort = settings.httpPort;
-        const isNvr = settings.isNvr?.toString() === 'true';
         const rtspPort = settings.rtspPort;
+        const isNvr = settings.isNvr?.toString() === 'true';
         const httpAddress = `${ip}:${httpPort || 80}`;
 
         if (isNvr) {
-            const apiWithToken = new ReolinkCameraClient(httpAddress, username, password, undefined, this.console, true);
-            const devInfo = await apiWithToken.getDeviceInfo();
+            const client = new ReolinkNvrClient(httpAddress, username, password, this.console);
+            const { devInfo } = await client.getHubInfo();
 
             if (!devInfo) {
                 throw new Error('Unable to connect to Reolink NVR. Please verify the IP address, port, username, and password are correct.');
-            }``
+            }
 
             const { detail, name } = devInfo;
             const nativeId = `${detail}-reolink-nvr`;
@@ -1202,12 +1203,14 @@ class ReolinkProvider extends RtspProvider {
                 type: ScryptedDeviceType.API,
             });
 
-            const nvrDevice = await this.getDevice(nativeId) as ReolinkNvrDevice;
+            const nvrDevice = this.getDevice(nativeId);
+
             nvrDevice.storageSettings.values.ipAddress = ip;
             nvrDevice.storageSettings.values.username = username;
             nvrDevice.storageSettings.values.password = password;
             nvrDevice.storageSettings.values.httpPort = httpPort;
             nvrDevice.storageSettings.values.rtspPort = rtspPort;
+
             nvrDevice.updateDeviceInfo(devInfo);
 
             return nativeId;
