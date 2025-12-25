@@ -285,24 +285,6 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
         return device;
     }
 
-    async adoptDevice(adopt: AdoptDevice): Promise<string> {
-        const entry = this.discoveredDevices.get(adopt.nativeId);
-
-        if (!entry)
-            throw new Error('device not found');
-
-        await this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, await this.discoverDevices());
-
-        await sdk.deviceManager.onDeviceDiscovered(entry.device);
-
-        const device = await this.getDevice(adopt.nativeId);
-        this.console.log('Adopted device', entry, device?.name);
-        device.storageSettings.values.rtspChannel = entry.rtspChannel;
-
-        this.discoveredDevices.delete(adopt.nativeId);
-        return device?.id;
-    }
-
     buildNativeId(uid: string) {
         return `${this.nativeId}-${uid}`;
     }
@@ -332,7 +314,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                 nativeId,
                 name,
                 providerNativeId: this.nativeId,
-                interfaces: this.getCameraInterfaces(),
+                interfaces: this.getCameraInterfaces() ?? [],
                 type: ScryptedDeviceType.Camera,
                 info: {
                     manufacturer: 'Reolink',
@@ -341,8 +323,8 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             };
 
             if (sdk.deviceManager.getNativeIds().includes(nativeId)) {
-                const device = sdk.systemManager.getDeviceById<Device>(this.pluginId, nativeId);
-                sdk.deviceManager.onDeviceDiscovered(device);
+                // const device = sdk.systemManager.getDeviceById<Device>(this.pluginId, nativeId);
+                // sdk.deviceManager.onDeviceDiscovered(device);
                 continue;
             }
 
@@ -367,5 +349,23 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             ...d.device,
             description: d.description,
         }));
+    }
+
+    async adoptDevice(adopt: AdoptDevice): Promise<string> {
+        const entry = this.discoveredDevices.get(adopt.nativeId);
+
+        if (!entry)
+            throw new Error('device not found');
+
+        await this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, await this.discoverDevices());
+
+        await sdk.deviceManager.onDeviceDiscovered(entry.device);
+
+        const device = await this.getDevice(adopt.nativeId);
+        this.console.log('Adopted device', entry, device?.name);
+        device.storageSettings.values.rtspChannel = entry.rtspChannel;
+
+        this.discoveredDevices.delete(adopt.nativeId);
+        return device?.id;
     }
 }

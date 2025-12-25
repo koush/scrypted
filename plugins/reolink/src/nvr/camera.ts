@@ -185,7 +185,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
 
         setTimeout(async () => {
             await this.init();
-        })
+        }, 2000);
     }
 
     public getLogger() {
@@ -205,14 +205,20 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         this.updatePtzCaps();
 
         const interfaces = await this.getDeviceInterfaces();
-        await sdk.deviceManager.onDeviceDiscovered({
+
+        const device = {
             nativeId: this.nativeId,
             providerNativeId: this.nvrDevice.nativeId,
             name: this.name,
             interfaces,
             type: this.type,
             info: this.info,
-        });
+        };
+
+        logger.log(`Updating device interfaces: ${JSON.stringify(interfaces)}`);
+
+        await sdk.deviceManager.onDeviceDiscovered(device);
+        // await this.nvrDevice.plugin.updateDevice(this.nativeId, this.name, interfaces, ScryptedDeviceType.Camera);
 
         if (this.hasBattery() && !this.storageSettings.getItem('prebufferSet')) {
             const device = sdk.systemManager.getDeviceById<Settings>(this.id);
@@ -397,29 +403,32 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     async getDeviceInterfaces() {
-        const logger = this.getLogger();
         const interfaces = [
             ScryptedInterface.VideoCamera,
             ScryptedInterface.Settings,
             ...this.nvrDevice.plugin.getAdditionalInterfaces(),
         ];
-        const type = ScryptedDeviceType.Camera;
-        if (this.storageSettings.values.useOnvifTwoWayAudio) {
-            interfaces.push(
-                ScryptedInterface.Intercom
-            );
-        }
 
-        if (this.getPtzCapabilities().hasPtz) {
-            interfaces.push(ScryptedInterface.PanTiltZoom);
-        }
-        if ((await this.getObjectTypes()).classes.length > 0) {
-            interfaces.push(ScryptedInterface.ObjectDetector);
-        }
-        if (this.hasSiren() || this.hasFloodlight() || this.hasPirEvents())
-            interfaces.push(ScryptedInterface.DeviceProvider);
-        if (this.hasBattery()) {
-            interfaces.push(ScryptedInterface.Battery, ScryptedInterface.Sleep);
+        try {
+            if (this.storageSettings.values.useOnvifTwoWayAudio) {
+                interfaces.push(
+                    ScryptedInterface.Intercom
+                );
+            }
+
+            if (this.getPtzCapabilities().hasPtz) {
+                interfaces.push(ScryptedInterface.PanTiltZoom);
+            }
+            if ((await this.getObjectTypes()).classes.length > 0) {
+                interfaces.push(ScryptedInterface.ObjectDetector);
+            }
+            if (this.hasSiren() || this.hasFloodlight() || this.hasPirEvents())
+                interfaces.push(ScryptedInterface.DeviceProvider);
+            if (this.hasBattery()) {
+                interfaces.push(ScryptedInterface.Battery, ScryptedInterface.Sleep);
+            }
+        } catch (e) {
+            this.getLogger().error('Error getting device interfaces', e);
         }
 
         return interfaces;
