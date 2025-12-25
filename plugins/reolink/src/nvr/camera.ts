@@ -37,22 +37,6 @@ class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     private async setSiren(on: boolean) {
         const api = this.camera.getClient();
 
-        // doorbell doesn't seem to support alarm_mode = 'manul'
-        if (this.camera.storageSettings.values.doorbell) {
-            if (!on) {
-                clearInterval(this.sirenTimeout);
-                await api.setSiren(this.camera.getRtspChannel(), false);
-                return;
-            }
-
-            // siren lasts around 4 seconds.
-            this.sirenTimeout = setTimeout(async () => {
-                await this.turnOff();
-            }, 4000);
-
-            await api.setSiren(this.camera.getRtspChannel(), true, 1);
-            return;
-        }
         await api.setSiren(this.camera.getRtspChannel(), on);
     }
 }
@@ -125,11 +109,6 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             type: 'boolean',
             immediate: true,
         },
-        doorbell: {
-            title: 'Doorbell',
-            description: 'This camera is a Reolink Doorbell.',
-            type: 'boolean',
-        },
         rtspChannel: {
             subgroup: 'Advanced',
             title: 'Channel',
@@ -177,16 +156,6 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             json: true,
             defaultValue: [],
         },
-        // useOnvifDetections: {
-        //     subgroup: 'Advanced',
-        //     title: 'Use ONVIF for Object Detection',
-        //     choices: [
-        //         'Default',
-        //         'Enabled',
-        //         'Disabled',
-        //     ],
-        //     defaultValue: 'Default',
-        // },
         useOnvifTwoWayAudio: {
             subgroup: 'Advanced',
             title: 'Use ONVIF for Two-Way Audio',
@@ -202,18 +171,6 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         super(nativeId, nvrDevice.plugin);
         this.nvrDevice = nvrDevice;
 
-        this.storageSettings.settings.useOnvifTwoWayAudio.onGet = async () => {
-            return {
-                hide: !!this.storageSettings.values.doorbell,
-            }
-        };
-
-        // this.storageSettings.settings.ptz.onGet = async () => {
-        //     return {
-        //         hide: !!this.storageSettings.values.doorbell,
-        //     }
-        // };
-
         this.storageSettings.settings.presets.onGet = async () => {
             const choices = this.storageSettings.values.cachedPresets.map((preset) => preset.id + '=' + preset.name);
             return {
@@ -226,7 +183,9 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             this.nvrDevice.cameraNativeMap.set(this.nativeId, this);
         }
 
-        this.init().catch(this.getLogger().error);
+        setTimeout(async () => {
+            await this.init();
+        })
     }
 
     public getLogger() {
@@ -242,9 +201,25 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         }
 
         await this.reportDevices();
-        await this.updateDevice();
         this.updateDeviceInfo();
         this.updatePtzCaps();
+
+        const interfaces = await this.getDeviceInterfaces();
+        await sdk.deviceManager.onDeviceDiscovered({
+            nativeId: this.nativeId,
+            providerNativeId: this.nvrDevice.nativeId,
+            name: this.name,
+            interfaces,
+            type: this.type,
+            info: this.info,
+        });
+
+        if (this.hasBattery() && !this.storageSettings.getItem('prebufferSet')) {
+            const device = sdk.systemManager.getDeviceById<Settings>(this.id);
+            logger.log('Disabling prebbufer for battery cam');
+            await device.putSetting('prebuffer:enabledStreams', '[]');
+            this.storageSettings.values.prebufferSet = true;
+        }
     }
 
     getClient() {
@@ -421,27 +396,19 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         return pirEvents > 0;
     }
 
-    async updateDevice() {
+    async getDeviceInterfaces() {
         const logger = this.getLogger();
         const interfaces = [
             ScryptedInterface.VideoCamera,
             ScryptedInterface.Settings,
             ...this.nvrDevice.plugin.getAdditionalInterfaces(),
         ];
-        let type = ScryptedDeviceType.Camera;
-        if (this.storageSettings.values.doorbell) {
-            interfaces.push(
-                ScryptedInterface.BinarySensor,
-            );
-            type = ScryptedDeviceType.Doorbell;
-        }
-        if (this.storageSettings.values.doorbell || this.storageSettings.values.useOnvifTwoWayAudio) {
+        const type = ScryptedDeviceType.Camera;
+        if (this.storageSettings.values.useOnvifTwoWayAudio) {
             interfaces.push(
                 ScryptedInterface.Intercom
             );
         }
-        const rtspChannel = this.getRtspChannel()
-        const name = this.nvrDevice.storageSettings.values.devicesData[rtspChannel]?.channelStatus?.name;
 
         if (this.getPtzCapabilities().hasPtz) {
             interfaces.push(ScryptedInterface.PanTiltZoom);
@@ -455,23 +422,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             interfaces.push(ScryptedInterface.Battery, ScryptedInterface.Sleep);
         }
 
-        await sdk.deviceManager.onDeviceDiscovered({
-            nativeId: this.nativeId,
-            providerNativeId: this.nvrDevice.nativeId,
-            name,
-            interfaces,
-            type,
-            info: sdk.deviceManager.getNativeIds().includes(this.nativeId) ?
-                sdk.deviceManager.getDeviceState(this.nativeId)?.info :
-                undefined,
-        });
-
-        if (this.hasBattery() && !this.storageSettings.getItem('prebufferSet')) {
-            const device = sdk.systemManager.getDeviceById<Settings>(this.id);
-            logger.log('Disabling prebbufer for battery cam');
-            await device.putSetting('prebuffer:enabledStreams', '[]');
-            this.storageSettings.values.prebufferSet = true;
-        }
+        return interfaces;
     }
 
     async processBatteryData(data: BatteryInfoResponse) {
@@ -545,7 +496,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     createOnvifClient() {
         const { username, password, httpPort, ipAddress } = this.nvrDevice.storageSettings.values;
         const address = `${ipAddress}:${httpPort}`;
-        return connectCameraAPI(address, username, password, this.getLogger(), this.storageSettings.values.doorbell ? this.storage.getItem('onvifDoorbellEvent') : undefined);
+        return connectCameraAPI(address, username, password, this.getLogger(), undefined);
     }
 
     async processEvents(events: EventsResponse) {

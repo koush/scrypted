@@ -296,6 +296,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
         await sdk.deviceManager.onDeviceDiscovered(entry.device);
 
         const device = await this.getDevice(adopt.nativeId);
+        this.console.log('Adopted device', entry, device?.name);
         device.storageSettings.values.rtspChannel = entry.rtspChannel;
 
         this.discoveredDevices.delete(adopt.nativeId);
@@ -321,19 +322,17 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
     async syncEntitiesFromRemote() {
         const api = this.getClient();
         const { channels, devicesData } = await api.getDevicesInfo();
-        const devices: Device[] = [];
 
         for (const channel of channels) {
             const { channelStatus, channelInfo } = devicesData[channel];
             const name = channelStatus.name || `Channel ${channel}`;
 
             const nativeId = this.buildNativeId(channelStatus.uid);
-            const actualDevice = sdk.systemManager.getDeviceById(this.pluginId, nativeId);
             const device: Device = {
                 nativeId,
-                name: actualDevice?.name || name,
+                name,
                 providerNativeId: this.nativeId,
-                interfaces: actualDevice?.interfaces || this.getCameraInterfaces(),
+                interfaces: this.getCameraInterfaces(),
                 type: ScryptedDeviceType.Camera,
                 info: {
                     manufacturer: 'Reolink',
@@ -342,7 +341,8 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             };
 
             if (sdk.deviceManager.getNativeIds().includes(nativeId)) {
-                devices.push(device);
+                const device = sdk.systemManager.getDeviceById<Device>(this.pluginId, nativeId);
+                sdk.deviceManager.onDeviceDiscovered(device);
                 continue;
             }
 
@@ -356,11 +356,6 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                 rtspChannel: channel,
             });
         }
-
-        await sdk.deviceManager.onDevicesChanged({
-            providerNativeId: this.nativeId,
-            devices,
-        });
     }
 
     async discoverDevices(scan?: boolean): Promise<DiscoveredDevice[]> {
