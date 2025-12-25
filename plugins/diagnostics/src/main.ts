@@ -1,6 +1,6 @@
 import { Deferred } from '@scrypted/common/src/deferred';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
-import sdk, { Camera, FFmpegInput, Image, MediaObject, MediaStreamDestination, MotionSensor, Notifier, ObjectDetection, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import sdk, { Camera, FFmpegInput, Image, MediaObject, MediaStreamDestination, MotionSensor, Notifier, ObjectDetection, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, TextEmbedding, ImageEmbedding } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import child_process from 'child_process';
 import dns from 'dns';
@@ -10,8 +10,28 @@ import net from 'net';
 import os from 'os';
 import sharp from 'sharp';
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
+
+function cosineSimilarityPrenormalized(e1: Buffer, e2: Buffer) {
+    const embedding1 = new Float32Array(e1.buffer, e1.byteOffset, e1.length / Float32Array.BYTES_PER_ELEMENT);
+    const embedding2 = new Float32Array(e2.buffer, e2.byteOffset, e2.length / Float32Array.BYTES_PER_ELEMENT);
+
+    let dotProduct = 0;
+    for (let i = 0; i < embedding1.length; i++) {
+        dotProduct += embedding1[i] * embedding2[i];
+    }
+    return dotProduct;
+}
+
 class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
     storageSettings = new StorageSettings(this, {
+        validateSystem: {
+            console: true,
+            group: 'System',
+            title: 'Validate System',
+            description: 'Validate the system configuration.',
+            type: 'button',
+            onPut: () => this.validateSystem(),
+        },
         testDevice: {
             group: 'Device',
             title: 'Validation Device',
@@ -29,14 +49,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
             onPut: async () => {
                 this.validateDevice();
             },
-        },
-        validateSystem: {
-            console: true,
-            group: 'System',
-            title: 'Validate System',
-            description: 'Validate the system configuration.',
-            type: 'button',
-            onPut: () => this.validateSystem(),
         },
     });
 
@@ -85,6 +97,80 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
         }
         catch (e) {
             console.error(stepName.padEnd(24), '\x1b[31m Failed\x1b[0m'.padEnd(24), (e as Error).message);
+        }
+    }
+
+    async validateNVR() {
+        const console = this.console;
+        const nvrPlugin = sdk.systemManager.getDeviceById('@scrypted/nvr');
+
+        if (!nvrPlugin) {
+            await this.validate(console, 'NVR Plugin Check', async () => {
+                throw new Error('NVR plugin not installed.');
+            });
+            return;
+        }
+
+        // Consolidated loop for detection plugins
+        const detectionPlugins = [
+            '@scrypted/onnx',
+            '@scrypted/openvino',
+            '@scrypted/coreml',
+            '@scrypted/ncnn',
+            '@scrypted/tensorflow-lite'
+        ];
+
+        for (const pluginId of detectionPlugins) {
+            const plugin = sdk.systemManager.getDeviceById<Settings & ObjectDetection>(pluginId);
+
+            if (!plugin) {
+                continue;
+            }
+
+            // Detect objects test
+            await this.validate(console, `${pluginId}`, async () => {
+                const settings = await plugin.getSettings();
+                const executionDevice = settings.find(s => s.key === 'execution_device');
+                if (executionDevice?.value?.toString().includes('CPU')) {
+                    this.warnStep(console, 'Using CPU execution. GPU recommended for better performance.');
+                }
+
+                const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
+                const detected = await plugin.detectObjects(zidane);
+                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
+                if (!personFound) {
+                    throw new Error('Person not detected in test image.');
+                }
+            });
+
+            const clip = sdk.systemManager.getDeviceById<TextEmbedding & ImageEmbedding>(pluginId, 'clipembedding');
+
+            // tflite and ncnn doesnt have it
+            if (!clip) {
+                continue;
+            }
+
+            // CLIP implementation test
+            await this.validate(console, `${pluginId} CLIP`, async () => {
+                // Test CLIP functionality
+                const testText = 'test';
+                const textEmbedding = await clip.getTextEmbedding(testText);
+                if (!textEmbedding || textEmbedding.length === 0) {
+                    throw new Error('Failed to get text embedding.');
+                }
+
+                const testImage = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
+                const imageEmbedding = await clip.getImageEmbedding(testImage);
+                if (!imageEmbedding || imageEmbedding.length === 0) {
+                    throw new Error('Failed to get image embedding.');
+                }
+
+                // Test similarity calculation
+                const similarity = cosineSimilarityPrenormalized(imageEmbedding, textEmbedding);
+                if (typeof similarity !== 'number') {
+                    throw new Error('Failed to calculate similarity.');
+                }
+            });
         }
     }
 
@@ -507,12 +593,6 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 const executionDevice = settings.find(s => s.key === 'execution_device');
                 if (executionDevice?.value?.toString().includes('CPU'))
                     this.warnStep(this.console, 'GPU device unvailable or not passed through to container.');
-
-                const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
-                const detected = await onnxPlugin.detectObjects(zidane);
-                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
-                if (!personFound)
-                    throw new Error('Person not detected in test image.');
             });
         }
 
@@ -522,14 +602,33 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 const availbleDevices = settings.find(s => s.key === 'available_devices');
                 if (!availbleDevices?.value?.toString().includes('GPU'))
                     this.warnStep(this.console, 'GPU device unvailable or not passed through to container.');
-
-                const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
-                const detected = await openvinoPlugin.detectObjects(zidane);
-                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
-                if (!personFound)
-                    throw new Error('Person not detected in test image.');
             });
         }
+
+        await this.validateNVR();
+
+        await this.validate(this.console, 'External Resource Access', async () => {
+            const urls = [
+                'https://huggingface.co/koushd/clip/resolve/main/requirements.txt',
+                'https://raw.githubusercontent.com/koush/openvino-models/refs/heads/main/scrypted_labels.txt',
+                'https://registry.npmjs.org/@scrypted/server'
+            ];
+
+            for (const url of urls) {
+                try {
+                    const response = await httpFetch({
+                        url,
+                        timeout: 5000,
+                    });
+
+                    if (response.statusCode >= 400) {
+                        throw new Error(`${url} returned status ${response.statusCode}`);
+                    }
+                } catch (error) {
+                    throw new Error(`${url} is not accessible: ${(error as Error).message}`);
+                }
+            }
+        });
 
         if (nvrPlugin) {
             await this.validate(this.console, "GPU Decode", async () => {

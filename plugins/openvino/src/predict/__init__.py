@@ -59,6 +59,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
     ):
         super().__init__(nativeId=nativeId)
 
+        self.periodic_restart = True
+
         self.systemDevice = {
             "deviceCreator": "Model",
         }
@@ -119,7 +121,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
         return ["motion"]
 
     def requestRestart(self):
-        asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
+        if self.periodic_restart:
+            asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
@@ -390,6 +393,10 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
                 pf.result.set_result(selfFork)
 
                 self.forks[cwid] = pf
+                continue
+
+            if self.pluginId not in workers[cwid]['labels']:
+                print(f"not using cluster worker {workers[cwid]['name']} without label {self.pluginId}")
                 continue
 
             async def startClusterWorker(clusterWorkerId=cwid):

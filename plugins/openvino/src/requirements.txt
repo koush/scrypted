@@ -5,7 +5,11 @@
 # openvino 2024.3.0 crashes on older CPU (J4105 and older) if level-zero is installed via apt.
 # openvino 2024.2.0 and older crashes on arc dGPU.
 # openvino 2024.2.0 and newer crashes on 700H and 900H GPUs
+
+# this works on wyse 5070 and core ultra 125h but requires a recent scrypted image for the compute runtime.
+# openvino==2025.4.0
 openvino==2024.5.0
+
 Pillow==10.3.0
 opencv-python-headless==4.10.0.84
 
