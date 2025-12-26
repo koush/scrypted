@@ -448,7 +448,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         }
 
         if (batteryLevel !== this.batteryLevel) {
-            this.batteryLevel = batteryLevel;
+            this.batteryLevel = batteryLevel ?? this.batteryLevel;
         }
     }
 
