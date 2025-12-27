@@ -116,7 +116,7 @@ export class ReolinkNvrClient {
     loggingIn = false;
     loggedIn = false;
     rebooting = false;
-    conmnectionTime = Date.now();
+    connectionTime = Date.now();
     console: Console;
     host: string;
 
@@ -204,7 +204,6 @@ export class ReolinkNvrClient {
         }
 
         if (this.loggingIn) {
-            // Another call is currently establishing auth; wait briefly.
             while (this.loggingIn) {
                 await sleep(50);
             }
@@ -233,7 +232,7 @@ export class ReolinkNvrClient {
                             this.parameters = stored.parameters;
                             this.tokenLease = tokenLease;
                             this.loggedIn = true;
-                            this.conmnectionTime = now;
+                            this.connectionTime = now;
                             // Refresh timestamp so we don't churn sessions on long runtimes.
                             this.setStoredLoginSession({
                                 ...stored,
@@ -265,7 +264,7 @@ export class ReolinkNvrClient {
             this.parameters = parameters;
             this.tokenLease = this.computeTokenLease(now, leaseTimeSeconds);
             this.loggedIn = true;
-            this.conmnectionTime = now;
+            this.connectionTime = now;
 
             this.setStoredLoginSession({
                 host: this.host,
@@ -285,7 +284,7 @@ export class ReolinkNvrClient {
             return;
         }
 
-        if (Date.now() - this.conmnectionTime > 1000 * 60 * 60 || this.loginFirstCount > 5) {
+        if (Date.now() - this.connectionTime > 1000 * 60 * 60 || this.loginFirstCount > 5) {
             this.console.log('Reconnecting')
             await this.reconnect();
         } else if (this.maxSessionsCount > 5) {
