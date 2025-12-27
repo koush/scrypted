@@ -68,6 +68,10 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             hide: true,
             defaultValue: {}
         },
+        loginSession: {
+            json: true,
+            hide: true,
+        },
     });
     plugin: ReolinkProvider;
     client: ReolinkNvrClient;
@@ -142,11 +146,9 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                 const devicesMap = new Map<number, DeviceInputData>();
                 let anyBattery = false;
                 let anyAwaken = false;
-                let anyFound = false;
 
                 this.cameraNativeMap.forEach((camera) => {
                     if (camera) {
-                        anyFound = true;
                         const channel = camera.storageSettings.values.rtspChannel;
 
                         const abilities = camera.getAbilities();
@@ -175,7 +177,9 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                     }
                 });
 
-                if (anyFound) {
+                const anyDeviceFound = devicesMap.size > 0;
+
+                if (anyDeviceFound) {
                     const eventsRes = await client.getEvents(devicesMap);
 
                     if (this.storageSettings.values.debugEvents) {
@@ -210,7 +214,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                     });
                 }
 
-                if (anyFound) {
+                if (anyDeviceFound) {
                     if (!this.lastDevicesStatusCheck || (now - this.lastDevicesStatusCheck > 15 * 1000) && anyAwaken) {
                         this.lastDevicesStatusCheck = now;
                         const { deviceStatusData, response } = await client.getStatusInfo(devicesMap);
@@ -242,7 +246,13 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
         if (!this.client) {
             const { ipAddress, httpPort, password, username } = this.storageSettings.values;
             const address = `${ipAddress}:${httpPort}`;
-            this.client = new ReolinkNvrClient(address, username, password, this.console);
+            this.client = new ReolinkNvrClient(
+                address, 
+                username, 
+                password, 
+                this.console,
+                this,
+            );
         }
         return this.client;
     }

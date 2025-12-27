@@ -3,6 +3,18 @@ import { PassThrough, Readable } from 'stream';
 import { sleep } from "@scrypted/common/src/sleep";
 import { PanTiltZoomCommand, VideoClipOptions } from "@scrypted/sdk";
 import { DevInfo, getLoginParameters } from '../probe';
+import { ReolinkNvrDevice } from './nvr';
+
+type StoredLoginSession = {
+    host: string;
+    username: string;
+    /** Querystring auth params expected by Reolink API (token OR user/password). */
+    parameters: Record<string, string>;
+    /** Epoch ms when session was obtained (or last confirmed valid). */
+    createdAt: number;
+    /** Token lease time in seconds. `0` means non-expiring/unknown; omit if unknown. */
+    leaseTimeSeconds?: number;
+};
 
 export interface DeviceInputData {
     hasBattery: boolean,
@@ -105,15 +117,25 @@ export class ReolinkNvrClient {
     loggedIn = false;
     rebooting = false;
     conmnectionTime = Date.now();
+    console: Console;
+    host: string;
 
     maxSessionsCount = 0;
     loginFirstCount = 0;
 
-    constructor(public host: string, public username: string, public password: string, public console: Console) {
+    constructor(
+        httpAddress: string,
+        username: string,
+        password: string,
+        console: Console,
+        public nvrDevice?: ReolinkNvrDevice
+    ) {
         this.credential = {
             username,
             password,
         };
+        this.host = httpAddress;
+        this.console = console;
     }
 
     private async request(options: HttpFetchOptions<Readable>, body?: Readable) {
@@ -133,30 +155,129 @@ export class ReolinkNvrClient {
         return pt;
     }
 
+    private getStoredLoginSession(): StoredLoginSession | undefined {
+        const stored = this.nvrDevice?.storageSettings?.values?.loginSession as StoredLoginSession;
+        if (!stored || typeof stored !== 'object')
+            return;
+        if (!stored.host || !stored.username || !stored.parameters || typeof stored.parameters !== 'object')
+            return;
+        return stored;
+    }
+
+    private setStoredLoginSession(session: StoredLoginSession | undefined) {
+        if (this.nvrDevice) {
+            this.nvrDevice.storageSettings.values.loginSession = session;
+        }
+    }
+
+    private computeTokenLease(createdAt: number, leaseTimeSeconds?: number) {
+        if (!leaseTimeSeconds || leaseTimeSeconds <= 0)
+            return Infinity;
+        return createdAt + leaseTimeSeconds * 1000;
+    }
+
+    private async validateExistingSession(parameters: Record<string, string>) {
+        const url = new URL(`http://${this.host}/api.cgi`);
+        const params = url.searchParams;
+        params.set('cmd', 'GetDevInfo');
+        for (const [k, v] of Object.entries(parameters)) {
+            params.set(k, v);
+        }
+
+        const response = await this.request({
+            url,
+            responseType: 'json',
+        });
+
+        const error = response?.body?.[0]?.error;
+        if (error)
+            return false;
+
+        const devInfo: DevInfo = response?.body?.[0]?.value?.DevInfo;
+        return !!(devInfo?.type || devInfo?.model || devInfo?.exactType);
+    }
+
     async login() {
-        if (this.parameters && this.tokenLease && this.tokenLease > Date.now()) {
+        const now = Date.now();
+        if (this.parameters && this.tokenLease && this.tokenLease > now) {
             return;
         }
 
         if (this.loggingIn) {
-            return;
+            // Another call is currently establishing auth; wait briefly.
+            while (this.loggingIn) {
+                await sleep(50);
+            }
+            if (this.parameters && this.tokenLease && this.tokenLease > Date.now()) {
+                return;
+            }
         }
 
         this.loggingIn = true;
+        try {
+            // 1) Try restore from storageSettings first (if still valid).
+            const stored = this.getStoredLoginSession();
+            if (stored
+                && stored.host === this.host
+                && stored.username === this.credential.username
+                && stored.parameters
+                && Object.keys(stored.parameters).length) {
+                const tokenLease = this.computeTokenLease(stored.createdAt, stored.leaseTimeSeconds);
+                const leaseStillValid = tokenLease === Infinity || tokenLease > now;
 
-        if (!this.tokenLease || !this.parameters) {
-            this.console.log(`Creating authentication session`);
-        } else {
-            this.console.log(`Token expired at ${new Date(this.tokenLease).toISOString()}, renewing`);
+                if (leaseStillValid) {
+                    try {
+                        const ok = await this.validateExistingSession(stored.parameters);
+                        if (ok) {
+                            this.console.log('Restored previous authentication session');
+                            this.parameters = stored.parameters;
+                            this.tokenLease = tokenLease;
+                            this.loggedIn = true;
+                            this.conmnectionTime = now;
+                            // Refresh timestamp so we don't churn sessions on long runtimes.
+                            this.setStoredLoginSession({
+                                ...stored,
+                                createdAt: now,
+                            });
+                            return;
+                        }
+                    }
+                    catch (e) {
+                        // Validation failed; fall through to full login.
+                    }
+                }
+            }
+
+            // 2) Create a new session.
+            if (!this.tokenLease || !this.parameters) {
+                this.console.log(`Creating authentication session`);
+            } else {
+                this.console.log(`Token expired at ${new Date(this.tokenLease).toISOString()}, renewing`);
+            }
+
+            const { parameters, leaseTimeSeconds } = await getLoginParameters(
+                this.host,
+                this.credential.username,
+                this.credential.password,
+                true
+            );
+
+            this.parameters = parameters;
+            this.tokenLease = this.computeTokenLease(now, leaseTimeSeconds);
+            this.loggedIn = true;
+            this.conmnectionTime = now;
+
+            this.setStoredLoginSession({
+                host: this.host,
+                username: this.credential.username,
+                parameters,
+                createdAt: now,
+                leaseTimeSeconds: (!leaseTimeSeconds || leaseTimeSeconds === Infinity) ? 0 : leaseTimeSeconds,
+            });
         }
-
-        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password, true);
-        this.parameters = parameters;
-        const now = Date.now();
-        this.tokenLease = now + 1000 * leaseTimeSeconds;
-        this.loggingIn = false;
-        this.loggedIn = true;
-        this.conmnectionTime = now;
+        finally {
+            this.loggingIn = false;
+        }
     }
 
     async checkErrors() {
@@ -247,6 +368,7 @@ export class ReolinkNvrClient {
 
         this.tokenLease = undefined;
         this.parameters = {};
+        this.setStoredLoginSession(undefined);
     }
 
     async reconnect() {
@@ -320,7 +442,7 @@ export class ReolinkNvrClient {
             {
                 cmd: "GetAbility",
                 action: 0,
-                param: { User: { userName: this.username } }
+                param: { User: { userName: this.credential.username } }
             },
             {
                 cmd: "GetDevInfo",

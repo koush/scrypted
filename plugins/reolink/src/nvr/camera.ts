@@ -416,7 +416,9 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
                 );
             }
 
-            if (this.getPtzCapabilities().hasPtz) {
+            const { hasPtz } = this.getPtzCapabilities();
+
+            if (hasPtz) {
                 interfaces.push(ScryptedInterface.PanTiltZoom);
             }
             if ((await this.getObjectTypes()).classes.length > 0) {
