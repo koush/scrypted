@@ -15,6 +15,8 @@ class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.Imag
     def __init__(self, plugin: PredictPlugin, nativeId: str):
         super().__init__(nativeId=nativeId, plugin=plugin)
 
+        hf_id = "openai/clip-vit-base-patch32"
+
         self.inputwidth = 224
         self.inputheight = 224
 
@@ -23,10 +25,35 @@ class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.Imag
         self.minThreshold = 0.5
 
         self.model = self.initModel()
-        self.processor = CLIPProcessor.from_pretrained(
-            "openai/clip-vit-base-patch32",
-            cache_dir=os.path.join(os.environ["SCRYPTED_PLUGIN_VOLUME"], "files", "hf"),
-        )
+        cache_dir = os.path.join(os.environ["SCRYPTED_PLUGIN_VOLUME"], "files", "hf")
+        os.makedirs(cache_dir, exist_ok=True)
+
+        self.processor = None
+        print("Loading CLIP processor from local cache.")
+        try:
+            self.processor = CLIPProcessor.from_pretrained(
+                hf_id,
+                cache_dir=cache_dir,
+                local_files_only=True,
+            )
+            print("Loaded CLIP processor from local cache.")
+        except Exception:
+            print("CLIP processor not available in local cache yet.")
+
+        asyncio.ensure_future(self.refreshClipProcessor(hf_id, cache_dir), loop=self.loop)
+
+    async def refreshClipProcessor(self, hf_id: str, cache_dir: str):
+        try:
+            print("Refreshing CLIP processor cache (online).")
+            processor = await asyncio.to_thread(
+                CLIPProcessor.from_pretrained,
+                hf_id,
+                cache_dir=cache_dir,
+            )
+            self.processor = processor
+            print("Refreshed CLIP processor cache.")
+        except Exception:
+            print("CLIP processor cache refresh failed.")
 
     def getFiles(self):
         pass
