@@ -740,7 +740,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
 
     async getLocalSnapshot(id: string, iface: string, search: string) {
         const endpoint = await this.authenticatedPath;
-        const ret = url.resolve(path.join(endpoint, id, iface, `${Date.now()}.jpg`) + `${search}`, '');
+        const ret = url.resolve(path.join(endpoint, 'hotlink-ok', id, iface, `${Date.now()}.jpg`) + `${search}`, '');
         return Buffer.from(ret);
     }
 
@@ -768,7 +768,10 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             return;
         }
 
-        const pathname = request.url.substring(request.rootPath.length);
+        let pathname = request.url.substring(request.rootPath.length);
+        if (pathname.startsWith('/hotlink-ok'))
+            pathname = pathname.substring('/hotlink-ok'.length);
+
         const [_, id, iface] = pathname.split('/');
         try {
             if (iface !== ScryptedInterface.Camera && iface !== ScryptedInterface.VideoCamera)
