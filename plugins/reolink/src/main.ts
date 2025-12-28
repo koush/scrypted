@@ -8,6 +8,8 @@ import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
 import { DevInfo } from './probe';
 import { AIState, Enc, isDeviceHomeHub, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
+import { ReolinkNvrDevice } from './nvr/nvr';
+import { ReolinkNvrClient } from './nvr/api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     sirenTimeout: NodeJS.Timeout;
@@ -1134,8 +1136,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 }
 
 class ReolinkProvider extends RtspProvider {
+    nvrDevices = new Map<string, ReolinkNvrDevice>();
+
     getScryptedDeviceCreator(): string {
-        return 'Reolink Camera';
+        return 'Reolink Camera/NVR';
     }
 
     getAdditionalInterfaces() {
@@ -1149,9 +1153,30 @@ class ReolinkProvider extends RtspProvider {
         ];
     }
 
+    getDevice(nativeId: string) {
+        if (nativeId.endsWith('-reolink-nvr')) {
+            let ret = this.nvrDevices.get(nativeId);
+            if (!ret) {
+                ret = new ReolinkNvrDevice(nativeId, this);
+                if (ret)
+                    this.nvrDevices.set(nativeId, ret);
+            }
+
+            return ret;
+        } else {
+            return super.getDevice(nativeId);
+        }
+    }
+
     async createDevice(settings: DeviceCreatorSettings, nativeId?: string): Promise<string> {
         const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
         let info: DeviceInformation = {};
+
+        const isNvr = settings.isNvr?.toString() === 'true';
+
+        if (isNvr) {
+            return this.createNvrDeviceFromSettings(settings);
+        }
 
         const skipValidate = settings.skipValidate?.toString() === 'true';
         const username = settings.username?.toString();
@@ -1225,6 +1250,12 @@ class ReolinkProvider extends RtspProvider {
                 placeholder: '192.168.2.222',
             },
             {
+                key: 'isNvr',
+                title: 'Is NVR',
+                description: 'Set if adding a Reolink NVR device. This will allow adding cameras connected to the NVR.',
+                type: 'boolean',
+            },
+            {
                 subgroup: 'Advanced',
                 key: 'rtspChannel',
                 title: 'Channel Number Override',
@@ -1251,6 +1282,49 @@ class ReolinkProvider extends RtspProvider {
 
     createCamera(nativeId: string) {
         return new ReolinkCamera(nativeId, this);
+    }
+
+    async createNvrDeviceFromSettings(settings: DeviceCreatorSettings) {
+        const username = settings.username?.toString();
+        const password = settings.password?.toString();
+        const ip = settings.ip?.toString();
+        const httpPort = settings.httpPort;
+        const rtspPort = settings.rtspPort;
+        const httpAddress = `${ip}:${httpPort || 80}`;
+
+        const client = new ReolinkNvrClient(httpAddress, username, password, this.console);
+        const { devInfo } = await client.getHubInfo();
+
+        if (!devInfo) {
+            throw new Error('Unable to connect to Reolink NVR. Please verify the IP address, port, username, and password are correct.');
+        }
+
+        const { detail, name } = devInfo;
+        const nativeId = `${detail}-reolink-nvr`;
+
+        await sdk.deviceManager.onDeviceDiscovered({
+            nativeId,
+            name,
+            interfaces: [
+                ScryptedInterface.Settings,
+                ScryptedInterface.DeviceDiscovery,
+                ScryptedInterface.DeviceProvider,
+                ScryptedInterface.Reboot,
+            ],
+            type: ScryptedDeviceType.API,
+        });
+
+        const nvrDevice = this.getDevice(nativeId);
+
+        nvrDevice.storageSettings.values.ipAddress = ip;
+        nvrDevice.storageSettings.values.username = username;
+        nvrDevice.storageSettings.values.password = password;
+        nvrDevice.storageSettings.values.httpPort = httpPort;
+        nvrDevice.storageSettings.values.rtspPort = rtspPort;
+
+        nvrDevice.updateDeviceInfo(devInfo);
+
+        return nativeId;
     }
 }
 
