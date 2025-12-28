@@ -128,6 +128,23 @@ def _annotate_points_with_degrees(points: List[Dict[str, int]]) -> List[Dict[str
     return out
 
 
+def _dedupe_cruise_points(points: List[Dict[str, int]]) -> List[Dict[str, int]]:
+    out = []
+    seen = set()
+    for p in points or []:
+        try:
+            v = int(p.get("vertical", 0))
+            h = int(p.get("horizontal", 0))
+        except Exception:
+            continue
+        key = (v, h)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+    return out
+
+
 def _resolve_ioctl_result(res):
     try:
         if isinstance(res, (list, dict)):
@@ -197,6 +214,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         self._cruise_points_cache: List[Dict[str, int]] = []
         self._cruise_points_cache_ts: float = 0.0
         self._cruise_points_refresh_lock = asyncio.Lock()
+        self._last_ptz_caps_json: str | None = None
 
         self.rfcServer = asyncio.ensure_future(
             self.ensureServer(self.handleMainRfcClient)
@@ -542,6 +560,67 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         except Exception:
             pass
 
+    def _should_emit_ptz_caps(self, caps_json: str, force: bool = False) -> bool:
+        if not force and caps_json == self._last_ptz_caps_json:
+            return False
+        self._last_ptz_caps_json = caps_json
+        return True
+
+    async def _emit_ptz_caps_json(self, caps_json: str):
+        try:
+            await scrypted_sdk.deviceManager.onDeviceEvent(
+                self.nativeId, "ptzCapabilitiesJson", caps_json
+            )
+            await scrypted_sdk.deviceManager.onDeviceEvent(
+                self.nativeId, "wyze.ptzCapabilitiesJson", caps_json
+            )
+            try:
+                self.print("ptzCapabilities published:", caps_json)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    async def _publish_ptz_presets(self, points: List[Dict[str, int]]):
+        if not self.camera.is_pan_cam:
+            return
+        try:
+            display_points = _dedupe_cruise_points(points)
+            presets = {}
+            for i, p in enumerate(display_points):
+                vd = p.get("vertical_degrees")
+                hd = p.get("horizontal_degrees")
+                if vd is None:
+                    vd = _vertical_to_degrees(p.get("vertical", 0))
+                if hd is None:
+                    hd = _horizontal_to_degrees(p.get("horizontal", 0))
+                label = f"Preset {i + 1}"
+                if vd is not None and hd is not None:
+                    label = f"Preset {i + 1} (tilt {vd}, pan {hd})"
+                presets[str(i + 1)] = label
+            caps = getattr(self, "ptzCapabilities", {"pan": True, "tilt": True})
+            caps = {**caps, "presets": presets}
+            caps_json = json.dumps(caps, default=str)
+            if not self._should_emit_ptz_caps(caps_json):
+                return
+            self.ptzCapabilities = caps
+            await scrypted_sdk.deviceManager.onDeviceEvent(
+                self.nativeId, "ptzCapabilities", caps
+            )
+            await self._emit_ptz_caps_json(caps_json)
+            try:
+                points_json = json.dumps(display_points, default=str)
+                await scrypted_sdk.deviceManager.onDeviceEvent(
+                    self.nativeId, "wyze.cruise_points", display_points
+                )
+                await scrypted_sdk.deviceManager.onDeviceEvent(
+                    self.nativeId, "wyze.cruise_points_json", points_json
+                )
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     async def refreshCruisePoints(self, force: bool = False) -> List[Dict[str, int]]:
         async with self._cruise_points_refresh_lock:
             now_ts = time.time()
@@ -552,6 +631,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             points = _annotate_points_with_degrees(_normalize_cruise_points(points))
             self._cruise_points_cache = points
             self._cruise_points_cache_ts = now_ts
+            await self._publish_ptz_presets(points)
             return points
 
     async def getCruisePoints(self) -> List[Dict[str, int]]:
@@ -610,6 +690,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                         points = _annotate_points_with_degrees(_normalize_cruise_points(points))
                         self._cruise_points_cache = points
                         self._cruise_points_cache_ts = time.time()
+                        await self._publish_ptz_presets(points)
                     except Exception:
                         pass
             except Exception:
@@ -721,7 +802,6 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
 
     async def getSettings(self):
         ret: List[Setting] = []
-        presets_group = "Camera Presets"
         ret.append(
             {
                 "key": "bitrate",
@@ -741,52 +821,9 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 ],
             }
         )
-        try:
-            if not self._cruise_points_cache:
-                try:
-                    await self.refreshCruisePoints(force=False)
-                except Exception:
-                    pass
-
-            ret.append({
-                "key": "refresh_cruise_points",
-                "title": "Refresh Cruise Points",
-                "description": "Fetch cruise points from the camera and update presets.",
-                "group": presets_group,
-                "type": "button",
-            })
-
-            for i, p in enumerate(self._cruise_points_cache or []):
-                vd = p.get("vertical_degrees")
-                hd = p.get("horizontal_degrees")
-                desc = f"Go to preset {i + 1}"
-                if vd is not None and hd is not None:
-                    desc = f"Go to preset {i + 1} (tilt {vd}°, pan {hd}°)"
-                ret.append({
-                    "key": f"goto_preset_{i + 1}",
-                    "title": f"Go To Preset {i + 1}",
-                    "description": desc,
-                    "group": presets_group,
-                    "type": "button",
-                })
-        except Exception:
-            pass
         return ret
 
     async def putSetting(self, key, value):
-        if key == "refresh_cruise_points":
-            try:
-                await self.refreshCruisePoints(force=True)
-            finally:
-                return
-
-        if isinstance(key, str) and key.startswith("goto_preset_"):
-            try:
-                idx = int(key.split("_")[-1])
-                await self.ptzCommand({"action": "goto_cruise_point", "index": idx})
-            finally:
-                return
-
         self.storage.setItem(key, json.dumps(value))
 
         await scrypted_sdk.deviceManager.onDeviceEvent(
