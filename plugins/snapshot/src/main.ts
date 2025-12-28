@@ -769,6 +769,9 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
         }
 
         let pathname = request.url.substring(request.rootPath.length);
+
+        // hotlink-ok is used by cloudflare to indicate that hotlink protection should be bypassed.
+        // https://developers.cloudflare.com/waf/tools/scrape-shield/hotlink-protection/
         if (pathname.startsWith('/hotlink-ok'))
             pathname = pathname.substring('/hotlink-ok'.length);
 
