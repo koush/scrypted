@@ -214,7 +214,6 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         self._cruise_points_cache: List[Dict[str, int]] = []
         self._cruise_points_cache_ts: float = 0.0
         self._cruise_points_refresh_lock = asyncio.Lock()
-        self._last_ptz_caps_json: str | None = None
 
         self.rfcServer = asyncio.ensure_future(
             self.ensureServer(self.handleMainRfcClient)
@@ -560,27 +559,6 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         except Exception:
             pass
 
-    def _should_emit_ptz_caps(self, caps_json: str, force: bool = False) -> bool:
-        if not force and caps_json == self._last_ptz_caps_json:
-            return False
-        self._last_ptz_caps_json = caps_json
-        return True
-
-    async def _emit_ptz_caps_json(self, caps_json: str):
-        try:
-            await scrypted_sdk.deviceManager.onDeviceEvent(
-                self.nativeId, "ptzCapabilitiesJson", caps_json
-            )
-            await scrypted_sdk.deviceManager.onDeviceEvent(
-                self.nativeId, "wyze.ptzCapabilitiesJson", caps_json
-            )
-            try:
-                self.print("ptzCapabilities published:", caps_json)
-            except Exception:
-                pass
-        except Exception:
-            pass
-
     async def _publish_ptz_presets(self, points: List[Dict[str, int]]):
         if not self.camera.is_pan_cam:
             return
@@ -600,24 +578,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 presets[str(i + 1)] = label
             caps = getattr(self, "ptzCapabilities", {"pan": True, "tilt": True})
             caps = {**caps, "presets": presets}
-            caps_json = json.dumps(caps, default=str)
-            if not self._should_emit_ptz_caps(caps_json):
-                return
             self.ptzCapabilities = caps
-            await scrypted_sdk.deviceManager.onDeviceEvent(
-                self.nativeId, "ptzCapabilities", caps
-            )
-            await self._emit_ptz_caps_json(caps_json)
-            try:
-                points_json = json.dumps(display_points, default=str)
-                await scrypted_sdk.deviceManager.onDeviceEvent(
-                    self.nativeId, "wyze.cruise_points", display_points
-                )
-                await scrypted_sdk.deviceManager.onDeviceEvent(
-                    self.nativeId, "wyze.cruise_points_json", points_json
-                )
-            except Exception:
-                pass
         except Exception:
             pass
 
