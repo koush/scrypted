@@ -426,19 +426,6 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         await self.ptzCommand({"action": "goto_cruise_point", "index": idx})
         return {"ok": True, "queued": True, "action": "goto_cruise_point", "index": idx}
 
-    async def webhookPtz(self, command: dict = None):
-        if isinstance(command, list) and len(command) == 1:
-            command = command[0]
-        if not isinstance(command, dict):
-            raise TypeError("webhookPtz requires a dict command")
-        if "index" in command:
-            try:
-                command["index"] = int(command["index"])
-            except Exception:
-                pass
-        await self.ptzCommand(command)
-        return {"ok": True, "queued": True, "command": command}
-
     async def onRequest(self, request, response):
         try:
             url = getattr(request, "url", None)
@@ -1457,7 +1444,7 @@ class WyzeFork:
                         except Exception as e:
                             print_exception(print, e)
 
-                asyncio.run_coroutine_threadsafe(ptzRunner(), loop)
+                asyncio.ensure_future(ptzRunner(), loop=loop)
 
                 def ignore(self, *args, **kwargs):
                     pass
