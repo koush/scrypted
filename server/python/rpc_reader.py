@@ -44,6 +44,9 @@ class RpcTransport:
     async def read(self):
         pass
 
+    async def drain(self):
+        pass
+
     def writeBuffer(self, buffer, reject):
         pass
 
@@ -112,6 +115,9 @@ class RpcStreamTransport(RpcTransport):
         self.reader = reader
         self.writer = writer
 
+    async def drain(self):
+        await self.writer.drain()
+
     async def read(self):
         lengthBytes = await self.reader.readexactly(4)
         typeBytes = await self.reader.readexactly(1)
@@ -150,6 +156,9 @@ class RpcPickleStreamTransport(RpcTransport):
         self.reader = reader
         self.writer = writer
         self.pickler = pickler
+
+    async def drain(self):
+        await self.writer.drain()
 
     async def read(self):
         lengthBytes = await self.reader.readexactly(4)
@@ -236,6 +245,7 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, rpcTransport: RpcTransp
                         for buffer in buffers:
                             rpcTransport.writeBuffer(buffer, reject)
                 rpcTransport.writeSerialized(message, reject)
+                await rpcTransport.drain()
             except Exception as e:
                 if reject:
                     reject(e)
