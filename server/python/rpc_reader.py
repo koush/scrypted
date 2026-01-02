@@ -7,7 +7,6 @@ import json
 import multiprocessing.connection
 import os
 import pickle
-import threading
 from asyncio.events import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
@@ -43,6 +42,9 @@ class RpcTransport:
         pass
 
     async def read(self):
+        pass
+
+    async def drain(self):
         pass
 
     def writeBuffer(self, buffer, reject):
@@ -113,6 +115,9 @@ class RpcStreamTransport(RpcTransport):
         self.reader = reader
         self.writer = writer
 
+    async def drain(self):
+        await self.writer.drain()
+
     async def read(self):
         lengthBytes = await self.reader.readexactly(4)
         typeBytes = await self.reader.readexactly(1)
@@ -151,6 +156,9 @@ class RpcPickleStreamTransport(RpcTransport):
         self.reader = reader
         self.writer = writer
         self.pickler = pickler
+
+    async def drain(self):
+        await self.writer.drain()
 
     async def read(self):
         lengthBytes = await self.reader.readexactly(4)
@@ -226,17 +234,24 @@ async def readLoop(loop, peer: rpc.RpcPeer, rpcTransport: RpcTransport):
 async def prepare_peer_readloop(loop: AbstractEventLoop, rpcTransport: RpcTransport):
     await rpcTransport.prepare()
 
-    mutex = threading.Lock()
+    send_lock = asyncio.Lock()
+
+    async def async_send(message, reject=None, serializationContext=None):
+        async with send_lock:
+            try:
+                if serializationContext:
+                    buffers = serializationContext.get("buffers", None)
+                    if buffers:
+                        for buffer in buffers:
+                            rpcTransport.writeBuffer(buffer, reject)
+                rpcTransport.writeSerialized(message, reject)
+                await rpcTransport.drain()
+            except Exception as e:
+                if reject:
+                    reject(e)
 
     def send(message, reject=None, serializationContext=None):
-        with mutex:
-            if serializationContext:
-                buffers = serializationContext.get("buffers", None)
-                if buffers:
-                    for buffer in buffers:
-                        rpcTransport.writeBuffer(buffer, reject)
-
-            rpcTransport.writeSerialized(message, reject)
+        asyncio.create_task(async_send(message, reject, serializationContext))
 
     peer = rpc.RpcPeer(send)
     peer.nameDeserializerMap["Buffer"] = SidebandBufferSerializer()
