@@ -268,8 +268,8 @@ export class AmcrestCameraClient {
                     continue;
                 if (ignore === boundaryEnd)
                     continue;
-                // dahua bugs out and sends this.
-                if (ignore === 'HTTP/1.1 200 OK') {
+                // dahua bugs out and sends this (handle both HTTP/1.0 and HTTP/1.1).
+                if (ignore === 'HTTP/1.1 200 OK' || ignore === 'HTTP/1.0 200 OK') {
                     const message = await readAmcrestMessage(stream);
                     this.console.log('ignoring dahua http message', message);
                     message.unshift('');
