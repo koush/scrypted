@@ -17,6 +17,8 @@ import urllib.request
 from ctypes import c_int
 from typing import Any, Coroutine, Dict, List
 
+import uuid
+
 import scrypted_sdk
 from requests import HTTPError, RequestException
 from scrypted_sdk.other import MediaObject
@@ -55,6 +57,114 @@ def print_exception(print, e):
 
 def format_exception(e):
     return "\n".join(traceback.format_exception(e))
+
+
+def _normalize_cruise_points(points):
+    """Normalize a raw cruise-point list into 0..40 (vertical) / 0..350 (horizontal) units."""
+    if not points:
+        return []
+
+    out = []
+    for p in points:
+        try:
+            if not isinstance(p, dict):
+                continue
+            raw_v = p.get("vertical", p.get("tilt", 0) or 0)
+            raw_h = p.get("horizontal", p.get("pan", 0) or 0)
+            raw_t = p.get("time", p.get("duration", 10) or 10)
+            v_in = int(raw_v)
+            h_in = int(raw_h)
+            t = int(raw_t)
+
+            if v_in > 40:
+                v_deg = max(0, min(180, v_in))
+                v = round(v_deg / 180.0 * 40.0)
+            else:
+                v = v_in
+
+            if h_in > 350:
+                h_deg = max(0, min(360, h_in))
+                h = round(h_deg / 360.0 * 350.0)
+            else:
+                h = h_in
+
+            v = max(0, min(40, int(v)))
+            h = max(0, min(350, int(h)))
+            t = max(1, min(255, int(t)))
+            out.append({"vertical": v, "horizontal": h, "time": t})
+        except Exception:
+            continue
+
+    return out
+
+
+def _vertical_to_degrees(v: int) -> int:
+    try:
+        return round(max(0, min(40, int(v))) / 40.0 * 180)
+    except Exception:
+        return 0
+
+
+def _horizontal_to_degrees(h: int) -> int:
+    try:
+        return round(max(0, min(350, int(h))) / 350.0 * 360)
+    except Exception:
+        return 0
+
+
+def _annotate_points_with_degrees(points: List[Dict[str, int]]) -> List[Dict[str, int]]:
+    out = []
+    for p in points:
+        try:
+            vp = dict(p)
+            v = int(vp.get("vertical", 0))
+            h = int(vp.get("horizontal", 0))
+            vp["vertical_degrees"] = _vertical_to_degrees(v)
+            vp["horizontal_degrees"] = _horizontal_to_degrees(h)
+            out.append(vp)
+        except Exception:
+            continue
+    return out
+
+
+def _dedupe_cruise_points(points: List[Dict[str, int]]) -> List[Dict[str, int]]:
+    out = []
+    seen = set()
+    for p in points or []:
+        try:
+            v = int(p.get("vertical", 0))
+            h = int(p.get("horizontal", 0))
+        except Exception:
+            continue
+        key = (v, h)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+    return out
+
+
+def _resolve_ioctl_result(res):
+    try:
+        if isinstance(res, (list, dict)):
+            return res
+        fn = getattr(res, "result", None)
+        if callable(fn):
+            try:
+                return fn()
+            except TypeError:
+                pass
+        fn2 = getattr(res, "wait", None)
+        if callable(fn2):
+            try:
+                return fn2()
+            except Exception:
+                pass
+        if hasattr(res, "value"):
+            return getattr(res, "value")
+    except Exception:
+        pass
+    return res
 
 
 async def to_thread(f):
@@ -96,6 +206,13 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         self.mainFrameSize = FRAME_SIZE_2K if camera.is_2k else FRAME_SIZE_1080P
         self.subByteRate = 30
         self.ptzQueue = asyncio.Queue[scrypted_sdk.PanTiltZoomCommand]()
+        self.ptzResponseQueue: asyncio.Queue[dict] = asyncio.Queue()
+        self._control_lock = threading.Lock()
+        self._ptz_pending: Dict[str, asyncio.Future] = {}
+        self._ptz_pending_lock = threading.Lock()
+        self._cruise_points_cache: List[Dict[str, int]] = []
+        self._cruise_points_cache_ts: float = 0.0
+        self._cruise_points_refresh_lock = asyncio.Lock()
 
         self.rfcServer = asyncio.ensure_future(
             self.ensureServer(self.handleMainRfcClient)
@@ -110,8 +227,397 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                 "tilt": True,
             }
 
-    async def ptzCommand(self, command: scrypted_sdk.PanTiltZoomCommand) -> None:
+        try:
+            asyncio.ensure_future(self._bootstrap_cruise_points())
+        except Exception:
+            pass
+
+        try:
+            asyncio.ensure_future(self._ptz_response_consumer())
+        except Exception:
+            pass
+
+    async def ptzCommand(self, command: scrypted_sdk.PanTiltZoomCommand = None, **kwargs) -> None:
+        if command is None and kwargs:
+            if "command" in kwargs and isinstance(kwargs.get("command"), str):
+                try:
+                    command = json.loads(kwargs.get("command"))
+                except Exception:
+                    command = {"raw": kwargs.get("command")}
+            else:
+                command = dict(kwargs)
+        if isinstance(command, list) and len(command) == 1:
+            command = command[0]
+
+        if isinstance(command, dict):
+            if "index" in command:
+                try:
+                    command["index"] = int(command["index"])
+                except Exception:
+                    pass
+            if "speed" in command:
+                try:
+                    command["speed"] = float(command["speed"])
+                except Exception:
+                    pass
+            if "pan" in command:
+                try:
+                    command["pan"] = float(command["pan"])
+                except Exception:
+                    pass
+            if "tilt" in command:
+                try:
+                    command["tilt"] = float(command["tilt"])
+                except Exception:
+                    pass
+
+        if command is None:
+            raise TypeError("ptzCommand requires a command dict")
+
+        try:
+            if isinstance(command, dict) and "action" in command:
+                action = command.get("action")
+                if action in ("goto_cruise_point", "get_cruise_points") and not command.get("request_id"):
+                    cmd = dict(command)
+                    cmd["request_id"] = uuid.uuid4().hex
+                    try:
+                        self.print("ptz queued:", json.dumps(cmd, default=str))
+                    except Exception:
+                        try:
+                            self.print("ptz queued:", str(cmd))
+                        except Exception:
+                            pass
+                    try:
+                        asyncio.ensure_future(self._ptz_action_with_retry(cmd))
+                    except Exception:
+                        await self.ptzQueue.put(cmd)
+                    return
+        except Exception:
+            pass
+
+        try:
+            self.print("ptz queued:", json.dumps(command, default=str))
+        except Exception:
+            try:
+                self.print("ptz queued:", str(command))
+            except Exception:
+                pass
+
         await self.ptzQueue.put(command)
+
+        try:
+            has_active = bool(self.streams) or (self.activeStream is not None)
+            if not has_active and isinstance(command, dict) and "action" in command:
+                msg = {
+                    "type": "error",
+                    "action": "queued",
+                    "message": "no active stream; open a live view for the camera so PTZ commands can be processed",
+                    "command": command,
+                }
+                try:
+                    self.print("ptz response:", json.dumps(msg, default=str))
+                except Exception:
+                    pass
+                try:
+                    await scrypted_sdk.deviceManager.onDeviceEvent(
+                        self.nativeId, "wyze.ptz_response", msg
+                    )
+                except Exception:
+                    pass
+                try:
+                    asyncio.ensure_future(self._pending_ptz_control(command, delay=3.0))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    async def _ptz_action_with_retry(self, command: dict, retries: int = 3, timeout: float = 2.0, retry_delay: float = 0.25):
+        try:
+            req_id = command.get("request_id") if isinstance(command, dict) else None
+        except Exception:
+            req_id = None
+
+        if not req_id:
+            req_id = uuid.uuid4().hex
+            command = dict(command or {})
+            command["request_id"] = req_id
+
+        loop = asyncio.get_running_loop()
+        fut: asyncio.Future = loop.create_future()
+        with self._ptz_pending_lock:
+            self._ptz_pending[req_id] = fut
+
+        try:
+            last_timeout = False
+            for attempt in range(retries + 1):
+                last_timeout = False
+                try:
+                    await self.ptzQueue.put(command)
+                except Exception:
+                    break
+
+                try:
+                    await asyncio.wait_for(asyncio.shield(fut), timeout=timeout)
+                    return
+                except asyncio.TimeoutError:
+                    last_timeout = True
+                    if attempt < retries:
+                        try:
+                            await asyncio.sleep(retry_delay)
+                        except Exception:
+                            pass
+                    continue
+                except Exception:
+                    return
+
+            if last_timeout and not fut.done():
+                msg = {
+                    "type": "error",
+                    "action": command.get("action") or "ptz",
+                    "message": f"no PTZ response after {retries + 1} attempt(s)",
+                    "command": command,
+                    "request_id": req_id,
+                }
+                try:
+                    await self.ptzResponseQueue.put(msg)
+                except Exception:
+                    pass
+                try:
+                    fut.set_result(msg)
+                except Exception:
+                    pass
+        finally:
+            with self._ptz_pending_lock:
+                self._ptz_pending.pop(req_id, None)
+
+    async def _pending_ptz_control(self, command: dict, delay: float = 1.5):
+        try:
+            await asyncio.sleep(delay)
+            has_active = bool(self.streams) or (self.activeStream is not None)
+            if has_active:
+                return
+            try:
+                if getattr(self, "ptzResponseQueue", None) and self.ptzResponseQueue.qsize() > 0:
+                    return
+            except Exception:
+                pass
+            try:
+                await self._handle_ptz_control(command)
+            except Exception as e:
+                try:
+                    await self.ptzResponseQueue.put({"type": "error", "action": "ptz_control", "message": str(e)})
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    async def ptzGoToPreset(self, index: int) -> None:
+        try:
+            await self.ptzCommand({"action": "goto_cruise_point", "index": int(index)})
+        except Exception:
+            pass
+
+    async def _handle_ptz_control(self, command: dict):
+        loop = asyncio.get_running_loop()
+        try:
+            res = await loop.run_in_executor(None, self._run_ptz_control_sync, command)
+            try:
+                await self.ptzResponseQueue.put(res)
+            except Exception:
+                pass
+        except Exception as e:
+            try:
+                await self.ptzResponseQueue.put({"type": "error", "action": "ptz_control", "message": str(e)})
+            except Exception:
+                pass
+
+    async def _bootstrap_cruise_points(self):
+        try:
+            await asyncio.sleep(2.0)
+        except Exception:
+            return
+        try:
+            await self.refreshCruisePoints(force=False)
+        except Exception:
+            pass
+
+    async def _publish_ptz_presets(self, points: List[Dict[str, int]]):
+        if not self.camera.is_pan_cam:
+            return
+        try:
+            display_points = _dedupe_cruise_points(points)
+            presets = {}
+            for i, p in enumerate(display_points):
+                vd = p.get("vertical_degrees")
+                hd = p.get("horizontal_degrees")
+                if vd is None:
+                    vd = _vertical_to_degrees(p.get("vertical", 0))
+                if hd is None:
+                    hd = _horizontal_to_degrees(p.get("horizontal", 0))
+                label = f"Preset {i + 1}"
+                if vd is not None and hd is not None:
+                    label = f"Preset {i + 1} (tilt {vd}, pan {hd})"
+                presets[str(i + 1)] = label
+            caps = getattr(self, "ptzCapabilities", {"pan": True, "tilt": True})
+            caps = {**caps, "presets": presets}
+            self.ptzCapabilities = caps
+        except Exception:
+            pass
+
+    async def refreshCruisePoints(self, force: bool = False) -> List[Dict[str, int]]:
+        async with self._cruise_points_refresh_lock:
+            now_ts = time.time()
+            if not force and self._cruise_points_cache and (now_ts - self._cruise_points_cache_ts) < 60:
+                return self._cruise_points_cache
+
+            points = await self.getCruisePoints()
+            points = _annotate_points_with_degrees(_normalize_cruise_points(points))
+            self._cruise_points_cache = points
+            self._cruise_points_cache_ts = now_ts
+            await self._publish_ptz_presets(points)
+            return points
+
+    async def getCruisePoints(self) -> List[Dict[str, int]]:
+        has_active = bool(self.streams) or (self.activeStream is not None)
+        if has_active:
+            request_id = uuid.uuid4().hex
+            loop = asyncio.get_running_loop()
+            fut: asyncio.Future = loop.create_future()
+            with self._ptz_pending_lock:
+                self._ptz_pending[request_id] = fut
+            try:
+                await self.ptzQueue.put({"action": "get_cruise_points", "request_id": request_id})
+                res = await asyncio.wait_for(fut, timeout=6.0)
+            finally:
+                with self._ptz_pending_lock:
+                    self._ptz_pending.pop(request_id, None)
+
+            if isinstance(res, dict) and res.get("type") == "cruise_points":
+                return res.get("points", [])
+            if isinstance(res, dict) and res.get("type") == "error":
+                raise RuntimeError(f"get_cruise_points error: {res.get('message')}")
+            return _normalize_cruise_points(res if isinstance(res, list) else [])
+
+        loop = asyncio.get_running_loop()
+        try:
+            res = await loop.run_in_executor(None, self._run_ptz_control_sync, {"action": "get_cruise_points"})
+        except Exception as e:
+            raise RuntimeError(f"ptz control failed: {e}")
+
+        if not isinstance(res, dict):
+            return _normalize_cruise_points(res if isinstance(res, list) else [])
+        if res.get("type") == "cruise_points":
+            return res.get("points", [])
+        if res.get("type") == "error":
+            raise RuntimeError(f"get_cruise_points error: {res.get('message')}")
+        return _normalize_cruise_points(res.get("points") or [])
+
+    async def _ptz_response_consumer(self):
+        while True:
+            try:
+                msg = await self.ptzResponseQueue.get()
+                if not isinstance(msg, dict):
+                    continue
+                req_id = msg.get("request_id")
+                if req_id:
+                    with self._ptz_pending_lock:
+                        fut = self._ptz_pending.get(req_id)
+                    if fut and not fut.done():
+                        try:
+                            fut.set_result(msg)
+                        except Exception:
+                            pass
+                if msg.get("type") == "cruise_points":
+                    points = msg.get("points") or []
+                    try:
+                        points = _annotate_points_with_degrees(_normalize_cruise_points(points))
+                        self._cruise_points_cache = points
+                        self._cruise_points_cache_ts = time.time()
+                        await self._publish_ptz_presets(points)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+    def _run_ptz_control_sync(self, cmd):
+        request_id = None
+        try:
+            if isinstance(cmd, dict):
+                request_id = cmd.get("request_id")
+        except Exception:
+            request_id = None
+        try:
+            wyze_iotc = getattr(self.plugin, "wyze_iotc", None)
+            if not wyze_iotc:
+                with self._control_lock:
+                    wyze_iotc = getattr(self.plugin, "wyze_iotc", None)
+                    if not wyze_iotc:
+                        wyze_iotc = wyzecam.WyzeIOTC(
+                            tutk_platform_lib=self.plugin.tutk_platform_lib,
+                            sdk_key=sdkKey,
+                            max_num_av_channels=1,
+                        )
+                        try:
+                            wyze_iotc.initialize()
+                        except Exception:
+                            pass
+
+            account = self.plugin.account
+            camera = self.camera
+            with wyzecam.WyzeIOTCSession(
+                wyze_iotc.tutk_platform_lib,
+                account,
+                camera,
+                frame_size=FRAME_SIZE_360P,
+                bitrate=0,
+                enable_audio=False,
+                stream_state=c_int(2),
+            ) as sess:
+
+                def do_ioctl(msg, retries=3, backoff=0.5):
+                    last = None
+                    for i in range(retries):
+                        try:
+                            with sess.iotctrl_mux() as mux:
+                                res = mux.send_ioctl(msg)
+                                return _resolve_ioctl_result(res)
+                        except Exception as e:
+                            last = e
+                            time.sleep(backoff * (i + 1))
+                    raise last
+
+                if isinstance(cmd, dict) and "action" in cmd:
+                    action = cmd.get("action")
+                    if action == "get_cruise_points":
+                        try:
+                            res = do_ioctl(tutk_protocol.K11010GetCruisePoints(), retries=4)
+                            points = res if isinstance(res, list) else []
+                            points = _normalize_cruise_points(points)
+                            points = _annotate_points_with_degrees(points)
+                            return {"type": "cruise_points", "points": points, "request_id": request_id}
+                        except Exception as e:
+                            return {"type": "error", "action": "get_cruise_points", "message": str(e), "request_id": request_id}
+                    elif action == "goto_cruise_point":
+                        idx = int(cmd.get("index", 1))
+                        try:
+                            res = do_ioctl(tutk_protocol.K11010GetCruisePoints(), retries=4)
+                            points = res if isinstance(res, list) else []
+                            points = _normalize_cruise_points(points)
+                            points = _annotate_points_with_degrees(points)
+                            if not points or idx < 1 or idx > len(points):
+                                return {"type": "error", "action": "goto_cruise_point", "message": "invalid index", "points": points, "request_id": request_id}
+                            p = points[idx - 1]
+                            v = int(p.get("vertical", 0))
+                            h = int(p.get("horizontal", 0))
+                            vd = _vertical_to_degrees(v)
+                            hd = _horizontal_to_degrees(h)
+                            do_ioctl(tutk_protocol.K11018SetPTZPosition(vd, hd), retries=4)
+                            return {"type": "goto_cruise_point", "index": idx, "point": p, "status": "ok", "request_id": request_id}
+                        except Exception as e:
+                            return {"type": "error", "action": "goto_cruise_point", "message": str(e), "request_id": request_id}
+                return {"type": "error", "action": "ptz_control", "message": "unsupported action", "request_id": request_id}
+        except Exception as e:
+            return {"type": "error", "action": "ptz_control", "message": str(e), "request_id": request_id}
 
     def safeParseJsonStorage(self, key: str):
         try:
@@ -190,6 +696,10 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         info = self.sub if substream else self.main
         ffmpeg = await scrypted_sdk.mediaManager.getFFmpegPath()
         loop = asyncio.get_event_loop()
+
+        stream_token = object()
+        self.streams.add(stream_token)
+        self.activeStream = stream_token
 
         class RFC4571Writer(asyncio.DatagramProtocol):
             def connection_made(self, transport):
@@ -298,6 +808,12 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
         except Exception as e:
             print_exception(self.print, e)
         finally:
+            try:
+                self.streams.discard(stream_token)
+                if self.activeStream is stream_token:
+                    self.activeStream = None
+            except Exception:
+                pass
             forked.worker.terminate()
             writer.close()
             self.print("rfc reader closed")
@@ -375,6 +891,7 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
                     bitrate,
                     self.getMuted(),
                     self.ptzQueue,
+                    self.ptzResponseQueue,
                 ):
                     audio: bool = payload["audio"]
                     data: bytes = payload["data"]
@@ -501,6 +1018,7 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
         self.tutk_platform_lib: str = None
         self.wyze_iotc: wyzecam.WyzeIOTC = None
         self.last_ts = 0
+        self.deviceInstances: Dict[str, WyzeCamera] = {}
 
         if sys.platform.find("linux"):
             self.print("Wyze plugin must be installed under Scrypted for Linux. Found: " + sys.platform)
@@ -545,7 +1063,13 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
         camera = self.cameras.get(nativeId)
         if not camera:
             return
-        return WyzeCamera(nativeId, self, camera)
+        existing = self.deviceInstances.get(nativeId)
+        if existing:
+            existing.camera = camera
+            return existing
+        device = WyzeCamera(nativeId, self, camera)
+        self.deviceInstances[nativeId] = device
+        return device
 
     def safeParseJsonStorage(self, key: str):
         try:
@@ -689,6 +1213,7 @@ class WyzeFork:
         bitrate: int,
         muted: bool,
         ptzQueue: asyncio.Queue[scrypted_sdk.PanTiltZoomCommand],
+        ptzResponseQueue: asyncio.Queue[dict],
     ):
         account = wyzecam.WyzeAccount(**account_json)
         camera = wyzecam.WyzeCamera(**camera_json)
@@ -722,42 +1247,94 @@ class WyzeFork:
                     while not closed:
                         command = await ptzQueue.get()
                         try:
-                            movement = command.get(
-                                "movement",
-                                scrypted_sdk.PanTiltZoomMovement.Relative.value,
-                            )
-                            pan = command.get("pan", 0)
-                            tilt = command.get("tilt", 0)
-                            speed = command.get("speed", 1)
-                            if (
-                                movement
-                                == scrypted_sdk.PanTiltZoomMovement.Absolute.value
-                            ):
-                                pan = round(max(0, min(350, pan * 350)))
-                                tilt = round(max(0, min(40, tilt * 40)))
-                                message = tutk_protocol.K11018SetPTZPosition(tilt, pan)
-                                with sess.iotctrl_mux() as mux:
-                                    mux.send_ioctl(message)
-                            elif (
-                                movement
-                                == scrypted_sdk.PanTiltZoomMovement.Relative.value
-                            ):
-                                # this is range which turns in a full rotation.
-                                scalar = 3072
-                                # speed is 1-9 inclusive
-                                speed = round(max(0, min(8, speed * 8)))
-                                speed += 1
-                                pan = round(max(-scalar, min(scalar, pan * scalar)))
-                                tilt = round(max(-scalar, min(scalar, tilt * scalar)))
-                                message = tutk_protocol.K11000SetRotaryByDegree(
-                                    pan, tilt, speed
-                                )
-                                with sess.iotctrl_mux() as mux:
-                                    mux.send_ioctl(message)
+                            if isinstance(command, dict) and "action" in command:
+                                action = command.get("action")
+                                request_id = None
+                                try:
+                                    request_id = command.get("request_id")
+                                except Exception:
+                                    request_id = None
+
+                                def do_ioctl_sync(msg, retries=3, backoff=0.5):
+                                    last_exc = None
+                                    for i in range(retries):
+                                        try:
+                                            with sess.iotctrl_mux() as mux:
+                                                res = mux.send_ioctl(msg)
+                                                res = _resolve_ioctl_result(res)
+                                                return res
+                                        except Exception as e:
+                                            last_exc = e
+                                            time.sleep(backoff * (i + 1))
+                                    raise last_exc
+
+                                if action == "get_cruise_points":
+                                    try:
+                                        res = do_ioctl_sync(tutk_protocol.K11010GetCruisePoints(), retries=4)
+                                        points = res if isinstance(res, list) else []
+                                        points = _normalize_cruise_points(points)
+                                        points = _annotate_points_with_degrees(points)
+                                        await ptzResponseQueue.put({"type": "cruise_points", "points": points, "request_id": request_id})
+                                    except Exception as e:
+                                        await ptzResponseQueue.put({"type": "error", "action": "get_cruise_points", "message": str(e), "request_id": request_id})
+                                elif action == "goto_cruise_point":
+                                    idx = int(command.get("index", 1))
+                                    try:
+                                        res = do_ioctl_sync(tutk_protocol.K11010GetCruisePoints(), retries=4)
+                                        points = res if isinstance(res, list) else []
+                                        points = _normalize_cruise_points(points)
+                                        points = _annotate_points_with_degrees(points)
+                                        if not points or idx < 1 or idx > len(points):
+                                            await ptzResponseQueue.put({"type": "error", "action": "goto_cruise_point", "message": "invalid index", "points": points, "request_id": request_id})
+                                        else:
+                                            p = points[idx - 1]
+                                            v = int(p.get("vertical", 0))
+                                            h = int(p.get("horizontal", 0))
+                                            vd = _vertical_to_degrees(v)
+                                            hd = _horizontal_to_degrees(h)
+                                            do_ioctl_sync(tutk_protocol.K11018SetPTZPosition(vd, hd), retries=4)
+                                            await ptzResponseQueue.put({"type": "goto_cruise_point", "index": idx, "point": p, "status": "ok", "request_id": request_id})
+                                    except Exception as e:
+                                        await ptzResponseQueue.put({"type": "error", "action": "goto_cruise_point", "message": str(e), "request_id": request_id})
+                                else:
+                                    await ptzResponseQueue.put({"type": "error", "action": action, "message": "unsupported action", "request_id": request_id})
                             else:
-                                raise Exception(
-                                    "Unknown PTZ cmmand: " + command["movement"]
+                                movement = command.get(
+                                    "movement",
+                                    scrypted_sdk.PanTiltZoomMovement.Relative.value,
                                 )
+                                pan = command.get("pan", 0)
+                                tilt = command.get("tilt", 0)
+                                speed = command.get("speed", 1)
+                                if (
+                                    movement
+                                    == scrypted_sdk.PanTiltZoomMovement.Absolute.value
+                                ):
+                                    pan = round(max(0, min(350, pan * 350)))
+                                    tilt = round(max(0, min(40, tilt * 40)))
+                                    message = tutk_protocol.K11018SetPTZPosition(tilt, pan)
+                                    with sess.iotctrl_mux() as mux:
+                                        mux.send_ioctl(message)
+                                elif (
+                                    movement
+                                    == scrypted_sdk.PanTiltZoomMovement.Relative.value
+                                ):
+                                    # this is range which turns in a full rotation.
+                                    scalar = 3072
+                                    # speed is 1-9 inclusive
+                                    speed = round(max(0, min(8, speed * 8)))
+                                    speed += 1
+                                    pan = round(max(-scalar, min(scalar, pan * scalar)))
+                                    tilt = round(max(-scalar, min(scalar, tilt * scalar)))
+                                    message = tutk_protocol.K11000SetRotaryByDegree(
+                                        pan, tilt, speed
+                                    )
+                                    with sess.iotctrl_mux() as mux:
+                                        mux.send_ioctl(message)
+                                else:
+                                    raise Exception(
+                                        "Unknown PTZ cmmand: " + command["movement"]
+                                    )
                         except Exception as e:
                             print_exception(print, e)
 
