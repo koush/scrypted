@@ -13,7 +13,6 @@ import time
 import traceback
 import socket
 import urllib
-import urllib.parse
 import urllib.request
 from ctypes import c_int
 from typing import Any, Coroutine, Dict, List
@@ -23,7 +22,7 @@ import uuid
 import scrypted_sdk
 from requests import HTTPError, RequestException
 from scrypted_sdk.other import MediaObject
-from scrypted_sdk.types import (DeviceProvider, HttpRequestHandler, PanTiltZoom,
+from scrypted_sdk.types import (DeviceProvider, PanTiltZoom,
                                 RequestMediaStreamOptions,
                                 ResponseMediaStreamOptions, ScryptedDeviceType,
                                 ScryptedInterface, Setting, Settings,
@@ -192,7 +191,7 @@ class CodecInfo:
         self.audioSampleRate = audioSampleRate
 
 
-class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTiltZoom, HttpRequestHandler):
+class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTiltZoom):
     def __init__(
         self, nativeId: str | None, plugin: WyzePlugin, camera: wyzecam.WyzeCamera
     ):
@@ -417,110 +416,6 @@ class WyzeCamera(scrypted_sdk.ScryptedDeviceBase, VideoCamera, Settings, PanTilt
             await self.ptzCommand({"action": "goto_cruise_point", "index": int(index)})
         except Exception:
             pass
-
-    async def webhookGotoPreset(self, index: int = 1):
-        try:
-            idx = int(index)
-        except Exception:
-            idx = 1
-        await self.ptzCommand({"action": "goto_cruise_point", "index": idx})
-        return {"ok": True, "queued": True, "action": "goto_cruise_point", "index": idx}
-
-    async def onRequest(self, request, response):
-        try:
-            url = getattr(request, "url", None)
-            if not url and isinstance(request, dict):
-                url = request.get("url")
-            url = url or ""
-
-            parsed = urllib.parse.urlparse(url)
-            path = parsed.path or ""
-            qs = urllib.parse.parse_qs(parsed.query or "")
-
-            body = None
-            raw_body = getattr(request, "body", None)
-            if raw_body is None and isinstance(request, dict):
-                raw_body = request.get("body")
-            if isinstance(raw_body, (bytes, bytearray)):
-                try:
-                    body = raw_body.decode("utf-8", "ignore")
-                except Exception:
-                    body = None
-            elif isinstance(raw_body, str):
-                body = raw_body
-
-            command = None
-            if body:
-                try:
-                    command = json.loads(body)
-                except Exception:
-                    command = None
-
-            if command is None and qs:
-                flat = {k: (v[0] if isinstance(v, list) and v else v) for k, v in qs.items()}
-                if "command" in flat:
-                    try:
-                        command = json.loads(flat["command"])
-                    except Exception:
-                        command = {"command": flat["command"]}
-                elif "action" in flat:
-                    command = flat
-
-            if command is None:
-                parts = [p for p in path.split("/") if p]
-                if len(parts) >= 2 and parts[-2] == "preset":
-                    try:
-                        idx = int(parts[-1])
-                        command = {"action": "goto_cruise_point", "index": idx}
-                    except Exception:
-                        command = None
-
-            if isinstance(command, list) and len(command) == 1:
-                command = command[0]
-
-            if not isinstance(command, dict):
-                response.send(
-                    json.dumps({
-                        "ok": False,
-                        "error": "missing/invalid command",
-                        "hint": "Send JSON body like {\"action\":\"goto_cruise_point\",\"index\":2} or query params action=...&index=...",
-                        "url": url,
-                        "path": path,
-                    }),
-                    {
-                        "code": 400,
-                        "headers": {"Content-Type": "application/json"},
-                    },
-                )
-                return
-
-            if "index" in command:
-                try:
-                    command["index"] = int(command["index"])
-                except Exception:
-                    pass
-
-            try:
-                await self.ptzCommand(command)
-            except Exception as e:
-                response.send(
-                    json.dumps({"ok": False, "error": str(e), "command": command}),
-                    {"code": 500, "headers": {"Content-Type": "application/json"}},
-                )
-                return
-
-            response.send(
-                json.dumps({"ok": True, "queued": True, "command": command}),
-                {"code": 200, "headers": {"Content-Type": "application/json"}},
-            )
-        except Exception as e:
-            try:
-                response.send(
-                    json.dumps({"ok": False, "error": str(e)}),
-                    {"code": 500, "headers": {"Content-Type": "application/json"}},
-                )
-            except Exception:
-                pass
 
     async def _handle_ptz_control(self, command: dict):
         loop = asyncio.get_running_loop()
@@ -1226,7 +1121,6 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
             interfaces: List[ScryptedInterface] = [
                 ScryptedInterface.Settings.value,
                 ScryptedInterface.VideoCamera.value,
-                ScryptedInterface.HttpRequestHandler.value,
             ]
 
             if camera.is_pan_cam:
