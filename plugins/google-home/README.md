@@ -14,3 +14,5 @@ The Google Home Plugin lets you control your Scrypted devices from Google Assist
 8. Add Scrypted, and log in to Scrypted with the same account from the step 2.
 
 Your devices should now sync with Google Home.
+
+**Note:** Video streaming no longer works in the Google Home app - you'll need to use a Nest Hub to view.
