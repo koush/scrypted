@@ -7,6 +7,7 @@ import { TuyaCamera } from "./camera";
 
 export function createTuyaDevice(state: TuyaDevice, plugin: TuyaPlugin): TuyaAccessory | null {
   switch (state.category) {
+    case "pettv":
     case "sp":
     case "dghsxj":
       return new TuyaCamera(state, plugin)

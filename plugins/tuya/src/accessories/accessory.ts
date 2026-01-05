@@ -32,7 +32,7 @@ export abstract class TuyaAccessory extends ScryptedDeviceBase implements Online
   }
 
   getStatus(code: string) {
-    return this.tuyaDevice.status.find(s => s.code === code);
+    return (this.tuyaDevice.status || []).find(s => s.code === code);
   }
 
   getSchema(...codes: string[]) {
@@ -50,10 +50,13 @@ export abstract class TuyaAccessory extends ScryptedDeviceBase implements Online
 
   async updateAllValues(): Promise<void> {
     this.online = this.tuyaDevice.online;
-    await this.updateStatus(this.tuyaDevice.status);
+    await this.updateStatus(this.tuyaDevice.status || []);
   }
 
   async updateStatus(status: TuyaDeviceStatus[]): Promise<void> {
+    if (!this.tuyaDevice.status) {
+      this.tuyaDevice.status = [];
+    }
     for (const stat of status) {
       const old = this.tuyaDevice.status.find(o => o.code === stat.code);
       if (old) {
