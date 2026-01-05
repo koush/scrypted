@@ -17,7 +17,7 @@
             "sourceMaps": true,
             "localRoot": "${workspaceFolder}/out",
             "remoteRoot": "/plugin/",
-            "type": "pwa-node"
+            "type": "node"
         }
     ]
 }

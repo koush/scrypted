@@ -1,129 +1,128 @@
-export interface TuyaResponse<T> {
-    success: boolean
-    t: number
-    result: T
+import { TuyaCloudTokenInfo } from "./cloud";
+import { TuyaSharingTokenInfo } from "./sharing";
+
+export enum TuyaLoginMethod {
+  App = "Tuya (Smart Life) App",
+  Account = "Tuya Developer Account"
 }
 
-export interface TuyaDeviceConfig {
-    id: string;
-    name: string;
-    local_key: string;
-    category: string;
-    product_id: string;
-    product_name: string;
-    sub: boolean;
-    uuid: string;
-    online: boolean;
-    icon: string;
-    ip: string;
-    time_zone: string;
-    active_time: number;
-    create_time: number;
-    update_time: number;
-    status: TuyaDeviceStatus[];
-    functions: DeviceFunction[];
+export type TuyaTokenInfo = (TuyaSharingTokenInfo & { type: TuyaLoginMethod.App }) | (TuyaCloudTokenInfo & { type: TuyaLoginMethod.Account });
 
-    // Not necessary?
-
-    uid: string;
-    biz_type: number;
-    model: string;
-    owner_id: string;
+export type TuyaResponse<T> = {
+  success?: boolean;
+  t?: number;
+  result: T;
+  tid?: string;
 }
 
-export interface TuyaDeviceStatus {
-    code: string;
-    value: any;
+export type TuyaDevice = {
+  id: string;
+  name: string;
+  local_key: string;
+  category: string;
+  product_id: string;
+  product_name: string;
+  sub: boolean;
+  uuid: string;
+  online: boolean;
+  icon: string;
+  ip: string;
+  time_zone: string;
+  active_time: number;
+  create_time: number;
+  update_time: number;
+  status: TuyaDeviceStatus[];
+  schema: TuyaDeviceSchema[];
+
+  // Not necessary?
+
+  uid: string;
+  biz_type: number;
+  model?: string;
+  owner_id: string;
 }
 
-export interface DeviceFunction {
-    code: string;
-    type: string;
-    values: string;
-    desc: string;
-    name: string;
-}
-
-export interface RTSPToken {
-    url: string;
-    expires: Date;
-}
-
-export interface MQTTConfig {
-    url: string;
-    username: string;
-    password: string;
-    client_id: string;
-    source_topic: string;
-    sink_topic: string;
-    expire_time: number;
-}
-
-export interface DeviceWebRTConfig {
-    audio_attributes: AudioAttributes;
-    auth: string;
-    id: string;
-    moto_id: string;
-    p2p_config: P2PConfig;
-    skill: string;
-    supports_webrtc: boolean;
-    vedio_clarity: number;
-}
-
-interface AudioAttributes {
-    call_mode: number[];
-    hardware_capability: number[];
-}
-
-interface P2PConfig {
-    ices: Ice[];
-}
-
-interface Ice {
-    urls: string;
-    credential?: string;
-    ttl?: number;
-    username?: string;
-}
-
-export interface WebRTCMQMessage {
-    protocol: number;
-    pv: string;
-    t: number;
-    data: {
-        header: {
-            type: 'offer' | 'answer' | 'candidate' | 'disconnect';
-            from: string;
-            to: string;
-            sub_dev_id: string;
-            sessionid: string;
-            moto_id: string;
-            tid: string;
-        },
-        msg: OfferMessage | AnswerMessage | CandidateMessage | DisconnectMessage
+export type TuyaDeviceSchema = {
+  code: string;
+  mode: "rw" | "r" | "w";
+} & (
+    {
+      type: "Boolean";
+      specs: never;
+    } | {
+      type: "Integer";
+      specs: {
+        unit?: string;
+        min: number;
+        max: number;
+        scale: number;
+        step: number;
+      }
+    } | {
+      type: "Enum";
+      specs: {
+        range: string[]
+      }
+    } | {
+      type: "String";
+      specs: {
+        maxlen: number
+      };
+    } | {
+      type: "Json";
+      specs: object;
+    } | {
+      type: "Raw";
+      specs: any;
     }
+  )
+
+export type TuyaDeviceStatus = {
+  code: string;
+  value: string | number | boolean;
 }
 
-export interface OfferMessage {
-    mode: string;
-    sdp: string;
-    auth: string;
-    stream_type: number;
+export type TuyaDeviceFunction = {
+  code: string;
+  type: string;
+  name?: string;
+  desc?: string;
+  values: string;
 }
 
-export interface AnswerMessage {
-    mode: string;
-    sdp: string;
-    stream_type: number;
-    token: Ice[];
-    replay: any;
+export enum TuyaMessageProtocol {
+  DEVICE = 4,
+  OTHER = 30
 }
 
-export interface CandidateMessage {
-    mode: string;
-    candidate: string;
-}
+export type TuyaMessage = {
+  data: {
+    dataId?: string;
+  };
+  protocol: number;
+  pv?: string;
+  sign?: string;
+  t: number;
+} & (
+  {
+    protocol: TuyaMessageProtocol.DEVICE;
+    data: {
+      devId: string;
+      status: (TuyaDeviceStatus & { t: number })[]
+    }
+  } | {
+    protocol: TuyaMessageProtocol.OTHER;
+    data: {
+      bizData: {
+        devId: string;
+        name?: string;
+      };
+      bizCode: "online" | "offline" | "nameUpdate" | "dpNameUpdate" | "bindUser" | "delete";
+    }
+  }
+)
 
-export interface DisconnectMessage {
-    mode: string;
+export type RTSPToken = {
+  url: string;
+  expires: number;
 }

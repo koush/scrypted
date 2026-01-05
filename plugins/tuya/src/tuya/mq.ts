@@ -1,129 +1,101 @@
-import Event from 'events';
-import * as mqtt from "mqtt";
-import { IClientPublishOptions } from 'mqtt';
-import { IPublishPacket } from 'mqtt-packet'
-import { MQTTConfig } from "./const";
+import Event from "events";
+import { connect, IClientPublishOptions, MqttClient, OnCloseCallback, OnErrorCallback, OnMessageCallback } from "mqtt";
+import { IPublishPacket } from "mqtt-packet";
+import { EventEmitter } from "events";
 
+export type MqttConfig = {
+  url: string;
+  clientId: string;
+  username: string;
+  password: string;
+  topics: string[];
+  expires: number;
+}
 
-export class TuyaMQ {
-    static connected = "TUYA_CONNECTED";
-    static message = "TUYA_MESSAGE";
-    static error = "TUYA_ERROR";
-    static close = "TUYA_CLOSE";
+export type TuyaMQEvent = {
+  connected: [];
+  message: Parameters<OnMessageCallback>;
+  error: Parameters<OnErrorCallback>
+  close: Parameters<OnCloseCallback>
+}
 
-    private client?: mqtt.MqttClient;
-    private config: MQTTConfig;
-    private event: Event;
+export class TuyaMQ extends EventEmitter<TuyaMQEvent> {
+  private client?: MqttClient;
+  private config: MqttConfig | undefined;
+  private fetchConfig: () => Promise<MqttConfig>;
+  private retryTimeout: NodeJS.Timeout | undefined;
 
-    constructor(
-        config: MQTTConfig
-    ) {
-        this.config = Object.assign({}, config);
-        this.event = new Event();
+  constructor(fetchConfig: () => Promise<MqttConfig>) {
+    super();
+    this.fetchConfig = fetchConfig;
+  }
+  
+  public async start(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.on("connected", () => {
+        resolve();
+      });
+      this.on("error", (error) => {
+        reject(error);
+      });
+      this._connect();
+    });
+  }
+
+  public stop() {
+    this.client?.end();
+    this.client?.removeAllListeners();
+    this.client = undefined;
+    this.config = undefined;
+    if (this.retryTimeout) {
+      clearTimeout(this.retryTimeout);
+      this.retryTimeout = undefined;
     }
+  }
 
-    public stop() {
-        this.client?.end();
-    }
+  public publish(topic: string, message: string) {
+    const properties: IClientPublishOptions = {
+      qos: 1,
+      retain: false,
+    };
 
-    public async connect(): Promise<mqtt.Client> {
-        return new Promise((resolve, reject) => {
-            this.event.on(
-                TuyaMQ.connected, 
-                (client: mqtt.MqttClient) => {
-                    if (client.connected) {
-                        resolve(client);
-                    } else {
-                        reject(new Error('Client did not connect successfully.'));
-                    }
-                }
-            );
-            this.client = this._connect();
-        });
-    }
+    this.client?.publish(topic, message, properties);
+  }
 
-    public message(
-        cb: (client: mqtt.MqttClient, message: any) => void
-    ) {
-        this.event.on(TuyaMQ.message, cb);
-    }
-
-    public error(
-        cb: (client: mqtt.MqttClient, error: Error) => void
-    ) {
-        this.event.on(TuyaMQ.error, cb);
-    }
-
-    public close(
-        cb: (client: mqtt.MqttClient) => void
-    ) {
-        this.event.on(TuyaMQ.close, cb);
-    }
-
-    public publish(message: string) {
-        const properties: IClientPublishOptions = {
-            qos: 1,
-            retain: false
+  private async _connect() {
+    this.stop();
+    const config = this.config && (this.config.expires - 60_000) > Date.now() ? this.config : await this.fetchConfig()
+    const client = connect(config.url, {
+      clientId: config.clientId,
+      username: config.username,
+      password: config.password,
+    });
+    client.on("connect", (packet) => {
+      if (packet.returnCode === 0) {
+        for (const topic of config.topics) {
+          client.subscribe(topic);
         }
-
-        this.client?.publish(this.config.sink_topic, message, properties);
-    }
-
-    public removeMessageListener(
-        cb: (client: mqtt.MqttClient, message: any) => void
-    ) {
-        this.event.removeListener(TuyaMQ.message, cb);
-    }
-
-    private _connect() {
-        this.client = mqtt.connect(this.config.url, {
-            clientId: this.config.client_id,
-            username: this.config.username,
-            password: this.config.password
-        });
-
-        this.subConnect(this.client);
-        this.subMessage(this.client);
-        this.subError(this.client);
-        this.subClose(this.client);
-        return this.client;
-    }
-
-    private subConnect(client: mqtt.MqttClient) {
-        client.on('connect', () => {
-            client.subscribe(this.config.source_topic);
-            this.event.emit(
-                TuyaMQ.connected,
-                client
-            )   
-        });
-    }
-
-    private subMessage(client: mqtt.MqttClient) {
-        client.on('message', (topic: string, payload: Buffer, packet: IPublishPacket) => {
-            this.event.emit(
-                TuyaMQ.message,
-                client,
-                payload
-            )
-        });
-    }
-
-    private subError(client: mqtt.MqttClient) {
-        client.on('error', (error: Error) => {
-            this.event.emit(
-                TuyaMQ.error,
-                error
-            )
-        });
-    }
-
-    private subClose(client: mqtt.MqttClient) {
-        client.on('close', () => {
-            this.event.emit(
-                TuyaMQ.close,
-                this.client
-            );
-        });
-    }
-} 
+        this.emit("connected");
+      } else if (packet.returnCode === 5) {
+        this.emit("error", new Error("Not authorized"));
+      } else {
+        this.emit("error", new Error("Connection failed to connect."));
+      }
+    });
+    client.on("message", (...args) => {
+        this.emit("message", ...args);
+    });
+    client.on("error", (error: Error) => {
+      this.emit("error", error);
+      this._connect();
+    });
+    client.on("close", () => {
+      this.emit("close");
+      this.stop();
+    });
+    this.client = client;
+    this.config = config;
+    this.retryTimeout = setTimeout(() => this._connect(), (config.expires - 60_000) - Date.now())
+    return client;
+  }
+}
