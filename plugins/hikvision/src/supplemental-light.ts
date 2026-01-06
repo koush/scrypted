@@ -4,22 +4,63 @@ import type { HikvisionCamera } from "./main";
 
 export class HikvisionSupplementalLight extends ScryptedDeviceBase implements OnOff, Brightness, Settings {
     storageSettings = new StorageSettings(this, {
+        supplementalLightMode: {
+            title: 'Supplemental Light Mode',
+            description: 'Available modes depend on your camera hardware.',
+            type: 'radiopanel',
+            choices: ['Smart', 'White', 'IR', 'Off'],
+            defaultValue: 'White',
+            onPut: async () => {
+                await this.updateSupplementalLight();
+            },
+        },
         mode: {
-            title: 'Mode',
-            description: 'Choose "auto" for automatic brightness control or "manual" for custom brightness.',
-            defaultValue: 'auto',
+            title: 'White Light Control',
             type: 'string',
             choices: ['auto', 'manual'],
+            defaultValue: 'manual',
+            radioGroups: ['White'],
             onPut: async () => {
                 await this.updateSupplementalLight();
             },
         },
         brightness: {
-            title: 'Manual Brightness',
-            description: 'Set brightness (0–100) when in manual mode.',
+            title: 'White Light Brightness',
             defaultValue: 100,
             type: 'number',
             placeholder: '0-100',
+            range: [0, 100],
+            radioGroups: ['White', 'Smart'],
+            onPut: async () => {
+                await this.updateSupplementalLight();
+            },
+        },
+        irBrightnessControl: {
+            title: 'IR Brightness Control',
+            type: 'string',
+            choices: ['auto', 'manual'],
+            defaultValue: 'auto',
+            radioGroups: ['IR'],
+            onPut: async () => {
+                await this.updateSupplementalLight();
+            },
+        },
+        irManualBrightness: {
+            title: 'IR Manual Brightness',
+            type: 'number',
+            placeholder: '0-100',
+            range: [0, 100],
+            defaultValue: 100,
+            radioGroups: ['IR', 'Smart'],
+            onPut: async () => {
+                await this.updateSupplementalLight();
+            },
+        },        
+        smartSupplementLight: {
+            title: 'Smart Supplement Light',
+            description: 'Enable to automatically adjust exposure based on scene conditions.',
+            type: 'boolean',
+            defaultValue: false,
             immediate: true,
             onPut: async () => {
                 await this.updateSupplementalLight();
@@ -50,10 +91,50 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
     }
 
     private async updateSupplementalLight(): Promise<void> {
-        const api = this.camera.getClient();
-        const mode = this.storageSettings.values.mode;
-        const brightness = this.storageSettings.values.brightness;
-        await api.setSupplementLight({ on: this.on, brightness: brightness, mode });
+        try {
+            const api = this.camera.getClient();
+            const values = this.storageSettings.values;
+            const supplementalLightMode = values.supplementalLightMode as string;
+            const smartSupplementLight = values.smartSupplementLight as boolean;
+
+            let on = this.on;
+            let output: 'auto' | 'white' | 'ir' | undefined;
+            let mode: 'auto' | 'manual' | undefined;
+            let brightness: number | undefined;
+
+            if (supplementalLightMode === 'Off') {
+                on = false;
+            } else if (on) {
+                if (supplementalLightMode === 'Smart') {
+                    output = 'auto';
+                } else if (supplementalLightMode === 'White') {
+                    output = 'white';
+                    mode = values.mode as 'auto' | 'manual';
+                    if (mode === 'manual') {
+                        brightness = values.brightness as number;
+                    }
+                } else if (supplementalLightMode === 'IR') {
+                    output = 'ir';
+                    mode = values.irBrightnessControl as 'auto' | 'manual';
+                    if (mode === 'manual') {
+                        brightness = values.irManualBrightness as number;
+                    }
+                } else {
+                    throw new Error('Unknown supplemental light mode: ' + supplementalLightMode);
+                }
+            }
+
+            await api.setSupplementLight({
+                on,
+                output,
+                brightness,
+                mode,
+                smartSupplementLightEnabled: smartSupplementLight,
+            });
+        } catch (e) {
+            this.console.error('Failed to update supplemental light:', e);
+            throw e; 
+        }
     }
 
     async getSettings(): Promise<Setting[]> {

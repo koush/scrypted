@@ -503,6 +503,37 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         });
     }
 
+    private async setSmartSupplementalLightEnabled(enabled: boolean): Promise<void> {
+        const url = `http://${this.ip}/ISAPI/Image/channels/1/exposure`;
+
+        const payload =
+            `<?xml version="1.0" encoding="UTF-8"?>` +
+            `<Exposure>` +
+            `<ExposureType>manual</ExposureType>` +
+            `<OverexposeSuppress><enabled>${enabled ? 'true' : 'false'}</enabled></OverexposeSuppress>` +
+            `</Exposure>`;
+
+        try {
+            const response = await this.request({
+                method: 'PUT',
+                url,
+                responseType: 'text',
+                headers: {
+                    'Content-Type': 'application/xml',
+                },
+                body: payload,
+            });
+
+            const status = (response as any)?.statusCode ?? (response as any)?.status ?? 'unknown';
+
+            if (typeof status === 'number' && status >= 400) {
+                this.console.warn('[SmartSupplementLight] Non success HTTP status:', status);
+            }
+        } catch (e) {
+            this.console.warn('[SmartSupplementLight] Failed to set Smart Supplemental Light setting, ignoring.', e);
+        }
+    }
+
     async getSupplementLight(): Promise<{ json: SupplementLightRoot | any; xml: string }> {
         const response = await this.request({
             method: 'GET',
@@ -520,7 +551,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         return { json, xml };
     }
 
-    async setSupplementLight(params: { on?: boolean, brightness?: number, mode?: 'auto' | 'manual' }): Promise<void> {
+    async setSupplementLight(params: { on?: boolean, output?: 'auto' | 'white' | 'ir',  brightness?: number,  mode?: 'auto' | 'manual', smartSupplementLightEnabled?: boolean,}): Promise<void> {
         const { json } = await this.getSupplementLight();
         const supp: any = json.SupplementLight;
         if (!supp) {
@@ -532,63 +563,111 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             t[k] = Array.isArray(t[k]) ? [v] : v;
         };
 
-        const setBrightnessForMode = (level: number, mode: string) => {
+        const parseOptList = (opt?: string) => {
+            if (!opt)
+                return [];
+            return opt.split(',').map((s: string) => s.trim()).filter(Boolean);
+        };
+
+        const selectMode = (output: 'auto' | 'white' | 'ir', opts: string[]) => {
+            if (output === 'white' && opts.includes('colorVuWhiteLight'))
+                return 'colorVuWhiteLight';
+            if (output === 'ir' && opts.includes('irLight'))
+                return 'irLight';
+            if (opts.includes('eventIntelligence'))
+                return 'eventIntelligence';
+            if (opts.includes('colorVuWhiteLight'))
+                return 'colorVuWhiteLight';
+            if (opts.includes('irLight'))
+                return 'irLight';
+            return undefined;
+        };
+
+        const setBrightnessForMode = (level: number, lightMode: string) => {
             const v = level.toString();
-            const map: Record<string, Array<{ obj: any; key: string }>> = {
-                colorVuWhiteLight: [
-                    { obj: supp, key: 'whiteLightBrightness' },
-                    { obj: supp.colorVuWhiteLightModeCfg, key: 'whiteLightbrightLimit' }
-                ],
-                irLight: [
-                    { obj: supp, key: 'irLightBrightness' },
-                    { obj: supp.IrLightModeCfg, key: 'irLightbrightLimit' }
-                ],
-                eventIntelligence: [
-                    { obj: supp.EventIntelligenceModeCfg, key: 'whiteLightBrightness' },
-                    { obj: supp.EventIntelligenceModeCfg, key: 'irLightBrightness' }
-                ]
-            };
-            (map[mode] || []).forEach(({ obj, key }) => {
-                if (obj && obj[key] !== undefined) setValue(obj, key, v);
-            });
+
+            if (lightMode === 'colorVuWhiteLight') {
+                if (supp.whiteLightBrightness !== undefined)
+                    setValue(supp, 'whiteLightBrightness', v);
+                if (supp.colorVuWhiteLightModeCfg?.whiteLightbrightLimit !== undefined)
+                    setValue(supp.colorVuWhiteLightModeCfg, 'whiteLightbrightLimit', v);
+                return;
+            }
+
+            if (lightMode === 'irLight') {
+                if (supp.irLightBrightness !== undefined)
+                    setValue(supp, 'irLightBrightness', v);
+                if (supp.IrLightModeCfg?.irLightbrightLimit !== undefined)
+                    setValue(supp.IrLightModeCfg, 'irLightbrightLimit', v);
+                return;
+            }
+
+            if (lightMode === 'eventIntelligence') {
+                if (supp.EventIntelligenceModeCfg?.whiteLightBrightness !== undefined)
+                    setValue(supp.EventIntelligenceModeCfg, 'whiteLightBrightness', v);
+                if (supp.EventIntelligenceModeCfg?.irLightBrightness !== undefined)
+                    setValue(supp.EventIntelligenceModeCfg, 'irLightBrightness', v);
+                return;
+            }
         };
 
-        const setModeConfigs = (m: 'auto' | 'manual') => {
-            if (getCurrentValue(supp.supplementLightMode) === 'eventIntelligence' && supp.EventIntelligenceModeCfg) {
+        const setControlMode = (m: 'auto' | 'manual') => {
+            const currentLightMode = getCurrentValue(supp.supplementLightMode);
+
+            if (currentLightMode === 'eventIntelligence' && supp.EventIntelligenceModeCfg) {
                 setValue(supp.EventIntelligenceModeCfg, 'brightnessRegulatMode', m);
-            } else if (supp.mixedLightBrightnessRegulatMode !== undefined) {
+                return;
+            }
+
+            if (supp.mixedLightBrightnessRegulatMode !== undefined) {
                 setValue(supp, 'mixedLightBrightnessRegulatMode', m);
-            } else if (supp.isAutoModeBrightnessCfg !== undefined) {
+                return;
+            }
+
+            if (supp.isAutoModeBrightnessCfg !== undefined) {
                 setValue(supp, 'isAutoModeBrightnessCfg', m === 'auto' ? 'true' : 'false');
+                return;
             }
         };
 
-        if (params.on !== undefined && supp.supplementLightMode) {
-            const opts = supp.supplementLightMode.opt?.split(',').map((s: string) => s.trim()) || [];
-            this.console.log('[API] Available supplemental light modes:', opts);
-            if (params.on) {
-                const preferred = ['colorVuWhiteLight', 'eventIntelligence', 'irLight'];
-                const sel = preferred.find(m => opts.includes(m));
-                if (!sel) {
-                    throw new Error(`Cannot turn on: no supported mode. Available: ${opts.join(', ')}`);
-                }
-                setValue(supp, 'supplementLightMode', sel);
-            } else {
+        const opts = parseOptList(supp.supplementLightMode?.opt);
+
+        if (params.smartSupplementLightEnabled !== undefined) {
+            await this.setSmartSupplementalLightEnabled(!!params.smartSupplementLightEnabled);
+        }
+
+        const currentMode = getCurrentValue(supp.supplementLightMode) || 'close';
+
+        const turningOff = params.on === false;
+        if (turningOff) {
+            if (supp.supplementLightMode !== undefined)
                 setValue(supp, 'supplementLightMode', 'close');
-            }
-        }
+        } else {
+            const wantOn = params.on === true ? true : currentMode !== 'close';
 
-        if (params.mode) {
-            setModeConfigs(params.mode);
-        }
+            if (wantOn) {
+                const wantOutput = params.output || 'auto';
+                const needsModePick = params.on === true || params.output !== undefined || currentMode === 'close';
 
-        if (params.brightness !== undefined) {
-            const lvl = Math.min(100, Math.max(0, params.brightness));
-            const mode = getCurrentValue(supp.supplementLightMode);
-            if (mode !== 'close') {
-                setBrightnessForMode(lvl, mode);
-            } else {
-                this.console.warn('[API] Brightness change ignored: light is off');
+                if (needsModePick && supp.supplementLightMode !== undefined) {
+                    const selected = selectMode(wantOutput, opts);
+                    if (!selected) {
+                        throw new Error(`Cannot enable supplemental light. Supported modes: ${opts.join(', ')}`);
+                    }
+                    setValue(supp, 'supplementLightMode', selected);
+                }
+
+                if (params.mode) {
+                    setControlMode(params.mode);
+                }
+
+                if (params.brightness !== undefined && params.mode !== 'auto') {
+                    const lvl = Math.min(100, Math.max(0, params.brightness));
+                    const activeMode = getCurrentValue(supp.supplementLightMode);
+                    if (activeMode && activeMode !== 'close') {
+                        setBrightnessForMode(lvl, activeMode);
+                    }
+                }
             }
         }
 
@@ -597,16 +676,24 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             renderOpts: { pretty: false },
         });
         const newXml = builder.buildObject({ SupplementLight: supp });
+
+        const url = `http://${this.ip}/ISAPI/Image/channels/1/supplementLight`;
         
-        await this.request({
+        const response = await this.request({
             method: 'PUT',
-            url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight`,
+            url,
             responseType: 'text',
             headers: {
                 'Content-Type': 'application/xml',
             },
             body: newXml,
         });
+
+        const status = (response as any)?.statusCode ?? (response as any)?.status ?? 'unknown';
+
+        if (typeof status === 'number' && status >= 400) {
+            this.console.warn('[SupplementLight] Non success HTTP status:', status);
+        }
     }
 
     async getAlarmCapabilities(): Promise<{ json: any; xml: string }> {

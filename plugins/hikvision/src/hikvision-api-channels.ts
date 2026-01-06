@@ -36,7 +36,7 @@ export interface HikvisionAPI {
     updateOverlayText(overlayId: string, entry: TextOverlayRoot): Promise<void>;
 
     getSupplementLight(): Promise<{json: SupplementLightRoot; xml: any }>;
-    setSupplementLight(params: { on?: boolean, brightness?: number, mode?: 'auto' | 'manual' }): Promise<void>;
+    setSupplementLight(params: { on?: boolean; output?: 'auto' | 'white' | 'ir'; brightness?: number; mode?: 'auto' | 'manual'; smartSupplementLightEnabled?: boolean; }): Promise<void>;
 
     getAlarmCapabilities(): Promise<{ json: any; xml: string }>;
     getAlarm(port: string): Promise<{ json: any; xml: string }>;
