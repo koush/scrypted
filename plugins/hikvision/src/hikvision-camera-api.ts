@@ -576,12 +576,26 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         return { on: currentMode !== 'close' };
     }
 
-    async setSupplementLight(params: { on?: boolean, output?: 'auto' | 'white' | 'ir',  brightness?: number,  mode?: 'auto' | 'manual', smartSupplementLightEnabled?: boolean,}): Promise<void> {
-        const { json } = await this.getSupplementLightCapabilities();
+    async setSupplementLight(params: { on?: boolean, output?: 'auto' | 'white' | 'ir', brightness?: number, whiteBrightness?: number, irBrightness?: number, mode?: 'auto' | 'manual', smartMode?: 'auto' | 'manual', smartSupplementLightEnabled?: boolean,}): Promise<void> {
+        const stateResponse = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+        });
+        const json = await xml2js.parseStringPromise(stateResponse.body, {
+            explicitArray: false,
+            mergeAttrs: true,
+        });
         const supp: any = json.SupplementLight;
         if (!supp) {
             throw new Error("Supplemental light configuration not available.");
         }
+
+        const { json: capsJson } = await this.getSupplementLightCapabilities();
+        const caps: any = capsJson.SupplementLight;
 
         const getCurrentValue = (obj: any) => Array.isArray(obj) ? obj[0] : obj;
         const setValue = (t: any, k: string, v: string) => {
@@ -608,54 +622,54 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             return undefined;
         };
 
+        const setWhiteBrightness = (level: number) => {
+            const v = Math.min(100, Math.max(0, level)).toString();
+            if (supp.whiteLightBrightness !== undefined)
+                setValue(supp, 'whiteLightBrightness', v);
+            if (supp.colorVuWhiteLightModeCfg?.whiteLightbrightLimit !== undefined)
+                setValue(supp.colorVuWhiteLightModeCfg, 'whiteLightbrightLimit', v);
+            if (supp.EventIntelligenceModeCfg?.whiteLightBrightness !== undefined)
+                setValue(supp.EventIntelligenceModeCfg, 'whiteLightBrightness', v);
+        };
+
+        const setIrBrightness = (level: number) => {
+            const v = Math.min(100, Math.max(0, level)).toString();
+            if (supp.irLightBrightness !== undefined)
+                setValue(supp, 'irLightBrightness', v);
+            if (supp.IrLightModeCfg?.irLightbrightLimit !== undefined)
+                setValue(supp.IrLightModeCfg, 'irLightbrightLimit', v);
+            if (supp.EventIntelligenceModeCfg?.irLightBrightness !== undefined)
+                setValue(supp.EventIntelligenceModeCfg, 'irLightBrightness', v);
+        };
+
         const setBrightnessForMode = (level: number, lightMode: string) => {
-            const v = level.toString();
-
             if (lightMode === 'colorVuWhiteLight') {
-                if (supp.whiteLightBrightness !== undefined)
-                    setValue(supp, 'whiteLightBrightness', v);
-                if (supp.colorVuWhiteLightModeCfg?.whiteLightbrightLimit !== undefined)
-                    setValue(supp.colorVuWhiteLightModeCfg, 'whiteLightbrightLimit', v);
-                return;
-            }
-
-            if (lightMode === 'irLight') {
-                if (supp.irLightBrightness !== undefined)
-                    setValue(supp, 'irLightBrightness', v);
-                if (supp.IrLightModeCfg?.irLightbrightLimit !== undefined)
-                    setValue(supp.IrLightModeCfg, 'irLightbrightLimit', v);
-                return;
-            }
-
-            if (lightMode === 'eventIntelligence') {
-                if (supp.EventIntelligenceModeCfg?.whiteLightBrightness !== undefined)
-                    setValue(supp.EventIntelligenceModeCfg, 'whiteLightBrightness', v);
-                if (supp.EventIntelligenceModeCfg?.irLightBrightness !== undefined)
-                    setValue(supp.EventIntelligenceModeCfg, 'irLightBrightness', v);
-                return;
+                setWhiteBrightness(level);
+            } else if (lightMode === 'irLight') {
+                setIrBrightness(level);
+            } else if (lightMode === 'eventIntelligence') {
+                setWhiteBrightness(level);
+                setIrBrightness(level);
             }
         };
 
         const setControlMode = (m: 'auto' | 'manual') => {
-            const currentLightMode = getCurrentValue(supp.supplementLightMode);
-
-            if (currentLightMode === 'eventIntelligence' && supp.EventIntelligenceModeCfg) {
-                setValue(supp.EventIntelligenceModeCfg, 'brightnessRegulatMode', m);
-                return;
-            }
-
             if (supp.mixedLightBrightnessRegulatMode !== undefined) {
                 setValue(supp, 'mixedLightBrightnessRegulatMode', m);
-                return;
             }
 
             if (supp.isAutoModeBrightnessCfg !== undefined) {
                 setValue(supp, 'isAutoModeBrightnessCfg', m === 'auto' ? 'true' : 'false');
-                return;
             }
         };
 
-        const opts = parseOptList(supp.supplementLightMode?.opt);
+        const setSmartControlMode = (m: 'auto' | 'manual') => {
+            if (supp.EventIntelligenceModeCfg?.brightnessRegulatMode !== undefined) {
+                setValue(supp.EventIntelligenceModeCfg, 'brightnessRegulatMode', m);
+            }
+        };
+
+        const opts = parseOptList(caps?.supplementLightMode?.opt);
 
         if (params.smartSupplementLightEnabled !== undefined) {
             await this.setSmartSupplementalLightEnabled(!!params.smartSupplementLightEnabled);
@@ -686,11 +700,21 @@ export class HikvisionCameraAPI implements HikvisionAPI {
                     setControlMode(params.mode);
                 }
 
+                if (params.smartMode) {
+                    setSmartControlMode(params.smartMode);
+                }
+
+                if (params.whiteBrightness !== undefined) {
+                    setWhiteBrightness(params.whiteBrightness);
+                }
+                if (params.irBrightness !== undefined) {
+                    setIrBrightness(params.irBrightness);
+                }
+
                 if (params.brightness !== undefined && params.mode !== 'auto') {
-                    const lvl = Math.min(100, Math.max(0, params.brightness));
                     const activeMode = getCurrentValue(supp.supplementLightMode);
                     if (activeMode && activeMode !== 'close') {
-                        setBrightnessForMode(lvl, activeMode);
+                        setBrightnessForMode(params.brightness, activeMode);
                     }
                 }
             }

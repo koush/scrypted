@@ -16,6 +16,16 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
                 }
             },
         },
+        smartBrightnessControl: {
+            title: 'Smart Brightness Control',
+            type: 'string',
+            choices: ['auto', 'manual'],
+            defaultValue: 'auto',
+            radioGroups: ['Smart'],
+            onPut: async () => {
+                await this.updateSupplementalLight();
+            },
+        },
         mode: {
             title: 'White Light Control',
             type: 'string',
@@ -57,7 +67,7 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             onPut: async () => {
                 await this.updateSupplementalLight();
             },
-        },        
+        },
         smartSupplementLight: {
             title: 'Smart Supplement Light',
             description: 'Enable to automatically adjust exposure based on scene conditions.',
@@ -121,21 +131,25 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
 
         let output: 'auto' | 'white' | 'ir' | undefined;
         let mode: 'auto' | 'manual' | undefined;
+        let smartMode: 'auto' | 'manual' | undefined;
         let brightness: number | undefined;
+        let whiteBrightness: number | undefined;
+        let irBrightness: number | undefined;
 
         if (this.on) {
             if (supplementalLightMode === 'Smart') {
                 output = 'auto';
+                smartMode = values.smartBrightnessControl as 'auto' | 'manual';
+                whiteBrightness = values.brightness as number;
+                irBrightness = values.irManualBrightness as number;
             } else if (supplementalLightMode === 'IR') {
                 output = 'ir';
                 mode = values.irBrightnessControl as 'auto' | 'manual';
-                if (mode === 'manual')
-                    brightness = values.irManualBrightness as number;
+                irBrightness = values.irManualBrightness as number;
             } else {
                 output = 'white';
                 mode = values.mode as 'auto' | 'manual';
-                if (mode === 'manual')
-                    brightness = values.brightness as number;
+                whiteBrightness = values.brightness as number;
             }
         }
 
@@ -143,7 +157,10 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             on: this.on,
             output,
             brightness,
+            whiteBrightness,
+            irBrightness,
             mode,
+            smartMode,
             smartSupplementLightEnabled: values.smartSupplementLight as boolean,
         });
     }

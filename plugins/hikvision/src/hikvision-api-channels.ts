@@ -37,7 +37,7 @@ export interface HikvisionAPI {
 
     getSupplementLightCapabilities(): Promise<{json: SupplementLightRoot; xml: any }>;
     getSupplementLightState(): Promise<{ on: boolean }>;
-    setSupplementLight(params: { on?: boolean; output?: 'auto' | 'white' | 'ir'; brightness?: number; mode?: 'auto' | 'manual'; smartSupplementLightEnabled?: boolean; }): Promise<void>;
+    setSupplementLight(params: { on?: boolean; output?: 'auto' | 'white' | 'ir'; brightness?: number; whiteBrightness?: number; irBrightness?: number; mode?: 'auto' | 'manual'; smartMode?: 'auto' | 'manual'; smartSupplementLightEnabled?: boolean; }): Promise<void>;
 
     getAlarmCapabilities(): Promise<{ json: any; xml: string }>;
     getAlarm(port: string): Promise<{ json: any; xml: string }>;
