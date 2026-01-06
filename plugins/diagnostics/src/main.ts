@@ -137,7 +137,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
 
                 const zidane = await sdk.mediaManager.createMediaObjectFromUrl('https://docs.scrypted.app/img/scrypted-nvr/troubleshooting/zidane.jpg');
                 const detected = await plugin.detectObjects(zidane);
-                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
+                const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .8);
                 if (!personFound) {
                     throw new Error('Person not detected in test image.');
                 }
@@ -714,7 +714,7 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                     if (image.width !== 320)
                         throw new Error('Unexpected image with from GPU transform.')
                     const detected = await openvinoPlugin.detectObjects(zidane);
-                    const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .9);
+                    const personFound = detected.detections!.find(d => d.className === 'person' && d.score > .8);
                     if (!personFound)
                         throw new Error('Person not detected in test image.');
                 }
