@@ -534,7 +534,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         }
     }
 
-    async getSupplementLight(): Promise<{ json: SupplementLightRoot | any; xml: string }> {
+    async getSupplementLightCapabilities(): Promise<{ json: SupplementLightRoot | any; xml: string }> {
         const response = await this.request({
             method: 'GET',
             url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight/capabilities`,
@@ -551,8 +551,33 @@ export class HikvisionCameraAPI implements HikvisionAPI {
         return { json, xml };
     }
 
+    async getSupplementLightState(): Promise<{ on: boolean }> {
+        const response = await this.request({
+            method: 'GET',
+            url: `http://${this.ip}/ISAPI/Image/channels/1/supplementLight`,
+            responseType: 'text',
+            headers: {
+                'Content-Type': 'application/xml',
+            },
+        });
+        const json = await xml2js.parseStringPromise(response.body, {
+            explicitArray: false,
+            mergeAttrs: true,
+        });
+        const supp: any = json.SupplementLight;
+        if (!supp) {
+            throw new Error("Supplemental light configuration not available.");
+        }
+
+        const currentMode = Array.isArray(supp.supplementLightMode) 
+            ? supp.supplementLightMode[0] 
+            : supp.supplementLightMode || 'close';
+        
+        return { on: currentMode !== 'close' };
+    }
+
     async setSupplementLight(params: { on?: boolean, output?: 'auto' | 'white' | 'ir',  brightness?: number,  mode?: 'auto' | 'manual', smartSupplementLightEnabled?: boolean,}): Promise<void> {
-        const { json } = await this.getSupplementLight();
+        const { json } = await this.getSupplementLightCapabilities();
         const supp: any = json.SupplementLight;
         if (!supp) {
             throw new Error("Supplemental light configuration not available.");
