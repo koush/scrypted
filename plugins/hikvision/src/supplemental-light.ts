@@ -3,6 +3,9 @@ import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import type { HikvisionCamera } from "./main";
 
 export class HikvisionSupplementalLight extends ScryptedDeviceBase implements OnOff, Brightness, Settings {
+    private availableModes: string[] = ['Smart', 'White', 'IR'];
+    private whiteOnlyCamera: boolean = false;
+
     storageSettings = new StorageSettings(this, {
         supplementalLightMode: {
             title: 'Supplemental Light Mode',
@@ -10,7 +13,12 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             type: 'radiopanel',
             choices: ['Smart', 'White', 'IR'],
             defaultValue: 'White',
-            onPut: async () => {
+            onPut: async (oldValue, newValue) => {
+                if (this.whiteOnlyCamera && newValue !== 'White') {
+                    this.storageSettings.values.supplementalLightMode = 'White';
+                    this.console.warn('This camera only supports white light mode.');
+                    return;
+                }
                 if (this.on) {
                     await this.updateSupplementalLight();
                 }
@@ -90,6 +98,34 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
         this.syncing = true;
         try {
             const api = this.camera.getClient();
+            
+            try {
+                const { json: capsJson } = await api.getSupplementLightCapabilities();
+                const caps: any = capsJson.SupplementLight;
+                const optString = caps?.supplementLightMode?.opt || '';
+                const opts = optString.split(',').map((s: string) => s.trim()).filter(Boolean);
+                
+                const hasIr = opts.includes('irLight');
+                const hasSmart = opts.includes('eventIntelligence');
+                const hasWhite = opts.includes('colorVuWhiteLight');
+                
+                const modes: string[] = [];
+                if (hasSmart) modes.push('Smart');
+                if (hasWhite) modes.push('White');
+                if (hasIr) modes.push('IR');
+                
+                if (modes.length === 1 && modes[0] === 'White') {
+                    this.whiteOnlyCamera = true;
+                    this.availableModes = ['White'];
+                    this.storageSettings.values.supplementalLightMode = 'White';
+                } else if (modes.length > 0) {
+                    this.availableModes = modes;
+                    this.whiteOnlyCamera = false;
+                }
+            } catch (e) {
+                this.console.warn('Could not fetch supplemental light capabilities:', e);
+            }
+            
             const { on } = await api.getSupplementLightState();
             this.on = on;
             // this.console.log('Synced supplemental light state from camera:', { on });
@@ -132,7 +168,6 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
         let output: 'auto' | 'white' | 'ir' | undefined;
         let mode: 'auto' | 'manual' | undefined;
         let smartMode: 'auto' | 'manual' | undefined;
-        let brightness: number | undefined;
         let whiteBrightness: number | undefined;
         let irBrightness: number | undefined;
 
@@ -156,7 +191,6 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
         await api.setSupplementLight({
             on: this.on,
             output,
-            brightness,
             whiteBrightness,
             irBrightness,
             mode,
@@ -166,7 +200,25 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
     }
 
     async getSettings(): Promise<Setting[]> {
-        return this.storageSettings.getSettings();
+        const settings = await this.storageSettings.getSettings();
+        
+        const filteredSettings = settings.filter(s => {
+            if (this.whiteOnlyCamera && s.key === 'supplementalLightMode') {
+                return false;
+            }
+            
+            if (s.key === 'supplementalLightMode') {
+                s.choices = this.availableModes;
+            }
+            
+            const radioGroups = (s as any).radioGroups as string[] | undefined;
+            if (!radioGroups || radioGroups.length === 0) {
+                return true;
+            }
+            return radioGroups.some(group => this.availableModes.includes(group));
+        });
+        
+        return filteredSettings;
     }
 
     async putSetting(key: string, value: SettingValue): Promise<void> {
