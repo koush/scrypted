@@ -18,21 +18,19 @@ faceRecognizePrepare, faceRecognizePredict = async_infer.create_executors(
 class OpenVINOFaceRecognition(FaceRecognizeDetection):
     def __init__(self, plugin, nativeId: str):
         super().__init__(plugin=plugin, nativeId=nativeId)
-        self.prefer_relu = True
 
     def downloadModel(self, model: str):
         scrypted_yolov9 = "scrypted_yolov9" in model
         inception = "inception" in model
         ovmodel = "best-converted" if scrypted_yolov9 else "best"
-        precision = self.plugin.precision
         model_version = "v8"
         xmlFile = self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
-            f"{model_version}/{model}/{precision}/{ovmodel}.xml",
+            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.xml",
+            f"{model_version}/{model}/{ovmodel}.xml",
         )
         self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.bin",
-            f"{model_version}/{model}/{precision}/{ovmodel}.bin",
+            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.bin",
+            f"{model_version}/{model}/{ovmodel}.bin",
         )
         if inception:
             model = self.plugin.core.read_model(xmlFile)

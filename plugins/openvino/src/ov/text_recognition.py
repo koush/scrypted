@@ -17,15 +17,14 @@ textRecognizePrepare, textRecognizePredict = async_infer.create_executors(
 class OpenVINOTextRecognition(TextRecognition):
     def downloadModel(self, model: str):
         ovmodel = "best"
-        precision = self.plugin.precision
         model_version = "v6"
         xmlFile = self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
-            f"{model_version}/{model}/{precision}/{ovmodel}.xml",
+            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.xml",
+            f"{model_version}/{model}/{ovmodel}.xml",
         )
         self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.bin",
-            f"{model_version}/{model}/{precision}/{ovmodel}.bin",
+            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.bin",
+            f"{model_version}/{model}/{ovmodel}.bin",
         )
         if "vgg" in model:
             model = self.plugin.core.read_model(xmlFile)

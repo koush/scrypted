@@ -8,15 +8,14 @@ import traceback
 from typing import Any, Tuple
 
 import numpy as np
-import openvino as ov
 import scrypted_sdk
 from PIL import Image
 from scrypted_sdk.other import SettingValue
 from scrypted_sdk.types import Setting
 
 import common.yolo as yolo
-from predict import Prediction, PredictPlugin
-from predict.rectangle import Rectangle
+import openvino as ov
+from predict import PredictPlugin
 
 from .custom_detection import OpenVINOCustomDetection
 from .face_recognition import OpenVINOFaceRecognition
@@ -41,21 +40,6 @@ availableModels = [
     "scrypted_yolov9m_relu_int8_320",
     "scrypted_yolov9s_relu_int8_320",
     "scrypted_yolov9t_relu_int8_320",
-    "scrypted_yolov9c_int8_320",
-    "scrypted_yolov9m_int8_320",
-    "scrypted_yolov9s_int8_320",
-    "scrypted_yolov9t_int8_320",
-    "scrypted_yolov10m_320",
-    "scrypted_yolov10s_320",
-    "scrypted_yolov10n_320",
-    "scrypted_yolo_nas_s_320",
-    "scrypted_yolov6n_320",
-    "scrypted_yolov6s_320",
-    "scrypted_yolov9c_320",
-    "scrypted_yolov9m_320",
-    "scrypted_yolov9s_320",
-    "scrypted_yolov9t_320",
-    "scrypted_yolov8n_320",
 ]
 
 
@@ -164,8 +148,6 @@ class OpenVINOPlugin(
         self.mode = mode
 
         # todo remove this, don't need to export two models anymore.
-        precision = "FP16"
-        self.precision = precision
 
         model = self.storage.getItem("model") or "Default"
         if model == "Default" or model not in availableModels:
@@ -181,57 +163,23 @@ class OpenVINOPlugin(
                 model = "scrypted_yolov9s_relu_int8_320"
             else:
                 model = "scrypted_yolov9t_relu_int8_320"
-        self.yolo = "yolo" in model
-        self.scrypted_yolov9 = "scrypted_yolov9" in model
-        self.scrypted_yolov10 = "scrypted_yolov10" in model
-        self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
-        self.scrypted_yolo = "scrypted_yolo" in model
-        self.scrypted_model = "scrypted" in model
-        self.scrypted_yuv = "yuv" in model
-        self.sigmoid = model == "yolo-v4-tiny-tf"
         self.modelName = model
 
-        ovmodel = (
-            "best-converted"
-            if self.scrypted_yolov9
-            else "best" if self.scrypted_model else model
-        )
+        ovmodel = "best-converted"
 
         model_version = "v7"
         xmlFile = self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
-            f"{model_version}/{model}/{precision}/{ovmodel}.xml",
+            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.xml",
+            f"{model_version}/{model}/{ovmodel}.xml",
         )
         self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.bin",
-            f"{model_version}/{model}/{precision}/{ovmodel}.bin",
+            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.bin",
+            f"{model_version}/{model}/{ovmodel}.bin",
         )
-        if self.scrypted_yolo_nas:
-            labelsFile = self.downloadFile(
-                "https://github.com/koush/openvino-models/raw/main/scrypted_nas_labels.txt",
-                "scrypted_nas_labels.txt",
-            )
-        elif self.scrypted_model:
-            labelsFile = self.downloadFile(
-                "https://github.com/koush/openvino-models/raw/main/scrypted_labels.txt",
-                "scrypted_labels.txt",
-            )
-        elif self.yolo:
-            labelsFile = self.downloadFile(
-                "https://github.com/koush/openvino-models/raw/main/coco_80cl.txt",
-                "coco_80cl.txt",
-            )
-        else:
-            labelsFile = self.downloadFile(
-                "https://github.com/koush/openvino-models/raw/main/coco_labels.txt",
-                "coco_labels.txt",
-            )
 
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)
         except:
-            import traceback
-
             traceback.print_exc()
 
             if "GPU" in mode:
@@ -244,36 +192,11 @@ class OpenVINOPlugin(
                     print("Reverting all settings.")
                     self.storage.removeItem("mode")
                     self.storage.removeItem("model")
-                    self.storage.removeItem("precision")
                     self.requestRestart()
 
         self.infer_queue = ov.AsyncInferQueue(self.compiled_model)
 
         def predict(output):
-            if not self.yolo:
-                objs = []
-                for values in output[0][0]:
-                    valid, index, confidence, l, t, r, b = values
-                    if valid == -1:
-                        break
-
-                    def torelative(value: float):
-                        return value * self.model_dim
-
-                    l = torelative(l)
-                    t = torelative(t)
-                    r = torelative(r)
-                    b = torelative(b)
-
-                    obj = Prediction(index - 1, confidence, Rectangle(l, t, r, b))
-                    objs.append(obj)
-
-                return objs
-
-            if self.scrypted_yolov10:
-                return yolo.parse_yolov10(output[0])
-            if self.scrypted_yolo_nas:
-                return yolo.parse_yolo_nas([output[1], output[0]])
             return yolo.parse_yolov9(output[0])
 
         def callback(infer_request, future: asyncio.Future):
@@ -292,14 +215,13 @@ class OpenVINOPlugin(
         )
         print(f"model/mode: {model}/{mode}")
 
-        # mobilenet 1,300,300,3
-        # yolov3/4 1,416,416,3
-        # yolov9 1,3,320,320
-        # second dim is always good.
         self.model_dim = self.compiled_model.inputs[0].shape[2]
 
-        labels_contents = open(labelsFile, "r").read()
-        self.labels = parse_label_contents(labels_contents)
+        self.labels = {
+            0: 'person',
+            1: 'vehicle',
+            2: 'animal',
+        }
 
         self.faceDevice = None
         self.textDevice = None
@@ -311,7 +233,6 @@ class OpenVINOPlugin(
     async def getSettings(self) -> list[Setting]:
         mode = self.storage.getItem("mode") or "Default"
         model = self.storage.getItem("model") or "Default"
-        precision = self.storage.getItem("precision") or "Default"
         return [
             {
                 "title": "Available Devices",
@@ -355,35 +276,14 @@ class OpenVINOPlugin(
         return [self.model_dim, self.model_dim]
 
     def get_input_format(self):
-        if self.scrypted_yuv:
-            return "yuvj444p"
         return super().get_input_format()
 
     async def detect_once(self, input: Image.Image, settings: Any, src_size, cvss):
         def prepare():
-            # the input_tensor can be created with the shared_memory=True parameter,
-            # but that seems to cause issues on some platforms.
-            if self.scrypted_yolo:
-                if not self.scrypted_yuv:
-                    im = np.expand_dims(input, axis=0)
-                    im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
-                else:
-                    # when a yuv image is requested, it may be either planar or interleaved
-                    # as as hack, the input will come as RGB if already planar.
-                    if input.mode != "RGB":
-                        im = np.array(input)
-                        im = im.reshape((1, self.model_dim, self.model_dim, 3))
-                        im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
-
-                    else:
-                        im = np.array(input)
-                        im = im.reshape((1, 3, self.model_dim, self.model_dim))
-                im = im.astype(np.float32) / 255.0
-                im = np.ascontiguousarray(im)  # contiguous
-            elif self.yolo:
-                im = np.expand_dims(np.array(input), axis=0).astype(np.float32)
-            else:
-                im = np.expand_dims(np.array(input), axis=0)
+            im = np.expand_dims(input, axis=0)
+            im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
+            im = im.astype(np.float32) / 255.0
+            im = np.ascontiguousarray(im)  # contiguous
             return im
 
         try:

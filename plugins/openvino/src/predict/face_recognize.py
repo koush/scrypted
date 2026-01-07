@@ -26,9 +26,6 @@ class FaceRecognizeDetection(PredictPlugin):
     def __init__(self, plugin: PredictPlugin, nativeId: str):
         super().__init__(nativeId=nativeId, plugin=plugin)
 
-        if not hasattr(self, "prefer_relu"):
-            self.prefer_relu = False
-
         self.inputheight = 320
         self.inputwidth = 320
 
@@ -38,7 +35,7 @@ class FaceRecognizeDetection(PredictPlugin):
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.5
 
-        self.detectModel = self.downloadModel("scrypted_yolov9t_relu_face_320" if self.prefer_relu else "scrypted_yolov9t_face_320")
+        self.detectModel = self.downloadModel("scrypted_yolov9t_relu_face_320")
         self.faceModel = self.downloadModel("inception_resnet_v1")
 
     def downloadModel(self, model: str):

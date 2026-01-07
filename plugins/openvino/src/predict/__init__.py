@@ -241,31 +241,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
             self.requestRestart()
             raise
 
-    # async def detectObjects(
-    #     self, mediaObject: scrypted_sdk.MediaObject, session: ObjectDetectionSession = None
-    # ) -> ObjectsDetected:
-    #     # main plugin can dispatch
-    #     plugin: PredictPlugin = None
-    #     if scrypted_sdk.clusterManager and scrypted_sdk.clusterManager.getClusterMode() and not self.forked:
-    #         if session:
-    #             del session['batch']
-    #         if len(self.forks):
-    #             totalWorkers = len(self.forks)
-    #             if not self.forked:
-    #                 totalWorkers += 1
-
-    #             self.clusterIndex += 1
-    #             self.clusterIndex %= totalWorkers
-    #             if len(self.forks) != self.clusterIndex:
-    #                 fork = list(self.forks.values())[self.clusterIndex]
-    #                 result = await fork.result
-    #                 plugin = await result.getPlugin()
-
-    #     if not plugin:
-    #         return await super().detectObjects(mediaObject, session)
-
-    #     return await plugin.detectObjects(mediaObject, session)
-
     async def run_detection_image(
         self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession
     ) -> ObjectsDetected:
