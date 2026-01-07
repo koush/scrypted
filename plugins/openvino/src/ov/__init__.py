@@ -36,6 +36,7 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(
 
 availableModels = [
     "Default",
+    "scrypted_yolov9t_relu_test_int8",
     "scrypted_yolov9c_relu_int8_320",
     "scrypted_yolov9m_relu_int8_320",
     "scrypted_yolov9s_relu_int8_320",
