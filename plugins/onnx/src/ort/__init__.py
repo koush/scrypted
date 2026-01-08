@@ -31,15 +31,11 @@ except:
 
 availableModels = [
     "Default",
-    "scrypted_yolov10m_320",
-    "scrypted_yolov10n_320",
-    "scrypted_yolo_nas_s_320",
-    "scrypted_yolov6n_320",
-    "scrypted_yolov6s_320",
-    "scrypted_yolov9c_320",
-    "scrypted_yolov9s_320",
-    "scrypted_yolov9t_320",
-    "scrypted_yolov8n_320",
+    "scrypted_yolov9t_relu_test",
+    "scrypted_yolov9c_relu",
+    "scrypted_yolov9m_relu",
+    "scrypted_yolov9s_relu",
+    "scrypted_yolov9t_relu",
 ]
 
 
@@ -66,7 +62,7 @@ class ONNXPlugin(
         if model == "Default" or model not in availableModels:
             if model != "Default":
                 self.storage.setItem("model", "Default")
-            model = "scrypted_yolov9c_320"
+            model = "scrypted_yolov9c_relu"
         self.yolo = "yolo" in model
         self.scrypted_yolov10 = "scrypted_yolov10" in model
         self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
@@ -76,16 +72,10 @@ class ONNXPlugin(
 
         print(f"model {model}")
 
-        onnxmodel = (
-            model
-            if self.scrypted_yolo_nas
-            else "best" if self.scrypted_model else model
-        )
-
         model_version = "v3"
         onnxfile = self.downloadFile(
-            f"https://github.com/koush/onnx-models/raw/main/{model}/{onnxmodel}.onnx",
-            f"{model_version}/{model}/{onnxmodel}.onnx",
+            f"https://huggingface.co/scrypted/plugin-models/resolve/main/onnx/{model}/{model}.onnx",
+            f"{model_version}/{model}/{model}.onnx",
         )
 
         print(onnxfile)

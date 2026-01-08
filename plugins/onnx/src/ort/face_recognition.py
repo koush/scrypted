@@ -15,11 +15,10 @@ from predict.face_recognize import FaceRecognizeDetection
 
 class ONNXFaceRecognition(FaceRecognizeDetection):
     def downloadModel(self, model: str):
-        onnxmodel = "best" if "scrypted" in model else model
         model_version = "v1"
         onnxfile = self.downloadFile(
-            f"https://github.com/koush/onnx-models/raw/main/{model}/{onnxmodel}.onnx",
-            f"{model_version}/{model}/{onnxmodel}.onnx",
+            f"https://huggingface.co/scrypted/plugin-models/resolve/main/onnx/{model}/{model}.onnx",
+            f"{model_version}/{model}/{model}.onnx",
         )
         print(onnxfile)
 

@@ -43,7 +43,7 @@ class CoreMLFaceRecognition(FaceRecognizeDetection):
 
         for f in files:
             p = self.downloadFile(
-                f"https://github.com/koush/coreml-models/raw/main/{f}",
+                f"https://huggingface.co/scrypted/plugin-models/resolve/main/coreml/{f}",
                 f"{model_version}/{f}",
             )
             modelFile = os.path.dirname(p)

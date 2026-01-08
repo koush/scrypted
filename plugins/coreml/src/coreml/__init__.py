@@ -29,10 +29,10 @@ predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "CoreML-Predict")
 availableModels = [
     "Default",
     "scrypted_yolov9t_relu_test",
-    "scrypted_yolov9c_relu_320",
-    "scrypted_yolov9m_relu_320",
-    "scrypted_yolov9s_relu_320",
-    "scrypted_yolov9t_relu_320",
+    "scrypted_yolov9c_relu",
+    "scrypted_yolov9m_relu",
+    "scrypted_yolov9s_relu",
+    "scrypted_yolov9t_relu",
 ]
 
 
