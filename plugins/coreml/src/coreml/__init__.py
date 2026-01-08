@@ -82,7 +82,7 @@ class CoreMLPlugin(
         if model == "Default" or model not in availableModels:
             if model != "Default":
                 self.storage.setItem("model", "Default")
-            model = "scrypted_yolov9c_relu_320"
+            model = "scrypted_yolov9c_relu"
         model_version = "v8"
         mlmodel = "model"
         self.modelName = model
