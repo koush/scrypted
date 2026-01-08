@@ -658,6 +658,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
                     ScryptedInterface.OnOff,
                     ScryptedInterface.Brightness,
                     ScryptedInterface.Settings,
+                    ScryptedInterface.Readme,
                 ],
                 type: ScryptedDeviceType.Light,
             };
