@@ -19,6 +19,7 @@ import { FileRtspServer } from './file-rtsp-server';
 import { getUrlLocalAdresses } from './local-addresses';
 import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
+import { startRtmpSession } from './rtmp-session';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { getSpsResolution } from './sps-resolution';
 import { createStreamSettings } from './stream-settings';
@@ -187,13 +188,17 @@ class PrebufferSession {
     return mediaStreamOptions?.container?.startsWith('rtsp');
   }
 
+  canUseRtmpParser(mediaStreamOptions: MediaStreamOptions) {
+    return mediaStreamOptions?.container?.startsWith('rtmp');
+  }
+
   getParser(mediaStreamOptions: MediaStreamOptions) {
     let parser: string;
     let rtspParser = this.storage.getItem(this.rtspParserKey);
 
     let isDefault = !rtspParser || rtspParser === 'Default';
 
-    if (!this.canUseRtspParser(mediaStreamOptions)) {
+    if (!this.canUseRtspParser(mediaStreamOptions) && !this.canUseRtmpParser(mediaStreamOptions)) {
       parser = STRING_DEFAULT;
       isDefault = true;
       rtspParser = undefined;
@@ -340,7 +345,7 @@ class PrebufferSession {
 
     let usingFFmpeg = true;
 
-    if (this.canUseRtspParser(this.advertisedMediaStreamOptions)) {
+    if (this.canUseRtspParser(this.advertisedMediaStreamOptions) || this.canUseRtmpParser(this.advertisedMediaStreamOptions)) {
       const parser = this.getParser(this.advertisedMediaStreamOptions);
       const defaultValue = parser.parser;
 
@@ -539,14 +544,26 @@ class PrebufferSession {
       this.usingScryptedUdpParser = parser === SCRYPTED_PARSER_UDP;
 
       if (this.usingScryptedParser) {
-        const rtspParser = createRtspParser();
-        rbo.parsers.rtsp = rtspParser;
+        if (this.canUseRtmpParser(sessionMso)) {
+          // rtmp becomes repackaged as rtsp
+          const rtspParser = createRtspParser();
+          rbo.parsers.rtsp = rtspParser;
 
-        session = await startRtspSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
-          useUdp: parser === SCRYPTED_PARSER_UDP,
-          audioSoftMuted,
-          rtspRequestTimeout: 10000,
-        });
+          session = await startRtmpSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
+            audioSoftMuted,
+            rtspRequestTimeout: 10000,
+          });
+        }
+        else {
+          const rtspParser = createRtspParser();
+          rbo.parsers.rtsp = rtspParser;
+
+          session = await startRtspSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
+            useUdp: parser === SCRYPTED_PARSER_UDP,
+            audioSoftMuted,
+            rtspRequestTimeout: 10000,
+          });
+        }
       }
       else {
         let acodec: string[];
