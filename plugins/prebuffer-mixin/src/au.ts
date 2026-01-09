@@ -29,11 +29,8 @@ export function createAUHeader(
   // Combine size and index into a single value
   const combinedValue = (frameSize << indexLength) | auIndex;
 
-  // Convert to bytes (little-endian within the multi-byte value)
-  const header = new Buffer(totalBytes);
-  for (let i = 0; i < totalBytes; i++) {
-    header[i] = (combinedValue >> ((totalBytes - 1 - i) * 8)) & 0xFF;
-  }
+  const header = Buffer.alloc(totalBytes);
+  header.writeUintBE(combinedValue, 0, totalBytes);
 
   return header;
 }

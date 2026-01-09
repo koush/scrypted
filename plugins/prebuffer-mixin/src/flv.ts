@@ -224,10 +224,7 @@ function parseNALUUnits(buffer: Buffer, offset: number, length: number, naluLeng
   }
 
   while (pos + naluLengthSize <= offset + length) {
-    let naluLength = 0;
-    for (let i = 0; i < naluLengthSize; i++) {
-      naluLength = (naluLength << 8) | buffer[pos + i];
-    }
+    const naluLength = buffer.readUintBE(pos, naluLengthSize);
     pos += naluLengthSize;
 
     if (naluLength === 0) {
