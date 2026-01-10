@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import numpy as np
-import openvino as ov
 from PIL import Image
 
+import openvino as ov
 from ov import async_infer
 from predict.face_recognize import FaceRecognizeDetection
 
@@ -20,18 +21,12 @@ class OpenVINOFaceRecognition(FaceRecognizeDetection):
         super().__init__(plugin=plugin, nativeId=nativeId)
 
     def downloadModel(self, model: str):
-        scrypted_yolov9 = "scrypted_yolov9" in model
         inception = "inception" in model
-        ovmodel = "best-converted" if scrypted_yolov9 else "best"
-        model_version = "v8"
-        xmlFile = self.downloadFile(
-            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.xml",
-            f"{model_version}/{model}/{ovmodel}.xml",
-        )
-        self.downloadFile(
-            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.bin",
-            f"{model_version}/{model}/{ovmodel}.bin",
-        )
+        ovmodel = "best-converted" if not inception else "best"
+        if not inception:
+            model = model + "_int8"
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        xmlFile = os.path.join(model_path, f"{ovmodel}.xml")
         if inception:
             model = self.plugin.core.read_model(xmlFile)
             model.reshape([1, 3, 160, 160])

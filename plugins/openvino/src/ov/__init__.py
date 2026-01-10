@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import asyncio
 import concurrent.futures
 import json
@@ -168,15 +169,8 @@ class OpenVINOPlugin(
 
         ovmodel = "best-converted"
 
-        model_version = "v7"
-        xmlFile = self.downloadFile(
-            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.xml",
-            f"{model_version}/{model}/{ovmodel}.xml",
-        )
-        self.downloadFile(
-            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.bin",
-            f"{model_version}/{model}/{ovmodel}.bin",
-        )
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        xmlFile = os.path.join(model_path, f"{ovmodel}.xml")
 
         try:
             self.compiled_model = self.core.compile_model(xmlFile, mode)

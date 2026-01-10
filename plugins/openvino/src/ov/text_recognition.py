@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import numpy as np
-import openvino as ov
 
+import openvino as ov
 from ov import async_infer
 from predict.text_recognize import TextRecognition
 
@@ -17,15 +18,8 @@ textRecognizePrepare, textRecognizePredict = async_infer.create_executors(
 class OpenVINOTextRecognition(TextRecognition):
     def downloadModel(self, model: str):
         ovmodel = "best"
-        model_version = "v6"
-        xmlFile = self.downloadFile(
-            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.xml",
-            f"{model_version}/{model}/{ovmodel}.xml",
-        )
-        self.downloadFile(
-            f"https://huggingface.co/scrypted/plugin-models/resolve/main/openvino/{model}/{ovmodel}.bin",
-            f"{model_version}/{model}/{ovmodel}.bin",
-        )
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        xmlFile = os.path.join(model_path, f"{ovmodel}.xml")
         if "vgg" in model:
             model = self.plugin.core.read_model(xmlFile)
             # this reshape causes a crash on GPU but causes a crash if NOT used with NPU...

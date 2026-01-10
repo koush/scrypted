@@ -20,6 +20,10 @@ import common.colors
 from detect import DetectPlugin
 from predict.rectangle import Rectangle
 
+cache_dir = os.path.join(os.environ["SCRYPTED_PLUGIN_VOLUME"], "files", "hf")
+os.makedirs(cache_dir, exist_ok=True)
+os.environ['HF_HUB_CACHE'] = cache_dir
+
 original_getaddrinfo = socket.getaddrinfo
 
 # Sort the results to put IPv4 addresses first
@@ -83,6 +87,32 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
 
         if not self.plugin and not self.forked:
             asyncio.ensure_future(self.startCluster(), loop=self.loop)
+
+    def downloadHuggingFaceModel(self, model: str, local_files_only: bool = False) -> str:
+        from huggingface_hub import snapshot_download
+        plugin_suffix = self.pluginId.split('/')[1]
+        local_path = snapshot_download(
+            repo_id="scrypted/plugin-models",
+            allow_patterns=f"{plugin_suffix}/{model}/*",
+            local_files_only=local_files_only,
+        )
+        local_path = os.path.join(local_path, plugin_suffix, model)
+        return local_path
+
+    def downloadHuggingFaceModelLocalFallback(self, model: str) -> str:
+        try:
+            local_path = self.downloadHuggingFaceModel(model)
+            print("Downloaded/refreshed model:", model)
+            return local_path
+        except Exception:
+            traceback.print_exc()
+
+            print("Unable to download model:", model)
+            print('This may be due to network or firewall issues.')
+
+        print("Trying model from Hugging Face Hub (offline):", model)
+        local_path = self.downloadHuggingFaceModel(model, local_files_only=True)
+        return local_path
 
     def downloadFile(self, url: str, filename: str):
         try:
