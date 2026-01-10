@@ -21,8 +21,8 @@ from detect import DetectPlugin
 from predict.rectangle import Rectangle
 
 cache_dir = os.path.join(os.environ["SCRYPTED_PLUGIN_VOLUME"], "files", "hf")
-os.makedirs(cache_dir, exist_ok=True)
-os.environ['HF_HUB_CACHE'] = cache_dir
+# os.makedirs(cache_dir, exist_ok=True)
+# os.environ['HF_HUB_CACHE'] = cache_dir
 
 original_getaddrinfo = socket.getaddrinfo
 
@@ -91,10 +91,12 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
     def downloadHuggingFaceModel(self, model: str, local_files_only: bool = False) -> str:
         from huggingface_hub import snapshot_download
         plugin_suffix = self.pluginId.split('/')[1]
+        local_dir = os.path.join(cache_dir, plugin_suffix, model)
         local_path = snapshot_download(
             repo_id="scrypted/plugin-models",
             allow_patterns=f"{plugin_suffix}/{model}/*",
             local_files_only=local_files_only,
+            local_dir=local_dir,
         )
         local_path = os.path.join(local_path, plugin_suffix, model)
         return local_path

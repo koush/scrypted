@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import os
 import platform
 import sys
 import threading
@@ -15,12 +16,8 @@ from predict.text_recognize import TextRecognition
 
 class ONNXTextRecognition(TextRecognition):
     def downloadModel(self, model: str):
-        onnxmodel = model
-        model_version = "v4"
-        onnxfile = self.downloadFile(
-            f"https://github.com/koush/onnx-models/raw/main/{model}/{onnxmodel}.onnx",
-            f"{model_version}/{model}/{onnxmodel}.onnx",
-        )
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        onnxfile = os.path.join(model_path, f"{model}.onnx")
         print(onnxfile)
 
         compiled_models_array = []

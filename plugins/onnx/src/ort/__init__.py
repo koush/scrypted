@@ -4,6 +4,7 @@ import ast
 import asyncio
 import concurrent.futures
 import json
+import os
 import platform
 import sys
 import threading
@@ -72,11 +73,8 @@ class ONNXPlugin(
 
         print(f"model {model}")
 
-        model_version = "v3"
-        onnxfile = self.downloadFile(
-            f"https://huggingface.co/scrypted/plugin-models/resolve/main/onnx/{model}/{model}.onnx",
-            f"{model_version}/{model}/{model}.onnx",
-        )
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        onnxfile = os.path.join(model_path, f"{model}.onnx")
 
         print(onnxfile)
 

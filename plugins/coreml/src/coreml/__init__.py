@@ -83,25 +83,13 @@ class CoreMLPlugin(
             if model != "Default":
                 self.storage.setItem("model", "Default")
             model = "scrypted_yolov9c_relu"
-        model_version = "v8"
-        mlmodel = "model"
         self.modelName = model
 
         print(f"model: {model}")
 
-        files = [
-            f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
-            f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{mlmodel}.mlmodel",
-            f"{model}/{model}.mlpackage/Manifest.json",
-        ]
-
-        for f in files:
-            p = self.downloadFile(
-                f"https://huggingface.co/scrypted/plugin-models/resolve/main/coreml/{f}",
-                f"{model_version}/{f}",
-            )
-            modelFile = os.path.dirname(p)
-
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        modelFile = os.path.join(model_path, f"{model}.mlpackage")
+        print(model_path, modelFile)
         self.model = ct.models.MLModel(modelFile)
 
         self.modelspec = self.model.get_spec()
