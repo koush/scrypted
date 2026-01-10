@@ -42,6 +42,26 @@ export interface HikvisionAPI {
     getAlarmCapabilities(): Promise<{ json: any; xml: string }>;
     getAlarm(port: string): Promise<{ json: any; xml: string }>;
     setAlarm(isOn: boolean): Promise<{ json: any; xml: string }>;
+    getAlarmLinkageCapabilities(): Promise<{ supportsBeep: boolean; supportsWhiteLight: boolean; supportsIO: boolean }>;
+    getAlarmLinkages(): Promise<{ beep: boolean; whiteLight: boolean; io: boolean; whiteLightDuration: number }>;
+    setAlarmLinkages(linkages: { beep: boolean; whiteLight: boolean; io: boolean; whiteLightDuration: number }): Promise<void>;
+    
+    getAudioAlarmCapabilities(): Promise<{
+        supported: boolean;
+        audioTypes: { id: number; description: string }[];
+        volumeRange: { min: number; max: number };
+        alarmTimesRange: { min: number; max: number };
+    } | null>;
+    getAudioAlarmSettings(): Promise<{ audioID: number; audioVolume: number; alarmTimes: number } | null>;
+    setAudioAlarmSettings(settings: { audioID: number; audioVolume: number; alarmTimes: number }): Promise<void>;
+    
+    getWhiteLightAlarmCapabilities(): Promise<{
+        supported: boolean;
+        durationRange: { min: number; max: number };
+        frequencyOptions: string[];
+    } | null>;
+    getWhiteLightAlarmSettings(): Promise<{ durationTime: number; frequency: string } | null>;
+    setWhiteLightAlarmSettings(settings: { durationTime: number; frequency: string }): Promise<void>;
 
     getPtzCapabilities(): Promise<{ json: PtzCapabilitiesRoot; xml: string }>;
     ptzCommand(command: PanTiltZoomCommand): Promise<any>;
