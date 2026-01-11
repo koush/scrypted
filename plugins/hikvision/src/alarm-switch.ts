@@ -37,7 +37,7 @@ export class HikvisionAlarmSwitch extends ScryptedDeviceBase implements OnOff, R
         },
         whiteLightEnabled: {
             title: 'Enable Strobe Light',
-            description: 'Trigger the flashing white light when alarm is activated.',
+            description: 'Trigger the strobe light when alarm is activated.',
             group: 'Linkages',
             type: 'boolean',
             immediate: true,

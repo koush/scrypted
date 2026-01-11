@@ -3,17 +3,31 @@ import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import type { HikvisionCamera } from "./main";
 
 export class HikvisionSupplementalLight extends ScryptedDeviceBase implements OnOff, Brightness, Settings, Readme {
-    private availableModes: string[] = ['Smart', 'White', 'IR'];
+    private availableModes: string[] = [];
     private whiteOnlyCamera: boolean = false;
     private irOnlyCamera: boolean = false;
+    private notSupported: boolean = false;
 
     storageSettings = new StorageSettings(this, {
+        smartSupplementLight: {
+            title: 'Smart Supplement Light',
+            description: 'Enable to automatically adjust exposure based on scene conditions.',
+            type: 'boolean',
+            defaultValue: false,
+            hide: true,
+            immediate: true,
+            onPut: async () => {
+                await this.updateSupplementalLight();
+            },
+        },
         supplementalLightMode: {
             title: 'Supplemental Light Mode',
             description: 'Available modes depend on your camera hardware.',
             type: 'radiopanel',
             choices: ['Smart', 'White', 'IR'],
             defaultValue: 'White',
+            immediate: true,
+            hide: true,
             onPut: async (oldValue, newValue) => {
                 if (this.whiteOnlyCamera && newValue !== 'White') {
                     this.storageSettings.values.supplementalLightMode = 'White';
@@ -31,27 +45,30 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             choices: ['auto', 'manual'],
             defaultValue: 'auto',
             radioGroups: ['Smart'],
+            hide: true,
             onPut: async () => {
                 await this.updateSupplementalLight();
             },
         },
         mode: {
-            title: 'White Light Control',
+            title: 'Light Brightness Control',
             type: 'string',
             choices: ['auto', 'manual'],
             defaultValue: 'manual',
             radioGroups: ['White'],
+            hide: true,
             onPut: async () => {
                 await this.updateSupplementalLight();
             },
         },
         brightness: {
-            title: 'White Light Brightness',
+            title: 'Light Manual Brightness',
             defaultValue: 100,
             type: 'number',
             placeholder: '0-100',
             range: [0, 100],
             radioGroups: ['White', 'Smart'],
+            hide: true,
             onPut: async () => {
                 await this.updateSupplementalLight();
             },
@@ -62,6 +79,7 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             choices: ['auto', 'manual'],
             defaultValue: 'auto',
             radioGroups: ['IR'],
+            hide: true,
             onPut: async () => {
                 await this.updateSupplementalLight();
             },
@@ -73,15 +91,7 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             range: [0, 100],
             defaultValue: 100,
             radioGroups: ['IR', 'Smart'],
-            onPut: async () => {
-                await this.updateSupplementalLight();
-            },
-        },
-        smartSupplementLight: {
-            title: 'Smart Supplement Light',
-            description: 'Enable to automatically adjust exposure based on scene conditions.',
-            type: 'boolean',
-            defaultValue: false,
+            hide: true,
             onPut: async () => {
                 await this.updateSupplementalLight();
             },
@@ -135,6 +145,9 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             } catch (e: any) {
                 if (e?.statusCode === 403 || e?.message?.includes('403')) {
                     this.console.error('This camera may not support supplemental lights. Please remove the supplemental light device from this camera.');
+                    this.notSupported = true;
+                    this.availableModes = [];
+                    this.updateSettingsVisibility();
                     return;
                 }
                 this.console.warn('Could not fetch supplemental light capabilities:', e);
@@ -143,15 +156,40 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             const { on } = await api.getSupplementLightState();
             this.on = on;
             // this.console.log('Synced supplemental light state from camera:', { on });
+
+            this.updateSettingsVisibility();
         } catch (e: any) {
             if (e?.statusCode === 403 || e?.message?.includes('403')) {
                 this.console.error('This camera may not support supplemental lights. Please remove the supplemental light device from this camera.');
+                this.notSupported = true;
+                this.availableModes = [];
+                this.updateSettingsVisibility();
                 return;
             }
             this.console.warn('Could not sync supplemental light state:', e);
         } finally {
             this.syncing = false;
         }
+    }
+
+    private updateSettingsVisibility(): void {
+        const hasSmart = this.availableModes.includes('Smart');
+        const hasWhite = this.availableModes.includes('White');
+        const hasIr = this.availableModes.includes('IR');
+        const singleMode = this.whiteOnlyCamera || this.irOnlyCamera;
+
+        this.storageSettings.settings.supplementalLightMode.hide = singleMode;
+        this.storageSettings.settings.supplementalLightMode.choices = this.availableModes;
+
+        this.storageSettings.settings.smartBrightnessControl.hide = !hasSmart;
+
+        this.storageSettings.settings.mode.hide = !hasWhite;
+        this.storageSettings.settings.brightness.hide = !hasWhite && !hasSmart;
+
+        this.storageSettings.settings.irBrightnessControl.hide = !hasIr;
+        this.storageSettings.settings.irManualBrightness.hide = !hasIr && !hasSmart;
+
+        this.storageSettings.settings.smartSupplementLight.hide = this.availableModes.length === 0;
     }
 
     async turnOn(): Promise<void> {
@@ -218,25 +256,7 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
     }
 
     async getSettings(): Promise<Setting[]> {
-        const settings = await this.storageSettings.getSettings();
-        
-        const filteredSettings = settings.filter(s => {
-            if ((this.whiteOnlyCamera || this.irOnlyCamera) && s.key === 'supplementalLightMode') {
-                return false;
-            }
-            
-            if (s.key === 'supplementalLightMode') {
-                s.choices = this.availableModes;
-            }
-            
-            const radioGroups = (s as any).radioGroups as string[] | undefined;
-            if (!radioGroups || radioGroups.length === 0) {
-                return true;
-            }
-            return radioGroups.some(group => this.availableModes.includes(group));
-        });
-        
-        return filteredSettings;
+        return this.storageSettings.getSettings();
     }
 
     async putSetting(key: string, value: SettingValue): Promise<void> {
@@ -244,27 +264,72 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
     }
 
     async getReadmeMarkdown(): Promise<string> {
+        if (this.notSupported) {
+            return `
+## **Supplemental Light**
+
+### **Not Supported**
+This camera does not support supplemental light control. Please remove this device from the camera.
+            `;
+        }
+
+        const hasSmart = this.availableModes.includes('Smart');
+        const hasWhite = this.availableModes.includes('White');
+        const hasIr = this.availableModes.includes('IR');
+        const hasAnyModes = this.availableModes.length > 0;
+
+        let modesSection = '';
+        if (hasAnyModes) {
+            modesSection = `
+### **Supported Modes**
+`;
+            if (hasSmart) {
+                modesSection += `- **Smart Mode** - IR light at night, switches to white light when motion is detected.\n`;
+            }
+            if (hasWhite) {
+                modesSection += `- **White Light Mode** - Full color night vision using white LEDs.\n`;
+            }
+            if (hasIr) {
+                modesSection += `- **IR Light Mode** - Traditional infrared night vision.\n`;
+            }
+        } else {
+            modesSection = `
+### **Note**
+This camera does not support configurable supplemental light modes.`;
+        }
+
+        let settingsSection = '';
+        if (hasAnyModes) {
+            settingsSection = `
+### **Settings**
+`;
+            if (this.availableModes.length > 1) {
+                settingsSection += `- **Supplemental Light Mode** - Choose between available modes\n`;
+            }
+            settingsSection += `- **Brightness Control** - Select automatic or manual brightness\n`;
+            settingsSection += `- **Manual Brightness** - Adjust light level (0-100)\n`;
+            settingsSection += `- **Smart Supplement Light** - Enable automatic exposure adjustment\n`;
+        }
+
+        let smartNotes = '';
+        if (hasSmart) {
+            smartNotes = `
+### **Smart Mode Notes**
+In normal conditions at night, IR light is on and the image is black and white. When a person or vehicle is detected, white light turns on as a warning and the image becomes full color.
+
+- Requires motion detection to be enabled on the camera.
+- Keep this device switched **on** to enable automatic lighting.
+`;
+        }
+
+        let brightnessNotes = `
+**Smart Supplement Light** prevents overexposure when the light is on. Enable if the image appears washed out with the light active.
+`;
+
         return `
 ## **Supplemental Light**
-This device controls the camera's supplemental lighting.
-
-### **Light Modes**
-
-Your camera's supported modes are automatically detected. If only one mode is supported, the mode selection will be hidden.
-
-- **IR Light Mode**
-- **White Light Mode**
-- **Smart Mode**: Automatically switches between IR and white light based on motion events. When motion is detected in the camera's detection zones, the white light automatically turns on. Otherwise, IR light is used.
-
-### **Settings**
-- **Supplemental Light Mode**: Choose between Smart, White, or IR modes. If your camera only supports one mode, this option will be hidden.
-- **Brightness Control**: Select automatic or manual brightness control for the selected light mode.
-- **Manual Brightness**: Adjust brightness for white and/or IR light (0-100).
-- **Smart Supplement Light**: Enable to automatically adjust exposure based on scene conditions.
-
-**Smart Mode Notes**: 
-- Smart Mode requires motion detection to be set up and enabled on the camera.
-- When using Smart Mode, keep this supplemental light device switched **on** to enable automatic lighting control based on motion events.
+Controls the camera's supplemental lighting for night vision and low-light scenarios.
+${modesSection}${settingsSection}${smartNotes}${brightnessNotes}
         `;
     }
 }
