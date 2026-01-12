@@ -2,11 +2,28 @@ import { Brightness, OnOff, Readme, ScryptedDeviceBase, Setting, Settings, Setti
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import type { HikvisionCamera } from "./main";
 
+export type LightMode = 'Smart' | 'White' | 'IR';
+
+export type CameraLightType = 'smart-hybrid' | 'white-only' | 'ir-only' | 'not-supported';
+
+export interface SupplementLightOptions {
+    on?: boolean;
+    output?: 'auto' | 'white' | 'ir';
+    whiteBrightness?: number;
+    irBrightness?: number;
+    mode?: 'auto' | 'manual';
+    smartMode?: 'auto' | 'manual';
+    smartSupplementLightEnabled?: boolean;
+}
+
+interface ParsedCapabilities {
+    modes: LightMode[];
+    cameraType: CameraLightType;
+}
+
 export class HikvisionSupplementalLight extends ScryptedDeviceBase implements OnOff, Brightness, Settings, Readme {
-    private availableModes: string[] = [];
-    private whiteOnlyCamera: boolean = false;
-    private irOnlyCamera: boolean = false;
-    private notSupported: boolean = false;
+    private availableModes: LightMode[] = [];
+    private cameraType: CameraLightType = 'smart-hybrid';
 
     storageSettings = new StorageSettings(this, {
         smartSupplementLight: {
@@ -29,7 +46,7 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             immediate: true,
             hide: true,
             onPut: async (oldValue, newValue) => {
-                if (this.whiteOnlyCamera && newValue !== 'White') {
+                if (this.cameraType === 'white-only' && newValue !== 'White') {
                     this.storageSettings.values.supplementalLightMode = 'White';
                     this.console.warn('This camera only supports white light mode.');
                     return;
@@ -112,73 +129,70 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             
             try {
                 const { json: capsJson } = await api.getSupplementLightCapabilities();
-                const caps: any = capsJson.SupplementLight;
-                const optString = caps?.supplementLightMode?.opt || '';
-                const opts = optString.split(',').map((s: string) => s.trim()).filter(Boolean);
+                const { modes, cameraType } = this.parseCapabilities(capsJson);
                 
-                const hasIr = opts.includes('irLight');
-                const hasSmart = opts.includes('eventIntelligence');
-                const hasWhite = opts.includes('colorVuWhiteLight');
+                this.availableModes = modes;
+                this.cameraType = cameraType;
                 
-                const modes: string[] = [];
-                if (hasSmart) modes.push('Smart');
-                if (hasWhite) modes.push('White');
-                if (hasIr) modes.push('IR');
-                
-                if (modes.length === 1) {
-                    if (modes[0] === 'White') {
-                        this.whiteOnlyCamera = true;
-                        this.irOnlyCamera = false;
-                        this.availableModes = ['White'];
-                        this.storageSettings.values.supplementalLightMode = 'White';
-                    } else if (modes[0] === 'IR') {
-                        this.irOnlyCamera = true;
-                        this.whiteOnlyCamera = false;
-                        this.availableModes = ['IR'];
-                        this.storageSettings.values.supplementalLightMode = 'IR';
-                    }
-                } else if (modes.length > 0) {
-                    this.availableModes = modes;
-                    this.whiteOnlyCamera = false;
-                    this.irOnlyCamera = false;
+                if (cameraType === 'white-only') {
+                    this.storageSettings.values.supplementalLightMode = 'White';
+                } else if (cameraType === 'ir-only') {
+                    this.storageSettings.values.supplementalLightMode = 'IR';
                 }
             } catch (e: any) {
-                if (e?.statusCode === 403 || e?.message?.includes('403')) {
-                    this.console.error('This camera may not support supplemental lights. Please remove the supplemental light device from this camera.');
-                    this.notSupported = true;
-                    this.availableModes = [];
-                    this.updateSettingsVisibility();
-                    return;
-                }
+                if (this.handleNotSupportedError(e)) return;
                 this.console.warn('Could not fetch supplemental light capabilities:', e);
             }
             
             const { on } = await api.getSupplementLightState();
             this.on = on;
-            // this.console.log('Synced supplemental light state from camera:', { on });
 
             this.updateSettingsVisibility();
         } catch (e: any) {
-            if (e?.statusCode === 403 || e?.message?.includes('403')) {
-                this.console.error('This camera may not support supplemental lights. Please remove the supplemental light device from this camera.');
-                this.notSupported = true;
-                this.availableModes = [];
-                this.updateSettingsVisibility();
-                return;
-            }
+            if (this.handleNotSupportedError(e)) return;
             this.console.warn('Could not sync supplemental light state:', e);
         } finally {
             this.syncing = false;
         }
     }
 
+    private parseCapabilities(capsJson: { SupplementLight?: Record<string, any> }): ParsedCapabilities {
+        const caps = capsJson?.SupplementLight;
+        const optString: string = caps?.supplementLightMode?.opt || '';
+        const opts = optString.split(',').map((s: string) => s.trim()).filter(Boolean);
+        
+        const modes: LightMode[] = [];
+        if (opts.includes('eventIntelligence')) modes.push('Smart');
+        if (opts.includes('colorVuWhiteLight')) modes.push('White');
+        if (opts.includes('irLight')) modes.push('IR');
+        
+        const cameraType: CameraLightType = 
+            modes.length === 0 ? 'not-supported' :
+            modes.length === 1 && modes[0] === 'White' ? 'white-only' :
+            modes.length === 1 && modes[0] === 'IR' ? 'ir-only' :
+            'smart-hybrid';
+        
+        return { modes, cameraType };
+    }
+
+    private handleNotSupportedError(e: any): boolean {
+        if (e?.statusCode === 403 || e?.message?.includes('403')) {
+            this.console.error('This camera may not support supplemental lights. Please remove the supplemental light device from this camera.');
+            this.cameraType = 'not-supported';
+            this.availableModes = [];
+            this.updateSettingsVisibility();
+            return true;
+        }
+        return false;
+    }
+
     private updateSettingsVisibility(): void {
         const hasSmart = this.availableModes.includes('Smart');
         const hasWhite = this.availableModes.includes('White');
         const hasIr = this.availableModes.includes('IR');
-        const singleMode = this.whiteOnlyCamera || this.irOnlyCamera;
+        const isSingleMode = this.cameraType === 'white-only' || this.cameraType === 'ir-only';
 
-        this.storageSettings.settings.supplementalLightMode.hide = singleMode;
+        this.storageSettings.settings.supplementalLightMode.hide = isSingleMode;
         this.storageSettings.settings.supplementalLightMode.choices = this.availableModes;
 
         this.storageSettings.settings.smartBrightnessControl.hide = !hasSmart;
@@ -189,7 +203,7 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
         this.storageSettings.settings.irBrightnessControl.hide = !hasIr;
         this.storageSettings.settings.irManualBrightness.hide = !hasIr && !hasSmart;
 
-        this.storageSettings.settings.smartSupplementLight.hide = this.availableModes.length === 0;
+        this.storageSettings.settings.smartSupplementLight.hide = this.cameraType === 'not-supported';
     }
 
     async turnOn(): Promise<void> {
@@ -204,8 +218,7 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
 
     async setBrightness(brightness: number): Promise<void> {
         this.brightness = brightness;
-    const supplementalLightMode = this.storageSettings.values.supplementalLightMode  as string;
-        if (supplementalLightMode === 'IR') {
+        if (this.storageSettings.values.supplementalLightMode === 'IR') {
             this.storageSettings.values.irManualBrightness = brightness;
         } else {
             this.storageSettings.values.brightness = brightness;
@@ -218,41 +231,36 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
             return;
 
         const api = this.camera.getClient();
-        const values = this.storageSettings.values;
-        const supplementalLightMode = values.supplementalLightMode as string;
+        const { supplementalLightMode, smartSupplementLight, smartBrightnessControl, brightness, irBrightnessControl, irManualBrightness, mode } = this.storageSettings.values;
 
-        let output: 'auto' | 'white' | 'ir' | undefined;
-        let mode: 'auto' | 'manual' | undefined;
-        let smartMode: 'auto' | 'manual' | undefined;
-        let whiteBrightness: number | undefined;
-        let irBrightness: number | undefined;
+        const options: SupplementLightOptions = {
+            on: this.on,
+            smartSupplementLightEnabled: smartSupplementLight,
+        };
 
         if (this.on) {
-            if (supplementalLightMode === 'Smart') {
-                output = 'auto';
-                smartMode = values.smartBrightnessControl as 'auto' | 'manual';
-                whiteBrightness = values.brightness as number;
-                irBrightness = values.irManualBrightness as number;
-            } else if (supplementalLightMode === 'IR') {
-                output = 'ir';
-                mode = values.irBrightnessControl as 'auto' | 'manual';
-                irBrightness = values.irManualBrightness as number;
-            } else {
-                output = 'white';
-                mode = values.mode as 'auto' | 'manual';
-                whiteBrightness = values.brightness as number;
+            switch (supplementalLightMode) {
+                case 'Smart':
+                    options.output = 'auto';
+                    options.smartMode = smartBrightnessControl;
+                    options.whiteBrightness = brightness;
+                    options.irBrightness = irManualBrightness;
+                    break;
+                case 'IR':
+                    options.output = 'ir';
+                    options.mode = irBrightnessControl;
+                    options.irBrightness = irManualBrightness;
+                    break;
+                case 'White':
+                default:
+                    options.output = 'white';
+                    options.mode = mode;
+                    options.whiteBrightness = brightness;
+                    break;
             }
         }
 
-        await api.setSupplementLight({
-            on: this.on,
-            output,
-            whiteBrightness,
-            irBrightness,
-            mode,
-            smartMode,
-            smartSupplementLightEnabled: values.smartSupplementLight as boolean,
-        });
+        await api.setSupplementLight(options);
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -264,7 +272,7 @@ export class HikvisionSupplementalLight extends ScryptedDeviceBase implements On
     }
 
     async getReadmeMarkdown(): Promise<string> {
-        if (this.notSupported) {
+        if (this.cameraType === 'not-supported') {
             return `
 ## **Supplemental Light**
 
