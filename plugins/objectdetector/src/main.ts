@@ -504,6 +504,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           this.console.log(`[${Math.round((now - start) / 100) / 10}s] Zones                : ${zones.length}`);
           stationaryDetections.clear();
           movingDetections.clear();
+          filteredDetections.clear();
           lastReport = now;
         }
       }
