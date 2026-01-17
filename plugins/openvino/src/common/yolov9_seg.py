@@ -21,10 +21,22 @@ def crop_mask_numpy(masks, boxes):
         numpy array [n, h, w] - cropped masks
     """
     n, h, w = masks.shape
-    x1 = boxes[:, 0][:, None, None]  # (n, 1, 1)
-    y1 = boxes[:, 1][:, None, None]  # (n, 1, 1)
-    x2 = boxes[:, 2][:, None, None]  # (n, 1, 1)
-    y2 = boxes[:, 3][:, None, None]  # (n, 1, 1)
+
+    # Safely clamp and normalize bounding boxes
+    boxes_clamped = np.clip(boxes, 0, None)
+    boxes_clamped[:, 0] = np.minimum(boxes_clamped[:, 0], w)  # x1 <= w
+    boxes_clamped[:, 2] = np.minimum(boxes_clamped[:, 2], w)  # x2 <= w
+    boxes_clamped[:, 1] = np.minimum(boxes_clamped[:, 1], h)  # y1 <= h
+    boxes_clamped[:, 3] = np.minimum(boxes_clamped[:, 3], h)  # y2 <= h
+
+    # Ensure x1 <= x2 and y1 <= y2
+    boxes_clamped[:, 0] = np.minimum(boxes_clamped[:, 0], boxes_clamped[:, 2])  # x1 <= x2
+    boxes_clamped[:, 1] = np.minimum(boxes_clamped[:, 1], boxes_clamped[:, 3])  # y1 <= y2
+
+    x1 = boxes_clamped[:, 0][:, None, None]  # (n, 1, 1)
+    y1 = boxes_clamped[:, 1][:, None, None]  # (n, 1, 1)
+    x2 = boxes_clamped[:, 2][:, None, None]  # (n, 1, 1)
+    y2 = boxes_clamped[:, 3][:, None, None]  # (n, 1, 1)
 
     r = np.arange(w).reshape(1, 1, -1)  # (1, 1, w)
     c = np.arange(h).reshape(1, -1, 1)  # (1, h, 1)
@@ -46,13 +58,36 @@ def _upsample_bilinear(masks, target_shape):
     Returns:
         numpy array [n, target_h, target_w]
     """
+    # Defensive check: ensure masks has valid shape
+    if len(masks.shape) != 3 or masks.shape[0] == 0:
+        print(f"Warning: unexpected mask shape for upsampling: {masks.shape}")
+        return masks
+
+    n, h, w = masks.shape
     masks_transposed = masks.transpose(1, 2, 0)  # (h, w, n)
-    upsampled = cv2.resize(
-        masks_transposed.astype(np.float32),
-        (target_shape[1], target_shape[0]),  # cv2 uses (width, height)
-        interpolation=cv2.INTER_LINEAR
-    )
-    return upsampled.transpose(2, 0, 1)  # (n, h, w)
+
+    try:
+        upsampled = cv2.resize(
+            masks_transposed.astype(np.float32),
+            (target_shape[1], target_shape[0]),  # cv2 uses (width, height)
+            interpolation=cv2.INTER_LINEAR
+        )
+
+        # cv2.resize may return 2D for single-channel input, need to restore 3D shape
+        if len(upsampled.shape) == 2:
+            # Input was single mask, cv2 returned (H, W) instead of (H, W, 1)
+            upsampled = upsampled[:, :, None]  # (H, W, 1)
+        result = upsampled.transpose(2, 0, 1)  # (n, h, w)
+
+        # Validate output shape
+        if result.shape != (n, target_shape[0], target_shape[1]):
+            print(f"Warning: upsampled mask shape mismatch. Expected {(n, target_shape[0], target_shape[1])}, got {result.shape}")
+            return masks
+
+        return result
+    except Exception as e:
+        print(f"Warning: error upscaling masks: {e}, falling back to original masks")
+        return masks
 
 
 def process_mask_numpy(protos, masks_in, bboxes, shape, upsample=False):
@@ -73,6 +108,15 @@ def process_mask_numpy(protos, masks_in, bboxes, shape, upsample=False):
 
     c, mh, mw = protos.shape  # prototype: CHW
     ih, iw = shape  # input image: height, width
+
+    # Validate inputs
+    if masks_in.shape[0] == 0:
+        print(f"Warning: empty masks_in shape: {masks_in.shape}")
+        return np.zeros((0, ih if upsample else mh, iw if upsample else mw), dtype=bool)
+
+    if masks_in.shape[1] != c:
+        print(f"Warning: masks_in shape mismatch: expected [:, {c}], got {masks_in.shape}")
+        return np.zeros((0, ih if upsample else mh, iw if upsample else mw), dtype=bool)
 
     # Flatten protos for matrix multiplication: [c, mh, mw] -> [c, mh*mw]
     protos_flat = protos.reshape(c, -1)
