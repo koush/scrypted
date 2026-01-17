@@ -65,7 +65,11 @@ class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.Imag
         pass
 
     async def getImageEmbedding(self, input):
-        detections = await super().detectObjects(input, None)
+        detections = await super().detectObjects(input, {
+            "settings": {
+                "pad": True,
+            }
+        })
         return detections["detections"][0]["embedding"]
     
     async def detectObjects(self, mediaObject, session = None):

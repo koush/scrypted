@@ -9,6 +9,7 @@ import traceback
 from typing import Any, Tuple
 
 import numpy as np
+from ov.segment import OpenVINOSegmentation
 import scrypted_sdk
 from PIL import Image
 from scrypted_sdk.other import SettingValue
@@ -221,6 +222,7 @@ class OpenVINOPlugin(
         self.faceDevice = None
         self.textDevice = None
         self.clipDevice = None
+        self.segmentDevice = None
 
         if not self.forked:
             asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
@@ -335,6 +337,18 @@ class OpenVINOPlugin(
                     "name": "OpenVINO CLIP Embedding",
                 }
             )
+
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(
+                {
+                    "nativeId": "segment",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                    ],
+                    "name": "OpenVINO Segmentation",
+                }
+            )
         except:
             pass
 
@@ -348,6 +362,9 @@ class OpenVINOPlugin(
         elif nativeId == "clipembedding":
             self.clipDevice = self.clipDevice or OpenVINOClipEmbedding(self, nativeId)
             return self.clipDevice
+        elif nativeId == "segment":
+            self.segmentDevice = self.segmentDevice or OpenVINOSegmentation(self, nativeId)
+            return self.segmentDevice
         custom_model = self.custom_models.get(nativeId, None)
         if custom_model:
             return custom_model

@@ -38,7 +38,7 @@ def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
 socket.getaddrinfo = custom_getaddrinfo
 
 class Prediction:
-    def __init__(self, id: int, score: float, bbox: Rectangle, embedding: str = None):
+    def __init__(self, id: int, score: float, bbox: Rectangle, embedding: str = None, clipPaths: List[List[Tuple[float, float]]] = None):
         # these may be numpy values. sanitize them.
         self.id = int(id)
         self.score = float(score)
@@ -50,7 +50,7 @@ class Prediction:
             float(bbox.ymax),
         )
         self.embedding = embedding
-
+        self.clipPaths = clipPaths
 
 class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sdk.ScryptedSystemDevice, scrypted_sdk.DeviceCreator, scrypted_sdk.DeviceProvider):
     labels: dict
@@ -191,6 +191,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
             detection["score"] = obj.score
             if hasattr(obj, "embedding") and obj.embedding is not None:
                 detection["embedding"] = obj.embedding
+            if hasattr(obj, "clipPaths") and obj.clipPaths is not None and len(obj.clipPaths) > 0:
+                detection["clipPaths"] = obj.clipPaths
             detections.append(detection)
 
         if convert_to_src_size:
@@ -204,6 +206,15 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
                 if any(map(lambda x: not math.isfinite(x), detection["boundingBox"])):
                     print("unexpected nan detected", obj.bbox)
                     continue
+                # Transform clipPaths coordinates if present
+                if "clipPaths" in detection and detection["clipPaths"] is not None:
+                    clip_paths = detection["clipPaths"]
+                    # Convert each polygon (list of [x, y] tuples) to source size
+                    transformed = [[
+                        (convert_to_src_size((pt[0], pt[1]))[0], convert_to_src_size((pt[0], pt[1]))[1])
+                        for pt in polygon
+                    ] for polygon in clip_paths]
+                    detection["clipPaths"] = transformed
                 detection_result["detections"].append(detection)
 
         # print(detection_result)
@@ -313,21 +324,59 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
             if image.ffmpegFormats != True:
                 format = image.format or "rgb"
 
-        b = await image.toBuffer(
-            {
-                "resize": resize,
-                "format": format,
-            }
-        )
+        if settings and settings.get("pad", False):
+            if iw / w > ih / h:
+                scale = w / iw
+            else:
+                scale = h / ih
+            nw = int(iw * scale)
+            nh = int(ih * scale)
 
-        if self.get_input_format() == "rgb":
-            data = await common.colors.ensureRGBData(b, (w, h), format)
-        elif self.get_input_format() == "rgba":
-            data = await common.colors.ensureRGBAData(b, (w, h), format)
-        elif self.get_input_format() == "yuvj444p":
-            data = await common.colors.ensureYCbCrAData(b, (w, h), format)
+            resize = {
+                "width": nw,
+                "height": nh,
+            }
+
+            b = await image.toBuffer(
+                {
+                    "resize": resize,
+                    "format": format,
+                }
+            )
+
+            if self.get_input_format() == "rgb":
+                data = await common.colors.ensureRGBData(b, (nw, nh), format)
+            elif self.get_input_format() == "rgba":
+                data = await common.colors.ensureRGBAData(b, (nw, nh), format)
+            elif self.get_input_format() == "yuvj444p":
+                data = await common.colors.ensureYCbCrAData(b, (nw, nh), format)
+            else:
+                raise Exception("unsupported format")
+            
+            # data is a PIL image and we need to pad it to w, h
+            new_image = Image.new(data.mode, (w, h))
+            paste_x = (w - nw) // 2
+            paste_y = (h - nh) // 2
+            new_image.paste(data, (paste_x, paste_y))
+            data.close()
+            data = new_image
+
         else:
-            raise Exception("unsupported format")
+            b = await image.toBuffer(
+                {
+                    "resize": resize,
+                    "format": format,
+                }
+            )
+
+            if self.get_input_format() == "rgb":
+                data = await common.colors.ensureRGBData(b, (w, h), format)
+            elif self.get_input_format() == "rgba":
+                data = await common.colors.ensureRGBAData(b, (w, h), format)
+            elif self.get_input_format() == "yuvj444p":
+                data = await common.colors.ensureYCbCrAData(b, (w, h), format)
+            else:
+                raise Exception("unsupported format")
 
         try:
             ret = await self.safe_detect_once(data, settings, (iw, ih), cvss)
