@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 import openvino as ov
-from ov import async_infer
+from common import async_infer
 from predict.text_recognize import TextRecognition
 
 textDetectPrepare, textDetectPredict = async_infer.create_executors("TextDetect")

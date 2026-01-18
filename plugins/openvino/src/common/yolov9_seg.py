@@ -7,6 +7,7 @@ that are equivalent to their torch counterparts in utils/segment/general.py.
 
 import numpy as np
 import cv2
+import time
 
 def crop_mask_numpy(masks, boxes):
     """
@@ -198,3 +199,157 @@ def masks2polygons_numpy(masks):
     segments = masks2segments_numpy(masks)
     # Convert to list of [x, y] pairs
     return [segment.tolist() for segment in segments]
+
+
+def xywh2xyxy(x):
+    """Convert [x_center, y_center, width, height] to [x1, y1, x2, y2]"""
+    y = np.copy(x)
+    y[:, 0] = x[:, 0] - x[:, 2] / 2  # x1
+    y[:, 1] = x[:, 1] - x[:, 3] / 2  # y1
+    y[:, 2] = x[:, 0] + x[:, 2] / 2  # x2
+    y[:, 3] = x[:, 1] + x[:, 3] / 2  # y2
+    return y
+
+
+def box_iou(box1, box2):
+    """Calculate IoU between two sets of boxes"""
+    area1 = (box1[:, 2] - box1[:, 0]) * (box1[:, 3] - box1[:, 1])
+    area2 = (box2[:, 2] - box2[:, 0]) * (box2[:, 3] - box2[:, 1])
+
+    iou = np.zeros((len(box1), len(box2)), dtype=np.float32)
+
+    for i in range(len(box1)):
+        for j in range(len(box2)):
+            inter_x1 = np.maximum(box1[i, 0], box2[j, 0])
+            inter_y1 = np.maximum(box1[i, 1], box2[j, 1])
+            inter_x2 = np.minimum(box1[i, 2], box2[j, 2])
+            inter_y2 = np.minimum(box1[i, 3], box2[j, 3])
+
+            inter_w = np.maximum(0, inter_x2 - inter_x1)
+            inter_h = np.maximum(0, inter_y2 - inter_y1)
+            inter_area = inter_w * inter_h
+
+            union = area1[i] + area2[j] - inter_area
+            iou[i, j] = inter_area / union if union > 0 else 0
+
+    return iou
+
+
+def nms(boxes, scores, iou_thres):
+    """Non-Maximum Suppression implementation in NumPy"""
+    if len(boxes) == 0:
+        return np.array([], dtype=np.int32)
+
+    indices = np.argsort(-scores)
+
+    keep = []
+    while len(indices) > 0:
+        i = indices[0]
+        keep.append(i)
+
+        if len(indices) == 1:
+            break
+
+        iou_scores = box_iou(boxes[indices[0:1]], boxes[indices[1:]])[0]
+
+        indices = indices[1:][iou_scores < iou_thres]
+
+    return np.array(keep, dtype=np.int32)
+
+
+def non_max_suppression(
+        prediction,
+        conf_thres=0.25,
+        iou_thres=0.45,
+        classes=None,
+        agnostic=False,
+        multi_label=False,
+        labels=(),
+        max_det=300,
+        nm=0,
+):
+    """Non-Maximum Suppression (NMS) on inference results to reject overlapping detections
+
+    Returns:
+         list of detections, on (n,6) tensor per image [xyxy, conf, cls]
+    """
+
+    if isinstance(prediction, (list, tuple)):
+        prediction = prediction[0]
+
+    bs = prediction.shape[0]
+    nc = prediction.shape[1] - nm - 4
+    mi = 4 + nc
+    xc = np.max(prediction[:, 4:mi], axis=1) > conf_thres
+
+    assert 0 <= conf_thres <= 1, f'Invalid Confidence threshold {conf_thres}, valid values are between 0.0 and 1.0'
+    assert 0 <= iou_thres <= 1, f'Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0'
+
+    max_wh = 7680
+    max_nms = 30000
+    time_limit = 2.5 + 0.05 * bs
+    redundant = True
+    multi_label &= nc > 1
+    merge = False
+
+    t = time.time()
+    output = [np.zeros((0, 6 + nm), dtype=np.float32)] * bs
+    for xi, pred_x in enumerate(prediction):
+        x = pred_x.T[xc[xi]]
+
+        if labels and len(labels[xi]):
+            lb = labels[xi]
+            v = np.zeros((len(lb), nc + nm + 5), dtype=x.dtype)
+            v[:, :4] = lb[:, 1:5]
+            v[np.arange(len(lb)), lb[:, 0].astype(int) + 4] = 1.0
+            x = np.concatenate((x, v), 0)
+
+        if x.shape[0] == 0:
+            continue
+
+        box = x[:, :4]
+        cls = x[:, 4:4 + nc]
+        mask = x[:, 4 + nc:] if nm > 0 else np.zeros((x.shape[0], nm), dtype=x.dtype)
+
+        box = xywh2xyxy(box)
+
+        if multi_label:
+            i, j = np.where(cls > conf_thres)
+            x = np.concatenate((box[i], x[i, 4 + j][:, None], j[:, None].astype(np.float32), mask[i]), 1)
+        else:
+            j = np.argmax(cls, axis=1, keepdims=True)
+            conf = cls[np.arange(len(cls)), j.flatten()][:, None]
+            x = np.concatenate((box, conf, j.astype(np.float32), mask), 1)[conf.flatten() > conf_thres]
+
+        if classes is not None:
+            class_tensor = np.array(classes, dtype=np.float32)
+            mask = np.any(x[:, 5:6] == class_tensor, axis=1)
+            x = x[mask]
+
+        n = x.shape[0]
+        if n == 0:
+            continue
+        elif n > max_nms:
+            x = x[x[:, 4].argsort()[::-1][:max_nms]]
+        else:
+            x = x[x[:, 4].argsort()[::-1]]
+
+        c = x[:, 5:6] * (0 if agnostic else max_wh)
+        boxes, scores = x[:, :4] + c, x[:, 4]
+        i = nms(boxes, scores, iou_thres)
+        if i.shape[0] > max_det:
+            i = i[:max_det]
+        if merge and (1 < n < 3E3):
+            iou = box_iou(boxes[i], boxes) > iou_thres
+            weights = iou * scores[None]
+            x[i, :4] = np.dot(weights, x[:, :4]).astype(np.float32) / weights.sum(1, keepdims=True)
+            if redundant:
+                i = i[iou.sum(1) > 1]
+
+        output[xi] = x[i]
+        if (time.time() - t) > time_limit:
+            import warnings
+            warnings.warn(f'WARNING ⚠️ NMS time limit {time_limit:.3f}s exceeded')
+            break
+
+    return output

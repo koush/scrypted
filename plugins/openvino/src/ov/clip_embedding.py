@@ -7,7 +7,7 @@ import numpy as np
 import openvino as ov
 from PIL import Image
 
-from ov import async_infer
+from common import async_infer
 from predict.clip import ClipEmbedding
 from scrypted_sdk import ObjectsDetected
 

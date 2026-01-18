@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 
 import openvino as ov
-from ov import async_infer
+from common import async_infer
 from predict.face_recognize import FaceRecognizeDetection
 
 faceDetectPrepare, faceDetectPredict = async_infer.create_executors("FaceDetect")

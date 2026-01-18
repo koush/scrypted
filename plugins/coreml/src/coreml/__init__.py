@@ -16,6 +16,7 @@ from common import yolo
 from coreml.face_recognition import CoreMLFaceRecognition
 from coreml.custom_detection import CoreMLCustomDetection
 from coreml.clip_embedding import CoreMLClipEmbedding
+from coreml.segment import CoreMLSegmentation
 
 try:
     from coreml.text_recognition import CoreMLTextRecognition
@@ -105,6 +106,7 @@ class CoreMLPlugin(
         self.faceDevice = None
         self.textDevice = None
         self.clipDevice = None
+        self.segmentDevice = None
 
         if not self.forked:
             asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
@@ -149,6 +151,18 @@ class CoreMLPlugin(
                     "name": "CoreML CLIP Embedding",
                 }
             )
+
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(
+                {
+                    "nativeId": "segment",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                    ],
+                    "name": "CoreML Segmentation",
+                }
+            )
         except:
             pass
 
@@ -162,6 +176,9 @@ class CoreMLPlugin(
         elif nativeId == "clipembedding":
             self.clipDevice = self.clipDevice or CoreMLClipEmbedding(self, nativeId)
             return self.clipDevice
+        elif nativeId == "segment":
+            self.segmentDevice = self.segmentDevice or CoreMLSegmentation(self, nativeId)
+            return self.segmentDevice
         custom_model = self.custom_models.get(nativeId, None)
         if custom_model:
             return custom_model

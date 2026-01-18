@@ -6,7 +6,7 @@ import traceback
 
 import numpy as np
 
-import openvino as ov
+import onnxruntime
 from predict.segment import Segmentation
 from common import yolov9_seg
 from common import async_infer
@@ -15,29 +15,27 @@ prepareExecutor, predictExecutor = async_infer.create_executors("Segment")
 
 
 
-class OpenVINOSegmentation(Segmentation):
+class ONNXSegmentation(Segmentation):
     def __init__(self, plugin, nativeId: str):
         super().__init__(plugin=plugin, nativeId=nativeId)
 
     def loadModel(self, name):
-        name = name + "_int8"
-        model_path = self.downloadHuggingFaceModelLocalFallback(name)
-        ovmodel = "best-converted"
-        xmlFile = os.path.join(model_path, f"{ovmodel}.xml")
-        model = self.plugin.core.compile_model(xmlFile, self.plugin.mode)
+        model_path = self.plugin.downloadHuggingFaceModelLocalFallback(name)
+        onnxfile = os.path.join(model_path, f"{name}.onnx")
+        model = onnxruntime.InferenceSession(onnxfile)
         return model
 
     async def detect_once(self, input, settings, src_size, cvss):
-        def predict():
+        def prepare():
             im = np.expand_dims(input, axis=0)
             im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)
             im = im.astype(np.float32) / 255.0
             im = np.ascontiguousarray(im)  # contiguous
+            return im
 
-            infer_request = self.model.create_infer_request()
-            tensor = ov.Tensor(array=im)
-            infer_request.set_input_tensor(tensor)
-            output_tensors = infer_request.infer()
+        def predict():
+            input_tensor = prepare()
+            output_tensors = self.model.run(None, {self.input_name: input_tensor})
 
             pred = output_tensors[0]
             proto = output_tensors[1]
@@ -55,4 +53,3 @@ class OpenVINOSegmentation(Segmentation):
 
         ret = self.create_detection_result(objs, src_size, cvss)
         return ret
-

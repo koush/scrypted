@@ -24,6 +24,7 @@ from predict import PredictPlugin
 
 from .face_recognition import ONNXFaceRecognition
 from .clip_embedding import ONNXClipEmbedding
+from .segment import ONNXSegmentation
 
 try:
     from .text_recognition import ONNXTextRecognition
@@ -155,6 +156,7 @@ class ONNXPlugin(
         self.faceDevice = None
         self.textDevice = None
         self.clipDevice = None
+        self.segmentDevice = None
 
         if not self.forked:
             asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
@@ -199,6 +201,18 @@ class ONNXPlugin(
                     "name": "ONNX CLIP Embedding",
                 }
             )
+
+            await scrypted_sdk.deviceManager.onDeviceDiscovered(
+                {
+                    "nativeId": "segment",
+                    "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                    "interfaces": [
+                        scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                        scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                    ],
+                    "name": "ONNX Segmentation",
+                }
+            )
         except:
             pass
 
@@ -212,6 +226,9 @@ class ONNXPlugin(
         elif nativeId == "clipembedding":
             self.clipDevice = self.clipDevice or ONNXClipEmbedding(self, nativeId)
             return self.clipDevice
+        elif nativeId == "segment":
+            self.segmentDevice = self.segmentDevice or ONNXSegmentation(self, nativeId)
+            return self.segmentDevice
         custom_model = self.custom_models.get(nativeId, None)
         if custom_model:
             return custom_model
