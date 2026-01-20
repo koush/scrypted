@@ -3,6 +3,7 @@ import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/ht
 import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, Resolution, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, Sleep, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
+import { checkUserId } from "@scrypted/sdk/acl";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import fs from 'fs';
 import https from 'https';
@@ -776,6 +777,13 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             pathname = pathname.substring('/hotlink-ok'.length);
 
         const [_, id, iface] = pathname.split('/');
+        if (!request.username || (request.aclId && !await checkUserId(id, request.aclId))) {
+            response.send('', {
+                code: 401,
+            });
+            return;
+        }
+
         try {
             if (iface !== ScryptedInterface.Camera && iface !== ScryptedInterface.VideoCamera)
                 throw new Error();
