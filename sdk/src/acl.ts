@@ -1,4 +1,5 @@
-import { EventDetails, ScryptedDeviceAccessControl, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedUserAccessControl } from ".";
+import sdk, { EventDetails, ScryptedDeviceAccessControl, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedUser, ScryptedUserAccessControl } from ".";
+import { createCachingMapPromiseDebouncer } from './promise-debounce';
 
 export function addAccessControlsForInterface(id: string, ...scryptedInterfaces: ScryptedInterface[]): ScryptedDeviceAccessControl {
     const methods = scryptedInterfaces.map(scryptedInterface => ScryptedInterfaceDescriptors[scryptedInterface]?.methods || []).flat();
@@ -117,4 +118,35 @@ export class AccessControls {
 
         return true;
     }
+}
+
+
+const accessControls = createCachingMapPromiseDebouncer<AccessControls|undefined>(60 * 1000);
+
+export async function checkUserId(id: string, userId: string) {
+    const user = sdk.systemManager.getDeviceById<ScryptedUser>(userId);
+    if (!user || !user.interfaces?.includes(ScryptedInterface.ScryptedUser)) {
+        // console.error('Error delivering notification, invalid user id:', userId);
+        return;
+    }
+
+    if (!sdk.systemManager.getDeviceById(id))
+        return;
+
+    try {
+        const acl = await accessControls(userId, async () => {
+            const acls = await user.getScryptedUserAccessControl();
+            const acl = acls ? new AccessControls(acls) : undefined;
+            return acl;
+        });
+        if (acl?.shouldRejectDevice(id)) {
+            return;
+        }
+    }
+    catch (e) {
+        // console.error('Error delivering notification, ACL check failed.', e);
+        return;
+    }
+
+    return user;
 }

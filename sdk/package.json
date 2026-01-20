@@ -1,11 +1,12 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.5.57",
+  "version": "0.5.58",
   "description": "",
   "main": "dist/src/index.js",
   "exports": {
     ".": "./dist/src/index.js",
     "./acl": "./dist/src/acl.js",
+    "./promise-debounce": "./dist/src/promise-debounce.js",
     "./storage-settings": "./dist/src/storage-settings.js",
     "./settings-mixin": "./dist/src/settings-mixin.js"
   },
