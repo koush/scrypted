@@ -1,7 +1,7 @@
-import sdk, { ClusterForkInterface, ClusterForkInterfaceOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedNativeId, StreamService, TTYSettings } from "@scrypted/sdk";
-import type { IPty, spawn as ptySpawn } from 'node-pty';
-import { createAsyncQueue } from '@scrypted/common/src/async-queue'
+import { createAsyncQueue } from '@scrypted/common/src/async-queue';
+import sdk, { ClusterForkInterface, ClusterForkInterfaceOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedNativeId, StreamService, TTY, TTYSettings } from "@scrypted/sdk";
 import { ChildProcess, spawn as childSpawn } from "child_process";
+import type { IPty, spawn as ptySpawn } from 'node-pty';
 import path from 'path';
 
 export const TerminalServiceNativeId = 'terminalservice';
@@ -19,12 +19,24 @@ function toSpawnPathEnv(paths: string[]): string {
 class InteractiveTerminal {
     cp: IPty
 
-    constructor(cmd: string[], paths: string[], spawn: typeof ptySpawn) {
+    constructor(cmd: string[], paths: string[], spawn: typeof ptySpawn, cwd?: string) {
         const spawnPath = toSpawnPathEnv(paths);
         if (cmd?.length) {
-            this.cp = spawn(cmd[0], cmd.slice(1), { env: { ...process.env, PATH: spawnPath } });
+            this.cp = spawn(cmd[0], cmd.slice(1), {
+                env: {
+                    ...process.env,
+                    PATH: spawnPath,
+                },
+                cwd,
+            });
         } else {
-            this.cp = spawn(process.env.SHELL as string, [], { env: { ...process.env, PATH: spawnPath } });
+            this.cp = spawn(process.env.SHELL as string, [], {
+                env: {
+                    ...process.env,
+                    PATH: spawnPath,
+                },
+                cwd,
+            });
         }
     }
 
@@ -111,7 +123,7 @@ class NoninteractiveTerminal {
 }
 
 
-export class TerminalService extends ScryptedDeviceBase implements StreamService<Buffer | string, Buffer>, ClusterForkInterface {
+export class TerminalService extends ScryptedDeviceBase implements StreamService<Buffer | string, Buffer>, ClusterForkInterface, TTY {
     private forks: { [clusterWorkerId: string]: TerminalService } = {};
     private forkClients: 0;
 
@@ -259,7 +271,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
                                 let spawn: typeof ptySpawn;
                                 try {
                                     spawn = require('@scrypted/node-pty').spawn as typeof ptySpawn;
-                                    cp = new InteractiveTerminal(cmd, extraPaths, spawn);
+                                    cp = new InteractiveTerminal(cmd, extraPaths, spawn, options?.cwd);
                                 }
                                 catch (e) {
                                     this.console.error('Error starting pty', e);
