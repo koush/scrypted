@@ -198,7 +198,7 @@ export class TerminalService extends ScryptedDeviceBase implements StreamService
     async connectStream(input: AsyncGenerator<Buffer | string, void>, options?: any): Promise<AsyncGenerator<Buffer, void>> {
         let cp: InteractiveTerminal | NoninteractiveTerminal = null;
         const queue = createAsyncQueue<Buffer>();
-        const extraPaths = await this.getExtraPaths();
+        const extraPaths = [...options?.env?.PATH?.split(path.delimiter) || [], ...await this.getExtraPaths()];
 
         if (this.isFork) {
             this.forkClients++;
