@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any, List, Tuple
+import hashlib
 import json
 
 import numpy as np
@@ -50,9 +51,11 @@ class CustomDetection(PredictPlugin, scrypted_sdk.Settings):
         self.inputheight = config["input_shape"][3]
         files: list[str] = config["files"]
         local_files: list[str] = []
+        plugin_suffix = self.pluginId.split('/')[1]
         for file in files:
             remote_file = replace_last_path_component(config_url, file)
-            localFile = self.downloadFile(remote_file, f"{self.id}/{file}")
+            url_hash = hashlib.sha256(remote_file.encode()).hexdigest()[:12]
+            localFile = self.downloadFile(remote_file, f"{plugin_suffix}/{url_hash}/{file}")
             local_files.append(localFile)
 
         self.model = self.loadModel(local_files)

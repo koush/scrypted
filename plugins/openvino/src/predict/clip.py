@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 from typing import Tuple
 
 import scrypted_sdk
@@ -55,9 +56,11 @@ class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.Imag
 
     def initModel(self):
         local_files: list[str] = []
+        plugin_suffix = self.pluginId.split('/')[1]
         for file in self.getFiles():
             remote_file = "https://huggingface.co/koushd/clip/resolve/main/" + file
-            localFile = self.downloadFile(remote_file, f"{self.id}/{file}")
+            url_hash = hashlib.sha256(remote_file.encode()).hexdigest()[:12]
+            localFile = self.downloadFile(remote_file, f"{plugin_suffix}/{url_hash}/{file}")
             local_files.append(localFile)
         return self.loadModel(local_files)
 
