@@ -42,34 +42,44 @@ export class AuthRequst {
 
             const req = Http.request(url, opt)
 
+            // Apply timeout if specified (Node.js http.request doesn't use timeout from options)
+            if (opt.timeout) {
+                req.setTimeout (opt.timeout, () => {
+                    req.destroy (new Error (`Request timeout after ${opt.timeout}ms`));
+                });
+            }
+
             req.once('response', async (resp) => {
+                try {
+                    if (resp.statusCode == 401) {
 
-                if (resp.statusCode == 401) {
+                        // Hikvision quirk: even if we already had a sessionAuth, a fresh
+                        // WWW-Authenticate challenge may require rebuilding credentials.
+                        // Limit the number of digest rebuilds to avoid infinite loops.
+                        const attempt = (opt.digestRetry ?? 0);
+                        if (attempt >= 2) {
+                            // Give up after a couple of rebuild attempts and surface the 401 response
+                            resolve(await this.parseResponse (opt.responseType, resp));
+                            return;
+                        }
 
-                    // Hikvision quirk: even if we already had a sessionAuth, a fresh
-                    // WWW-Authenticate challenge may require rebuilding credentials.
-                    // Limit the number of digest rebuilds to avoid infinite loops.
-                    const attempt = (opt.digestRetry ?? 0);
-                    if (attempt >= 2) {
-                        // Give up after a couple of rebuild attempts and surface the 401 response
-                        resolve(await this.parseResponse (opt.responseType, resp));
-                        return;
+                        const newAuth = this.createAuth(resp.headers['www-authenticate'], !!this.auth);
+                        // Clear cached auth to avoid stale nonce reuse
+                        this.auth = undefined;
+                        opt.sessionAuth = newAuth;
+                        opt.digestRetry = attempt + 1;
+                        const result = await this.request(url, opt, body);
+                        resolve(result);
                     }
-
-                    const newAuth = this.createAuth(resp.headers['www-authenticate'], !!this.auth);
-                    // Clear cached auth to avoid stale nonce reuse
-                    this.auth = undefined;
-                    opt.sessionAuth = newAuth;
-                    opt.digestRetry = attempt + 1;
-                    const result = await this.request(url, opt, body);
-                    resolve(result);
-                }
-                else {
-                    // Cache the negotiated session auth only if it was provided for this request.
-                    if (opt.sessionAuth) {
-                    this.auth = opt.sessionAuth;
+                    else {
+                        // Cache the negotiated session auth only if it was provided for this request.
+                        if (opt.sessionAuth) {
+                        this.auth = opt.sessionAuth;
+                        }
+                        resolve(await this.parseResponse(opt.responseType, resp));
                     }
-                    resolve(await this.parseResponse(opt.responseType, resp));
+                } catch (error) {
+                    reject(error);
                 }
             });
 
@@ -169,6 +179,10 @@ export class AuthRequst {
             readable.once('end', () => {
                 resolve(result);
             });
+
+            readable.once('error', (error) => {
+                reject(error);
+            });
         });
     }
 
@@ -183,6 +197,10 @@ export class AuthRequst {
 
             readable.once('end', () => {
                 resolve(result);
+            });
+
+            readable.once('error', (error) => {
+                reject(error);
             });
         });
     }
