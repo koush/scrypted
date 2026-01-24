@@ -405,7 +405,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }, 30000);
     signal.promise.finally(() => clearInterval(interval));
 
-    const currentDetections = new Map<string, number>();
+    const stationaryDetections = new Map<string, number>();
+    const filteredDetections = new Map<string, number>();
+    const movingDetections = new Map<string, number>();
     let lastReport = 0;
 
     updatePipelineStatus('waiting result');
@@ -477,21 +479,32 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!this.hasMotionType) {
         this.plugin.trackDetection();
 
-        const numZonedDetections = zonedDetections.filter(d => d.className !== 'motion').length;
-        const numOriginalDetections = originalDetections.filter(d => d.className !== 'motion').length;
-        if (numZonedDetections !== numOriginalDetections)
-          currentDetections.set('filtered', (currentDetections.get('filtered') || 0) + 1);
+        for (const d of originalDetections) {
+          if (!zonedDetections.includes(d)) {
+            filteredDetections.set(d.className, Math.max(filteredDetections.get(d.className) || 0, d.score));
+          }
+        }
 
         for (const d of detected.detected.detections) {
-          currentDetections.set(d.className, Math.max(currentDetections.get(d.className) || 0, d.score));
+          const set = d.movement?.moving ? movingDetections : stationaryDetections;
+          set.set(d.className, Math.max(set.get(d.className) || 0, d.score));
         }
 
         if (now > lastReport + 10000) {
-          const found = [...currentDetections.entries()].map(([className, score]) => `${className} (${score})`);
-          if (!found.length)
-            found.push('[no detections]');
-          this.console.log(`[${Math.round((now - start) / 100) / 10}s] Detected:`, ...found);
-          currentDetections.clear();
+          const classScores = (set: Map<string, number>) => {
+            const found = [...set.entries()].map(([className, score]) => `${className} (${score})`);
+            if (!found.length)
+              found.push('[no detections]');
+            return found;
+          };
+
+          this.console.log(`[${Math.round((now - start) / 100) / 10}s] Detected (stationary):`, ...classScores(stationaryDetections));
+          this.console.log(`[${Math.round((now - start) / 100) / 10}s] Detected (moving)    :`, ...classScores(movingDetections));
+          this.console.log(`[${Math.round((now - start) / 100) / 10}s] Detected (filtered)  :`, ...classScores(filteredDetections));
+          this.console.log(`[${Math.round((now - start) / 100) / 10}s] Zones                : ${zones.length}`);
+          stationaryDetections.clear();
+          movingDetections.clear();
+          filteredDetections.clear();
           lastReport = now;
         }
       }

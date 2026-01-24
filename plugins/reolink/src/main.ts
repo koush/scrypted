@@ -7,7 +7,9 @@ import { OnvifCameraAPI, OnvifEvent, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
 import { DevInfo } from './probe';
-import { AIState, Enc, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
+import { AIState, Enc, isDeviceHomeHub, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
+import { ReolinkNvrDevice } from './nvr/nvr';
+import { ReolinkNvrClient } from './nvr/api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     sirenTimeout: NodeJS.Timeout;
@@ -237,6 +239,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             await this.updateAbilities();
             await this.updateDevice();
             await this.reportDevices();
+            await this.checkNetData();
             this.startDevicesStatesPolling();
         })()
             .catch(e => {
@@ -464,6 +467,26 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         return batteryConfigVer > 0;
     }
 
+    hasRtsp() {
+        const rtspAbility = this.storageSettings.values.abilities?.value?.Ability?.supportRtspEnable;
+        return rtspAbility && rtspAbility?.ver !== 0;
+    }
+
+    hasRtmp() {
+        const rtmpAbility = this.storageSettings.values.abilities?.value?.Ability?.supportRtmpEnable;
+        return rtmpAbility && rtmpAbility?.ver !== 0;
+    }
+
+    hasOnvif() {
+        const onvifAbility = this.storageSettings.values.abilities?.value?.Ability?.supportOnvifEnable;
+        return onvifAbility && onvifAbility?.ver !== 0;
+    }
+
+    hasHttps() {
+        const httpsAbility = this.storageSettings.values.abilities?.value?.Ability?.supportHttpsEnable;
+        return httpsAbility && httpsAbility?.ver !== 0;
+    }
+
     async updateDevice() {
         const interfaces = this.provider.getInterfaces();
         let type = ScryptedDeviceType.Camera;
@@ -604,6 +627,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                     const od: ObjectsDetected = {
                         timestamp: Date.now(),
                         detections: [],
+                        sourceId: this.pluginId
                     };
                     for (const c of classes) {
                         const { alarm_state } = ai.value[c];
@@ -661,6 +685,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                                 score: 1,
                             }
                         ],
+                        sourceId: this.pluginId
                     };
                     sdk.deviceManager.onDeviceEvent(this.nativeId, ScryptedInterface.ObjectDetector, od);
                 }
@@ -842,7 +867,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         // anecdotally, encoders of type h265 do not have a working RTMP main stream.
         const mainEncType = this.storageSettings.values.abilities?.value?.Ability?.abilityChn?.[rtspChannel]?.mainEncType?.ver;
 
-        if (live === 2) {
+        if (isDeviceHomeHub(deviceInfo)) {
+            streams.push(...[rtspMain, rtspSub]);
+        } else if (live === 2) {
             if (mainEncType === 1) {
                 streams.push(rtmpSub, rtspMain, rtspSub);
             }
@@ -1037,6 +1064,53 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         });
     }
 
+
+    async checkNetData() {
+        try {
+            const api = this.getClientWithToken();
+            const { netData } = await api.getNetData();
+            this.console.log('netData', JSON.stringify(netData));
+            const deviceInfo = this.storageSettings.values.deviceInfo;
+            const isHomeHub = isDeviceHomeHub(deviceInfo);
+
+            const shouldDisableHttps = this.hasHttps() ? netData.httpsEnable === 1 : false;
+            const shouldEnableRtmp = this.hasRtmp() ? (!isHomeHub && netData.rtmpEnable === 0) : false;
+            const shouldDisableRtmp = this.hasRtmp() ? (isHomeHub && netData.rtmpEnable === 1) : false;
+            const shouldEnableRtsp = this.hasRtsp() ? netData.rtspEnable === 0 : false;
+            const shouldEnableOnvif = this.hasOnvif() ? netData.onvifEnable === 0 : false;
+
+            this.console.log(`NetData checks: shouldDisableHttps: ${shouldDisableHttps}, shouldEnableRtmp: ${shouldEnableRtmp}, shouldEnableRtsp: ${shouldEnableRtsp}, shouldEnableOnvif: ${shouldEnableOnvif}, shouldDisableRtmp: ${shouldDisableRtmp}`);
+
+            if (shouldDisableHttps || shouldEnableRtmp || shouldEnableRtsp || shouldEnableOnvif || shouldDisableRtmp) {
+                const newNetData = {
+                    ...netData
+                };
+
+                if (shouldDisableHttps) {
+                    newNetData.httpsEnable = 0;
+                }
+                if (shouldEnableRtmp) {
+                    newNetData.rtmpEnable = 1;
+                }
+                if (shouldDisableRtmp) {
+                    newNetData.rtmpEnable = 0;
+                }
+                if (shouldEnableRtsp) {
+                    newNetData.rtspEnable = 1;
+                }
+                if (shouldEnableOnvif) {
+                    newNetData.onvifEnable = 1;
+                }
+
+                this.console.log(`Fixing netdata settings: ${JSON.stringify(newNetData)}`);
+
+                await api.setNetData(newNetData);
+            }
+        } catch (e) {
+            this.console.error('Error in pollDeviceStates', e);
+        }
+    }
+
     async getDevice(nativeId: string): Promise<any> {
         if (nativeId.endsWith('-siren')) {
             this.siren ||= new ReolinkCameraSiren(this, nativeId);
@@ -1062,8 +1136,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 }
 
 class ReolinkProvider extends RtspProvider {
+    nvrDevices = new Map<string, ReolinkNvrDevice>();
+
     getScryptedDeviceCreator(): string {
-        return 'Reolink Camera';
+        return 'Reolink Camera/NVR';
     }
 
     getAdditionalInterfaces() {
@@ -1077,9 +1153,30 @@ class ReolinkProvider extends RtspProvider {
         ];
     }
 
+    getDevice(nativeId: string) {
+        if (nativeId.endsWith('-reolink-nvr')) {
+            let ret = this.nvrDevices.get(nativeId);
+            if (!ret) {
+                ret = new ReolinkNvrDevice(nativeId, this);
+                if (ret)
+                    this.nvrDevices.set(nativeId, ret);
+            }
+
+            return ret;
+        } else {
+            return super.getDevice(nativeId);
+        }
+    }
+
     async createDevice(settings: DeviceCreatorSettings, nativeId?: string): Promise<string> {
         const httpAddress = `${settings.ip}:${settings.httpPort || 80}`;
         let info: DeviceInformation = {};
+
+        const isNvr = settings.isNvr?.toString() === 'true';
+
+        if (isNvr) {
+            return this.createNvrDeviceFromSettings(settings);
+        }
 
         const skipValidate = settings.skipValidate?.toString() === 'true';
         const username = settings.username?.toString();
@@ -1153,6 +1250,12 @@ class ReolinkProvider extends RtspProvider {
                 placeholder: '192.168.2.222',
             },
             {
+                key: 'isNvr',
+                title: 'Is NVR',
+                description: 'Set if adding a Reolink NVR device. This will allow adding cameras connected to the NVR.',
+                type: 'boolean',
+            },
+            {
                 subgroup: 'Advanced',
                 key: 'rtspChannel',
                 title: 'Channel Number Override',
@@ -1179,6 +1282,49 @@ class ReolinkProvider extends RtspProvider {
 
     createCamera(nativeId: string) {
         return new ReolinkCamera(nativeId, this);
+    }
+
+    async createNvrDeviceFromSettings(settings: DeviceCreatorSettings) {
+        const username = settings.username?.toString();
+        const password = settings.password?.toString();
+        const ip = settings.ip?.toString();
+        const httpPort = settings.httpPort;
+        const rtspPort = settings.rtspPort;
+        const httpAddress = `${ip}:${httpPort || 80}`;
+
+        const client = new ReolinkNvrClient(httpAddress, username, password, this.console);
+        const { devInfo } = await client.getHubInfo();
+
+        if (!devInfo) {
+            throw new Error('Unable to connect to Reolink NVR. Please verify the IP address, port, username, and password are correct.');
+        }
+
+        const { detail, name } = devInfo;
+        const nativeId = `${detail}-reolink-nvr`;
+
+        await sdk.deviceManager.onDeviceDiscovered({
+            nativeId,
+            name,
+            interfaces: [
+                ScryptedInterface.Settings,
+                ScryptedInterface.DeviceDiscovery,
+                ScryptedInterface.DeviceProvider,
+                ScryptedInterface.Reboot,
+            ],
+            type: ScryptedDeviceType.API,
+        });
+
+        const nvrDevice = this.getDevice(nativeId);
+
+        nvrDevice.storageSettings.values.ipAddress = ip;
+        nvrDevice.storageSettings.values.username = username;
+        nvrDevice.storageSettings.values.password = password;
+        nvrDevice.storageSettings.values.httpPort = httpPort;
+        nvrDevice.storageSettings.values.rtspPort = rtspPort;
+
+        nvrDevice.updateDeviceInfo(devInfo);
+
+        return nativeId;
     }
 }
 

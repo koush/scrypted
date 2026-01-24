@@ -3,7 +3,9 @@ import { AuthFetchCredentialState, authHttpFetch } from '@scrypted/common/src/ht
 import { RefreshPromise, TimeoutError, createMapPromiseDebouncer, singletonPromise, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { BufferConverter, Camera, DeviceManifest, DeviceProvider, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaObjectOptions, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, Resolution, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, Settings, Sleep, VideoCamera, WritableDeviceState } from "@scrypted/sdk";
+import { checkUserId } from "@scrypted/sdk/acl";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import fs from 'fs';
 import https from 'https';
 import os from 'os';
 import path from 'path';
@@ -13,7 +15,6 @@ import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filte
 import { ImageConverter, ImageConverterNativeId } from './image-converter';
 import { ImageReader, ImageReaderNativeId, loadSharp, loadVipsImage } from './image-reader';
 import { ImageWriter, ImageWriterNativeId } from './image-writer';
-import fs from 'fs';
 
 const { mediaManager, systemManager } = sdk;
 if (os.cpus().find(cpu => cpu.model?.toLowerCase().includes('qemu'))) {
@@ -31,6 +32,25 @@ class NeverWaitError extends Error {
 class PrebufferUnavailableError extends Error {
 
 }
+
+function calculateConstrainedDimensions(originalWidth: number, originalHeight: number, targetAspectRatio: number) {
+    const imageAspectRatio = originalWidth / originalHeight;
+
+    if (imageAspectRatio > targetAspectRatio) {
+        // Image is wider than target aspect ratio, constrain by height
+        return {
+            width: Math.round(originalHeight * targetAspectRatio),
+            height: originalHeight
+        };
+    } else {
+        // Image is taller than target aspect ratio, constrain by width
+        return {
+            width: originalWidth,
+            height: Math.round(originalWidth / targetAspectRatio)
+        };
+    }
+}
+
 
 class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, Resolution {
     storageSettings = new StorageSettings(this, {
@@ -103,6 +123,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
             title: 'Crop and Scale',
             description: 'Set the approximate region to crop and scale to 16:9 snapshots.',
             type: 'clippath',
+        },
+        snapshotAspectRatio: {
+            title: 'Snapshot Aspect Ratio',
+            description: 'Override the aspect ratio for snapshots (e.g., 1.777 for 16:9). Images from the camera will be resized to this aspect ratio.',
+            type: 'number',
+            placeholder: '1.777',
         },
         privacyMode: {
             group: 'Privacy',
@@ -384,7 +410,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
             availablePicture = undefined;
         }
 
-        const needSoftwareResize = !!(options?.picture?.width || options?.picture?.height) && this.storageSettings.values.snapshotResolution !== 'Full Resolution';
+        const aspectRatio = this.storageSettings.values.snapshotAspectRatio;
+        const needSoftwareResize = (!!(options?.picture?.width || options?.picture?.height) && this.storageSettings.values.snapshotResolution !== 'Full Resolution')
+            || aspectRatio;
 
         if (!needSoftwareResize)
             return rawPicture.picture;
@@ -401,11 +429,46 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
 
                 if (loadSharp()) {
                     const vips = await loadVipsImage(rawPicture.picture, this.id);
-                    if (this.resolution?.[0] !== vips.width || this.resolution?.[1] !== vips.height)
-                        this.resolution = [vips.width, vips.height];
+
+                    let resolutionWidth = vips.width;
+                    let resolutionHeight = vips.height;
+                    if (aspectRatio) {
+                        const constrained = calculateConstrainedDimensions(vips.width, vips.height, aspectRatio);
+                        resolutionWidth = constrained.width;
+                        resolutionHeight = constrained.height;
+                    }
+                    if (this.resolution?.[0] !== resolutionWidth || this.resolution?.[1] !== resolutionHeight)
+                        this.resolution = [resolutionWidth, resolutionHeight];
+
+                    let resizeOptions = options?.picture;
+                    if (aspectRatio) {
+                        resizeOptions ||= {};
+                        const { width, height } = resizeOptions;
+
+                        if (!width && !height) {
+                            resizeOptions = {
+                                ...resizeOptions,
+                                width: resolutionWidth,
+                                height: resolutionHeight,
+                            };
+                        }
+                        else if (!width) {
+                            resizeOptions = {
+                                ...resizeOptions,
+                                width: Math.round(resizeOptions.height * aspectRatio)
+                            };
+                        }
+                        else if (!height) {
+                            resizeOptions = {
+                                ...resizeOptions,
+                                height: Math.round(resizeOptions.width / aspectRatio)
+                            };
+                        }
+                    }
+
                     try {
                         const ret = await vips.toBuffer({
-                            resize: options?.picture,
+                            resize: resizeOptions,
                             format: 'jpg',
                         });
                         return {
@@ -678,7 +741,7 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
 
     async getLocalSnapshot(id: string, iface: string, search: string) {
         const endpoint = await this.authenticatedPath;
-        const ret = url.resolve(path.join(endpoint, id, iface, `${Date.now()}.jpg`) + `${search}`, '');
+        const ret = url.resolve(path.join(endpoint, 'hotlink-ok', id, iface, `${Date.now()}.jpg`) + `${search}`, '');
         return Buffer.from(ret);
     }
 
@@ -706,8 +769,21 @@ export class SnapshotPlugin extends AutoenableMixinProvider implements MixinProv
             return;
         }
 
-        const pathname = request.url.substring(request.rootPath.length);
+        let pathname = request.url.substring(request.rootPath.length);
+
+        // hotlink-ok is used by cloudflare to indicate that hotlink protection should be bypassed.
+        // https://developers.cloudflare.com/waf/tools/scrape-shield/hotlink-protection/
+        if (pathname.startsWith('/hotlink-ok'))
+            pathname = pathname.substring('/hotlink-ok'.length);
+
         const [_, id, iface] = pathname.split('/');
+        if (!request.username || (request.aclId && !await checkUserId(id, request.aclId))) {
+            response.send('', {
+                code: 401,
+            });
+            return;
+        }
+
         try {
             if (iface !== ScryptedInterface.Camera && iface !== ScryptedInterface.VideoCamera)
                 throw new Error();

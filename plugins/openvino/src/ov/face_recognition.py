@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import numpy as np
-import openvino as ov
 from PIL import Image
 
-from ov import async_infer
+import openvino as ov
+from common import async_infer
 from predict.face_recognize import FaceRecognizeDetection
 
 faceDetectPrepare, faceDetectPredict = async_infer.create_executors("FaceDetect")
@@ -18,22 +19,14 @@ faceRecognizePrepare, faceRecognizePredict = async_infer.create_executors(
 class OpenVINOFaceRecognition(FaceRecognizeDetection):
     def __init__(self, plugin, nativeId: str):
         super().__init__(plugin=plugin, nativeId=nativeId)
-        self.prefer_relu = True
 
     def downloadModel(self, model: str):
-        scrypted_yolov9 = "scrypted_yolov9" in model
         inception = "inception" in model
-        ovmodel = "best-converted" if scrypted_yolov9 else "best"
-        precision = self.plugin.precision
-        model_version = "v8"
-        xmlFile = self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
-            f"{model_version}/{model}/{precision}/{ovmodel}.xml",
-        )
-        self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.bin",
-            f"{model_version}/{model}/{precision}/{ovmodel}.bin",
-        )
+        ovmodel = "best-converted" if not inception else "best"
+        if not inception:
+            model = model + "_int8"
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        xmlFile = os.path.join(model_path, f"{ovmodel}.xml")
         if inception:
             model = self.plugin.core.read_model(xmlFile)
             model.reshape([1, 3, 160, 160])

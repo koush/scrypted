@@ -1,4 +1,5 @@
-import { ScryptedDeviceAccessControl, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedUserAccessControl } from ".";
+import sdk, { EventDetails, ScryptedDeviceAccessControl, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedUser, ScryptedUserAccessControl } from ".";
+import { createCachingMapPromiseDebouncer } from './promise-debounce';
 
 export function addAccessControlsForInterface(id: string, ...scryptedInterfaces: ScryptedInterface[]): ScryptedDeviceAccessControl {
     const methods = scryptedInterfaces.map(scryptedInterface => ScryptedInterfaceDescriptors[scryptedInterface]?.methods || []).flat();
@@ -19,4 +20,133 @@ export function mergeDeviceAccessControls(accessControls: ScryptedUserAccessCont
     accessControls.devicesAccessControls ||= [];
     accessControls.devicesAccessControls.push(...dacls);
     return accessControls;
+}
+
+export class AccessControls {
+    constructor(public acl: ScryptedUserAccessControl) {
+    }
+
+    deny(reason: string = 'User does not have permission') {
+        throw new Error(reason);
+    }
+
+    shouldRejectDevice(id: string) {
+        if (this.acl.devicesAccessControls === null)
+            return false;
+
+        if (!this.acl.devicesAccessControls)
+            return true;
+
+        const dacls = this.acl.devicesAccessControls.filter(dacl => dacl.id === id);
+        return !dacls.length;
+    }
+
+    shouldRejectProperty(id: string, property: string) {
+        if (this.acl.devicesAccessControls === null)
+            return false;
+
+        if (!this.acl.devicesAccessControls)
+            return true;
+
+        const dacls = this.acl.devicesAccessControls.filter(dacl => dacl.id === id);
+
+        for (const dacl of dacls) {
+            if (!dacl.properties || dacl.properties.includes(property))
+                return false;
+        }
+
+        return true;
+    }
+
+    shouldRejectEvent(id: string, eventDetails: EventDetails) {
+        if (this.acl.devicesAccessControls === null)
+            return false;
+
+        if (!this.acl.devicesAccessControls)
+            return true;
+
+        const dacls = this.acl.devicesAccessControls.filter(dacl => dacl.id === id);
+
+        const { property } = eventDetails;
+        if (property) {
+            for (const dacl of dacls) {
+                if (!dacl.properties || dacl.properties.includes(property))
+                    return false;
+            }
+        }
+
+        const { eventInterface } = eventDetails;
+
+        for (const dacl of dacls) {
+            if (!dacl.interfaces || dacl.interfaces.includes(eventInterface!))
+                return false;
+        }
+
+        return true;
+    }
+
+    shouldRejectInterface(id: string, scryptedInterface: ScryptedInterface) {
+        if (this.acl.devicesAccessControls === null)
+            return false;
+
+        if (!this.acl.devicesAccessControls)
+            return true;
+
+        const dacls = this.acl.devicesAccessControls.filter(dacl => dacl.id === id);
+
+        for (const dacl of dacls) {
+            if (!dacl.interfaces || dacl.interfaces.includes(scryptedInterface))
+                return false;
+        }
+
+        return true;
+    }
+
+    shouldRejectMethod(id: string, method: string) {
+        if (this.acl.devicesAccessControls === null)
+            return false;
+
+        if (!this.acl.devicesAccessControls)
+            return true;
+
+        const dacls = this.acl.devicesAccessControls.filter(dacl => dacl.id === id);
+
+        for (const dacl of dacls) {
+            if (!dacl.methods || dacl.methods.includes(method))
+                return false;
+        }
+
+        return true;
+    }
+}
+
+
+const accessControls = createCachingMapPromiseDebouncer<AccessControls|undefined>(60 * 1000);
+
+export async function checkUserId(id: string, userId: string) {
+    const user = sdk.systemManager.getDeviceById<ScryptedUser>(userId);
+    if (!user || !user.interfaces?.includes(ScryptedInterface.ScryptedUser)) {
+        // console.error('Error delivering notification, invalid user id:', userId);
+        return;
+    }
+
+    if (!sdk.systemManager.getDeviceById(id))
+        return;
+
+    try {
+        const acl = await accessControls(userId, async () => {
+            const acls = await user.getScryptedUserAccessControl();
+            const acl = acls ? new AccessControls(acls) : undefined;
+            return acl;
+        });
+        if (acl?.shouldRejectDevice(id)) {
+            return;
+        }
+    }
+    catch (e) {
+        // console.error('Error delivering notification, ACL check failed.', e);
+        return;
+    }
+
+    return user;
 }

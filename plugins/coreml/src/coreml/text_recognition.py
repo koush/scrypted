@@ -20,22 +20,8 @@ class CoreMLTextRecognition(TextRecognition):
         self.recogExecutor = concurrent.futures.ThreadPoolExecutor(1, "recog-text")
 
     def downloadModel(self, model: str):
-        model_version = "v8"
-        mlmodel = "model"
-
-        files = [
-            f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
-            f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{mlmodel}.mlmodel",
-            f"{model}/{model}.mlpackage/Manifest.json",
-        ]
-
-        for f in files:
-            p = self.downloadFile(
-                f"https://github.com/koush/coreml-models/raw/main/{f}",
-                f"{model_version}/{f}",
-            )
-            modelFile = os.path.dirname(p)
-
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        modelFile = os.path.join(model_path, f"{model}.mlpackage")
         model = ct.models.MLModel(modelFile)
         inputName = model.get_spec().description.input[0].name
         return model, inputName

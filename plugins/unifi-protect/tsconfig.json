@@ -10,6 +10,7 @@
     "include": [
         "src/**/*",
         "../../common/src/**/*",
-        "../../server/src/**/*"
+        "../../server/src/**/sleep.ts",
+        "../../server/src/**/media-helpers.ts"
     ]
 }

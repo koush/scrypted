@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import os
 from typing import Tuple
 
 import scrypted_sdk
@@ -15,6 +14,8 @@ class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.Imag
     def __init__(self, plugin: PredictPlugin, nativeId: str):
         super().__init__(nativeId=nativeId, plugin=plugin)
 
+        hf_id = "openai/clip-vit-base-patch32"
+
         self.inputwidth = 224
         self.inputheight = 224
 
@@ -23,10 +24,31 @@ class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.Imag
         self.minThreshold = 0.5
 
         self.model = self.initModel()
-        self.processor = CLIPProcessor.from_pretrained(
-            "openai/clip-vit-base-patch32",
-            cache_dir=os.path.join(os.environ["SCRYPTED_PLUGIN_VOLUME"], "files", "hf"),
-        )
+
+        self.processor = None
+        print("Loading CLIP processor from local cache.")
+        try:
+            self.processor = CLIPProcessor.from_pretrained(
+                hf_id,
+                local_files_only=True,
+            )
+            print("Loaded CLIP processor from local cache.")
+        except Exception:
+            print("CLIP processor not available in local cache yet.")
+
+        asyncio.ensure_future(self.refreshClipProcessor(hf_id), loop=self.loop)
+
+    async def refreshClipProcessor(self, hf_id: str):
+        try:
+            print("Refreshing CLIP processor cache (online).")
+            processor = await asyncio.to_thread(
+                CLIPProcessor.from_pretrained,
+                hf_id,
+            )
+            self.processor = processor
+            print("Refreshed CLIP processor cache.")
+        except Exception:
+            print("CLIP processor cache refresh failed.")
 
     def getFiles(self):
         pass
@@ -43,7 +65,11 @@ class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.Imag
         pass
 
     async def getImageEmbedding(self, input):
-        detections = await super().detectObjects(input, None)
+        detections = await super().detectObjects(input, {
+            "settings": {
+                "pad": True,
+            }
+        })
         return detections["detections"][0]["embedding"]
     
     async def detectObjects(self, mediaObject, session = None):

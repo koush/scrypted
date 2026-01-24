@@ -12,7 +12,7 @@ import { AutomationCore, AutomationCoreNativeId } from './automations-core';
 import { ClusterCore, ClusterCoreNativeId } from './cluster';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
-import { checkLegacyLxc, checkLxc } from './platform/lxc';
+import { checkLegacyLxc, checkLxc, checkLxcVersionUpdateNeeded } from './platform/lxc';
 import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId, newTerminalService } from './terminal-service';
@@ -215,9 +215,14 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
             );
         })();
 
-        // check on workers once an hour.
+        // check on workers immediately and once an hour.
         this.updateWorkers();
-        setInterval(() => this.updateWorkers(), 1000 * 60 * 60);
+        setInterval(() => this.updateWorkers(), 60 * 1000 * 60);
+
+        // check on worker images once an hour.
+        // checking immediately is problematic as a failed update may cause a restart loop on startup.
+        // images are also pruned 1 minute after startup, so avoid that.
+        setInterval(() => this.updateWorkerImages(), 60 * 1000 * 60);
     }
 
     async updateWorkers() {
@@ -236,6 +241,38 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
                     result.checkLxc();
                 }
                 catch (e) {
+                    forked.worker.terminate();
+                }
+            })();
+        }
+    }
+
+    async updateWorkerImages() {
+        const workers = await sdk.clusterManager?.getClusterWorkers();
+        if (!workers)
+            return;
+        for (const [id, worker] of Object.entries(workers)) {
+            const forked = sdk.fork<ReturnType<typeof fork>>({
+                clusterWorkerId: id,
+                runtime: 'node',
+            });
+
+            (async () => {
+                try {
+                    const result = await forked.result;
+                    if (!await result.checkLxcVersionUpdateNeeded()) {
+                        return;
+                    }
+
+                    // restart the worker to pick up the new image.
+                    const clusterFork = await sdk.systemManager.getComponent('cluster-fork');
+                    const serviceControl = await clusterFork.getServiceControl(worker.id);
+                    await serviceControl.restart().catch(() => { });
+                }
+                catch (e) {
+                }
+                finally {
+                    await sleep(1000);
                     forked.worker.terminate();
                 }
             })();
@@ -361,6 +398,7 @@ export async function fork() {
         tsCompile,
         newScript,
         newTerminalService,
+        checkLxcVersionUpdateNeeded,
         checkLxc: async () => {
             try {
                 // console.warn('Checking for LXC installation...');

@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/prebuffer-mixin",
-   "version": "0.10.62",
+   "version": "0.10.65",
    "description": "Video Stream Rebroadcast, Prebuffer, and Management Plugin for Scrypted.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -37,6 +37,7 @@
       "realfs": true
    },
    "dependencies": {
+      "@koush/werift-src": "file:../../external/werift",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "h264-sps-parser": "^0.2.1",

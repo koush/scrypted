@@ -1,6 +1,5 @@
-import { getH264DecoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
-import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings";
+import { StorageSetting, StorageSettings, StorageSettingsDict } from "@scrypted/sdk/storage-settings";
 
 export type StreamStorageSetting = StorageSetting & {
     prefersPrebuffer: boolean,
@@ -13,6 +12,11 @@ function getStreamTypes<T extends string>(storageSettings: StreamStorageSettings
     return storageSettings;
 }
 
+function msoHasJpegCodec(mso: ResponseMediaStreamOptions) {
+    const lower = mso?.video?.codec?.toLowerCase();
+    return lower?.includes('jpeg') || lower?.includes('jpg');
+}
+
 function pickBestStream(msos: ResponseMediaStreamOptions[], resolution: number) {
     if (!msos)
         return;
@@ -20,6 +24,10 @@ function pickBestStream(msos: ResponseMediaStreamOptions[], resolution: number) 
     let best: ResponseMediaStreamOptions;
     let bestScore: number;
     for (const mso of msos) {
+        if (msoHasJpegCodec(mso)) {
+            continue;
+        }
+
         const score = Math.abs(mso.video?.width * mso.video?.height - resolution);
         if (!best || score < bestScore) {
             best = mso;
@@ -80,6 +88,13 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
     });
 
     const storageSettings = new StorageSettings(device, {
+        hasMjpeg: {
+            subgroup,
+            title: 'Invalid Codecs',
+            type: 'html',
+            defaultValue: '<p style="color: red;">MJPEG streams detected. These streams are incompatible Scrypted and should be reconfigured to H264 using the camera\'s web admin if possible.</p>',
+            hide: true,
+        },
         noAudio: {
             subgroup,
             title: 'No Audio',
@@ -197,6 +212,15 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             try {
                 const msos = await device.mixinDevice.getVideoStreamOptions();
 
+                const hasMjpeg: StorageSettingsDict<'hasMjpeg'> = msos?.find(mso => msoHasJpegCodec(mso))
+                    ? {
+                        hasMjpeg: {
+                            hide: false,
+                        },
+                    }
+                    : undefined;
+
+
                 enabledStreams = {
                     defaultValue: getDefaultPrebufferedStreams(msos)?.map(mso => mso.name || mso.id),
                     choices: msos.map((mso, index) => mso.name || mso.id),
@@ -211,11 +235,13 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
                         lowResolutionStream: createStreamOptions(streamTypes.lowResolutionStream, msos),
                         recordingStream: createStreamOptions(streamTypes.recordingStream, msos),
                         remoteRecordingStream: createStreamOptions(streamTypes.remoteRecordingStream, msos),
+                        ...hasMjpeg,
                     }
                 }
                 else {
                     return {
                         enabledStreams,
+                        ...hasMjpeg,
                     }
                 }
             }

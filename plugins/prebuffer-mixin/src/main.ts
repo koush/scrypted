@@ -19,6 +19,7 @@ import { FileRtspServer } from './file-rtsp-server';
 import { getUrlLocalAdresses } from './local-addresses';
 import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
+import { startRtmpSession } from './rtmp-session';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { getSpsResolution } from './sps-resolution';
 import { createStreamSettings } from './stream-settings';
@@ -187,13 +188,17 @@ class PrebufferSession {
     return mediaStreamOptions?.container?.startsWith('rtsp');
   }
 
+  canUseRtmpParser(mediaStreamOptions: MediaStreamOptions) {
+    return mediaStreamOptions?.container?.startsWith('rtmp');
+  }
+
   getParser(mediaStreamOptions: MediaStreamOptions) {
     let parser: string;
     let rtspParser = this.storage.getItem(this.rtspParserKey);
 
     let isDefault = !rtspParser || rtspParser === 'Default';
 
-    if (!this.canUseRtspParser(mediaStreamOptions)) {
+    if (!this.canUseRtspParser(mediaStreamOptions) && !this.canUseRtmpParser(mediaStreamOptions)) {
       parser = STRING_DEFAULT;
       isDefault = true;
       rtspParser = undefined;
@@ -340,11 +345,25 @@ class PrebufferSession {
 
     let usingFFmpeg = true;
 
-    if (this.canUseRtspParser(this.advertisedMediaStreamOptions)) {
+    if (this.canUseRtspParser(this.advertisedMediaStreamOptions) || this.canUseRtmpParser(this.advertisedMediaStreamOptions)) {
       const parser = this.getParser(this.advertisedMediaStreamOptions);
       const defaultValue = parser.parser;
 
       const currentParser = parser.isDefault ? STRING_DEFAULT : parser.parser;
+
+      const choices = this.canUseRtmpParser(this.advertisedMediaStreamOptions)
+        ? [
+          STRING_DEFAULT,
+          SCRYPTED_PARSER_TCP,
+          FFMPEG_PARSER_TCP,
+        ]
+        : [
+          STRING_DEFAULT,
+          SCRYPTED_PARSER_TCP,
+          SCRYPTED_PARSER_UDP,
+          FFMPEG_PARSER_TCP,
+          FFMPEG_PARSER_UDP,
+        ]
 
       settings.push(
         {
@@ -354,13 +373,7 @@ class PrebufferSession {
           title: 'RTSP Parser',
           description: `The RTSP Parser used to read the stream. The default is "${defaultValue}" for this stream.`,
           value: currentParser,
-          choices: [
-            STRING_DEFAULT,
-            SCRYPTED_PARSER_TCP,
-            SCRYPTED_PARSER_UDP,
-            FFMPEG_PARSER_TCP,
-            FFMPEG_PARSER_UDP,
-          ],
+          choices,
         }
       );
 
@@ -539,14 +552,26 @@ class PrebufferSession {
       this.usingScryptedUdpParser = parser === SCRYPTED_PARSER_UDP;
 
       if (this.usingScryptedParser) {
-        const rtspParser = createRtspParser();
-        rbo.parsers.rtsp = rtspParser;
+        if (this.canUseRtmpParser(sessionMso)) {
+          // rtmp becomes repackaged as rtsp
+          const rtspParser = createRtspParser();
+          rbo.parsers.rtsp = rtspParser;
 
-        session = await startRtspSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
-          useUdp: parser === SCRYPTED_PARSER_UDP,
-          audioSoftMuted,
-          rtspRequestTimeout: 10000,
-        });
+          session = await startRtmpSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
+            audioSoftMuted,
+            rtspRequestTimeout: 10000,
+          });
+        }
+        else {
+          const rtspParser = createRtspParser();
+          rbo.parsers.rtsp = rtspParser;
+
+          session = await startRtspSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
+            useUdp: parser === SCRYPTED_PARSER_UDP,
+            audioSoftMuted,
+            rtspRequestTimeout: 10000,
+          });
+        }
       }
       else {
         let acodec: string[];
@@ -568,10 +593,12 @@ class PrebufferSession {
 
         acodec = audioSoftMuted ? acodec : ['-acodec', 'copy'];
 
-        if (parser === FFMPEG_PARSER_UDP)
-          ffmpegInput.inputArguments = ['-rtsp_transport', 'udp', '-i', ffmpegInput.url];
-        else if (parser === FFMPEG_PARSER_TCP)
-          ffmpegInput.inputArguments = ['-rtsp_transport', 'tcp', '-i', ffmpegInput.url];
+        if (!this.canUseRtmpParser(mso)) {
+          if (parser === FFMPEG_PARSER_UDP)
+            ffmpegInput.inputArguments = ['-rtsp_transport', 'udp', '-i', ffmpegInput.url];
+          else if (parser === FFMPEG_PARSER_TCP)
+            ffmpegInput.inputArguments = ['-rtsp_transport', 'tcp', '-i', ffmpegInput.url];
+        }
         // create missing pts from dts so mpegts and mp4 muxing does not fail
         const userInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey);
         const extraInputArguments = userInputArguments || DEFAULT_FFMPEG_INPUT_ARGUMENTS;

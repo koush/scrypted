@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import numpy as np
-import openvino as ov
 
-from ov import async_infer
+import openvino as ov
+from common import async_infer
 from predict.text_recognize import TextRecognition
 
 textDetectPrepare, textDetectPredict = async_infer.create_executors("TextDetect")
@@ -17,19 +18,14 @@ textRecognizePrepare, textRecognizePredict = async_infer.create_executors(
 class OpenVINOTextRecognition(TextRecognition):
     def downloadModel(self, model: str):
         ovmodel = "best"
-        precision = self.plugin.precision
-        model_version = "v6"
-        xmlFile = self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.xml",
-            f"{model_version}/{model}/{precision}/{ovmodel}.xml",
-        )
-        self.downloadFile(
-            f"https://github.com/koush/openvino-models/raw/main/{model}/{precision}/{ovmodel}.bin",
-            f"{model_version}/{model}/{precision}/{ovmodel}.bin",
-        )
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        xmlFile = os.path.join(model_path, f"{ovmodel}.xml")
         if "vgg" in model:
             model = self.plugin.core.read_model(xmlFile)
-            model.reshape([1, 1, 64, 384])
+            # this reshape causes a crash on GPU but causes a crash if NOT used with NPU...
+            # on older systems skipping the reshape does not crash, but does throw na exception which is recoverable.
+            if "NPU" in self.plugin.mode:
+                model.reshape([1, 1, 64, 384])
             return self.plugin.core.compile_model(model, self.plugin.mode)
         else:
             model = self.plugin.core.read_model(xmlFile)

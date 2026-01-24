@@ -1,6 +1,5 @@
 import child_process from 'child_process';
-import { once } from 'events';
-import { EventEmitter } from "ws";
+import { EventEmitter, once } from 'events';
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 
@@ -31,7 +30,7 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
                 stdio.on('error', e => this.emit('error', e));
         }
 
-        this.killPromise = once(this.worker, 'exit').then(() => {}).catch(() => {});
+        this.killPromise = once(this.worker, 'exit').then(() => { }).catch(() => { });
     }
 
     get pid() {

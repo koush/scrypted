@@ -6,6 +6,7 @@ import os
 import asyncio
 import coremltools as ct
 import numpy as np
+
 # import Quartz
 # from Foundation import NSData, NSMakeSize
 
@@ -25,6 +26,7 @@ def cosine_similarity(vector_a, vector_b):
     similarity = dot_product / (norm_a * norm_b)
     return similarity
 
+
 class CoreMLFaceRecognition(FaceRecognizeDetection):
     def __init__(self, plugin, nativeId: str):
         super().__init__(plugin, nativeId)
@@ -32,26 +34,12 @@ class CoreMLFaceRecognition(FaceRecognizeDetection):
         self.recogExecutor = concurrent.futures.ThreadPoolExecutor(1, "recog-face")
 
     def downloadModel(self, model: str):
-        model_version = "v7"
-        mlmodel = "model"
-
-        files = [
-            f"{model}/{model}.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
-            f"{model}/{model}.mlpackage/Data/com.apple.CoreML/{mlmodel}.mlmodel",
-            f"{model}/{model}.mlpackage/Manifest.json",
-        ]
-
-        for f in files:
-            p = self.downloadFile(
-                f"https://github.com/koush/coreml-models/raw/main/{f}",
-                f"{model_version}/{f}",
-            )
-            modelFile = os.path.dirname(p)
-
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        modelFile = os.path.join(model_path, f"{model}.mlpackage")
         model = ct.models.MLModel(modelFile)
         inputName = model.get_spec().description.input[0].name
         return model, inputName
-    
+
     async def predictDetectModel(self, input: Image.Image):
         def predict():
             model, inputName = self.detectModel
@@ -70,11 +58,12 @@ class CoreMLFaceRecognition(FaceRecognizeDetection):
             out_dict = model.predict({inputName: input})
             results = list(out_dict.values())[0][0]
             return results
+
         results = await asyncio.get_event_loop().run_in_executor(
             self.recogExecutor, lambda: predict()
         )
         return results
-    
+
     # def predictVision(self, input: Image.Image) -> asyncio.Future[list[Prediction]]:
     #     buffer = input.tobytes()
     #     myData = NSData.alloc().initWithBytes_length_(buffer, len(buffer))

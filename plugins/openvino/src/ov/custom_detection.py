@@ -6,7 +6,7 @@ import numpy as np
 import openvino as ov
 from PIL import Image
 
-from ov import async_infer
+from common import async_infer
 from predict.custom_detect import CustomDetection
 from scrypted_sdk import ObjectsDetected
 
@@ -16,7 +16,6 @@ customDetectPrepare, customDetectPredict = async_infer.create_executors("CustomD
 class OpenVINOCustomDetection(CustomDetection):
     def __init__(self, plugin, nativeId: str):
         super().__init__(plugin=plugin, nativeId=nativeId)
-        self.prefer_relu = True
 
     def loadModel(self, files: list[str]):
         # find the xml file in the files list

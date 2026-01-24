@@ -20,6 +20,10 @@ import common.colors
 from detect import DetectPlugin
 from predict.rectangle import Rectangle
 
+cache_dir = os.path.join(os.environ["SCRYPTED_PLUGIN_VOLUME"], "files", "hf")
+# os.makedirs(cache_dir, exist_ok=True)
+# os.environ['HF_HUB_CACHE'] = cache_dir
+
 original_getaddrinfo = socket.getaddrinfo
 
 # Sort the results to put IPv4 addresses first
@@ -34,7 +38,7 @@ def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
 socket.getaddrinfo = custom_getaddrinfo
 
 class Prediction:
-    def __init__(self, id: int, score: float, bbox: Rectangle, embedding: str = None):
+    def __init__(self, id: int, score: float, bbox: Rectangle, embedding: str = None, clipPaths: List[List[Tuple[float, float]]] = None):
         # these may be numpy values. sanitize them.
         self.id = int(id)
         self.score = float(score)
@@ -46,7 +50,7 @@ class Prediction:
             float(bbox.ymax),
         )
         self.embedding = embedding
-
+        self.clipPaths = clipPaths
 
 class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sdk.ScryptedSystemDevice, scrypted_sdk.DeviceCreator, scrypted_sdk.DeviceProvider):
     labels: dict
@@ -58,6 +62,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
         forked: bool = False,
     ):
         super().__init__(nativeId=nativeId)
+
+        self.periodic_restart = True
 
         self.systemDevice = {
             "deviceCreator": "Model",
@@ -81,6 +87,34 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
 
         if not self.plugin and not self.forked:
             asyncio.ensure_future(self.startCluster(), loop=self.loop)
+
+    def downloadHuggingFaceModel(self, model: str, local_files_only: bool = False) -> str:
+        from huggingface_hub import snapshot_download
+        plugin_suffix = self.pluginId.split('/')[1]
+        local_dir = os.path.join(cache_dir, plugin_suffix, model)
+        local_path = snapshot_download(
+            repo_id="scrypted/plugin-models",
+            allow_patterns=f"{plugin_suffix}/{model}/*",
+            local_files_only=local_files_only,
+            local_dir=local_dir,
+        )
+        local_path = os.path.join(local_path, plugin_suffix, model)
+        return local_path
+
+    def downloadHuggingFaceModelLocalFallback(self, model: str) -> str:
+        try:
+            local_path = self.downloadHuggingFaceModel(model)
+            print("Downloaded/refreshed model:", model)
+            return local_path
+        except Exception:
+            traceback.print_exc()
+
+            print("Unable to download model:", model)
+            print('This may be due to network or firewall issues.')
+
+        print("Trying model from Hugging Face Hub (offline):", model)
+        local_path = self.downloadHuggingFaceModel(model, local_files_only=True)
+        return local_path
 
     def downloadFile(self, url: str, filename: str):
         try:
@@ -119,7 +153,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
         return ["motion"]
 
     def requestRestart(self):
-        asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
+        if self.periodic_restart:
+            asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
 
     # width, height, channels
     def get_input_details(self) -> Tuple[int, int, int]:
@@ -156,6 +191,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
             detection["score"] = obj.score
             if hasattr(obj, "embedding") and obj.embedding is not None:
                 detection["embedding"] = obj.embedding
+            if hasattr(obj, "clipPaths") and obj.clipPaths is not None and len(obj.clipPaths) > 0:
+                detection["clipPaths"] = obj.clipPaths
             detections.append(detection)
 
         if convert_to_src_size:
@@ -169,6 +206,15 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
                 if any(map(lambda x: not math.isfinite(x), detection["boundingBox"])):
                     print("unexpected nan detected", obj.bbox)
                     continue
+                # Transform clipPaths coordinates if present
+                if "clipPaths" in detection and detection["clipPaths"] is not None:
+                    clip_paths = detection["clipPaths"]
+                    # Convert each polygon (list of [x, y] tuples) to source size
+                    transformed = [[
+                        (convert_to_src_size((pt[0], pt[1]))[0], convert_to_src_size((pt[0], pt[1]))[1])
+                        for pt in polygon
+                    ] for polygon in clip_paths]
+                    detection["clipPaths"] = transformed
                 detection_result["detections"].append(detection)
 
         # print(detection_result)
@@ -238,31 +284,6 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
             self.requestRestart()
             raise
 
-    # async def detectObjects(
-    #     self, mediaObject: scrypted_sdk.MediaObject, session: ObjectDetectionSession = None
-    # ) -> ObjectsDetected:
-    #     # main plugin can dispatch
-    #     plugin: PredictPlugin = None
-    #     if scrypted_sdk.clusterManager and scrypted_sdk.clusterManager.getClusterMode() and not self.forked:
-    #         if session:
-    #             del session['batch']
-    #         if len(self.forks):
-    #             totalWorkers = len(self.forks)
-    #             if not self.forked:
-    #                 totalWorkers += 1
-
-    #             self.clusterIndex += 1
-    #             self.clusterIndex %= totalWorkers
-    #             if len(self.forks) != self.clusterIndex:
-    #                 fork = list(self.forks.values())[self.clusterIndex]
-    #                 result = await fork.result
-    #                 plugin = await result.getPlugin()
-
-    #     if not plugin:
-    #         return await super().detectObjects(mediaObject, session)
-
-    #     return await plugin.detectObjects(mediaObject, session)
-
     async def run_detection_image(
         self, image: scrypted_sdk.Image, detection_session: ObjectDetectionSession
     ) -> ObjectsDetected:
@@ -303,21 +324,59 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
             if image.ffmpegFormats != True:
                 format = image.format or "rgb"
 
-        b = await image.toBuffer(
-            {
-                "resize": resize,
-                "format": format,
-            }
-        )
+        if settings and settings.get("pad", False):
+            if iw / w > ih / h:
+                scale = w / iw
+            else:
+                scale = h / ih
+            nw = int(iw * scale)
+            nh = int(ih * scale)
 
-        if self.get_input_format() == "rgb":
-            data = await common.colors.ensureRGBData(b, (w, h), format)
-        elif self.get_input_format() == "rgba":
-            data = await common.colors.ensureRGBAData(b, (w, h), format)
-        elif self.get_input_format() == "yuvj444p":
-            data = await common.colors.ensureYCbCrAData(b, (w, h), format)
+            resize = {
+                "width": nw,
+                "height": nh,
+            }
+
+            b = await image.toBuffer(
+                {
+                    "resize": resize,
+                    "format": format,
+                }
+            )
+
+            if self.get_input_format() == "rgb":
+                data = await common.colors.ensureRGBData(b, (nw, nh), format)
+            elif self.get_input_format() == "rgba":
+                data = await common.colors.ensureRGBAData(b, (nw, nh), format)
+            elif self.get_input_format() == "yuvj444p":
+                data = await common.colors.ensureYCbCrAData(b, (nw, nh), format)
+            else:
+                raise Exception("unsupported format")
+            
+            # data is a PIL image and we need to pad it to w, h
+            new_image = Image.new(data.mode, (w, h))
+            paste_x = (w - nw) // 2
+            paste_y = (h - nh) // 2
+            new_image.paste(data, (paste_x, paste_y))
+            data.close()
+            data = new_image
+
         else:
-            raise Exception("unsupported format")
+            b = await image.toBuffer(
+                {
+                    "resize": resize,
+                    "format": format,
+                }
+            )
+
+            if self.get_input_format() == "rgb":
+                data = await common.colors.ensureRGBData(b, (w, h), format)
+            elif self.get_input_format() == "rgba":
+                data = await common.colors.ensureRGBAData(b, (w, h), format)
+            elif self.get_input_format() == "yuvj444p":
+                data = await common.colors.ensureYCbCrAData(b, (w, h), format)
+            else:
+                raise Exception("unsupported format")
 
         try:
             ret = await self.safe_detect_once(data, settings, (iw, ih), cvss)
@@ -365,6 +424,8 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
             ret = await result.getFaceRecognition()
         elif self.nativeId == "clipembedding":
             ret = await result.getClipEmbedding()
+        elif self.nativeId == "segmentation":
+            ret = await result.getSegmentation()
         else:
             ret = await result.getCustomDetection(self.nativeId)
         return ret
@@ -390,6 +451,10 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
                 pf.result.set_result(selfFork)
 
                 self.forks[cwid] = pf
+                continue
+
+            if self.pluginId not in workers[cwid]['labels']:
+                print(f"not using cluster worker {workers[cwid]['name']} without label {self.pluginId}")
                 continue
 
             async def startClusterWorker(clusterWorkerId=cwid):
@@ -496,6 +561,9 @@ class Fork:
 
     async def getClipEmbedding(self):
         return await self.plugin.getDevice("clipembedding")
+    
+    async def getSegmentation(self):
+        return await self.plugin.getDevice("segmentation")
 
     async def getCustomDetection(self, nativeId: str):
         return await self.plugin.getDevice(nativeId)

@@ -1,12 +1,19 @@
-# openvino 2025.3.0 is failing to load on 9700, this may be because models need to be reexported.
+# openvino 2025.3.0 is failing to load on 9700 (VGG), this may be because models need to be reexported.
 # openvino 2025.0.0 does not detect CPU on 13500H
 # openvino 2024.5.0 crashes NPU. Update: NPU can not be used with AUTO in this version
 # openvino 2024.4.0 crashes legacy systems.
 # openvino 2024.3.0 crashes on older CPU (J4105 and older) if level-zero is installed via apt.
 # openvino 2024.2.0 and older crashes on arc dGPU.
 # openvino 2024.2.0 and newer crashes on 700H and 900H GPUs
+
+# this works on wyse 5070 and core ultra 125h but requires a recent scrypted image for the compute runtime.
+# openvino==2025.4.0
 openvino==2024.5.0
+
 Pillow==10.3.0
 opencv-python-headless==4.10.0.84
 
+# clip processor
 transformers==4.52.4
+# model downloads
+huggingface-hub

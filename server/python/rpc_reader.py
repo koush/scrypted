@@ -206,7 +206,7 @@ class RpcConnectionTransport(RpcTransport):
         return self.writeMessage(bytes(buffer), reject)
 
 
-async def readLoop(loop, peer: rpc.RpcPeer, rpcTransport: RpcTransport):
+async def readLoop(peer: rpc.RpcPeer, rpcTransport: RpcTransport):
     deserializationContext = {"buffers": []}
 
     while True:
@@ -216,9 +216,7 @@ async def readLoop(loop, peer: rpc.RpcPeer, rpcTransport: RpcTransport):
             deserializationContext["buffers"].append(message)
             continue
 
-        asyncio.run_coroutine_threadsafe(
-            peer.handleMessage(message, deserializationContext), loop
-        )
+        asyncio.create_task(peer.handleMessage(message, deserializationContext))
 
         deserializationContext = {"buffers": []}
 
@@ -246,7 +244,7 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, rpcTransport: RpcTransp
 
     async def peerReadLoop():
         try:
-            await readLoop(loop, peer, rpcTransport)
+            await readLoop(peer, rpcTransport)
         except:
             peer.kill()
             raise

@@ -47,9 +47,6 @@ RUN_IGNORE sudo installer -pkg /tmp/node.pkg -target /
 NODE_PATH=/usr/local # used to pass var test
 NODE_BIN_PATH=/usr/local/bin
 
-# gstreamer plugins
-RUN_IGNORE brew install gstreamer
-
 ARCH=$(arch)
 if [ "$ARCH" = "arm64" ]
 then

@@ -1,1 +1,1 @@
-../../../openvino/src/ov/async_infer.py
+../../../openvino/src/common/async_infer.py
