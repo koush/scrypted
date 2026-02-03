@@ -73,6 +73,7 @@ export async function listenEvents(thisDevice: ScryptedDeviceBase, client: Onvif
 
     const ret = {
         destroy() {
+            clearTimeout(binaryTimeout);
             clearTimeout(motionTimeout);
             try {
                 client.unsubscribe();
