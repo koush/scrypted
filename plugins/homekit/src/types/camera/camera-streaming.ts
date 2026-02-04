@@ -101,6 +101,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             audioReturn.setSendBufferSize(1024 * 1024);
 
             killPromise.finally(() => {
+                videoReturn.removeAllListeners('message');
+                audioReturn.removeAllListeners('message');
                 closeQuiet(videoReturn);
                 closeQuiet(audioReturn);
             });
