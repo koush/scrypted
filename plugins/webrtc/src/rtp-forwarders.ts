@@ -57,9 +57,11 @@ function createPacketDelivery(track: RtpTrack) {
     return (rtp: Buffer, codec: string) => track.onRtp(rtp, codec);
 }
 
-function attachTrackDgram(track: RtpTrack, server: dgram.Socket, codec: () =>string) {
+function attachTrackDgram(track: RtpTrack, server: dgram.Socket, codec: () =>string): () => void {
     const delivery = createPacketDelivery(track);
-    server?.on('message', rtp => delivery(rtp, codec()));
+    const listener = (rtp: Buffer) => delivery(rtp, codec());
+    server?.on('message', listener);
+    return () => server?.removeListener('message', listener);
 }
 
 async function setupRtspClient(console: Console, rtspClient: RtspClient, channel: number, section: MSection, rtspClientForceTcp: boolean, deliver: ReturnType<typeof createPacketDelivery>) {
@@ -125,6 +127,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         delete rtpTracks.video;
 
     const killDeferred = new Deferred<void>();
+    const dgramListenerCleanups: Array<() => void> = [];
 
     const killGuard = (track: RtpTrack) => {
         const old = track?.onRtp;
@@ -145,7 +148,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
     let { inputArguments } = ffmpegInput;
     let rtspClient: RtspClient;
-    killDeferred.promise.finally(() => rtspClient?.safeTeardown());
+    killDeferred.promise.finally(() => {
+        dgramListenerCleanups.forEach(cleanup => cleanup?.());
+        rtspClient?.safeTeardown();
+    });
     let pipeSdp: string;
 
     let rtspClientHooked = false;
@@ -448,9 +454,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
         if (useRtp) {
             if (video?.bind?.server)
-                attachTrackDgram(video, video.bind.server, () => rtpVideoCodec);
+                dgramListenerCleanups.push(attachTrackDgram(video, video.bind.server, () => rtpVideoCodec));
             if (audio?.bind?.server)
-                attachTrackDgram(audio, audio.bind.server, () => rtpAudioCodec);
+                dgramListenerCleanups.push(attachTrackDgram(audio, audio.bind.server, () => rtpAudioCodec));
 
             args.push(
                 '-sdp_file', 'pipe:4',
@@ -481,9 +487,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                 await rtspServer.handleSetup();
 
                 if (video)
-                    attachTrackDgram(video, rtspServer.setupTracks[videoSection?.control]?.rtp, () => videoSection.codec);
+                    dgramListenerCleanups.push(attachTrackDgram(video, rtspServer.setupTracks[videoSection?.control]?.rtp, () => videoSection.codec));
                 if (audio)
-                    attachTrackDgram(audio, rtspServer.setupTracks[audioSection?.control]?.rtp, () => audioSection.codec);
+                    dgramListenerCleanups.push(attachTrackDgram(audio, rtspServer.setupTracks[audioSection?.control]?.rtp, () => audioSection.codec));
 
                 rtspServerDeferred.resolve(rtspServer);
 
