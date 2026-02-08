@@ -398,7 +398,7 @@ export class RtmpClient {
       // Count: basic header (1 byte) + message header (0-11 bytes) + extended timestamp (0-4 bytes) + payload
       const extTimestampSize = (hasExtendedTimestamp || chunkStream.hasExtendedTimestamp) ? 4 : 0;
       const bytesInChunk = 1 + headerSize + extTimestampSize + chunkDataSize;
-      this.totalBytesReceived += bytesInChunk;
+      this.totalBytesReceived = (this.totalBytesReceived + bytesInChunk) >>> 0;
 
       // Send window acknowledgement if threshold exceeded
       this.sendAcknowledgementIfNeeded();
@@ -421,12 +421,14 @@ export class RtmpClient {
    * Send acknowledgement if window threshold exceeded
    */
   private sendAcknowledgementIfNeeded(): void {
-    const bytesToAck = this.totalBytesReceived - this.lastAcknowledgementBytes;
+    // Handle uint32 wrap-around: if totalBytesReceived wrapped past 0,
+    // bytesToAck will be a large positive number, which is correct.
+    const bytesToAck = (this.totalBytesReceived - this.lastAcknowledgementBytes) >>> 0;
     if (bytesToAck >= this.windowAckSize) {
       this.lastAcknowledgementBytes = this.totalBytesReceived;
       console.log(`Sending acknowledgement: ${this.lastAcknowledgementBytes} bytes received (${bytesToAck} since last ACK)`);
       const data = Buffer.alloc(4);
-      data.writeUInt32BE(this.lastAcknowledgementBytes & 0xFFFFFFFF, 0);
+      data.writeUInt32BE(this.lastAcknowledgementBytes, 0);
       this.sendMessage(2, 0, RtmpMessageType.ACKNOWLEDGEMENT, 0, data);
     }
   }
