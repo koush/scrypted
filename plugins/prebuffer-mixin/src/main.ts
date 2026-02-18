@@ -1358,7 +1358,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       }
       const name = mso?.name;
       const enabled = enabledIds.includes(id);
-      session = new PrebufferSession(this, mso, enabled, mso.allowBatteryPrebuffer);
+      session = new PrebufferSession(this, mso, enabled, mso?.allowBatteryPrebuffer ?? false);
       this.sessions.set(id, session);
 
       if (!enabled) {
