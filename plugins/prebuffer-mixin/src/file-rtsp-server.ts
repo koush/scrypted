@@ -72,7 +72,7 @@ export class FileRtspServer extends RtspServer {
                 }
             }
             catch (e) {
-                this.writeConsole?.error('RTSP WRITE error during truncate file', truncate, e);
+                this.writeConsole?.warn('RTSP WRITE truncate target removed', truncate, e);
             }
         }
 

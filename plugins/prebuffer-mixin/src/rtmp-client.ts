@@ -426,7 +426,7 @@ export class RtmpClient {
     const bytesToAck = (this.totalBytesReceived - this.lastAcknowledgementBytes) >>> 0;
     if (bytesToAck >= this.windowAckSize) {
       this.lastAcknowledgementBytes = this.totalBytesReceived;
-      console.log(`Sending acknowledgement: ${this.lastAcknowledgementBytes} bytes received (${bytesToAck} since last ACK)`);
+      // this.console?.log(`Sending acknowledgement: ${this.lastAcknowledgementBytes} bytes received (${bytesToAck} since last ACK)`);
       const data = Buffer.alloc(4);
       data.writeUInt32BE(this.lastAcknowledgementBytes, 0);
       this.sendMessage(2, 0, RtmpMessageType.ACKNOWLEDGEMENT, 0, data);
