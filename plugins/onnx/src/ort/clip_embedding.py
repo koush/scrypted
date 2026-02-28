@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+import os
 
 import numpy as np
 import onnxruntime
@@ -19,24 +20,12 @@ class ONNXClipEmbedding(ClipEmbedding):
     def __init__(self, plugin, nativeId: str):
         super().__init__(plugin=plugin, nativeId=nativeId)
 
-    def getFiles(self):
-        return [
-            "text.onnx",
-            "vision.onnx",
-        ]
+    def initModel(self):
+        model_path = self.downloadHuggingFaceModelLocalFallback("clip")
 
-    def loadModel(self, files):
         # find the xml file in the files list
-        text_onnx = [f for f in files if f.lower().endswith('text.onnx')]
-        if not text_onnx:
-            raise ValueError("No onnx model file found in the provided files list")
-        text_onnx = text_onnx[0]
-
-        vision_onnx = [f for f in files if f.lower().endswith('vision.onnx')]
-        if not vision_onnx:
-            raise ValueError("No onnx model file found in the provided files list")
-        vision_onnx = vision_onnx[0]
-        
+        text_onnx = os.path.join(model_path, 'text.onnx')
+        vision_onnx = os.path.join(model_path, 'vision.onnx')        
 
         compiled_models_array = []
         compiled_models = {}

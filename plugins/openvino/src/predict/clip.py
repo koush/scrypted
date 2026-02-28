@@ -23,45 +23,38 @@ class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.Imag
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.5
 
-        self.model = self.initModel()
+        try:
+           self.model = self.initModel()
+        except Exception as e:
+            self.print("Error initializing CLIP model:", e)
+            raise
 
         self.processor = None
-        print("Loading CLIP processor from local cache.")
+        self.print("Loading CLIP processor from local cache.")
         try:
             self.processor = CLIPProcessor.from_pretrained(
                 hf_id,
                 local_files_only=True,
             )
-            print("Loaded CLIP processor from local cache.")
+            self.print("Loaded CLIP processor from local cache.")
         except Exception:
-            print("CLIP processor not available in local cache yet.")
+            self.print("CLIP processor not available in local cache yet.")
 
         asyncio.ensure_future(self.refreshClipProcessor(hf_id), loop=self.loop)
 
     async def refreshClipProcessor(self, hf_id: str):
         try:
-            print("Refreshing CLIP processor cache (online).")
+            self.print("Refreshing CLIP processor cache (online).")
             processor = await asyncio.to_thread(
                 CLIPProcessor.from_pretrained,
                 hf_id,
             )
             self.processor = processor
-            print("Refreshed CLIP processor cache.")
+            self.print("Refreshed CLIP processor cache.")
         except Exception:
-            print("CLIP processor cache refresh failed.")
-
-    def getFiles(self):
-        pass
+            self.print("CLIP processor cache refresh failed.")
 
     def initModel(self):
-        local_files: list[str] = []
-        for file in self.getFiles():
-            remote_file = "https://huggingface.co/koushd/clip/resolve/main/" + file
-            localFile = self.downloadFile(remote_file, f"{self.id}/{file}")
-            local_files.append(localFile)
-        return self.loadModel(local_files)
-
-    def loadModel(self, files: list[str]):
         pass
 
     async def getImageEmbedding(self, input):

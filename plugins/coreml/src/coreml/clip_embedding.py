@@ -29,21 +29,12 @@ class CoreMLClipEmbedding(ClipEmbedding):
             "vision.mlpackage/Data/com.apple.CoreML/model.mlmodel",
         ]
 
-    def loadModel(self, files):
-        # find the xml file in the files list
-        text_manifest = [f for f in files if f.lower().endswith('text.mlpackage/manifest.json')]
-        if not text_manifest:
-            raise ValueError("No XML model file found in the provided files list")
-        text_manifest = text_manifest[0]
-
-        vision_manifest = [f for f in files if f.lower().endswith('vision.mlpackage/manifest.json')]
-        if not vision_manifest:
-            raise ValueError("No XML model file found in the provided files list")
-        vision_manifest = vision_manifest[0]
-        
-
-        textModel = ct.models.MLModel(os.path.dirname(text_manifest))
-        visionModel = ct.models.MLModel(os.path.dirname(vision_manifest))
+    def initModel(self):
+        model_path = self.downloadHuggingFaceModelLocalFallback("clip")
+        text = os.path.join(model_path, "text.mlpackage")
+        vision = os.path.join(model_path, "vision.mlpackage")
+        textModel = ct.models.MLModel(text)
+        visionModel = ct.models.MLModel(vision)
 
         return textModel, visionModel
 

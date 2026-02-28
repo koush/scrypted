@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+import os
 
 import numpy as np
 import openvino as ov
@@ -31,17 +32,12 @@ class OpenVINOClipEmbedding(ClipEmbedding):
             f"openvino/vision{model_suffix}.bin"
         ]
 
-    def loadModel(self, files):
-        # find the xml file in the files list
-        text_xml = [f for f in files if f.lower().endswith(text_xml_name)]
-        if not text_xml:
-            raise ValueError("No XML model file found in the provided files list")
-        text_xml = text_xml[0]
+    def initModel(self):
+        model_path = self.downloadHuggingFaceModelLocalFallback("clip")
 
-        vision_xml = [f for f in files if f.lower().endswith(vision_xml_name)]
-        if not vision_xml:
-            raise ValueError("No XML model file found in the provided files list")
-        vision_xml = vision_xml[0]
+        # find the xml file in the files list
+        text_xml = os.path.join(model_path, "text.xml")
+        vision_xml = os.path.join(model_path, "vision.xml")
         
         textModel = self.plugin.core.compile_model(text_xml, self.plugin.mode)
         model = self.plugin.core.read_model(vision_xml)
