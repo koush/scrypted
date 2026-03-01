@@ -29,6 +29,9 @@ predictExecutor = concurrent.futures.ThreadPoolExecutor(1, "CoreML-Predict")
 
 availableModels = [
     "Default",
+    "scrypted_yolov9c_relu_test",
+    "scrypted_yolov9m_relu_test",
+    "scrypted_yolov9s_relu_test",
     "scrypted_yolov9t_relu_test",
     "scrypted_yolov9c_relu",
     "scrypted_yolov9m_relu",
@@ -83,7 +86,7 @@ class CoreMLPlugin(
         if model == "Default" or model not in availableModels:
             if model != "Default":
                 self.storage.setItem("model", "Default")
-            model = "scrypted_yolov9c_relu"
+            model = "scrypted_yolov9c_relu_test"
         self.modelName = model
 
         print(f"model: {model}")

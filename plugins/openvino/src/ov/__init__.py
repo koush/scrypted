@@ -38,6 +38,9 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(
 
 availableModels = [
     "Default",
+    "scrypted_yolov9c_relu_test_int8",
+    "scrypted_yolov9m_relu_test_int8",
+    "scrypted_yolov9s_relu_test_int8",
     "scrypted_yolov9t_relu_test_int8",
     "scrypted_yolov9c_relu_int8",
     "scrypted_yolov9m_relu_int8",
@@ -161,11 +164,11 @@ class OpenVINOPlugin(
             if model != "Default":
                 self.storage.setItem("model", "Default")
             if arc or nvidia or npu:
-                model = "scrypted_yolov9c_relu_int8"
+                model = "scrypted_yolov9c_relu_test_int8"
             elif iris_xe:
-                model = "scrypted_yolov9s_relu_int8"
+                model = "scrypted_yolov9s_relu_test_int8"
             else:
-                model = "scrypted_yolov9t_relu_int8"
+                model = "scrypted_yolov9t_relu_test_int8"
         self.modelName = model
 
         ovmodel = "best-converted"
