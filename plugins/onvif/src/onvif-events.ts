@@ -40,14 +40,12 @@ export async function listenEvents(thisDevice: ScryptedDeviceBase, client: Onvif
             // furthermore, cameras are not guaranteed to send motion stop events, which makes.
             // for the sake of providing normalized motion durations through scrypted, debounce the motion.
             triggerMotion();
-            // thisDevice.motionDetected = true;
         }
         else if (event === OnvifEvent.MotionStop) {
-            // reset the trigger to debounce per above.
-            if (thisDevice.motionDetected)
-                triggerMotion();
-
-            // thisDevice.motionDetected = false;
+            // Camera sent an explicit stop signal - clear motion immediately rather than
+            // debouncing, so the motion badge reflects the true state of the camera.
+            clearTimeout(motionTimeout);
+            thisDevice.motionDetected = false;
         }
         else if (event === OnvifEvent.AudioStart)
             thisDevice.audioDetected = true;
