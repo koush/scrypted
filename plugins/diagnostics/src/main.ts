@@ -406,6 +406,11 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                 throw new Error('Unrecognized Linux installation. Installation via Docker image or the official Proxmox LXC script (not tteck) is recommended: https://docs.scrypted.app/installation');
         });
 
+        await this.validate(this.console, 'Host OS', async () => {
+            const installEnv = process.env.SCRYPTED_INSTALL_ENVIRONMENT || 'unknown';
+            return `${os.type()} ${os.release()} (${os.platform()}/${os.arch()}) [${installEnv}]`;
+        });
+
         await this.validate(this.console, 'IPv4 (jsonip.com)', httpFetch({
             url: 'https://jsonip.com',
             family: 4,
@@ -626,6 +631,22 @@ class DiagnosticsPlugin extends ScryptedDeviceBase implements Settings {
                     }
                 } catch (error) {
                     throw new Error(`${url} is not accessible: ${(error as Error).message}`);
+                }
+            }
+        });
+
+        await this.validate(this.console, 'External Resource Access (DNS)', async () => {
+            const domains = [
+                'cdn-lfs-us-1.hf.co',
+                'cdn-lfs-eu-1.hf.co',
+                'cdn-lfs.hf.co',
+                'cas-bridge.xethub.hf.co'
+            ];
+
+            for (const domain of domains) {
+                const addresses = await dns.promises.resolve4(domain);
+                if (addresses.some(ip => ip === '0.0.0.0')) {
+                    throw new Error(`${domain} resolves to 0.0.0.0 (DNS blocking detected)`);
                 }
             }
         });
