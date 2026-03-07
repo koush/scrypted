@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import numpy as np
 
@@ -16,28 +17,12 @@ textRecognizePrepare, textRecognizePredict = async_infer.create_executors(
 
 class NCNNTextRecognition(TextRecognition):
     def downloadModel(self, model: str):
-        model_version = "v1"
-        files = [
-            f"{model}/{model}.ncnn.bin",
-            f"{model}/{model}.ncnn.param",
-        ]
-
-        for f in files:
-            p = self.downloadFile(
-                f"https://github.com/koush/ncnn-models/raw/main/{f}",
-                f"{model_version}/{f}",
-            )
-            if ".bin" in p:
-                binFile = p
-            if ".param" in p:
-                paramFile = p
-
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        binFile = os.path.join(model_path, f"{model}.ncnn.bin")
+        paramFile = os.path.join(model_path, f"{model}.ncnn.param")
 
         net = ncnn.Net()
         net.opt.use_vulkan_compute = True
-        # net.opt.use_fp16_packed = False
-        # net.opt.use_fp16_storage = False
-        # net.opt.use_fp16_arithmetic = False
 
         net.load_param(paramFile)
         net.load_model(binFile)

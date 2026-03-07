@@ -1,3 +1,4 @@
-ncnn==1.0.20241226
+ncnn==1.0.20260114
 Pillow==11.1.0
 opencv-python-headless==4.10.0.84
+huggingface-hub==1.5.0

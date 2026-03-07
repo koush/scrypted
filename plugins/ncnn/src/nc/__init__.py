@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import concurrent.futures
+import os
 import re
 import traceback
 from typing import Any, List, Tuple
@@ -32,14 +33,14 @@ prepareExecutor = concurrent.futures.ThreadPoolExecutor(1, "NCNN-Prepare")
 
 availableModels = [
     "Default",
-    "scrypted_yolov9c_relu_320",
-    "scrypted_yolov9m_relu_320",
-    "scrypted_yolov9s_relu_320",
-    "scrypted_yolov9t_relu_320",
-    "scrypted_yolov9c_320",
-    "scrypted_yolov9m_320",
-    "scrypted_yolov9s_320",
-    "scrypted_yolov9t_320",
+    "scrypted_yolov9c_relu_test",
+    "scrypted_yolov9m_relu_test",
+    "scrypted_yolov9s_relu_test",
+    "scrypted_yolov9t_relu_test",
+    "scrypted_yolov9c_relu",
+    "scrypted_yolov9m_relu",
+    "scrypted_yolov9s_relu",
+    "scrypted_yolov9t_relu",
 ]
 
 
@@ -85,39 +86,18 @@ class NCNNPlugin(
         if model == "Default" or model not in availableModels:
             if model != "Default":
                 self.storage.setItem("model", "Default")
-            model = "scrypted_yolov9t_relu_320"
-        self.scrypted_yolov10 = "scrypted_yolov10" in model
-        self.scrypted_yolo_nas = "scrypted_yolo_nas" in model
-        self.scrypted_yolo = "scrypted_yolo" in model
-        self.scrypted_model = "scrypted" in model
-        model_version = "v2"
+            model = "scrypted_yolov9t_relu_test"
         self.modelName = model
+        self.labels = {
+            0: "person",
+            1: "vehicle",
+            2: "animal",
+        }
 
         print(f"model: {model}")
-
-        if self.scrypted_yolo:
-            self.labels = {
-                0: "person",
-                1: "vehicle",
-                2: "animal",
-            }
-            files = [
-                f"{model}/best_converted.ncnn.bin",
-                f"{model}/best_converted.ncnn.param",
-            ]
-
-            for f in files:
-                p = self.downloadFile(
-                    f"https://github.com/koush/ncnn-models/raw/main/{f}",
-                    f"{model_version}/{f}",
-                )
-                if ".bin" in p:
-                    binFile = p
-                if ".param" in p:
-                    paramFile = p
-        else:
-            raise Exception("Unknown model. Please reinstall.")
-
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        bin_file = os.path.join(model_path, "best_converted.ncnn.bin")
+        param_file = os.path.join(model_path, "best_converted.ncnn.param")
 
         self.net = ncnn.Net()
         self.net.opt.use_vulkan_compute = True
@@ -125,8 +105,8 @@ class NCNNPlugin(
         # self.net.opt.use_fp16_storage = False
         # self.net.opt.use_fp16_arithmetic = False
 
-        self.net.load_param(paramFile)
-        self.net.load_model(binFile)
+        self.net.load_param(param_file)
+        self.net.load_model(bin_file)
 
         self.input_name = self.net.input_names()[0]
 
@@ -246,10 +226,6 @@ class NCNNPlugin(
             ex.extract("out0", output_ncnn)
 
             output_tensors =  np.array(output_ncnn)
-            if self.scrypted_yolov10:
-                return yolo.parse_yolov10(output_tensors)
-            if self.scrypted_yolo_nas:
-                return yolo.parse_yolo_nas([output_tensors[1], output_tensors[0]])
             return yolo.parse_yolov9(output_tensors)
 
         try:

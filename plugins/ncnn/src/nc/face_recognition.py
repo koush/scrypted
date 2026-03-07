@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import numpy as np
 from PIL import Image
@@ -22,29 +23,13 @@ class NCNNFaceRecognition(FaceRecognizeDetection):
 
     def downloadModel(self, model: str):
         scrypted_yolov9 = "scrypted_yolov9" in model
-        ncnnmodel = "best_converted" if scrypted_yolov9 else model
-        model_version = "v1"
-        files = [
-            f"{model}/{ncnnmodel}.ncnn.bin",
-            f"{model}/{ncnnmodel}.ncnn.param",
-        ]
-
-        for f in files:
-            p = self.downloadFile(
-                f"https://github.com/koush/ncnn-models/raw/main/{f}",
-                f"{model_version}/{f}",
-            )
-            if ".bin" in p:
-                binFile = p
-            if ".param" in p:
-                paramFile = p
-
+        ncnnmodel = "best_converted" if scrypted_yolov9 else "best"
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        binFile = os.path.join(model_path, f"{ncnnmodel}.ncnn.bin")
+        paramFile = os.path.join(model_path, f"{ncnnmodel}.ncnn.param")
 
         net = ncnn.Net()
         net.opt.use_vulkan_compute = True
-        # net.opt.use_fp16_packed = False
-        # net.opt.use_fp16_storage = False
-        # net.opt.use_fp16_arithmetic = False
 
         net.load_param(paramFile)
         net.load_model(binFile)
