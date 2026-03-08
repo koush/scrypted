@@ -21,7 +21,11 @@ class Segmentation(PredictPlugin):
         self.inputwidth = 320
         self.inputheight = 320
         self.loop = asyncio.get_event_loop()
-        self.labels = coco.COCO_LABELS
+        self.labels = {
+            0: "person",
+            1: "vehicle",
+            2: "animal",
+        }
 
         try:
             self.model = self.loadModel('scrypted_yolov9t_seg_relu')
