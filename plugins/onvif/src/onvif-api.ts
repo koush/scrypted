@@ -146,9 +146,11 @@ export class OnvifCameraAPI {
                     ret.emit('event', OnvifEvent.BinaryStop)
             }
             else if (eventTopic.includes('RuleEngine/CellMotionDetector/Motion')) {
-                // unclear if the IsMotion false is indicative of motion stop?
-                if (event.message.message.data.simpleItem.$.Name === 'IsMotion' && dataValue) {
-                    ret.emit('event', OnvifEvent.MotionBuggy);
+                if (event.message.message.data.simpleItem.$.Name === 'IsMotion') {
+                    if (dataValue)
+                        ret.emit('event', OnvifEvent.MotionStart);
+                    else
+                        ret.emit('event', OnvifEvent.MotionStop);
                 }
             }
             else if (eventTopic.includes('RuleEngine/ObjectDetector')) {
