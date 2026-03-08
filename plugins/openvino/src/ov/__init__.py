@@ -343,7 +343,7 @@ class OpenVINOPlugin(
 
             await scrypted_sdk.deviceManager.onDeviceDiscovered(
                 {
-                    "nativeId": "segment",
+                    "nativeId": "segmentation",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                     "interfaces": [
                         scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
@@ -365,7 +365,7 @@ class OpenVINOPlugin(
         elif nativeId == "clipembedding":
             self.clipDevice = self.clipDevice or OpenVINOClipEmbedding(self, nativeId)
             return self.clipDevice
-        elif nativeId == "segment":
+        elif nativeId == "segmentation":
             self.segmentDevice = self.segmentDevice or OpenVINOSegmentation(self, nativeId)
             return self.segmentDevice
         custom_model = self.custom_models.get(nativeId, None)

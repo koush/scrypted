@@ -25,6 +25,10 @@ try:
     from nc.text_recognition import NCNNTextRecognition
 except:
     NCNNTextRecognition = None
+try:
+    from nc.segment import NCNNSegmentation
+except:
+    NCNNSegmentation = None
 from predict import Prediction, PredictPlugin
 from predict.rectangle import Rectangle
 
@@ -128,6 +132,7 @@ class NCNNPlugin(
 
         self.faceDevice = None
         self.textDevice = None
+        self.segmentDevice = None
 
         if not self.forked:
             asyncio.ensure_future(self.prepareRecognitionModels(), loop=self.loop)
@@ -158,6 +163,19 @@ class NCNNPlugin(
                         "name": "NCNN Text Recognition",
                     },
                 )
+
+            if NCNNSegmentation:
+                await scrypted_sdk.deviceManager.onDeviceDiscovered(
+                    {
+                        "nativeId": "segmentation",
+                        "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
+                        "interfaces": [
+                            scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
+                            scrypted_sdk.ScryptedInterface.ObjectDetection.value,
+                        ],
+                        "name": "NCNN Segmentation",
+                    },
+                )
         except:
             pass
 
@@ -168,6 +186,9 @@ class NCNNPlugin(
         if nativeId == "textrecognition":
             self.textDevice = self.textDevice or NCNNTextRecognition(self, nativeId)
             return self.textDevice
+        if nativeId == "segmentation":
+            self.segmentDevice = self.segmentDevice or NCNNSegmentation(self, nativeId)
+            return self.segmentDevice
         custom_model = self.custom_models.get(nativeId, None)
         if custom_model:
             return custom_model
