@@ -207,7 +207,7 @@ class ONNXPlugin(
 
             await scrypted_sdk.deviceManager.onDeviceDiscovered(
                 {
-                    "nativeId": "segmentation",
+                    "nativeId": "segment",
                     "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                     "interfaces": [
                         scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
@@ -229,7 +229,7 @@ class ONNXPlugin(
         elif nativeId == "clipembedding":
             self.clipDevice = self.clipDevice or ONNXClipEmbedding(self, nativeId)
             return self.clipDevice
-        elif nativeId == "segmentation":
+        elif nativeId == "segment":
             self.segmentDevice = self.segmentDevice or ONNXSegmentation(self, nativeId)
             return self.segmentDevice
         custom_model = self.custom_models.get(nativeId, None)

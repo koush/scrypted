@@ -167,7 +167,7 @@ class NCNNPlugin(
             if NCNNSegmentation:
                 await scrypted_sdk.deviceManager.onDeviceDiscovered(
                     {
-                        "nativeId": "segmentation",
+                        "nativeId": "segment",
                         "type": scrypted_sdk.ScryptedDeviceType.Builtin.value,
                         "interfaces": [
                             scrypted_sdk.ScryptedInterface.ClusterForkInterface.value,
@@ -186,7 +186,7 @@ class NCNNPlugin(
         if nativeId == "textrecognition":
             self.textDevice = self.textDevice or NCNNTextRecognition(self, nativeId)
             return self.textDevice
-        if nativeId == "segmentation":
+        if nativeId == "segment":
             self.segmentDevice = self.segmentDevice or NCNNSegmentation(self, nativeId)
             return self.segmentDevice
         custom_model = self.custom_models.get(nativeId, None)

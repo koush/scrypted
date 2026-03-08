@@ -424,7 +424,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
             ret = await result.getFaceRecognition()
         elif self.nativeId == "clipembedding":
             ret = await result.getClipEmbedding()
-        elif self.nativeId == "segmentation":
+        elif self.nativeId == "segment":
             ret = await result.getSegmentation()
         else:
             ret = await result.getCustomDetection(self.nativeId)
@@ -563,7 +563,7 @@ class Fork:
         return await self.plugin.getDevice("clipembedding")
     
     async def getSegmentation(self):
-        return await self.plugin.getDevice("segmentation")
+        return await self.plugin.getDevice("segment")
 
     async def getCustomDetection(self, nativeId: str):
         return await self.plugin.getDevice(nativeId)
