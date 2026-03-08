@@ -23,7 +23,7 @@ class NCNNFaceRecognition(FaceRecognizeDetection):
 
     def downloadModel(self, model: str):
         scrypted_yolov9 = "scrypted_yolov9" in model
-        ncnnmodel = "best_converted" if scrypted_yolov9 else "best"
+        ncnnmodel = "best_converted" if scrypted_yolov9 else model
         model_path = self.downloadHuggingFaceModelLocalFallback(model)
         binFile = os.path.join(model_path, f"{ncnnmodel}.ncnn.bin")
         paramFile = os.path.join(model_path, f"{ncnnmodel}.ncnn.param")

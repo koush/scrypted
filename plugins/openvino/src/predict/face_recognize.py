@@ -35,8 +35,12 @@ class FaceRecognizeDetection(PredictPlugin):
         self.loop = asyncio.get_event_loop()
         self.minThreshold = 0.5
 
-        self.detectModel = self.downloadModel("scrypted_yolov9t_relu_face")
-        self.faceModel = self.downloadModel("inception_resnet_v1")
+        try:
+            self.detectModel = self.downloadModel("scrypted_yolov9t_relu_face")
+            self.faceModel = self.downloadModel("inception_resnet_v1")
+        except Exception:
+            traceback.print_exc()
+            raise
 
     def downloadModel(self, model: str):
         pass
