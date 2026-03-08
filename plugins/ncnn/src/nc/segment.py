@@ -20,8 +20,9 @@ class NCNNSegmentation(Segmentation):
 
     def loadModel(self, name):
         model_path = self.downloadHuggingFaceModelLocalFallback(name)
-        binFile = os.path.join(model_path, f"{name}.ncnn.bin")
-        paramFile = os.path.join(model_path, f"{name}.ncnn.param")
+        model_name = 'best_converted'
+        binFile = os.path.join(model_path, f"{model_name}.ncnn.bin")
+        paramFile = os.path.join(model_path, f"{model_name}.ncnn.param")
 
         net = ncnn.Net()
         net.opt.use_vulkan_compute = True
@@ -53,8 +54,9 @@ class NCNNSegmentation(Segmentation):
             ex.extract("out0", out0)
             ex.extract("out1", out1)
 
-            pred = np.array(out0)
-            proto = np.array(out1)
+            # ncnn does not have batch dimension, so unsqueeze
+            pred = np.array([out0])
+            proto = np.array([out1])
             pred = yolov9_seg.non_max_suppression(pred, nm=32)
 
             return self.process_segmentation_output(pred, proto)
