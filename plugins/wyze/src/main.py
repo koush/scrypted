@@ -1113,11 +1113,22 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
         self.authInfo = auth_info
         self.account = wyzecam.get_user_info(auth_info)
         cameras = wyzecam.get_camera_list(auth_info)
-        # await self.pollEvents()
-        manifest: scrypted_sdk.DeviceManifest = {"devices": []}
+
+        # Store all discovered cameras before filtering so getSettings can populate choices
         for camera in cameras:
             self.cameras[camera.p2p_id] = camera
 
+        # Apply include/exclude filter
+        filter_mode = self.safeParseJsonStorage("cameraFilterMode") or "Disabled"
+        filter_list = self.safeParseJsonStorage("cameraFilter") or []
+        if filter_mode == "Include Only" and filter_list:
+            cameras = [c for c in cameras if c.nickname in filter_list]
+        elif filter_mode == "Exclude" and filter_list:
+            cameras = [c for c in cameras if c.nickname not in filter_list]
+
+        # await self.pollEvents()
+        manifest: scrypted_sdk.DeviceManifest = {"devices": []}
+        for camera in cameras:
             interfaces: List[ScryptedInterface] = [
                 ScryptedInterface.Settings.value,
                 ScryptedInterface.VideoCamera.value,
@@ -1185,6 +1196,26 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
                 "type": "password",
                 "description": "The API Key retrieved from the Wyze portal.",
                 "value": self.safeParseJsonStorage("apiKey"),
+            }
+        )
+        ret.append(
+            {
+                "key": "cameraFilterMode",
+                "title": "Camera Filter Mode",
+                "description": "Choose whether to include or exclude specific cameras. Save credentials first to populate the camera list.",
+                "choices": ["Disabled", "Include Only", "Exclude"],
+                "value": self.safeParseJsonStorage("cameraFilterMode") or "Disabled",
+            }
+        )
+        camera_choices = sorted([cam.nickname for cam in self.cameras.values()])
+        ret.append(
+            {
+                "key": "cameraFilter",
+                "title": "Camera Filter",
+                "description": "Select cameras to include or exclude based on the filter mode above.",
+                "multiple": True,
+                "choices": camera_choices,
+                "value": self.safeParseJsonStorage("cameraFilter") or [],
             }
         )
         return ret
