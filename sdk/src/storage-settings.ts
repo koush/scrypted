@@ -32,7 +32,11 @@ function parseValue(value: string | null | undefined, setting: StorageSetting, r
         if (!value)
             return readDefaultValue() || [];
         try {
-            return JSON.parse(value);
+            const ret = JSON.parse(value);
+            if (setting.type !== 'device')
+                return ret;
+            // ensure the devices have not been deleted
+            return ret?.filter((id: string) => !!systemManager.getDeviceById(id));
         }
         catch (e) {
             return readDefaultValue() || [];
