@@ -126,11 +126,43 @@ export class ReolinkCameraClient {
             return;
         }
 
-        this.console.log(`token expired at ${this.tokenLease}, renewing...`);
+        if (this.parameters?.token) {
+            this.console.log(`token expired at ${this.tokenLease}, logging out before renewing...`);
+            await this.logout();
+        } else if (this.tokenLease !== undefined) {
+            this.console.log(`token expired at ${this.tokenLease}, renewing...`);
+        } else {
+            this.console.log('performing initial login...');
+        }
 
         const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password, this.forceToken);
-        this.parameters = parameters
+        this.parameters = parameters;
         this.tokenLease = Date.now() + 1000 * leaseTimeSeconds;
+    }
+
+    async logout() {
+        if (!this.parameters?.token) {
+            return;
+        }
+        try {
+            const url = new URL(`http://${this.host}/api.cgi`);
+            const params = url.searchParams;
+            params.set('cmd', 'Logout');
+            params.set('token', this.parameters.token);
+
+            await this.request({
+                url,
+                method: 'POST',
+                responseType: 'json',
+            }, this.createReadable([{
+                cmd: "Logout",
+                action: 0,
+                param: {},
+            }]));
+            this.console.log('successfully logged out previous session');
+        } catch (e) {
+            this.console.warn('failed to logout previous session:', e.message);
+        }
     }
 
     async requestWithLogin(options: HttpFetchOptions<Readable>, body?: Readable) {
