@@ -33,15 +33,14 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
             },
             {
                 key: 'template',
-                title: 'Template',
-                description: 'The script template to use as a starting point.',
-                choices: fs.readdirSync('examples').filter(f => fs.statSync('examples/' + f).isFile()).map(f => path.basename(f)),
+                type: 'html',
+                value: `Learn more about scripts at <a href='https://scripts.scrypted.app'>scripts.scrypted.app.</a>`,
             }
         ]
     }
 
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {
-        const { name, template } = settings;
+        const { name } = settings;
         const nativeId = 'script:' + randomBytes(8).toString('hex');
         await this.reportScript(nativeId, name?.toString());
         const script = new Script(nativeId);
@@ -49,20 +48,7 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
             script,
             worker: undefined,
         });
-        if (template) {
-            try {
-                await script.saveScript({
-                    script: fs.readFileSync('examples/' + template).toString()
-                        .split('\n')
-                        .filter(line => !line.includes('SCRYPTED_FILTER_EXAMPLE_LINE'))
-                        .join('\n')
-                        .trim(),
-                });
-                await script.run();
-            }
-            catch (e) {
-            }
-        }
+
         return nativeId;
     }
 
