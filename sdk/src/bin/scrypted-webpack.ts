@@ -11,7 +11,7 @@ import process from 'process';
 import fs from 'fs';
 import os from 'os';
 import AdmZip from 'adm-zip';
-import rimraf from 'rimraf';
+import { rimrafSync } from 'rimraf';
 import webpack from 'webpack';
 import tmp from 'tmp';
 import child_process from 'child_process';
@@ -36,7 +36,7 @@ if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
 
     zip.addLocalFolder(resolved);
 
-    const sdk = path.join(__dirname, '../../types/scrypted_python/scrypted_sdk');
+    const sdk = path.join(__dirname, '../../../types/scrypted_python/scrypted_sdk');
     zip.addLocalFolder(sdk, 'scrypted_sdk', filename => !filename.endsWith('.pyc'));
 
     const zipfs = path.join(cwd, 'fs');
@@ -115,7 +115,7 @@ if (fs.existsSync(readme)) {
     zip.addFile('README.md', Buffer.from(readmeText));
 }
 
-const NODE_PATH = path.resolve(__dirname, '..', '..', 'node_modules');
+const NODE_PATH = path.resolve(__dirname, '..', '..', '..', 'node_modules');
 
 process.env.NODE_PATH = NODE_PATH;
 require('module').Module._initPaths();
@@ -133,7 +133,7 @@ interface WebpackConfig {
 
 async function rollup(): Promise<void> {
     if (out)
-        rimraf.sync(out);
+        rimrafSync(out);
 
     let rollupCmd = path.resolve(cwd, 'node_modules/.bin/rollup');
 
@@ -145,7 +145,7 @@ async function rollup(): Promise<void> {
     }
 
     const cp = child_process.spawn(rollupCmd, [
-        '--config', path.resolve(__dirname, '../../rollup.nodejs.config.mjs'),
+        '--config', path.resolve(__dirname, '../../../rollup.nodejs.config.mjs'),
     ], {
         stdio: 'inherit',
     });
@@ -169,7 +169,7 @@ function finishZip(): void {
         console.log(js);
     }
 
-    const sdkPackageJson = require(path.join(__dirname, '../../package.json'));
+    const sdkPackageJson = require(path.join(__dirname, '../../../package.json'));
     zip.addFile('sdk.json', Buffer.from(JSON.stringify({
         version: (sdkPackageJson as { version: string }).version,
         interfaceDescriptors,
@@ -189,12 +189,12 @@ function finishZip(): void {
 
 async function pack(): Promise<void> {
     if (out)
-        rimraf.sync(out);
+        rimrafSync(out);
 
     await new Promise<void>((resolve, reject) => {
         let webpackConfig: string;
         const customWebpackConfig = path.resolve(cwd, nodeWebpackConfig);
-        const defaultWebpackConfig = path.resolve(__dirname, '..', '..', nodeWebpackConfig);
+        const defaultWebpackConfig = path.resolve(__dirname, '..', '..', '..', nodeWebpackConfig);
         if (fs.existsSync(customWebpackConfig)) {
             webpackConfig = customWebpackConfig;
         }

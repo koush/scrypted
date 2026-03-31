@@ -18,13 +18,13 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "scrypted-package-json": "dist/src/bin/scrypted-package-json.js",
-    "scrypted-changelog": "dist/src/bin/scrypted-changelog.js",
-    "scrypted-setup-project": "dist/src/bin/scrypted-setup-project.js",
-    "scrypted-webpack": "dist/src/bin/scrypted-webpack.js",
-    "scrypted-deploy-debug": "dist/src/bin/scrypted-deploy-debug.js",
-    "scrypted-deploy": "dist/src/bin/scrypted-deploy.js",
-    "scrypted-debug": "dist/src/bin/scrypted-debug.js"
+    "scrypted-package-json": "./bin/cli.js",
+    "scrypted-changelog": "./bin/cli.js",
+    "scrypted-setup-project": "./bin/cli.js",
+    "scrypted-webpack": "./bin/cli.js",
+    "scrypted-deploy-debug": "./bin/cli.js",
+    "scrypted-deploy": "./bin/cli.js",
+    "scrypted-debug": "./bin/cli.js"
   },
   "author": "",
   "license": "ISC",
@@ -36,7 +36,7 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.3.0",
     "@rollup/plugin-virtual": "^3.0.2",
-    "@scrypted/auth-fetch": "^1.0.3",
+    "@scrypted/auth-fetch": "^1.0.5",
     "adm-zip": "^0.5.16",
     "babel-loader": "^10.0.0",
     "babel-plugin-const-enum": "^1.2.0",

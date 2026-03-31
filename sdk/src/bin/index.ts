@@ -1,4 +1,4 @@
-import { authFetch } from '@scrypted/auth-fetch';
+import { httpFetch } from '@scrypted/auth-fetch';
 import process from 'process';
 import path from 'path';
 import fs from 'fs';
@@ -82,11 +82,14 @@ export async function deploy(debugHost: string, noRebind?: boolean): Promise<voi
     const auth = getLogin(debugHost);
 
     try {
-        await authFetch({
+        await httpFetch({
             url: setupUrl,
             method: 'POST',
-            body: packageJson,
-            credential: auth,
+            body: JSON.stringify(packageJson),
+            headers: {
+                ...basicAuthHeaders(auth.username, auth.password),
+                'Content-Type': 'application/json',
+            },
             timeout: 10000,
             rejectUnauthorized: false,
             checkStatusCode(statusCode) {
@@ -99,14 +102,14 @@ export async function deploy(debugHost: string, noRebind?: boolean): Promise<voi
 
         console.log(`configured ${debugHost}`);
 
-        await authFetch({
+        await httpFetch({
             url: deployUrl,
             method: 'POST',
             body: fileContents,
-            credential: auth,
             timeout: 10000,
             rejectUnauthorized: false,
             headers: {
+                ...basicAuthHeaders(auth.username, auth.password),
                 'Content-Type': 'application/zip',
             },
         });
@@ -118,6 +121,12 @@ export async function deploy(debugHost: string, noRebind?: boolean): Promise<voi
         console.error(error.message);
         throw error;
     }
+}
+
+function basicAuthHeaders(username: string, password: string) {
+    return {
+        'Authorization': `Basic ${Buffer.from(username + ":" + password).toString('base64')}`
+    };
 }
 
 export async function debug(debugHost: string, entryPoint?: string): Promise<void> {
@@ -133,10 +142,10 @@ export async function debug(debugHost: string, entryPoint?: string): Promise<voi
     const auth = getLogin(debugHost);
 
     try {
-        await authFetch({
+        await httpFetch({
             url: debugUrl,
             method: 'POST',
-            credential: auth,
+            headers: basicAuthHeaders(auth.username, auth.password),
             timeout: 10000,
             rejectUnauthorized: false,
         });
@@ -151,5 +160,5 @@ export async function debug(debugHost: string, entryPoint?: string): Promise<voi
 }
 
 export function getDefaultWebpackConfig(name: string): unknown {
-    return require(path.resolve(__dirname, `../../${name}`));
+    return require(path.resolve(__dirname, `../../../${name}`));
 }
