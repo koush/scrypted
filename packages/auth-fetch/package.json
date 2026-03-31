@@ -1,8 +1,8 @@
 {
   "name": "@scrypted/auth-fetch",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "",
-  "main": "dist/index.js",
+  "main": "dist/packages/auth-fetch/src/index.js",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc --outDir dist",
