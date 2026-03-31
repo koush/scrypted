@@ -135,7 +135,7 @@ export function createHeadersArray(headers: HeadersInit | undefined): [string, s
  */
 export function createStringOrBufferBody(headers: [string, string][], body: any) {
     let contentType: string | undefined;
-    if (typeof body === 'object') {
+    if (typeof body === 'object' && !ArrayBuffer.isView(body)) {
         body = JSON.stringify(body);
         contentType = 'application/json';
     }
