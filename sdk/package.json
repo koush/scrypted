@@ -18,13 +18,13 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "scrypted-package-json": "bin/scrypted-package-json.js",
-    "scrypted-changelog": "bin/scrypted-changelog.js",
-    "scrypted-setup-project": "bin/scrypted-setup-project.js",
-    "scrypted-webpack": "bin/scrypted-webpack.js",
-    "scrypted-deploy-debug": "bin/scrypted-deploy-debug.js",
-    "scrypted-deploy": "bin/scrypted-deploy.js",
-    "scrypted-debug": "bin/scrypted-debug.js"
+    "scrypted-package-json": "dist/src/bin/scrypted-package-json.js",
+    "scrypted-changelog": "dist/src/bin/scrypted-changelog.js",
+    "scrypted-setup-project": "dist/src/bin/scrypted-setup-project.js",
+    "scrypted-webpack": "dist/src/bin/scrypted-webpack.js",
+    "scrypted-deploy-debug": "dist/src/bin/scrypted-deploy-debug.js",
+    "scrypted-deploy": "dist/src/bin/scrypted-deploy.js",
+    "scrypted-debug": "dist/src/bin/scrypted-debug.js"
   },
   "author": "",
   "license": "ISC",
@@ -36,8 +36,8 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.3.0",
     "@rollup/plugin-virtual": "^3.0.2",
+    "@scrypted/auth-fetch": "^1.0.3",
     "adm-zip": "^0.5.16",
-    "axios": "^1.10.0",
     "babel-loader": "^10.0.0",
     "babel-plugin-const-enum": "^1.2.0",
     "ncp": "^2.0.0",
@@ -53,7 +53,10 @@
     "webpack-bundle-analyzer": "^4.10.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/ncp": "^2.0.8",
     "@types/node": "^24.9.2",
+    "@types/tmp": "^0.2.6",
     "ts-node": "^10.9.2",
     "typedoc": "^0.28.14"
   },
