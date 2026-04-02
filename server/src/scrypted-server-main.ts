@@ -62,12 +62,12 @@ installSourceMapSupport({
     environment: 'node',
 });
 
-let workerInspectPort: number = undefined;
-let workerInspectAddress: string = undefined;
+let workerInspectPort: number | undefined = undefined;
+let workerInspectAddress: string | undefined = undefined;
 
 async function doconnect(): Promise<net.Socket> {
     return new Promise((resolve, reject) => {
-        const target = net.connect(workerInspectPort, workerInspectAddress);
+        const target = net.connect(workerInspectPort!, workerInspectAddress!);
         target.once('error', reject)
         target.once('connect', () => resolve(target))
     })
@@ -123,7 +123,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.raw({ type: 'application/*', limit: 100000000 }) as any);
 
 function checkListenSet(socket: net.Socket) {
-    return listenSet.check(socket.localAddress, net.isIPv4(socket.localAddress) ? 'ipv4' : 'ipv6');
+    const localAddress = socket.localAddress!;
+    return listenSet.check(localAddress, net.isIPv4(localAddress) ? 'ipv4' : 'ipv6');
 }
 
 if (listenSet.rules.length) {
@@ -359,7 +360,7 @@ async function start(mainFilename: string, options?: {
         if (req.protocol === 'https' && req.headers.authorization && req.headers.authorization.toLowerCase()?.indexOf('basic') !== -1) {
             const basicChecker = basicAuth.check(async (req) => {
                 try {
-                    const user = await db.tryGet(ScryptedUser, req.user);
+                    const user = (await db.tryGet(ScryptedUser, req.user))!;
                     res.locals.username = user._id;
                     res.locals.aclId = user.aclId;
                 }
@@ -436,7 +437,7 @@ async function start(mainFilename: string, options?: {
         if (owner)
             endpoint = `@${owner}/${endpoint}`;
         try {
-            const json = await getNpmPackageInfo(endpoint);
+            const json = await getNpmPackageInfo(endpoint!);
             res.send(json);
         }
         catch (e) {
@@ -451,9 +452,9 @@ async function start(mainFilename: string, options?: {
         if (owner)
             endpoint = `@${owner}/${endpoint}`;
         try {
-            const plugin = await scrypted.installNpm(endpoint, tag);
+            const plugin = (await scrypted.installNpm(endpoint!, tag))!;
             res.send({
-                id: scrypted.findPluginDevice(plugin.pluginId)._id,
+                id: scrypted.findPluginDevice(plugin.pluginId)!._id,
             });
         }
         catch (e) {
@@ -528,7 +529,7 @@ async function start(mainFilename: string, options?: {
                 }
             }
         }
-        catch (e) {
+        catch (e: any) {
             res.header('Content-Type', 'text/plain');
             res.status(500);
             res.send(e.toString());
@@ -753,7 +754,7 @@ async function start(mainFilename: string, options?: {
                 hostname,
             })
         }
-        catch (e) {
+        catch (e: any) {
             // env based anon user login
             const defaultAuthentication = getDefaultAuthentication(req);
             if (defaultAuthentication) {
