@@ -74,7 +74,7 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect): any 
 
     class WebSocket extends WebSocketEventTarget {
         _url: string;
-        _protocols: string[];
+        _protocols: string[] | undefined;
         readyState: number;
 
         constructor(public connection: WebSocketConnection, protocols?: string[]) {

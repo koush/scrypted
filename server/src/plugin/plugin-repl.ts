@@ -22,7 +22,7 @@ export async function createREPLServer(scrypted: ScryptedStatic, params: any, pl
             const { id } = nativeIds.get(filter);
             const d = await systemManager.getDeviceById(id);
             chain.push(filter);
-            filter = reversed.get(d.providerId);
+            filter = reversed.get(d!.providerId!);
         }
 
         chain.reverse();
