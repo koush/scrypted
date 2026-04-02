@@ -66,14 +66,14 @@ export type fetcher<B, M> = <T extends HttpFetchOptions<B>>(options: T) => Promi
 >>;
 
 
-export function getHttpFetchAccept(responseType: HttpFetchResponseType | undefined) {
+export function getHttpFetchAccept(responseType: HttpFetchResponseType | undefined): string | undefined {
     switch (responseType) {
         case 'json':
             return 'application/json';
         case 'text':
             return 'text/plain';
     }
-    return;
+    return undefined;
 }
 
 export function hasHeader(headers: [string, string][], key: string) {

@@ -236,7 +236,7 @@ async function start(mainFilename: string, options?: {
         };
     }
 
-    const getDefaultAuthentication = (req: Request) => {
+    const getDefaultAuthentication = (req: Request): ScryptedUser | undefined => {
         const defaultAuthentication = !req.query.disableDefaultAuthentication && process.env.SCRYPTED_DEFAULT_AUTHENTICATION;
         if (defaultAuthentication) {
             const referer = req.headers.referer;
@@ -244,7 +244,7 @@ async function start(mainFilename: string, options?: {
                 try {
                     const u = new URL(referer);
                     if (u.searchParams.has('disableDefaultAuthentication'))
-                        return;
+                        return undefined;
                 }
                 catch (e) {
                     // no/invalid referer, allow the default auth
@@ -252,6 +252,7 @@ async function start(mainFilename: string, options?: {
             }
             return scrypted.usersService.users.get(defaultAuthentication);
         }
+        return undefined;
     }
 
     app.use(async (req, res, next) => {
@@ -544,9 +545,9 @@ async function start(mainFilename: string, options?: {
         return req.secure ? 'login_user_token' : 'login_user_token_insecure';
     };
 
-    const checkValidUserToken = (token: string) => {
+    const checkValidUserToken = (token: string): UserToken | undefined => {
         if (!token)
-            return;
+            return undefined;
         try {
             const userToken = UserToken.validateToken(token);
             if (scrypted.usersService.users.has(userToken.username))
@@ -555,6 +556,7 @@ async function start(mainFilename: string, options?: {
         catch (e) {
             // console.warn('invalid token', e.message);
         }
+        return undefined;
     }
 
     const getSignedLoginUserToken = (req: Request<any>) => {

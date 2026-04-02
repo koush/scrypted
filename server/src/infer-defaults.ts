@@ -96,24 +96,24 @@ const roomHints: { [hint: string]: string } = {
     'Laundry': 'Laundry Room',
 }
 
-export function inferRoomFromName(name: string): string {
+export function inferRoomFromName(name: string): string | undefined {
     if (!name)
-        return;
+        return undefined;
     for (const hint of Object.keys(roomHints)) {
         if (name.includes(hint))
             return roomHints[hint];
     }
+    return undefined;
 }
 
-export function getProvidedRoomOrDefault(pluginDevice: PluginDevice): string {
+export function getProvidedRoomOrDefault(pluginDevice: PluginDevice): string | undefined {
     const providedRoom = getState(pluginDevice, ScryptedInterfaceProperty.providedRoom);
     if (providedRoom)
         return providedRoom;
-    const room = inferRoomFromName(getDisplayName(pluginDevice));
-    return room;
+    return inferRoomFromName(getDisplayName(pluginDevice));
 }
 
-export function getDisplayRoom(pluginDevice: PluginDevice): string {
+export function getDisplayRoom(pluginDevice: PluginDevice): string | undefined {
     const room = getState(pluginDevice, ScryptedInterfaceProperty.room);
     if (room)
         return room;

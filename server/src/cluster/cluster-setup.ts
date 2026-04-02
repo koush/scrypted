@@ -18,10 +18,10 @@ export function isClusterAddress(address: string) {
     return !address || address === process.env.SCRYPTED_CLUSTER_ADDRESS;
 }
 
-export function getClusterObject(clusterId: string, value: any) {
+export function getClusterObject(clusterId: string, value: any): ClusterObject | undefined {
     const clusterObject: ClusterObject = value?.__cluster;
     if (clusterObject?.id !== clusterId)
-        return;
+        return undefined;
     return clusterObject;
 }
 
@@ -400,7 +400,7 @@ export function setupCluster(peer: RpcPeer) {
 
 export type InitializeCluster = (cluster: { clusterId: string, clusterSecret: string, clusterWorkerId: string, }) => Promise<void>;
 
-export function getScryptedClusterMode(): ['server' | 'client', string, number] {
+export function getScryptedClusterMode(): ['server' | 'client', string, number] | undefined {
     const mode = process.env.SCRYPTED_CLUSTER_MODE as 'server' | 'client';
 
     if (!mode) {
@@ -416,7 +416,7 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
             console.warn('SCRYPTED_CLUSTER_SECRET is set but SCRYPTED_CLUSTER_MODE is not set. This setting will be ignored.');
             delete process.env.SCRYPTED_CLUSTER_SECRET;
         }
-        return;
+        return undefined;
     }
 
     if (!['server', 'client'].includes(mode))

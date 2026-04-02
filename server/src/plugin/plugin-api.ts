@@ -108,9 +108,9 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
         this.acl?.deny();
         return this.api.setStorage(nativeId, storage);
     }
-    getDeviceById(id: string): Promise<ScryptedDevice> {
+    getDeviceById(id: string): Promise<ScryptedDevice | undefined> {
         if (this.acl?.shouldRejectDevice(id))
-            return;
+            return undefined;
         return this.api.getDeviceById(id);
     }
     setDeviceProperty(id: string, property: ScryptedInterfaceProperty, value: any): Promise<void> {

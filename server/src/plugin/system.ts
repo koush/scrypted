@@ -26,7 +26,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any> {
         return [...methods, ...properties];
     }
 
-    getOwnPropertyDescriptor(target: any, p: string | symbol): PropertyDescriptor {
+    getOwnPropertyDescriptor(target: any, p: string | symbol): PropertyDescriptor | undefined {
         const interfaces = new Set<string>(this.systemManager.state[this.id].interfaces.value);
         const methods = getInterfaceMethods(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces);
         const prop = p.toString();
@@ -42,6 +42,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any> {
                 value: this.systemManager.state[this.id][prop]?.value
             }
         }
+        return undefined;
     }
 
     deleteProperty(target: any, p: string | symbol): boolean {

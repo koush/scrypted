@@ -266,10 +266,10 @@ function isSameValue(value1: any, value2: any) {
     return value1 === value2 || JSON.stringify(value1) === JSON.stringify(value2);
 }
 
-export function setState(pluginDevice: PluginDevice, property: string, value: any): boolean {
+export function setState(pluginDevice: PluginDevice, property: string, value: any): boolean | undefined {
     // device may have been deleted.
     if (!pluginDevice.state)
-        return;
+        return undefined;
     if (!pluginDevice.state[property])
         pluginDevice.state[property] = {};
     const state = pluginDevice.state[property];

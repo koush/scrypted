@@ -350,9 +350,9 @@ export class RpcPeer {
     //     return value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES];
     // }
 
-    static getIteratorNext(target: any): string {
+    static getIteratorNext(target: any): string | undefined {
         if (!target[Symbol.asyncIterator])
-            return;
+            return undefined;
         const proxyProps = target[this.PROPERTY_PROXY_PROPERTIES]?.[Symbol.asyncIterator.toString()];
         return proxyProps?.next || 'next';
     }

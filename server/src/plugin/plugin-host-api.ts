@@ -103,7 +103,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         return this.scrypted.getComponent(id);
     }
 
-    setDeviceProperty(id: string, property: ScryptedInterfaceProperty, value: any): Promise<void> {
+    async setDeviceProperty(id: string, property: ScryptedInterfaceProperty, value: any): Promise<void> {
         switch (property) {
             case ScryptedInterfaceProperty.room:
             case ScryptedInterfaceProperty.type:

@@ -11,6 +11,7 @@
         "strictFunctionTypes": true,
         "noUncheckedIndexedAccess": true,
         "noImplicitOverride": true,
+        "noImplicitReturns": true,
         "outDir": "./dist",
         "esModuleInterop": true,
         "moduleResolution": "NodeNext",

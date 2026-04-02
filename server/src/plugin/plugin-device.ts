@@ -382,7 +382,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
         throw new PluginError(`${method} not implemented`)
     }
 
-    async findMethod(method: string) {
+    async findMethod(method: string): Promise<{ mixin: MixinTable, entry: MixinTableEntry } | undefined> {
         for (const mixin of this.mixinTable) {
             const entry = await mixin.entry;
             if (!entry.methods) {
@@ -402,9 +402,10 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
                 return { mixin, entry };
             }
         }
+        return undefined;
     }
 
-    async findMixin(iface: string) {
+    async findMixin(iface: string): Promise<{ mixin: MixinTable, entry: MixinTableEntry } | undefined> {
         for (const mixin of this.mixinTable) {
             const entry = await mixin.entry;
             const { interfaces } = entry;
@@ -412,6 +413,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
                 return { mixin, entry };
             }
         }
+        return undefined;
     }
 
     async apply(target: any, thisArg: any, argArray?: any): Promise<any> {

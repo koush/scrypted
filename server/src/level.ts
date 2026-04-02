@@ -31,7 +31,7 @@ export class WrappedLevel extends Level<string, string | number> {
     }
 
 
-    async tryGet<T>(documentConstructor: new () => T, _id: any, options?: GetOptions<string, string | number>): Promise<T> {
+    async tryGet<T>(documentConstructor: new () => T, _id: any, options?: GetOptions<string, string | number>): Promise<T | undefined> {
         try {
             const _documentType = documentConstructor.name;
             const key = `${_documentType}/${_id}`;
@@ -39,6 +39,7 @@ export class WrappedLevel extends Level<string, string | number> {
             return createLevelDocument(documentConstructor, json);
         }
         catch (e) {
+            return undefined;
         }
     }
 
