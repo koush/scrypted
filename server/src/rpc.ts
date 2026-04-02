@@ -227,7 +227,7 @@ interface SerialiedRpcResultError {
 
 // todo: error constructor adds a "cause" variable in Chrome 93, Node v??
 export class RPCResultError extends Error {
-    constructor(peer: RpcPeer, message: string, public cause?: Error, options?: { name: string, stack: string | undefined }) {
+    constructor(peer: RpcPeer, message: string, public override cause?: Error, options?: { name: string, stack: string | undefined }) {
         super(`${message}\n${peer.selfName}:${peer.peerName}`);
 
         if (options?.name) {

@@ -72,7 +72,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     stateManager = new ScryptedStateManager(this);
     logger = new Logger(this, '', 'Scrypted');
     devicesLogger = this.logger.getLogger('device', 'Devices');
-    wss = new WebSocketServer({ noServer: true });
+    override wss = new WebSocketServer({ noServer: true });
     wsAtomic = 0;
     connectRPCObjectIO: IOServer = new io.Server({
         pingTimeout: 120000,

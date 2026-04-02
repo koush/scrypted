@@ -149,7 +149,7 @@ export class ScryptedStateManager extends EventRegistry {
         return systemState;
     }
 
-    listenDevice(id: string, options: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
+    override listenDevice(id: string, options: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
         let { denoise, event, watch } = (options || {}) as EventListenerOptions;
         if (!event && typeof options === 'string')
             event = options as string;

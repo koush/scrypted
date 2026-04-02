@@ -33,11 +33,11 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
     _stderr = new PassThrough();
     pythonInstallationComplete = true;
 
-    get stdout() {
+    override get stdout() {
         return this._stdout;
     }
 
-    get stderr() {
+    override get stderr() {
         return this._stderr;
     }
 

@@ -10,6 +10,7 @@
         "noImplicitThis": true,
         "strictFunctionTypes": true,
         "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
         "outDir": "./dist",
         "esModuleInterop": true,
         "moduleResolution": "NodeNext",

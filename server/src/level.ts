@@ -18,8 +18,8 @@ function createLevelDocument(documentConstructor: any, json: any) {
 export class WrappedLevel extends Level<string, string | number> {
     curId: number;
 
-    async open(): Promise<void>;
-    async open(options?: OpenOptions): Promise<void> {
+    override async open(): Promise<void>;
+    override async open(options?: OpenOptions): Promise<void> {
         await super.open(options);
         try {
             this.curId = parseInt(await this.get('_id') as string);

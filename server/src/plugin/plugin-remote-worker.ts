@@ -84,7 +84,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             class PluginForkableAPI extends PluginAPIProxy {
                 [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (_api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];
 
-                setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
+                override setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
                     const id = deviceManager.nativeIds.get(nativeId).id;
                     for (const r of forks) {
                         r.setNativeId(nativeId, id, storage);
@@ -316,7 +316,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     class PluginForkAPI extends PluginAPIProxy {
                         [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];
 
-                        setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
+                        override setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
                             const id = deviceManager.nativeIds.get(nativeId).id;
                             pluginRemoteAPI.setNativeId(nativeId, id, storage);
                             for (const r of forks) {
