@@ -9,6 +9,7 @@
         "noFallthroughCasesInSwitch": true,
         "noImplicitThis": true,
         "strictFunctionTypes": true,
+        "noUncheckedIndexedAccess": true,
         "outDir": "./dist",
         "esModuleInterop": true,
         "moduleResolution": "NodeNext",
