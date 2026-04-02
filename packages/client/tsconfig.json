@@ -8,6 +8,7 @@
         "sourceMap": true,
         "inlineSources": true,
         "declaration": true,
+        "strict": true,
         "resolveJsonModule": true,
     },
     "include": [

@@ -162,7 +162,7 @@ export function getCurrentBaseUrlRaw() {
 
     if (!url) {
         try {
-            return getBaseUrl(process.env.SCRYPTED_ENDPOINT_PATH);
+            return getBaseUrl(process.env.SCRYPTED_ENDPOINT_PATH!);
         }
         catch (e) {
         }
@@ -307,7 +307,7 @@ export function redirectScryptedLogin(options?: {
     globalThis.location.href = redirect_uri;
 }
 
-export function combineBaseUrl(baseUrl: string, rootPath: string) {
+export function combineBaseUrl(baseUrl: string|undefined, rootPath: string) {
     return baseUrl ? new URL(rootPath, baseUrl).toString() : '/' + rootPath;
 }
 
@@ -348,13 +348,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         localAddresses = loginResult.addresses;
         externalAddresses = loginResult.externalAddresses;
         scryptedCloud = loginResult.scryptedCloud;
-        directAddress = loginResult.directAddress;
-        cloudAddress = loginResult.cloudAddress;
+        directAddress = loginResult.directAddress!;
+        cloudAddress = loginResult.cloudAddress!;
         authorization = loginResult.authorization;
         queryToken = loginResult.queryToken;
         token = loginResult.token;
         hostname = loginResult.hostname;
-        serverId = loginResult.serverId;
+        serverId = loginResult.serverId!;
         console.log('login result', Date.now() - start, loginResult);
     }
     else {
@@ -421,14 +421,14 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         localAddresses = loginCheck.addresses;
         externalAddresses = loginCheck.externalAddresses;
         scryptedCloud = loginCheck.scryptedCloud;
-        directAddress = loginCheck.directAddress;
-        cloudAddress = loginCheck.cloudAddress;
+        directAddress = loginCheck.directAddress!;
+        cloudAddress = loginCheck.cloudAddress!;
         username = loginCheck.username;
         authorization = loginCheck.authorization;
         queryToken = loginCheck.queryToken;
         token = loginCheck.token;
         hostname = loginCheck.hostname;
-        serverId = loginCheck.serverId;
+        serverId = loginCheck.serverId!;
         console.log('login checked', Date.now() - start, loginCheck);
     }
 
@@ -487,7 +487,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     // cross origin requests will not send cookies, so must send the authorization header.
     // note that cross origin websockets do not support extra headers, so the conneciton
     // must be initiated with polling transport first to establish a session.
-    localEioOptions.extraHeaders['Authorization'] ||= authorization;
+    localEioOptions.extraHeaders!['Authorization'] ||= authorization;
 
     let sockets: IOClientSocket[] = [];
     type EIOResult = { ready: IOClientSocket, connectionType: ScryptedClientConnectionType, address?: string, rpcPeer?: RpcPeer };
@@ -526,7 +526,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 const any = Promise.any(p2pPromises);
                 await timeoutPromise(waitDuration, any);
                 console.log('found direct connection, aborting scrypted cloud connection')
-                return;
+                return undefined!;
             }
             catch (e) {
                 // timeout or all failures
@@ -598,7 +598,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         } = scrypted;
         console.log('api attached', Date.now() - start);
 
-        mediaManager.createMediaObject = async<T extends MediaObjectCreateOptions>(data: any, mimeType: string, options: T) => {
+        mediaManager.createMediaObject = async<T extends MediaObjectCreateOptions>(data: any, mimeType: string, options?: T) => {
             return new MediaObject(mimeType, data, options) as any;
         }
 
@@ -621,7 +621,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             .map(id => systemManager.getDeviceById(id))
             .find(device => device.pluginId === '@scrypted/core' && device.nativeId === `user:${username}`);
 
-        const connectRPCObject = clusterSetup(address, connectionType, queryToken, extraHeaders, options?.transports, sourcePeerId, clientName);
+        const connectRPCObject = clusterSetup(address!, connectionType, queryToken, extraHeaders, options?.transports, sourcePeerId, clientName);
 
         const loginResult: ScryptedClientLoginResult = {
             username,
@@ -655,7 +655,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 }
             });
 
-            rpcPeer.killed.finally(() => threadPeer.kill('main rpc peer killed'));
+            rpcPeer!.killed.finally(() => threadPeer.kill('main rpc peer killed'));
 
             worker.addEventListener('message', async event => {
                 if (event.data instanceof Uint8Array) {
@@ -700,7 +700,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     if (eventDetails.eventInterface === ScryptedInterface.ScryptedDevice) {
                         if (eventDetails.property === ScryptedInterfaceProperty.id) {
                             // a change on the id property means device was deleted
-                            remote.updateDeviceState(eventData, undefined);
+                            remote.updateDeviceState(eventData, undefined!);
                         }
                         else {
                             // a change on anything else is a descriptor update
@@ -755,18 +755,18 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             endpointManager,
             mediaManager,
             disconnect() {
-                rpcPeer.kill('disconnect requested');
+                rpcPeer!.kill('disconnect requested');
             },
             pluginHostAPI,
-            rpcPeer,
+            rpcPeer: rpcPeer!,
             loginResult,
             connectRPCObject,
             fork,
-            connect: undefined,
+            connect: undefined!,
         }
 
         socket.on('close', () => {
-            rpcPeer.kill('socket closed');
+            rpcPeer!.kill('socket closed');
         });
 
         rpcPeer.killed.finally(() => {
@@ -831,7 +831,8 @@ function clusterSetup(address: string, connectionType: ScryptedClientConnectionT
                 }
             };
 
-            const resetReceiveTimeout = connectRPCObjectOptions?.dedicatedTransport?.receiveTimeout ? () => {
+            const dt = connectRPCObjectOptions?.dedicatedTransport;
+            const resetReceiveTimeout = dt?.receiveTimeout ? () => {
                 if (receiveTimeout) {
                     clearTimeout(receiveTimeout);
                 }
@@ -839,10 +840,10 @@ function clusterSetup(address: string, connectionType: ScryptedClientConnectionT
                     if (clusterPeer) {
                         clusterPeer.kill('receive timeout');
                     }
-                }, connectRPCObjectOptions.dedicatedTransport.receiveTimeout);
+                }, dt!.receiveTimeout);
             } : undefined;
 
-            const resetSendTimeout = connectRPCObjectOptions?.dedicatedTransport?.sendTimeout ? () => {
+            const resetSendTimeout = dt?.sendTimeout ? () => {
                 if (sendTimeout) {
                     clearTimeout(sendTimeout);
                 }
@@ -850,7 +851,7 @@ function clusterSetup(address: string, connectionType: ScryptedClientConnectionT
                     if (clusterPeer) {
                         clusterPeer.kill('send timeout');
                     }
-                }, connectRPCObjectOptions.dedicatedTransport.sendTimeout);
+                }, dt!.sendTimeout);
             } : undefined;
 
             clusterPeerSocket.on('close', () => {
@@ -1020,7 +1021,7 @@ export async function connectScryptedClientFork(forkMain: (client: ScryptedClien
         } = scrypted;
         console.log('api attached', Date.now() - start);
 
-        mediaManager.createMediaObject = async<T extends MediaObjectCreateOptions>(data: any, mimeType: string, options: T) => {
+        mediaManager.createMediaObject = async<T extends MediaObjectCreateOptions>(data: any, mimeType: string, options?: T) => {
             return new MediaObject(mimeType, data, options) as any;
         }
         console.log('api initialized', Date.now() - start);
@@ -1042,7 +1043,7 @@ export async function connectScryptedClientFork(forkMain: (client: ScryptedClien
             .map(id => systemManager.getDeviceById(id))
             .find(device => device.pluginId === '@scrypted/core' && device.nativeId === `user:${username}`);
 
-        const connectRPCObject = clusterSetup(address, connectionType, queryToken, extraHeaders, transports, sourcePeerId, clientName);
+        const connectRPCObject = clusterSetup(address!, connectionType, queryToken, extraHeaders, transports, sourcePeerId, clientName);
 
         type ForkType = ScryptedClientStatic['fork'];
         const fork: ForkType = (forkOptions) => {
@@ -1070,7 +1071,7 @@ export async function connectScryptedClientFork(forkMain: (client: ScryptedClien
             loginResult,
             connectRPCObject,
             fork,
-            connect: undefined,
+            connect: undefined!,
         }
         rpcPeer.killed.finally(() => {
             self.close();
