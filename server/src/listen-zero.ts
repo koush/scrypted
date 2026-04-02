@@ -18,7 +18,7 @@ export async function listenZeroSingleClient(hostname: string, options?: net.Ser
     const server = options?.tls ? new tls.Server(options) : new net.Server(options);
     const port = await listenZero(server, hostname);
 
-    let cancel: () => void;
+    let cancel!: () => void;
     const clientPromise = new Promise<net.Socket>((resolve, reject) => {
         const timeout = setTimeout(() => {
             server.close();
