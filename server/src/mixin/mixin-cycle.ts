@@ -10,22 +10,22 @@ export function getMixins(scrypted: ScryptedRuntime, id: string) {
 }
 
 export function hasMixinCycle(scrypted: ScryptedRuntime, id: string, mixins?: string[]) {
-    mixins = mixins || getMixins(scrypted, id);
+    let mixinsList = mixins || getMixins(scrypted, id);
 
     // given the mixins for a device, find all the mixins for those mixins,
     // and create a visited graph.
     // if the visited graphs includes the original device, that indicates
     // a cyclical dependency for that device.
-    const visitedMixins = new Set(mixins);
+    const visitedMixins = new Set(mixinsList);
 
-    mixins = mixins.slice();
-    while (mixins.length) {
-        const mixin = mixins.pop();
+    mixinsList = mixinsList.slice();
+    while (mixinsList.length) {
+        const mixin = mixinsList.pop()!;
         if (visitedMixins.has(mixin))
             continue;
         visitedMixins.add(mixin);
         const providerMixins = getMixins(scrypted, mixin);
-        mixins.push(...providerMixins);
+        mixinsList.push(...providerMixins);
     }
 
     return visitedMixins.has(id);
