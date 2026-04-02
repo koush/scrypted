@@ -8,7 +8,7 @@ import { NodeThreadWorker } from './plugin/runtime/node-thread-worker';
 import { isNodePluginForkProcess, isNodePluginThreadProcess } from './plugin/runtime/node-fork-worker';
 
 function start(mainFilename: string) {
-    const pluginId = process.argv[3];
+    const pluginId = process.argv[3]!;
     module.paths.push(getPluginNodePath(pluginId));
 
     if (isNodePluginThreadProcess()) {
@@ -30,7 +30,7 @@ function start(mainFilename: string) {
             console.log('starting fork', pluginId, process.pid);
         else
             console.log('starting plugin', pluginId, process.pid);
-        const peer = startPluginRemote(mainFilename, process.argv[3], (message, reject, serializationContext) => process.send(message, serializationContext?.sendHandle, {
+        const peer = startPluginRemote(mainFilename, pluginId, (message, reject, serializationContext) => process.send!(message, serializationContext?.sendHandle, {
             // what happened to this argument?
             // swallowErrors: !reject,
         }, e => {
