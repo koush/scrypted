@@ -1241,7 +1241,7 @@ export interface DeviceManager {
   /**
    * Get all the native ids that have been reported by this plugin. This always includes "undefined", the plugin itself.
    */
-  getNativeIds(): string[];
+  getNativeIds(): ScryptedNativeId[];
 
   /**
    * onDeviceDiscovered is used to report new devices that are trickle discovered, one by one, such as via a network broadcast.
