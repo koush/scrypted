@@ -56,12 +56,12 @@ function createOptions() {
         userAgent: getUserAgent(),
         capabilities: {
             audio: RTCRtpReceiver.getCapabilities?.('audio') || {
-                codecs: undefined,
-                headerExtensions: undefined,
+                codecs: undefined!,
+                headerExtensions: undefined!,
             },
             video: RTCRtpReceiver.getCapabilities?.('video') || {
-                codecs: undefined,
-                headerExtensions: undefined,
+                codecs: undefined!,
+                headerExtensions: undefined!,
             },
         },
         screen: {
@@ -82,12 +82,12 @@ export async function getPacketsLost(t: { getStats(): Promise<RTCStatsReport> })
 }
 
 export class BrowserSignalingSession implements RTCSignalingSession {
-    private pc: RTCPeerConnection;
+    private pc!: RTCPeerConnection;
     pcDeferred = new Deferred<RTCPeerConnection>();
     dcDeferred = new Deferred<RTCDataChannel>();
-    microphone: RTCRtpSender;
+    microphone!: RTCRtpSender;
     micEnabled = false;
-    onPeerConnection: (pc: RTCPeerConnection) => Promise<void>;
+    onPeerConnection!: (pc: RTCPeerConnection) => Promise<void>;
     __proxy_props = { options: createOptions() };
     options = createOptions();
 
@@ -225,17 +225,17 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         }
 
         if (type === 'offer') {
-            let offer: RTCSessionDescriptionInit = this.pc.localDescription;
+            let offer: RTCSessionDescriptionInit | null = this.pc.localDescription;
             if (offer) {
                 // fast path for duplicate calls to createLocalDescription
-                return toDescription(this.pc.localDescription);
+                return toDescription(this.pc.localDescription!);
             }
             offer = await this.pc.createOffer({
                 offerToReceiveAudio: !!setup.audio,
                 offerToReceiveVideo: !!setup.video,
             });
             const set = this.pc.setLocalDescription(offer);
-            if (sendIceCandidate)
+            if (sendIceCandidate!)
                 return toDescription(offer);
             await set;
             await gatheringPromise;
@@ -248,7 +248,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         else {
             let answer = await this.pc.createAnswer();
             const set = this.pc.setLocalDescription(answer);
-            if (sendIceCandidate)
+            if (sendIceCandidate!)
                 return toDescription(answer);
             await set;
             await gatheringPromise;

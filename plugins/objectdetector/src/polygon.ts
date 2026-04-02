@@ -98,7 +98,7 @@ export function normalizeBox(box: BoundingBox, dims: Point): BoundingBox {
 
 export function fixLegacyClipPath(clipPath: ClipPath): ClipPath {
     if (!clipPath)
-        return;
+        return undefined!;
 
     // if any value is over abs 2, then divide by 100.
     // this is a workaround for the old scrypted bug where the path was not normalized.
