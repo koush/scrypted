@@ -6,7 +6,7 @@ import WebSocket, { Server as WebSocketServer } from "ws";
 
 export function isConnectionUpgrade(headers: IncomingHttpHeaders) {
     // connection:'keep-alive, Upgrade'
-    return headers.connection?.toLowerCase().includes('upgrade');
+    return headers.connection?.toLowerCase().includes('upgrade') ?? false;
 }
 
 export abstract class PluginHttp<T> {
@@ -49,7 +49,7 @@ export abstract class PluginHttp<T> {
 
         const end = (code: number, message: string) => {
             if (isUpgrade) {
-                const socket = res.socket;
+                const socket = res.socket!;
                 socket.write(`HTTP/1.1 ${code} ${message}\r\n` +
                     '\r\n');
                 socket.destroy();
@@ -65,6 +65,10 @@ export abstract class PluginHttp<T> {
         let endpoint = pkg;
         if (owner)
             endpoint = `@${owner}/${endpoint}`;
+        if (!endpoint) {
+            end(400, 'Bad Request');
+            return;
+        }
         const pluginData = await this.getEndpointPluginData(req, endpoint, isUpgrade, isEngineIOEndpoint);
 
         if (!pluginData) {
