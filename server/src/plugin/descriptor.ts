@@ -1,6 +1,6 @@
 import { ScryptedInterface, ScryptedInterfaceDescriptor, ScryptedInterfaceDescriptors } from "@scrypted/types";
 
-export const allInterfaceProperties: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map(type => type.properties));
+export const allInterfaceProperties: string[] = Object.values(ScryptedInterfaceDescriptors).map(type => type.properties).flat();
 
 export function getPropertyInterfaces(descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }) {
     const propertyInterfaces: { [property: string]: ScryptedInterface } = {};
@@ -26,7 +26,7 @@ export function getInterfaceProperties(descriptors: { [scryptedInterface: string
 
 export function isValidInterfaceMethod(descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }, interfaces: Set<string>, method: string) {
     const availableMethods = getInterfaceMethods(descriptors, interfaces);
-    return availableMethods.includes(method) || descriptors[ScryptedInterface.ScryptedDevice].methods.includes(method);
+    return availableMethods.includes(method) || descriptors[ScryptedInterface.ScryptedDevice]!.methods.includes(method);
 }
 
 export function isValidInterfaceProperty(descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }, interfaces: string[], property: string): boolean {

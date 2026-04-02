@@ -9,8 +9,8 @@ export class MediaObject implements MediaObjectRemote {
         this.__proxy_props = {}
         options ||= {};
         options.mimeType = mimeType;
-        options.convert ||= null;
-        options.toMimeTypes ||= null;
+        options!.convert ||= null!;
+        options!.toMimeTypes ||= null!;
 
         for (const [key, value] of Object.entries(options)) {
             if (RpcPeer.isTransportSafe(value))

@@ -16,7 +16,7 @@ export class ClusterManagerImpl implements ClusterManager {
     }
 
     getClusterAddress(): string {
-        return process.env.SCRYPTED_CLUSTER_ADDRESS;
+        return process.env.SCRYPTED_CLUSTER_ADDRESS!;
     }
 
     getClusterMode(): 'server' | 'client' | undefined {

@@ -61,7 +61,7 @@ export class AccessControls {
         const { eventInterface } = eventDetails;
 
         for (const dacl of dacls) {
-            if (!dacl.interfaces || dacl.interfaces.includes(eventInterface))
+            if (!dacl.interfaces || dacl.interfaces.includes(eventInterface!))
                 return false;
         }
 
