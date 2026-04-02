@@ -36,12 +36,16 @@ addType(ScryptedInterface.HttpRequestHandler, ScryptedDeviceType.DataSource);
 addType(ScryptedInterface.BufferConverter, ScryptedDeviceType.API);
 addType(ScryptedInterface.DeviceProvider, ScryptedDeviceType.DeviceProvider);
 
-export function inferTypeFromInterfaces(interfaces: ScryptedInterface[]): ScryptedDeviceType {
+export function inferTypeFromInterfaces(interfaces: ScryptedInterface[]): ScryptedDeviceType | undefined {
     return inferTypesFromInterfaces(interfaces)[0];
 }
 
 export function inferTypesFromInterfaces(interfaces: ScryptedInterface[]): ScryptedDeviceType[] {
-    const types = Object.keys(inferenceTable).filter(iface => interfaces.includes(iface as ScryptedInterface)).map(iface => inferenceTable[iface]).flat();
+    const types = Object.keys(inferenceTable)
+        .filter(iface => interfaces.includes(iface as ScryptedInterface))
+        .map(iface => inferenceTable[iface])
+        .filter((types): types is ScryptedDeviceType[] => types !== undefined)
+        .flat();
     return types;
 }
 
