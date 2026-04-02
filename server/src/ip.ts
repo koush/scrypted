@@ -70,6 +70,7 @@ export function getUsableNetworkAddresses() {
     const getUsable = (family: string | number) => {
         const usable = Object.values(nis)
             .flat()
+            .filter((details): details is os.NetworkInterfaceInfo => !!details)
             .filter((details) => details.family === family)
             .filter(details => isUsableNetworkAddress(details.address));
         return usable;
@@ -84,7 +85,7 @@ export function getUsableNetworkAddresses() {
     const fixedAddresses = ipv6.filter(details => details.address.includes('::'));
     const fixedRanges = fixedAddresses.map(details => {
         const block = new net.BlockList();
-        const cidr = parseInt(details.address.split('/')[1]) || 1;
+        const cidr = parseInt(details.address.split('/')[1] ?? '') || 1;
         block.addSubnet(details.address, cidr, 'ipv6');
         return block;
     });
