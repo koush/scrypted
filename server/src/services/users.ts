@@ -5,9 +5,9 @@ import crypto from 'crypto';
 
 export class UsersService {
     users = new Map<string, ScryptedUser>();
-    usersPromise: Promise<ScryptedUser[]>;
+    usersPromise!: Promise<ScryptedUser[]>;
 
-    static async addUserToDatabase(db: WrappedLevel, username: string, password: string, aclId: string) {
+    static async addUserToDatabase(db: WrappedLevel, username: string, password: string, aclId?: string) {
         const user = new ScryptedUser();
         user._id = username;
         user.aclId = aclId;
@@ -63,7 +63,7 @@ export class UsersService {
         this.updateUsersPromise();
     }
 
-    async addUserInternal(username: string, password: string, aclId: string) {
+    async addUserInternal(username: string, password: string, aclId?: string) {
         await this.ensureUsersPromise();
 
         const user = await UsersService.addUserToDatabase(this.scrypted.datastore, username, password, aclId);

@@ -25,7 +25,7 @@ export class PluginComponent {
     }
 
     async renameDeviceId(id: string, newId: string) {
-        const pluginDevice = this.scrypted.findPluginDeviceById(id);
+        const pluginDevice = this.scrypted.findPluginDeviceById(id)!;
         await this.kill(pluginDevice.pluginId);
         // wait for everything to settle.
         await sleep(2000);
@@ -45,7 +45,7 @@ export class PluginComponent {
     }
 
     async setStorage(id: string, storage: { [key: string]: string }) {
-        const pluginDevice = this.scrypted.findPluginDeviceById(id);
+        const pluginDevice = this.scrypted.findPluginDeviceById(id)!;
         pluginDevice.storage = storage;
         await this.scrypted.datastore.upsert(pluginDevice);
         const host = this.scrypted.getPluginHostForDeviceId(id);
@@ -58,7 +58,7 @@ export class PluginComponent {
             console.warn(message);
             throw new Error(message);
         }
-        const pluginDevice = this.scrypted.findPluginDeviceById(id);
+        const pluginDevice = this.scrypted.findPluginDeviceById(id)!;
         this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)]);
         this.scrypted.stateManager.updateDescriptor(pluginDevice);
         await this.scrypted.datastore.upsert(pluginDevice);
@@ -75,7 +75,7 @@ export class PluginComponent {
     }
     async reload(pluginId: string) {
         const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
-        await this.scrypted.runPlugin(plugin);
+        await this.scrypted.runPlugin(plugin!);
     }
     async kill(pluginId: string) {
         return this.scrypted.plugins[pluginId]?.kill();
@@ -98,7 +98,7 @@ export class PluginComponent {
     }
     async getPluginInfo(pluginId: string) {
         const packageJson = await this.getPackageJson(pluginId);
-        const host = this.scrypted.plugins[pluginId];
+        const host = this.scrypted.plugins[pluginId]!;
         let rpcObjects = 0;
         let pendingResults = 0;
         const pendingResultMethods: {
@@ -108,17 +108,17 @@ export class PluginComponent {
             rpcObjects = host.peer.localProxied.size + Object.keys(host.peer.remoteWeakProxies).length;
             pendingResults = Object.keys(host.peer.pendingResults).length;
             for (const deferred of Object.values(host.peer.pendingResults)) {
-                pendingResultMethods[deferred.method] = (pendingResultMethods[deferred.method] || 0) + 1;
+                pendingResultMethods[deferred.method!] = (pendingResultMethods[deferred.method!] || 0) + 1;
             }
         }
         return {
-            pid: host?.worker?.pid,
-            clientsCount: host?.io?.clientsCount,
+            pid: host.worker?.pid,
+            clientsCount: host.io?.clientsCount,
             rpcObjects,
             packageJson,
             pendingResults,
             pendingResultCounts: pendingResultMethods,
-            id: this.scrypted.findPluginDevice(pluginId)._id,
+            id: this.scrypted.findPluginDevice(pluginId)!._id,
         }
     }
 
@@ -167,21 +167,21 @@ export class PluginComponent {
     }
 
     async clearConsole(id: string) {
-        const pluginDevice = this.scrypted.findPluginDeviceById(id);
-        const consoleServer = await this.scrypted.plugins[pluginDevice.pluginId].consoleServer;
+        const pluginDevice = this.scrypted.findPluginDeviceById(id)!;
+        const consoleServer = await this.scrypted.plugins[pluginDevice.pluginId]!.consoleServer;
         consoleServer.clear(pluginDevice.nativeId);
     }
 
     async getRemoteServicePort(pluginId: string, name: string, ...args: any[]): Promise<[number, string]> {
         if (name === 'console') {
-            const consoleServer = await this.scrypted.plugins[pluginId].consoleServer;
-            return [consoleServer.readPort, process.env.SCRYPTED_CLUSTER_ADDRESS];
+            const consoleServer = await this.scrypted.plugins[pluginId]!.consoleServer;
+            return [consoleServer.readPort, process.env.SCRYPTED_CLUSTER_ADDRESS!];
         }
         if (name === 'console-writer') {
-            const consoleServer = await this.scrypted.plugins[pluginId].consoleServer;
-            return [consoleServer.writePort, process.env.SCRYPTED_CLUSTER_ADDRESS];
+            const consoleServer = await this.scrypted.plugins[pluginId]!.consoleServer;
+            return [consoleServer.writePort, process.env.SCRYPTED_CLUSTER_ADDRESS!];
         }
 
-        return this.scrypted.plugins[pluginId].remote.getServicePort(name, ...args);
+        return this.scrypted.plugins[pluginId]!.remote.getServicePort(name, ...args);
     }
 }
