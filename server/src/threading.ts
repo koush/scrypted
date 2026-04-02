@@ -36,7 +36,7 @@ export async function newThread<T>(...args: any[]): Promise<T> {
         const thread_vm: typeof vm = global.require('vm');
         const mainPeer: RpcPeer = new RpcPeer('thread', 'main', (message: any, reject: any) => {
             try {
-                thread_worker_threads.parentPort.postMessage(thread_v8.serialize(message));
+                thread_worker_threads.parentPort!.postMessage(thread_v8.serialize(message));
             }
             catch (e) {
                 reject?.(e);
@@ -44,7 +44,7 @@ export async function newThread<T>(...args: any[]): Promise<T> {
         });
         mainPeer.transportSafeArgumentTypes.add(Buffer.name);
         mainPeer.transportSafeArgumentTypes.add(Uint8Array.name);
-        thread_worker_threads.parentPort.on('message', (message: any) => mainPeer.handleMessage(thread_v8.deserialize(message)));
+        thread_worker_threads.parentPort!.on('message', (message: any) => mainPeer.handleMessage(thread_v8.deserialize(message)));
 
         mainPeer.params.eval = async (script: string, moduleNames: string[], paramNames: string[], ...paramValues: any[]) => {
             const f = thread_vm.compileFunction(`return (${script})`, paramNames, {
@@ -55,7 +55,7 @@ export async function newThread<T>(...args: any[]): Promise<T> {
                 params[module] = global.require(module);
             }
             for (let i = 0; i < paramNames.length; i++) {
-                params[paramNames[i]] = paramValues[i];
+                params[paramNames[i]!] = paramValues[i];
             }
             const c = await f(...paramValues);
             return await c(params);
