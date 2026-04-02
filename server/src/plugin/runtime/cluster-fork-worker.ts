@@ -16,7 +16,9 @@ export function createClusterForkWorker(
 
     // these are specific to the cluster worker host
     // and will be set there.
+    // @ts-ignore these are optional at runtime
     delete runtimeWorkerOptions.zipFile;
+    // @ts-ignore these are optional at runtime
     delete runtimeWorkerOptions.unzippedPath;
 
     const waitKilled = new Deferred<void>();
