@@ -15,7 +15,7 @@ export interface SelfSignedCertificate {
 };
 
 export function createSelfSignedCertificate(existing?: SelfSignedCertificate): SelfSignedCertificate {
-    let serviceKey: ReturnType<typeof pki.privateKeyFromPem>;
+    let serviceKey: ReturnType<typeof pki.privateKeyFromPem> | undefined;
     // check if existing key is usable
     if (existing?.certificate && existing?.serviceKey && existing?.version === CURRENT_SELF_SIGNED_CERTIFICATE_VERSION) {
         try {
@@ -30,7 +30,7 @@ export function createSelfSignedCertificate(existing?: SelfSignedCertificate): S
 
     const certificate = pki.createCertificate();
 
-    if (existing?.serviceKey) {
+    if (serviceKey) {
         certificate.publicKey = pki.rsa.setPublicKey(serviceKey.n, serviceKey.e);
     }
     else {
