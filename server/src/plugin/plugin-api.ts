@@ -19,9 +19,9 @@ export interface PluginAPI {
     onDeviceEvent(nativeId: ScryptedNativeId, eventInterface: string, eventData?: any): Promise<void>;
     onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData?: any): Promise<void>;
     onDeviceRemoved(nativeId: string): Promise<void>;
-    setStorage(nativeId: string, storage: { [key: string]: any }): Promise<void>;
+    setStorage(nativeId: ScryptedNativeId, storage: { [key: string]: any }): Promise<void>;
 
-    getDeviceById(id: string): Promise<ScryptedDevice>;
+    getDeviceById(id: string): Promise<ScryptedDevice | undefined>;
     setDeviceProperty(id: string, property: ScryptedInterfaceProperty, value: any): Promise<void>;
     removeDevice(id: string): Promise<void>;
     listen(EventListener: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister>;
@@ -108,7 +108,7 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
         this.acl?.deny();
         return this.api.setStorage(nativeId, storage);
     }
-    getDeviceById(id: string): Promise<ScryptedDevice | undefined> {
+    async getDeviceById(id: string): Promise<ScryptedDevice | undefined> {
         if (this.acl?.shouldRejectDevice(id))
             return undefined;
         return this.api.getDeviceById(id);
@@ -148,7 +148,7 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
         return this.api.getComponent(id);
     }
     async getMediaManager(): Promise<MediaManager> {
-        return this.mediaManager;
+        return this.mediaManager!;
     }
 
     async requestRestart() {
