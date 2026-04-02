@@ -85,9 +85,9 @@ interface DeviceManagerDevice {
 
 export class DeviceManagerImpl implements DeviceManager {
     api: PluginAPI;
-    nativeIds = new Map<string, DeviceManagerDevice>();
-    deviceStorage = new Map<string, StorageImpl>();
-    mixinStorage = new Map<string, Map<string, StorageImpl>>();
+    nativeIds = new Map<ScryptedNativeId, DeviceManagerDevice>();
+    deviceStorage = new Map<ScryptedNativeId, StorageImpl>();
+    mixinStorage = new Map<ScryptedNativeId, Map<string, StorageImpl>>();
 
     constructor(public systemManager: SystemManagerImpl,
         public getDeviceConsole: (nativeId?: ScryptedNativeId) => Console,
@@ -152,7 +152,7 @@ export class DeviceManagerImpl implements DeviceManager {
     async onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData: any) {
         return this.api.onMixinEvent(id, nativeId, eventInterface, eventData);
     }
-    getNativeIds(): string[] {
+    getNativeIds(): ScryptedNativeId[] {
         return Array.from(this.nativeIds.keys());
     }
     async onDeviceDiscovered(device: Device) {

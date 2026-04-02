@@ -102,7 +102,7 @@ export function prepareConsoles(getConsoleName: () => string, systemManager: () 
         return ret;
     }
 
-    const mixinConsoles = new Map<string, Map<string, Console>>();
+    const mixinConsoles = new Map<ScryptedNativeId, Map<string, Console>>();
 
     function getMixinConsole(mixinId: string, nativeId: ScryptedNativeId) {
         let nativeIdConsoles = mixinConsoles.get(nativeId);
@@ -179,7 +179,7 @@ export function prepareConsoles(getConsoleName: () => string, systemManager: () 
 }
 
 export async function createConsoleServer(remoteStdout: Readable, remoteStderr: Readable, header: string) {
-    const outputs = new Map<string, StdPassThroughs>();
+    const outputs = new Map<ScryptedNativeId, StdPassThroughs>();
 
     const addHeader = (pts: StdPassThroughs) => {
         pts.buffers.push(Buffer.from(header));
@@ -199,6 +199,7 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
                 buffers: [],
             }
             outputs.set(nativeId, pts);
+            const ptsRef = pts;
 
             let writeTimestamp = true;
             let timestampTimer: NodeJS.Timeout;
@@ -206,7 +207,7 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
             stderr.on('close', () => clearTimeout(timestampTimer));
 
             const appendOutput = (data: Buffer) => {
-                const { buffers } = pts;
+                const { buffers } = ptsRef;
 
                 if (writeTimestamp) {
                     writeTimestamp = false;
@@ -220,7 +221,7 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
                 // when we're over 4000 lines or whatever these buffer are,
                 // truncate down to 2000.
                 if (buffers.length > 4000)
-                    pts.buffers = buffers.slice(buffers.length - 2000);
+                    ptsRef.buffers = buffers.slice(buffers.length - 2000);
             };
 
             stdout.on('data', appendOutput);
@@ -279,15 +280,14 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
     const { server: writeServer, port: writePort } = await clusterListenZero(async (socket) => {
         sockets.add(socket);
         const [data] = await once(socket, 'data');
-        let filter: string = data.toString();
-        const newline = filter.indexOf('\n');
+        let filterStr: string = data.toString();
+        const newline = filterStr.indexOf('\n');
         if (newline !== -1) {
-            socket.unshift(Buffer.from(filter.substring(newline + 1)));
+            socket.unshift(Buffer.from(filterStr.substring(newline + 1)));
         }
-        filter = filter.substring(0, newline);
+        filterStr = filterStr.substring(0, newline);
 
-        if (filter === 'undefined')
-            filter = undefined;
+        const filter = filterStr === 'undefined' ? undefined : filterStr;
 
         const { stdout } = getPassthroughs(filter);
         socket.pipe(stdout, { end: false });
@@ -306,9 +306,10 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
     return {
         clear(nativeId: ScryptedNativeId) {
             const pt = outputs.get(nativeId);
-            if (pt)
+            if (pt) {
                 pt.buffers = [];
-            addHeader(pt);
+                addHeader(pt);
+            }
         },
         destroy() {
             for (const socket of sockets) {
