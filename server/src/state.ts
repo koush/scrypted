@@ -34,7 +34,7 @@ export class ScryptedStateManager extends EventRegistry {
         this.scrypted = scrypted;
     }
 
-    async getImplementerId(pluginDevice: PluginDevice, eventInterface: ScryptedInterface | string) {
+    async getImplementerId(pluginDevice: PluginDevice, eventInterface: ScryptedInterface | string | undefined) {
         if (!eventInterface)
             throw new Error(`ScryptedInterface is required`);
 
@@ -62,7 +62,7 @@ export class ScryptedStateManager extends EventRegistry {
                 });
 
                 this.notifyEventDetails(pluginDevice._id, {
-                    eventId: undefined,
+                    eventId: undefined!,
                     eventInterface,
                     eventTime: Date.now(),
                     mixinId,
@@ -75,8 +75,7 @@ export class ScryptedStateManager extends EventRegistry {
         this.notify(pluginDevice?._id, Date.now(), eventInterface, undefined, value);
     }
 
-    async setPluginDeviceStateFromMixin(pluginDevice: PluginDevice, property: string, value: any, eventInterface: ScryptedInterface, mixinId: string) {
-        // TODO: crashing here. send descriptor from python too.
+    async setPluginDeviceStateFromMixin(pluginDevice: PluginDevice, property: string, value: any, eventInterface: string | undefined, mixinId: string) {
         eventInterface = eventInterface || propertyInterfaces[property];
 
         const implementerId = await this.getImplementerId(pluginDevice, eventInterface);
@@ -85,9 +84,9 @@ export class ScryptedStateManager extends EventRegistry {
                 event: eventInterface,
                 mixinId,
             });
-            this.scrypted.getDeviceLogger(pluginDevice).log('i', `${property}: ${value} (mixin)`);
+            this.scrypted.getDeviceLogger(pluginDevice)!.log('i', `${property}: ${value} (mixin)`);
             this.notifyEventDetails(pluginDevice._id, {
-                eventId: undefined,
+                eventId: undefined!,
                 eventInterface,
                 eventTime: Date.now(),
                 mixinId,
@@ -99,7 +98,7 @@ export class ScryptedStateManager extends EventRegistry {
         return this.setPluginDeviceState(pluginDevice, property, value, eventInterface);
     }
 
-    setPluginDeviceState(device: PluginDevice, property: string, value: any, eventInterface?: ScryptedInterface) {
+    setPluginDeviceState(device: PluginDevice, property: string, value: any, eventInterface?: string) {
         eventInterface = eventInterface || propertyInterfaces[property];
         if (!eventInterface)
             throw new Error(`eventInterface must be provided`);
@@ -108,7 +107,7 @@ export class ScryptedStateManager extends EventRegistry {
 
         if (eventInterface !== ScryptedInterface.ScryptedDevice) {
             if (this.notify(device?._id, Date.now(), eventInterface, property, value, { changed }) && device) {
-                this.scrypted.getDeviceLogger(device).log('i', `${property}: ${value}`);
+                this.scrypted.getDeviceLogger(device)!.log('i', `${property}: ${value}`);
             }
         }
 
@@ -163,7 +162,7 @@ export class ScryptedStateManager extends EventRegistry {
                 while (polling && !watch) {
                     // listen is not user initiated. an explicit refresh call would be.
                     try {
-                        await this.refresh(id, event, false)
+                        await this.refresh(id, event!, false)
                     }
                     catch (e) {
                         console.error('refresh ended by exception', e);
@@ -174,10 +173,11 @@ export class ScryptedStateManager extends EventRegistry {
         }
 
         let lastData: any = undefined;
-        let cb = (eventDetails: EventDetails, eventData: any) => {
+        let callbackWrapper: typeof callback | undefined = callback;
+        let cb: typeof callback | undefined = (eventDetails, eventData) => {
             if (denoise && lastData === eventData)
                 return;
-            callback?.(eventDetails, eventData);
+            callbackWrapper?.(eventDetails, eventData);
         };
 
         const wrappedRegister = super.listenDevice(id, options, cb);
@@ -185,7 +185,7 @@ export class ScryptedStateManager extends EventRegistry {
         return new EventListenerRegisterImpl(() => {
             wrappedRegister.removeListener();
             cb = undefined;
-            callback = undefined;
+            callbackWrapper = undefined;
             polling = false;
         });
     }
@@ -203,7 +203,7 @@ export class ScryptedStateManager extends EventRegistry {
         }
 
         const device: any = this.scrypted.getDevice<Refresh>(id);
-        const logger = this.scrypted.getDeviceLogger(this.scrypted.findPluginDeviceById(id));
+        const logger = this.scrypted.getDeviceLogger(this.scrypted.findPluginDeviceById(id))!;
 
         if (!device.interfaces.includes(ScryptedInterface.Refresh))
             throw new Error('device does not implement refresh');
@@ -221,9 +221,9 @@ export class ScryptedStateManager extends EventRegistry {
                 await sleep(timeout);
                 try {
                     const rt = this.refreshThrottles[id];
-                    if (!rt.tailRefresh)
+                    if (!rt!.tailRefresh)
                         return;
-                    await device[RefreshSymbol](rt.refreshInterface, rt.userInitiated);
+                    await device[RefreshSymbol](rt!.refreshInterface, rt!.userInitiated);
                 }
                 catch (e) {
                     logger.log('e', 'Refresh failed');
@@ -257,7 +257,7 @@ export class ScryptedStateManager extends EventRegistry {
 
 interface RefreshThrottle {
     promise: Promise<void>;
-    refreshInterface: string;
+    refreshInterface: string | undefined;
     userInitiated: boolean;
     tailRefresh: boolean;
 }

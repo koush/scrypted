@@ -29,10 +29,11 @@ export class EventRegistry {
 
     listen(callback: (id: string, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
         const events = this.systemListeners;
-        events.add(callback);
+        let cb: typeof callback | undefined = callback;
+        events.add(cb);
         return new EventListenerRegisterImpl(() => {
-            events.delete(callback);
-            callback = undefined;
+            events.delete(cb!);
+            cb = undefined;
         });
     }
 
@@ -45,14 +46,15 @@ export class EventRegistry {
             this.listeners[token] = events;
         }
 
-        events.add(callback);
+        let cb: typeof callback | undefined = callback;
+        events.add(cb);
         return new EventListenerRegisterImpl(() => {
-            events.delete(callback);
-            callback = undefined;
+            events.delete(cb!);
+            cb = undefined;
         });
     }
 
-    notify(id: string | undefined, eventTime: number, eventInterface: string, property: string | undefined, value: any, options?: {
+    notify(id: string | undefined, eventTime: number | undefined, eventInterface: string, property: string | undefined, value: any, options?: {
         changed?: boolean;
         mixinId?: string;
     }): boolean {
@@ -62,9 +64,9 @@ export class EventRegistry {
             return false;
 
         const eventDetails: EventDetails = {
-            eventId: undefined,
+            eventId: undefined!,
             eventInterface,
-            eventTime,
+            eventTime: eventTime!,
             property,
             mixinId,
         };
@@ -79,9 +81,9 @@ export class EventRegistry {
         // system listeners only get state changes.
         // there are many potentially noisy stateless events, like
         // object detection and settings changes.
-        if ((eventDetails.property && !eventDetails.mixinId) || allowedEventInterfaces.has(eventInterface)) {
+        if ((eventDetails.property && !eventDetails.mixinId) || allowedEventInterfaces.has(eventInterface!)) {
             for (const event of this.systemListeners) {
-                event(id, eventDetails, value);
+                event(id!, eventDetails, value);
             }
         }
 
