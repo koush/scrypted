@@ -14,10 +14,10 @@ export class Alerts {
     }
     async removeAlert(alert: ScryptedAlert) {
         await this.scrypted.datastore.removeId(ScryptedAlert, alert._id);
-        this.scrypted.stateManager.notifyInterfaceEvent(null, 'Logger' as any, undefined);
+        this.scrypted.stateManager.notifyInterfaceEvent(undefined, 'Logger' as any, undefined);
     }
     async clearAlerts() {
         await this.scrypted.datastore.removeAll(ScryptedAlert);
-        this.scrypted.stateManager.notifyInterfaceEvent(null, 'Logger' as any, undefined);
+        this.scrypted.stateManager.notifyInterfaceEvent(undefined, 'Logger' as any, undefined);
     }
 }

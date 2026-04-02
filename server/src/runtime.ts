@@ -166,7 +166,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
             datastore.upsert(alert);
 
-            this.stateManager.notifyInterfaceEvent(null, 'Logger' as any, logEntry);
+            this.stateManager.notifyInterfaceEvent(undefined, 'Logger' as any, logEntry);
         });
 
         // purge logs older than 2 hours every hour

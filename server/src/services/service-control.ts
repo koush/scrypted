@@ -20,7 +20,7 @@ export class ServiceControl {
             await httpFetch({
                 url: webhookUpdate,
                 headers: {
-                    Authorization: webhookUpdateAuthorization,
+                    Authorization: webhookUpdateAuthorization!,
                 }
             });
         }
