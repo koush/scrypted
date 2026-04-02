@@ -7,7 +7,7 @@ import { SystemManagerImpl } from './system';
 class DeviceLogger implements Logger {
     nativeId: ScryptedNativeId;
     api: PluginAPI;
-    logger: Promise<PluginLogger>;
+    logger!: Promise<PluginLogger>;
 
     constructor(api: PluginAPI, nativeId: ScryptedNativeId, public console: any) {
         this.api = api;
@@ -65,12 +65,12 @@ export class DeviceStateProxyHandler implements ProxyHandler<any> {
             return { id: this.id }
         if (p === 'setState')
             return this.setState;
-        return this.deviceManager.systemManager.state[this.id][p as string]?.value;
+        return this.deviceManager.systemManager.state[this.id]![p as string]?.value;
     }
 
     set?(target: any, p: PropertyKey, value: any, receiver: any) {
         checkProperty(p.toString(), value);
-        this.deviceManager.systemManager.state[this.id][p as string] = {
+        this.deviceManager.systemManager.state[this.id]![p as string] = {
             value,
         };
         this.setState(p.toString(), value);
@@ -84,7 +84,7 @@ interface DeviceManagerDevice {
 }
 
 export class DeviceManagerImpl implements DeviceManager {
-    api: PluginAPI;
+    api!: PluginAPI;
     nativeIds = new Map<ScryptedNativeId, DeviceManagerDevice>();
     deviceStorage = new Map<ScryptedNativeId, StorageImpl>();
     mixinStorage = new Map<ScryptedNativeId, Map<string, StorageImpl>>();
@@ -103,7 +103,7 @@ export class DeviceManagerImpl implements DeviceManager {
     }
 
     getDeviceState(nativeId?: any): DeviceState {
-        const handler = new DeviceStateProxyHandler(this, this.nativeIds.get(nativeId).id,
+        const handler = new DeviceStateProxyHandler(this, this.nativeIds.get(nativeId)!.id,
             (property, value) => this.api.setState(nativeId, property, value));
         return new Proxy(handler, handler);
     }
@@ -136,7 +136,7 @@ export class DeviceManagerImpl implements DeviceManager {
     }
     pruneMixinStorage() {
         for (const nativeId of this.nativeIds.keys()) {
-            const storage = this.nativeIds.get(nativeId).storage;
+            const storage = this.nativeIds.get(nativeId)!.storage;
             for (const key of Object.keys(storage)) {
                 if (!key.startsWith('mixin:'))
                     continue;
@@ -219,20 +219,20 @@ export class StorageImpl implements Storage {
     }
 
     get storage(): { [key: string]: any } {
-        return this.deviceManager.nativeIds.get(this.nativeId).storage;
+        return this.deviceManager.nativeIds.get(this.nativeId)!.storage;
     }
 
     get length(): number {
-        return Object.keys(this.storage).filter(key => key.startsWith(this.prefix)).length;
+        return Object.keys(this.storage).filter(key => key.startsWith(this.prefix!)).length;
     }
 
     clear(): void {
         if (!this.prefix) {
-            this.deviceManager.nativeIds.get(this.nativeId).storage = {};
+            this.deviceManager.nativeIds.get(this.nativeId)!.storage = {};
         }
         else {
             const storage = this.storage;
-            Object.keys(this.storage).filter(key => key.startsWith(this.prefix)).forEach(key => delete storage[key]);
+            Object.keys(this.storage).filter(key => key.startsWith(this.prefix!)).forEach(key => delete storage[key]);
         }
         this.api.setStorage(this.nativeId, this.storage);
     }
@@ -242,9 +242,9 @@ export class StorageImpl implements Storage {
     }
     key(index: number): string {
         if (!this.prefix) {
-            return Object.keys(this.storage)[index];
+            return Object.keys(this.storage)[index]!;
         }
-        return Object.keys(this.storage).filter(key => key.startsWith(this.prefix))[index].substring(this.prefix.length);
+        return Object.keys(this.storage).filter(key => key.startsWith(this.prefix!))[index]!.substring(this.prefix!.length);
     }
     removeItem(key: string): void {
         delete this.storage[this.prefix + key];

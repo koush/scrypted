@@ -69,7 +69,7 @@ export class PluginAPIManagedListeners {
 }
 
 export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginAPI {
-    acl: AccessControls;
+    acl!: AccessControls;
 
     constructor(public api: PluginAPI, public mediaManager?: MediaManager) {
         super();

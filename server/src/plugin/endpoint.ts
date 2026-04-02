@@ -3,10 +3,10 @@ import type { DeviceManagerImpl } from "./device";
 import type { PluginAPI } from "./plugin-api";
 
 export class EndpointManagerImpl implements EndpointManager {
-    deviceManager: DeviceManagerImpl;
-    api: PluginAPI;
-    pluginId: string;
-    mediaManager: MediaManager;
+    deviceManager!: DeviceManagerImpl;
+    api!: PluginAPI;
+    pluginId!: string;
+    mediaManager!: MediaManager;
 
     getEndpoint(nativeId?: ScryptedNativeId) {
         if (!nativeId)

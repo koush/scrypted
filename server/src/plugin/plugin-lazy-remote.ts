@@ -8,7 +8,7 @@ import { PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin
  * execution order of state reporting may fail.
  */
  export class LazyRemote implements PluginRemote {
-    remote: PluginRemote;
+    remote!: PluginRemote;
 
     constructor(public remotePromise: Promise<PluginRemote>, public remoteReadyPromise: Promise<PluginRemote>) {
         this.remoteReadyPromise = (async () => {

@@ -10,8 +10,8 @@ function newDeviceProxy(id: string, systemManager: SystemManagerImpl) {
 }
 
 class DeviceProxyHandler implements PrimitiveProxyHandler<any> {
-    customProperties: Map<string | number | symbol, any>;
-    device: Promise<ScryptedDevice>;
+    customProperties!: Map<string | number | symbol, any>;
+    device!: Promise<ScryptedDevice | undefined>;
     constructor(public id: string, public systemManager: SystemManagerImpl) {
     }
 
@@ -20,14 +20,14 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any> {
     }
 
     ownKeys(target: any): ArrayLike<string | symbol> {
-        const interfaces = new Set<string>(this.systemManager.state[this.id].interfaces.value);
+        const interfaces = new Set<string>(this.systemManager.state[this.id]!.interfaces!.value);
         const methods = getInterfaceMethods(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces);
         const properties = getInterfaceProperties(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces);
         return [...methods, ...properties];
     }
 
     getOwnPropertyDescriptor(target: any, p: string | symbol): PropertyDescriptor | undefined {
-        const interfaces = new Set<string>(this.systemManager.state[this.id].interfaces.value);
+        const interfaces = new Set<string>(this.systemManager.state[this.id]!.interfaces!.value);
         const methods = getInterfaceMethods(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces);
         const prop = p.toString();
         if (methods.includes(prop)) {
@@ -39,7 +39,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any> {
         if (properties.includes(prop)) {
             return {
                 configurable: true,
-                value: this.systemManager.state[this.id][prop]?.value
+                value: this.systemManager.state[this.id]![prop]?.value
             }
         }
         return undefined;
@@ -77,19 +77,19 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any> {
         if (handled)
             return handled;
 
-        const interfaces = new Set<string>(this.systemManager.state[this.id].interfaces?.value || []);
+        const interfaces = new Set<string>(this.systemManager.state[this.id]!.interfaces?.value || []);
         const prop = p.toString();
         const isValidProperty = this.systemManager.propertyInterfaces?.[prop] || propertyInterfaces[prop];
 
         // this will also return old properties that should not exist on a device. ie, a disabled mixin provider.
         // should this change?
         if (isValidProperty)
-            return (this.systemManager.state[this.id] as any)?.[p]?.value;
+            return (this.systemManager.state[this.id]! as any)?.[p]?.value;
 
         if (!isValidInterfaceMethod(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces, prop))
             return;
 
-        if (ScryptedInterfaceDescriptors[ScryptedInterface.ScryptedDevice].methods.includes(prop))
+        if (ScryptedInterfaceDescriptors[ScryptedInterface.ScryptedDevice]!.methods.includes(prop))
             return (this as any)[p].bind(this);
 
         return new Proxy(() => p, this);
@@ -98,7 +98,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any> {
     ensureDevice() {
         if (!this.device)
             this.device = this.systemManager.api.getDeviceById(this.id);
-        return this.device;
+        return this.device!;
     }
 
     async apply(target: any, thisArg: any, argArray?: any) {
@@ -133,7 +133,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any> {
 
 
 class EventListenerRegisterImpl implements EventListenerRegister {
-    promise: Promise<EventListenerRegister>;
+    promise: Promise<EventListenerRegister> | undefined;
     constructor(promise: Promise<EventListenerRegister>) {
         this.promise = promise;
     }
@@ -152,21 +152,21 @@ class EventListenerRegisterImpl implements EventListenerRegister {
 function makeOneWayCallback<T>(input: T): T {
     const f: any = input;
     const oneways: string[] = f[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] || [];
-    if (!oneways.includes(null))
-        oneways.push(null);
+    if (!oneways.includes(null!))
+        oneways.push(null!);
     f[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = oneways;
     return input;
 }
 
 export class SystemManagerImpl implements SystemManager {
-    api: PluginAPI;
-    state: { [id: string]: { [property: string]: SystemDeviceState } };
+    api!: PluginAPI;
+    state!: { [id: string]: { [property: string]: SystemDeviceState } };
     deviceProxies: { [id: string]: ScryptedDevice } = {};
-    log: Logger;
+    log!: Logger;
     events = new EventRegistry();
-    typesVersion: string;
-    descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
-    propertyInterfaces: ReturnType<typeof getPropertyInterfaces>;
+    typesVersion!: string;
+    descriptors!: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
+    propertyInterfaces!: ReturnType<typeof getPropertyInterfaces>;
 
     getDeviceState(id: string) {
         return this.state[id];
@@ -197,9 +197,9 @@ export class SystemManagerImpl implements SystemManager {
                 }
             }
         }
-        if (!id)
+        if (!id!)
             return;
-        let proxy = this.deviceProxies[id];
+        let proxy = this.deviceProxies[id!];
         if (!proxy)
             proxy = this.deviceProxies[id] = newDeviceProxy(id, this);
         return proxy;
@@ -207,10 +207,10 @@ export class SystemManagerImpl implements SystemManager {
 
     getDeviceByName(name: string): any {
         for (const id of Object.keys(this.state)) {
-            const s = this.state[id];
+            const s = this.state[id]!;
             if ((s.interfaces?.value as string[])?.includes(ScryptedInterface.ScryptedPlugin) && s.pluginId?.value === name)
                 return this.getDeviceById(id);
-            if (s.name.value === name)
+            if (s.name!.value === name)
                 return this.getDeviceById(id);
         }
     }

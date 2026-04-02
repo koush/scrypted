@@ -12,9 +12,9 @@ import { checkProperty } from './plugin-state-check';
 
 export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAPI {
     pluginId: string;
-    typesVersion: string;
-    descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
-    propertyInterfaces: ReturnType<typeof getPropertyInterfaces>;
+    typesVersion!: string;
+    descriptors!: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
+    propertyInterfaces!: ReturnType<typeof getPropertyInterfaces>;
 
     [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = [
         'onMixinEvent',
@@ -131,7 +131,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     }
 
     async setStorage(nativeId: ScryptedNativeId, storage: { [key: string]: string }) {
-        const device = this.scrypted.findPluginDevice(this.pluginId, nativeId)
+        const device = this.scrypted.findPluginDevice(this.pluginId, nativeId)!;
         device.storage = storage;
         this.scrypted.datastore.upsert(device);
     }
@@ -168,12 +168,12 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     }
 
     async onDeviceRemoved(nativeId: string) {
-        await this.scrypted.removeDevice(this.scrypted.findPluginDevice(this.pluginId, nativeId))
+        await this.scrypted.removeDevice(this.scrypted.findPluginDevice(this.pluginId, nativeId)!)
     }
 
     async onDeviceEvent(nativeId: any, eventInterface: any, eventData?: any) {
-        const plugin = this.scrypted.findPluginDevice(this.pluginId, nativeId);
-        this.scrypted.stateManager.notifyInterfaceEventFromMixin(plugin!, eventInterface, eventData, plugin!._id);
+        const plugin = this.scrypted.findPluginDevice(this.pluginId, nativeId)!;
+        this.scrypted.stateManager.notifyInterfaceEventFromMixin(plugin, eventInterface, eventData, plugin._id);
     }
 
     async getDeviceById<T>(id: string): Promise<T & ScryptedDevice> {
