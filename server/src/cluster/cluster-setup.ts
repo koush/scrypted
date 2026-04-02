@@ -219,7 +219,7 @@ export function setupCluster(peer: RpcPeer) {
         const connect = workers.get(connectThreadId);
         const channel = new worker_threads.MessageChannel();
 
-        worker.postMessage({
+        worker!.postMessage({
             port: channel.port1,
             threadId: connectThreadId,
         }, [channel.port1]);
@@ -233,7 +233,7 @@ export function setupCluster(peer: RpcPeer) {
         else if (connectThreadId === worker_threads.threadId) {
             connectTidPeer(threadId);
             const deferred = tidChannels.get(threadId);
-            deferred.resolve(channel.port2);
+            deferred!.resolve(channel.port2);
         }
         else {
             channel.port2.close();
@@ -269,14 +269,14 @@ export function setupCluster(peer: RpcPeer) {
         // can use worker to worker ipc if the address and pid matches and both side are node.
         if (address === SCRYPTED_CLUSTER_ADDRESS && proxyId.startsWith('n-')) {
             const parts = proxyId.split('-');
-            const pid = parseInt(parts[1]);
-            const tid = parseInt(parts[2]);
+            const pid = parseInt(parts[1]!);
+            const tid = parseInt(parts[2]!);
             if (pid === process.pid) {
                 if (worker_threads.isMainThread && tid === worker_threads.threadId) {
                     // main thread can't call itself, so this may be a different thread cluster.
                 }
                 else {
-                    return connectIPCObject(clusterObject, parseInt(parts[2]));
+                    return connectIPCObject(clusterObject, parseInt(parts[2]!));
                 }
             }
         }
@@ -301,7 +301,7 @@ export function setupCluster(peer: RpcPeer) {
 
     const onProxySerialization = (peer: RpcPeer, value: any, sourceKey: string) => {
         const properties = RpcPeer.prepareProxyProperties(value) || {};
-        let clusterEntry: ClusterObject = properties.__cluster;
+        let clusterEntry: ClusterObject | undefined = properties.__cluster;
 
         // ensure globally stable proxyIds.
         // worker threads will embed their pid and tid in the proxy id for cross worker fast path.
@@ -318,11 +318,11 @@ export function setupCluster(peer: RpcPeer) {
         if (!clusterEntry) {
             clusterEntry = {
                 id: clusterId,
-                address: SCRYPTED_CLUSTER_ADDRESS,
+                address: SCRYPTED_CLUSTER_ADDRESS!,
                 port: clusterPort,
                 proxyId,
                 sourceKey,
-                sha256: null,
+                sha256: null!,
             };
             clusterEntry.sha256 = computeClusterObjectHash(clusterEntry, clusterSecret);
             properties.__cluster = clusterEntry;
@@ -347,8 +347,8 @@ export function setupCluster(peer: RpcPeer) {
 
 
         const { server: clusterRpcServer, port } = await clusterListenZero(client => {
-            const clusterPeerAddress = client.remoteAddress;
-            const clusterPeerPort = client.remotePort;
+            const clusterPeerAddress = client.remoteAddress!;
+            const clusterPeerPort = client.remotePort!;
             const clusterPeerKey = getClusterPeerKey(clusterPeerAddress, clusterPeerPort);
             const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, client, client);
             // set params from the primary peer, needed for get getRemote in cluster mode.
@@ -368,7 +368,7 @@ export function setupCluster(peer: RpcPeer) {
 
         clusterPort = port;
 
-        peer.onProxySerialization = value => onProxySerialization(peer, value, undefined);
+        peer.onProxySerialization = value => onProxySerialization(peer, value, undefined!);
         delete peer.params.initializeCluster;
 
         peer.killedSafe.finally(() => clusterRpcServer.close());
@@ -426,7 +426,7 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
         throw new Error('SCRYPTED_CLUSTER_MODE is set but SCRYPTED_CLUSTER_SECRET is not set.');
 
     const [server, sport] = process.env.SCRYPTED_CLUSTER_SERVER?.split(':') || [];
-    const port = parseInt(sport) || 10556;
+    const port = parseInt(sport!) || 10556;
     const address = process.env.SCRYPTED_CLUSTER_ADDRESS;
 
     if (mode === 'client') {
@@ -444,12 +444,12 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
             throw new Error('SCRYPTED_CLUSTER_ADDRESS and SCRYPTED_CLUSTER_SERVER must not both be used.');
 
         let serverAddress = address || server;
-        if (!net.isIP(serverAddress)) {
+        if (!net.isIP(serverAddress!)) {
             // due to dhcp changes allowing an interface name for the server address is also valid,
             // resolve using network interfaces.
             const interfaces = os.networkInterfaces();
-            const iface = interfaces[serverAddress];
-            const ipv4 = iface?.find(i => i.family === 'IPv4');
+            const iface = interfaces[serverAddress!];
+            const ipv4 = iface?.find((i: os.NetworkInterfaceInfo) => i.family === 'IPv4');
             if (!ipv4)
                 throw new Error('SCRYPTED_CLUSTER_ADDRESS is not set.');
             serverAddress = ipv4.address;
@@ -458,7 +458,7 @@ export function getScryptedClusterMode(): ['server' | 'client', string, number] 
         delete process.env.SCRYPTED_CLUSTER_SERVER;
     }
 
-    return [mode, server, port];
+    return [mode, server!, port];
 }
 
 export async function clusterListenZero(callback: (socket: net.Socket) => void) {
