@@ -41,7 +41,7 @@ export interface RpcApply extends RpcMessage {
     id: string | undefined;
     proxyId: string;
     args: any[];
-    method: string;
+    method?: string;
     oneway?: boolean;
 }
 
@@ -63,7 +63,7 @@ interface RpcRemoteProxyValue {
     __remote_proxy_finalizer_id: string | undefined;
     __remote_constructor_name: string;
     __remote_proxy_props: any;
-    __remote_proxy_oneway_methods: string[];
+    __remote_proxy_oneway_methods?: string[];
     __serialized_value?: any;
 }
 
@@ -74,7 +74,7 @@ interface RpcLocalProxyValue {
 interface Deferred {
     resolve: (value: any) => void;
     reject: (e: Error) => void;
-    method: string;
+    method: string | undefined;
 }
 
 export interface PrimitiveProxyHandler<T extends object> extends ProxyHandler<T> {
@@ -278,7 +278,7 @@ interface LocalProxiedEntry {
 
 interface ErrorType {
     name: string;
-    message: string;
+    message?: string;
     stack?: string;
 }
 
@@ -308,7 +308,7 @@ export class RpcPeer {
     static readonly finalizerIdSymbol = Symbol('rpcFinalizerId');
     static remotesCollected = 0;
     static remotesCreated = 0;
-    static activeRpcPeer: RpcPeer;
+    static activeRpcPeer: RpcPeer | undefined;
 
     static isRpcProxy(value: any) {
         return !!value?.[RpcPeer.PROPERTY_PROXY_ID];
@@ -720,13 +720,12 @@ export class RpcPeer {
                 case 'param': {
                     const rpcParam = message as RpcParam;
                     const serializationContext: any = {};
-                    let result: RpcResult;
+                    const result: RpcResult = {
+                        type: 'result',
+                        id: rpcParam.id,
+                    };
                     try {
-                        result = {
-                            type: 'result',
-                            id: rpcParam.id,
-                            result: this.serialize(this.params[rpcParam.param], serializationContext)
-                        };
+                        result.result = this.serialize(this.params[rpcParam.param], serializationContext);
                     }
                     catch (e) {
                         // console.error('failure', rpcApply.method, e);
