@@ -109,8 +109,8 @@ export function createRpcDuplexSerializer(writable: {
         sendMessageFinish: (message) => sendMessageFinish(Buffer.from(JSON.stringify(message))),
     });
 
-    let header: Buffer;
-    let pending: Buffer;
+    let header: Buffer | undefined;
+    let pending: Buffer | undefined;
     let offset: number;
     let type: number;
 
@@ -183,7 +183,7 @@ export function createRpcDuplexSerializer(writable: {
 
 export function createDataChannelSerializer(dc: { send: (data: Buffer) => void }) {
     // Chunking and debouncing state
-    let pending: Buffer[];
+    let pending: Buffer[] | undefined;
     
     // Max packet size for data channels is 16KB
     const MAX_PACKET_SIZE = 16384;
