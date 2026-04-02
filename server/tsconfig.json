@@ -4,6 +4,8 @@
         "module": "NodeNext",
         "target": "esnext",
         "noImplicitAny": true,
+        "alwaysStrict": true,
+        "strictBindCallApply": true,
         "outDir": "./dist",
         "esModuleInterop": true,
         "moduleResolution": "NodeNext",
