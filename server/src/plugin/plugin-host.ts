@@ -36,8 +36,8 @@ export class UnsupportedRuntimeError extends Error {
 }
 
 export class PluginHost {
-    worker: RuntimeWorker;
-    peer: RpcPeer;
+    worker!: RuntimeWorker;
+    peer!: RpcPeer;
     pluginId: string;
     module: Promise<any>;
     scrypted: ScryptedRuntime;
@@ -50,7 +50,7 @@ export class PluginHost {
         perMessageDeflate: true,
         cors: (req, callback) => {
             const header = this.scrypted.getAccessControlAllowOrigin(req.headers);
-            callback(undefined, {
+            callback(undefined!, {
                 origin: header,
                 credentials: true,
             })
@@ -61,11 +61,11 @@ export class PluginHost {
     pluginName: string;
     packageJson: any;
     killed = false;
-    consoleServer: Promise<ConsoleServer>;
+    consoleServer!: Promise<ConsoleServer>;
     zipHash: string;
     zipFile: string;
     unzippedPath: string;
-    clusterWorkerId: Promise<string>;
+    clusterWorkerId!: Promise<string>;
 
     kill() {
         this.killed = true;
@@ -103,10 +103,11 @@ export class PluginHost {
             if (!needInvalidate) {
                 // may also need to invalidate if the the plugin did not previously return a device
                 // because it had not yet completed the discovery process.
-                const device = this.scrypted.devices[pi._id];
+                const device = this.scrypted.devices[pi._id]!;
                 try {
-                    if (device.handler?.mixinTable)
-                        needInvalidate = !(await device.handler.mixinTable?.[device.handler.mixinTable.length - 1].entry).proxy;
+                    const handler = device.handler;
+                    if (handler?.mixinTable)
+                        needInvalidate = !(await handler.mixinTable?.[handler.mixinTable.length - 1]!.entry).proxy;
                 }
                 catch (e) {
                     // device retrieval had previously failed, fetch again.
@@ -125,16 +126,16 @@ export class PluginHost {
         this.pluginName = plugin.packageJson?.name;
         this.packageJson = plugin.packageJson;
 
-        const pluginDeviceId = scrypted.findPluginDevice(this.pluginId)._id;
-        const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(this.pluginId));
+        const pluginDeviceId = scrypted.findPluginDevice(this.pluginId)!._id;
+        const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(this.pluginId)!)!;
 
         const volume = getScryptedVolume();
         const pluginVolume = ensurePluginVolume(this.pluginId);
 
         {
-            const zipBuffer = Buffer.from(plugin.zip, 'base64');
+            const zipBuffer = Buffer.from(plugin.zip!, 'base64');
             // allow garbage collection of the base 64 contents
-            plugin = undefined;
+            (plugin as any) = undefined;
             const hash = crypto.createHash('md5').update(zipBuffer).digest().toString('hex');
             this.zipHash = hash;
 
@@ -146,7 +147,7 @@ export class PluginHost {
         const peerPromise = this.startPluginHost(logger, {
             SCRYPTED_VOLUME: volume,
             SCRYPTED_PLUGIN_VOLUME: pluginVolume,
-        }, pluginDebug);
+        }, pluginDebug!);
 
         this.io.on('connection', async (socket) => {
             try {
@@ -157,8 +158,8 @@ export class PluginHost {
                 } = (socket.request as any).scrypted;
 
                 try {
-                    if (socket.request.url.indexOf('/engine.io/api') !== -1) {
-                        if (socket.request.url.indexOf('/public') !== -1) {
+                    if (socket.request.url!.indexOf('/engine.io/api') !== -1) {
+                        if (socket.request.url!.indexOf('/public') !== -1) {
                             socket.close();
                             return;
                         }
@@ -205,13 +206,13 @@ export class PluginHost {
             ? new MediaManagerHostImpl(pluginDeviceId, () => scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id))
             : undefined;
 
-        this.api = new PluginHostAPI(scrypted, this.pluginId, this, mediaManager);
+        this.api = new PluginHostAPI(scrypted, this.pluginId, this, mediaManager!);
 
         logger.log('i', `loading ${this.pluginName}`);
         logger.log('i', 'pid ' + this.worker?.pid);
 
-        const remotePromise = this.prepareRemote(peerPromise, logger, pluginDebug);
-        const init = this.initializeRemote(remotePromise, logger, pluginDebug);
+        const remotePromise = this.prepareRemote(peerPromise, logger, pluginDebug!);
+        const init = this.initializeRemote(remotePromise, logger, pluginDebug!);
 
         init.catch(e => {
             console.error('plugin failed to load', e);
@@ -280,7 +281,7 @@ export class PluginHost {
         }
         catch (e) {
             logger.log('e', 'plugin failed to start ' + e);
-            throw new RPCResultError(this.peer, 'cluster plugin start failed', e);
+            throw new RPCResultError(this.peer, 'cluster plugin start failed', e as Error | undefined);
         }
 
         const startupTime = Date.now();
@@ -333,8 +334,8 @@ export class PluginHost {
         let { runtime } = this.packageJson.scrypted;
         runtime ||= 'node';
 
-        const pluginDevice = this.scrypted.findPluginDevice(this.pluginId);
-        const customRuntime = pluginDevice.state.interfaces.value.includes(ScryptedInterface.ScryptedPluginRuntime);
+        const pluginDevice = this.scrypted.findPluginDevice(this.pluginId)!;
+        const customRuntime = pluginDevice.state.interfaces!.value.includes(ScryptedInterface.ScryptedPluginRuntime);
         if (customRuntime) {
             runtime = 'custom';
         }
@@ -375,7 +376,7 @@ export class PluginHost {
 
             this.worker.stdout.on('data', data => console.log(data.toString()));
             this.worker.stderr.on('data', data => console.error(data.toString()));
-            this.clusterWorkerId = Promise.resolve(undefined);
+            this.clusterWorkerId = Promise.resolve(undefined!);
         }
         else {
             const scrypted: ClusterForkOptions = JSON.parse(JSON.stringify(this.packageJson.scrypted));
@@ -414,7 +415,7 @@ export class PluginHost {
                 peer.killedSafe.finally(() => originalPeer.kill());
             }).catch(() => { });
 
-            this.clusterWorkerId = clusterWorkerId;
+            this.clusterWorkerId = clusterWorkerId as Promise<string>;
             clusterWorkerId.then(clusterWorkerId => {
                 console.log('cluster worker id', clusterWorkerId);
             }).catch(() => {
@@ -483,7 +484,7 @@ export class PluginHost {
                 serializer.sendMessage(message, reject, serializationContext);
             }
             catch (e) {
-                reject?.(e);
+                reject?.(e as Error);
             }
         });
         rpcPeer.tags.acl = accessControls;
@@ -500,6 +501,6 @@ export class PluginHost {
         socket.on('close', kill);
         socket.on('error', kill);
 
-        return setupPluginRemote(rpcPeer, api, null, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
+        return setupPluginRemote(rpcPeer, api, null!, { serverVersion }, () => this.scrypted.stateManager.getSystemState());
     }
 }

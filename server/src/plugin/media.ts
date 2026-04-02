@@ -348,7 +348,7 @@ export abstract class MediaManagerBase implements MediaManager {
                 fromMimeType: mediaObject.mimeType,
                 toMimeType,
                 convert: async (data, fromMimeType, toMimeType) => {
-                    return mediaObject.convert(toMimeType);
+                    return mediaObject.convert!(toMimeType);
                 }
             });
 
@@ -366,10 +366,10 @@ export abstract class MediaManagerBase implements MediaManager {
             // connect the intrinsic converter to other converters
             for (const candidate of converters) {
                 try {
-                    const candidateMime = new MimeType(candidate.fromMimeType);
+                    const candidateMime = new MimeType(candidate.fromMimeType!);
                     if (!mimeMatches(convertedMime, candidateMime))
                         continue;
-                    const outputWeight = parseFloat(candidateMime.parameters.get('converter-weight')) || (candidateMime.essence === '*/*' ? 1000 : 1);
+                    const outputWeight = parseFloat(candidateMime.parameters.get('converter-weight')!) || (candidateMime.essence === '*/*' ? 1000 : 1);
                     const candidateId = candidate.id;
                     node[candidateId] = outputWeight;
                 }
@@ -381,10 +381,10 @@ export abstract class MediaManagerBase implements MediaManager {
 
         for (const converter of converters) {
             try {
-                const inputMime = new MimeType(converter.fromMimeType);
-                const convertedMime = new MimeType(converter.toMimeType);
+                const inputMime = new MimeType(converter.fromMimeType!);
+                const convertedMime = new MimeType(converter.toMimeType!);
                 // catch all converters should be heavily weighted so as not to use them.
-                const inputWeight = parseFloat(inputMime.parameters.get('converter-weight')) || (inputMime.essence === '*/*' ? 1000 : 1);
+                const inputWeight = parseFloat(inputMime.parameters.get('converter-weight')!) || (inputMime.essence === '*/*' ? 1000 : 1);
                 // const convertedWeight = parseFloat(convertedMime.parameters.get('converter-weight')) || (convertedMime.essence === ScryptedMimeTypes.MediaObject ? 1000 : 1);
                 // const conversionWeight = inputWeight + convertedWeight;
                 const targetId = converter.id;
@@ -393,10 +393,10 @@ export abstract class MediaManagerBase implements MediaManager {
                 // edge matches
                 for (const candidate of converters) {
                     try {
-                        const candidateMime = new MimeType(candidate.fromMimeType);
+                        const candidateMime = new MimeType(candidate.fromMimeType!);
                         if (!mimeMatches(convertedMime, candidateMime))
                             continue;
-                        const outputWeight = parseFloat(candidateMime.parameters.get('converter-weight')) || (candidateMime.essence === '*/*' ? 1000 : 1);
+                        const outputWeight = parseFloat(candidateMime.parameters.get('converter-weight')!) || (candidateMime.essence === '*/*' ? 1000 : 1);
                         const candidateId = candidate.id;
                         node[candidateId] = inputWeight + outputWeight;
                     }
@@ -436,23 +436,23 @@ export abstract class MediaManagerBase implements MediaManager {
         let valueMime = new MimeType(mediaObject.mimeType);
 
         while (route.length) {
-            const node = route.shift();
-            const converter = converterMap.get(node);
-            const converterToMimeType = new MimeType(converter.toMimeType);
-            const converterFromMimeType = new MimeType(converter.fromMimeType);
+            const node = route.shift()!;
+            const converter = converterMap.get(node)!;
+            const converterToMimeType = new MimeType(converter.toMimeType!);
+            const converterFromMimeType = new MimeType(converter.fromMimeType!);
             const type = converterToMimeType.type === '*' ? valueMime.type : converterToMimeType.type;
             const subtype = converterToMimeType.subtype === '*' ? valueMime.subtype : converterToMimeType.subtype;
             let targetMimeType = `${type}/${subtype}`;
             if (!route.length && outputMime.parameters.size) {
                 const withParameters = new MimeType(targetMimeType);
                 for (const k of outputMime.parameters.keys()) {
-                    withParameters.parameters.set(k, outputMime.parameters.get(k));
+                    withParameters.parameters.set(k, outputMime.parameters.get(k)!);
                 }
                 targetMimeType = outputMime.toString();
             }
 
             if (converter.toMimeType === ScryptedMimeTypes.MediaObject) {
-                const mo = await converter.convert(value, valueMime.essence, toMimeType, { sourceId }) as MediaObjectInterface;
+                const mo = await converter.convert!(value, valueMime.essence, toMimeType, { sourceId }) as MediaObjectInterface;
                 const found = await this.convertMediaObject(mo, toMimeType);
                 return {
                     data: found,
@@ -460,7 +460,7 @@ export abstract class MediaManagerBase implements MediaManager {
                 };
             }
 
-            value = await converter.convert(value, valueMime.essence, targetMimeType, { sourceId }) as string | Buffer;
+            value = await converter.convert!(value, valueMime.essence, targetMimeType, { sourceId }) as string | Buffer;
             valueMime = new MimeType(targetMimeType);
         }
 
