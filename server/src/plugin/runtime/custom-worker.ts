@@ -8,13 +8,13 @@ import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
 
 export class CustomRuntimeWorker extends ChildProcessWorker {
-    serializer: ReturnType<typeof createRpcDuplexSerializer>;
-    fork: boolean;
+    serializer!: ReturnType<typeof createRpcDuplexSerializer>;
+    fork!: boolean;
 
     constructor(options: RuntimeWorkerOptions, runtime: ScryptedRuntime) {
         super(options);
 
-        const pluginDevice = runtime.findPluginDevice(this.pluginId);
+        const pluginDevice = runtime.findPluginDevice(this.pluginId)!;
         const scryptedRuntimeArguments: ScryptedRuntimeArguments = pluginDevice.state.scryptedRuntimeArguments?.value;
         if (!scryptedRuntimeArguments)
             throw new Error('custom runtime requires scryptedRuntimeArguments');
@@ -75,7 +75,7 @@ export class CustomRuntimeWorker extends ChildProcessWorker {
             this.serializer.sendMessage(message, reject, serializationContext);
         }
         catch (e) {
-            reject?.(e);
+            reject?.(e as Error);
         }
     }
 }

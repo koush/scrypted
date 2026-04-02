@@ -105,7 +105,7 @@ export class NodeForkWorker extends ChildProcessWorker {
             });
         }
         catch (e) {
-            reject?.(e);
+            reject?.(e as Error);
         }
     }
 

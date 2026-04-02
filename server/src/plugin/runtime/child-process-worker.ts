@@ -6,7 +6,7 @@ import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 export abstract class ChildProcessWorker extends EventEmitter implements RuntimeWorker {
     public pluginId: string;
     protected worker: child_process.ChildProcess | undefined;
-    killPromise: Promise<void>;
+    killPromise!: Promise<void>;
 
     get childProcess() {
         return this.worker;

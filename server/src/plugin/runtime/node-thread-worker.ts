@@ -129,7 +129,7 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
             port.postMessage(postMessage, transferList);
         }
         catch (e) {
-            reject?.(e);
+            reject?.(e as Error);
         }
     }
 

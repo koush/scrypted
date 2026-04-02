@@ -26,7 +26,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         }
     }
 
-    serializer: ReturnType<typeof createRpcDuplexSerializer>;
+    serializer!: ReturnType<typeof createRpcDuplexSerializer>;
     peerin: Writable;
     peerout: Readable;
     _stdout = new PassThrough();
@@ -200,7 +200,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
             this.serializer.sendMessage(message, reject, serializationContext);
         }
         catch (e) {
-            reject?.(e);
+            reject?.(e as Error);
         }
     }
 }
