@@ -13,7 +13,7 @@ export interface RuntimeWorkerOptions {
 }
 
 export interface RuntimeWorker {
-    pid: number;
+    pid: number | undefined;
     stdout: Readable;
     stderr: Readable;
     killPromise: Promise<any>;

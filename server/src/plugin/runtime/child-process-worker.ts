@@ -5,7 +5,7 @@ import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 
 export abstract class ChildProcessWorker extends EventEmitter implements RuntimeWorker {
     public pluginId: string;
-    protected worker: child_process.ChildProcess;
+    protected worker: child_process.ChildProcess | undefined;
     killPromise: Promise<void>;
 
     get childProcess() {
@@ -19,18 +19,18 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
     }
 
     setupWorker() {
-        this.worker.on('close', () => this.emit('error', new Error('close')));
-        this.worker.on('disconnect', () => this.emit('error', new Error('disconnect')));
-        this.worker.on('exit', (code, signal) => this.emit('exit', code, signal));
-        this.worker.on('error', e => this.emit('error', e));
+        this.worker!.on('close', () => this.emit('error', new Error('close')));
+        this.worker!.on('disconnect', () => this.emit('error', new Error('disconnect')));
+        this.worker!.on('exit', (code, signal) => this.emit('exit', code, signal));
+        this.worker!.on('error', e => this.emit('error', e));
         // aggressively catch errors
         // ECONNRESET can be raised when the child process is killed
-        for (const stdio of this.worker.stdio || []) {
+        for (const stdio of this.worker!.stdio || []) {
             if (stdio)
                 stdio.on('error', e => this.emit('error', e));
         }
 
-        this.killPromise = once(this.worker, 'exit').then(() => { }).catch(() => { });
+        this.killPromise = once(this.worker!, 'exit').then(() => { }).catch(() => { });
     }
 
     get pid() {
@@ -38,11 +38,11 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
     }
 
     get stdout() {
-        return this.worker.stdout;
+        return this.worker!.stdout!;
     }
 
     get stderr() {
-        return this.worker.stderr;
+        return this.worker!.stderr!;
     }
 
     kill(): void {
