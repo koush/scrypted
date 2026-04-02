@@ -51,7 +51,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
                         delete state[id];
                         continue;
                     }
-                    state[id] = getAccessControlDeviceState(id, state[id]);
+                    state[id] = getAccessControlDeviceState(id, state[id]!)!;
                 }
             }
 
@@ -67,11 +67,11 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
             if (eventDetails.eventInterface === ScryptedInterface.ScryptedDevice) {
                 if (eventDetails.property === ScryptedInterfaceProperty.id) {
                     // a change on the id property means device was deleted
-                    remote.updateDeviceState(eventData, undefined);
+                    remote.updateDeviceState(eventData, undefined!);
                 }
                 else {
                     // a change on anything else is a descriptor update
-                    remote.updateDeviceState(id, getAccessControlDeviceState(id));
+                    remote.updateDeviceState(id, getAccessControlDeviceState(id)!);
                 }
                 return;
             }
@@ -127,7 +127,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
                 ioSockets[id] = callbacks;
 
-                callbacks.connect(undefined, {
+                callbacks.connect(undefined!, {
                     close: (message) => connection.close(message),
                     send: (message) => connection.send(message),
                 });
@@ -140,14 +140,14 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         api = await options?.onGetRemote?.(api, pluginId) || api;
 
         const systemManager = new SystemManagerImpl();
-        const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole, getMixinConsole);
+        const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole!, getMixinConsole!);
         const endpointManager = new EndpointManagerImpl();
-        const clusterManager = new ClusterManagerImpl(undefined, api, undefined);
+        const clusterManager = new ClusterManagerImpl(undefined, api, undefined!);
         const hostMediaManager = await api.getMediaManager();
         if (!hostMediaManager) {
-            peer.params['createMediaManager'] = async () => createMediaManager(systemManager, deviceManager);
+            peer.params['createMediaManager'] = async () => createMediaManager!(systemManager, deviceManager);
         }
-        const mediaManager = hostMediaManager || await createMediaManager(systemManager, deviceManager);
+        const mediaManager = hostMediaManager || await createMediaManager!(systemManager, deviceManager);
         peer.params['mediaManager'] = mediaManager;
 
         systemManager.api = api;
@@ -163,11 +163,11 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             clusterManager,
             log,
             pluginHostAPI: api,
-            pluginRemoteAPI: undefined,
+            pluginRemoteAPI: undefined!,
             serverVersion: hostInfo?.serverVersion,
-            connect: undefined,
-            fork: undefined,
-            connectRPCObject: undefined,
+            connect: undefined!,
+            fork: undefined!,
+            connectRPCObject: undefined!,
         };
 
         delete peer.params.getRemote;
@@ -188,7 +188,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 'ioEvent',
                 'setNativeId',
             ],
-            getServicePort,
+            getServicePort: getServicePort!,
             async createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>) {
                 return deviceManager.createDeviceState(id, setState);
             },
@@ -300,7 +300,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 params.pluginRuntimeAPI = ret;
 
                 try {
-                    return await options.onLoadZip(ret, params, packageJson, zipAPI, zipOptions);
+                    return await options!.onLoadZip!(ret, params, packageJson, zipAPI, zipOptions!);
                 }
                 catch (e) {
                     console.error('plugin start/fork failed', e)

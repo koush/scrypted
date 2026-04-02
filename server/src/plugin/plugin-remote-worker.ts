@@ -85,7 +85,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (_api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];
 
                 override setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
-                    const id = deviceManager.nativeIds.get(nativeId).id;
+                    const id = deviceManager.nativeIds.get(nativeId)!.id;
                     for (const r of forks) {
                         r.setNativeId(nativeId, id, storage);
                     }
@@ -104,7 +104,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             if (name === 'repl') {
                 if (!replPort)
                     throw new Error('REPL unavailable: Plugin not loaded.')
-                return [await replPort, process.env.SCRYPTED_CLUSTER_ADDRESS];
+                return [await replPort, process.env.SCRYPTED_CLUSTER_ADDRESS!] as [number, string];
             }
             throw new Error(`unknown service ${name}`);
         },
@@ -183,11 +183,11 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                 process.on('uncaughtException', e => {
                     getPluginConsole().error('uncaughtException', e);
-                    scrypted.log.e('uncaughtException ' + (e.stack || e?.toString()));
+                    scrypted.log!.e('uncaughtException ' + (e.stack || e?.toString()));
                 });
                 process.on('unhandledRejection', e => {
                     getPluginConsole().error('unhandledRejection', e);
-                    scrypted.log.e('unhandledRejection ' + ((e as Error).stack || e?.toString()));
+                    scrypted.log!.e('unhandledRejection ' + ((e as Error).stack || e?.toString()));
                 });
 
                 installSourceMapSupport({
@@ -209,10 +209,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             await installOptionalDependencies(getPluginConsole(), packageJson);
 
             const main = await pluginReader(mainNodejs);
-            const script = main.toString();
+            const script = main!.toString();
 
             scrypted.connect = (socket, options) => {
-                process.send(options, socket);
+                process.send!(options, socket);
             }
 
             const pluginRemoteAPI: PluginRemote = scrypted.pluginRemoteAPI;
@@ -221,12 +221,12 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 let forkPeer: Promise<RpcPeer>;
                 let runtimeWorker: RuntimeWorker;
                 let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
-                let clusterWorkerId: Promise<string>;
+                let clusterWorkerId: Promise<string> | undefined;
 
                 const runtimeWorkerOptions: RuntimeWorkerOptions = {
                     packageJson,
                     env: undefined,
-                    pluginDebug: undefined,
+                    pluginDebug: undefined!,
                     zipFile,
                     unzippedPath,
                     zipHash,
@@ -234,13 +234,15 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
                 // if running in a cluster, fork to a matching cluster worker only if necessary.
                 if (utilizesClusterForkWorker(options)) {
-                    ({ runtimeWorker, forkPeer, clusterWorkerId } = createClusterForkWorker(
+                    const result = createClusterForkWorker(
                         runtimeWorkerOptions,
-                        options,
+                        options!,
                         api.getComponent('cluster-fork'),
                         () => zipAPI.getZip(),
-                        scrypted.connectRPCObject)
-                    );
+                        scrypted.connectRPCObject);
+                    runtimeWorker = result.runtimeWorker;
+                    forkPeer = result.forkPeer;
+                    clusterWorkerId = result.clusterWorkerId as Promise<string>;
                 }
                 else {
                     if (options?.runtime) {
@@ -248,10 +250,10 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                         const runtime = builtins.get(options.runtime);
                         if (!runtime)
                             throw new Error('unknown runtime ' + options.runtime);
-                        runtimeWorker = runtime(mainFilename, runtimeWorkerOptions, undefined);
+                        runtimeWorker = runtime(mainFilename, runtimeWorkerOptions, undefined!);
 
                         if (runtimeWorker instanceof ChildProcessWorker) {
-                            nativeWorker = runtimeWorker.childProcess;
+                            nativeWorker = runtimeWorker.childProcess!;
                         }
                     }
                     else {
@@ -261,7 +263,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                         const ntw = new NodeThreadWorker(mainFilename, pluginId, {
                             packageJson,
                             env: undefined,
-                            pluginDebug: undefined,
+                            pluginDebug: undefined!,
                             zipFile,
                             unzippedPath,
                             zipHash,
@@ -317,7 +319,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                         [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];
 
                         override setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
-                            const id = deviceManager.nativeIds.get(nativeId).id;
+                            const id = deviceManager.nativeIds.get(nativeId)!.id;
                             pluginRemoteAPI.setNativeId(nativeId, id, storage);
                             for (const r of forks) {
                                 if (r === remote)
@@ -361,7 +363,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     removeListener(event, listener) {
                         return runtimeWorker.removeListener(event as any, listener);
                     },
-                    nativeWorker,
+                    nativeWorker: nativeWorker!,
                 };
                 return {
                     [Symbol.dispose]() {
@@ -376,7 +378,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
             try {
                 const isModule = packageJson.type === 'module';
                 const filename = zipOptions?.debug ? pluginMainNodeJs : pluginIdMainNodeJs;
-                const sdkVersion = await pluginReader('sdk.json').then(b => JSON.parse(b.toString()).version).catch(() => { });
+                const sdkVersion = await pluginReader('sdk.json').then(b => JSON.parse(b!.toString()).version).catch(() => { });
                 const mainNodeJsOnFilesystem = path.join(unzippedPath, mainNodejs);
                 if (sdkVersion) {
                     // todo: remove this, only existed in prerelease versions

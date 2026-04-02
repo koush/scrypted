@@ -31,7 +31,7 @@ export const QueryInterfaceSymbol = Symbol("ScryptedPluginDeviceQueryInterface")
 export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
     scrypted: ScryptedRuntime;
     id: string;
-    mixinTable: MixinTable[];
+    mixinTable!: MixinTable[];
     releasing = new Set<any>();
 
     static sortInterfaces(interfaces: string[]): string[] {
@@ -65,8 +65,8 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
     async getMixinProviderId(id: string, mixinDevice: any) {
         if (this.releasing.has(mixinDevice))
             return true;
-        await this.scrypted.devices[id].handler.ensureProxy();
-        for (const mixin of this.scrypted.devices[id].handler.mixinTable) {
+        await this.scrypted.devices[id]!.handler.ensureProxy();
+        for (const mixin of this.scrypted.devices[id]!.handler.mixinTable) {
             const { proxy } = await mixin.entry;
             if (proxy === mixinDevice) {
                 return mixin.mixinProviderId || id;
@@ -78,7 +78,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
     // should this be async?
     invalidate() {
         const mixinTable = this.mixinTable;
-        this.mixinTable = undefined;
+        this.mixinTable = undefined!;
         for (const mixinEntry of (mixinTable || [])) {
             this.invalidateEntry(mixinEntry);
         }
@@ -102,7 +102,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
         const mixins = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
         // iterate the new mixin table to find the last good mixin,
         // and resume creation from there.
-        let lastValidMixinId: string;
+        let lastValidMixinId: string | undefined;
         for (const mixinId of mixins) {
             if (!previousMixinIds.length) {
                 // reached of the previous mixin table, meaning
@@ -121,7 +121,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
 
         // invalidate and remove everything up to lastValidMixinId
         while (true) {
-            const entry = this.mixinTable[0];
+            const entry = this.mixinTable[0]!;
             if (entry.mixinProviderId === lastValidMixinId)
                 break;
             this.mixinTable.shift();
@@ -149,7 +149,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
                 try {
                     if (!pluginDevice.nativeId) {
                         const plugin = this.scrypted.plugins[pluginDevice.pluginId];
-                        proxy = await plugin.module;
+                        proxy = await plugin!.module;
                     }
                     else {
                         const providerId = getState(pluginDevice, ScryptedInterfaceProperty.providerId);
@@ -174,7 +174,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
             })();
 
             this.mixinTable.unshift({
-                mixinProviderId: undefined,
+                mixinProviderId: undefined!,
                 entry,
             });
         }
@@ -202,7 +202,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
             });
         }
 
-        return this.mixinTable[0].entry.then(entry => {
+        return this.mixinTable[0]!.entry.then(entry => {
             if (entry.error) {
                 console.error('Mixin device creation completed with error. Merging with previous interface set to retain device descriptor.');
                 const previousInterfaces = getState(pluginDevice, ScryptedInterfaceProperty.interfaces) as string[] || [];
@@ -219,7 +219,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
 
     async rebuildEntry(pluginDevice: PluginDevice, mixinId: string, wrappedMixinTablePromise: Promise<MixinTable[]>): Promise<MixinTableEntry> {
         const wrappedMixinTable = await wrappedMixinTablePromise;
-        const previousEntry = wrappedMixinTable[0].entry;
+        const previousEntry = wrappedMixinTable[0]!.entry;
 
         const type = getDisplayType(pluginDevice);
 
@@ -255,7 +255,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
                     passthrough: true,
                     allInterfaces,
                     interfaces: new Set<string>(),
-                    proxy: undefined as any,
+                    proxy: undefined!,
                 };
             }
 
@@ -269,7 +269,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
             const wrappedProxy = new Proxy(wrappedHandler, wrappedHandler);
 
             const implementer = await (mixinProvider as any)[QueryInterfaceSymbol](ScryptedInterface.MixinProvider);
-            const host = this.scrypted.getPluginHostForDeviceId(implementer);
+            const host = this.scrypted.getPluginHostForDeviceId(implementer)!;
             const propertyInterfaces = getPropertyInterfaces(host.api.descriptors || ScryptedInterfaceDescriptors);
             // todo: remove this and pass the setter directly.
             const deviceState = await host.remote.createDeviceState(this.id,
@@ -304,8 +304,8 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
                 passthrough: false,
                 allInterfaces,
                 interfaces: new Set<string>(),
-                error: e,
-                proxy: undefined as any,
+                error: e as Error,
+                proxy: undefined!,
             };
         }
     }
@@ -328,7 +328,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
         if (p === RefreshSymbol || p === QueryInterfaceSymbol)
             return new Proxy(() => p, this);
 
-        if (ScryptedInterfaceDescriptors[ScryptedInterface.ScryptedDevice].methods.includes(prop))
+        if (ScryptedInterfaceDescriptors[ScryptedInterface.ScryptedDevice]!.methods.includes(prop))
             return (this as any)[p].bind(this);
 
         return new Proxy(() => prop, this);
@@ -445,7 +445,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
         if (method === 'getReadmeMarkdown') {
             const pluginDevice = this.scrypted.findPluginDeviceById(this.id);
             if (pluginDevice && !pluginDevice.nativeId) {
-                const plugin = this.scrypted.plugins[pluginDevice.pluginId];
+                const plugin = this.scrypted.plugins[pluginDevice.pluginId]!;
                 if (!plugin.packageJson.scrypted.interfaces.includes(ScryptedInterface.Readme)) {
                     const readmePath = path.join(plugin.unzippedPath, 'README.md');
                     if (fs.existsSync(readmePath)) {
