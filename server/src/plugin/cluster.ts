@@ -6,7 +6,7 @@ export interface ClusterForkServiceInterface {
 }
 
 export class ClusterManagerImpl implements ClusterManager {
-    private clusterServicePromise: Promise<ClusterForkServiceInterface>;
+    private clusterServicePromise!: Promise<ClusterForkServiceInterface>;
     
     constructor(public clusterMode: undefined | 'client' | 'server', private api: PluginAPI, private clusterWorkerId: string) {
     }

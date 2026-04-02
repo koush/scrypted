@@ -9,7 +9,7 @@ import { removeIPv4EmbeddedIPv6 } from "../ip";
 
 class WrappedForkResult implements ClusterForkResultInterface {
     [RpcPeer.PROPERTY_PROXY_PROPERTIES] = {
-        clusterWorkerId: undefined as string,
+        clusterWorkerId: undefined as unknown as string,
     };
 
     constructor(public clusterWorkerId: string, public forkResult: Promise<ClusterForkResultInterface>) {
@@ -48,7 +48,7 @@ export class ClusterForkService {
                 return matches && (!options.clusterWorkerId || worker.id === options.clusterWorkerId);
             });
 
-        let worker: RunningClusterWorker;
+        let worker: RunningClusterWorker | undefined;
 
         // try to keep fork id affinity to single worker if present. this presents the opportunity for
         // IPC.
@@ -73,7 +73,7 @@ export class ClusterForkService {
                 // sort by number of forks, to distribute load.
                 .sort((a, b) => a.worker.forks.size * a.worker.weight - b.worker.forks.size * b.worker.weight);
 
-            worker = matchingWorkers[0]?.worker;
+            worker = matchingWorkers[0]?.worker!;
         }
 
         console.log('forking to worker', worker.id, options);
@@ -81,8 +81,8 @@ export class ClusterForkService {
         worker.fork ||= worker.peer.getParam('fork');
         const fork: ClusterForkParam = await worker.fork;
 
-        const forkResultPromise = fork(options.runtime, runtimeWorkerOptions, peerLiveness, getZip);
-        options.id ||= this.runtime.findPluginDevice(runtimeWorkerOptions.packageJson.name)?._id;
+        const forkResultPromise = fork(options.runtime!, runtimeWorkerOptions, peerLiveness, getZip);
+        options.id! ||= this.runtime.findPluginDevice(runtimeWorkerOptions.packageJson.name)!._id;
 
         // the server is responsible for killing the forked process when the requestor is killed.
         // minimizes lifecycle management duplication in python and node.
@@ -117,12 +117,12 @@ export class ClusterForkService {
     }
 
     async getParam(clusterWorkerId: string, key: string) {
-        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId)!;
         return clusterWorker.peer.getParam(key);
     }
 
     async getFsPromises(clusterWorkerId: string) {
-        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId)!;
         if (clusterWorker.mode === 'server') {
             return {
                 [RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN]: true,
@@ -133,21 +133,21 @@ export class ClusterForkService {
     }
 
     async getEnvControl(clusterWorkerId: string) {
-        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId)!;
         if (clusterWorker.mode === 'server')
             return this.runtime.envControl;
         return clusterWorker.peer.getParam('env-control');
     }
 
     async getServiceControl(clusterWorkerId: string) {
-        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId)!;
         if (clusterWorker.mode === 'server')
             return this.runtime.serviceControl;
         return clusterWorker.peer.getParam('service-control');
     }
 
     async getInfo(clusterWorkerId: string) {
-        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId);
+        const clusterWorker = this.runtime.clusterWorkers.get(clusterWorkerId)!;
         if (clusterWorker.mode === 'server')
             return this.runtime.info;
         return clusterWorker.peer.getParam('info');

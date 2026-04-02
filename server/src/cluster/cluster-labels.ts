@@ -45,13 +45,13 @@ export function getClusterWorkerWeight() {
     return parseFloat(process.env.SCRYPTED_CLUSTER_WEIGHT || '') || 1;
 }
 
-export function needsClusterForkWorker(options: ClusterForkOptions) {
+export function needsClusterForkWorker(options?: ClusterForkOptions) {
     return process.env.SCRYPTED_CLUSTER_ADDRESS
         && options
         && (!matchesClusterLabels(options, getClusterLabels()) || options.clusterWorkerId);
 }
 
-export function utilizesClusterForkWorker(options: ClusterForkOptions) {
+export function utilizesClusterForkWorker(options?: ClusterForkOptions) {
     return process.env.SCRYPTED_CLUSTER_ADDRESS
         && (options?.labels || options?.clusterWorkerId);
 }

@@ -152,7 +152,7 @@ function createClusterForkParam(mainFilename: string, clusterId: string, cluster
             SCRYPTED_FFMPEG_PATH: process.env.SCRYPTED_FFMPEG_PATH || await getScryptedFFmpegPath(),
         };
 
-        runtimeWorker = rt(mainFilename, runtimeWorkerOptions, undefined);
+        runtimeWorker = rt(mainFilename, runtimeWorkerOptions, undefined!);
         runtimeWorker.stdout.on('data', data => console.log(data.toString()));
         runtimeWorker.stderr.on('data', data => console.error(data.toString()));
 
@@ -224,8 +224,8 @@ export function startClusterClient(mainFilename: string, options?: {
     const labels = getClusterLabels();
     const weight = getClusterWorkerWeight();
 
-    const clusterSecret = process.env.SCRYPTED_CLUSTER_SECRET;
-    const clusterMode = getScryptedClusterMode();
+    const clusterSecret = process.env.SCRYPTED_CLUSTER_SECRET!;
+    const clusterMode = getScryptedClusterMode()!;
     const [, host, port] = clusterMode;
 
     const clusterPluginHosts = getBuiltinRuntimeHosts();
@@ -294,12 +294,12 @@ export function startClusterClient(mainFilename: string, options?: {
             try {
                 const connectForkWorker: ConnectForkWorker = await peer.getParam('connectForkWorker');
                 const auth: ClusterObject = {
-                    address: socket.localAddress,
-                    port: socket.localPort,
+                    address: socket.localAddress!,
+                    port: socket.localPort!,
                     id: process.env.SCRYPTED_CLUSTER_WORKER_NAME || os.hostname(),
-                    proxyId: undefined,
-                    sourceKey: undefined,
-                    sha256: undefined,
+                    proxyId: undefined!,
+                    sourceKey: undefined!,
+                    sha256: undefined!,
                 };
                 auth.sha256 = computeClusterObjectHash(auth, clusterSecret);
 
@@ -310,14 +310,14 @@ export function startClusterClient(mainFilename: string, options?: {
 
                 const { clusterId, clusterWorkerId } = await connectForkWorker(auth, properties);
                 const clusterPeerSetup = setupCluster(peer);
-                await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret, clusterWorkerId });
+                await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret: clusterSecret!, clusterWorkerId });
                 console.log('Cluster server authenticated.', localAddress, localPort, properties);
 
-                peer.params['fork'] = createClusterForkParam(mainFilename, clusterId, clusterSecret, clusterWorkerId, clusterPluginHosts);
+                peer.params['fork'] = createClusterForkParam(mainFilename, clusterId, clusterSecret!, clusterWorkerId!, clusterPluginHosts);
 
                 await peer.killed;
             }
-            catch (e) {
+            catch (e: any) {
                 peer.kill(e.message);
                 console.warn('Cluster client error:', localAddress, localPort, e);
             }
@@ -334,10 +334,10 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
     const serverWorker: RunningClusterWorker = {
         labels: getClusterLabels(),
         id: scryptedRuntime.serverClusterWorkerId,
-        peer: undefined,
+        peer: undefined!,
         fork: Promise.resolve(createClusterForkParam(mainFilename, scryptedRuntime.clusterId, scryptedRuntime.clusterSecret, scryptedRuntime.serverClusterWorkerId, scryptedRuntime.pluginHosts)),
         name: process.env.SCRYPTED_CLUSTER_WORKER_NAME || os.hostname(),
-        address: process.env.SCRYPTED_CLUSTER_ADDRESS,
+        address: process.env.SCRYPTED_CLUSTER_ADDRESS!,
         weight: getClusterWorkerWeight(),
         forks: new Set(),
         mode: 'server',
@@ -369,16 +369,17 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
                 // the remote address may be ipv6 prefixed so use a fuzzy match.
                 // eg ::ffff:192.168.2.124
                 if (!process.env.SCRYPTED_DISABLE_CLUSTER_SERVER_TRUST) {
-                    if (auth.port !== socket.remotePort || !socket.remoteAddress.endsWith(auth.address))
+                    if (auth.port !== socket.remotePort || !socket.remoteAddress!.endsWith(auth.address))
                         throw new Error('cluster object address mismatch');
                 }
+                const remoteAddress = socket.remoteAddress!;
                 const worker: RunningClusterWorker = {
                     ...properties,
                     id,
                     peer,
-                    fork: undefined,
-                    name: auth.id,
-                    address: socket.remoteAddress,
+                    fork: undefined!,
+                    name: auth.id!,
+                    address: remoteAddress,
                     forks: new Set(),
                     mode: 'client',
                 };
@@ -391,7 +392,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
                 });
                 console.log('Cluster client authenticated.', socket.remoteAddress, socket.remotePort, properties);
             }
-            catch (e) {
+            catch (e: any) {
                 console.error('Cluster client authentication failed.', socket.remoteAddress, socket.remotePort, e);
                 peer.kill(e);
                 socket.destroy();
