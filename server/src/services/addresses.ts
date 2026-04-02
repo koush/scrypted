@@ -34,7 +34,7 @@ export class AddressSettings {
         const ret: string[] = [];
         const networkInterfaces = os.networkInterfaces();
         const allAddresses = new Set(Object.values(networkInterfaces)
-            .flat().map(ni => ni.address));
+            .flat().filter((ni): ni is os.NetworkInterfaceInfo => ni !== undefined).map(ni => ni.address));
         for (const addressOrInterface of settings.value) {
             const nif = networkInterfaces[addressOrInterface];
             if (raw) {
