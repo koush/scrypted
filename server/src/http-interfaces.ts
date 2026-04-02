@@ -63,7 +63,7 @@ export class HttpResponseImpl implements HttpResponse {
 
         // prefer etag
         this.res.sendFile(filePath, {
-            root: null,
+            root: undefined,
             dotfiles: 'allow',
             cacheControl: false,
         });

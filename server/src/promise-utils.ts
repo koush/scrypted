@@ -1,5 +1,5 @@
 export interface RefreshPromise<T> {
-    promise: Promise<T>;
+    promise: Promise<T> | undefined;
     cacheDuration: number;
 }
 
@@ -66,12 +66,12 @@ export function timeoutFunction<T>(timeout: number, f: (isTimedOut: () => boolea
 }
 
 export function createPromiseDebouncer<T>() {
-    let current: Promise<T>;
+    let current: Promise<T> | undefined;
 
     return (func: () => Promise<T>): Promise<T> => {
         if (!current)
-            current = func().finally(() => current = undefined);
-        return current;
+            current = func().finally(() => current = undefined as unknown as Promise<T>);
+        return current!;
     }
 }
 
