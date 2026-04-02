@@ -7,6 +7,7 @@
         "alwaysStrict": true,
         "strictBindCallApply": true,
         "noFallthroughCasesInSwitch": true,
+        "noImplicitThis": true,
         "outDir": "./dist",
         "esModuleInterop": true,
         "moduleResolution": "NodeNext",
